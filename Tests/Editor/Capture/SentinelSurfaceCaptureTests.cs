@@ -55,9 +55,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
             Assert.IsFalse(string.IsNullOrWhiteSpace(directory));
             Directory.CreateDirectory(directory);
+            bool sentinelEnabled = ValidationPreferences.Enabled;
             bool previous = EditorGUIUtility.isProSkin;
             try
             {
+                ValidationPreferences.Enabled = true;
                 foreach (bool dark in new[] { true, false })
                 {
                     SelectActualEditorSkin(dark);
@@ -83,6 +85,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             }
             finally
             {
+                ValidationPreferences.Enabled = sentinelEnabled;
                 SelectActualEditorSkin(previous);
             }
             yield return null;

@@ -17,6 +17,11 @@ namespace UnityEditor.Overlays
         ) { }
     }
 
+    public interface ITransientOverlay
+    {
+        bool visible { get; }
+    }
+
     public abstract class Overlay
     {
         public abstract VisualElement CreatePanelContent();

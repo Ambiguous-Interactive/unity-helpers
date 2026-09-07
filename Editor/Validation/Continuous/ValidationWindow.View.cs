@@ -35,6 +35,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         {
             VisualElement root = rootVisualElement;
             root.Clear();
+            if (!ValidationPreferences.Enabled)
+                return;
             _toast = null;
             EditorTheme.Apply(root);
             StyleSheet sheet = EditorTheme.Load("ValidationWindow.uss");

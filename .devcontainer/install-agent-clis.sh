@@ -106,6 +106,24 @@ latest_version() {
     timeout "${VIEW_TIMEOUT_SECONDS}" npm view "${pkg}" version 2>/dev/null | tr -d '[:space:]' || true
 }
 
+# View keys are file names; npm scoped package names contain a slash.
+view_key() {
+    echo "${1//\//@}"
+}
+
+# Resolve every latest version concurrently: five serial `npm view` calls with a 20s timeout
+# each could stall a container start for ~100s against a slow or unreachable registry. The
+# installs stay serial because concurrent global installs into one prefix are not safe.
+resolve_latest_versions() {
+    VIEW_DIR="$(mktemp -d)"
+    export VIEW_DIR
+    for package in "${PACKAGES[@]}"; do
+        pkg="${package%%|*}"
+        latest_version "${pkg}" >"${VIEW_DIR}/$(view_key "${pkg}").txt" &
+    done
+    wait
+}
+
 # Returns 0 when the package is installed and its binary resolves.
 verify_package() {
     local bin="$1"
@@ -134,12 +152,15 @@ install_package() {
 
 failures=0
 
+resolve_latest_versions
+trap 'rm -rf "${VIEW_DIR}"' EXIT
+
 for package in "${PACKAGES[@]}"; do
     pkg="${package%%|*}"
     bin="${package##*|}"
 
     installed="$(installed_version "${pkg}")"
-    latest="$(latest_version "${pkg}")"
+    latest="$(tr -d '[:space:]' <"${VIEW_DIR}/$(view_key "${pkg}").txt" 2>/dev/null || true)"
 
     if [[ -z "${latest}" ]]; then
         if [[ -n "${installed}" ]] && verify_package "${bin}"; then

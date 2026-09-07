@@ -320,6 +320,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             Assert.AreEqual(random.MaximumUintCalls, random.UintCalls);
         }
 
+        [TestCase(0d, -double.MaxValue)]
+        [TestCase(double.PositiveInfinity, double.MaxValue)]
+        public void LegacyInfiniteDoubleStopsAfterNestedEntropyExhaustion(
+            double maximum,
+            double expected
+        )
+        {
+            ScriptedRandom random = new();
+            random.SetConstant(0u);
+            random.MaximumUintCalls = 2 * ((1 << 20) + 1);
+
+            Assert.AreEqual(expected, random.NextDouble(double.NegativeInfinity, maximum));
+            Assert.AreEqual(random.MaximumUintCalls, random.UintCalls);
+        }
+
         [Test]
         public void LegacyDoubleRetainsItsNestedBoundedFallback()
         {

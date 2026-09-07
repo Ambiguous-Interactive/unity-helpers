@@ -19,6 +19,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         internal static void OpenFinding(ValidationFinding finding, string action)
         {
+            if (!ValidationPreferences.Enabled)
+                return;
             Open();
             ValidationWindow window = GetWindow<ValidationWindow>();
             if (action == "fix")

@@ -381,6 +381,25 @@ skipped and fails on the selected severity threshold, execution failures and mis
 Changing configuration requires a new completed run before exporting. The optional build gate runs
 validation before a player build and stops the build on blocking findings or incomplete coverage.
 
+## Turning Sentinel off
+
+![Sentinel workstation preference](../../images/editor-tools/asset-validation/sentinel-preferences.png)
+
+| Enabled                                                                                              | Disabled                                                                                              |
+| ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| ![Sentinel editor surfaces enabled](../../images/editor-tools/asset-validation/sentinel-enabled.png) | ![Sentinel editor surfaces removed](../../images/editor-tools/asset-validation/sentinel-disabled.png) |
+
+Clear **Enable Sentinel** in **Edit > Preferences > Unity Helpers > Sentinel**, or set
+`ValidationPreferences.Enabled = false`, to disable Sentinel on this workstation. This cancels the
+active scan, drops queued re-checks, closes its window, hides toolbar, overlay and Inspector status,
+and stops automatic validation and the build hook. The Asset Validation menu opens this preference
+page while disabled, so the setting remains reachable. Re-enable it there to restore the integration.
+
+Existing installations remain enabled by default. Profiles, rules, results and the separate
+**Re-check on import** preference are preserved; re-enabling does not replay discarded work.
+Explicit `ValidationBatch.Run` and command-line validation remain available, so a workstation
+preference cannot silently bypass a requested CI validation gate.
+
 ## Automatic re-checks
 
 Enable **Re-check on import** in Issues, or set `ValidationAutoRun.Enabled`, to opt this workstation

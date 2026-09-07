@@ -100,6 +100,81 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         }
 
         [Test]
+        public void OneBoundInfiniteDoubleMatchesTheExplicitZeroLowerBound()
+        {
+            PcgRandom random = new(DeterministicGuid);
+            PcgRandom control = new(DeterministicGuid);
+            for (int draw = 0; draw < 16; ++draw)
+            {
+                double value = random.NextDouble(double.PositiveInfinity);
+                Assert.IsFalse(double.IsNaN(value));
+                Assert.IsFalse(double.IsInfinity(value));
+                Assert.AreEqual(control.NextDouble(0d, double.PositiveInfinity), value);
+                Assert.AreEqual(control.InternalState, random.InternalState);
+            }
+        }
+
+        [TestCase(0f, float.PositiveInfinity)]
+        [TestCase(float.MaxValue, float.PositiveInfinity)]
+        [TestCase(float.NegativeInfinity, -3.25f)]
+        [TestCase(float.NegativeInfinity, float.PositiveInfinity)]
+        [TestCase(float.NegativeInfinity, -float.MaxValue)]
+        public void InfiniteFloatRangesKeepBothBounds(float minimum, float maximum)
+        {
+            PcgRandom random = new(DeterministicGuid);
+            for (int draw = 0; draw < 32; ++draw)
+            {
+                float value = random.NextFloat(minimum, maximum);
+                Assert.IsTrue(minimum <= value && value < maximum);
+                if (maximum != -float.MaxValue)
+                {
+                    Assert.IsFalse(float.IsInfinity(value));
+                }
+            }
+        }
+
+        [Test]
+        public void OneBoundInfiniteFloatMatchesTheExplicitZeroLowerBound()
+        {
+            PcgRandom random = new(DeterministicGuid);
+            PcgRandom control = new(DeterministicGuid);
+            for (int draw = 0; draw < 16; ++draw)
+            {
+                float value = random.NextFloat(float.PositiveInfinity);
+                Assert.IsFalse(float.IsNaN(value));
+                Assert.IsFalse(float.IsInfinity(value));
+                Assert.AreEqual(control.NextFloat(0f, float.PositiveInfinity), value);
+                Assert.AreEqual(control.InternalState, random.InternalState);
+            }
+        }
+
+        [TestCase(1u, 0f)]
+        [TestCase(uint.MaxValue, float.MaxValue)]
+        public void InfiniteFloatSamplingUsesItsOwnRepresentableEndpoints(uint word, float expected)
+        {
+            DeterministicRandom random = new();
+            random.EnqueueUlong((ulong)word << 32);
+            Assert.AreEqual(expected, random.NextFloat(float.PositiveInfinity));
+            Assert.AreEqual(1, random.UintCalls);
+        }
+
+        [Test]
+        public void DoubleRangeWithNoFiniteCandidatePreservesItsOnlyInRangeValue()
+        {
+            PcgRandom random = new(DeterministicGuid);
+            RandomState before = random.InternalState;
+            Assert.AreEqual(
+                double.NegativeInfinity,
+                random.NextDouble(double.NegativeInfinity, -double.MaxValue)
+            );
+            Assert.IsFalse(
+                random.TryNextDouble(double.NegativeInfinity, -double.MaxValue, out double value)
+            );
+            Assert.AreEqual(default(double), value);
+            Assert.AreEqual(before, random.InternalState);
+        }
+
+        [Test]
         public void NextDoubleSupportsNegativeInfinityLowerBound()
         {
             PcgRandom random = new(DeterministicGuid);

@@ -9,8 +9,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     using UnityEngine.UIElements;
 
     [Overlay(typeof(SceneView), "Sentinel", true)]
-    internal sealed class ValidationSceneOverlay : Overlay
+    internal sealed class ValidationSceneOverlay : Overlay, ITransientOverlay
     {
+        /// <inheritdoc />
+        public bool visible => ValidationPreferences.Enabled;
+
         /// <inheritdoc />
         public override VisualElement CreatePanelContent() =>
             ValidationStatusSurfaces.CreatePanel();

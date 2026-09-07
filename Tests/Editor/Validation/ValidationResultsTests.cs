@@ -22,6 +22,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     [TestFixture]
     public sealed class ValidationResultsTests : CommonTestBase
     {
+        private bool _sentinelEnabled;
         private const string FirstGuid = "00000000000000000000000000000001";
         private const string SecondGuid = "00000000000000000000000000000002";
         private const string ThirdGuid = "00000000000000000000000000000003";
@@ -29,6 +30,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         [SetUp]
         public void ClearStore()
         {
+            _sentinelEnabled = ValidationPreferences.Enabled;
+            ValidationPreferences.Enabled = true;
             ValidationResults.Clear();
         }
 
@@ -36,6 +39,41 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         public void ClearStoreAfter()
         {
             ValidationResults.Clear();
+            ValidationPreferences.Enabled = _sentinelEnabled;
+        }
+
+        [Test]
+        public void DisablingSentinelRetainsResultsWithoutUpdatingStatusUntilEnabled()
+        {
+            bool enabled = ValidationPreferences.Enabled;
+            ValidationPreferences.Enabled = true;
+            ValidationResults.Replace(
+                FirstGuid,
+                new List<ValidationFinding> { Finding(FirstGuid, "retained") }
+            );
+            int notifications = 0;
+            void CountNotification() => notifications++;
+            ValidationStatusSurfaces.StatusChanged += CountNotification;
+            try
+            {
+                ValidationPreferences.Enabled = false;
+                Assert.AreEqual(1, notifications);
+                Assert.AreEqual(1, ValidationResults.CheckedAssetCount);
+                Assert.AreEqual(1, ValidationResults.Snapshot().Count);
+                ValidationResults.Replace(SecondGuid, null);
+                Assert.AreEqual(1, notifications);
+                Assert.AreEqual("Sentinel · disabled", ValidationStatusSurfaces.Badge);
+                ValidationPreferences.Enabled = true;
+                Assert.AreEqual(2, notifications);
+                Assert.AreEqual(2, ValidationResults.CheckedAssetCount);
+                Assert.AreEqual(1, ValidationResults.Snapshot().Count);
+                Assert.AreNotEqual("Sentinel · disabled", ValidationStatusSurfaces.Badge);
+            }
+            finally
+            {
+                ValidationStatusSurfaces.StatusChanged -= CountNotification;
+                ValidationPreferences.Enabled = enabled;
+            }
         }
 
         [Test]

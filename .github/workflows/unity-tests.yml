@@ -75,6 +75,7 @@ jobs:
     timeout-minutes: 2
     outputs:
       unity-versions: ${{ steps.resolve.outputs.unity-versions }}
+      release-unity-version: ${{ steps.release_version.outputs.version }}
       test-modes: ${{ steps.resolve.outputs.test-modes }}
       matrix-exclude: ${{ steps.resolve.outputs.matrix-exclude }}
       editmode-integration-assemblies: ${{ steps.assemblies.outputs.editmode_integrations }}
@@ -216,6 +217,14 @@ jobs:
       # simplicity. If a perf-doc auto-update PR flow is added later, repoint a
       # docs-only gate at docs/performance/ rather than DxMessaging's
       # docs/architecture/performance.md path.
+      - name: Resolve release editor version
+        id: release_version
+        shell: pwsh
+        run: |
+          $version = (Get-Content .github/unity-versions.json -Raw | ConvertFrom-Json).release
+          if ($version -notmatch '^\d+\.\d+\.\d+f\d+$') { throw 'Invalid release Unity version.' }
+          "version=$version" >> $env:GITHUB_OUTPUT
+
       - name: Resolve dispatch overrides
         id: resolve
         env:
@@ -1319,7 +1328,7 @@ jobs:
         needs.runner-preflight.outputs.org-credentials == 'true' &&
         needs.matrix-config.outputs.superseded != 'true'
       }}
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Windows, RAM-64GB]
     timeout-minutes: 360
     steps:
       - name: Require current PR head before setup
@@ -1330,8 +1339,28 @@ jobs:
           pull-request-number: ${{ github.event.pull_request.number }}
           expected-head-sha: ${{ github.event.pull_request.head.sha }}
 
+      - name: Require manually installed Unity editor
+        id: ensure_unity_editor
+        timeout-minutes: 10
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/ensure-unity-editor@64bac446903115134dca8235410b332bc5a83547 # v1.14.0
+        with:
+          unity-version: ${{ needs.matrix-config.outputs.release-unity-version }}
+          install-root: ${{ runner.tool_cache }}\u6-v3
+          provisioning-profile: EditorOnly
+          diagnostics-path: unity-editor-check.json
+          ci-managed-only: true
+          require-healthy-existing: true
+
+      - name: Enable Git long paths
+        shell: powershell
+        env:
+          GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
+        run: git config --global core.longpaths true
+
       - name: Checkout
         id: checkout
+        env:
+          GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 1 # Export inputs come from this source tree, without history or tags.
@@ -1341,6 +1370,14 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: "22.18.0"
+
+      - name: Stage release package payload
+        shell: pwsh
+        env:
+          UNITY_VERSION: ${{ needs.matrix-config.outputs.release-unity-version }}
+        run: |
+          node scripts/unity/stage-unitypackage.js --project-dir ".artifacts/unity/unitypackage-smoke-project"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Validate Unity license secrets
         uses: ./.github/actions/validate-unity-license
@@ -1376,47 +1413,60 @@ jobs:
 
       - name: Export Unity package smoke artifact
         id: export_unitypackage
+        if: ${{ !cancelled() && steps.unity_lock.outputs.acquired == 'true' }}
         timeout-minutes: 155
+        shell: pwsh
         env:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
+          UNITY_VERSION: ${{ needs.matrix-config.outputs.release-unity-version }}
+          UH_CENTRAL_LICENSE_RETURN: "true"
         run: |
-          set -euo pipefail
-          UNITY_VERSION="$(jq -r '.release' .github/unity-versions.json)"
-          export UNITY_VERSION
-          package_name="$(jq -r '.name // empty' package.json)"
-          package_version="$(jq -r '.version // empty' package.json)"
-          output=".artifacts/unitypackage-smoke/${package_name}-${package_version}.unitypackage"
-          bash scripts/unity/export-unitypackage.sh \
-            --project-dir ".artifacts/unity/unitypackage-smoke-project" \
-            --output "${output}"
+          $package = Get-Content package.json -Raw | ConvertFrom-Json
+          ./scripts/unity/run-ci-tests.ps1 `
+            -UnityVersion $env:UNITY_VERSION `
+            -TestMode 'export' `
+            -ProjectPath '.artifacts/unity/unitypackage-smoke-project' `
+            -ArtifactsPath '.artifacts/unity/unitypackage-smoke-project/unitypackage-output' `
+            -ExportPackagePath ".artifacts/unitypackage-smoke/$($package.name)-$($package.version).unitypackage"
 
       - name: Return Unity license
         id: return_unity_license
-        if: ${{ always() && steps.unity_lock.outcome == 'success' }}
+        if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
         timeout-minutes: 5
-        continue-on-error: true
-        uses: ./.github/actions/return-unity-license
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/return-unity-license@64bac446903115134dca8235410b332bc5a83547 # v1.14.0
         with:
-          prior-return-log-path: .artifacts/unity/unitypackage-smoke-project/unitypackage-output/unity.log
-          prior-command-succeeded: ${{ steps.export_unitypackage.outcome == 'success' }}
-        env:
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          unity-version: ${{ needs.matrix-config.outputs.release-unity-version }}
+          tool-cache: ${{ runner.tool_cache }}
+          unity-email: ${{ secrets.UNITY_EMAIL }}
+          unity-password: ${{ secrets.UNITY_PASSWORD }}
+          evidence-suffix: unitypackage-smoke
+
+      - name: Classify Unity cleanup evidence
+        id: cleanup_classification
+        if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@64bac446903115134dca8235410b332bc5a83547 # v1.14.0
+        with:
+          return-log-path: ${{ steps.return_unity_license.outputs.return-log-path }}
+          return-command-completed: ${{ steps.return_unity_license.outputs.return-command-completed }}
+          return-exit-code: ${{ steps.return_unity_license.outputs.return-exit-code }}
+          evidence-capture-complete: ${{ steps.return_unity_license.outputs.evidence-capture-complete }}
+          return-log-digest: ${{ steps.return_unity_license.outputs.return-log-digest }}
 
       - name: Release organization Unity lock
         id: release_unity_lock
-        if: ${{ always() && (steps.unity_lock.outcome == 'success' || steps.unity_lock.outcome == 'failure' || steps.unity_lock.outcome == 'cancelled') }}
+        if: always()
         timeout-minutes: 5
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@64bac446903115134dca8235410b332bc5a83547 # v1.14.0
         with:
           lock-name: wallstop-organization-builds
           holder-id-suffix: unitypackage-smoke-${{ github.run_id }}
           runner-id: ${{ runner.name }}
-          resource-cleanup-status: ${{ steps.return_unity_license.outputs.resource-cleanup-status }}
-          resource-health: ${{ steps.return_unity_license.outputs.resource-health }}
-          resource-reason: ${{ steps.return_unity_license.outputs.resource-reason }}
+          resource-cleanup-status: ${{ steps.cleanup_classification.outputs.resource-cleanup-status }}
+          resource-health: ${{ steps.cleanup_classification.outputs.resource-health }}
+          resource-reason: ${{ steps.cleanup_classification.outputs.resource-reason }}
         env:
           BUILD_LOCK_APP_ID: ${{ secrets.BUILD_LOCK_APP_ID }}
           BUILD_LOCK_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_APP_PRIVATE_KEY }}
@@ -1426,10 +1476,10 @@ jobs:
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-confirmed-unity-cleanup@64bac446903115134dca8235410b332bc5a83547 # v1.14.0
         with:
           acquired: ${{ steps.unity_lock.outputs.acquired }}
-          classification-complete: ${{ steps.return_unity_license.outputs.classification-complete }}
-          cleanup-status: ${{ steps.return_unity_license.outputs.resource-cleanup-status }}
-          cleanup-health: ${{ steps.return_unity_license.outputs.resource-health }}
-          cleanup-reason: ${{ steps.return_unity_license.outputs.resource-reason }}
+          classification-complete: ${{ steps.cleanup_classification.outputs.classification-complete }}
+          cleanup-status: ${{ steps.cleanup_classification.outputs.resource-cleanup-status }}
+          cleanup-health: ${{ steps.cleanup_classification.outputs.resource-health }}
+          cleanup-reason: ${{ steps.cleanup_classification.outputs.resource-reason }}
           release-outcome: ${{ steps.release_unity_lock.outcome }}
           cleanup-result: ${{ steps.release_unity_lock.outputs.cleanup-result }}
           released: ${{ steps.release_unity_lock.outputs.released }}
@@ -1447,17 +1497,7 @@ jobs:
           results-dir: .artifacts/unity/unitypackage-smoke-project/unitypackage-output
           label: Unity package export smoke
 
-      # LEAK GUARD: Unity writes its license identity into unity.log and
-      # configure.log while it activates. GitHub masks a registered secret in
-      # the rendered job log, but it never rewrites the bytes of an uploaded
-      # artifact, so the upload below would hand the serial to anyone who can
-      # download it. Scrub the tree after the last Unity invocation and before
-      # the first upload that can carry a log.
-      # Scope is exactly what this job uploads. A wider scope reaches files the
-      # job never publishes, and the redactor fails closed on a file it cannot
-      # scrub, so it fails the job over a file that was never at risk. Run
-      # 33597641377 went red that way, on the root-owned Docker license cache
-      # that used to sit under this tree; it lives under RUNNER_TEMP now (#690).
+      # Upload only scrubbed package and compiler diagnostics.
       - name: Redact credentials from Unity artifacts
         id: redact_unity_artifacts
         if: ${{ steps.checkout.outcome == 'success' && always() }}
@@ -1486,20 +1526,6 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
           overwrite: true
-
-      - name: Delete private Unity cleanup evidence
-        if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
-        shell: pwsh
-        env:
-          RETURN_LOG_PATH: ${{ steps.return_unity_license.outputs.return-log-path }}
-          SUPPLEMENTAL_EVIDENCE_PATHS: ${{ steps.return_unity_license.outputs.supplemental-evidence-paths }}
-        run: |
-          $evidencePaths = @($env:RETURN_LOG_PATH) + @($env:SUPPLEMENTAL_EVIDENCE_PATHS -split "`r?`n")
-          foreach ($evidencePath in @($evidencePaths | Sort-Object -Unique)) {
-            if (-not [string]::IsNullOrWhiteSpace($evidencePath) -and (Test-Path -LiteralPath $evidencePath -PathType Leaf)) {
-              Remove-Item -LiteralPath $evidencePath -Force
-            }
-          }
 
   unity-ci-success:
     name: Unity CI Success

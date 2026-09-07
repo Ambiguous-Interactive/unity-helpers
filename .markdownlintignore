@@ -15,3 +15,6 @@ GOAL.md.meta
 # MkDocs Material files with tabbed content syntax (===) that markdownlint doesn't support
 docs/index.md
 
+# Machine-local handoff notes (gitignored per-developer documentation)
+scripts/mcp/PIPELINE_SETUP_HANDOFF.md
+

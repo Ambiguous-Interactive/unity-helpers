@@ -7,6 +7,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Random
     using System.Collections.Generic;
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Core.Random;
+    using WallstopStudios.UnityHelpers.Core.Serialization;
+    using WallstopStudios.UnityHelpers.Tests.Core;
 
     /// <summary>
     /// WDoomRandom deliberately has a period of 1024, so it is the one generator that does not run
@@ -107,6 +109,42 @@ namespace WallstopStudios.UnityHelpers.Tests.Random
 
             copy.NextUint();
             Assert.That(copy.InternalState, Is.Not.EqualTo(original.InternalState));
+        }
+
+        [TestCase(0, false)]
+        [TestCase(1023, false)]
+        [TestCase(0, true)]
+        [TestCase(1023, true)]
+        [SkipUnderIL2CPP]
+        public void JsonRestoresTheIndexAndPendingMixedDraws(int seedIndex, bool primeCaches)
+        {
+            WDoomRandom original = new(seedIndex);
+            if (primeCaches)
+            {
+                original.NextBool();
+                original.NextByte();
+                original.NextGaussian();
+                RandomState primedState = original.InternalState;
+                Assert.That(primedState.BitCount, Is.EqualTo(31));
+                Assert.That(primedState.ByteCount, Is.EqualTo(3));
+                Assert.That(primedState.Gaussian.HasValue, Is.True);
+            }
+
+            RandomState savedState = original.InternalState;
+            string json = Serializer.JsonStringify(original);
+            WDoomRandom restored = Serializer.JsonDeserialize<WDoomRandom>(json);
+            Assert.That(restored, Is.Not.Null);
+            Assert.That(restored.InternalState, Is.EqualTo(savedState));
+
+            for (int draw = 0; draw < 40; ++draw)
+            {
+                Assert.That(restored.NextGaussian(), Is.EqualTo(original.NextGaussian()));
+                Assert.That(restored.NextBool(), Is.EqualTo(original.NextBool()));
+                Assert.That(restored.NextByte(), Is.EqualTo(original.NextByte()));
+                Assert.That(restored.NextUint(), Is.EqualTo(original.NextUint()));
+                Assert.That(restored.NextUlong(), Is.EqualTo(original.NextUlong()));
+                Assert.That(restored.InternalState, Is.EqualTo(original.InternalState));
+            }
         }
 
         [Test]

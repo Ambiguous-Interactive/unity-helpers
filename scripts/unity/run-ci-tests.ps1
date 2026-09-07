@@ -6,11 +6,12 @@ param(
     [string]$UnityVersion,
 
     [Parameter(Mandatory = $true)]
-    [ValidateSet('editmode', 'playmode', 'standalone')]
+    [ValidateSet('editmode', 'playmode', 'standalone', 'export')]
     [string]$TestMode,
 
-    [Parameter(Mandatory = $true)]
     [string]$AssemblyNames,
+
+    [string]$ExportPackagePath,
 
     [Parameter(Mandatory = $true)]
     [string]$ArtifactsPath,
@@ -3679,6 +3680,89 @@ function Invoke-UnityConfigurePass {
     Write-AnalyzerSetupDiagnostics -Project $ProjectPath -LogPath $LogPath -Label $Label
 }
 
+function Assert-UnityRunMode {
+    param(
+        [string]$Mode,
+        [string]$Assemblies,
+        [string]$Project,
+        [string]$ExportPath,
+        [string]$Version,
+        [bool]$HasTestOptions
+    )
+
+    if ($Mode -ne 'export') {
+        if ([string]::IsNullOrWhiteSpace($Assemblies)) {
+            throw '-AssemblyNames is required for Unity test modes.'
+        }
+        if (-not [string]::IsNullOrWhiteSpace($ExportPath)) {
+            throw '-ExportPackagePath requires -TestMode export.'
+        }
+        return
+    }
+    if ([string]::IsNullOrWhiteSpace($Project) -or [string]::IsNullOrWhiteSpace($ExportPath)) {
+        throw 'Export requires an already staged -ProjectPath and -ExportPackagePath.'
+    }
+    if ($HasTestOptions -or -not [string]::IsNullOrWhiteSpace($Assemblies)) {
+        throw 'Export cannot use test selection, project generation, or test project modifiers.'
+    }
+    if ([IO.Path]::GetExtension($ExportPath) -ine '.unitypackage') {
+        throw '-ExportPackagePath must name a .unitypackage file.'
+    }
+    foreach ($required in @('Assets/Editor/UnityHelpersPackageExporter.cs',
+            'Assets/WallstopStudios/UnityHelpers/package.json', 'Packages/manifest.json',
+            'ProjectSettings/ProjectVersion.txt')) {
+        if (-not (Test-Path -LiteralPath (Join-Path $Project $required) -PathType Leaf)) {
+            throw "Export project is not staged: missing $required. Run node scripts/unity/stage-unitypackage.js first."
+        }
+    }
+    $projectVersion = Get-Content -LiteralPath (Join-Path $Project 'ProjectSettings/ProjectVersion.txt') -Raw
+    if ($projectVersion -notmatch ('(?m)^m_EditorVersion: *' + [regex]::Escape($Version) + '\s*$')) {
+        throw "Staged export project must target Unity $Version."
+    }
+    $manifest = Get-Content -LiteralPath (Join-Path $Project 'Packages/manifest.json') -Raw | ConvertFrom-Json
+    if ($manifest.dependencies.PSObject.Properties.Name -contains 'com.wallstop-studios.unity-helpers') {
+        throw 'Export must compile the staged Assets payload without a UPM package copy.'
+    }
+}
+
+function Invoke-UnityPackageExport {
+    param(
+        [Parameter(Mandatory = $true)][string]$EditorPath,
+        [Parameter(Mandatory = $true)][string]$Project,
+        [Parameter(Mandatory = $true)][string]$OutputPath,
+        [Parameter(Mandatory = $true)][string]$LogPath,
+        [string[]]$ExtraArguments = @()
+    )
+
+    $OutputPath = [IO.Path]::GetFullPath($OutputPath)
+    $hashPath = "$OutputPath.sha256"
+    foreach ($stale in @($OutputPath, $hashPath)) {
+        if (Test-Path -LiteralPath $stale) { Remove-Item -LiteralPath $stale -Force }
+    }
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $OutputPath) | Out-Null
+    $exportArguments = @('-batchmode', '-nographics', '-quit', '-releaseCodeOptimization',
+        '-projectPath', $Project, '-executeMethod', 'UnityHelpersPackageExporter.Export',
+        '-exportOutput', $OutputPath, '-logFile', '-') + $ExtraArguments
+    $exportExit = Invoke-UnityEditor -EditorPath $EditorPath -Arguments $exportArguments `
+        -Label 'Export Unity package' -LogPath $LogPath -TimeoutSeconds 7200 -StallSeconds 900
+    if ($exportExit -ne 0) {
+        throw "Unity package export failed with exit code $exportExit. See $LogPath."
+    }
+    if (-not (Test-Path -LiteralPath $OutputPath -PathType Leaf) -or
+        (Get-Item -LiteralPath $OutputPath).Length -le 0) {
+        throw "Unity package export did not produce a fresh non-empty file: $OutputPath. See $LogPath."
+    }
+    $hash = (Get-FileHash -LiteralPath $OutputPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    Set-Content -LiteralPath $hashPath -Value "$hash  $([IO.Path]::GetFileName($OutputPath))" -Encoding ascii
+    Write-Host "Unity package exported: $OutputPath (SHA256 $hash)"
+}
+
+Assert-UnityRunMode -Mode $TestMode -Assemblies $AssemblyNames -Project $ProjectPath `
+    -ExportPath $ExportPackagePath -Version $UnityVersion `
+    -HasTestOptions:($GenerateOnly -or $IncludeComparisons -or $IncludeIntegrations -or
+        $AdditionalScriptingDefines.Count -gt 0 -or -not [string]::IsNullOrWhiteSpace($TestFilter) -or
+        -not [string]::IsNullOrWhiteSpace($TestCategory))
+
 $RepoRoot = Resolve-FullPath -Path $RepoRoot
 Assert-RepoRoot -Path $RepoRoot
 $ArtifactsPath = Resolve-FullPath -Path $ArtifactsPath
@@ -3772,10 +3856,15 @@ $AdditionalScriptingDefinesJoined = ($AdditionalScriptingDefinesList -join ';')
 # not actually surviving between jobs, which is the whole point of this path.
 $LibraryWarmth = if (Test-Path -LiteralPath (Join-Path $ProjectPath 'Library') -PathType Container) { 'warm (reused)' } else { 'cold (first run on this runner)' }
 
-$ProjectPath = Initialize-EphemeralProject -Root $RepoRoot -Version $UnityVersion -Mode $TestMode -Path $ProjectPath -IncludeComparisons:$IncludeComparisons -IncludeIntegrations:$IncludeIntegrations -Backend $StandaloneScriptingBackend -Il2CppCompilerConfiguration $Il2CppCompilerConfiguration -ManagedStrippingLevel $ManagedStrippingLevel -DevelopmentBuild:(-not $UseReleasePlayerBuild) -RepoRoot $RepoRoot
-$LibraryPath = Join-Path $ProjectPath 'Library'
-New-Item -ItemType Directory -Force -Path $LibraryPath | Out-Null
-Clear-StaleUnityCompilationCache -Project $ProjectPath -RepoRoot $RepoRoot
+if ($TestMode -ne 'export') {
+    $ProjectPath = Initialize-EphemeralProject -Root $RepoRoot -Version $UnityVersion -Mode $TestMode -Path $ProjectPath -IncludeComparisons:$IncludeComparisons -IncludeIntegrations:$IncludeIntegrations -Backend $StandaloneScriptingBackend -Il2CppCompilerConfiguration $Il2CppCompilerConfiguration -ManagedStrippingLevel $ManagedStrippingLevel -DevelopmentBuild:(-not $UseReleasePlayerBuild) -RepoRoot $RepoRoot
+    $LibraryPath = Join-Path $ProjectPath 'Library'
+    New-Item -ItemType Directory -Force -Path $LibraryPath | Out-Null
+    Clear-StaleUnityCompilationCache -Project $ProjectPath -RepoRoot $RepoRoot
+} else {
+    $LibraryPath = Join-Path $ProjectPath 'Library'
+}
+
 
 Write-Host "::group::Ephemeral Unity project"
 Write-Host "RepoRoot: $RepoRoot"
@@ -3955,6 +4044,12 @@ try {
     # is assumed already licensed).
     if ($hasLicenseCreds) {
         Invoke-UnityLicenseActivate -EditorPath $UnityEditorPath -Serial $env:UNITY_SERIAL -Email $env:UNITY_EMAIL -Password $env:UNITY_PASSWORD -LogPath $activateLogPath
+    }
+
+    if ($TestMode -eq 'export') {
+        Invoke-UnityPackageExport -EditorPath $UnityEditorPath -Project $ProjectPath `
+            -OutputPath $ExportPackagePath -LogPath $logPath -ExtraArguments $acceleratorArgs
+        return
     }
 
     if ($TestMode -eq 'standalone') {

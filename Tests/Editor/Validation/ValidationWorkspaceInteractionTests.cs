@@ -39,12 +39,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 : null;
             Undo.IncrementCurrentGroup();
             int undoGroup = Undo.GetCurrentGroup();
+            bool sentinelEnabled = ValidationPreferences.Enabled;
             ValidationRun blocker = null;
             PanelSettings panel = null;
             GameObject panelObject = null;
             ValidationWindow window = null;
             try
             {
+                ValidationPreferences.Enabled = true;
                 settings.selectedProfile = "Probe A";
                 settings.profiles = new List<ValidationWorkspaceSettings.Profile>
                 {
@@ -173,6 +175,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             }
             finally
             {
+                ValidationPreferences.Enabled = sentinelEnabled;
                 try
                 {
                     if (blocker != null && ReferenceEquals(ValidationScheduler.Active, blocker))

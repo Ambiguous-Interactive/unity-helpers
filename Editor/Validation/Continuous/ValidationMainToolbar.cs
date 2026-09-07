@@ -17,7 +17,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             return new MainToolbarButton(
                 new MainToolbarContent(ValidationStatusSurfaces.Badge, "Open validation issues"),
                 ValidationWindow.Open
-            );
+            )
+            {
+                displayed = ValidationPreferences.Enabled,
+            };
         }
     }
 #endif

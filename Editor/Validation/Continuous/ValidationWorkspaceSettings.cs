@@ -25,12 +25,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         private void OnEnable()
         {
             Normalize();
-            Undo.undoRedoPerformed += SaveAfterUndo;
+            ValidationPreferences.Changed += UpdateUndoSubscription;
+            UpdateUndoSubscription();
         }
 
         private void OnDisable()
         {
+            ValidationPreferences.Changed -= UpdateUndoSubscription;
             Undo.undoRedoPerformed -= SaveAfterUndo;
+        }
+
+        private void UpdateUndoSubscription()
+        {
+            Undo.undoRedoPerformed -= SaveAfterUndo;
+            if (ValidationPreferences.Enabled)
+                Undo.undoRedoPerformed += SaveAfterUndo;
         }
 
         internal static readonly string[] Categories =

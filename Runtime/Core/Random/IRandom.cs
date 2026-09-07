@@ -187,6 +187,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// <param name="max">The exclusive upper bound.</param>
         /// <returns>A number within the range [0, max).</returns>
         /// <exception cref="ArgumentException">The range is empty or a bound is NaN.</exception>
+        /// <remarks>A positive-infinity bound samples finite float bit patterns.</remarks>
         float NextFloat(float max);
 
         /// <summary>
@@ -196,6 +197,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// <param name="max">The exclusive upper bound.</param>
         /// <returns>A number within the range [min, max).</returns>
         /// <exception cref="ArgumentException">The range is empty or a bound is NaN.</exception>
+        /// <remarks>
+        /// Infinite bounds sample finite float bit patterns, unless negative infinity is the only representable value in the range.
+        /// </remarks>
         float NextFloat(float min, float max);
 
         /// <summary>
@@ -210,6 +214,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// <param name="max">The exclusive upper bound.</param>
         /// <returns>A number within the range [0, max).</returns>
         /// <exception cref="ArgumentException">The range is empty or a bound is NaN.</exception>
+        /// <remarks>A positive-infinity bound samples finite double bit patterns.</remarks>
         double NextDouble(double max);
 
         /// <summary>
@@ -219,6 +224,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// <param name="max">The exclusive upper bound.</param>
         /// <returns>A number within the range [min, max).</returns>
         /// <exception cref="ArgumentException">The range is empty or a bound is NaN.</exception>
+        /// <remarks>When negative infinity is the only representable value in the range, returns it without drawing.</remarks>
         double NextDouble(double min, double max);
 
         /// <summary>

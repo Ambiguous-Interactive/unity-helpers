@@ -198,7 +198,7 @@ oracle cases that require unsupported reflection remain separately marked on IL2
 and continuation checks establish compatibility, not statistical quality, throughput or allocation
 performance; the paired player campaign and WebGL execution remain separate acceptance items.
 WDoomRandom intentionally skips the inherited statistical fixture; its snapshot, copy and protobuf
-paths have dedicated coverage, but its JSON continuation still needs an explicit fixture.
+and JSON paths have dedicated coverage, including mixed draws with empty and primed caches.
 
 ## Refreshing these numbers
 

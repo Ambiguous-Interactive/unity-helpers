@@ -74,7 +74,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// </param>
         /// <param name="onComplete">Invoked once, on the main thread, when the run ends.</param>
         /// <returns>
-        /// <c>false</c> when the run was <c>null</c>, already complete, or another run is active.
+        /// <c>false</c> when the run was <c>null</c>, already complete, Sentinel is disabled, or another run is active.
         /// </returns>
         public static bool TryStart(
             ValidationRun run,
@@ -82,7 +82,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             Action<ValidationRun> onComplete = null
         )
         {
-            if (run == null || run.IsComplete || IsRunning)
+            if (!ValidationPreferences.Enabled || run == null || run.IsComplete || IsRunning)
             {
                 return false;
             }
@@ -111,7 +111,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             Finish(run);
         }
 
-        private static void Tick()
+        internal static void Tick()
         {
             ValidationRun run = _active;
             if (run == null)
@@ -143,6 +143,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         private static void Finish(ValidationRun run)
         {
+            if (!ReferenceEquals(run, _active))
+                return;
             EditorApplication.update -= Tick;
             Action<ValidationRun> onComplete = _onComplete;
             _active = null;

@@ -11,7 +11,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     {
         private static string[] OnWillSaveAssets(string[] paths)
         {
-            if (!ValidationAutoRun.Enabled || paths == null)
+            if (!ValidationAutoRun.IsActive || paths == null)
                 return paths;
             List<string> guids = new List<string>();
             foreach (string path in paths)

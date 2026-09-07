@@ -78,15 +78,23 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 EditorPrefs.SetBool(EnabledPreferenceKey, value);
                 if (!value)
                 {
-                    Pending.Clear();
-                    TriggerSources.Clear();
-                    _pruneDeleted = false;
+                    ClearPending();
                 }
             }
         }
 
         /// <summary>How many assets are queued for a re-check.</summary>
         public static int PendingCount => Pending.Count;
+
+        internal static bool IsActive => _enabled && ValidationPreferences.Enabled;
+
+        internal static void ClearPending()
+        {
+            EditorApplication.delayCall -= RetryAction;
+            Pending.Clear();
+            TriggerSources.Clear();
+            _pruneDeleted = false;
+        }
 
         /// <summary>
         /// Queues assets for a re-check and asks for one drain.
@@ -104,7 +112,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             int trigger = -1
         )
         {
-            if (!_enabled)
+            if (!IsActive)
             {
                 return;
             }
@@ -136,15 +144,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         private static void Retry()
         {
-            AssetPostprocessorDeferral.Schedule(DrainAction);
+            if (IsActive)
+                AssetPostprocessorDeferral.Schedule(DrainAction);
         }
 
         private static void Drain()
         {
-            if (!_enabled)
+            if (!IsActive)
             {
-                Pending.Clear();
-                _pruneDeleted = false;
+                ClearPending();
                 return;
             }
 
@@ -162,7 +170,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             // Keep queued work until the active scan releases the scheduler.
             if (ValidationScheduler.IsRunning)
             {
-                EditorApplication.delayCall += RetryAction;
+                ScheduleRetry();
                 return;
             }
 
@@ -221,11 +229,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 return;
             }
 
+            ScheduleRetry();
+        }
+
+        private static void ScheduleRetry()
+        {
+            EditorApplication.delayCall -= RetryAction;
             EditorApplication.delayCall += RetryAction;
         }
 
         private static void CompleteRun(ValidationRun run)
         {
+            if (!ValidationPreferences.Enabled)
+                return;
             if (ValidationResults.TryMergeScopedRun(run))
             {
                 return;

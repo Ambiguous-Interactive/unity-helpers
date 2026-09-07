@@ -16,6 +16,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         public ValidationToolbarButton()
         {
+            style.display = ValidationPreferences.Enabled ? DisplayStyle.Flex : DisplayStyle.None;
             icon = EditorGUIUtility.IconContent("console.warnicon.sml").image as Texture2D;
             clicked += ValidationWindow.Open;
             RegisterCallback<AttachToPanelEvent>(_ =>
@@ -30,6 +31,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         private void Refresh()
         {
+            style.display = ValidationPreferences.Enabled ? DisplayStyle.Flex : DisplayStyle.None;
             text = ValidationStatusSurfaces.Badge;
             tooltip = text + " · Open validation issues";
         }

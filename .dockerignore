@@ -1,0 +1,80 @@
+# This file MUST live at the build-context root (repo root) to take effect. Both the local
+# Dev Containers build (devcontainer.json "context": "..") and the CI publish workflow
+# (build-publish-devcontainer.yml, context: .) resolve <context-root>/.dockerignore; a file
+# placed beside .devcontainer/Dockerfile is never read, because Dev Containers builds with a
+# generated Dockerfile in a temp directory. Only .devcontainer/requirements-tools.txt is
+# COPYed into the image, so every exclusion below shrinks context upload time and keeps
+# machine-local files out of the daemon.
+
+# Git
+.git
+.gitignore
+.gitattributes
+.githooks
+
+# IDE and editor
+.idea
+.vs
+.vscode
+*.suo
+*.user
+
+# Build artifacts
+[Bb]in/
+[Oo]bj/
+[Ll]ibrary/
+[Tt]emp/
+[Bb]uild/
+[Bb]uilds/
+artifacts/
+
+# Unity specific
+Library/
+Temp/
+Logs/
+UserSettings/
+*.pidb
+*.unityproj
+*.sln.docstates
+*.csproj.user
+
+# Node modules
+node_modules/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Test results
+TestResults/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Samples (can be large)
+Samples~/
+
+# Machine-local agent state and credentials: nothing outside .devcontainer/ is COPYed into
+# the image, so sending these to the daemon only costs context-upload time and leaks
+# per-developer endpoints and tokens into the build context.
+.claude
+.tmp
+.venv
+.pytest_cache
+Generator~
+progress/
+site/
+.artifacts
+perf-results
+failed-tests-*.txt
+.env.local
+.mcp.json
+.cursor
+.codex
+.nanocoder
+.copilot
+opencode.json
+agents.config.json

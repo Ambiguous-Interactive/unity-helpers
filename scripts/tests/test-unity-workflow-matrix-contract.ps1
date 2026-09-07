@@ -596,8 +596,13 @@ function Test-UnityLockCleanupIsGated {
             )) {
             $failures += "$($job.Key): return-unity-license must classify the licensed command's log and successful outcome"
         }
+        $expectedVersion = switch ($job.Key) {
+            'unitypackage-smoke' { '${{ needs.matrix-config.outputs.release-unity-version }}' }
+            'unitypackage' { '${{ needs.runner-preflight.outputs.unity-version }}' }
+            default { '${{ matrix.unity-version }}' }
+        }
         if ($usesCentralCleanup -and (
-                $returnStep.Value -notmatch '(?m)^\s+unity-version:\s+\$\{\{ matrix\.unity-version \}\}\s*$' -or
+                -not $returnStep.Value.Contains("unity-version: $expectedVersion") -or
                 $returnStep.Value -notmatch '(?m)^\s+tool-cache:\s+\$\{\{ runner\.tool_cache \}\}\s*$' -or
                 $jobText -notmatch ('(?ms)- name: Classify Unity cleanup evidence\s*\r?\n\s+id:\s+cleanup_classification\s*\r?\n\s+' + [regex]::Escape($centralCleanupGate) + '.*?uses:\s+' + [regex]::Escape($centralClassifierUses) + $buildLockUsesLineSuffix + '.*?return-log-digest:\s+\$\{\{ steps\.return_unity_license\.outputs\.return-log-digest \}\}')
             )) {
@@ -3165,13 +3170,14 @@ foreach ($unityWorkflowFile in $unityWorkflowFilesWithProjects) {
     }
 
     $unityWorkflowText = Get-Content -LiteralPath $unityWorkflowPath -Raw
-    $runCiTestsInvocations = @([regex]::Matches($unityWorkflowText, [regex]::Escape('./scripts/unity/run-ci-tests.ps1'))).Count
+    $testWorkflowText = [regex]::Replace($unityWorkflowText, '(?ms)^  unitypackage(?:-smoke)?:\s*$.*?(?=^  [A-Za-z0-9_-]+:\s*$|\z)', '')
+    $runCiTestsInvocations = @([regex]::Matches($testWorkflowText, [regex]::Escape('./scripts/unity/run-ci-tests.ps1'))).Count
     $persistentRootDeclarations = @([regex]::Matches(
             $unityWorkflowText,
             [regex]::Escape($persistentProjectRootArgument)
         )).Count
 
-    if ($runCiTestsInvocations -eq 0) {
+    if ($runCiTestsInvocations -eq 0 -and $unityWorkflowFile -ne '.github/workflows/release.yml') {
         Write-Host "::error file=$unityWorkflowFile::Expected at least one run-ci-tests.ps1 invocation while validating persistent project roots."
         $failed = $true
     } elseif ($persistentRootDeclarations -ne $runCiTestsInvocations) {
@@ -3678,8 +3684,8 @@ if (-not $unityLockCleanupIsGated) {
 $centralReturnUses = "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/return-unity-license@$centralReturnActionCommit"
 $testCentralReturnCalls = [regex]::Matches($workflowContent, [regex]::Escape("uses: $centralReturnUses")).Count
 $benchmarkCentralReturnCalls = [regex]::Matches(($benchmarksWorkflowLines -join "`n"), [regex]::Escape("uses: $centralReturnUses")).Count
-if ($testCentralReturnCalls -ne 2 -or $benchmarkCentralReturnCalls -ne 1) {
-    Write-Host "::error file=scripts/tests/test-unity-workflow-matrix-contract.ps1::All three Windows licensed callers must use the immutable central return executor (tests=$testCentralReturnCalls, benchmarks=$benchmarkCentralReturnCalls)."
+if ($testCentralReturnCalls -ne 3 -or $benchmarkCentralReturnCalls -ne 1) {
+    Write-Host "::error file=scripts/tests/test-unity-workflow-matrix-contract.ps1::All Windows licensed callers must use the immutable central return executor (tests=$testCentralReturnCalls, benchmarks=$benchmarkCentralReturnCalls)."
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info 'Checked all Windows licensed callers use the central return executor.'
@@ -3816,8 +3822,8 @@ foreach ($workflowJobSet in $licensedWorkflowJobSets) {
 }
 if (
     $licensedLifecycleCount -ne 5 -or
-    $centralLifecycleCount -ne 3 -or
-    $legacyLifecycleCount -ne 2 -or
+    $centralLifecycleCount -ne 5 -or
+    $legacyLifecycleCount -ne 0 -or
     $centralLifecycleFailures.Count -gt 0
 ) {
     Write-Host "::error file=scripts/tests/test-unity-workflow-matrix-contract.ps1::Three Windows jobs must preserve central return -> digest classifier -> release -> gate with classifier-owned evidence deletion, while two Ubuntu/Docker jobs retain the legacy fail-closed return -> release -> gate -> deletion contract. Total=$licensedLifecycleCount Central=$centralLifecycleCount Legacy=$legacyLifecycleCount Failures=$($centralLifecycleFailures -join ', ')."
@@ -3850,6 +3856,56 @@ if (-not $centralReturnOwnershipContract) {
     Write-Info 'Checked central lifecycle callers leave the single authoritative return to the central executor.'
 }
 
+function Test-NativeExportFleet {
+    param([string]$Job, [string]$Preflight)
+
+    $stageIndex = $Job.IndexOf('node scripts/unity/stage-unitypackage.js', [StringComparison]::Ordinal)
+    $acquireIndex = $Job.IndexOf('- name: Acquire organization Unity lock', [StringComparison]::Ordinal)
+    $exportIndex = $Job.IndexOf("-TestMode 'export'", [StringComparison]::Ordinal)
+    return (
+        $Job.Contains('runs-on: [self-hosted, Windows, RAM-64GB]') -and
+        $Job.Contains('      - runner-preflight') -and
+        $Preflight.Contains('required-label-sets: ''[["self-hosted","Windows","RAM-64GB"]]''') -and
+        $Preflight.Contains("uses: $runnerPreflightAction # $runnerAvailabilityActionVersion") -and
+        $stageIndex -ge 0 -and $acquireIndex -gt $stageIndex -and $exportIndex -gt $acquireIndex -and
+        $Job.Contains('UH_CENTRAL_LICENSE_RETURN: "true"') -and
+        $Job.Contains('-ExportPackagePath ') -and
+        $Job.Contains('uses: ' + $centralReturnUses) -and
+        -not $Job.Contains('run-unity-docker') -and
+        -not $Job.Contains('uses: ./.github/actions/return-unity-license')
+    )
+}
+
+foreach ($exportContract in @(
+        @{ Job = [string]$jobTexts['unitypackage-smoke']; Preflight = [string]$jobTexts['runner-preflight']; Name = 'smoke' },
+        @{ Job = [string]$releaseJobTexts['unitypackage']; Preflight = [string]$releaseJobTexts['runner-preflight']; Name = 'release' }
+    )) {
+    if (-not (Test-NativeExportFleet -Job $exportContract.Job -Preflight $exportContract.Preflight)) {
+        Write-Host "::error::The $($exportContract.Name) export must stage the release payload before native activation on the preflighted Windows fleet."
+        $failed = $true
+    }
+    foreach ($mutation in @(
+            @{ From = 'runs-on: [self-hosted, Windows, RAM-64GB]'; To = 'runs-on: ubuntu-latest'; Target = 'Job' },
+            @{ From = '      - runner-preflight'; To = '      - no-preflight'; Target = 'Job' },
+            @{ From = 'node scripts/unity/stage-unitypackage.js'; To = 'node scripts/unity/create-test-project.js'; Target = 'Job' },
+            @{ From = "-TestMode 'export'"; To = "-TestMode 'editmode'"; Target = 'Job' },
+            @{ From = 'UH_CENTRAL_LICENSE_RETURN: "true"'; To = 'UH_CENTRAL_LICENSE_RETURN: "false"'; Target = 'Job' },
+            @{ From = 'required-label-sets: ''[["self-hosted","Windows","RAM-64GB"]]'''; To = 'required-label-sets: ''[["self-hosted","Linux"]]'''; Target = 'Preflight' }
+        )) {
+        $candidate = @{ Job = $exportContract.Job; Preflight = $exportContract.Preflight }
+        if (-not $candidate[$mutation.Target].Contains($mutation.From)) {
+            Write-Host "::error::Native export mutation has no subject: $($exportContract.Name), $($mutation.From)"
+            $failed = $true
+            continue
+        }
+        $candidate[$mutation.Target] = $candidate[$mutation.Target].Replace($mutation.From, $mutation.To)
+        if (Test-NativeExportFleet @candidate) {
+            Write-Host "::error::Native export gate accepted mutation: $($exportContract.Name), $($mutation.From)"
+            $failed = $true
+        }
+    }
+}
+
 $sharedDiagnosticEvidenceFailures = @()
 foreach ($sharedDiagnosticJob in @(
         @{
@@ -3871,16 +3927,16 @@ foreach ($sharedDiagnosticJob in @(
         $gateIndex -lt 0 -or
         $dumpIndex -le $gateIndex -or
         $uploadIndex -le $dumpIndex -or
-        $deleteIndex -le $uploadIndex
+        $deleteIndex -ge 0
     ) {
         $sharedDiagnosticEvidenceFailures += $sharedDiagnosticJob.File
     }
 }
 if ($sharedDiagnosticEvidenceFailures.Count -gt 0) {
-    Write-Host "::error file=scripts/tests/test-unity-workflow-matrix-contract.ps1::Shared Unity export logs must remain available for failure diagnostics until after the final gate, dump, and upload steps. Failures=$($sharedDiagnosticEvidenceFailures -join ', ')."
+    Write-Host "::error file=scripts/tests/test-unity-workflow-matrix-contract.ps1::Native export diagnostics must survive gate, dump and upload; private cleanup evidence belongs only to the central classifier. Failures=$($sharedDiagnosticEvidenceFailures -join ', ')."
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info 'Checked shared Unity export evidence is deleted only after failure diagnostics.'
+    Write-Info 'Checked native export diagnostics remain separate from centrally owned cleanup evidence.'
 }
 
 # The central cleanup policy is also *checked out* so its runtime can be diffed against ours. That
@@ -4077,12 +4133,12 @@ if (-not $jobTexts.ContainsKey('unitypackage-smoke')) {
         },
         @{
             Name = 'runs the release exporter'
-            Pattern = 'bash scripts/unity/export-unitypackage\.sh'
-            Message = 'unitypackage-smoke must run scripts/unity/export-unitypackage.sh so Samples~ are staged as the release .unitypackage payload.'
+            Pattern = 'node scripts/unity/stage-unitypackage\.js'
+            Message = 'unitypackage-smoke must stage the shared npm payload so Samples~ compile as release assets.'
         },
         @{
             Name = 'uses release Unity version'
-            Pattern = [regex]::Escape('UNITY_VERSION="$(jq -r ''.release'' .github/unity-versions.json)"')
+            Pattern = [regex]::Escape('UNITY_VERSION: ${{ needs.matrix-config.outputs.release-unity-version }}')
             Message = 'unitypackage-smoke must use the release Unity version source of truth.'
         },
         @{

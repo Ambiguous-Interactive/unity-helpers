@@ -23,6 +23,17 @@ Skipped or inconclusive target cases do not satisfy the requirement, even when t
 
 ## The RunCommand contract, measured on 2026-08-27 (editor 6000.4.6f1)
 
+### Bridge backend determines the tool names
+
+`UNITY_MCP_BACKEND` selects the child MCP server the bridge spawns; the
+[MCP server catalog](../../scripts/mcp/README.md) documents the options. Everything measured below
+is the `relay` backend, whose tools are
+`Unity_*`-prefixed. Under the default `cli` backend the Pipeline package serves differently named
+tools with the same jobs: `Unity_RunCommand` → `eval` / `run_script`,
+`Unity_ManageEditor GetState` → `editor_status`, `Unity_ReadConsole` → `get_console_logs`. The
+result shapes differ (`eval` returns structured output, not an `executionLogs` field), so the
+timings and traps in this skill are relay measurements until re-measured against Pipeline.
+
 The host is the `com.unity.ai.assistant` package inside the editor (a throw stack names
 `AgentRunCommand.Execute` in that package), not the standalone unity-mcp-server where
 [#583](https://github.com/Ambiguous-Interactive/unity-helpers/issues/583) watched every execution

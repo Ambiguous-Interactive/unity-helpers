@@ -525,6 +525,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             _settingsContent.Clear();
             ValidationWorkspaceSettings settings = ValidationWorkspaceSettings.instance;
             ValidationWorkspaceSettings.Profile profile = settings.ActiveProfile;
+            _settingsContent.Add(
+                new Button(() =>
+                    SettingsService.OpenUserPreferences(ValidationPreferences.SettingsPath)
+                )
+                {
+                    text = "Enable or disable Sentinel on this workstation",
+                }
+            );
             AddLabel(
                 _settingsContent,
                 "VALIDATION TRIGGERS — " + profile.name,
