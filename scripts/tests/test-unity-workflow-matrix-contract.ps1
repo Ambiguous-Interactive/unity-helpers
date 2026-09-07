@@ -4070,30 +4070,40 @@ for ($i = 0; $i -lt $lines.Count; $i++) {
     $i = $end - 1
 }
 
+$requiredQueuedUnityContracts = @(
+    @{
+        Name = 'needs matrix resolution'
+        Pattern = '(?m)^      - matrix-config\s*$'
+        Message = 'Queued Unity jobs must wait for matrix and source-head resolution.'
+    },
+    @{
+        Name = 'needs runner preflight'
+        Pattern = '(?m)^      - runner-preflight\s*$'
+        Message = 'Queued Unity jobs must wait for runner and credential preflight.'
+    },
+    @{
+        Name = 'requires successful matrix resolution'
+        Pattern = "needs\.matrix-config\.result\s*==\s*'success'"
+        Message = 'Queued Unity jobs require successful matrix and source-head resolution.'
+    },
+    @{
+        Name = 'requires successful runner preflight'
+        Pattern = "needs\.runner-preflight\.result\s*==\s*'success'"
+        Message = 'Queued Unity jobs require successful runner and credential preflight.'
+    }
+)
+
 if (-not $jobTexts.ContainsKey('unity-tests-single-threaded')) {
     Write-Host "::error file=.github/workflows/unity-tests.yml::Missing unity-tests-single-threaded job."
     $failed = $true
 } else {
     $singleThreadedJob = $jobTexts['unity-tests-single-threaded']
-    $requiredSingleThreadedContracts = @(
-        @{
-            Name = 'needs main Unity matrix'
-            Pattern = '(?m)^      - unity-tests\s*$'
-            Message = 'unity-tests-single-threaded must wait for unity-tests so a fundamentally broken tree does not spend a Unity seat.'
-        },
-        @{
-            Name = 'uses always for skipped dependencies'
-            Pattern = 'always\(\)'
-            Message = 'unity-tests-single-threaded must use always() so workflow_dispatch runs with a skipped tier can still evaluate its result gate.'
-        },
-        @{
-            Name = 'requires successful main Unity matrix'
-            Pattern = "needs\.unity-tests\.result\s*==\s*'success'"
-            Message = 'unity-tests-single-threaded must run only after unity-tests succeeds.'
-        }
-    )
+    if ($singleThreadedJob -match '(?m)^      - unity-tests\s*$|needs\.unity-tests\.') {
+        Write-Host '::error file=.github/workflows/unity-tests.yml::SINGLE_THREADED must enter the runner queue with the default matrix; waiting for that matrix lets newer runs move ahead of this required coverage.'
+        $failed = $true
+    }
 
-    foreach ($contract in $requiredSingleThreadedContracts) {
+    foreach ($contract in $requiredQueuedUnityContracts) {
         if ($singleThreadedJob -notmatch $contract.Pattern) {
             Write-Host "::error file=.github/workflows/unity-tests.yml::Unity workflow contract failed ($($contract.Name)): $($contract.Message)"
             $failed = $true
@@ -4103,7 +4113,7 @@ if (-not $jobTexts.ContainsKey('unity-tests-single-threaded')) {
     }
 
     if ($jobTexts.ContainsKey('unity-tests-standalone') -or $singleThreadedJob -match 'unity-tests-standalone') {
-        Write-Host "::error file=.github/workflows/unity-tests.yml::The obsolete standalone tier must not return: Standalone is a selected mode inside each version-grouped unity-tests job, and SINGLE_THREADED depends only on that grouped result."
+        Write-Host "::error file=.github/workflows/unity-tests.yml::The obsolete standalone tier must not return: Standalone is a selected mode inside each version-grouped unity-tests job, and SINGLE_THREADED queues independently after preflight."
         $failed = $true
     } elseif ($VerboseOutput) {
         Write-Info 'Checked the removed standalone tier cannot be restored beside the grouped default job.'
@@ -4115,22 +4125,12 @@ if (-not $jobTexts.ContainsKey('unitypackage-smoke')) {
     $failed = $true
 } else {
     $unitypackageSmokeJob = $jobTexts['unitypackage-smoke']
-    $requiredUnitypackageSmokeContracts = @(
-        @{
-            Name = 'needs main Unity matrix'
-            Pattern = '(?m)^      - unity-tests\s*$'
-            Message = 'unitypackage-smoke must wait for unity-tests so package export smoke runs only after the standard matrix is green.'
-        },
-        @{
-            Name = 'needs single-threaded Unity tier'
-            Pattern = '(?m)^      - unity-tests-single-threaded\s*$'
-            Message = 'unitypackage-smoke must wait for unity-tests-single-threaded so release payload smoke is the final Unity gate.'
-        },
-        @{
-            Name = 'requires successful single-threaded Unity tier'
-            Pattern = "needs\.unity-tests-single-threaded\.result\s*==\s*'success'"
-            Message = 'unitypackage-smoke must run only after the single-threaded Unity tier succeeds.'
-        },
+    if ($unitypackageSmokeJob -match '(?m)^      - unity-tests(?:-single-threaded)?\s*$|needs\.unity-tests(?:-single-threaded)?\.') {
+        Write-Host '::error file=.github/workflows/unity-tests.yml::Package smoke must enter the runner queue with the tests; only the final Unity CI Success job waits for all licensed jobs.'
+        $failed = $true
+    }
+
+    $requiredUnitypackageSmokeContracts = $requiredQueuedUnityContracts + @(
         @{
             Name = 'runs the release exporter'
             Pattern = 'node scripts/unity/stage-unitypackage\.js'

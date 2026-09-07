@@ -911,13 +911,11 @@ jobs:
   # would only add cost. It is a SEPARATE job from unity-tests but shares the SAME
   # self-hosted Unity seat.
   #
-  # It `needs: unity-tests` so the alternate compilation does not spend a Unity
-  # seat on a fundamentally broken tree. It used to also wait for the standalone
-  # tier solely to avoid org-lock contention. That former edge bought nothing and
-  # cost a median 2.8 runner-minutes per run in idle, measured over six runs in
-  # session 194. Each host runs one runner, and the external
-  # `wallstop-organization-builds` lock still serializes this work against other
-  # workflows and runs.
+  # Queue this required coverage alongside the default matrix. Waiting for all
+  # four editors let newer runs enter the shared fleet first; the single-threaded
+  # queue grew by 36 minutes in session 260. The central lock and one runner per host still
+  # limit simultaneous Unity work. A failed default tree may now also spend a
+  # single-threaded job; final success still requires every licensed job.
   #
   # Reuses the same secrets gate, runner-preflight,
   # provisioning, perf-category exclusion, verify-results, and artifact-upload
@@ -929,7 +927,6 @@ jobs:
     needs:
       - matrix-config
       - runner-preflight
-      - unity-tests
     if: >-
       ${{
         always() &&
@@ -938,7 +935,6 @@ jobs:
         (github.event_name != 'push' || github.ref_protected) &&
         needs.matrix-config.result == 'success' &&
         needs.runner-preflight.result == 'success' &&
-        needs.unity-tests.result == 'success' &&
         needs.runner-preflight.outputs.org-credentials == 'true' &&
         needs.matrix-config.outputs.superseded != 'true'
       }}
@@ -1308,13 +1304,13 @@ jobs:
           reservation-id: ${{ steps.release_unity_lock.outputs.reservation-id }}
           incident-id: ${{ steps.release_unity_lock.outputs.incident-id }}
 
+  # Export consumes only the checkout payload. Queue it with the tests so it does
+  # not re-enter the fleet behind newer runs; the aggregate gate waits for all.
   unitypackage-smoke:
     name: Unity package export smoke
     needs:
       - matrix-config
       - runner-preflight
-      - unity-tests
-      - unity-tests-single-threaded
     if: >-
       ${{
         always() &&
@@ -1323,8 +1319,6 @@ jobs:
         (github.event_name != 'push' || github.ref_protected) &&
         needs.matrix-config.result == 'success' &&
         needs.runner-preflight.result == 'success' &&
-        needs.unity-tests.result == 'success' &&
-        needs.unity-tests-single-threaded.result == 'success' &&
         needs.runner-preflight.outputs.org-credentials == 'true' &&
         needs.matrix-config.outputs.superseded != 'true'
       }}
