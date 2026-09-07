@@ -12,11 +12,12 @@ The shared catalog is:
 - Z.AI Web Search for current search results.
 - Z.AI Web Reader for structured webpage extraction.
 - Z.AI Zread for public GitHub repository documentation and source exploration.
+- Context7 for version-specific third-party library documentation (Unity, Roslyn, mkdocs,
+  protobuf-net).
 - `mcp-server-git` for local repository queries (log, diff, status, branches).
 - `mcp-server-fetch` for retrieving web pages as markdown.
 
-The git and fetch servers are credential-free uv tools baked into the image, so they need no
-`.env.local` entries.
+The git, fetch, and Context7 servers are credential-free, so they need no `.env.local` entries.
 
 Set `Z_AI_API_KEY` on the host before opening the devcontainer, or add it to the repository's
 gitignored `.env.local` file:

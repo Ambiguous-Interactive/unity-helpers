@@ -247,7 +247,9 @@ nav:
   - Guides:
       - Odin Migration: guides/odin-migration-guide.md
       - Unity Devcontainer Licensing: guides/unity-devcontainer-licensing.md
+      - AI Model Backends: guides/ai-model-backends.md
       - MCP Local Setup: guides/mcp-local-setup.md
+      - MCP Ecosystem Notes: guides/mcp-ecosystem.md
       - Bundled Assembly Conflicts: guides/bundled-assembly-conflicts.md
   - Contributing:
       - Overview: project/contributing.md

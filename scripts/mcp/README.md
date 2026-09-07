@@ -15,10 +15,12 @@ npm run mcp:configure-shared
 ```
 
 The generated catalog contains `github`, `zai-vision`, `zai-web-search`, `zai-web-reader`,
-`zai-zread`, `git`, and `fetch`. Z.AI documents these as its Vision, Web Search, Web Reader, and
-Zread MCP services. Vision runs locally through `@z_ai/mcp-server`; the three HTTP services use
-`mcp-remote` so all seven frontends receive one consistent stdio configuration. `git` and `fetch`
-are credential-free uv tools (`mcp-server-git`, `mcp-server-fetch`) baked into the image.
+`zai-zread`, `context7`, `git`, and `fetch`. Z.AI documents its four as the Vision, Web Search, Web
+Reader, and Zread MCP services. Vision runs locally through `@z_ai/mcp-server`; the three HTTP
+services use `mcp-remote` so all seven frontends receive one consistent stdio configuration.
+`context7` runs the official `@upstash/context7-mcp` stdio package, which serves version-specific
+third-party library documentation without credentials. `git` and `fetch` are credential-free uv
+tools (`mcp-server-git`, `mcp-server-fetch`) baked into the image.
 
 `zai-mcp.mjs` resolves `Z_AI_API_KEY` from the process environment first and `.env.local` second.
 Remote authorization is written to a private temporary header file and deleted at exit, keeping the

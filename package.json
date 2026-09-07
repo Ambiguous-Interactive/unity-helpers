@@ -335,6 +335,7 @@
     "test:validate-devcontainer-urls": "bash scripts/tests/test-validate-devcontainer-urls.sh",
     "test:final-newline": "bash scripts/tests/test-final-newline.sh",
     "test:post-create": "bash scripts/tests/test-post-create.sh",
+    "test:ai-backends": "bash scripts/tests/test-ai-backends.sh",
     "test:wiki-generation": "bash scripts/tests/test-wiki-generation.sh",
     "test:shell-portability": "bash scripts/tests/test-shell-portability.sh",
     "test:unity-nunit-results": "bash scripts/tests/test-unity-nunit-results.sh",

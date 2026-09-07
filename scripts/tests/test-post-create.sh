@@ -308,6 +308,44 @@ else
         "post-start.sh should call install-agent-clis.sh for runtime repair"
 fi
 
+AI_BACKENDS="$REPO_ROOT/.devcontainer/ai-backends.sh"
+
+if [ -f "$AI_BACKENDS" ]; then
+    pass "ai-backends.sh exists"
+else
+    fail "ai-backends.sh exists" "File not found: .devcontainer/ai-backends.sh"
+fi
+
+if grep -q 'ai-backends\.sh" install' "$POST_CREATE"; then
+    pass "post-create.sh installs AI backend launchers"
+else
+    fail "post-create.sh installs AI backend launchers" \
+        "post-create.sh should call ai-backends.sh install"
+fi
+
+if grep -q 'ai-backends\.sh" install' "$POST_START"; then
+    pass "post-start.sh repairs AI backend launchers"
+else
+    fail "post-start.sh repairs AI backend launchers" \
+        "post-start.sh should call ai-backends.sh install for runtime repair"
+fi
+
+for backend_launcher in codex-zai claude-zai codex-openrouter claude-openrouter; do
+    if grep -q "\"${backend_launcher}\"" "$AI_BACKENDS"; then
+        pass "ai-backends.sh dispatches ${backend_launcher}"
+    else
+        fail "ai-backends.sh dispatches ${backend_launcher}" \
+            "ai-backends.sh must install and dispatch the ${backend_launcher} launcher"
+    fi
+done
+
+if grep -qE 'ln -sfn' "$AI_BACKENDS"; then
+    pass "ai-backends.sh installs launchers as symlinks"
+else
+    fail "ai-backends.sh installs launchers as symlinks" \
+        "ai-backends.sh must symlink launchers so upgrades never shadow them"
+fi
+
 if grep -q 'CODEX_VERSION_TIMEOUT_SECONDS' "$POST_START"; then
     pass "post-start.sh defines Codex version timeout"
 else
@@ -334,6 +372,13 @@ if grep -q 'opencode-ai' "$INSTALL_AGENT_CLIS"; then
 else
     fail "install-agent-clis.sh targets opencode-ai" \
         "install-agent-clis.sh must install opencode-ai"
+fi
+
+if grep -q '@anthropic-ai/claude-code' "$INSTALL_AGENT_CLIS"; then
+    pass "install-agent-clis.sh targets @anthropic-ai/claude-code"
+else
+    fail "install-agent-clis.sh targets @anthropic-ai/claude-code" \
+        "install-agent-clis.sh must install @anthropic-ai/claude-code"
 fi
 
 if grep -q '@nanocollective/nanocoder' "$INSTALL_AGENT_CLIS"; then
