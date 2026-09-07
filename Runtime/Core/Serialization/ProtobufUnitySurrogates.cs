@@ -624,7 +624,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
         internal bool TryRestore(out SparseSet value)
         {
-            value = default;
             int[] elements = Elements ?? Array.Empty<int>();
             bool inferCapacity = Capacity <= 0;
             int capacity = inferCapacity ? 1 : Capacity;
@@ -632,6 +631,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             {
                 if (element < 0 || int.MaxValue <= element)
                 {
+                    value = default;
                     return false;
                 }
 
@@ -645,12 +645,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 }
                 else if (capacity <= element)
                 {
+                    value = default;
                     return false;
                 }
             }
 
             if (!SerializationCapacityLimits.TryAccept(capacity, elements.Length, out _))
             {
+                value = default;
                 return false;
             }
 
