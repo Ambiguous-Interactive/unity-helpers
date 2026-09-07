@@ -28,6 +28,10 @@ exclude = [
   # Sites with aggressive bot protection that return 403 but links are valid
   "^https?://www\\.npmjs\\.com",
   "^https?://doi\\.org",
+  # These exact primary references serve bot challenges to lychee (September 2026).
+  # Their content was verified independently; keep unrelated URLs and 403s checked.
+  "^https://www\\.w3\\.org/TR/WCAG21/#contrast-minimum$",
+  "^https://sourceforge\\.net/projects/pracrand/$",
   # Known flaky/unreliable sites that cause intermittent CI failures
   "^https?://bugs\\.python\\.org",
   # Academic/hobby/archive sites with intermittent connectivity from GitHub Actions runners
