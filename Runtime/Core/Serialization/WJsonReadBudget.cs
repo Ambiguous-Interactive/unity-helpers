@@ -173,9 +173,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// own words, so nothing is waved through either way.
         /// </para>
         /// <para>
-        /// The decoder's bound is at least 1 (System.Text.Json validates that on assignment), so
-        /// the sum stays positive; the ceiling case is passed through unchanged because the walk's
-        /// own limit check fires long before the tokenizer's could.
+        /// The decoder's bound is read off the options the decode will use, and a ZERO is what
+        /// <see cref="JsonSerializerOptions.MaxDepth"/>'s getter reports for "unset" -- the
+        /// default 64 the decoder will apply is not visible through it. A zero is therefore
+        /// resolved UNBOUNDED, which is the only safe direction: an underestimate puts the
+        /// tokenizer's bound under the decoder's and reopens the bypass; an overestimate costs
+        /// nothing, because the walk refuses at the limit on the first token past it and so never
+        /// finishes walking a document the limit would refuse. The explicit ceiling passes
+        /// through unchanged for the same reason.
         /// </para>
         /// </remarks>
         private static JsonReaderOptions ReaderOptionsFor(
@@ -186,7 +191,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             int decodeDepth =
                 options == null ? SerializerEncoding.NormalJsonOptions.MaxDepth : options.MaxDepth;
             int tokenizerDepth =
-                decodeDepth == int.MaxValue
+                decodeDepth <= 0 || decodeDepth == int.MaxValue
                     ? int.MaxValue
                     : Math.Max(limits.MaximumNestingDepth, decodeDepth) + 1;
             return new JsonReaderOptions
