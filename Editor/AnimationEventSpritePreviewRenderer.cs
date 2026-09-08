@@ -60,7 +60,6 @@ namespace WallstopStudios.UnityHelpers.Editor
             out Rect? sourceRect
         )
         {
-            sourceRect = null;
             Sprite sprite = item.sprite;
             if (
                 (sprite == null || item.resolvedSpriteTime != item.animationEvent.time)
@@ -70,6 +69,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 item.sprite = null;
                 item.isTextureReadable = false;
                 item.isInvalidTextureRect = false;
+                sourceRect = null;
                 return null;
             }
 
@@ -79,6 +79,7 @@ namespace WallstopStudios.UnityHelpers.Editor
             if (spriteTextureCache.TryGetValue(sprite, out Texture2D cachedTexture))
             {
                 item.isTextureReadable = true;
+                sourceRect = null;
                 return cachedTexture;
             }
 
@@ -87,6 +88,7 @@ namespace WallstopStudios.UnityHelpers.Editor
             {
                 item.isTextureReadable = true;
                 spriteTextureCache.Add(sprite, preview);
+                sourceRect = null;
                 return preview;
             }
 
@@ -100,11 +102,11 @@ namespace WallstopStudios.UnityHelpers.Editor
             out Rect? sourceRect
         )
         {
-            sourceRect = null;
             Texture2D source = sprite.texture;
             item.isTextureReadable = source != null && source.isReadable;
             if (!item.isTextureReadable)
             {
+                sourceRect = null;
                 return null;
             }
 
@@ -116,6 +118,7 @@ namespace WallstopStudios.UnityHelpers.Editor
             catch (Exception)
             {
                 item.isInvalidTextureRect = true;
+                sourceRect = null;
                 return null;
             }
 
@@ -138,6 +141,7 @@ namespace WallstopStudios.UnityHelpers.Editor
             Texture2D copied = CopyTexture(textureRect, source);
             if (spriteTextureCache.Add(sprite, copied, owned: true))
             {
+                sourceRect = null;
                 return copied;
             }
             UnityEngine.Object.DestroyImmediate(copied);

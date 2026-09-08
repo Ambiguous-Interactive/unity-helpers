@@ -31,17 +31,18 @@ namespace WallstopStudios.UnityHelpers.Editor
 
         internal bool TryGetValue(Sprite sprite, out Texture2D texture)
         {
-            texture = null;
             if (
                 !WasProvided(sprite)
                 || !_entries.TryGetValue(sprite, out LinkedListNode<Entry> node)
             )
             {
+                texture = null;
                 return false;
             }
             if (sprite == null || node.Value.Texture == null)
             {
                 Remove(node);
+                texture = null;
                 return false;
             }
             _recency.Remove(node);
