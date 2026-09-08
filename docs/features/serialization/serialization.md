@@ -256,6 +256,44 @@ The converters are fuzzed against structure-aware mutations of their own output 
 wrong token kinds, out-of-range numbers, dropped and duplicated members, truncations and oversized
 repeated members, and each one must also read back anything it writes.
 
+Both guarantees above are about **reporting** a bad document. Size is the other hazard: nesting
+costs a payload three bytes per level and an element run two bytes per element, while the objects a
+decoder builds from them cost far more, so `[1,` repeated three hundred thousand times is a
+900 KB document that asks for a great deal more than 900 KB. `WJsonReadLimits` bounds that, and the
+overloads that take it refuse an over-budget document before any of it is decoded:
+
+```csharp
+WJsonReadLimits limits = new WJsonReadLimits(
+    maximumElementCount: 4096,
+    maximumTextLength: 64 * 1024,
+    maximumNestingDepth: 16
+);
+
+if (!Serializer.TryJsonDeserialize(downloaded, out LevelPack pack, null, null, limits))
+{
+    UseBuiltInLevels();
+    return;
+}
+```
+
+Construct the limits once and reuse them: they are immutable and safe to share across threads. The
+public parameterless constructor creates the default profile and supports generic `new()` factories,
+and passing `null` for `limits` selects that same profile. Element counts are **per container** --
+one array's elements, one object's members -- and text lengths are counted in encoded UTF-8 bytes,
+for a string value and a property name alike. Negative values become zero, and a zero element count
+still admits an empty array or object, because the root value belongs to no container. A requested
+nesting depth above `WJsonReadLimits.MaximumSupportedNestingDepth` (64) stays capped there, because
+nesting is stack depth and a stack overflow cannot be caught.
+
+The gate walks the encoded bytes and materializes nothing -- no string, no collection, no boxed
+element -- so an over-budget document is refused rather than truncated:
+`Serializer.JsonDeserialize` raises `SerializationCorruptDataException` whose `Reason` names the
+limit that refused it, and `Serializer.TryJsonDeserialize` returns `false`. A **malformed** document
+is still System.Text.Json's to report, in its own words. These are **encoded-document limits**, not
+a cumulative decoded-object or retained-memory budget, and custom converters remain responsible for
+their own allocations. The overloads without a `limits` argument are unchanged and keep
+System.Text.Json's own bounds, so nothing an existing save file loads with starts failing.
+
 ### Fast Serialization (Hot Paths)
 
 For performance-critical scenarios where you serialize/deserialize frequently:
@@ -2463,8 +2501,9 @@ of 64. Negative limits become zero; zero allows empty regions or fields but no t
 respectively. Requested depth above 64 remains capped at 64. Limits are immutable and reusable across
 threads; constructing readers does not allocate a mutable budget object. These are **per-region wire
 limits**, not a cumulative decoded-object, collection-element, or retained-memory budget. Custom
-formatters remain responsible for their own allocations, and these overloads do not configure JSON
-or the legacy protobuf-net fallback.
+formatters remain responsible for their own allocations, and these overloads do not configure the
+legacy protobuf-net fallback. JSON has its own limits, described under
+[Reading Untrusted JSON](#reading-untrusted-json).
 
 `TryReadMessage(formatter, ...)` accepts a hand-written formatter only when it returns success,
 leaves its nested reader well formed, and consumes the complete nested payload. A formatter cannot
