@@ -215,7 +215,7 @@ jobs:
       # skipped the licensed matrix when a PR touched ONLY its perf-numbers doc
       # + baseline. unity-helpers has no such CI-owned perf-doc auto-commit on
       # the PR path (the unity-benchmarks workflow commits perf results from a
-      # SCHEDULED run, not a PR), so that detection is intentionally DROPPED for
+      # DISPATCH run, not a PR), so that detection is intentionally DROPPED for
       # simplicity. If a perf-doc auto-update PR flow is added later, repoint a
       # docs-only gate at docs/performance/ rather than DxMessaging's
       # docs/architecture/performance.md path.

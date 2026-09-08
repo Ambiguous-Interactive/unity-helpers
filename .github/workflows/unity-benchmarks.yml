@@ -573,7 +573,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      # Scheduled aggregates remain advisory. Baseline promotion requires calibrated
+      # Dispatch aggregates remain advisory. Baseline promotion requires calibrated
       # player evidence and an accepted candidate confirmed after merge (#636).
       - name: Compute perf deltas vs baseline
         id: perf_deltas
