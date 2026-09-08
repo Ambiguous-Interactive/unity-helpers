@@ -36,7 +36,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <summary>Tim sort algorithm - hybrid run-detecting mergesort popularized by Python/Java. Stable.</summary>
         Tim = 7,
 
-        /// <summary>Jesse sort algorithm - dual-patience sort hybrid inspired by Jesse Michel’s research. Not stable.</summary>
+        /// <summary>Jesse sort algorithm - dual-patience sort hybrid inspired by Jesse Lew’s research. Not stable.</summary>
         Jesse = 8,
 
         /// <summary>Green sort algorithm - symmetric merge strategy inspired by greeNsort sustainability work. Stable.</summary>

@@ -79,40 +79,46 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             using (EnterGate(path))
             {
-                string temporaryPath = path + TemporarySuffix;
-                FileStream staging;
-                byte[] bytes;
                 try
                 {
-                    // Encode before opening so encoding failure cannot leave an undisposed stream.
-                    bytes = Utf8NoByteOrderMark.GetBytes(contents ?? string.Empty);
-                    EnsureDirectory(path);
-                    staging = OpenStagingStream(temporaryPath, useAsync: false);
+                    byte[] bytes = Utf8NoByteOrderMark.GetBytes(contents ?? string.Empty);
+                    return TryWriteStagedBytes(path, bytes, out error);
                 }
                 catch (Exception e)
                 {
                     error = e;
                     return false;
                 }
+            }
+        }
 
-                try
-                {
-                    using (staging)
-                    {
-                        staging.Write(bytes, 0, bytes.Length);
-                        staging.Flush(flushToDisk: true);
-                    }
+        /// <summary>
+        /// Replaces a file's bytes, staging and flushing before the swap.
+        /// </summary>
+        /// <remarks>
+        /// Carries the same durability guarantees as <see cref="TryWriteAllText"/>.
+        /// The array is written directly; do not modify it until this call returns.
+        /// </remarks>
+        /// <param name="path">Destination file path. Missing directories are created.</param>
+        /// <param name="contents">Bytes to write. Null is treated as empty.</param>
+        /// <param name="error">The failure when this returns false; null otherwise.</param>
+        /// <returns>True when the destination holds the new contents.</returns>
+        /// <example>
+        /// <code>
+        /// bool saved = DurableFile.TryWriteAllBytes(savePath, serializedBytes, out Exception error);
+        /// </code>
+        /// </example>
+        public static bool TryWriteAllBytes(string path, byte[] contents, out Exception error)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                error = new ArgumentException("A destination path is required.", nameof(path));
+                return false;
+            }
 
-                    Swap(temporaryPath, path);
-                    error = null;
-                    return true;
-                }
-                catch (Exception e)
-                {
-                    DiscardStagedFile(temporaryPath);
-                    error = e;
-                    return false;
-                }
+            using (EnterGate(path))
+            {
+                return TryWriteStagedBytes(path, contents ?? Array.Empty<byte>(), out error);
             }
         }
 
@@ -455,6 +461,41 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             catch (Exception)
             {
+                return false;
+            }
+        }
+
+        private static bool TryWriteStagedBytes(string path, byte[] contents, out Exception error)
+        {
+            string temporaryPath = path + TemporarySuffix;
+            FileStream staging;
+            try
+            {
+                EnsureDirectory(path);
+                staging = OpenStagingStream(temporaryPath, useAsync: false);
+            }
+            catch (Exception e)
+            {
+                error = e;
+                return false;
+            }
+
+            try
+            {
+                using (staging)
+                {
+                    staging.Write(contents, 0, contents.Length);
+                    staging.Flush(flushToDisk: true);
+                }
+
+                Swap(temporaryPath, path);
+                error = null;
+                return true;
+            }
+            catch (Exception e)
+            {
+                DiscardStagedFile(temporaryPath);
+                error = e;
                 return false;
             }
         }

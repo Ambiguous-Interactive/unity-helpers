@@ -395,13 +395,17 @@ function Get-RepoRelativePath {
 function Get-TargetFiles {
     $results = [System.Collections.Generic.List[string]]::new()
 
-    # *.sh (recursive, but skip node_modules / site / .git)
-    Get-ChildItem -Path $repoRoot -Recurse -File -Filter '*.sh' -ErrorAction SilentlyContinue |
-        Where-Object {
-            $rel = Get-RepoRelativePath $_.FullName
-            $rel -notmatch '^(node_modules|site|\.git)/'
-        } |
+    # Prune excluded roots before recursion; an explicit symlink root would otherwise be followed.
+    Get-ChildItem -LiteralPath $repoRoot -File -Filter '*.sh' -ErrorAction SilentlyContinue |
         ForEach-Object { $results.Add($_.FullName) | Out-Null }
+    foreach ($directory in (Get-ChildItem -LiteralPath $repoRoot -Directory -ErrorAction SilentlyContinue)) {
+        if ($directory.Name -match '^(node_modules|site|\.git)$' -or
+            ($directory.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
+            continue
+        }
+        Get-ChildItem -LiteralPath $directory.FullName -Recurse -File -Filter '*.sh' -ErrorAction SilentlyContinue |
+            ForEach-Object { $results.Add($_.FullName) | Out-Null }
+    }
 
     # .githooks/* (non-recursive files)
     $hooksDir = Join-Path $repoRoot '.githooks'

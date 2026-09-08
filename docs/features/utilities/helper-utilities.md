@@ -898,6 +898,18 @@ if (!DurableFile.TryWriteAllText(savePath, json, out Exception error))
 }
 ```
 
+For binary saves, `TryWriteAllBytes` accepts the serialized `byte[]` directly (added in the upcoming
+release). It uses the same staging and flush guarantees as text writes, without encoding or copying the
+payload. Missing directories are created; null or empty bytes replace the destination with an empty
+file. Keep the array unchanged until the call returns.
+
+```csharp
+if (!DurableFile.TryWriteAllBytes(savePath, serializedBytes, out Exception error))
+{
+    Debug.LogError($"Could not save binary data: {error}");
+}
+```
+
 Every method reports failure instead of throwing, and the async ones return the exception (null on
 success):
 

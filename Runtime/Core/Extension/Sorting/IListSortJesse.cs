@@ -1,9 +1,9 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 //
-// The algorithm in this file is JesseSort, by Jesse Michel, https://github.com/lewj85/jessesort.
-// This is an adaptation of that work; the design is the original author's. The upstream license is
-// not recorded in this repository. See docs/project/third-party-notices.md.
+// The algorithm in this file is JesseSort, by Jesse Lew, https://github.com/lewj85/jessesort.
+// This is an adaptation of that work; the design is the original author's.
+// Upstream: MIT License - Copyright (c) 2026 Jesse Lew. See docs/project/third-party-notices.md.
 
 // ReSharper disable once CheckNamespace
 namespace WallstopStudios.UnityHelpers.Core.Extension
@@ -14,12 +14,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     public static partial class IListExtensions
     {
         /// <summary>
-        /// Sorts the list using JesseSort, a hybrid that routes natural runs through two patience games
-        /// before merging all piles with a k-way heap.
+        /// Sorts the list using a simulated dual-patience adaptation of JesseSort.
         /// </summary>
         /// <remarks>
-        /// Implementation reference: JesseSort by Jesse Michel, https://github.com/lewj85/jessesort.
-        /// This adaptation materializes patience piles as <c>IList</c>-backed stacks and performs a k-way merge.
+        /// Implementation reference: JesseSort by Jesse Lew, https://github.com/lewj85/jessesort.
+        /// This adaptation records pile assignments before reconstructing contiguous piles for a k-way merge.
+        /// It does not implement the upstream live-phase routing pipeline. See docs/performance/ilist-sorting-performance.md.
         /// </remarks>
         public static void JesseSort<T, TComparer>(this IList<T> list, TComparer comparer)
             where TComparer : IComparer<T>
@@ -45,290 +45,187 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         private static void JesseSortCore<T, TComparer>(T[] array, int count, TComparer comparer)
             where TComparer : IComparer<T>
         {
-            using PooledResource<List<List<T>>> ascendingLease = Buffers<List<T>>.List.Get(
-                out List<List<T>> ascendingPiles
-            );
-            using PooledResource<List<List<T>>> descendingLease = Buffers<List<T>>.List.Get(
-                out List<List<T>> descendingPiles
-            );
-            using PooledResource<List<PooledResource<List<T>>>> ascendingPileLeaseListLease =
-                Buffers<PooledResource<List<T>>>.List.Get(
-                    out List<PooledResource<List<T>>> ascendingPileLeases
-                );
-            using PooledResource<List<PooledResource<List<T>>>> descendingPileLeaseListLease =
-                Buffers<PooledResource<List<T>>>.List.Get(
-                    out List<PooledResource<List<T>>> descendingPileLeases
-                );
-
-            try
+            int direction = 0;
+            int orderedEnd = 1;
+            while (orderedEnd < count)
             {
-                int index = 0;
-                while (index < count)
+                int comparison = comparer.Compare(array[orderedEnd - 1], array[orderedEnd]);
+                if (comparison != 0)
                 {
-                    int runStart = index;
-                    index++;
-                    if (index == count)
+                    int nextDirection = comparison < 0 ? 1 : -1;
+                    if (direction != 0 && direction != nextDirection)
                     {
-                        JessePatienceInsert(
-                            ascendingPiles,
-                            ascendingPileLeases,
-                            array[runStart],
-                            comparer
-                        );
                         break;
                     }
+                    direction = nextDirection;
+                }
+                ++orderedEnd;
+            }
+            if (orderedEnd == count)
+            {
+                if (direction < 0)
+                {
+                    System.Array.Reverse(array, 0, count);
+                }
+                return;
+            }
 
-                    int compare = comparer.Compare(array[index - 1], array[index]);
-                    bool ascendingRun = compare <= 0;
-                    while (index < count)
+            using PooledResource<List<JessePile>> ascendingLease = Buffers<JessePile>.List.Get(
+                out List<JessePile> ascending
+            );
+            using PooledResource<List<JessePile>> descendingLease = Buffers<JessePile>.List.Get(
+                out List<JessePile> descending
+            );
+            using PooledArray<int> blueprintLease = SystemArrayPool<int>.Get(
+                count,
+                out int[] blueprint
+            );
+            bool descendingRun = direction < 0;
+            for (int index = 0; index < count; ++index)
+            {
+                if (0 < index)
+                {
+                    int comparison = comparer.Compare(array[index - 1], array[index]);
+                    if (comparison != 0)
                     {
-                        int nextCompare = comparer.Compare(array[index - 1], array[index]);
-                        if (ascendingRun)
-                        {
-                            if (nextCompare <= 0)
-                            {
-                                index++;
-                                continue;
-                            }
-                        }
-                        else
-                        {
-                            if (0 <= nextCompare)
-                            {
-                                index++;
-                                continue;
-                            }
-                        }
-                        break;
+                        descendingRun = 0 < comparison;
                     }
-
-                    int runEnd = index - 1;
-                    if (ascendingRun)
+                }
+                List<JessePile> piles = descendingRun ? descending : ascending;
+                int left = 0;
+                int right = piles.Count;
+                while (left < right)
+                {
+                    int middle = left + ((right - left) >> 1);
+                    int comparison = comparer.Compare(array[index], array[piles[middle].Tail]);
+                    if (descendingRun ? 0 < comparison : comparison < 0)
                     {
-                        for (int i = runStart; i <= runEnd; ++i)
-                        {
-                            JessePatienceInsert(
-                                ascendingPiles,
-                                ascendingPileLeases,
-                                array[i],
-                                comparer
-                            );
-                        }
+                        left = middle + 1;
                     }
                     else
                     {
-                        for (int i = runEnd; runStart <= i; --i)
-                        {
-                            JessePatienceInsert(
-                                descendingPiles,
-                                descendingPileLeases,
-                                array[i],
-                                comparer
-                            );
-                        }
+                        right = middle;
                     }
                 }
-
-                using PooledResource<List<JesseCursor<T>>> heapLease = Buffers<
-                    JesseCursor<T>
-                >.List.Get(out List<JesseCursor<T>> heap);
-                InitializeJesseHeap(ascendingPiles, heap, comparer);
-                InitializeJesseHeap(descendingPiles, heap, comparer);
-
-                using PooledArray<T> outputLease = SystemArrayPool<T>.Get(count, out T[] output);
-                int outputIndex = 0;
-                while (0 < heap.Count)
+                if (left == piles.Count)
                 {
-                    JesseCursor<T> cursor = heap[0];
-                    output[outputIndex] = cursor.Peek();
-                    outputIndex++;
-                    if (cursor.MoveNext())
-                    {
-                        heap[0] = cursor;
-                    }
-                    else
-                    {
-                        heap[0] = heap[heap.Count - 1];
-                        heap.RemoveAt(heap.Count - 1);
-                    }
-
-                    if (0 < heap.Count)
-                    {
-                        JesseHeapSiftDown(heap, 0, comparer);
-                    }
+                    piles.Add(new JessePile());
                 }
-
-                for (int i = 0; i < count; ++i)
-                {
-                    array[i] = output[i];
-                }
+                JessePile pile = piles[left];
+                pile.Tail = index;
+                ++pile.Count;
+                piles[left] = pile;
+                blueprint[index] = descendingRun ? ~left : left;
             }
-            finally
-            {
-                ClearAndDisposeJessePiles(ascendingPiles, ascendingPileLeases);
-                ClearAndDisposeJessePiles(descendingPiles, descendingPileLeases);
-            }
-        }
 
-        private static void JessePatienceInsert<T, TComparer>(
-            List<List<T>> piles,
-            List<PooledResource<List<T>>> pileLeases,
-            T value,
-            TComparer comparer
-        )
-            where TComparer : IComparer<T>
-        {
-            int left = 0;
-            int right = piles.Count;
-            while (left < right)
+            using PooledArray<T> storageLease = SystemArrayPool<T>.Get(count, out T[] storage);
+            using PooledResource<List<JesseCursor>> heapLease = Buffers<JesseCursor>.List.Get(
+                out List<JesseCursor> heap
+            );
+            int offset = InitializeJessePiles(ascending, 0, false, heap);
+            InitializeJessePiles(descending, offset, true, heap);
+            for (int index = 0; index < count; ++index)
             {
-                int mid = (left + right) >> 1;
-                List<T> pile = piles[mid];
-                T top = pile[pile.Count - 1];
-                if (comparer.Compare(value, top) <= 0)
+                int tag = blueprint[index];
+                bool reversed = tag < 0;
+                int pileIndex = reversed ? ~tag : tag;
+                List<JessePile> piles = reversed ? descending : ascending;
+                JessePile pile = piles[pileIndex];
+                storage[pile.Position] = array[index];
+                pile.Position += reversed ? -1 : 1;
+                piles[pileIndex] = pile;
+            }
+            for (int index = heap.Count / 2 - 1; 0 <= index; --index)
+            {
+                JesseHeapSiftDown(heap, index, storage, comparer);
+            }
+            for (int index = 0; index < count; ++index)
+            {
+                JesseCursor cursor = heap[0];
+                array[index] = storage[cursor.Position++];
+                if (cursor.Position < cursor.End)
                 {
-                    right = mid;
+                    heap[0] = cursor;
                 }
                 else
                 {
-                    left = mid + 1;
+                    heap[0] = heap[heap.Count - 1];
+                    heap.RemoveAt(heap.Count - 1);
                 }
-            }
-
-            if (left == piles.Count)
-            {
-                PooledResource<List<T>> newPileLease = Buffers<T>.List.Get(out List<T> newPile);
-                newPile.Add(value);
-                piles.Add(newPile);
-                pileLeases.Add(newPileLease);
-            }
-            else
-            {
-                piles[left].Add(value);
+                if (0 < heap.Count)
+                {
+                    JesseHeapSiftDown(heap, 0, storage, comparer);
+                }
             }
         }
 
-        private static void InitializeJesseHeap<T, TComparer>(
-            List<List<T>> piles,
-            List<JesseCursor<T>> heap,
-            TComparer comparer
+        private static int InitializeJessePiles(
+            List<JessePile> piles,
+            int offset,
+            bool reversed,
+            List<JesseCursor> heap
         )
-            where TComparer : IComparer<T>
         {
-            foreach (List<T> pile in piles)
+            for (int index = 0; index < piles.Count; ++index)
             {
-                if (pile.Count == 0)
-                {
-                    continue;
-                }
-
-                JesseCursor<T> cursor = new(pile);
-                heap.Add(cursor);
-                JesseHeapSiftUp(heap, heap.Count - 1, comparer);
+                JessePile pile = piles[index];
+                int end = offset + pile.Count;
+                heap.Add(new JesseCursor { Position = offset, End = end });
+                pile.Position = reversed ? end - 1 : offset;
+                piles[index] = pile;
+                offset = end;
             }
+            return offset;
         }
 
         private static void JesseHeapSiftDown<T, TComparer>(
-            List<JesseCursor<T>> heap,
+            List<JesseCursor> heap,
             int index,
+            T[] storage,
             TComparer comparer
         )
             where TComparer : IComparer<T>
         {
             int count = heap.Count;
-            while (true)
+            while (index < count / 2)
             {
-                int leftChild = (index << 1) + 1;
-                int rightChild = leftChild + 1;
-                int smallest = index;
-
+                int child = (index << 1) + 1;
+                int right = child + 1;
                 if (
-                    leftChild < count
-                    && comparer.Compare(heap[leftChild].Peek(), heap[smallest].Peek()) < 0
+                    right < count
+                    && comparer.Compare(
+                        storage[heap[right].Position],
+                        storage[heap[child].Position]
+                    ) < 0
                 )
                 {
-                    smallest = leftChild;
+                    child = right;
                 }
-
                 if (
-                    rightChild < count
-                    && comparer.Compare(heap[rightChild].Peek(), heap[smallest].Peek()) < 0
+                    comparer.Compare(storage[heap[index].Position], storage[heap[child].Position])
+                    <= 0
                 )
-                {
-                    smallest = rightChild;
-                }
-
-                if (smallest == index)
                 {
                     return;
                 }
-
-                (heap[index], heap[smallest]) = (heap[smallest], heap[index]);
-                index = smallest;
+                JesseCursor cursor = heap[index];
+                heap[index] = heap[child];
+                heap[child] = cursor;
+                index = child;
             }
         }
 
-        private static void ClearAndDisposeJessePiles<T>(
-            List<List<T>> piles,
-            List<PooledResource<List<T>>> leases
-        )
+        private struct JessePile
         {
-            foreach (List<T> pile in piles)
-            {
-                pile.Clear();
-            }
-
-            foreach (PooledResource<List<T>> lease in leases)
-            {
-                lease.Dispose();
-            }
-
-            piles.Clear();
-            leases.Clear();
+            public int Tail;
+            public int Count;
+            public int Position;
         }
 
-        private static void JesseHeapSiftUp<T, TComparer>(
-            List<JesseCursor<T>> heap,
-            int index,
-            TComparer comparer
-        )
-            where TComparer : IComparer<T>
+        private struct JesseCursor
         {
-            while (0 < index)
-            {
-                int parent = (index - 1) >> 1;
-                if (0 <= comparer.Compare(heap[index].Peek(), heap[parent].Peek()))
-                {
-                    return;
-                }
-
-                (heap[index], heap[parent]) = (heap[parent], heap[index]);
-                index = parent;
-            }
-        }
-
-        private struct JesseCursor<T>
-        {
-            public JesseCursor(List<T> pile)
-            {
-                Pile = pile;
-                Index = pile.Count - 1;
-            }
-
-            public List<T> Pile { get; }
-
-            public int Index { get; private set; }
-
-            public T Peek()
-            {
-                return Pile[Index];
-            }
-
-            public bool MoveNext()
-            {
-                Index--;
-                return 0 <= Index;
-            }
+            public int Position;
+            public int End;
         }
     }
 }

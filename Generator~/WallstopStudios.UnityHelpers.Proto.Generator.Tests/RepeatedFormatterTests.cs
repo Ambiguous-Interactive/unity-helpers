@@ -222,8 +222,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 new RepeatedContract { Ints = Array.Empty<int>(), IntList = new List<int>() }
             );
 
-            Assert.IsNull(restored.Ints);
-            Assert.IsNull(restored.IntList);
+            Assert.IsTrue(restored.Ints == null);
+            Assert.IsTrue(restored.IntList == null);
         }
 
         [Test]
@@ -341,7 +341,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             // A zero-length packed run can express a present empty collection.
             int[] decoded = Decode<RepeatedContract>("0A00").Ints;
 
-            Assert.IsNotNull(decoded);
+            Assert.IsTrue(decoded != null);
             Assert.AreEqual(0, decoded.Length);
         }
 
@@ -371,7 +371,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             {
                 WProtoReader reader = new WProtoReader(Parse(payload));
                 Assert.IsFalse(formatter.TryRead(ref reader, out RepeatedContract value), payload);
-                Assert.IsNull(value, payload);
+                Assert.IsTrue(value == null, payload);
             }
         }
 
@@ -441,6 +441,67 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.IsFalse(
                 wroteWithoutRefusing,
                 "Write must refuse a null element on its own, not only through Measure"
+            );
+        }
+
+        [Test]
+        public void GeneratedPackedReadersShareTheBudgetBeforeReservingCollections()
+        {
+            AssertPackedLimit<RepeatedContract>("0A01010A0102", 2);
+            AssertPackedLimit<RepeatedContract>("0A0101120102", 2);
+            AssertPackedLimit<Box<int>>("120101120102", 2);
+            AssertPackedLimit<RectangularBox<int>>("0A080A02010212020102", 4);
+
+            const int elementCount = 16384;
+            long controlStart = GC.GetAllocatedBytesForCurrentThread();
+            byte[] control = new byte[elementCount];
+            long controlBytes = GC.GetAllocatedBytesForCurrentThread() - controlStart;
+            GC.KeepAlive(control);
+            Assert.LessOrEqual(elementCount, controlBytes);
+            byte[] payload = new byte[elementCount + 4];
+            payload[0] = 10;
+            payload[1] = 128;
+            payload[2] = 128;
+            payload[3] = 1;
+            IWProtoFormatter<RepeatedContract> formatter =
+                WProtoFormatterProvider.Get<RepeatedContract>();
+            WProtoReader reader = new WProtoReader(
+                payload,
+                new WProtoReadLimits(maximumPackedElementCount: 1)
+            );
+            long start = GC.GetAllocatedBytesForCurrentThread();
+            bool read = formatter.TryRead(ref reader, out _);
+            long allocated = GC.GetAllocatedBytesForCurrentThread() - start;
+            Assert.IsFalse(read);
+            Assert.Less(
+                allocated,
+                elementCount,
+                "The refused packed run reserved its collection before checking the limit."
+            );
+        }
+
+        private static void AssertPackedLimit<T>(string hex, int required)
+        {
+            byte[] payload = Parse(hex);
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            WProtoReader refused = new WProtoReader(
+                payload,
+                new WProtoReadLimits(maximumPackedElementCount: required - 1)
+            );
+            Assert.IsFalse(formatter.TryRead(ref refused, out _), typeof(T).Name);
+            WProtoReader accepted = new WProtoReader(
+                payload,
+                new WProtoReadLimits(maximumPackedElementCount: required)
+            );
+            Assert.IsTrue(formatter.TryRead(ref accepted, out _), typeof(T).Name);
+            Assert.IsTrue(accepted.End);
+            Assert.IsFalse(accepted.Malformed);
+            WProtoReadLimits limits = new WProtoReadLimits(maximumPackedElementCount: required - 1);
+            Assert.Throws<InvalidOperationException>(() =>
+                WProtoFacade.TryDeserialize(payload, limits, out T _)
+            );
+            Assert.Throws<InvalidOperationException>(() =>
+                WProtoFacade.TryDeserializeAs(payload, typeof(T), limits, out T _)
             );
         }
 

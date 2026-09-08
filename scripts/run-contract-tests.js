@@ -423,14 +423,42 @@ const CHECKS = [
   }
 ];
 
-module.exports = { CHECKS, runChecks };
+const HOOK_CHECKS = [
+  {
+    id: "agent-preflight",
+    name: "Agent preflight regressions",
+    run: "npm run test:agent-preflight"
+  },
+  {
+    id: "precommit-integration",
+    name: "Pre-commit integration regressions",
+    run: "npm run test:precommit-integration"
+  },
+  {
+    id: "pre-push-changed-files",
+    name: "Pre-push changed-file regressions",
+    run: "npm run test:pre-push-changed-files"
+  }
+];
+
+/** Selects the full suite without changing the fast registry or its order. */
+function checksFor(includeHookRegressions) {
+  // Start the isolated, long-running fixtures first; runChecks still drains every exclusive check before any shared work.
+  return includeHookRegressions ? [...HOOK_CHECKS, ...CHECKS] : CHECKS;
+}
+
+module.exports = { CHECKS, HOOK_CHECKS, checksFor, runChecks };
 
 if (require.main === module) {
+  const argv = process.argv.slice(2);
+  const includeHookRegressions = argv.includes("--include-hook-regressions");
   runRegistry({
-    checks: CHECKS,
+    checks: checksFor(includeHookRegressions),
     title: "Contract Tests",
-    command: "node scripts/run-contract-tests.js",
-    argv: process.argv.slice(2)
+    command:
+      "node scripts/run-contract-tests.js" +
+      (includeHookRegressions ? " --include-hook-regressions" : ""),
+    argv: argv.filter((argument) => argument !== "--include-hook-regressions")
   }).then((code) => {
     process.exitCode = code;
   });

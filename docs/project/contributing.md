@@ -98,6 +98,12 @@ What does not auto‑fix:
 - Verify all tools: `npm run verify:tools`
 - Format C#: `dotnet tool run csharpier format`
 - Check docs/JSON/YAML: `npm run validate:content`
+- Run the complete contract suite: `npm run validate:tests`. Hook regressions share the bounded
+  worker pool with the fast checks; any check that mutates the repository runs exclusively first.
+  `npm run validate:tests:fast` keeps its smaller scope, and
+  `npm run validate:tests:hook-regressions` remains available for hook changes.
+  To select a hook check in the full runner, use
+  `node scripts/run-contract-tests.js --include-hook-regressions --only agent-preflight`.
 - Enforce EOL/encoding: `npm run eol:check`
 - Lint GitHub Actions: `actionlint`
 - Verify Markdown/code links: `npm run lint:doc-links` (cross-platform wrapper that locates PowerShell automatically)

@@ -73,21 +73,11 @@ if (Test-Path (Join-Path (Get-Location).Path 'package.json')) {
 function Remove-CsStringLiteralsAndLineComments([string]$text) {
   if ([string]::IsNullOrEmpty($text)) { return $text }
 
-  # Pass 1: mask comments via the shared helper. Splitting on "`n" then
-  # rejoining on "`n" preserves total length because Get-CommentMaskedLines
-  # masks comment chars with spaces while preserving newlines. When the
-  # source uses CRLF, the "`r" on each line survives the split/join and
-  # column counts are unchanged.
-  $lines = $text -split "`n", -1
-  $maskedLines = Get-CommentMaskedLines -Lines $lines -Language 'csharp'
-  $commentMasked = [string]::Join("`n", $maskedLines)
+  return Remove-CsStringLiteralsFromCommentMaskedText (Get-CsCommentMaskedText $text)
+}
 
-  # Defensive: if the helper ever changed length (e.g. trailing newline
-  # handling quirk), fall back to the original text for pass 2 rather than
-  # corrupt column offsets. In practice this branch is unreachable.
-  if ($commentMasked.Length -ne $text.Length) {
-    $commentMasked = $text
-  }
+function Remove-CsStringLiteralsFromCommentMaskedText([string]$commentMasked) {
+  if ([string]::IsNullOrEmpty($commentMasked)) { return $commentMasked }
 
   # Pass 2: blank string/char literal contents.
   $sb = New-Object System.Text.StringBuilder ($commentMasked.Length)
@@ -1404,7 +1394,7 @@ foreach ($file in $filesToScan) {
   $commentMaskedContent = @($commentMaskedContent)
   if ($commentMaskedContent.Count -ne $content.Count) { $commentMaskedContent = $content }
 
-  $scrubbedText = Remove-CsStringLiteralsAndLineComments $text
+  $scrubbedText = Remove-CsStringLiteralsFromCommentMaskedText $commentMaskedText
   if ($null -eq $scrubbedText) {
     $scrubbedContent = $content
   } else {

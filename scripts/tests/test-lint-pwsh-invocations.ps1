@@ -96,6 +96,21 @@ try {
 set -e
 pwsh -NoProfile -File scripts/lint-dependabot.ps1 -Paths "${ARRAY[@]}"
 '@
+    foreach ($excludedRoot in @('node_modules', 'site', '.git', 'NODE_MODULES', 'SITE')) {
+        $excludedDirectory = Join-Path $root $excludedRoot
+        New-Item -ItemType Directory -Path $excludedDirectory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $excludedDirectory 'excluded.sh') -Value 'pwsh -File bad.ps1 -- arg'
+    }
+    if ($env:OS -ne 'Windows_NT') {
+        $hiddenDirectory = Join-Path $root '.hidden'
+        New-Item -ItemType Directory -Path $hiddenDirectory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $hiddenDirectory 'hidden.sh') -Value 'pwsh -File bad.ps1 -- arg'
+        $outsideDirectory = Join-Path $tempRoot 'outside'
+        New-Item -ItemType Directory -Path $outsideDirectory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $outsideDirectory 'linked.sh') -Value 'pwsh -File bad.ps1 -- arg'
+        New-Item -ItemType SymbolicLink -Path (Join-Path $root 'linked-root') -Target $outsideDirectory | Out-Null
+        New-Item -ItemType SymbolicLink -Path (Join-Path $root 'scripts/linked-nested') -Target $outsideDirectory | Out-Null
+    }
     $result = Invoke-LintInFixture $root
     Write-TestResult "Pass_CleanRepo" ($result.ExitCode -eq 0) "Expected exit 0 on clean fixture. Exit: $($result.ExitCode). Output: $($result.Output)"
 
@@ -119,8 +134,22 @@ pwsh -File bad.ps1 -- arg
 set -e
 pwsh -NoProfile -File scripts/lint-dependabot.ps1 -- "${FILES[@]}"
 '@
+    foreach ($nestedRoot in @('nested', 'nested/node_modules', 'nested/site')) {
+        $nestedDirectory = Join-Path $root $nestedRoot
+        New-Item -ItemType Directory -Path $nestedDirectory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $nestedDirectory 'included.sh') -Value 'pwsh -File bad.ps1 -- arg'
+    }
+    if ($env:OS -ne 'Windows_NT') {
+        New-Item -ItemType SymbolicLink -Path (Join-Path $root 'linked-file.sh') -Target (Join-Path $root 'scripts/bad.sh') | Out-Null
+    }
     $result = Invoke-LintInFixture $root
     $hasPws001 = $result.Output -match 'PWS001' -and $result.Output -match 'scripts/bad\.sh'
+    foreach ($includedPath in @('nested/included.sh', 'nested/node_modules/included.sh', 'nested/site/included.sh')) {
+        $hasPws001 = $hasPws001 -and $result.Output.Contains($includedPath)
+    }
+    if ($env:OS -ne 'Windows_NT') {
+        $hasPws001 = $hasPws001 -and $result.Output.Contains('linked-file.sh')
+    }
     Write-TestResult "Fail_BadInvocationInShellScript" ($result.ExitCode -ne 0 -and $hasPws001) "Expected exit != 0 + PWS001. Exit: $($result.ExitCode). Output: $($result.Output)"
 
     # --- Fail_BadInvocationInWorkflow ---
