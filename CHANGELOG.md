@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add reusable protobuf read limits for encoded bytes, length-delimited fields, tag counts and nesting, with a parameterless constructor for generic factories. See [Serialization](./docs/features/serialization/serialization.md) ([#647](https://github.com/Ambiguous-Interactive/unity-helpers/issues/647)).
+- Add `WUH017` warnings for a same-object `GetComponent` compared against null, where `TryGetComponent` answers the same question without Unity's Editor allocation. See [Analyzers](./docs/performance/analyzers.md#wuh017-a-getcomponent-compared-against-null) ([#741](https://github.com/Ambiguous-Interactive/unity-helpers/issues/741)).
 - Add opt-in exact sprite-art colliders, reusable alpha-mask reading and pixel-boundary tracing, with alpha and minimum-area controls. See [Sprite Colliders](./docs/features/inspector/utility-components.md) ([#715](https://github.com/Ambiguous-Interactive/unity-helpers/issues/715)).
 - Add editor-only sprite keyframe times and threshold-based last-motion detection, with renderer-path filtering and selectable bounds edges. See [Sprite Animation Motion](./docs/features/editor-tools/sprite-animation-motion.md) ([#717](https://github.com/Ambiguous-Interactive/unity-helpers/issues/717)).
 - Add cross-assembly WallstopProto subtypes with static dispatch, inherited private-member support, and collision checks at compilation, project assembly and startup ([#612](https://github.com/Ambiguous-Interactive/unity-helpers/issues/612)).

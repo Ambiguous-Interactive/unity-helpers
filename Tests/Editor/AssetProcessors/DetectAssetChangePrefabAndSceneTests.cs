@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
     using WallstopStudios.UnityHelpers.Core.Extension;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.AssetProcessors;
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Tests.Editor.TestAssets;
@@ -919,7 +920,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             GameObject prefabHandler = SharedPrefabTestFixtures.PrefabHandler;
             Assert.IsTrue(prefabHandler != null, "Shared PrefabHandler fixture not found");
             Assert.IsTrue(
-                prefabHandler.GetComponent<TestPrefabAssetChangeHandler>() != null,
+                prefabHandler.HasComponent<TestPrefabAssetChangeHandler>(),
                 "PrefabHandler fixture missing TestPrefabAssetChangeHandler component"
             );
 
@@ -943,14 +944,14 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             GameObject combinedHandler = SharedPrefabTestFixtures.CombinedHandler;
             Assert.IsTrue(combinedHandler != null, "Shared CombinedHandler fixture not found");
             Assert.IsTrue(
-                combinedHandler.GetComponent<TestCombinedSearchHandler>() != null,
+                combinedHandler.HasComponent<TestCombinedSearchHandler>(),
                 "CombinedHandler fixture missing TestCombinedSearchHandler component"
             );
 
             GameObject sceneHandler = SharedPrefabTestFixtures.SceneHandler;
             Assert.IsTrue(sceneHandler != null, "Shared SceneHandler fixture not found");
             Assert.IsTrue(
-                sceneHandler.GetComponent<TestSceneAssetChangeHandler>() != null,
+                sceneHandler.HasComponent<TestSceneAssetChangeHandler>(),
                 "SceneHandler fixture missing TestSceneAssetChangeHandler component"
             );
         }

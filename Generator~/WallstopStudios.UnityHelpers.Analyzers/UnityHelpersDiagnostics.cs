@@ -413,5 +413,69 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: true
             );
+
+        /// <summary>
+        /// A <c>GetComponent</c> call compared against null, which is <c>TryGetComponent</c>'s
+        /// question asked in the form Unity documents as the allocating one.
+        /// </summary>
+        /// <remarks>
+        /// The comparison throws the component away, so the whole expression asks only whether one
+        /// is present -- and that is the question <c>TryGetComponent</c> exists to answer. Unity
+        /// documents the difference as an Editor allocation: <c>GetComponent</c> allocates when the
+        /// component is absent and <c>TryGetComponent</c> does not. The cost is therefore invisible
+        /// to a profiler run in a player and paid by every author every day, which is the worst
+        /// shape a cost can have (#741).
+        /// <para>
+        /// <b>Scope is the same-object <c>GetComponent</c>, declared on
+        /// <c>UnityEngine.Component</c> or <c>UnityEngine.GameObject</c>, in its generic and
+        /// <c>System.Type</c> forms.</b> Three exclusions, each because the diagnostic could not
+        /// name a fix that exists. <c>GetComponentInChildren</c> and <c>GetComponentInParent</c>
+        /// search a hierarchy, and neither Unity nor this package ships a non-allocating existence
+        /// query for one -- there is no <c>TryGetComponentInChildren</c>, and <c>HasComponent</c>
+        /// forwards to <c>TryGetComponent</c>, so it is same-object too. <c>GetComponent(string)</c>
+        /// has no <c>Try</c> counterpart at all. And <c>Helpers.GetComponent&lt;T&gt;(this
+        /// Object)</c>, this package's own dispatching extension, hands back <c>default</c> for a
+        /// target that is neither a <c>GameObject</c> nor a <c>Component</c>, so a null comparison
+        /// there is a test of the TARGET rather than an existence query.
+        /// </para>
+        /// <para>
+        /// The fix named for a concrete component type is <c>HasComponent&lt;T&gt;()</c>, which is
+        /// in scope wherever this diagnostic can fire: the analyzer sits under
+        /// <c>Runtime/Analyzers</c> beside the runtime asmdef, so Unity applies it to that assembly
+        /// and to every assembly referencing it -- the same placement contract
+        /// <c>scripts/tests/test-analyzer-placement.js</c> pins. Its <c>where T : Object</c>
+        /// constraint is the one case where it is not: <c>GetComponent&lt;T&gt;()</c> accepts an
+        /// interface, so an interface type argument is offered <c>TryGetComponent(out T _)</c>
+        /// instead.
+        /// </para>
+        /// <para>
+        /// <b>On by default</b>, which rule 17 of <c>.llm/context.md</c> asks of every member of
+        /// this family and which the population supports rather than merely permits. Measured
+        /// 2026-09-07 across <c>Runtime/</c>, <c>Editor/</c> and <c>Tests/</c>: <b>seven sites, all
+        /// of them under <c>Tests/</c></b> and none in shipped code, against the 346 and 306 that
+        /// put <see cref="DictionaryIndexerReadThrowsOnMiss"/> and
+        /// <see cref="CountingLoopOverAllocationFreeSequence"/> behind an opt-in. The shape is also
+        /// unlike theirs in kind: a key that is known present makes an indexer read correct, where
+        /// a discarded <c>GetComponent</c> result has no case in which the comparison is the better
+        /// spelling. All seven were converted.
+        /// </para>
+        /// <para>
+        /// <c>is null</c> and <c>is not null</c> on a <c>GetComponent</c> result are reported here
+        /// as well, and <see cref="NullPropagationOnUnityObject"/> reports them too. The overlap is
+        /// deliberate: the two diagnostics report different defects in one expression -- WUH003 that
+        /// a CLR null test does not see a destroyed object, WUH017 that the result is thrown away --
+        /// and WUH003's fix alone leaves the allocation, so an author told only that would write
+        /// <c>!= null</c> and keep it. <c>TryGetComponent</c> settles both.
+        /// </para>
+        /// </remarks>
+        internal static readonly DiagnosticDescriptor GetComponentComparedAgainstNull =
+            new DiagnosticDescriptor(
+                "WUH017",
+                "A GetComponent compared against null allocates in the Editor",
+                "'{0}' is compared against null, so the component it found is discarded and this expression asks only whether one is present. Unity documents that 'GetComponent' allocates in the Editor when the component is absent and that 'TryGetComponent' does not -- a cost no profiler run in a player will ever show you, paid on every editor frame that takes the absent branch. Call '{1}' and use what it writes, or '{2}' where only the answer is wanted.",
+                "Performance",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: true
+            );
     }
 }
