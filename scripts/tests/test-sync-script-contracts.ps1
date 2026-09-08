@@ -288,7 +288,7 @@ function Run-AgentValidationContractTests {
     -Passed $hookTestsAreSplit `
     -Message "hook regressions = $hookRegressionScript"
 
-  $expectedFullTestScript = 'npm run validate:tests:fast && npm run validate:tests:hook-regressions'
+  $expectedFullTestScript = 'node scripts/run-contract-tests.js --include-hook-regressions'
   $fullTestsComposeBothAggregates = $fullTestScript -ceq $expectedFullTestScript
   Write-TestResult `
     -TestName 'Full CI test aggregate retains fast and exhaustive hook suites' `
@@ -1590,7 +1590,7 @@ function Run-DocumentationWorkflowContractTests {
   # format proves the link syntax is right. Losing either silently halves the check.
   #
   # The registry counts ONLY if some workflow invokes the runner. Seeding coverage from the registry
-  # unconditionally let an uninvoked file satisfy the contract while CI ran something else -- the
+  # unconditionally let a file nobody invoked satisfy the contract while CI ran something else -- the
   # modes would be present in a script nothing called.
   $runnerIsInvoked = $false
   [string]$docLinkSources = ''
@@ -2156,7 +2156,7 @@ function Run-ReleasePublishTagPreparationContractTests {
   )
 
   # DERIVE the setup-node pin from the workflow instead of restating it. A restated SHA is not a
-  # pin -- it is a second copy that every Dependabot bump desynchronizes, and this contract failed
+  # pin -- it is a second copy that every Dependabot bump leaves stale, and this contract failed
   # for exactly that reason when actions/setup-node moved. What needs protecting is that BOTH tag
   # jobs set up a SHA-pinned Node, on the SAME pin the rest of the workflow uses, before the npm
   # publication check runs.
