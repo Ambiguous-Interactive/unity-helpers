@@ -26,10 +26,10 @@ namespace WallstopStudios.UnityHelpers.Editor
         public string search;
         public string typeSearch;
         public readonly AnimationEvent animationEvent;
-        public Texture2D texture;
         public bool isTextureReadable;
         public bool isInvalidTextureRect;
         public Sprite sprite;
+        public float resolvedSpriteTime;
         public int? originalIndex;
         public bool overrideEnumValues;
         public bool isValid = true;

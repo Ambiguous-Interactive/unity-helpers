@@ -17,6 +17,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor
     public sealed class EditorWindowNativeResourceTests : CommonTestBase
     {
         [Test]
+        public void AnimationEventPreviewCacheBoundsRetainedEntries()
+        {
+            AnimationEventEditor window = Track(
+                ScriptableObject.CreateInstance<AnimationEventEditor>()
+            );
+            Texture2D texture = Track(new Texture2D(1, 1));
+            for (int index = 0; index < 129; index++)
+            {
+                Sprite sprite = Track(Sprite.Create(texture, new Rect(0, 0, 1, 1), Vector2.zero));
+                window._spriteTextureCache.Add(sprite, texture);
+            }
+            Assert.LessOrEqual(window._spriteTextureCache.Count, 128);
+        }
+
+        [Test]
         public void FitTextureWindowReleasesStateAcrossReopens()
         {
             SerializedObject previous = null;
@@ -57,9 +72,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor
             AnimationEventEditor window = Track(
                 ScriptableObject.CreateInstance<AnimationEventEditor>()
             );
-            window._spriteTextureCache.Add(sprite, owned);
+            window._spriteTextureCache.Add(sprite, owned, owned: true);
             window._spriteTextureCache.Add(otherSprite, borrowed);
-            _ = window._ownedSpriteTextures.Add(owned);
             if (alreadyDestroyed)
             {
                 Object.DestroyImmediate(owned); // UNH-SUPPRESS: cleanup of dead previews is the subject
@@ -79,7 +93,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor
             Assert.IsTrue(borrowed != null);
             Assert.AreEqual(Color.magenta, borrowed.GetPixel(0, 0));
             Assert.AreEqual(0, window._spriteTextureCache.Count);
-            Assert.AreEqual(0, window._ownedSpriteTextures.Count);
         }
     }
 #endif

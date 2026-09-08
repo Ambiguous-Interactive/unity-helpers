@@ -435,6 +435,27 @@ T element2 = random.NextOf(list);
 int index = random.Next(collection.Count);
 ```
 
+Use `NextEnumExcept` with an array when the exclusions are determined at runtime. Import
+`WallstopStudios.UnityHelpers.Core.Random`; the extension works on both `IRandom` and concrete
+generators without adding a member to the interface.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using System;
+using WallstopStudios.UnityHelpers.Core.Random;
+
+IRandom random = new PcgRandom(42);
+DayOfWeek[] excludedDays = { DayOfWeek.Saturday, DayOfWeek.Sunday };
+DayOfWeek weekday = random.NextEnumExcept(excludedDays);
+```
+
+A null or empty array excludes nothing. Duplicate and undefined exclusions follow the generator's
+existing rules; the built-in generators ignore them and throw `InvalidOperationException` when
+no enum value remains. An existing array is passed through without copying or modifying it. A
+null generator returns the default enum value. Existing calls listing individual exclusions keep
+using the interface overloads.
+
 ---
 
 ## Thread Safety

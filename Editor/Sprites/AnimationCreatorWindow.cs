@@ -224,7 +224,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private int _previewFrameIndex;
         private TimeSpan _lastPreviewTick;
         private bool _isPreviewPlaying;
-        private readonly Dictionary<Sprite, Texture2D> _previewTextureCache = new();
+        internal readonly SpritePreviewCache _previewTextureCache = new();
 
         private readonly Dictionary<string, AnimationCreatorConfig> _loadedConfigs = new();
         private bool _configSectionExpanded = true;
@@ -1191,21 +1191,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return null;
             }
 
-            // AssetPreview destroys evicted textures; refresh dead cache entries instead of leaving blank frames.
             if (_previewTextureCache.TryGetValue(sprite, out Texture2D cached))
             {
-                if (cached != null)
-                {
-                    return cached;
-                }
-
-                _ = _previewTextureCache.Remove(sprite);
+                return cached;
             }
 
             Texture2D preview = AssetPreview.GetAssetPreview(sprite);
             if (preview != null)
             {
-                _previewTextureCache[sprite] = preview;
+                _previewTextureCache.Add(sprite, preview);
             }
 
             return preview;
