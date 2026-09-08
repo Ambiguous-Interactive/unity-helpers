@@ -53,7 +53,7 @@ jobs:
         env:
           INPUT_UNITY_VERSION: ${{ inputs.unity-version }}
         # The benchmark matrix list and the latest entry both come from the
-        # canonical source (.github/unity-versions.json), so the scheduled perf
+        # canonical source (.github/unity-versions.json), so the dispatched perf
         # coverage tracks every supported runtime and the latest-vs-list pair
         # cannot drift. The LAST entry is the latest Unity version. A dispatch
         # override pins a single version.
@@ -265,7 +265,7 @@ jobs:
         run: |
           # Release (not Debug) code optimization for the editmode/playmode perf
           # legs, mirroring the repo-wide Unity Release-mode contract so the
-          # weekly coverage run measures the same optimized hot path the docs do.
+          # dispatched benchmark run measures the same optimized hot path the docs do.
           # Same persistent project root as unity-tests.yml but a SEPARATE per-leg
           # directory. These legs deliberately omit -IncludeIntegrations, so their
           # ephemeral manifest and compiled assembly set differ from the test legs'.
@@ -435,8 +435,12 @@ jobs:
   # Enrollment contract (Workflow contract item 10): a stable, always-reporting
   # aggregate covering the licensed benchmark job and its runner preflight, so a
   # skipped or cancelled benchmark matrix can never disappear silently from the
-  # required-checks summary. Kept independent of commit-perf-results so partial
-  # diagnostic capture still runs when a leg fails.
+  # required-checks summary. It carries the central trusted-skip script shape:
+  # green ONLY for an exact untrusted skip (fork or Dependabot pull request --
+  # unreachable here today because the workflow has no pull_request trigger, but
+  # kept exact so the shape cannot drift) or full success. Kept independent of
+  # commit-perf-results so partial diagnostic capture still runs when a leg
+  # fails.
   benchmarks-aggregate:
     name: Require Unity benchmark result
     if: ${{ always() }}
@@ -448,19 +452,31 @@ jobs:
     steps:
       - name: Enforce Unity benchmark and preflight results
         shell: bash
+        env:
+          RUNNER_PREFLIGHT_RESULT: ${{ needs.runner-preflight.result }}
+          UNITY_TESTS_RESULT: ${{ needs.benchmarks.result }}
+          FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          DEPENDABOT_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]' }}
         run: |
-          test "${{ needs.benchmarks.result }}" = success
-          test "${{ needs.runner-preflight.result }}" = success
+          set -euo pipefail
+          if [ "${FORK_PR}" = "true" ] || [ "${DEPENDABOT_PR}" = "true" ]; then
+            test "${RUNNER_PREFLIGHT_RESULT}" = skipped
+            test "${UNITY_TESTS_RESULT}" = skipped
+          else
+            test "${RUNNER_PREFLIGHT_RESULT}" = success
+            test "${UNITY_TESTS_RESULT}" = success
+          fi
 
   commit-perf-results:
     name: Commit refreshed perf results
     needs:
       - matrix-config
       - benchmarks
-    # schedule + workflow_dispatch only ever run on the canonical repo (scheduled
-    # runs fire only from the default branch; a dispatch requires write access),
-    # so no repo-slug guard is needed (avoids hardcoding a slug that breaks after
-    # an org transfer). Run even if some benchmark legs failed (!cancelled, not
+    # workflow_dispatch only ever runs on the canonical repo (a dispatch
+    # requires write access), so no repo-slug guard is needed (avoids hardcoding
+    # a slug that breaks after an org transfer). The weekly cron was removed:
+    # scheduled runs are never an eligible trusted trigger for licensed Unity
+    # work. Run even if some benchmark legs failed (!cancelled, not
     # success()) so a partial result set is still captured; if there are no
     # artifacts at all, git-auto-commit-action is a no-op.
     if: ${{ !cancelled() }}
