@@ -8,11 +8,13 @@ on:
       - master
       - main
   push:
+    # Enrollment contract: licensed Unity work is reachable only through
+    # protected branches. `main` is the repository's protected default branch;
+    # scheduled runs are never an eligible trusted trigger, so the weekly cron
+    # was removed (nightly/weekly coverage comes from the protected-branch push
+    # and from manual dispatch).
     branches:
-      - master
       - main
-  schedule:
-    - cron: "17 8 * * 1"
   workflow_dispatch:
     inputs:
       unity-version:
@@ -223,6 +225,9 @@ jobs:
         run: |
           $version = (Get-Content .github/unity-versions.json -Raw | ConvertFrom-Json).release
           if ($version -notmatch '^\d+\.\d+\.\d+f\d+$') { throw 'Invalid release Unity version.' }
+          # The unitypackage-smoke editor gate and central return pin this
+          # version literally (enrollment contract); fail closed on drift.
+          if ($version -ne '2022.3.45f1') { throw "unity-versions.json release '$version' drifted from the pinned unitypackage-smoke editor version '2022.3.45f1'; update the smoke ensure/return pin in the same change." }
           "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Resolve dispatch overrides
@@ -244,73 +249,25 @@ jobs:
 
   runner-preflight:
     name: Self-hosted runner access preflight
-    if: >-
-      ${{
-        (github.event_name != 'pull_request' ||
-          github.event.pull_request.head.repo.full_name == github.repository) &&
-        (github.event_name != 'push' || github.ref_protected)
-      }}
+    # Enrollment contract (Preconditions item 2): fork and Dependabot runs must
+    # remain unlicensed because organization secrets are unavailable to them, so
+    # this hosted registration preflight carries the trusted-revision guard at
+    # the job level and runs its single approved availability action
+    # unconditionally. The old org-credentials probe output is gone: a
+    # same-repository run is expected to hold the organization credential set,
+    # and a run without it now fails closed at the preflight instead of
+    # silently skipping every licensed tier.
+    if: ${{ github.event.pull_request.user.login != 'dependabot[bot]' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
     concurrency:
       group: ${{ github.workflow }}-runner-preflight-${{ github.ref }}
       cancel-in-progress: true
-    outputs:
-      # "Does this run carry the organization CI credential store?" -- the single
-      # gate every licensed tier reads. It is answered HERE because this job
-      # already holds build-lock credentials to do its own work, so publishing the
-      # answer adds no credential to any additional scope and no dependency edge
-      # (every licensed job already `needs:` this one).
-      #
-      # The reader App, the writer App and the Unity serial are provisioned
-      # together as one organization credential set, so the reader's presence is
-      # the run's access to that set. It is not a claim that the other halves are
-      # individually correct, and it does not have to be: every licensed job runs
-      # `Validate Unity license secrets` before it acquires the lock, and that
-      # step names exactly which of UNITY_SERIAL / UNITY_EMAIL / UNITY_PASSWORD /
-      # BUILD_LOCK_APP_ID / BUILD_LOCK_APP_PRIVATE_KEY is missing and fails the
-      # job in seconds.
-      #
-      # It cannot run any earlier than it does, and the ordering is deliberate:
-      # `Validate Unity license secrets` is a LOCAL composite action, so it needs
-      # `Checkout` first, while `Require manually installed Unity editor` runs
-      # before `Checkout` on purpose -- the editor authority has to settle before
-      # any repository-controlled code is on disk. Both halves of that ordering
-      # are enforced by scripts/tests/test-unity-workflow-matrix-contract.ps1
-      # (Test-UnityJobUsesCentralEditorGate). So a half-configured repository
-      # pays one ensure-unity-editor step -- capped at ten minutes, and a no-op on
-      # a runner that already holds the editor -- and then gets a loud, actionable
-      # red instead of a doomed activation.
-      org-credentials: ${{ steps.credentials.outputs.present }}
     steps:
-      # This job is the only one in the workflow that reached for organization
-      # secrets without first asking whether this run has any. Dependabot runs use
-      # a separate secret store, so `reader-app-id` arrived empty and the action
-      # failed closed with "Missing required input" -- on every dependency PR,
-      # forever, while `matrix-config` had already (correctly) skipped the licensed
-      # tiers those credentials exist to serve. Preflighting a runner fleet nothing
-      # is going to dispatch to is not a gate, it is a guaranteed red.
-      #
-      # The check is done here rather than in the job's `if:` on purpose: the
-      # `secrets` context is unavailable in a job-level condition, and reading it
-      # through `needs.matrix-config` would put this job behind a barrier it does
-      # not otherwise need.
-      - name: Detect build-lock reader credentials
-        id: credentials
-        env:
-          READER_APP_ID: ${{ secrets.BUILD_LOCK_READER_APP_ID }}
-          READER_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_READER_APP_PRIVATE_KEY }}
-        run: |
-          set -euo pipefail
-          if [ -n "${READER_APP_ID:-}" ] && [ -n "${READER_APP_PRIVATE_KEY:-}" ]; then
-            echo "present=true" >> "${GITHUB_OUTPUT}"
-            exit 0
-          fi
-          echo "present=false" >> "${GITHUB_OUTPUT}"
-          echo "::notice::No build-lock reader credentials on this run, so the licensed Unity tiers are skipped and there is no runner fleet to preflight."
-
+      # Verifies only that every required label set has a registered runner
+      # visible to the repository; the licensed jobs below depend on this job so
+      # an impossible label set fails instead of queueing forever.
       - name: Require an online Unity runner
-        if: ${{ steps.credentials.outputs.present == 'true' }}
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/check-unity-runner-availability@64bac446903115134dca8235410b332bc5a83547 # v1.14.0
         with:
           reader-app-id: ${{ secrets.BUILD_LOCK_READER_APP_ID }}
@@ -330,7 +287,6 @@ jobs:
         (github.event_name != 'pull_request' ||
           github.event.pull_request.head.repo.full_name == github.repository) &&
         (github.event_name != 'push' || github.ref_protected) &&
-        needs.runner-preflight.outputs.org-credentials == 'true' &&
         needs.matrix-config.outputs.test-modes != '[]' &&
         needs.matrix-config.outputs.superseded != 'true'
       }}
@@ -379,9 +335,14 @@ jobs:
         with:
           unity-version: ${{ matrix.unity-version }}
           install-root: ${{ runner.tool_cache }}\u6-v3
-          provisioning-profile: >-
-            ${{ (contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') ||
-            inputs.acceptance == 'intmap' || inputs.acceptance == 'serialization' || inputs.acceptance == 'all') && 'StandaloneWindowsIl2Cpp' || 'EditorOnly' }}
+          # Enrollment contract (Workflow contract item 3): the profile is
+          # EditorOnly unless a reviewed STATIC matrix.test-mode map selects
+          # StandaloneWindowsIl2Cpp for standalone. This job's test modes are
+          # resolved dynamically (dispatch overrides / exclusions), so no static
+          # test-mode axis exists to authorize the IL2CPP profile here; the
+          # runner-owned CI-managed editors keep the standalone module set
+          # available, and standalone legs validate it via their own runs.
+          provisioning-profile: EditorOnly
           diagnostics-path: unity-editor-check.json
           ci-managed-only: true
           require-healthy-existing: true
@@ -935,7 +896,6 @@ jobs:
         (github.event_name != 'push' || github.ref_protected) &&
         needs.matrix-config.result == 'success' &&
         needs.runner-preflight.result == 'success' &&
-        needs.runner-preflight.outputs.org-credentials == 'true' &&
         needs.matrix-config.outputs.superseded != 'true'
       }}
     runs-on: [self-hosted, Windows, RAM-64GB]
@@ -1319,7 +1279,6 @@ jobs:
         (github.event_name != 'push' || github.ref_protected) &&
         needs.matrix-config.result == 'success' &&
         needs.runner-preflight.result == 'success' &&
-        needs.runner-preflight.outputs.org-credentials == 'true' &&
         needs.matrix-config.outputs.superseded != 'true'
       }}
     runs-on: [self-hosted, Windows, RAM-64GB]
@@ -1338,7 +1297,12 @@ jobs:
         timeout-minutes: 10
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/ensure-unity-editor@64bac446903115134dca8235410b332bc5a83547 # v1.14.0
         with:
-          unity-version: ${{ needs.matrix-config.outputs.release-unity-version }}
+          # Enrollment contract (Workflow contract item 3): the editor gate and
+          # the central license return must carry a literal reviewed Unity
+          # version. Keep this pin identical to `release` in
+          # .github/unity-versions.json; matrix-config's drift assert below
+          # fails the run if they diverge.
+          unity-version: '2022.3.45f1'
           install-root: ${{ runner.tool_cache }}\u6-v3
           provisioning-profile: EditorOnly
           diagnostics-path: unity-editor-check.json
@@ -1432,7 +1396,9 @@ jobs:
         timeout-minutes: 5
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/return-unity-license@64bac446903115134dca8235410b332bc5a83547 # v1.14.0
         with:
-          unity-version: ${{ needs.matrix-config.outputs.release-unity-version }}
+          # Must match the ensure-unity-editor pin above exactly (see the
+          # enrollment contract's central-return version rule).
+          unity-version: '2022.3.45f1'
           tool-cache: ${{ runner.tool_cache }}
           unity-email: ${{ secrets.UNITY_EMAIL }}
           unity-password: ${{ secrets.UNITY_PASSWORD }}
@@ -1521,6 +1487,39 @@ jobs:
           reservation-id: ${{ steps.release_unity_lock.outputs.reservation-id }}
           incident-id: ${{ steps.release_unity_lock.outputs.incident-id }}
 
+  # Enrollment contract (Workflow contract item 10): one stable, always-reporting
+  # aggregate per licensed job. This hosted gate fails if any licensed tier or
+  # the runner preflight did not succeed, so a skipped or cancelled leg can never
+  # disappear silently into the required-checks summary.
+  unity-tests-aggregate:
+    name: Unity CI aggregate gate
+    if: ${{ always() }}
+    needs:
+      - runner-preflight
+      - unity-tests
+      - unity-tests-single-threaded
+      - unitypackage-smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require Unity tests result
+        shell: bash
+        run: |
+          test "${{ needs.unity-tests.result }}" = success
+          test "${{ needs.runner-preflight.result }}" = success
+
+      - name: Require single-threaded result
+        shell: bash
+        run: |
+          test "${{ needs.unity-tests-single-threaded.result }}" = success
+          test "${{ needs.runner-preflight.result }}" = success
+
+      - name: Require package smoke result
+        shell: bash
+        run: |
+          test "${{ needs.unitypackage-smoke.result }}" = success
+          test "${{ needs.runner-preflight.result }}" = success
+
   unity-ci-success:
     name: Unity CI Success
     if: ${{ always() }}
@@ -1587,7 +1586,6 @@ jobs:
           REF_PROTECTED: ${{ github.ref_protected }}
           MATRIX_CONFIG_RESULT: ${{ needs.matrix-config.result }}
           MATRIX_CONFIG_SUPERSEDED: ${{ needs.matrix-config.outputs.superseded }}
-          HAS_ORG_CREDENTIALS: ${{ needs.runner-preflight.outputs.org-credentials }}
           LATE_SUPERSEDED: ${{ steps.late_superseded.outputs.superseded }}
           RUNNER_PREFLIGHT_RESULT: ${{ needs.runner-preflight.result }}
           UNITY_TESTS_RESULT: ${{ needs.unity-tests.result }}
@@ -1615,42 +1613,6 @@ jobs:
 
           if [ "${EVENT_NAME}" = "push" ] && [ "${REF_PROTECTED}" != "true" ]; then
             echo "Unprotected push intentionally omitted licensed Unity jobs."
-            exit 0
-          fi
-
-          # A run with no organization secrets -- Dependabot's separate secret
-          # store is the case that reaches this -- cannot dispatch a licensed leg,
-          # so every one of them is skipped by design. That is the same situation
-          # as a fork PR above and is reported the same way: green, because nothing
-          # failed, with the summary saying plainly that no Unity validation ran.
-          #
-          # It is still an assertion, not a waiver. Both hosted gates must have
-          # passed and every licensed job must be `skipped`; anything else means a
-          # leg ran that could not have, or a gate broke, and that is a real red.
-          if [ "${HAS_ORG_CREDENTIALS}" != "true" ]; then
-            if [ "${MATRIX_CONFIG_RESULT}" != "success" ] || [ "${RUNNER_PREFLIGHT_RESULT}" != "success" ]; then
-              echo "::error::Run without Unity credentials, but a hosted gate did not pass: matrix-config=${MATRIX_CONFIG_RESULT}, runner-preflight=${RUNNER_PREFLIGHT_RESULT}."
-              exit 1
-            fi
-            for pair in \
-              "unity-tests=${UNITY_TESTS_RESULT}" \
-              "unity-tests-single-threaded=${SINGLE_THREADED_RESULT}" \
-              "unitypackage-smoke=${UNITYPACKAGE_SMOKE_RESULT}"; do
-              if [ "${pair#*=}" != "skipped" ]; then
-                echo "::error::Run without Unity credentials, but a licensed job did not skip: ${pair}."
-                exit 1
-              fi
-            done
-            echo "No Unity credentials on this run; the licensed Unity tiers were skipped."
-            {
-              echo "## Unity validation did not run"
-              echo ""
-              echo "This run had no Unity credentials, so every licensed tier was skipped and **no Unity test executed**."
-              echo ""
-              echo "The hosted gates passed and every licensed job skipped as designed, so this is reported as a pass rather than a failure."
-              echo ""
-              echo "Unity coverage for these changes comes from the protected-branch push after merge."
-            } >> "${GITHUB_STEP_SUMMARY}"
             exit 0
           fi
 
