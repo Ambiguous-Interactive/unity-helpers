@@ -35,7 +35,7 @@
 # - GitHub Actions run on Linux (LF is native)
 # - Dependabot commits with LF line endings
 # - This prevents line-ending diffs from dependabot PRs
-.github/**  text eol=lf
+.github/**  text=auto eol=lf
 
 # npm package files MUST have LF line endings
 # - Dependabot updates npm dependencies and commits with LF

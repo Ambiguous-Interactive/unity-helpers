@@ -454,7 +454,9 @@ A null or empty array excludes nothing. Duplicate and undefined exclusions follo
 existing rules; the built-in generators ignore them and throw `InvalidOperationException` when
 no enum value remains. An existing array is passed through without copying or modifying it. A
 null generator returns the default enum value. Existing calls listing individual exclusions keep
-using the interface overloads.
+using the interface overloads: one through four exclusions create no params array, while more
+than four keep the existing tail-array allocation. Calling the extension explicitly as
+`RandomUtilities.NextEnumExcept(random, ...)` with individual values can create a params array.
 
 ---
 

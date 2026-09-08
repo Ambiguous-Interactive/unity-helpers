@@ -17,6 +17,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// <remarks>
         /// Uses the generator's existing enum selection semantics, including its handling of
         /// duplicate, undefined and fully excluded values. Passing an array does not copy it.
+        /// Fixed-arity instance calls retain precedence over this extension.
         /// </remarks>
         public static T NextEnumExcept<T>(this IRandom random, params T[] exceptions)
             where T : unmanaged, Enum

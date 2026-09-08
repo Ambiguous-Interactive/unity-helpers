@@ -1068,7 +1068,9 @@ runtime API.
 ## Property Drawers & Attributes
 
 These are the inspector attributes the tools above lean on most. The
-[Inspector documentation](../inspector/inspector-overview.md) covers the full set.
+[Inspector documentation](../inspector/inspector-overview.md) covers the full set. Collection
+inspectors release their cached button textures on script reload and editor exit; the next draw
+rebuilds the styles as needed.
 
 <a id="winlineeditor-property-drawer"></a>
 

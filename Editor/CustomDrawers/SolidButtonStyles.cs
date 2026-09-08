@@ -28,6 +28,20 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private static readonly RectOffset ZeroMargin = new(0, 0, 0, 0);
         private static readonly RectOffset StandardPadding = new(8, 8, 3, 3);
 
+        /// <summary>Releases owned textures and the styles that reference them.</summary>
+        internal static void ClearCache()
+        {
+            ButtonStyleCache.Clear();
+            foreach (Texture2D texture in ColorTextureCache.Values)
+            {
+                if (texture != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(texture);
+                }
+            }
+            ColorTextureCache.Clear();
+        }
+
         internal static Color DisabledColor => ThemeDisabledColor;
 
         internal static GUIStyle GetSolidButtonStyle(string action, bool enabled)

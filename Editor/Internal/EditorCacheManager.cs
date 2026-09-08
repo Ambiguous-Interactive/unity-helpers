@@ -20,16 +20,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Internal
         {
             // Defer beyond initialization, with a fallback because an idle editor may not pump delayCall.
             EditorStartupCallback.RunOnce(ClearAllCaches);
+            AssemblyReloadEvents.beforeAssemblyReload += ClearAllCaches;
+            EditorApplication.quitting += ClearAllCaches;
         }
 
-        /// <summary>
-        /// Clears all editor caches. This method is called automatically on domain reload
-        /// via <see cref="InitializeOnLoadAttribute"/> (deferred via <see cref="EditorStartupCallback"/>)
-        /// to ensure all cached state is properly reset when Unity reloads the domain
-        /// (after script compilation, entering/exiting play mode, etc.).
-        /// </summary>
+        /// <summary>Releases editor caches before domain reload and quit, and after startup.</summary>
         internal static void ClearAllCaches()
         {
+            SolidButtonStyles.ClearCache();
             EditorCacheHelper.ClearAllCaches();
             WGroupLayoutBuilder.ClearCache();
             WButtonGUI.ClearContextCache();
