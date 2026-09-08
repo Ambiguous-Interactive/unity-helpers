@@ -63,7 +63,12 @@ function expression(text) {
     );
 }
 function predicate(step) {
-  const line = step.match(/^        if: (.*)$/m)?.[1];
+  // Long conditions are wrapped in the repo's folded `if: >-` style; keep the
+  // extraction aligned with the diagnostic sweep below.
+  const line = step
+    .match(/^        if: ([^\n]*(?:\n          [^\n]*)*)/m)?.[1]
+    ?.replace(/^(?:>-?|\|-?)\s*/, "")
+    .trim();
   assert.ok(line, "Explicit acceptance predicate required");
   assert.match(
     line,
@@ -89,8 +94,10 @@ for (const event of ["pull_request", "push", "schedule", "workflow_dispatch"]) {
           const context = {
             github: { event_name: event },
             inputs: { acceptance },
-            // Acceptance runs once per version, in the editmode leg.
-            matrix: { "test-mode": "editmode" },
+            // Acceptance runs once per version, in the standalone leg: the
+            // intmap and serialization kinds build IL2CPP standalone players,
+            // so the leg's editor gate must provision StandaloneWindowsIl2Cpp.
+            matrix: { "test-mode": "standalone" },
             cancelled,
             success: false,
             steps: {
@@ -140,13 +147,40 @@ for (const [testMode, expected] of [
   assert.equal(
     profile({
       matrix: { "test-mode": testMode },
-      needs: { "matrix-config": { outputs: { "test-modes": JSON.stringify(["editmode", "playmode", "standalone"]) } } }
+      needs: {
+        "matrix-config": {
+          outputs: { "test-modes": JSON.stringify(["editmode", "playmode", "standalone"]) }
+        }
+      }
     }),
     expected,
     `Wrong provisioning profile for the ${testMode} leg`
   );
   controls++;
 }
+
+// The standalone leg must exist whenever acceptance is requested: the resolver
+// receives the dispatch acceptance input and adds 'standalone' to test-modes.
+assert.match(
+  workflow,
+  /INPUT_ACCEPTANCE: \$\{\{ inputs\.acceptance \}\}/,
+  "Dispatch acceptance must feed resolve-test-matrix.js"
+);
+const { resolveTestMatrix } = require("../unity/resolve-test-matrix.js");
+assert.deepEqual(resolveTestMatrix(["2022.3.45f1"], "", "all", "none")["test-modes"], [
+  "editmode",
+  "playmode",
+  "standalone"
+]);
+assert.deepEqual(resolveTestMatrix(["2022.3.45f1"], "", "editmode", "sentinel")["test-modes"], [
+  "editmode",
+  "standalone"
+]);
+assert.deepEqual(resolveTestMatrix(["2022.3.45f1"], "", "playmode", "intmap")["test-modes"], [
+  "playmode",
+  "standalone"
+]);
+controls += 3;
 
 assert.ok(
   job.indexOf(identified("unity_lock")) < job.indexOf(run),

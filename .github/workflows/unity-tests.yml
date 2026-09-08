@@ -227,7 +227,9 @@ jobs:
           if ($version -notmatch '^\d+\.\d+\.\d+f\d+$') { throw 'Invalid release Unity version.' }
           # The unitypackage-smoke editor gate and central return pin this
           # version literally (enrollment contract); fail closed on drift.
-          if ($version -ne '2022.3.45f1') { throw "unity-versions.json release '$version' drifted from the pinned unitypackage-smoke editor version '2022.3.45f1'; update the smoke ensure/return pin in the same change." }
+          if ($version -ne '2022.3.45f1') {
+            throw "unity-versions.json release '$version' drifted from the pinned unitypackage-smoke editor version '2022.3.45f1'; update the smoke ensure/return pin in the same change."
+          }
           "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Resolve dispatch overrides
@@ -235,6 +237,7 @@ jobs:
         env:
           INPUT_UNITY_VERSION: ${{ inputs.unity-version }}
           INPUT_TEST_MODE: ${{ inputs.test-mode }}
+          INPUT_ACCEPTANCE: ${{ inputs.acceptance }}
         run: node scripts/unity/resolve-test-matrix.js
 
       # NOTE: this job deliberately holds NO `secrets.*` reference. It used to read
@@ -486,7 +489,9 @@ jobs:
 
       - name: Run PlayMode tests
         id: run_playmode
-        if: ${{ !cancelled() && matrix.test-mode == 'playmode' && steps.unity_lock.outputs.acquired == 'true' && steps.playmode_head.outcome == 'success' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode') }}
+        if: >-
+          ${{ !cancelled() && matrix.test-mode == 'playmode' && steps.unity_lock.outputs.acquired == 'true'
+          && steps.playmode_head.outcome == 'success' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode') }}
         continue-on-error: true
         timeout-minutes: 40
         shell: pwsh
@@ -527,7 +532,9 @@ jobs:
 
       - name: Run Standalone tests
         id: run_standalone
-        if: ${{ !cancelled() && matrix.test-mode == 'standalone' && steps.unity_lock.outputs.acquired == 'true' && steps.standalone_head.outcome == 'success' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') }}
+        if: >-
+          ${{ !cancelled() && matrix.test-mode == 'standalone' && steps.unity_lock.outputs.acquired == 'true'
+          && steps.standalone_head.outcome == 'success' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') }}
         continue-on-error: true
         timeout-minutes: 60
         shell: pwsh
@@ -557,9 +564,14 @@ jobs:
 
       - name: Run additional native acceptance
         id: run_acceptance
-        # Acceptance runs once per version, in the editmode leg, independent of
-        # the mode selection: it is requested explicitly per dispatch.
-        if: ${{ !cancelled() && matrix.test-mode == 'editmode' && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none' && steps.unity_lock.outputs.acquired == 'true' }}
+        # Acceptance runs once per version, in the standalone leg: the intmap
+        # and serialization kinds build IL2CPP standalone players, so this leg's
+        # editor gate provisions the StandaloneWindowsIl2Cpp profile the player
+        # builds need. resolve-test-matrix.js guarantees the standalone leg is
+        # selected whenever acceptance is requested.
+        if: >-
+          ${{ !cancelled() && matrix.test-mode == 'standalone' && github.event_name == 'workflow_dispatch'
+          && inputs.acceptance != '' && inputs.acceptance != 'none' && steps.unity_lock.outputs.acquired == 'true' }}
         continue-on-error: true
         timeout-minutes: 120
         shell: pwsh
@@ -659,7 +671,8 @@ jobs:
       - name: Dump EditMode log tail on failure
         if: >-
           ${{ steps.checkout.outcome == 'success' && (always()
-          && matrix.test-mode == 'editmode' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'editmode') && steps.run_editmode.outcome != 'success' && steps.run_editmode.outcome != 'skipped') }}
+          && matrix.test-mode == 'editmode' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'editmode')
+          && steps.run_editmode.outcome != 'success' && steps.run_editmode.outcome != 'skipped') }}
         uses: ./.github/actions/dump-unity-log-tail
         with:
           results-dir: .artifacts/unity/${{ matrix.unity-version }}-editmode
@@ -668,7 +681,8 @@ jobs:
       - name: Dump PlayMode log tail on failure
         if: >-
           ${{ steps.checkout.outcome == 'success' && (always()
-          && matrix.test-mode == 'playmode' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode') && steps.run_playmode.outcome != 'success' && steps.run_playmode.outcome != 'skipped') }}
+          && matrix.test-mode == 'playmode' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode')
+          && steps.run_playmode.outcome != 'success' && steps.run_playmode.outcome != 'skipped') }}
         uses: ./.github/actions/dump-unity-log-tail
         with:
           results-dir: .artifacts/unity/${{ matrix.unity-version }}-playmode
@@ -677,7 +691,8 @@ jobs:
       - name: Dump Standalone log tail on failure
         if: >-
           ${{ steps.checkout.outcome == 'success' && (always()
-          && matrix.test-mode == 'standalone' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') && steps.run_standalone.outcome != 'success' && steps.run_standalone.outcome != 'skipped') }}
+          && matrix.test-mode == 'standalone' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone')
+          && steps.run_standalone.outcome != 'success' && steps.run_standalone.outcome != 'skipped') }}
         uses: ./.github/actions/dump-unity-log-tail
         with:
           results-dir: .artifacts/unity/${{ matrix.unity-version }}-standalone
@@ -782,7 +797,7 @@ jobs:
 
       - name: Verify additional native acceptance
         id: verify_acceptance
-        if: ${{ always() && !cancelled() && matrix.test-mode == 'editmode' && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none' }}
+        if: ${{ always() && !cancelled() && matrix.test-mode == 'standalone' && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none' }}
         continue-on-error: true
         shell: pwsh
         env:
@@ -798,7 +813,10 @@ jobs:
 
       - name: Redact credentials from acceptance artifacts
         id: redact_acceptance
-        if: ${{ steps.checkout.outcome == 'success' && (always() && matrix.test-mode == 'editmode' && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none') }}
+        if: >-
+          ${{ steps.checkout.outcome == 'success' && (always()
+          && matrix.test-mode == 'standalone' && github.event_name == 'workflow_dispatch'
+          && inputs.acceptance != '' && inputs.acceptance != 'none') }}
         continue-on-error: true
         timeout-minutes: 2
         uses: ./.github/actions/redact-unity-artifacts
@@ -807,7 +825,9 @@ jobs:
 
       - name: Upload acceptance artifacts
         id: upload_acceptance
-        if: ${{ always() && matrix.test-mode == 'editmode' && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none' && steps.redact_acceptance.outcome == 'success' }}
+        if: >-
+          ${{ always() && matrix.test-mode == 'standalone' && github.event_name == 'workflow_dispatch'
+          && inputs.acceptance != '' && inputs.acceptance != 'none' && steps.redact_acceptance.outcome == 'success' }}
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -817,7 +837,7 @@ jobs:
           retention-days: 30
 
       - name: Require requested native acceptance
-        if: ${{ always() && !cancelled() && matrix.test-mode == 'editmode' && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none' }}
+        if: ${{ always() && !cancelled() && matrix.test-mode == 'standalone' && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none' }}
         shell: pwsh
         env:
           ACCEPTANCE_RUN: ${{ steps.run_acceptance.outcome }}
@@ -1315,7 +1335,7 @@ jobs:
           # version. Keep this pin identical to `release` in
           # .github/unity-versions.json; matrix-config's drift assert below
           # fails the run if they diverge.
-          unity-version: '2022.3.45f1'
+          unity-version: "2022.3.45f1"
           install-root: ${{ runner.tool_cache }}\u6-v3
           provisioning-profile: EditorOnly
           diagnostics-path: unity-editor-check.json
@@ -1411,7 +1431,7 @@ jobs:
         with:
           # Must match the ensure-unity-editor pin above exactly (see the
           # enrollment contract's central-return version rule).
-          unity-version: '2022.3.45f1'
+          unity-version: "2022.3.45f1"
           tool-cache: ${{ runner.tool_cache }}
           unity-email: ${{ secrets.UNITY_EMAIL }}
           unity-password: ${{ secrets.UNITY_PASSWORD }}

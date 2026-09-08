@@ -552,9 +552,11 @@ function Test-UnityLockCleanupIsGated {
         # drift between the ensure and return pins inside one job). The pinned
         # version must stay identical to `release` in .github/unity-versions.json,
         # which matrix-config's drift assert and the release workflow enforce.
+        # Quoting is prettier's canonical double-quote form; the contract checks
+        # the literal pin, not the quote style.
         $expectedVersion = switch ($job.Key) {
-            'unitypackage-smoke' { '''2022.3.45f1''' }
-            'unitypackage' { '''2022.3.45f1''' }
+            'unitypackage-smoke' { '"2022.3.45f1"' }
+            'unitypackage' { '"2022.3.45f1"' }
             default { '${{ matrix.unity-version }}' }
         }
         if (

@@ -40,6 +40,31 @@ for (const invalid of [[], null, [""], ["version", "version"], [123]]) {
   assert.throws(() => resolveTestMatrix(invalid), /Unity versions must/);
   cases++;
 }
+// Requested native acceptance always selects the standalone leg: intmap and
+// serialization acceptance build IL2CPP standalone players, so the only leg
+// whose editor gate provisions StandaloneWindowsIl2Cpp must exist.
+for (const acceptance of ["", "none"]) {
+  assert.deepEqual(resolveTestMatrix(versions, "", "all", acceptance)["test-modes"], TEST_MODES);
+  assert.deepEqual(resolveTestMatrix(versions, "", "playmode", acceptance)["test-modes"], [
+    "playmode"
+  ]);
+  cases += 2;
+}
+for (const acceptance of ["sentinel", "intmap", "serialization", "all"]) {
+  assert.deepEqual(resolveTestMatrix(versions, "", "all", acceptance)["test-modes"], TEST_MODES);
+  assert.deepEqual(resolveTestMatrix(versions, "", "editmode", acceptance)["test-modes"], [
+    "editmode",
+    "standalone"
+  ]);
+  assert.deepEqual(resolveTestMatrix(versions, "", "playmode", acceptance)["test-modes"], [
+    "playmode",
+    "standalone"
+  ]);
+  assert.deepEqual(resolveTestMatrix(versions, "", "standalone", acceptance)["test-modes"], [
+    "standalone"
+  ]);
+  cases += 4;
+}
 const matrix = resolveTestMatrix(versions);
 matrix["unity-versions"].pop();
 assert.deepEqual(resolveTestMatrix(versions)["unity-versions"], versions);
@@ -75,6 +100,40 @@ try {
       })
   );
   assert.deepEqual(published, resolveTestMatrix(versions, versions[0], "standalone"));
+  cases++;
+  const acceptanceOutput = path.join(scratch, "outputs-acceptance");
+  const acceptanceResult = spawnSync(
+    process.execPath,
+    [path.join(repoRoot, "scripts/unity/resolve-test-matrix.js")],
+    {
+      cwd: scratch,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        INPUT_UNITY_VERSION: versions[0],
+        INPUT_TEST_MODE: "editmode",
+        INPUT_ACCEPTANCE: "serialization",
+        GITHUB_OUTPUT: acceptanceOutput
+      }
+    }
+  );
+  assert.ifError(acceptanceResult.error);
+  assert.equal(acceptanceResult.status, 0, acceptanceResult.stderr);
+  const publishedAcceptance = Object.fromEntries(
+    fs
+      .readFileSync(acceptanceOutput, "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => {
+        const separator = line.indexOf("=");
+        return [line.slice(0, separator), JSON.parse(line.slice(separator + 1))];
+      })
+  );
+  assert.deepEqual(
+    publishedAcceptance,
+    resolveTestMatrix(versions, versions[0], "editmode", "serialization")
+  );
+  assert.deepEqual(publishedAcceptance["test-modes"], ["editmode", "standalone"]);
   cases++;
 } finally {
   fs.rmSync(scratch, { recursive: true, force: true });

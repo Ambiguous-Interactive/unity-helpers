@@ -5,7 +5,12 @@ const path = require("node:path");
 
 const TEST_MODES = Object.freeze(["editmode", "playmode", "standalone"]);
 
-function resolveTestMatrix(versions, requestedVersion = "", requestedMode = "all") {
+function resolveTestMatrix(
+  versions,
+  requestedVersion = "",
+  requestedMode = "all",
+  requestedAcceptance = "none"
+) {
   if (
     !Array.isArray(versions) ||
     versions.length === 0 ||
@@ -24,10 +29,19 @@ function resolveTestMatrix(versions, requestedVersion = "", requestedMode = "all
   if (mode && mode !== "all" && !TEST_MODES.includes(mode)) {
     throw new Error(`Unsupported Unity test mode: ${mode}`);
   }
+  const acceptance = requestedAcceptance.trim();
+  const acceptanceRequested = acceptance !== "" && acceptance !== "none";
   const selectedVersions = version ? [version] : [...versions];
+  const selectedModes = !mode || mode === "all" ? [...TEST_MODES] : [mode];
+  if (acceptanceRequested && !selectedModes.includes("standalone")) {
+    // Native acceptance builds IL2CPP standalone players (intmap, serialization),
+    // so the standalone leg -- the only leg whose editor gate provisions the
+    // StandaloneWindowsIl2Cpp profile -- must exist whenever acceptance runs.
+    selectedModes.push("standalone");
+  }
   return {
     "unity-versions": selectedVersions,
-    "test-modes": !mode || mode === "all" ? [...TEST_MODES] : [mode],
+    "test-modes": selectedModes,
     "matrix-exclude": versions
       .filter((entry) => !selectedVersions.includes(entry))
       .map((entry) => ({ "unity-version": entry }))
@@ -42,7 +56,8 @@ function main() {
   const matrix = resolveTestMatrix(
     versions,
     process.env.INPUT_UNITY_VERSION || "",
-    process.env.INPUT_TEST_MODE || "all"
+    process.env.INPUT_TEST_MODE || "all",
+    process.env.INPUT_ACCEPTANCE || "none"
   );
   if (!process.env.GITHUB_OUTPUT) {
     throw new Error("GITHUB_OUTPUT is required to publish the Unity test matrix.");
