@@ -31,46 +31,12 @@ Unity Helpers ships several custom sorting algorithms for `IList<T>` that cover 
 >
 > **Heads up:** Ghost Sort and Meteor Sort have no reachable upstream. Both were published by Will Stafford Parsons and both repositories now return 404, so the implementation in this package is the reference for what these algorithms do here. Anything a third party reports about them cannot be checked against a source.
 
-## JesseSort Implementation Provenance
+## JesseSort
 
-`JesseSort` adapts Jesse Lew's dual-patience design. It simulates an ascending and a descending
-game using pile tails and a per-element blueprint, reconstructs their contents into one pooled
-array, and merges the contiguous sorted piles. Monotone input is detected before renting pile
-storage; descending input is reversed. Ascending runs grow ascending piles, fixing the previous
-port's behavior of creating one descending pile per ascending element.
-
-The upstream source was inspected at
-[revision 9ed5edf](https://github.com/lewj85/jessesort/tree/9ed5edf715d6011f6594723f67c63f745e8df016).
-This C# adaptation implements the simulated dual-game design, **not the current upstream E738
-live-phase implementation**. It does not include upstream's phase classifier, pressure overflow,
-sparse-disorder bypass, global natural-run routing, or large-object compact-index realization.
-[Issue #747](https://github.com/Ambiguous-Interactive/unity-helpers/issues/747) tracks the remaining
-upstream alignment and representative Unity benchmarks.
-
-The Jesse columns in the historical snapshots below, including the 181 ms result for 100,000
-integers, measure the old C# port. They describe neither this updated adaptation nor current
-upstream JesseSort and must not be used to compare either implementation with other algorithms.
-
-### Paired Unity editor measurement
-
-On Unity 6000.4.6f1, Windows 11, 100,000 integers, the old and updated source were compiled
-in the same optimized probe and used the real package pools. Each shape used one warmup and
-seven timed samples with alternating algorithm order; the table reports medians. Input copying
-and exact comparison against `Array.Sort` were outside the timed interval. Random input used
-`System.Random(747)`. These are Mono editor measurements, not player or upstream E738 results.
-
-| Shape            | Previous C# port | Updated adaptation | `Array.Sort` |
-| ---------------- | ---------------: | -----------------: | -----------: |
-| Random           |       120.132 ms |          65.309 ms |    17.248 ms |
-| Sorted           |       326.477 ms |           0.957 ms |     8.581 ms |
-| Reverse          |       310.823 ms |           1.064 ms |    15.584 ms |
-| Equal            |         9.177 ms |           0.808 ms |    10.925 ms |
-| Organ pipe       |       328.950 ms |          10.397 ms |    38.423 ms |
-| Sawtooth         |        29.025 ms |          20.786 ms |    13.969 ms |
-| Alternating runs |        29.382 ms |          22.582 ms |    13.832 ms |
-
-`Array.Sort` remains faster on random, sawtooth and alternating-run data. The table establishes
-improvement over this package's old port; it does not establish a generally fastest sort.
+`JesseSort` adapts [Jesse Lew's dual-patience design](https://github.com/lewj85/jessesort).
+It handles sorted, reverse-sorted, and equal input in linear time. Upstream alignment is still
+in progress; [current measurements](https://github.com/Ambiguous-Interactive/unity-helpers/issues/747#issuecomment-5588241194)
+are available in the tracking issue. The historical Jesse columns below measure the previous C# port.
 
 ## Where the Time Actually Goes
 

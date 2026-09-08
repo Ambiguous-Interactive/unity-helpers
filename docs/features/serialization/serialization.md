@@ -2462,14 +2462,7 @@ one declaration; a runtime claim alone cannot make the generated-adapter registr
 
 ### Hostile payloads
 
-`WProtoReader.MaxNestingDepth` (64) bounds how deep a payload may nest, counting sub-messages and
-groups together. A formatter reads a sub-message by calling another formatter, so nesting depth is
-stack depth: a few kilobytes can describe two thousand levels, and a stack overflow cannot be
-caught. `TryReadMessage` refuses past the bound and reports it as malformed.
-
-Construct immutable `WProtoReadLimits` once and reuse them. The public parameterless constructor
-creates the default profile and supports generic `new()` factories. Use named constructor arguments
-to override individual limits for smaller protocol envelopes:
+Use reusable `WProtoReadLimits` to bound untrusted input:
 
 ```csharp
 WProtoReadLimits limits = new WProtoReadLimits(
@@ -2482,60 +2475,27 @@ WProtoReadLimits limits = new WProtoReadLimits(
 WProtoReader reader = new WProtoReader(bytes, limits);
 ```
 
-The byte limit rejects an oversized reader region immediately, before a facade invokes its formatter.
-The length limit applies before slicing, copying, or decoding strings, bytes, packed fields, nested
-messages, and unknown length-delimited fields. The tag limit counts duplicate and unknown fields,
-including tags inside skipped groups and their terminators; it refuses the next tag without consuming
-it. A clean end exactly at the limit still succeeds. Limits propagate through nested, detached,
-merged, and packed readers. Each reader region has its own tag count, while skipped groups share
-that region's count. Packed elements have no tags, so the tag limit does not count them.
-The packed-element limit is cumulative across all packed fields, split runs, and nested or merged
-messages in one root read. Generated readers charge complete runs before reserving a destination,
-including packed rectangular-array dimensions. Hand-written formatters can use
-`TryReadPackedRun(wireType, out reader)` for the same early refusal. The overload without a wire type
-charges each scalar read and caps its sizing hint to the remaining allowance. Unpacked repeated
-values still use the tag limit; skipping an unknown length-delimited field does not decode or charge
-packed elements.
+| Limit                  | Scope                                                                                          |
+| ---------------------- | ---------------------------------------------------------------------------------------------- |
+| Message bytes          | Each reader region                                                                             |
+| Length-delimited bytes | Each field, checked before copying or decoding                                                 |
+| Field count            | Tags per region, including duplicate, unknown, and skipped-group tags                          |
+| Nesting depth          | Combined sub-message and group depth; maximum 64                                               |
+| Packed elements        | All packed runs and nested messages in one root read, checked before reserving packed capacity |
 
-`WProtoFacade.TryDeserialize(bytes, limits, out T value)` and its `TryDeserializeAs` overload also
-accept these limits. The facade retains its routing contract: `false` means the type is unhandled;
-a registered formatter refusing malformed or over-budget input raises `InvalidOperationException`
-and never retries the payload with protobuf-net. Reader methods instead return `false`, latch
-`Malformed`, and clear their output. A failed length read may consume its prefix, but not its payload;
-a failed nested or packed read returns a malformed child reader.
+Defaults leave byte and count limits unrestricted, with depth capped at 64. Negative limits become
+zero. These limits do not bound total decoded memory or configure protobuf-net fallback or
+[JSON reads](#reading-untrusted-json).
 
-Defaults preserve existing behavior: no additional wire-size, tag-count, or packed-element cap and a maximum depth
-of 64. Negative limits become zero; zero allows empty regions or fields but no tags or descent,
-respectively. Requested depth above 64 remains capped at 64. Limits are immutable and reusable across
-threads. Only a finite packed-element limit allocates a small mutable budget per root reader; child
-readers share it, while separate root reads using the same limits remain independent. Reader copies
-share the allowance; opening the same typed run again charges its complete count again. Copying an
-already accepted typed packed reader replays prepaid bytes without charging again; decode its scalars
-using the supplied wire type. These bounds do not provide a cumulative
-decoded-object or retained-memory budget. Custom
-formatters remain responsible for their own allocations, and these overloads do not configure the
-legacy protobuf-net fallback. JSON has its own limits, described under
-[Reading Untrusted JSON](#reading-untrusted-json).
+`WProtoFacade.TryDeserialize(bytes, limits, out T value)` and `TryDeserializeAs` also accept limits.
+They throw `InvalidOperationException` for malformed or over-budget handled payloads; `false` means
+an unhandled type. Reader methods return `false` and latch `Malformed`. Invalid UTF-8 is refused.
 
-`TryReadMessage(formatter, ...)` accepts a hand-written formatter only when it returns success,
-leaves its nested reader well formed, and consumes the complete nested payload. A formatter cannot
-hide a malformed read or silently ignore a suffix. The root facade enforces the same complete-read
-contract. `TryReadRemaining` also refuses a malformed reader, returning an empty span without moving its position.
-A refused nested helper read also latches the parent reader as malformed, so every caller
-can stop from the returned `false` without inspecting a child reader it cannot access.
-
-Strings are decoded strictly: wire bytes that are not valid UTF-8 latch `Malformed` and refuse, the
-way proto3 requires, instead of decoding to replacement characters that no honest writer produced.
-`byte[]` members are untouched (no UTF-8 requirement), and a lone surrogate in a written string or
-`Uri` still reaches the wire as U+FFFD bytes, which are valid UTF-8 and read back unchanged.
-
-A formatter reading a nested contract should call `reader.TryReadMessage(formatter, out T value)`,
-which descends and decodes in one call and applies the bound for free. Reading the payload with
-`TryReadBytes` and constructing a reader over it with the single-argument constructor restarts the
-depth count at zero at every level, which removes the bound entirely for that subtree while
-round-tripping perfectly well. A formatter that must build its own reader should pass the parent
-`new WProtoReader(payload, in reader)`, which is the only way to name a depth, and therefore cannot
-understate one.
+Custom formatters must consume the complete payload. Use `TryReadMessage` or
+`new WProtoReader(payload, in reader)` to preserve parent limits. For packed fields, use
+`TryReadPackedRun(wireType, out reader)` before allocating and decode with that wire type.
+Reader copies share the packed allowance; copies of an accepted typed run replay its prepaid bytes.
+Custom allocations remain the formatter's responsibility.
 
 ### Wire compatibility
 

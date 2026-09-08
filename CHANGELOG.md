@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add a JesseSort adaptation with linear monotone-input handling and contiguous pile storage, credited to Jesse Lew. See [implementation provenance](./docs/performance/ilist-sorting-performance.md#jessesort-implementation-provenance) ([#747](https://github.com/Ambiguous-Interactive/unity-helpers/issues/747)).
+- Add a JesseSort adaptation with linear monotone-input handling and contiguous pile storage, credited to Jesse Lew. See [JesseSort](./docs/performance/ilist-sorting-performance.md#jessesort) ([#747](https://github.com/Ambiguous-Interactive/unity-helpers/issues/747)).
 - Add runtime-length exclusion arrays to `NextEnumExcept` for interface and concrete generators. See [Random Generators](./docs/features/utilities/random-generators.md#collection-operations) ([#742](https://github.com/Ambiguous-Interactive/unity-helpers/issues/742)).
 - Add reusable protobuf read limits for encoded bytes, length-delimited fields, tag counts, nesting and cumulative packed-element counts across nested messages. See [Serialization](./docs/features/serialization/serialization.md) ([#647](https://github.com/Ambiguous-Interactive/unity-helpers/issues/647)).
 - Add reusable JSON read limits for nesting, per-container element counts and string or property-name lengths, with a parameterless constructor for generic factories. New `Serializer.JsonDeserialize` overloads refuse an over-budget document before decoding it. See [Serialization](./docs/features/serialization/serialization.md) ([#647](https://github.com/Ambiguous-Interactive/unity-helpers/issues/647)).
