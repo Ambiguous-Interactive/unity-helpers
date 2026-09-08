@@ -59,6 +59,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor
             AssertSerializedStateLifecycle<SpriteSheetExtractor>(window =>
                 window.SerializedStateForTesting
             );
+            AssertSerializedStateLifecycle<FitTextureSizeWindow>(window =>
+                window.SerializedStateForTesting
+            );
         }
 
         [TestCase(false)]
