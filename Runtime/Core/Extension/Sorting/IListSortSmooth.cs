@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 {
     using System.Collections.Generic;
     using Utils;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     public static partial class IListExtensions
     {
@@ -139,7 +140,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 if (pshift <= 1)
                 {
-                    int trailing = SmoothSortTrailingZeroCount(p & ~1);
+                    int trailing = BitOps.TrailingZeroCount(p & ~1);
                     p >>= trailing;
                     pshift += trailing;
                 }
@@ -239,7 +240,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
                 array[head] = array[stepson];
                 head = stepson;
-                int trailing = SmoothSortTrailingZeroCount(p & ~1);
+                int trailing = BitOps.TrailingZeroCount(p & ~1);
                 p >>= trailing;
                 pshift += trailing;
                 isTrusty = false;
@@ -253,23 +254,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             array[head] = value;
-        }
-
-        private static int SmoothSortTrailingZeroCount(int value)
-        {
-            if (value == 0)
-            {
-                return 32;
-            }
-
-            int count = 0;
-            while ((value & 1) == 0)
-            {
-                count++;
-                value >>= 1;
-            }
-
-            return count;
         }
     }
 }

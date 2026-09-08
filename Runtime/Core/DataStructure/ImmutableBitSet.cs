@@ -119,7 +119,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             int count = 0;
             foreach (ulong bit in _bits)
             {
-                count += PopCount(bit);
+                count += BitOps.PopCount(bit);
             }
             return count;
         }
@@ -288,19 +288,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 }
             }
             return result;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static int PopCount(ulong value)
-        {
-            // Brian Kernighan's algorithm
-            int count = 0;
-            while (value != 0)
-            {
-                value &= value - 1;
-                count++;
-            }
-            return count;
         }
 
         /// <summary>

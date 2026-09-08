@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     using System;
     using System.Collections.Generic;
     using Utils;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     public static partial class IListExtensions
     {
@@ -65,7 +66,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         )
             where TComparer : IComparer<T>
         {
-            int depthLimit = 2 * FloorLog2(count);
+            int depthLimit = 2 * BitOps.Log2(count);
             PatternDefeatingQuickSortRange(array, 0, count - 1, comparer, depthLimit);
         }
 

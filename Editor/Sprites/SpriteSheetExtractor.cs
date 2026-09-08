@@ -3456,7 +3456,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         combinedScore += 0.08f;
                     }
 
-                    if (IsPowerOfTwo(candidateWidth) && IsPowerOfTwo(candidateHeight))
+                    if (BitOps.IsPowerOfTwo(candidateWidth) && BitOps.IsPowerOfTwo(candidateHeight))
                     {
                         combinedScore += 0.05f;
                     }
@@ -3707,14 +3707,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             // Weight peak transparency for thin or offset gutters while retaining evidence from wider clear regions.
             return maxScore * 0.6f + avgNearby * 0.25f + primaryScore * 0.15f;
-        }
-
-        /// <summary>
-        /// Checks if a value is a power of two.
-        /// </summary>
-        private static bool IsPowerOfTwo(int value)
-        {
-            return 0 < value && (value & (value - 1)) == 0;
         }
 
         /// <summary>

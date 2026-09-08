@@ -16,7 +16,7 @@ Static helper classes and utilities that solve common programming problems witho
 - [Threading](#threading): Main thread dispatcher, single-threaded pool teardown
 - [Path & File Helpers](#path--file-helpers): Path resolution, file operations
 - [Scene Helpers](#scene-helpers): Scene queries and loading
-- [Advanced Utilities](#advanced-utilities): `RestorableGlobal<T>`, null checks, hashing, formatting
+- [Advanced Utilities](#advanced-utilities): `RestorableGlobal<T>`, `BitOps`, null checks, hashing, formatting
 - [Environment Detection](#environment-detection): CI, batch mode, and runtime environment
 
 ---
@@ -1243,6 +1243,32 @@ int[] restored = ArrayConverter.ByteArrayToIntArrayBlockCopy(bytes);
 - High-performance data conversion
 
 **Performance:** Uses native memory copy (Buffer.BlockCopy) which is faster than element-by-element loops due to optimized native implementation, though both are O(n).
+
+---
+
+### Bit Manipulation (`BitOps`)
+
+**One home for the bit math every system re-derives:** `BitOps` centralizes the SWAR popcount,
+trailing zero count, floor log2, highest-bit isolation, power-of-two detection and power-of-two
+ceiling that data structures, sorters and capacity sizing keep re-implementing. Every method is a
+pure, allocation-free function of its inputs; signed overloads interpret their argument as the
+two's-complement bit pattern.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+int liveEnemies = BitOps.PopCount(0b1011UL); // 3
+int bucket = BitOps.Log2(77) + 1; // floor log2 + 1
+int lowestFlag = BitOps.TrailingZeroCount(0b1010_0000); // lowest set bit, 32 when none
+uint poolSize = BitOps.NextPowerOfTwo(37U); // smallest power of two >= 37
+bool isFlag = BitOps.IsPowerOfTwo(1UL << 7); // exactly one bit set
+```
+
+`NextPowerOfTwo` throws `ArgumentOutOfRangeException` when no exact power of two is representable
+(negative values, or values beyond 2^30 / 2^31 / 2^62 / 2^63 for int / uint / long / ulong) instead
+of overflowing silently.
 
 ---
 

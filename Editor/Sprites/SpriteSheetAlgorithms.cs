@@ -700,7 +700,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         selectionScore += 0.05f;
                     }
 
-                    if (IsPowerOfTwo(candidateWidth) && IsPowerOfTwo(candidateHeight))
+                    if (BitOps.IsPowerOfTwo(candidateWidth) && BitOps.IsPowerOfTwo(candidateHeight))
                     {
                         selectionScore += 0.03f;
                     }
@@ -2550,16 +2550,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             return bestDivisor;
-        }
-
-        /// <summary>
-        /// Checks if a value is a power of two.
-        /// </summary>
-        /// <param name="value">The value to check.</param>
-        /// <returns>True if the value is a positive power of two (1, 2, 4, 8, ...).</returns>
-        private static bool IsPowerOfTwo(int value)
-        {
-            return 0 < value && (value & (value - 1)) == 0;
         }
 
         /// <summary>

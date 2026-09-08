@@ -331,10 +331,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// </summary>
         /// <param name="value">The value to check.</param>
         /// <returns>True if the value is a power of two and not zero; otherwise, false.</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsPowerOfTwo(ulong value)
         {
-            return value != 0UL && (value & (value - 1UL)) == 0UL;
+            return BitOps.IsPowerOfTwo(value);
         }
 
         /// <summary>

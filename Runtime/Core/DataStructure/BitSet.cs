@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using System.Runtime.CompilerServices;
     using ProtoBuf;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Utils;
 
@@ -426,7 +427,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             int count = 0;
             foreach (ulong bit in _bits)
             {
-                count += PopCount(bit);
+                count += BitOps.PopCount(bit);
             }
             return count;
         }
@@ -598,19 +599,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             ulong[] bitsCopy = new ulong[_bits.Length];
             Array.Copy(_bits, bitsCopy, _bits.Length);
             return new ImmutableBitSet(bitsCopy, _capacity);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static int PopCount(ulong value)
-        {
-            // Brian Kernighan's algorithm
-            int count = 0;
-            while (value != 0)
-            {
-                value &= value - 1;
-                count++;
-            }
-            return count;
         }
 
         /// <summary>

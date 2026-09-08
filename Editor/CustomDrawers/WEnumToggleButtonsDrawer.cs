@@ -917,7 +917,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
                 ulong numericValue = ConvertToUInt64(value);
                 // Mask sign extension before deciding whether a signed top-bit flag is composite.
-                if (isFlags && numericValue != 0UL && !IsPowerOfTwo(numericValue & underlyingMask))
+                if (
+                    isFlags
+                    && numericValue != 0UL
+                    && !BitOps.IsPowerOfTwo(numericValue & underlyingMask)
+                )
                 {
                     Debug.LogWarning(
                         $"[{nameof(WEnumToggleButtonsUtility)}] Skipping composite flag value {name} "
@@ -1319,11 +1323,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             {
                 return 0UL;
             }
-        }
-
-        private static bool IsPowerOfTwo(ulong value)
-        {
-            return value != 0UL && (value & (value - 1UL)) == 0UL;
         }
 
         private static TAttribute GetAttribute<TAttribute>(

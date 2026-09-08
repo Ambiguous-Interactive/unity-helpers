@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 {
     using System.Collections.Generic;
     using Utils;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     public static partial class IListExtensions
     {
@@ -45,7 +46,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         private static void SkaSortCore<T, TComparer>(T[] array, int count, TComparer comparer)
             where TComparer : IComparer<T>
         {
-            SkaSortRange(array, 0, count - 1, comparer, 2 * FloorLog2(count));
+            SkaSortRange(array, 0, count - 1, comparer, 2 * BitOps.Log2(count));
         }
 
         private static void SkaSortRange<T, TComparer>(
