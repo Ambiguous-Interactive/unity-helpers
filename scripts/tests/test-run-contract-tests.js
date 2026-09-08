@@ -19,7 +19,7 @@ const path = require("path");
 
 const repoRoot = path.resolve(__dirname, "..", "..");
 const runnerPath = path.join(repoRoot, "scripts", "run-contract-tests.js");
-const { CHECKS, runChecks } = require(runnerPath);
+const { CHECKS, HOOK_CHECKS, checksFor, runChecks } = require(runnerPath);
 const repoLintChecks = require(path.join(repoRoot, "scripts", "run-repo-lint.js")).CHECKS;
 const { expandNpmScript, scriptPathsIn, leafCommands, filesInvoking } = require(
   path.join(repoRoot, "scripts", "tests", "test-run-repo-lint.js")
@@ -97,7 +97,7 @@ runTest("validate:tests:fast is the runner, not a serial chain", () => {
 
 runTest("the heavy hook regressions stay out of the fast aggregate", () => {
   // They synthesize whole repositories and run the hooks against them; they are minutes, not
-  // seconds, and `validate:tests` runs them separately for that reason. The chain made this
+  // seconds, and `validate:tests` opts them into its complete registry. The separate command keeps this
   // readable at a glance, so it has to be asserted now that the chain is gone.
   const heavy = [
     "test:agent-preflight",
@@ -118,19 +118,61 @@ runTest("the heavy hook regressions stay out of the fast aggregate", () => {
   );
 });
 
+runTest("the full aggregate selects exactly the fast checks and all hook regressions", () => {
+  assert.strictEqual(
+    packageScripts["validate:tests"],
+    "node scripts/run-contract-tests.js --include-hook-regressions"
+  );
+  assert.strictEqual(
+    checksFor(false),
+    CHECKS,
+    "the fast registry must retain its existing order and identity"
+  );
+  const combined = checksFor(true);
+  assert.deepStrictEqual(combined, [...HOOK_CHECKS, ...CHECKS]);
+  assert.strictEqual(new Set(combined.map((check) => check.id)).size, combined.length);
+  assert.strictEqual(
+    HOOK_CHECKS.map((check) => check.run).join(" && "),
+    packageScripts["validate:tests:hook-regressions"]
+  );
+  assert.deepStrictEqual(
+    combined.filter((check) => check.exclusive).map((check) => check.id),
+    ["npm-package-changelog"]
+  );
+});
+
+runTest("the combined CLI lists the exact registry and retains selection failures", () => {
+  const listed = spawnSync(process.execPath, [runnerPath, "--include-hook-regressions", "--list"], {
+    cwd: repoRoot,
+    encoding: "utf8"
+  });
+  assert.strictEqual(listed.status, 0);
+  assert.deepStrictEqual(
+    listed.stdout.trim().split(/\r?\n/),
+    checksFor(true).map((check) => check.id)
+  );
+  const refused = spawnSync(
+    process.execPath,
+    [runnerPath, "--include-hook-regressions", "--only", "not-a-real-check"],
+    { cwd: repoRoot, encoding: "utf8" }
+  );
+  assert.notStrictEqual(refused.status, 0);
+  assert.match(refused.stdout + refused.stderr, /Unknown check id/);
+});
+
 runTest("runChecks runs every check even after one fails", async () => {
   // The property that distinguishes a registry from `&&`, asserted rather than inferred.
   const results = await runChecks(
     [
       { id: "ok-first", name: "ok first", run: "true" },
-      { id: "boom", name: "boom", run: "exit 3" },
+      { ...HOOK_CHECKS[0], run: "exit 3" },
       { id: "ok-last", name: "ok last", run: "true" }
     ],
     2
   );
   assert.deepStrictEqual(
     results.map((result) => `${result.id}:${result.ok}`),
-    ["ok-first:true", "boom:false", "ok-last:true"],
+    ["ok-first:true", `${HOOK_CHECKS[0].id}:false`, "ok-last:true"],
     "a failure must not stop the checks after it, and results stay in registry order"
   );
 });
@@ -150,7 +192,7 @@ runTest("an exclusive check never overlaps another", async () => {
       { id: "a", name: "a", run: stamp("a") },
       { id: "solo", name: "solo", run: stamp("solo"), exclusive: true },
       { id: "b", name: "b", run: stamp("b") },
-      { id: "c", name: "c", run: stamp("c") }
+      ...HOOK_CHECKS.map((check) => ({ ...check, run: stamp(check.id) }))
     ],
     4
   );

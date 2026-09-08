@@ -470,7 +470,7 @@ runTest("no linter in scripts/ has been left unreachable", () => {
     // scripts (#505), so expanding the npm script alone stops at `node scripts/run-contract-tests.js`
     // and every check behind it reads as an orphan.
     ...scriptPathsIn(
-      leafCommands(require(path.join(repoRoot, "scripts", "run-contract-tests.js")).CHECKS)
+      leafCommands(require(path.join(repoRoot, "scripts", "run-contract-tests.js")).checksFor(true))
     ),
     ...scriptPathsIn(expandNpmScript("validate:tests")),
     ...scriptPathsIn(expandNpmScript("typecheck:unity"))
@@ -574,7 +574,7 @@ runTest("no linter in scripts/ has been left unfalsifiable", () => {
   // part of the property rather than a separate assertion.
   const reachableTests = new Set([
     ...scriptPathsIn(
-      leafCommands(require(path.join(repoRoot, "scripts", "run-contract-tests.js")).CHECKS)
+      leafCommands(require(path.join(repoRoot, "scripts", "run-contract-tests.js")).checksFor(true))
     ),
     ...scriptPathsIn(leafCommands(CHECKS)),
     ...scriptPathsIn(expandNpmScript("validate:tests"))
@@ -594,7 +594,7 @@ runTest("no linter in scripts/ has been left unfalsifiable", () => {
 
   const spawnedAsAGate = new Set([
     ...scriptPathsIn(
-      leafCommands(require(path.join(repoRoot, "scripts", "run-contract-tests.js")).CHECKS)
+      leafCommands(require(path.join(repoRoot, "scripts", "run-contract-tests.js")).checksFor(true))
     ),
     ...scriptPathsIn(leafCommands(CHECKS)),
     ...scriptPathsIn(Object.keys(packageScripts).flatMap((name) => expandNpmScript(name)))

@@ -203,7 +203,7 @@ The following algorithms are based on well-known academic work and are implement
 - **TimSort**: Hybrid stable sort by Tim Peters. [His description](https://bugs.python.org/file4451/timsort.txt)
 - **Dual-Pivot Quicksort**: Partitioning scheme published by Vladimir Yaroslavskiy (2009), used by `FluxSort`'s partition helper.
 - **SmoothSort**: Heap-based adaptive sort by Edsger Dijkstra. Further analysis by Stefan Edelkamp and Armin Wegener.
-- **JesseSort**: Dual-patience sort hybrid by Jesse Michel. [GitHub](https://github.com/lewj85/jessesort)
+- **JesseSort**: Dual-patience sort hybrid by Jesse Lew (Copyright (c) 2026 Jesse Lew), licensed under MIT. [GitHub](https://github.com/lewj85/jessesort)
 - **greeNsort**: Symmetric mergesort by Jens Oehlschlegel. [Website](https://www.greensort.org)
 - **Ska Sort**: Branch-friendly dual-pivot quicksort by Malte Skarupke. [Blog post](https://probablydance.com/2016/12/27/i-wrote-a-faster-sorting-algorithm/)
 - **PowerSort+**: Enhanced run-priority mergesort by Sebastian Wild and Martin Nebel.
@@ -228,7 +228,7 @@ The following algorithms are based on well-known academic work and are implement
 
 ### MIT License
 
-Used by: Unity-Serializable-Dictionary, Unity Editor Toolbox, Grail Sort, YamSort, cocowalla/wyhash-dotnet
+Used by: Unity-Serializable-Dictionary, Unity Editor Toolbox, Grail Sort, YamSort, JesseSort, cocowalla/wyhash-dotnet
 
 ```text
 MIT License

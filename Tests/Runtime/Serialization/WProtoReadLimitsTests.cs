@@ -20,6 +20,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual(int.MaxValue, limits.MaximumMessageBytes);
             Assert.AreEqual(int.MaxValue, limits.MaximumLengthDelimitedBytes);
             Assert.AreEqual(int.MaxValue, limits.MaximumFieldCount);
+            Assert.AreEqual(int.MaxValue, limits.MaximumPackedElementCount);
             Assert.AreEqual(WProtoReader.MaxNestingDepth, limits.MaximumNestingDepth);
         }
 
@@ -414,10 +415,167 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
         }
 
+        [TestCase(WProtoWireType.Varint)]
+        [TestCase(WProtoWireType.Fixed32)]
+        [TestCase(WProtoWireType.Fixed64)]
+        public void PackedElementBudgetIsSharedAcrossSplitAndNestedRuns(int wireType)
+        {
+            int width =
+                wireType == WProtoWireType.Fixed64 ? 8
+                : wireType == WProtoWireType.Fixed32 ? 4
+                : 1;
+            byte[] payload = new byte[width + 1];
+            payload[0] = (byte)width;
+            WProtoReadLimits limits = new WProtoReadLimits(maximumPackedElementCount: 1);
+            WProtoReader root = new WProtoReader(payload, limits);
+            Assert.IsTrue(root.TryReadPackedRun(out WProtoReader first));
+            Assert.AreEqual(1, first.CountPackedElements(wireType));
+            Assert.IsTrue(ReadPackedValue(ref first, wireType));
+            WProtoReader nested = new WProtoReader(payload, in root);
+            Assert.IsTrue(nested.TryReadPackedRun(out WProtoReader second));
+            Assert.AreEqual(0, second.CountPackedElements(wireType));
+            Assert.IsFalse(ReadPackedValue(ref second, wireType));
+            Assert.IsTrue(second.Malformed);
+            Assert.AreEqual(0, second.Position);
+            WProtoReader independent = new WProtoReader(payload, limits);
+            Assert.IsTrue(independent.TryReadPackedRun(out WProtoReader fresh));
+            Assert.IsTrue(ReadPackedValue(ref fresh, wireType));
+        }
+
+        [TestCase(WProtoWireType.Varint)]
+        [TestCase(WProtoWireType.Fixed32)]
+        [TestCase(WProtoWireType.Fixed64)]
+        public void TypedPackedRunsRefuseBeforeReservationAndUseOneBudget(int wireType)
+        {
+            int width =
+                wireType == WProtoWireType.Fixed64 ? 8
+                : wireType == WProtoWireType.Fixed32 ? 4
+                : 1;
+            byte[] payload = new byte[2 * width + 2];
+            payload[0] = (byte)width;
+            payload[width + 1] = (byte)width;
+            foreach (int limit in new[] { -1, 0, 1, 2, int.MaxValue })
+            {
+                WProtoReader reader = new WProtoReader(
+                    payload,
+                    new WProtoReadLimits(maximumPackedElementCount: limit)
+                );
+                bool firstAccepted = 0 < limit;
+                Assert.AreEqual(
+                    firstAccepted,
+                    reader.TryReadPackedRun(wireType, out WProtoReader first)
+                );
+                Assert.AreEqual(firstAccepted ? 1 : 0, first.CountPackedElements(wireType));
+                if (!firstAccepted)
+                {
+                    Assert.IsTrue(reader.Malformed);
+                    Assert.IsTrue(first.Malformed);
+                    continue;
+                }
+
+                Assert.IsTrue(ReadPackedValue(ref first, wireType));
+                bool secondAccepted = 1 < limit;
+                Assert.AreEqual(
+                    secondAccepted,
+                    reader.TryReadPackedRun(wireType, out WProtoReader second)
+                );
+                Assert.AreEqual(!secondAccepted, second.Malformed);
+                Assert.AreEqual(secondAccepted ? 1 : 0, second.CountPackedElements(wireType));
+                if (secondAccepted)
+                {
+                    Assert.IsTrue(ReadPackedValue(ref second, wireType));
+                }
+            }
+
+            WProtoReader empty = new WProtoReader(
+                new byte[] { 0 },
+                new WProtoReadLimits(maximumPackedElementCount: 0)
+            );
+            Assert.IsTrue(empty.TryReadPackedRun(wireType, out WProtoReader emptyRun));
+            Assert.IsTrue(emptyRun.End);
+            foreach (
+                int invalidWire in new[]
+                {
+                    -1,
+                    WProtoWireType.LengthDelimited,
+                    WProtoWireType.StartGroup,
+                    WProtoWireType.EndGroup,
+                    int.MaxValue,
+                }
+            )
+            {
+                WProtoReader invalid = new WProtoReader(new byte[] { 0 });
+                Assert.IsFalse(invalid.TryReadPackedRun(invalidWire, out WProtoReader refused));
+                Assert.IsTrue(invalid.Malformed);
+                Assert.IsTrue(refused.Malformed);
+            }
+        }
+
+        [Test]
+        public void EveryNestedReadRouteRetainsTheCumulativePackedBudget()
+        {
+            PackedFormatter formatter = new PackedFormatter();
+            byte[] payload = { 1, 0 };
+            WProtoReadLimits limits = new WProtoReadLimits(maximumPackedElementCount: 1);
+            WProtoReader detached = new WProtoReader(default, limits);
+            Assert.IsTrue(detached.TryReadMessage(payload, formatter, out _));
+            Assert.IsFalse(detached.TryReadMessage(payload, formatter, out _));
+            Assert.IsTrue(detached.Malformed);
+            WProtoReader merged = new WProtoReader(default, limits);
+            int seed = 0;
+            Assert.IsTrue(merged.TryReadMessage(payload, formatter, in seed, out _));
+            Assert.IsFalse(merged.TryReadMessage(payload, formatter, in seed, out _));
+            Assert.IsTrue(merged.Malformed);
+            WProtoReader nested = new WProtoReader(new byte[] { 2, 1, 0, 2, 1, 0 }, limits);
+            Assert.IsTrue(nested.TryReadMessage(formatter, out _));
+            Assert.IsFalse(nested.TryReadMessage(formatter, out _));
+            Assert.IsTrue(nested.Malformed);
+
+            WProtoReader original = new WProtoReader(payload, limits);
+            WProtoReader copy = original;
+            Assert.IsTrue(original.TryReadPackedRun(WProtoWireType.Varint, out _));
+            Assert.IsFalse(copy.TryReadPackedRun(WProtoWireType.Varint, out _));
+            Assert.IsTrue(copy.Malformed);
+            WProtoReader untyped = new WProtoReader(payload, limits);
+            Assert.IsTrue(untyped.TryReadPackedRun(out WProtoReader packed));
+            WProtoReader packedCopy = packed;
+            Assert.IsTrue(packed.TryReadInt32(out _));
+            Assert.IsFalse(packedCopy.TryReadInt32(out _));
+            Assert.IsTrue(packedCopy.Malformed);
+            Assert.AreEqual(0, packedCopy.Position);
+        }
+
+        private static bool ReadPackedValue(ref WProtoReader reader, int wireType)
+        {
+            switch (wireType)
+            {
+                case WProtoWireType.Fixed32:
+                    return reader.TryReadFixed32(out _);
+                case WProtoWireType.Fixed64:
+                    return reader.TryReadFixed64(out _);
+                default:
+                    return reader.TryReadInt32(out _);
+            }
+        }
+
         private static T CreateDefault<T>()
             where T : class, new()
         {
             return new T();
+        }
+
+        private sealed class PackedFormatter : IWProtoFormatter<int>
+        {
+            public int Measure(in int value) => 0;
+
+            public bool Write(ref WProtoWriter writer, in int value) => true;
+
+            public bool TryRead(ref WProtoReader reader, out int value)
+            {
+                value = 0;
+                return reader.TryReadPackedRun(WProtoWireType.Varint, out WProtoReader packed)
+                    && packed.TryReadInt32(out value);
+            }
         }
 
         private sealed class CountingFormatter : IWProtoFormatter<int>

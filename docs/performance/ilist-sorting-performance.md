@@ -31,6 +31,13 @@ Unity Helpers ships several custom sorting algorithms for `IList<T>` that cover 
 >
 > **Heads up:** Ghost Sort and Meteor Sort have no reachable upstream. Both were published by Will Stafford Parsons and both repositories now return 404, so the implementation in this package is the reference for what these algorithms do here. Anything a third party reports about them cannot be checked against a source.
 
+## JesseSort
+
+`JesseSort` adapts [Jesse Lew's dual-patience design](https://github.com/lewj85/jessesort).
+It handles sorted, reverse-sorted, and equal input in linear time. Upstream alignment is still
+in progress; [current measurements](https://github.com/Ambiguous-Interactive/unity-helpers/issues/747#issuecomment-5588241194)
+are available in the tracking issue. The historical Jesse columns below measure the previous C# port.
+
 ## Where the Time Actually Goes
 
 Every algorithm here sorts a `T[]`, never an `IList<T>` directly. Reaching an element through the

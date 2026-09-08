@@ -230,16 +230,34 @@ test_format_staged_csharp_branch() {
         skip "$name" "no scripts/format-staged-csharp.ps1"; return
     fi
 
-    local fixture="$TEMPDIR/FormatFixture.cs"
-    echo "namespace X { public class Y { } }" > "$fixture"
+    local sandbox="$TEMPDIR/formatter repo"
+    local fixture="$sandbox/Format Fixture.cs"
+    local original="namespace X { public class Y { } }"
+    mkdir -p "$sandbox/.config"
+    cp "$REPO_ROOT/.config/dotnet-tools.json" "$sandbox/.config/dotnet-tools.json"
+    git -C "$sandbox" init -q
+    git -C "$sandbox" config core.autocrlf false
+    printf '%s\n' "$original" > "$fixture"
 
     local out
-    out=$(pwsh -NoProfile -File "$REPO_ROOT/scripts/format-staged-csharp.ps1" "$fixture" 2>&1 || true)
-    if grep -q "Parameter cannot be processed" <<<"$out"; then
-        fail "$name" "PWS001-style param binding failure: $out"
-    else
-        pass "$name"
+    if ! out=$(cd "$sandbox" && pwsh -NoProfile -File "$REPO_ROOT/scripts/format-staged-csharp.ps1" "$fixture" 2>&1); then
+        fail "$name" "formatter must succeed inside its fixture repository: $out"
+        return
     fi
+
+    local formatted staged_paths staged_contents
+    formatted=$(< "$fixture")
+    staged_paths=$(git -C "$sandbox" diff --cached --name-only)
+    if [[ "$formatted" == "$original" || "$staged_paths" != "Format Fixture.cs" ]]; then
+        fail "$name" "expected the positional path with spaces to be formatted and staged: $out"
+        return
+    fi
+    staged_contents=$(git -C "$sandbox" show ':Format Fixture.cs')
+    if [[ "$staged_contents" != "$formatted" ]]; then
+        fail "$name" "staged contents must match the formatted working file"
+        return
+    fi
+    pass "$name"
 }
 
 # -----------------------------------------------------------------------------

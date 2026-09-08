@@ -839,7 +839,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 writer.Indent();
                 EmitSeed(writer);
                 writer.Line(
-                    "if (!reader.TryReadPackedRun(out "
+                    "if (!reader.TryReadPackedRun("
+                        + Generic
+                        + ".WireType, out "
                         + Proto
                         + ".WProtoReader "
                         + genericPacked
@@ -909,7 +911,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             OpenCase(writer, Proto + ".WProtoWireType.LengthDelimited");
             EmitSeed(writer);
             writer.Line(
-                "if (!reader.TryReadPackedRun(out "
+                "if (!reader.TryReadPackedRun("
+                    + _shape.WireType
+                    + ", out "
                     + Proto
                     + ".WProtoReader "
                     + packed

@@ -45,6 +45,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         private readonly ReadOnlySpan<byte> _buffer;
         private readonly int _depth;
         private readonly WProtoReadLimits _limits;
+        private readonly PackedReadBudget _packedBudget;
+        private bool _countPackedElements;
         private int _fieldCount;
         private int _position;
         private bool _malformed;
@@ -58,10 +60,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
         /// <summary>Initializes a reader with limits checked before consuming fields or creating nested readers.</summary>
         /// <param name="buffer">The encoded bytes.</param>
-        /// <param name="limits">Immutable per-region limits; null uses the default limits.</param>
+        /// <param name="limits">Immutable limits; null uses the default limits.</param>
         /// <remarks>A region exceeding the byte limit starts malformed, with no bytes consumed.</remarks>
         public WProtoReader(ReadOnlySpan<byte> buffer, WProtoReadLimits limits)
-            : this(buffer, 0, limits ?? WProtoReadLimits.Default) { }
+            : this(buffer, 0, limits ?? WProtoReadLimits.Default, CreatePackedBudget(limits)) { }
 
         /// <summary>
         /// Initializes a reader over a sub-message payload already carved out of <paramref name="parent"/>.
@@ -86,6 +88,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         public WProtoReader(ReadOnlySpan<byte> buffer, in WProtoReader parent)
         {
             _limits = parent._limits ?? WProtoReadLimits.Default;
+            _packedBudget = parent._packedBudget;
+            _countPackedElements = false;
             bool exhausted = parent._malformed || _limits.MaximumNestingDepth <= parent._depth;
             _buffer = exhausted ? default : buffer;
             _depth = exhausted ? _limits.MaximumNestingDepth : parent._depth + 1;
@@ -94,11 +98,18 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             _malformed = exhausted || _limits.MaximumMessageBytes < buffer.Length;
         }
 
-        private WProtoReader(ReadOnlySpan<byte> buffer, int depth, WProtoReadLimits limits)
+        private WProtoReader(
+            ReadOnlySpan<byte> buffer,
+            int depth,
+            WProtoReadLimits limits,
+            PackedReadBudget packedBudget = null
+        )
         {
             _buffer = buffer;
             _depth = depth;
             _limits = limits;
+            _packedBudget = packedBudget;
+            _countPackedElements = false;
             _position = 0;
             _fieldCount = 0;
             _malformed = limits.MaximumMessageBytes < buffer.Length;
@@ -235,7 +246,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <returns><c>true</c> when a value was read.</returns>
         public bool TryReadVarint64(out ulong value)
         {
-            if (_malformed)
+            if (_malformed || !TryChargePackedElement())
             {
                 value = 0;
                 return false;
@@ -344,7 +355,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <returns><c>true</c> when a value was read.</returns>
         public bool TryReadFixed32(out uint value)
         {
-            if (!TryConsume(sizeof(uint), out int start))
+            if (!TryChargePackedElement() || !TryConsume(sizeof(uint), out int start))
             {
                 value = 0;
                 return false;
@@ -365,7 +376,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <returns><c>true</c> when a value was read.</returns>
         public bool TryReadFixed64(out ulong value)
         {
-            if (!TryConsume(sizeof(ulong), out int start))
+            if (!TryChargePackedElement() || !TryConsume(sizeof(ulong), out int start))
             {
                 value = 0;
                 return false;
@@ -510,17 +521,23 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             if (Limits.MaximumNestingDepth <= _depth)
             {
                 _malformed = true;
-                nested = new WProtoReader(default, _depth, Limits) { _malformed = true };
+                nested = new WProtoReader(default, _depth, Limits, _packedBudget)
+                {
+                    _malformed = true,
+                };
                 return false;
             }
 
             if (!TryReadBytes(out ReadOnlySpan<byte> payload))
             {
-                nested = new WProtoReader(default, _depth + 1, Limits) { _malformed = true };
+                nested = new WProtoReader(default, _depth + 1, Limits, _packedBudget)
+                {
+                    _malformed = true,
+                };
                 return false;
             }
 
-            nested = new WProtoReader(payload, _depth + 1, Limits);
+            nested = new WProtoReader(payload, _depth + 1, Limits, _packedBudget);
             return true;
         }
 
@@ -549,11 +566,50 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             if (!TryReadBytes(out ReadOnlySpan<byte> payload))
             {
-                packed = new WProtoReader(default, _depth, Limits) { _malformed = true };
+                packed = new WProtoReader(default, _depth, Limits, _packedBudget)
+                {
+                    _malformed = true,
+                };
                 return false;
             }
 
-            packed = new WProtoReader(payload, _depth, Limits);
+            packed = new WProtoReader(payload, _depth, Limits, _packedBudget)
+            {
+                _countPackedElements = _packedBudget != null,
+            };
+            return true;
+        }
+
+        /// <summary>Opens a packed run after charging its complete element count before allocation.</summary>
+        /// <param name="wireType">The packed scalar wire type.</param>
+        /// <param name="packed">Receives a reader scoped to the accepted run.</param>
+        /// <returns>Whether the entire run fits the remaining cumulative packed-element budget.</returns>
+        /// <remarks>Decode with the supplied wire type. Copies replay already charged bytes without charging again.</remarks>
+        public bool TryReadPackedRun(int wireType, out WProtoReader packed)
+        {
+            if (!TryReadPackedRun(out packed))
+            {
+                return false;
+            }
+
+            if (
+                (
+                    wireType != WProtoWireType.Varint
+                    && wireType != WProtoWireType.Fixed32
+                    && wireType != WProtoWireType.Fixed64
+                )
+                || (
+                    _packedBudget != null
+                    && !_packedBudget.TryCharge(packed.CountPackedElementsCore(wireType))
+                )
+            )
+            {
+                _malformed = true;
+                packed._malformed = true;
+                return false;
+            }
+
+            packed._countPackedElements = false;
             return true;
         }
 
@@ -581,10 +637,19 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// is not counted, which under-sizes by one and costs a grow rather than corrupting
         /// anything -- the read that follows fails on the same bytes either way. Nothing here
         /// latches <see cref="Malformed"/>: this reports on bytes rather than consuming them, and a
-        /// hint is not a read.
+        /// hint is not a read. For an untyped packed reader with a finite budget, the hint is capped
+        /// to the remaining allowance; scalar reads refuse further elements before consumption.
         /// </para>
         /// </remarks>
         public int CountPackedElements(int wireType)
+        {
+            int count = CountPackedElementsCore(wireType);
+            return _countPackedElements && _packedBudget.Remaining < count
+                ? _packedBudget.Remaining
+                : count;
+        }
+
+        private int CountPackedElementsCore(int wireType)
         {
             if (_malformed)
             {
@@ -703,7 +768,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            WProtoReader nested = new WProtoReader(payload, _depth + 1, Limits);
+            WProtoReader nested = new WProtoReader(payload, _depth + 1, Limits, _packedBudget);
             if (nested.Malformed)
             {
                 _malformed = true;
@@ -755,7 +820,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
 
-            WProtoReader nested = new WProtoReader(payload, _depth + 1, Limits);
+            WProtoReader nested = new WProtoReader(payload, _depth + 1, Limits, _packedBudget);
             if (nested.Malformed)
             {
                 _malformed = true;
@@ -786,6 +851,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             return formatterSucceeded
                 && !expected.Malformed
                 && ReferenceEquals(reader.Limits, expected.Limits)
+                && ReferenceEquals(reader._packedBudget, expected._packedBudget)
                 && !reader.Malformed
                 && reader.End
                 && reader.Depth == expected.Depth
@@ -936,6 +1002,50 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             _position += count;
             start = consumed;
             return true;
+        }
+
+        private bool TryChargePackedElement()
+        {
+            if (!_countPackedElements)
+            {
+                return true;
+            }
+
+            if (_malformed || !_packedBudget.TryCharge(1))
+            {
+                _malformed = true;
+                return false;
+            }
+
+            return true;
+        }
+
+        private static PackedReadBudget CreatePackedBudget(WProtoReadLimits limits)
+        {
+            return limits != null && limits.MaximumPackedElementCount < int.MaxValue
+                ? new PackedReadBudget(limits.MaximumPackedElementCount)
+                : null;
+        }
+
+        private sealed class PackedReadBudget
+        {
+            internal int Remaining;
+
+            internal PackedReadBudget(int remaining)
+            {
+                Remaining = remaining;
+            }
+
+            internal bool TryCharge(int count)
+            {
+                if (Remaining < count)
+                {
+                    return false;
+                }
+
+                Remaining -= count;
+                return true;
+            }
         }
     }
 }
