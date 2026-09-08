@@ -32,7 +32,7 @@ namespace Samples.UnityHelpers.DI.Zenject
 
         private void EnsureSceneContext()
         {
-            if (GetComponent<SceneContext>() == null)
+            if (!TryGetComponent(out SceneContext _))
             {
                 gameObject.AddComponent<SceneContext>();
             }

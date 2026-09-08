@@ -370,7 +370,8 @@
         "undefines",
         "finalizable",
         "finalizer",
-        "devirtualizing"
+        "devirtualizing",
+        "sln"
       ]
     },
     {
@@ -920,7 +921,13 @@
         "undispatched",
         "unpremultiplication",
         "uncatchable",
-        "unpremultiplied"
+        "unpremultiplied",
+        "socat",
+        "gpt",
+        "xhigh",
+        "devpack",
+        "uvx",
+        "Murzak"
       ]
     }
   ],

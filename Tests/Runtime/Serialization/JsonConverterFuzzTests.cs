@@ -18,6 +18,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     using WallstopStudios.UnityHelpers.Core.Math;
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Tests.Core;
+    using WallstopStudios.UnityHelpers.Tests.TestUtils;
 
     /// <summary>
     /// Feeds structure-aware malformed JSON to every Unity-aware converter and asserts what a
@@ -96,7 +97,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         /// </summary>
         private const int GrownArrayLength = 12;
 
+        /// <summary>
+        /// Levels of nesting in the amplifying prefix, from the issue that asked for these limits.
+        /// Three bytes each, so the whole hostile document is under a megabyte.
+        /// </summary>
+        private const int AmplifyingNestingLevels = 300_000;
+
+        /// <summary>
+        /// Elements in the amplifying array. Two bytes each on the wire, and an <c>int</c> plus list
+        /// growth each once a decoder believes them.
+        /// </summary>
+        private const int AmplifyingElementCount = 200_000;
+
         private static IReadOnlyList<FuzzTarget> _targets;
+
+        private static string _repeatingPrefixPayload;
+
+        private static string _wideArrayPayload;
 
         /// <summary>
         /// The converters that deliberately write a value they cannot rebuild, each with the reason.
@@ -136,6 +153,149 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     _targets = BuildTargets();
                 }
                 return _targets;
+            }
+        }
+
+        /// <summary>
+        /// Built once and shared: every case source is enumerated per test, and these two payloads
+        /// are the only ones large enough for that to matter.
+        /// </summary>
+        private static string RepeatingPrefixPayload =>
+            _repeatingPrefixPayload ??= RepeatedArrayPrefix(AmplifyingNestingLevels);
+
+        /// <inheritdoc cref="RepeatingPrefixPayload"/>
+        private static string WideArrayPayload =>
+            _wideArrayPayload ??= WideArray(AmplifyingElementCount);
+
+        /// <summary>
+        /// One case per read limit, on both sides of its boundary, plus the two shapes a hostile
+        /// document uses to buy an allocation it did not pay for in bytes.
+        /// </summary>
+        public static IEnumerable<JsonBudgetCase> BudgetCases
+        {
+            get
+            {
+                yield return JsonBudgetCase.InBudget(
+                    "a converter payload well inside every limit",
+                    typeof(Vector2),
+                    "{\"x\":1.5,\"y\":-2.25}",
+                    new WJsonReadLimits(
+                        maximumElementCount: 8,
+                        maximumTextLength: 32,
+                        maximumNestingDepth: 4
+                    )
+                );
+                yield return JsonBudgetCase.InBudget(
+                    "nesting exactly at the depth limit",
+                    typeof(object),
+                    NestedArrays(8),
+                    new WJsonReadLimits(maximumNestingDepth: 8)
+                );
+                yield return JsonBudgetCase.OverBudget(
+                    "nesting one level past the depth limit",
+                    typeof(object),
+                    NestedArrays(9),
+                    new WJsonReadLimits(maximumNestingDepth: 8),
+                    nameof(WJsonReadLimits.MaximumNestingDepth),
+                    legalWithoutLimits: true
+                );
+                yield return JsonBudgetCase.OverBudget(
+                    "nesting past the tokenizer's own bound, which must refuse and not defer",
+                    typeof(object),
+                    NestedArrays(20),
+                    new WJsonReadLimits(maximumNestingDepth: 8),
+                    nameof(WJsonReadLimits.MaximumNestingDepth),
+                    legalWithoutLimits: true
+                );
+                yield return JsonBudgetCase.InBudget(
+                    "an array exactly at the element limit",
+                    typeof(SerializableList<int>),
+                    "[1,2,3,4]",
+                    new WJsonReadLimits(maximumElementCount: 4)
+                );
+                yield return JsonBudgetCase.OverBudget(
+                    "an array one element past the element limit",
+                    typeof(SerializableList<int>),
+                    "[1,2,3,4,5]",
+                    new WJsonReadLimits(maximumElementCount: 4),
+                    nameof(WJsonReadLimits.MaximumElementCount),
+                    legalWithoutLimits: true
+                );
+                yield return JsonBudgetCase.OverBudget(
+                    "an object past the element limit, counted by its members",
+                    typeof(Vector3Int),
+                    "{\"x\":1,\"y\":2,\"z\":3}",
+                    new WJsonReadLimits(maximumElementCount: 2),
+                    nameof(WJsonReadLimits.MaximumElementCount),
+                    legalWithoutLimits: true
+                );
+                yield return JsonBudgetCase.InBudget(
+                    "an empty container under a zero element limit",
+                    typeof(object),
+                    "[]",
+                    new WJsonReadLimits(maximumElementCount: 0)
+                );
+                yield return JsonBudgetCase.OverBudget(
+                    "a single element under a zero element limit",
+                    typeof(object),
+                    "[1]",
+                    new WJsonReadLimits(maximumElementCount: 0),
+                    nameof(WJsonReadLimits.MaximumElementCount),
+                    legalWithoutLimits: true
+                );
+                yield return JsonBudgetCase.InBudget(
+                    "a string exactly at the text limit",
+                    typeof(object),
+                    QuotedRun(8),
+                    new WJsonReadLimits(maximumTextLength: 8)
+                );
+                yield return JsonBudgetCase.OverBudget(
+                    "a string one byte past the text limit",
+                    typeof(object),
+                    QuotedRun(9),
+                    new WJsonReadLimits(maximumTextLength: 8),
+                    nameof(WJsonReadLimits.MaximumTextLength),
+                    legalWithoutLimits: true
+                );
+                yield return JsonBudgetCase.OverBudget(
+                    "a property name past the text limit",
+                    typeof(object),
+                    PropertyNameRun(16),
+                    new WJsonReadLimits(maximumTextLength: 4),
+                    nameof(WJsonReadLimits.MaximumTextLength),
+                    legalWithoutLimits: true
+                );
+                foreach (JsonBudgetCase amplifying in AmplifyingShapes)
+                {
+                    yield return amplifying;
+                }
+            }
+        }
+
+        /// <summary>
+        /// The two shapes that cost a payload almost nothing and a decoder a great deal: nesting
+        /// three bytes per level, and an element run two bytes per element.
+        /// </summary>
+        public static IEnumerable<JsonBudgetCase> AmplifyingShapes
+        {
+            get
+            {
+                yield return JsonBudgetCase.OverBudget(
+                    "a repeating array prefix, 300000 levels deep",
+                    typeof(object),
+                    RepeatingPrefixPayload,
+                    null,
+                    nameof(WJsonReadLimits.MaximumNestingDepth),
+                    legalWithoutLimits: false
+                );
+                yield return JsonBudgetCase.OverBudget(
+                    "an array of 200000 elements",
+                    typeof(SerializableList<int>),
+                    WideArrayPayload,
+                    new WJsonReadLimits(maximumElementCount: 1024),
+                    nameof(WJsonReadLimits.MaximumElementCount),
+                    legalWithoutLimits: true
+                );
             }
         }
 
@@ -600,6 +760,238 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 () => JsonSerializer.Deserialize(payload, type, options),
                 $"{type.Name} must refuse {payload} with JsonException"
             );
+        }
+
+        /// <summary>
+        /// A document inside its read budget decodes exactly as it does with no budget at all, and
+        /// one outside it is refused rather than truncated (#647).
+        /// </summary>
+        /// <remarks>
+        /// Both halves matter. The refusal is the point of the limits, but a budget that also
+        /// changed what an in-budget save file decodes to would be a worse defect than the one it
+        /// closes, so every accepted case is compared against the overload without limits.
+        /// </remarks>
+        [Test]
+        [TestCaseSource(nameof(BudgetCases))]
+        public void JsonReadLimitsRefuseOnlyAnOverBudgetDocument(JsonBudgetCase budgetCase)
+        {
+            JsonSerializerOptions options = Serializer.CreateNormalJsonOptions();
+
+            if (budgetCase.AcceptedWithLimits)
+            {
+                object unlimited = Serializer.JsonDeserialize<object>(
+                    budgetCase.Payload,
+                    budgetCase.Type
+                );
+                object limited = Serializer.JsonDeserialize<object>(
+                    budgetCase.Payload,
+                    budgetCase.Type,
+                    null,
+                    budgetCase.Limits
+                );
+
+                Assert.AreEqual(
+                    JsonSerializer.Serialize(unlimited, budgetCase.Type, options),
+                    JsonSerializer.Serialize(limited, budgetCase.Type, options),
+                    $"{budgetCase.Name}: read limits changed the value an in-budget document decodes to."
+                );
+                return;
+            }
+
+            if (budgetCase.AcceptedWithoutLimits)
+            {
+                Assert.DoesNotThrow(
+                    () =>
+                    {
+                        _ = Serializer.JsonDeserialize<object>(budgetCase.Payload, budgetCase.Type);
+                    },
+                    $"{budgetCase.Name}: this payload is legal JSON for this type, so the refusal "
+                        + "below has to be the budget's doing rather than the payload's."
+                );
+            }
+            else
+            {
+                Assert.Throws<SerializationCorruptDataException>(
+                    () => Serializer.JsonDeserialize<object>(budgetCase.Payload, budgetCase.Type),
+                    $"{budgetCase.Name}: this payload is declared unreadable even without limits."
+                );
+            }
+
+            SerializationCorruptDataException refusal =
+                Assert.Throws<SerializationCorruptDataException>(
+                    () =>
+                        Serializer.JsonDeserialize<object>(
+                            budgetCase.Payload,
+                            budgetCase.Type,
+                            null,
+                            budgetCase.Limits
+                        ),
+                    $"{budgetCase.Name}: an over-budget document must be refused, not decoded."
+                );
+            StringAssert.Contains(
+                budgetCase.RefusedBy,
+                refusal.Reason,
+                $"{budgetCase.Name}: the refusal must name the limit that refused it."
+            );
+            Assert.IsFalse(
+                Serializer.TryJsonDeserialize(
+                    budgetCase.Payload,
+                    out object _,
+                    budgetCase.Type,
+                    null,
+                    budgetCase.Limits
+                ),
+                $"{budgetCase.Name}: the Try overload must fail closed rather than throw or truncate."
+            );
+        }
+
+        /// <summary>
+        /// Refusing a hostile document costs less than a copy of it, so a tiny payload cannot buy
+        /// a large allocation (#647).
+        /// </summary>
+        /// <remarks>
+        /// The relative half is the one that says something: the wide-array shape materializes a
+        /// two-hundred-thousand-element list when nothing refuses it, and the budget has to be what
+        /// prevents that rather than merely reporting it afterwards.
+        /// </remarks>
+        [Test]
+        [TestCaseSource(nameof(AmplifyingShapes))]
+        public void RefusingAnAmplifyingDocumentDoesNotAmplifyAllocation(JsonBudgetCase budgetCase)
+        {
+            byte[] utf8 = Encoding.UTF8.GetBytes(budgetCase.Payload);
+            long refused = GCAssert.MeasureAllocatedBytes(() =>
+            {
+                try
+                {
+                    _ = Serializer.JsonDeserialize<object>(
+                        utf8,
+                        budgetCase.Type,
+                        null,
+                        budgetCase.Limits
+                    );
+                }
+                catch (SerializationCorruptDataException) { }
+            });
+
+            if (refused <= 0)
+            {
+                Assert.Inconclusive(
+                    $"{budgetCase.Name}: refusing a document allocates its exception, so a zero "
+                        + "reading means this runtime's allocation counter is too coarse to bound "
+                        + "anything here."
+                );
+            }
+
+            Assert.LessOrEqual(
+                refused,
+                utf8.Length,
+                $"{budgetCase.Name}: refusing this document ten times allocated more than one copy "
+                    + "of it, which is the amplification the limits exist to prevent."
+            );
+
+            if (!budgetCase.AcceptedWithoutLimits)
+            {
+                return;
+            }
+
+            long materialized = GCAssert.MeasureAllocatedBytes(() =>
+            {
+                _ = Serializer.JsonDeserialize<object>(utf8, budgetCase.Type);
+            });
+            Assert.LessOrEqual(
+                refused * 8,
+                materialized,
+                $"{budgetCase.Name}: decoding this document allocated {materialized} bytes and "
+                    + $"refusing it allocated {refused}. The budget has to be what avoids the "
+                    + "materialization, not a report filed after it."
+            );
+        }
+
+        /// <summary>
+        /// The parameterless constructor produces the default profile, so a generic
+        /// <c>new()</c> factory can build one.
+        /// </summary>
+        [Test]
+        public void ParameterlessJsonReadLimitsSupportGenericFactories()
+        {
+            WJsonReadLimits limits = CreateDefault<WJsonReadLimits>();
+
+            Assert.AreEqual(int.MaxValue, limits.MaximumElementCount);
+            Assert.AreEqual(int.MaxValue, limits.MaximumTextLength);
+            Assert.AreEqual(
+                WJsonReadLimits.MaximumSupportedNestingDepth,
+                limits.MaximumNestingDepth
+            );
+        }
+
+        /// <summary>
+        /// Nesting is stack depth and a stack overflow cannot be caught, so the ceiling is the
+        /// package's rather than the caller's.
+        /// </summary>
+        [TestCase(-1, 0)]
+        [TestCase(0, 0)]
+        [TestCase(
+            WJsonReadLimits.MaximumSupportedNestingDepth,
+            WJsonReadLimits.MaximumSupportedNestingDepth
+        )]
+        [TestCase(int.MaxValue, WJsonReadLimits.MaximumSupportedNestingDepth)]
+        public void ACallerCannotRaiseTheJsonNestingCeiling(int requested, int expected)
+        {
+            Assert.AreEqual(
+                expected,
+                new WJsonReadLimits(maximumNestingDepth: requested).MaximumNestingDepth
+            );
+        }
+
+        private static T CreateDefault<T>()
+            where T : class, new()
+        {
+            return new T();
+        }
+
+        private static string NestedArrays(int depth)
+        {
+            return new string('[', depth) + "1" + new string(']', depth);
+        }
+
+        /// <summary>
+        /// The shape from the issue: a repeating prefix nobody closes, three bytes per level of
+        /// nesting, which a reader that descends before it counts turns into stack depth.
+        /// </summary>
+        private static string RepeatedArrayPrefix(int repeats)
+        {
+            StringBuilder builder = new(repeats * 3);
+            for (int repeat = 0; repeat < repeats; repeat++)
+            {
+                builder.Append("[1,");
+            }
+            return builder.ToString();
+        }
+
+        private static string WideArray(int elements)
+        {
+            StringBuilder builder = new(elements * 2 + 2);
+            builder.Append('[');
+            for (int element = 0; element < elements; element++)
+            {
+                if (0 < element)
+                {
+                    builder.Append(',');
+                }
+                builder.Append('1');
+            }
+            builder.Append(']');
+            return builder.ToString();
+        }
+
+        private static string QuotedRun(int length)
+        {
+            return "\"" + new string('a', length) + "\"";
+        }
+
+        private static string PropertyNameRun(int length)
+        {
+            return "{" + QuotedRun(length) + ":1}";
         }
 
         private static IEnumerable<string> Corpus(FuzzTarget target)
@@ -1330,6 +1722,99 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     return _seeds;
                 }
             }
+
+            public override string ToString()
+            {
+                return Name;
+            }
+        }
+
+        /// <summary>
+        /// A document, the read limits it is offered to, and what each side of the API must do
+        /// with it.
+        /// </summary>
+        public sealed class JsonBudgetCase
+        {
+            private JsonBudgetCase(
+                string name,
+                Type type,
+                string payload,
+                WJsonReadLimits limits,
+                bool acceptedWithoutLimits,
+                string refusedBy
+            )
+            {
+                Name = name;
+                Type = type;
+                Payload = payload;
+                Limits = limits;
+                AcceptedWithoutLimits = acceptedWithoutLimits;
+                RefusedBy = refusedBy;
+            }
+
+            /// <summary>
+            /// A document the limits admit, which must decode to what it decodes to without them.
+            /// </summary>
+            public static JsonBudgetCase InBudget(
+                string name,
+                Type type,
+                string payload,
+                WJsonReadLimits limits
+            )
+            {
+                return new JsonBudgetCase(name, type, payload, limits, true, null);
+            }
+
+            /// <summary>
+            /// A document the limits refuse.
+            /// </summary>
+            /// <param name="refusedBy">
+            /// The <see cref="WJsonReadLimits"/> member the refusal must name, so a case cannot pass
+            /// by being refused for some unrelated reason.
+            /// </param>
+            /// <param name="legalWithoutLimits">
+            /// Whether the overloads without limits still read it. The pair is the finding: a
+            /// document that only the budget refuses is one the package previously decoded.
+            /// </param>
+            public static JsonBudgetCase OverBudget(
+                string name,
+                Type type,
+                string payload,
+                WJsonReadLimits limits,
+                string refusedBy,
+                bool legalWithoutLimits
+            )
+            {
+                return new JsonBudgetCase(
+                    name,
+                    type,
+                    payload,
+                    limits,
+                    legalWithoutLimits,
+                    refusedBy
+                );
+            }
+
+            /// <summary>The case name, and the name NUnit reports.</summary>
+            public string Name { get; }
+
+            /// <summary>The type the document is read as.</summary>
+            public Type Type { get; }
+
+            /// <summary>The document.</summary>
+            public string Payload { get; }
+
+            /// <summary>The limits it is read under; null exercises the default profile.</summary>
+            public WJsonReadLimits Limits { get; }
+
+            /// <summary>Whether the overloads without limits read this document.</summary>
+            public bool AcceptedWithoutLimits { get; }
+
+            /// <summary>The limit that must refuse it, or null when it is in budget.</summary>
+            public string RefusedBy { get; }
+
+            /// <summary>Whether the limits admit this document.</summary>
+            public bool AcceptedWithLimits => RefusedBy == null;
 
             public override string ToString()
             {

@@ -448,6 +448,7 @@ const EXPECTED_SHARED_MCP_SERVERS = [
   "zai-web-search",
   "zai-web-reader",
   "zai-zread",
+  "context7",
   "git",
   "fetch"
 ];
@@ -486,8 +487,11 @@ test("configure writes every shared MCP server for every supported frontend", ()
         const server = document[client.collection][serverName];
         assert.ok(server, `${client.file} must configure ${serverName}`);
         // Launchers are bash/node scripts in scripts/mcp; git and fetch are uv tools baked into
-        // the devcontainer image and referenced by their own command names.
-        assert.match(client.commandFor(server), /^(?:bash|node|mcp-server-git|mcp-server-fetch)$/);
+        // the devcontainer image and referenced by their own command names; context7 is npx-run.
+        assert.match(
+          client.commandFor(server),
+          /^(?:bash|node|mcp-server-git|mcp-server-fetch|npx)$/
+        );
       }
     }
 
@@ -546,7 +550,9 @@ test("shared launchers survive moving the workspace and starting in a subdirecto
       );
     }
     for (const [name, server] of Object.entries(document.mcpServers)) {
-      if (name === "git" || name === "fetch") continue;
+      // git and fetch are image-baked direct commands and context7 is npx-run;
+      // none of the three is a repo-relative launcher.
+      if (["git", "fetch", "context7"].includes(name)) continue;
       assert.ok(!JSON.stringify(server).includes(repoRoot));
       const result = spawnSync(process.execPath, server.args, { cwd, encoding: "utf8" });
       assert.equal(result.status, 7, result.stderr);
@@ -598,6 +604,24 @@ test("git and fetch shared servers are credential-free direct commands", () => {
     assert.deepEqual(document.mcpServers.git.args, []);
     assert.deepEqual(document.mcpServers.fetch.args, []);
     assert.equal(document.mcpServers.git.transport, "stdio");
+  } finally {
+    fs.rmSync(repoRoot, { recursive: true, force: true });
+  }
+});
+
+// Context7 ships version-specific library docs (Unity, Roslyn, mkdocs, protobuf-net) and is the
+// only shared server that is a remote service behind a local npx launcher; it must stay
+// credential-free so the shared catalog never carries or requires a key.
+test("context7 shared server runs the official stdio package without credentials", () => {
+  const repoRoot = newTempRepoRoot();
+  try {
+    configureShared(repoRoot);
+    const document = JSON.parse(fs.readFileSync(path.join(repoRoot, ".mcp.json"), "utf8"));
+    const server = document.mcpServers.context7;
+    assert.deepEqual(server.args, ["-y", "@upstash/context7-mcp"]);
+    assert.equal(server.transport, "stdio");
+    const serialized = JSON.stringify(document);
+    assert.doesNotMatch(serialized, /context7[_-]?api[_-]?key/i);
   } finally {
     fs.rmSync(repoRoot, { recursive: true, force: true });
   }

@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags.Helpers
 {
     using System;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Tags;
 
     public abstract class TagsTestBase : AttributeTagsTestBase
@@ -20,7 +21,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags.Helpers
 
             foreach (Type componentType in componentTypes)
             {
-                if (gameObject.GetComponent(componentType) != null)
+                if (gameObject.HasComponent(componentType))
                 {
                     continue;
                 }

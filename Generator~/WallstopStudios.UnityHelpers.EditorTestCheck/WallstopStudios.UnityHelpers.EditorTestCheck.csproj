@@ -475,7 +475,7 @@
     <!-- CASCADE ONLY: names `SharedSpriteTestFixtures`. -->
     <Compile Remove="$(RepoRoot)/Tests/Editor/Sprites/SpriteSheetExtractor/SpriteTestAssemblySetup.cs" />
     <!--
-      GROUP 4, 3 files: cascade off the native windows removed above because
+      GROUP 4, 4 files: cascade off the native windows removed above because
       `TextureImporter.GetSourceTextureWidthAndHeight` postdates the 2021.1.14 editor pin. The window
       declares both `FitTextureSizeWindow` and the `FitMode` enum these two bind.
     -->
@@ -484,6 +484,10 @@
     <!-- Native window lifetimes bind both excluded FitTextureSizeWindow and AnimationEventEditor.
          Run these fixtures in Unity; the name-only animation shim cannot verify ownership. -->
     <Compile Remove="$(RepoRoot)/Tests/Editor/EditorWindowNativeResourceTests.cs" />
+    <!-- Serialized-state ownership across all nine windows, FitTextureSizeWindow included. A shim
+         declaring `SerializedStateForTesting` would hand back a confident GREEN for the one member
+         the fixture exists to check, so this one runs in Unity too. -->
+    <Compile Remove="$(RepoRoot)/Tests/Editor/EditorWindowSerializedStateTests.cs" />
   </ItemGroup>
   <!--
     Both pins announce themselves on every compile, for the reason ../UnityReferenceAssemblies.props

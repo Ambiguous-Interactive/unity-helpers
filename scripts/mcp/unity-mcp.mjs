@@ -1274,12 +1274,16 @@ function sharedMcpDefinitions(repoRoot) {
   });
   // git and fetch are credential-free uv tools baked into the devcontainer image
   // (/usr/local/bin), so they are referenced by command name instead of a launcher.
+  // context7 is the official stdio package serving version-specific library docs;
+  // it is credential-free (an optional CONTEXT7_API_KEY passes through from the
+  // environment when the user sets one).
   const definitions = [
     launch("github", "github-mcp.mjs"),
     launch("zai-vision", "zai-mcp.mjs", "vision"),
     launch("zai-web-search", "zai-mcp.mjs", "web-search"),
     launch("zai-web-reader", "zai-mcp.mjs", "web-reader"),
     launch("zai-zread", "zai-mcp.mjs", "zread"),
+    { name: "context7", command: "npx", args: ["-y", "@upstash/context7-mcp"] },
     { name: "git", command: "mcp-server-git", args: [] },
     { name: "fetch", command: "mcp-server-fetch", args: [] }
   ];

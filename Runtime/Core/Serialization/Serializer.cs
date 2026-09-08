@@ -34,6 +34,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     internal static class SerializerEncoding
     {
         public static readonly Encoding Encoding;
+
+        /// <summary>
+        /// The encoder JSON text is validated through before its bytes are judged and decoded.
+        /// </summary>
+        /// <remarks>
+        /// The BCL's <see cref="Encoding.UTF8"/> replaces an unpaired surrogate with U+FFFD instead
+        /// of reporting it, which would let text no honest writer could have produced decode under
+        /// limits while the same text throws from the overloads that hand it to System.Text.Json
+        /// directly. This encoder throws on the first invalid sequence, so both spellings refuse.
+        /// </remarks>
+        public static readonly UTF8Encoding StrictUtf8 = new UTF8Encoding(
+            encoderShouldEmitUTF8Identifier: false,
+            throwOnInvalidBytes: true
+        );
+
         public static readonly JsonSerializerOptions NormalJsonOptions;
         public static readonly JsonSerializerOptions PrettyJsonOptions;
         public static readonly JsonSerializerOptions FastJsonOptions;
@@ -2103,6 +2118,84 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         }
 
         /// <summary>
+        /// Deserializes JSON text under package-owned read limits, refusing an over-budget document
+        /// before any of it is decoded.
+        /// </summary>
+        /// <typeparam name="T">Target type.</typeparam>
+        /// <param name="data">JSON string.</param>
+        /// <param name="type">Concrete target type, or <see langword="null"/> for <typeparamref name="T"/>.</param>
+        /// <param name="options">Serializer options, or <see langword="null"/> for the Unity-aware defaults.</param>
+        /// <param name="limits">Immutable per-container limits; <see langword="null"/> uses the default limits.</param>
+        /// <returns>The decoded instance.</returns>
+        /// <remarks>
+        /// The limits are held before the decode rather than during it, so a hostile document is
+        /// refused instead of truncated. Existing overloads keep System.Text.Json's own bounds.
+        /// </remarks>
+        public static T JsonDeserialize<T>(
+            string data,
+            Type type,
+            JsonSerializerOptions options,
+            WJsonReadLimits limits
+        )
+        {
+            if (data == null)
+            {
+                SerializationFailureException.ThrowNullInput<T>(
+                    SerializationFormat.Json,
+                    SerializationOperation.Deserialize
+                );
+            }
+            if (data.Length == 0)
+            {
+                SerializationFailureException.ThrowEmptyInput<T>(
+                    SerializationFormat.Json,
+                    SerializationOperation.Deserialize
+                );
+            }
+
+            /*
+                Encode once and both judge and decode those bytes: transcoding inside System.Text.Json
+                would repeat the work the gate already paid for. The encoder is strict, because the
+                overloads without limits hand text this corrupt to System.Text.Json directly, which
+                refuses it -- substituting U+FFFD here would make the limit-taking spelling decode
+                what the plain spelling rejects.
+            */
+            int maximumByteCount = SerializerEncoding.Encoding.GetMaxByteCount(data.Length);
+            using PooledArray<byte> lease = SystemArrayPool<byte>.Get(
+                maximumByteCount,
+                out byte[] utf8
+            );
+            int byteCount;
+            try
+            {
+                byteCount = SerializerEncoding.StrictUtf8.GetBytes(data, 0, data.Length, utf8, 0);
+            }
+            catch (EncoderFallbackException exception)
+            {
+                throw new SerializationCorruptDataException(
+                    SerializationFormat.Json,
+                    SerializationOperation.Deserialize,
+                    type ?? typeof(T),
+                    SerializationFailureException.DescribeString(data.Length),
+                    SerializationStage.Decode,
+                    "The JSON text is not valid UTF-16 (it carries an unpaired surrogate or "
+                        + "otherwise unencodable scalar), so it cannot be judged or decoded as "
+                        + "written. Refused rather than re-encoded with replacement characters, "
+                        + "which would silently change the value.",
+                    exception
+                );
+            }
+
+            return JsonDeserializeUtf8Slice<T>(
+                utf8,
+                byteCount,
+                type,
+                options,
+                limits ?? WJsonReadLimits.Default
+            );
+        }
+
+        /// <summary>
         /// Attempts to deserialize a JSON string. Returns <see langword="false"/> for null/empty/corrupt input.
         /// </summary>
         public static bool TryJsonDeserialize<T>(
@@ -2115,6 +2208,42 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             try
             {
                 value = JsonDeserialize<T>(data, type, options);
+                return true;
+            }
+            catch (SerializationInputException)
+            {
+                value = default;
+                return false;
+            }
+            catch (SerializationCorruptDataException)
+            {
+                value = default;
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Attempts to deserialize a JSON string under read limits. Returns <see langword="false"/>
+        /// for null, empty, corrupt, or over-budget input.
+        /// </summary>
+        /// <typeparam name="T">Target type.</typeparam>
+        /// <param name="data">JSON string.</param>
+        /// <param name="value">Receives the decoded instance, or <c>default</c> on failure.</param>
+        /// <param name="type">Concrete target type, or <see langword="null"/> for <typeparamref name="T"/>.</param>
+        /// <param name="options">Serializer options, or <see langword="null"/> for the Unity-aware defaults.</param>
+        /// <param name="limits">Immutable per-container limits; <see langword="null"/> uses the default limits.</param>
+        /// <returns><see langword="false"/> when the document was refused.</returns>
+        public static bool TryJsonDeserialize<T>(
+            string data,
+            out T value,
+            Type type,
+            JsonSerializerOptions options,
+            WJsonReadLimits limits
+        )
+        {
+            try
+            {
+                value = JsonDeserialize<T>(data, type, options, limits);
                 return true;
             }
             catch (SerializationInputException)
@@ -2148,6 +2277,32 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         }
 
         /// <summary>
+        /// Deserializes JSON bytes under package-owned read limits, refusing an over-budget
+        /// document before any of it is decoded.
+        /// </summary>
+        /// <typeparam name="T">Target type.</typeparam>
+        /// <param name="data">UTF-8 JSON bytes.</param>
+        /// <param name="type">Concrete target type, or <see langword="null"/> for <typeparamref name="T"/>.</param>
+        /// <param name="options">Serializer options, or <see langword="null"/> for the Unity-aware defaults.</param>
+        /// <param name="limits">Immutable per-container limits; <see langword="null"/> uses the default limits.</param>
+        /// <returns>The decoded instance.</returns>
+        public static T JsonDeserialize<T>(
+            byte[] data,
+            Type type,
+            JsonSerializerOptions options,
+            WJsonReadLimits limits
+        )
+        {
+            return JsonDeserializeUtf8Slice<T>(
+                data,
+                data?.Length ?? 0,
+                type,
+                options,
+                limits ?? WJsonReadLimits.Default
+            );
+        }
+
+        /// <summary>
         /// Deserializes the valid prefix of a UTF-8 buffer without copying it into an exact-sized
         /// array. The caller must keep the buffer alive and exclusively owned until this method
         /// returns.
@@ -2157,6 +2312,26 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             int length,
             Type type = null,
             JsonSerializerOptions options = null
+        )
+        {
+            return JsonDeserializeUtf8Slice<T>(data, length, type, options, null);
+        }
+
+        /// <summary>
+        /// Deserializes the valid prefix of a UTF-8 buffer, holding <paramref name="limits"/> when
+        /// the caller asked for them.
+        /// </summary>
+        /// <remarks>
+        /// Null limits mean no gate at all rather than the default profile, because the overloads
+        /// that predate them must not start paying for a pre-decode walk they never asked for. The
+        /// public limit-taking overloads resolve null to <c>WJsonReadLimits.Default</c> first.
+        /// </remarks>
+        internal static T JsonDeserializeUtf8Slice<T>(
+            byte[] data,
+            int length,
+            Type type,
+            JsonSerializerOptions options,
+            WJsonReadLimits limits
         )
         {
             if (data == null)
@@ -2177,12 +2352,20 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             try
             {
                 ReadOnlySpan<byte> span = new(data, 0, length);
-                return (T)
-                    JsonSerializer.Deserialize(
+                JsonSerializerOptions resolvedOptions =
+                    options ?? SerializerEncoding.NormalJsonOptions;
+                if (limits != null)
+                {
+                    WJsonReadBudget.Enforce(
                         span,
+                        length,
                         type ?? typeof(T),
-                        options ?? SerializerEncoding.NormalJsonOptions
+                        limits,
+                        resolvedOptions
                     );
+                }
+
+                return (T)JsonSerializer.Deserialize(span, type ?? typeof(T), resolvedOptions);
             }
             catch (SerializationFailureException)
             {
@@ -2215,6 +2398,42 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             try
             {
                 value = JsonDeserialize<T>(data, type, options);
+                return true;
+            }
+            catch (SerializationInputException)
+            {
+                value = default;
+                return false;
+            }
+            catch (SerializationCorruptDataException)
+            {
+                value = default;
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Attempts to deserialize JSON bytes under read limits. Returns <see langword="false"/>
+        /// for null, empty, corrupt, or over-budget input.
+        /// </summary>
+        /// <typeparam name="T">Target type.</typeparam>
+        /// <param name="data">UTF-8 JSON bytes.</param>
+        /// <param name="value">Receives the decoded instance, or <c>default</c> on failure.</param>
+        /// <param name="type">Concrete target type, or <see langword="null"/> for <typeparamref name="T"/>.</param>
+        /// <param name="options">Serializer options, or <see langword="null"/> for the Unity-aware defaults.</param>
+        /// <param name="limits">Immutable per-container limits; <see langword="null"/> uses the default limits.</param>
+        /// <returns><see langword="false"/> when the document was refused.</returns>
+        public static bool TryJsonDeserialize<T>(
+            byte[] data,
+            out T value,
+            Type type,
+            JsonSerializerOptions options,
+            WJsonReadLimits limits
+        )
+        {
+            try
+            {
+                value = JsonDeserialize<T>(data, type, options, limits);
                 return true;
             }
             catch (SerializationInputException)

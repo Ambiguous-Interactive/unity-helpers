@@ -9,6 +9,7 @@
 #
 # Packages installed:
 #   * @openai/codex                (bin: codex)
+#   * @anthropic-ai/claude-code    (bin: claude)
 #   * opencode-ai                  (bin: opencode)
 #   * @nanocollective/nanocoder    (bin: nanocoder)
 #   * @z_ai/mcp-server             (bin: zai-mcp-server)
@@ -27,6 +28,7 @@ set -euo pipefail
 
 PACKAGES=(
     "@openai/codex|codex"
+    "@anthropic-ai/claude-code|claude"
     "opencode-ai|opencode"
     "@nanocollective/nanocoder|nanocoder"
     "@z_ai/mcp-server|zai-mcp-server"

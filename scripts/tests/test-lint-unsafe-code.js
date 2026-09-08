@@ -357,6 +357,198 @@ runTest("the shipped trees carry memory-access Unsafe members for the rule to ju
   assert.deepStrictEqual(found, []);
 });
 
+// The fourth rule: [Il2CppSetOption(Option.NullChecks, false)] deletes the runtime checks that
+// make a wrong index or a null field a catchable exception instead of undefined behaviour, and it
+// needs neither the `unsafe` keyword nor allowUnsafeCode -- so no rule above can see it. Zero such
+// sites exist, which is why the RED cases carry the whole burden of proving the matcher is alive:
+// a repository scan of an empty subject set looks identical whether the pattern works or not.
+const { findIl2CppSafetyDisables } = require(linterPath);
+
+function il2cpp(text) {
+  return findIl2CppSafetyDisables([{ path: "Runtime/Sample.cs", text }]).failures;
+}
+
+/** Every spelling that leaves a check switched off. Each must be reported exactly once. */
+const IL2CPP_DISABLED = [
+  ["the attribute on a type", "[Il2CppSetOption(Option.NullChecks, false)]\nclass Sample { }\n"],
+  [
+    "the attribute on a method",
+    "class Sample { [Il2CppSetOption(Option.ArrayBoundsChecks, false)] void M() { } }\n"
+  ],
+  [
+    "the attribute on a property",
+    "class Sample { [Il2CppSetOption(Option.DivideByZeroChecks, false)] int P => 1; }\n"
+  ],
+  [
+    "named arguments in the reverse order",
+    "[Il2CppSetOption(value: false, option: Option.NullChecks)]\nclass Sample { }\n"
+  ],
+  [
+    "the fully qualified attribute",
+    "[Unity.IL2CPP.CompilerServices.Il2CppSetOption(Option.NullChecks, false)]\nclass Sample { }\n"
+  ],
+  [
+    "the constructor spelled with its Attribute suffix",
+    "class Sample { void M() { object a = new Il2CppSetOptionAttribute(Option.NullChecks, false); } }\n"
+  ],
+  [
+    "an array of options",
+    "[Il2CppSetOption(new[] { Option.NullChecks, Option.ArrayBoundsChecks }, false)]\nclass Sample { }\n"
+  ],
+  [
+    "an option name reached through using static",
+    "[Il2CppSetOption(NullChecks, false)]\nclass Sample { }\n"
+  ],
+  [
+    "an option name in a different case",
+    "[Il2CppSetOption(Option.nullchecks, false)]\nclass Sample { }\n"
+  ],
+  [
+    "an option this gate does not know by name",
+    "[Il2CppSetOption(Option.Whatever, false)]\nclass Sample { }\n"
+  ],
+  [
+    "a value routed through a named constant",
+    "class Sample { const bool Fast = false;\n" +
+      "    [Il2CppSetOption(Option.NullChecks, Fast)] void M() { } }\n"
+  ],
+  [
+    "a helper that sets the option instead of the attribute",
+    "class Sample { void M() { Configure(Option.NullChecks, false); } }\n"
+  ]
+];
+
+for (const [label, text] of IL2CPP_DISABLED) {
+  runTest(`${label} is reported`, () => {
+    const found = il2cpp(text);
+    assert.strictEqual(found.length, 1, `expected one violation, got ${JSON.stringify(found)}`);
+    assert.ok(found[0].startsWith("Runtime/Sample.cs:"), `expected file and line, got ${found[0]}`);
+    assert.ok(/switches off/.test(found[0]), found[0]);
+    assert.ok(found[0].includes("#637"), "the report must name the issue that explains the rule");
+  });
+}
+
+/*
+    Shapes that name the options and leave every check ON. The attribute with `true` -- or with no
+    value at all -- is harmless and was historically written to record that a hot path had been
+    considered, so only the disabling forms are red. The prose cases are the ones that matter most:
+    issue #637's own text names all three options, and a gate that flagged its own rationale would
+    be uninstallable.
+*/
+const IL2CPP_ENABLED = [
+  ["the attribute with true", "[Il2CppSetOption(Option.NullChecks, true)]\nclass Sample { }\n"],
+  [
+    "named arguments in the reverse order with true",
+    "[Il2CppSetOption(value: true, option: Option.NullChecks)]\nclass Sample { }\n"
+  ],
+  ["the attribute with no value", "[Il2CppSetOption(Option.NullChecks)]\nclass Sample { }\n"],
+  [
+    "an array of options with true",
+    "[Il2CppSetOption(new[] { Option.NullChecks, Option.ArrayBoundsChecks }, true)]\nclass Sample { }\n"
+  ],
+  [
+    "a line comment quoting the refused form",
+    "// [Il2CppSetOption(Option.NullChecks, false)] is refused by lint:unsafe-code.\nclass Sample { }\n"
+  ],
+  [
+    "an XML doc comment naming the options",
+    "/// <summary>Option.ArrayBoundsChecks must never be set to false.</summary>\nclass Sample { }\n"
+  ],
+  [
+    "a block comment quoting the refused form",
+    "/*\n    Il2CppSetOption(Option.DivideByZeroChecks, false)\n*/\nclass Sample { }\n"
+  ],
+  [
+    "a string literal quoting the refused form",
+    'class Sample { const string N = "Il2CppSetOption(Option.NullChecks, false)"; }\n'
+  ],
+  [
+    "a different attribute whose argument merely reads alike",
+    "[Diagnostics(Mode.NullChecksReport, false)]\nclass Sample { }\n"
+  ],
+  [
+    "an option named outside every argument list",
+    "class Sample { Option o = Option.NullChecks; bool disabled = false; }\n"
+  ],
+  ["a different IL2CPP attribute", "[Il2CppEagerStaticClassConstruction]\nclass Sample { }\n"]
+];
+
+for (const [label, text] of IL2CPP_ENABLED) {
+  runTest(`${label} is not a violation`, () => {
+    assert.deepStrictEqual(il2cpp(text), []);
+  });
+}
+
+runTest("a trailing comment cannot make an enabling attribute read as disabling", () => {
+  assert.deepStrictEqual(
+    il2cpp("[Il2CppSetOption(Option.NullChecks, true)] // never false\nclass Sample { }\n"),
+    []
+  );
+});
+
+runTest("a trailing comment cannot hide a disabling attribute either", () => {
+  const found = il2cpp(
+    "[Il2CppSetOption(Option.NullChecks, false)] // Option.NullChecks, true\nclass Sample { }\n"
+  );
+  assert.strictEqual(found.length, 1, `expected one violation, got ${JSON.stringify(found)}`);
+});
+
+runTest("the vendored tree is excluded from the IL2CPP rule too", () => {
+  const vendored = findIl2CppSafetyDisables([
+    {
+      path: "Runtime/Utils/SevenZip/Vendored.cs",
+      text: "[Il2CppSetOption(Option.NullChecks, false)]\nclass Sample { }\n"
+    }
+  ]);
+  assert.deepStrictEqual(vendored.failures, []);
+  assert.strictEqual(vendored.inspected, 0, "a vendored file must not even be judged");
+});
+
+runTest("the IL2CPP rule rides the same entry point as the rest", () => {
+  const found = findViolations(
+    [],
+    [
+      {
+        path: "Runtime/Sample.cs",
+        text: "[Il2CppSetOption(Option.NullChecks, false)]\nclass Sample { }\n"
+      }
+    ],
+    []
+  );
+  assert.strictEqual(found.length, 1, `expected one violation, got ${JSON.stringify(found)}`);
+  assert.ok(/switches off/.test(found[0]), found[0]);
+});
+
+runTest("the package sets no IL2CPP check option at all, which is the point of the rule", () => {
+  const listed = spawnSync(
+    "git",
+    ["-C", repoRoot, "ls-files", "--", "Runtime", "Editor", "Tests"],
+    { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }
+  );
+  const { readFileSync } = require("fs");
+  const corpus = listed.stdout
+    .split("\n")
+    .filter((entry) => entry.endsWith(".cs"))
+    .map((entry) => ({ path: entry, text: readFileSync(path.join(repoRoot, entry), "utf8") }));
+  const { failures: found, inspected } = findIl2CppSafetyDisables(corpus);
+  assert.deepStrictEqual(found, []);
+  assert.strictEqual(inspected, 0, "a site appeared; the rule needs a decision, not a baseline");
+
+  // The subject set is empty by design, so the control cannot be a subject count (honest-gates).
+  // It is the matcher itself: handed a real site, over the same corpus shape, it must red.
+  assert.strictEqual(
+    findIl2CppSafetyDisables([
+      ...corpus,
+      {
+        path: "Runtime/Control.cs",
+        text: "[Il2CppSetOption(Option.NullChecks, false)]\nclass Control { }\n"
+      }
+    ]).failures.length,
+    1,
+    "the scan cannot see a disabling attribute, so its clean run over the package means nothing"
+  );
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (0 < failed) {
   console.error(`Failed: ${failures.join(", ")}`);

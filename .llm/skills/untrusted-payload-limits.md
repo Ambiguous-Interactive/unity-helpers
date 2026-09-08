@@ -99,6 +99,18 @@ unbounded stackalloc" cannot read the same as "found no stackalloc". Two shipped
 100k vertices) and `WButtonGUI` hashed the Inspector's whole multi-selection
 ([#637](https://github.com/Ambiguous-Interactive/unity-helpers/issues/637)).
 
+## The same gate refuses turning IL2CPP's checks off
+
+`[Il2CppSetOption(Option.NullChecks, false)]` -- and the `ArrayBoundsChecks` and
+`DivideByZeroChecks` forms -- deletes the runtime checks that make a null field or an out-of-range
+index a catchable exception. What is left is not a faster correct program but the undefined
+behaviour the `unsafe` rules refuse, reached with neither the keyword nor `allowUnsafeCode`.
+
+Only the disabling spellings are red. `true`, or no value at all, leaves the check on. A value
+routed through a `const bool` is red too, because the gate refuses what it cannot read at face
+value. The package has zero sites and no baseline, so the first one fails the build; the option
+names are safe to write in prose, since comments and string literals are blanked before the match.
+
 ## Related
 
 - [defensive-programming](./defensive-programming.md) -- handle every input; this is the allocation half of it

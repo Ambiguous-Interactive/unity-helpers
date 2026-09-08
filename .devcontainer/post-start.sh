@@ -163,7 +163,7 @@ if ! retry_is_deferred; then
     # Installer is non-fatal by design; verify command availability explicitly.
     bash "$SCRIPT_DIR/install-agent-clis.sh" || true
     all_packages_available=true
-    for agent_bin in codex opencode nanocoder; do
+    for agent_bin in codex claude opencode nanocoder; do
         if command -v "$agent_bin" >/dev/null 2>&1 && timeout "${CODEX_VERSION_TIMEOUT_SECONDS}" "$agent_bin" --version >/dev/null 2>&1; then
             log_ok "$agent_bin CLI is available"
         else
@@ -187,6 +187,14 @@ if ! retry_is_deferred; then
         record_failure_and_backoff
         log_warn "Package verification failed (non-fatal). Re-run: bash .devcontainer/install-agent-clis.sh --force-latest-check"
     fi
+fi
+
+log_step "Installing AI backend launchers"
+
+if bash "$SCRIPT_DIR/ai-backends.sh" install; then
+    log_ok "AI backend launchers available (codex-zai, claude-zai, codex-openrouter, claude-openrouter)"
+else
+    log_warn "AI backend launcher installation failed (non-fatal)."
 fi
 
 log_step "Syncing MCP client configs"

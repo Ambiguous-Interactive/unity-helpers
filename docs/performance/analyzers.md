@@ -22,6 +22,7 @@ finds are not specific to either.
 | [`WUH014`](#wuh014-a-disposable-structs-dispose-that-assigns)            | A disposable `struct` whose `Dispose` assigns                     |
 | [`WUH015`](#wuh015-an-invalid-unity-lifecycle-signature)                 | A Unity callback with an invalid signature                        |
 | [`WUH016`](#wuh016-a-hidden-inherited-unity-callback)                    | A Unity callback hides an ancestor callback                       |
+| [`WUH017`](#wuh017-a-getcomponent-compared-against-null)                 | A `GetComponent` compared against null                            |
 
 These are a different family from the `WPROTO###` serialization diagnostics, and they follow a
 different policy on purpose:
@@ -702,6 +703,43 @@ The [Unity Method Analyzer window](../features/editor-tools/unity-method-analyze
 these compiler diagnostics alongside the compiler's ordinary inheritance diagnostics. Its regex
 source scanner is retired. Both rules are warnings, enabled by default and suppressible through
 standard compiler controls or the package's existing test-only `SuppressAnalyzerAttribute`.
+
+## `WUH017`: a `GetComponent` compared against null
+
+A same-object `GetComponent<T>()` compared against null -- `GetComponent<T>() != null`,
+`GetComponent(typeof(T)) == null`, `is null`, `is not null`, in either operand position -- asks
+only whether one is present, and that is `TryGetComponent`'s question. Unity documents that
+`GetComponent` allocates in the Editor when the component is absent and `TryGetComponent` does not:
+a cost no player profiler run will ever show you, paid on every editor frame that takes the absent
+branch. The comparison discards the component it found, so nothing is lost by switching.
+
+```csharp
+// WUH017: allocates on every absent frame, and the result is thrown away
+if (GetComponent<SceneContext>() == null)
+{
+    gameObject.AddComponent<SceneContext>();
+}
+
+// the same question, without the allocation
+if (!TryGetComponent(out SceneContext _))
+{
+    gameObject.AddComponent<SceneContext>();
+}
+
+// where only the answer is wanted, the package's own utility reads the same
+Assert.IsTrue(gameObject.HasComponent<SpriteRenderer>());
+```
+
+The rule matches the **callee symbol**, not the name. Three different methods are spelled
+`GetComponent`, and only the ones with a `Try` counterpart that means the same thing are reported:
+the generic form and the `System.Type` form declared on `UnityEngine.Component` and
+`UnityEngine.GameObject`. `GetComponentInChildren`/`GetComponentInParent` are not reported -- there
+is no `TryGetComponentInChildren`, and the package's `HasComponent` forwards to
+`TryGetComponent`, which searches one object -- and neither is `GetComponent(string)` nor the
+package's own `Helpers.GetComponent<T>`, whose null comparison tests the _target_ (it returns
+`default` for a target that is neither a `GameObject` nor a `Component`) rather than asking an
+existence question. `GetComponentInChildren<T>() != null` stays as written; the fix this rule names
+must exist where the diagnostic fires.
 
 ## Turning one off
 

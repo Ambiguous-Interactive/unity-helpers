@@ -335,16 +335,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             yield return null;
 
             Assert.AreEqual(0, one.GetComponents<ObjectHelperComponent>().Length);
-            Assert.IsTrue(one.GetComponent<SpriteRenderer>() != null);
+            Assert.IsTrue(one.HasComponent<SpriteRenderer>());
             Assert.AreEqual(4, two.GetComponents<ObjectHelperComponent>().Length);
 
             two.DestroyAllComponentsOfType<ObjectHelperComponent>();
             yield return null;
 
             Assert.AreEqual(0, one.GetComponents<ObjectHelperComponent>().Length);
-            Assert.IsTrue(one.GetComponent<SpriteRenderer>() != null);
+            Assert.IsTrue(one.HasComponent<SpriteRenderer>());
             Assert.AreEqual(0, two.GetComponents<ObjectHelperComponent>().Length);
-            Assert.IsTrue(two.GetComponent<SpriteRenderer>() != null);
+            Assert.IsTrue(two.HasComponent<SpriteRenderer>());
             yield break;
 
             GameObject New(string name)

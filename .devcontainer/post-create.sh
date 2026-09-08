@@ -126,7 +126,7 @@ fi
 log_step "Installing AI coding agent CLIs and MCP runtimes"
 
 if bash "$SCRIPT_DIR/install-agent-clis.sh" --force-latest-check; then
-    for agent_bin in codex opencode nanocoder; do
+    for agent_bin in codex claude opencode nanocoder; do
         if command -v "$agent_bin" >/dev/null 2>&1 && timeout "${CODEX_VERSION_TIMEOUT_SECONDS}" "$agent_bin" --version >/dev/null 2>&1; then
             log_ok "$agent_bin CLI is available"
         else
@@ -165,6 +165,19 @@ fi
 log_step "Syncing MCP client configs"
 
 bash "$SCRIPT_DIR/sync-mcp.sh"
+
+# ── Step 4d: Install isolated AI backend launchers ──────────────────────────
+# Installs the codex-zai, claude-zai, codex-openrouter, and claude-openrouter
+# launchers plus their Codex model profiles. The native `codex` and `claude`
+# commands keep their own backends; the launchers are opt-in and process-scoped.
+
+log_step "Installing AI backend launchers"
+
+if bash "$SCRIPT_DIR/ai-backends.sh" install; then
+    log_ok "AI backend launchers installed (codex-zai, claude-zai, codex-openrouter, claude-openrouter)"
+else
+    log_warn "AI backend launcher installation failed (non-fatal). It will retry on next container start."
+fi
 
 # ── Step 5: Install git hooks ────────────────────────────────────────────────
 # Sets core.hooksPath and makes hook scripts executable.
