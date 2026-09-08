@@ -277,6 +277,37 @@ try {
   Remove-TestRepo $repo
 }
 
+Write-Host "`nTest group: Repository GitHub attributes" -ForegroundColor Magenta
+
+$repositoryRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$attributes = [System.IO.File]::ReadAllText((Join-Path $repositoryRoot '.gitattributes'))
+$repo = New-TestRepo -GitattributesContent $attributes
+try {
+  $imagePath = '.github/review-artifacts/preview.png'
+  $imageSource = Join-Path $repositoryRoot 'Tests/Editor/TestAssets/Textures/solid_1x1_black.png'
+  $imageTarget = Join-Path $repo $imagePath
+  New-Item -ItemType Directory -Path (Split-Path -Parent $imageTarget) -Force | Out-Null
+  Copy-Item -LiteralPath $imageSource -Destination $imageTarget
+  Add-NormalizedFile -RepoDir $repo -RelativePath '.github/actions/example.ps1' -Content "Write-Host 'example'`r`n"
+  Push-Location $repo
+  try {
+    $expectedImageBlob = (& git hash-object --no-filters -- $imagePath).Trim()
+    & git add -- $imagePath 2>&1 | Out-Null
+    $stagedImageBlob = (& git rev-parse ":$imagePath").Trim()
+    Write-TestResult 'RepositoryGitHubAttributes_PreserveStagedPng' ($expectedImageBlob -eq $stagedImageBlob) 'Staging a PNG must preserve its exact bytes.'
+    Remove-Item -LiteralPath $imageTarget, (Join-Path $repo '.github/actions/example.ps1')
+    & git checkout-index --force -- $imagePath '.github/actions/example.ps1' 2>&1 | Out-Null
+    $checkedOutImageBlob = (& git hash-object --no-filters -- $imagePath).Trim()
+    Write-TestResult 'RepositoryGitHubAttributes_PreserveCheckedOutPng' ($expectedImageBlob -eq $checkedOutImageBlob) 'Checking out a PNG must preserve its exact bytes.'
+    $scriptText = [System.IO.File]::ReadAllText((Join-Path $repo '.github/actions/example.ps1'))
+    Write-TestResult 'RepositoryGitHubAttributes_KeepScriptsLf' ($scriptText -ceq "Write-Host 'example'`n") 'GitHub scripts must still check out with LF line endings.'
+  } finally {
+    Pop-Location
+  }
+} finally {
+  Remove-TestRepo $repo
+}
+
 # ==== Test group 4: -Paths scoping ====
 Write-Host "`nTest group: Path scoping" -ForegroundColor Magenta
 

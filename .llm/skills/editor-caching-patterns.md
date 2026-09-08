@@ -215,6 +215,11 @@ public static T GetCachedOrCompute<T>(string key, Func<T> compute)
 
 ### Domain Reload Handling
 
+Destroy owned native textures before assembly reload and on editor exit, then clear styles that
+reference them. Clearing only after reload cannot reach the old domain's native resources. Route
+shared caches through `EditorCacheManager`; make cleanup idempotent and preserve borrowed Unity
+resources. Window-owned caches clear in `OnDisable`, which also runs when a window is destroyed.
+
 Static caches persist across domain reloads in some configurations. Handle this:
 
 ```csharp

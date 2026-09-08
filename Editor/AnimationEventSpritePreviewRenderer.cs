@@ -17,16 +17,27 @@ namespace WallstopStudios.UnityHelpers.Editor
         public static void Draw(
             AnimationEventItem item,
             AnimationEventEditorViewModel viewModel,
-            Dictionary<Sprite, Texture2D> spriteTextureCache,
-            HashSet<Texture2D> ownedTextures
+            SpritePreviewCache spriteTextureCache
         )
         {
-            SetupPreviewData(item, viewModel, spriteTextureCache, ownedTextures);
+            Texture2D texture = SetupPreviewData(
+                item,
+                viewModel,
+                spriteTextureCache,
+                out Rect? sourceRect
+            );
 
             string spriteName = item.sprite == null ? string.Empty : item.sprite.name;
-            if (item.texture != null)
+            if (texture != null)
             {
-                GUILayout.Label(item.texture);
+                if (sourceRect.HasValue)
+                {
+                    DrawSourceCrop(texture, sourceRect.Value);
+                }
+                else
+                {
+                    GUILayout.Label(texture);
+                }
                 return;
             }
 
@@ -42,77 +53,153 @@ namespace WallstopStudios.UnityHelpers.Editor
             }
         }
 
-        private static void SetupPreviewData(
+        internal static Texture2D SetupPreviewData(
             AnimationEventItem item,
             AnimationEventEditorViewModel viewModel,
-            Dictionary<Sprite, Texture2D> spriteTextureCache,
-            HashSet<Texture2D> ownedTextures
+            SpritePreviewCache spriteTextureCache,
+            out Rect? sourceRect
         )
         {
-            if (item.texture != null)
-            {
-                return;
-            }
-
-            if (!TryFindSpriteForEvent(item, viewModel.ReferenceCurve, out Sprite sprite))
+            Sprite sprite = item.sprite;
+            if (
+                (sprite == null || item.resolvedSpriteTime != item.animationEvent.time)
+                && !TryFindSpriteForEvent(item, viewModel.ReferenceCurve, out sprite)
+            )
             {
                 item.sprite = null;
                 item.isTextureReadable = false;
-                return;
+                item.isInvalidTextureRect = false;
+                sourceRect = null;
+                return null;
             }
 
             item.sprite = sprite;
-
-            // AssetPreview destroys evicted textures, so cached dead entries must be rebuilt.
+            item.resolvedSpriteTime = item.animationEvent.time;
+            item.isInvalidTextureRect = false;
             if (spriteTextureCache.TryGetValue(sprite, out Texture2D cachedTexture))
             {
-                if (cachedTexture != null)
-                {
-                    item.texture = cachedTexture;
-                    item.isTextureReadable = true;
-                    item.isInvalidTextureRect = false;
-                    return;
-                }
-
-                _ = spriteTextureCache.Remove(sprite);
+                item.isTextureReadable = true;
+                sourceRect = null;
+                return cachedTexture;
             }
 
             Texture2D preview = AssetPreview.GetAssetPreview(sprite);
             if (preview != null)
             {
-                item.texture = preview;
                 item.isTextureReadable = true;
-                item.isInvalidTextureRect = false;
-                spriteTextureCache[sprite] = preview;
-                return;
+                spriteTextureCache.Add(sprite, preview);
+                sourceRect = null;
+                return preview;
             }
 
-            item.isTextureReadable = sprite.texture.isReadable;
-            item.isInvalidTextureRect = false;
+            return SetupReadablePreview(item, sprite, spriteTextureCache, out sourceRect);
+        }
+
+        internal static Texture2D SetupReadablePreview(
+            AnimationEventItem item,
+            Sprite sprite,
+            SpritePreviewCache spriteTextureCache,
+            out Rect? sourceRect
+        )
+        {
+            Texture2D source = sprite.texture;
+            item.isTextureReadable = source != null && source.isReadable;
             if (!item.isTextureReadable)
             {
-                return;
+                sourceRect = null;
+                return null;
             }
 
-            Rect? maybeRect = null;
+            Rect textureRect;
             try
             {
-                maybeRect = sprite.textureRect;
+                textureRect = sprite.textureRect;
             }
             catch (Exception)
             {
                 item.isInvalidTextureRect = true;
+                sourceRect = null;
+                return null;
             }
 
-            if (maybeRect == null)
+            // Oversized previews keep their original resolution by drawing the source crop directly.
+            int width = Mathf.CeilToInt(textureRect.width);
+            int height = Mathf.CeilToInt(textureRect.height);
+            int mipmapCount = 1 + Mathf.FloorToInt(Mathf.Log(Mathf.Max(width, height), 2));
+            long maximumCopyBytes = SpritePreviewCache.EstimateBytes(
+                width,
+                height,
+                TextureFormat.RGBA32,
+                mipmapCount
+            );
+            if (!spriteTextureCache.CanRetain(maximumCopyBytes))
+            {
+                sourceRect = textureRect;
+                return source;
+            }
+
+            Texture2D copied = CopyTexture(textureRect, source);
+            if (spriteTextureCache.Add(sprite, copied, owned: true))
+            {
+                sourceRect = null;
+                return copied;
+            }
+            UnityEngine.Object.DestroyImmediate(copied);
+            sourceRect = textureRect;
+            return source;
+        }
+
+        internal static void DrawSourceCrop(Texture2D texture, Rect crop)
+        {
+            crop = new Rect(
+                Mathf.CeilToInt(crop.x),
+                Mathf.CeilToInt(crop.y),
+                Mathf.CeilToInt(crop.width),
+                Mathf.CeilToInt(crop.height)
+            );
+            RectOffset padding = GUI.skin.label.padding;
+            Rect position = GUILayoutUtility.GetRect(
+                crop.width + padding.horizontal,
+                crop.height + padding.vertical,
+                GUI.skin.label
+            );
+            position = padding.Remove(position);
+            float scale = Mathf.Min(
+                1,
+                Mathf.Min(position.width / crop.width, position.height / crop.height)
+            );
+            position.width = crop.width * scale;
+            position.height = crop.height * scale;
+            if (Event.current.type != EventType.Repaint)
             {
                 return;
             }
-
-            Texture2D copied = CopyTexture(maybeRect.Value, sprite.texture);
-            _ = ownedTextures.Add(copied);
-            item.texture = copied;
-            spriteTextureCache[sprite] = copied;
+            FilterMode previousFilter = texture.filterMode;
+            TextureWrapMode previousWrapU = texture.wrapModeU;
+            TextureWrapMode previousWrapV = texture.wrapModeV;
+            TextureWrapMode previousWrapW = texture.wrapModeW;
+            try
+            {
+                texture.filterMode = FilterMode.Point;
+                texture.wrapMode = TextureWrapMode.Clamp;
+                GUI.DrawTextureWithTexCoords(
+                    position,
+                    texture,
+                    new Rect(
+                        crop.x / texture.width,
+                        crop.y / texture.height,
+                        crop.width / texture.width,
+                        crop.height / texture.height
+                    )
+                );
+            }
+            finally
+            {
+                texture.filterMode = previousFilter;
+                texture.wrapModeU = previousWrapU;
+                texture.wrapModeV = previousWrapV;
+                texture.wrapModeW = previousWrapW;
+            }
         }
 
         private static void DrawReadWriteFixButton(AnimationEventItem item, string spriteName)

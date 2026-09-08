@@ -187,8 +187,7 @@ namespace WallstopStudios.UnityHelpers.Editor
         private bool _controlFrameTime;
         private string _animationSearchString = string.Empty;
 
-        internal readonly Dictionary<Sprite, Texture2D> _spriteTextureCache = new();
-        internal readonly HashSet<Texture2D> _ownedSpriteTextures = new();
+        internal readonly SpritePreviewCache _spriteTextureCache = new();
 
         private int _selectedFrameIndex = -1;
 
@@ -201,14 +200,6 @@ namespace WallstopStudios.UnityHelpers.Editor
 
         internal void ReleaseSpritePreviews()
         {
-            foreach (Texture2D texture in _ownedSpriteTextures)
-            {
-                if (texture != null)
-                {
-                    DestroyImmediate(texture);
-                }
-            }
-            _ownedSpriteTextures.Clear();
             _spriteTextureCache.Clear();
         }
 
@@ -332,12 +323,7 @@ namespace WallstopStudios.UnityHelpers.Editor
 
                 EditorGUILayout.PrefixLabel("Frame " + frame);
 
-                AnimationEventSpritePreviewRenderer.Draw(
-                    item,
-                    _viewModel,
-                    _spriteTextureCache,
-                    _ownedSpriteTextures
-                );
+                AnimationEventSpritePreviewRenderer.Draw(item, _viewModel, _spriteTextureCache);
 
                 using (new EditorGUI.IndentLevelScope())
                 {
@@ -485,7 +471,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 _viewModel.CurrentClip == null ? 0f : _viewModel.CurrentClip.length,
                 _controlFrameTime,
                 RecordUndo,
-                () => item.texture = null
+                () => item.sprite = null
             );
 
             AnimationEventFunctionFieldRenderer.DrawFunctionFields(item, _explicitMode, RecordUndo);

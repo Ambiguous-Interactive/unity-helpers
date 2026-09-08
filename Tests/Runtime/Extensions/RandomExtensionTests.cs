@@ -864,6 +864,91 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.AreEqual(3, seen.Count);
         }
 
+        [TestCase(-1)]
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        [TestCase(4)]
+        [TestCase(5)]
+        [TestCase(9)]
+        public void NextEnumExceptAcceptsRuntimeLengthArrays(int count)
+        {
+            IRandom random = new PcgRandom(42);
+            PcgRandom concrete = new(42);
+            PcgRandom explicitConcrete = new(42);
+            IRandom explicitInterface = new PcgRandom(42);
+            TestValues[] exclusions = count < 0 ? null : new TestValues[count];
+            for (int index = 0; index < count; ++index)
+            {
+                exclusions[index] = (TestValues)index;
+            }
+            TestValues[] original = exclusions == null ? null : (TestValues[])exclusions.Clone();
+
+            for (int draw = 0; draw < 32; ++draw)
+            {
+                TestValues value = random.NextEnumExcept(exclusions);
+                Assert.AreEqual(value, concrete.NextEnumExcept(exclusions));
+                Assert.AreEqual(value, explicitConcrete.NextEnumExcept<TestValues>(exclusions));
+                Assert.AreEqual(value, explicitInterface.NextEnumExcept<TestValues>(exclusions));
+                Assert.IsTrue(Math.Max(0, count) <= (int)value && (int)value < 10);
+            }
+            CollectionAssert.AreEqual(original, exclusions);
+        }
+
+        [Test]
+        public void NextEnumExceptArrayIgnoresDuplicateAndUndefinedExclusions()
+        {
+            IRandom random = new PcgRandom(42);
+            IRandom expected = new PcgRandom(42);
+            TestValues[] exclusions =
+            {
+                TestValues.Value0,
+                TestValues.Value0,
+                (TestValues)(-1),
+                TestValues.Value0,
+                (TestValues)100,
+                TestValues.Value0,
+            };
+            for (int draw = 0; draw < 32; ++draw)
+            {
+                Assert.AreEqual(
+                    expected.NextEnumExcept(TestValues.Value0),
+                    random.NextEnumExcept(exclusions)
+                );
+            }
+        }
+
+        [Test]
+        public void NextEnumExceptArrayPreservesCompleteExclusionFailure()
+        {
+            IRandom random = new PcgRandom(42);
+            TestValues[] exclusions = (TestValues[])Enum.GetValues(typeof(TestValues));
+            Assert.Throws<InvalidOperationException>(() => random.NextEnumExcept(exclusions));
+        }
+
+        [Test]
+        public void NextEnumExceptArrayWithNoExclusionsPreservesDraws()
+        {
+            IRandom random = new PcgRandom(42);
+            IRandom expected = new PcgRandom(42);
+            Assert.AreEqual(expected.NextEnum<TestValues>(), random.NextEnumExcept<TestValues>());
+            Assert.AreEqual(
+                expected.NextEnum<TestValues>(),
+                random.NextEnumExcept((TestValues[])null)
+            );
+        }
+
+        [Test]
+        public void NextEnumExceptArrayWithNullGeneratorReturnsDefault()
+        {
+            IRandom random = null;
+            Assert.AreEqual(
+                default(TestValues),
+                random.NextEnumExcept(new[] { TestValues.Value1 })
+            );
+        }
+
         [Test]
         public void NextEnumExceptSkipsAllProvidedExceptions()
         {

@@ -659,8 +659,15 @@ Putting a footstep sound on frame 4 of a run cycle in Unity's Animation window m
 right time value and typing a method name from memory. This shows the sprite at each event, lists the
 methods that are actually callable, and edits the parameter with the right field type.
 
-Changing clips or closing the window releases copied sprite previews. Unity's shared previews stay
-owned by Unity, and a failed preview copy releases its temporary texture.
+Animation Creator and Animation Event Editor retain at most 128 sprite previews per window,
+within a 32 MiB estimated texture-storage budget. The estimate includes mip levels, CPU/GPU copies
+and a per-texture allowance; it is not a measurement of total editor or driver memory. Recently
+used previews stay cached, and Unity-destroyed previews are rebuilt when needed.
+
+Changing clips or closing Animation Event Editor releases copied previews. Eviction releases only
+textures the window created; Unity's shared previews remain owned by Unity. A readable sprite too
+large to copy within the budget is drawn directly from its source rectangle at the same resolution.
+A failed preview copy releases its temporary texture.
 
 First, mark the methods you want to fire:
 
@@ -1061,7 +1068,9 @@ runtime API.
 ## Property Drawers & Attributes
 
 These are the inspector attributes the tools above lean on most. The
-[Inspector documentation](../inspector/inspector-overview.md) covers the full set.
+[Inspector documentation](../inspector/inspector-overview.md) covers the full set. Collection
+inspectors release their cached button textures on script reload and editor exit; the next draw
+rebuilds the styles as needed.
 
 <a id="winlineeditor-property-drawer"></a>
 

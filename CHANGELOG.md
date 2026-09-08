@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add runtime-length exclusion arrays to `NextEnumExcept` for interface and concrete generators. See [Random Generators](./docs/features/utilities/random-generators.md#collection-operations) ([#742](https://github.com/Ambiguous-Interactive/unity-helpers/issues/742)).
 - Add reusable protobuf read limits for encoded bytes, length-delimited fields, tag counts and nesting, with a parameterless constructor for generic factories. See [Serialization](./docs/features/serialization/serialization.md) ([#647](https://github.com/Ambiguous-Interactive/unity-helpers/issues/647)).
 - Add reusable JSON read limits for nesting, per-container element counts and string or property-name lengths, with a parameterless constructor for generic factories. New `Serializer.JsonDeserialize` overloads refuse an over-budget document before decoding it. See [Serialization](./docs/features/serialization/serialization.md) ([#647](https://github.com/Ambiguous-Interactive/unity-helpers/issues/647)).
 - Add `WUH017` warnings for a same-object `GetComponent` compared against null, where `TryGetComponent` answers the same question without Unity's Editor allocation. See [Analyzers](./docs/performance/analyzers.md#wuh017-a-getcomponent-compared-against-null) ([#741](https://github.com/Ambiguous-Interactive/unity-helpers/issues/741)).
@@ -206,6 +207,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix collection-inspector button textures leaking across script reloads. See [Property Drawers](./docs/features/editor-tools/editor-tools-guide.md#property-drawers-attributes) ([#648](https://github.com/Ambiguous-Interactive/unity-helpers/issues/648)).
+- Fix unbounded sprite preview retention in Animation Creator and Animation Event Editor while preserving full-resolution previews. See [Animation Tools](./docs/features/editor-tools/editor-tools-guide.md#animation-tools) ([#648](https://github.com/Ambiguous-Interactive/unity-helpers/issues/648)).
 - Fix `WyRandom.Copy()` losing pending Gaussian, bool, and byte values, so a copied generator continues the same mixed draw sequence ([#638](https://github.com/Ambiguous-Interactive/unity-helpers/issues/638)).
 - Fix malformed `SparseSet` binary saves silently losing invalid element IDs or enlarging their universe for duplicates. Both binary readers now refuse invalid elements before restoring the set ([#647](https://github.com/Ambiguous-Interactive/unity-helpers/issues/647)).
 - Fix explicit-type protobuf collection reads bypassing wrappers, preserving stored elements and capacity rules ([#647](https://github.com/Ambiguous-Interactive/unity-helpers/issues/647)).

@@ -664,16 +664,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
         private static IEnumerable<TestCaseData> EveryMixedContinuation()
         {
+            return MixedContinuationCases(nameof(MixedContinuationSurvivesEveryRestorePath));
+        }
+
+        private static IEnumerable<TestCaseData> EveryMixedJsonContinuation()
+        {
+            return MixedContinuationCases(nameof(MixedContinuationSurvivesJsonRestore));
+        }
+
+        private static IEnumerable<TestCaseData> MixedContinuationCases(string testName)
+        {
             foreach (bool primeCaches in new[] { false, true })
             {
                 foreach (TestCaseData generator in EveryGenerator())
                 {
                     yield return new TestCaseData(generator.Arguments[0], primeCaches).SetName(
-                        nameof(MixedContinuationSurvivesEveryRestorePath)
-                            + "-"
-                            + generator.TestName
-                            + "-"
-                            + primeCaches
+                        testName + "-" + generator.TestName + "-" + primeCaches
                     );
                 }
             }
@@ -682,15 +688,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         [TestCaseSource(nameof(EveryMixedContinuation))]
         public void MixedContinuationSurvivesEveryRestorePath(IRandom random, bool primeCaches)
         {
-            if (primeCaches)
-            {
-                PrimeCommonReservoirs(random);
-            }
-
-            RandomState saved = random.InternalState;
-            Assert.AreEqual(primeCaches, saved.Gaussian.HasValue);
-            Assert.AreEqual(primeCaches && random is not SystemRandom ? 31 : 0, saved.BitCount);
-            Assert.AreEqual(primeCaches ? 3 : 0, saved.ByteCount);
+            RandomState saved = PrepareMixedContinuation(random, primeCaches);
             IRandom[] restored =
             {
                 random.Copy(),
@@ -703,6 +701,32 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             }
 
             AssertMixedContinuation(random, restored);
+        }
+
+        [TestCaseSource(nameof(EveryMixedJsonContinuation))]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
+        public void MixedContinuationSurvivesJsonRestore(IRandom random, bool primeCaches)
+        {
+            RandomState saved = PrepareMixedContinuation(random, primeCaches);
+            string json = Serializer.JsonStringify(random);
+            IRandom restored = Serializer.JsonDeserialize<IRandom>(json, random.GetType());
+            Assert.IsTrue(restored != null);
+            Assert.AreEqual(saved, restored.InternalState);
+            AssertMixedContinuation(random, new[] { restored });
+        }
+
+        private static RandomState PrepareMixedContinuation(IRandom random, bool primeCaches)
+        {
+            if (primeCaches)
+            {
+                PrimeCommonReservoirs(random);
+            }
+
+            RandomState saved = random.InternalState;
+            Assert.AreEqual(primeCaches, saved.Gaussian.HasValue);
+            Assert.AreEqual(primeCaches && random is not SystemRandom ? 31 : 0, saved.BitCount);
+            Assert.AreEqual(primeCaches ? 3 : 0, saved.ByteCount);
+            return saved;
         }
 
         [Test]
