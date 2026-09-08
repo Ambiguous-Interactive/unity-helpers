@@ -199,6 +199,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     nameof(WJsonReadLimits.MaximumNestingDepth),
                     legalWithoutLimits: true
                 );
+                yield return JsonBudgetCase.OverBudget(
+                    "nesting past the tokenizer's own bound, which must refuse and not defer",
+                    typeof(object),
+                    NestedArrays(20),
+                    new WJsonReadLimits(maximumNestingDepth: 8),
+                    nameof(WJsonReadLimits.MaximumNestingDepth),
+                    legalWithoutLimits: true
+                );
                 yield return JsonBudgetCase.InBudget(
                     "an array exactly at the element limit",
                     typeof(SerializableList<int>),

@@ -162,21 +162,39 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// <param name="options">The options the decode will use, or null for the defaults.</param>
         /// <returns>The tokenizer options.</returns>
         /// <remarks>
-        /// The tokenizer's own depth bound sits one level above the limit so the breach is reported
-        /// as a refusal naming the limit, rather than as a tokenizer error this gate would forward
-        /// to the decoder.
+        /// <para>
+        /// The tokenizer's depth bound must sit above the LIMIT, so the breach is reported as a
+        /// refusal naming the limit rather than as a tokenizer error, and above the DECODER's own
+        /// bound, so every token the decoder could have read has been judged by the walk. A bound
+        /// between the two is a bypass: a document nested past it makes the tokenizer throw
+        /// mid-walk, the swallowed exception reads as "malformed, left to the decoder", and the
+        /// decoder -- whose bound is higher -- materializes the very nesting the limit refused.
+        /// A document deeper than both bounds is different work: the decoder refuses it in its
+        /// own words, so nothing is waved through either way.
+        /// </para>
+        /// <para>
+        /// The decoder's bound is at least 1 (System.Text.Json validates that on assignment), so
+        /// the sum stays positive; the ceiling case is passed through unchanged because the walk's
+        /// own limit check fires long before the tokenizer's could.
+        /// </para>
         /// </remarks>
         private static JsonReaderOptions ReaderOptionsFor(
             WJsonReadLimits limits,
             JsonSerializerOptions options
         )
         {
+            int decodeDepth =
+                options == null ? SerializerEncoding.NormalJsonOptions.MaxDepth : options.MaxDepth;
+            int tokenizerDepth =
+                decodeDepth == int.MaxValue
+                    ? int.MaxValue
+                    : Math.Max(limits.MaximumNestingDepth, decodeDepth) + 1;
             return new JsonReaderOptions
             {
                 AllowTrailingCommas = options == null || options.AllowTrailingCommas,
                 CommentHandling =
                     options == null ? JsonCommentHandling.Skip : options.ReadCommentHandling,
-                MaxDepth = limits.MaximumNestingDepth + 1,
+                MaxDepth = tokenizerDepth,
             };
         }
 

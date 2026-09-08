@@ -307,7 +307,7 @@
     "validate:tests": "npm run validate:tests:fast && npm run validate:tests:hook-regressions",
     "validate:prepush": "npm run validate:git-push-config",
     "validate:local": "npm run validate:git-push-config && npm run validate:content && npm run lint:spelling && npm run eol:check && npm run validate:tests:fast && npm run format:csharp:check && npm run lint:csharp-naming && npm run lint:duplicate-usings && npm run lint:spelling:config && npm run validate:devcontainer && npm run validate:hook-sync && npm run validate:hook-perms && npm run validate:hook-spell-parity && npm run validate:cspell-files-parity",
-    "validate:devcontainer": "pwsh -NoProfile -File scripts/validate-devcontainer-config.ps1 -VerboseOutput && npm run test:validate-devcontainer-urls && npm run test:post-create",
+    "validate:devcontainer": "pwsh -NoProfile -File scripts/validate-devcontainer-config.ps1 -VerboseOutput && npm run test:validate-devcontainer-urls && npm run test:post-create && npm run test:ai-backends",
     "validate:hook-sync": "pwsh -NoProfile -File scripts/validate-hook-sync-calls.ps1 -VerboseOutput",
     "validate:hook-perms": "bash scripts/validate-hook-permissions.sh",
     "validate:hook-spell-parity": "bash scripts/tests/test-hook-spell-parity.sh",
