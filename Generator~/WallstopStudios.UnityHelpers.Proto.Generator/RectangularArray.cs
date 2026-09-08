@@ -420,7 +420,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             );
             writer.Indent();
             writer.Line(
-                "if (!reader.TryReadPackedRun(out "
+                "if (!reader.TryReadPackedRun("
+                    + NestedCollections.Proto
+                    + ".WProtoWireType.Varint, out "
                     + NestedCollections.Proto
                     + ".WProtoReader header))"
                     + Writer.Open

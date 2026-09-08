@@ -2476,7 +2476,8 @@ WProtoReadLimits limits = new WProtoReadLimits(
     maximumMessageBytes: 64 * 1024,
     maximumLengthDelimitedBytes: 16 * 1024,
     maximumFieldCount: 1024,
-    maximumNestingDepth: 16
+    maximumNestingDepth: 16,
+    maximumPackedElementCount: 4096
 );
 WProtoReader reader = new WProtoReader(bytes, limits);
 ```
@@ -2488,6 +2489,13 @@ including tags inside skipped groups and their terminators; it refuses the next 
 it. A clean end exactly at the limit still succeeds. Limits propagate through nested, detached,
 merged, and packed readers. Each reader region has its own tag count, while skipped groups share
 that region's count. Packed elements have no tags, so the tag limit does not count them.
+The packed-element limit is cumulative across all packed fields, split runs, and nested or merged
+messages in one root read. Generated readers charge complete runs before reserving a destination,
+including packed rectangular-array dimensions. Hand-written formatters can use
+`TryReadPackedRun(wireType, out reader)` for the same early refusal. The overload without a wire type
+charges each scalar read and caps its sizing hint to the remaining allowance. Unpacked repeated
+values still use the tag limit; skipping an unknown length-delimited field does not decode or charge
+packed elements.
 
 `WProtoFacade.TryDeserialize(bytes, limits, out T value)` and its `TryDeserializeAs` overload also
 accept these limits. The facade retains its routing contract: `false` means the type is unhandled;
@@ -2496,11 +2504,15 @@ and never retries the payload with protobuf-net. Reader methods instead return `
 `Malformed`, and clear their output. A failed length read may consume its prefix, but not its payload;
 a failed nested or packed read returns a malformed child reader.
 
-Defaults preserve existing behavior: no additional wire-size or tag-count cap and a maximum depth
+Defaults preserve existing behavior: no additional wire-size, tag-count, or packed-element cap and a maximum depth
 of 64. Negative limits become zero; zero allows empty regions or fields but no tags or descent,
 respectively. Requested depth above 64 remains capped at 64. Limits are immutable and reusable across
-threads; constructing readers does not allocate a mutable budget object. These are **per-region wire
-limits**, not a cumulative decoded-object, collection-element, or retained-memory budget. Custom
+threads. Only a finite packed-element limit allocates a small mutable budget per root reader; child
+readers share it, while separate root reads using the same limits remain independent. Reader copies
+share the allowance; opening the same typed run again charges its complete count again. Copying an
+already accepted typed packed reader replays prepaid bytes without charging again; decode its scalars
+using the supplied wire type. These bounds do not provide a cumulative
+decoded-object or retained-memory budget. Custom
 formatters remain responsible for their own allocations, and these overloads do not configure the
 legacy protobuf-net fallback. JSON has its own limits, described under
 [Reading Untrusted JSON](#reading-untrusted-json).

@@ -153,6 +153,40 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             }
         }
 
+        [TestCase(0, false)]
+        [TestCase(1, false)]
+        [TestCase(2, false)]
+        [TestCase(3, false)]
+        [TestCase(0, true)]
+        [TestCase(1, true)]
+        [TestCase(2, true)]
+        [TestCase(3, true)]
+        public void JesseSortAbsorbsMonotoneRunsWithLinearComparisons(int shape, bool useList)
+        {
+            const int count = 4096;
+            int[] input = new int[count];
+            for (int index = 0; index < count; ++index)
+            {
+                input[index] = shape switch
+                {
+                    0 => index / 2,
+                    1 => (count - index) / 2,
+                    2 => 7,
+                    _ => Math.Min(index, count - index),
+                };
+            }
+            int[] expected = (int[])input.Clone();
+            Array.Sort(expected);
+            IList<int> subject = useList ? new List<int>(input) : input;
+            JesseCountingComparer comparer = new();
+            subject.JesseSort(comparer);
+            CollectionAssert.AreEqual(expected, subject);
+            Assert.That(
+                comparer.Comparisons,
+                Is.LessThanOrEqualTo(shape == 3 ? count * 6 : count - 1)
+            );
+        }
+
         [Test]
         public void EveryDeclaredAlgorithmCarriesAStabilityPromise()
         {
@@ -415,6 +449,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             public int Compare(SortProbe x, SortProbe y)
             {
                 return x.Key.CompareTo(y.Key);
+            }
+        }
+
+        private sealed class JesseCountingComparer : IComparer<int>
+        {
+            public int Comparisons { get; private set; }
+
+            public int Compare(int left, int right)
+            {
+                ++Comparisons;
+                return left.CompareTo(right);
             }
         }
 

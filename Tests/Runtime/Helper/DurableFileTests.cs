@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     using System.Collections.Generic;
     using System.IO;
     using System.Text;
+    using System.Threading;
     using System.Threading.Tasks;
     using NUnit.Framework;
     using UnityEngine;
@@ -148,6 +149,119 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
             Assert.IsTrue(error == null);
             Assert.AreEqual(0, new FileInfo(path).Length);
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(256)]
+        [TestCase(16384)]
+        public void ByteWriteCreatesThenReplacesWithExactContents(int length)
+        {
+            string path = Path.Combine(_testDirectory, "binary", "save.bin");
+            byte[] contents = new byte[length];
+            for (int i = 0; i < contents.Length; ++i)
+            {
+                contents[i] = (byte)(i % 256);
+            }
+
+            Assert.IsTrue(DurableFile.TryWriteAllBytes(path, contents, out Exception createError));
+            Assert.IsTrue(createError == null);
+            CollectionAssert.AreEqual(contents, File.ReadAllBytes(path));
+            Assert.IsFalse(File.Exists(path + DurableFile.TemporarySuffix));
+
+            byte[] replacement = { 255, 0, 128 };
+            Assert.IsTrue(
+                DurableFile.TryWriteAllBytes(path, replacement, out Exception replaceError)
+            );
+            Assert.IsTrue(replaceError == null);
+            CollectionAssert.AreEqual(replacement, File.ReadAllBytes(path));
+            Assert.IsFalse(File.Exists(path + DurableFile.TemporarySuffix));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ByteWriteTreatsNullAndEmptyContentsAsEmpty(bool useNull)
+        {
+            string path = WriteDirectly("save.bin", "previous");
+            byte[] contents = useNull ? null : Array.Empty<byte>();
+
+            Assert.IsTrue(DurableFile.TryWriteAllBytes(path, contents, out Exception error));
+
+            Assert.IsTrue(error == null);
+            Assert.AreEqual(0, new FileInfo(path).Length);
+            Assert.IsFalse(File.Exists(path + DurableFile.TemporarySuffix));
+        }
+
+        [TestCase(null)]
+        [TestCase("")]
+        [TestCase("   ")]
+        [TestCase("invalid\0path")]
+        public void ByteWriteRejectsInvalidPaths(string path)
+        {
+            Assert.IsFalse(
+                DurableFile.TryWriteAllBytes(path, new byte[] { 255 }, out Exception error)
+            );
+            Assert.IsTrue(error is ArgumentException);
+        }
+
+        [Test]
+        public void FailedByteWriteLeavesPreviousContentsAndBlockedStagingIntact()
+        {
+            string path = WriteDirectly("save.bin", "previous");
+            BlockStaging(path);
+
+            Assert.IsFalse(
+                DurableFile.TryWriteAllBytes(path, new byte[] { 255 }, out Exception error)
+            );
+
+            Assert.IsTrue(error != null);
+            Assert.AreEqual("previous", File.ReadAllText(path));
+            Assert.IsTrue(Directory.Exists(path + DurableFile.TemporarySuffix));
+        }
+
+        [Test]
+        public void FailedByteWriteSwapRemovesItsStagedFile()
+        {
+            string path = Path.Combine(_testDirectory, "save.bin");
+            Directory.CreateDirectory(path);
+
+            Assert.IsFalse(
+                DurableFile.TryWriteAllBytes(path, new byte[] { 255 }, out Exception error)
+            );
+
+            Assert.IsTrue(error != null);
+            Assert.IsTrue(Directory.Exists(path));
+            Assert.IsFalse(File.Exists(path + DurableFile.TemporarySuffix));
+        }
+
+        [Test]
+        public void ConcurrentByteAndTextWritesLeaveOneCompletePayload()
+        {
+            string path = Path.Combine(_testDirectory, "save.bin");
+            string text = new string('a', 16384);
+            byte[] bytes = new byte[16384];
+            using Barrier start = new(2);
+            Task<bool> textWrite = Task.Run(() =>
+            {
+                Assert.IsTrue(start.SignalAndWait(TimeSpan.FromSeconds(10)));
+                return DurableFile.TryWriteAllText(path, text, out _);
+            });
+            Task<bool> byteWrite = Task.Run(() =>
+            {
+                Assert.IsTrue(start.SignalAndWait(TimeSpan.FromSeconds(10)));
+                return DurableFile.TryWriteAllBytes(path, bytes, out _);
+            });
+
+            Task.WaitAll(textWrite, byteWrite);
+
+            Assert.IsTrue(textWrite.Result);
+            Assert.IsTrue(byteWrite.Result);
+            byte[] actual = File.ReadAllBytes(path);
+            Assert.AreEqual(bytes.Length, actual.Length);
+            byte expected = actual[0];
+            Assert.IsTrue(expected == 0 || expected == (byte)'a');
+            CollectionAssert.AreEqual(expected == 0 ? bytes : Encoding.UTF8.GetBytes(text), actual);
+            Assert.IsFalse(File.Exists(path + DurableFile.TemporarySuffix));
         }
 
         [Test]
