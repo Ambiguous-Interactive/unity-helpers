@@ -202,4 +202,5 @@ and JSON paths have dedicated coverage, including mixed draws with empty and pri
 
 ## Refreshing these numbers
 
-Run `RandomPerformanceTests.Benchmark` from Unity's Test Runner, or let the weekly `Unity Benchmarks` workflow do it. Both rewrite the tables in place.
+Run `RandomPerformanceTests.Benchmark` from Unity's Test Runner, or dispatch the `Unity Benchmarks`
+workflow manually; refreshed results land through the protected-branch perf-results commit. Both rewrite the tables in place.

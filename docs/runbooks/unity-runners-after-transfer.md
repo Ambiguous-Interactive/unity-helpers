@@ -257,9 +257,12 @@ reason to repeat runs until a favorable number appears.
 
 `run-ci-tests.ps1 -TestFilter 'Namespace.Fixture.Method'` forwards Unity's test-name filter
 in EditMode, PlayMode and standalone builds. It preserves the assembly and category filters.
-A filtered run requires at least one passing test: zero matches, all skipped, and entirely
-inconclusive results cannot establish acceptance. The NUnit XML and logs remain available when
-this check fails, including an IntMap measurement rejected for unstable timing.
+The script no longer resolves an editor itself: set `UNITY_EDITOR_PATH` to a CI-managed editor
+first (in CI the central `ensure-unity-editor` gate publishes it; locally run the repository's
+`ensure-editor.ps1` helper with `-CiManagedOnly -RequireHealthyExisting`). Without it the script
+fails closed. A filtered run requires at least one passing test: zero matches, all skipped, and
+entirely inconclusive results cannot establish acceptance. The NUnit XML and logs remain
+available when this check fails, including an IntMap measurement rejected for unstable timing.
 
 The explicit `ValidationWorkspaceInteractionTests.NativePanelCallbacksRetainDraftAndPersistSettings`
 fixture exercises native field-change and button-submit callbacks. It requires batchmode and a fresh,

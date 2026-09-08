@@ -38,6 +38,7 @@ function expression(text) {
     "inputs",
     "steps",
     "needs",
+    "matrix",
     "always",
     "cancelled",
     "success",
@@ -52,6 +53,7 @@ function expression(text) {
       context.inputs,
       context.steps,
       context.needs,
+      context.matrix,
       () => true,
       () => context.cancelled,
       () => context.success,
@@ -87,6 +89,8 @@ for (const event of ["pull_request", "push", "schedule", "workflow_dispatch"]) {
           const context = {
             github: { event_name: event },
             inputs: { acceptance },
+            // Acceptance runs once per version, in the editmode leg.
+            matrix: { "test-mode": "editmode" },
             cancelled,
             success: false,
             steps: {
@@ -119,28 +123,29 @@ for (const event of ["pull_request", "push", "schedule", "workflow_dispatch"]) {
   }
 }
 
+// Enrollment contract (Workflow contract item 3): the provisioning profile is
+// the reviewed STATIC matrix.test-mode map -- the exact form the central
+// analyzer accepts. Standalone legs verify the IL2CPP module set at gate time;
+// editmode and playmode legs keep EditorOnly. The old resolver-driven dynamic
+// expression is gone on purpose: a source-free audit cannot bound it.
 const profileLine = named("Require manually installed Unity editor").match(
   /^          provisioning-profile:\s*(?:>-\s*)?(\$\{\{[\s\S]*?\}\})/m
 )?.[1];
 const profile = expression(profileLine);
-for (const modes of [
-  ["editmode"],
-  ["playmode"],
-  ["standalone"],
-  ["editmode", "playmode", "standalone"]
+for (const [testMode, expected] of [
+  ["editmode", "EditorOnly"],
+  ["playmode", "EditorOnly"],
+  ["standalone", "StandaloneWindowsIl2Cpp"]
 ]) {
-  for (const acceptance of ["", "none", "sentinel", "intmap", "serialization", "all"]) {
-    assert.equal(
-      profile({
-        inputs: { acceptance },
-        needs: { "matrix-config": { outputs: { "test-modes": JSON.stringify(modes) } } }
-      }),
-      modes.includes("standalone") || ["intmap", "serialization", "all"].includes(acceptance)
-        ? "StandaloneWindowsIl2Cpp"
-        : "EditorOnly"
-    );
-    controls++;
-  }
+  assert.equal(
+    profile({
+      matrix: { "test-mode": testMode },
+      needs: { "matrix-config": { outputs: { "test-modes": JSON.stringify(["editmode", "playmode", "standalone"]) } } }
+    }),
+    expected,
+    `Wrong provisioning profile for the ${testMode} leg`
+  );
+  controls++;
 }
 
 assert.ok(
@@ -257,6 +262,10 @@ for (const file of fs.readdirSync(workflowDirectory).filter((name) => /\.ya?ml$/
         .trim();
       assert.ok(condition, `${file}/${match[1]} diagnostic predicate missing`);
       const evaluate = expression(condition);
+      // Per-leg guards scope diagnostics to their own matrix.test-mode leg, so
+      // evaluate each condition against the leg its text pins (editmode is the
+      // default for conditions without a leg guard).
+      const legMode = condition.match(/matrix\.test-mode == '(\w+)'/)?.[1] ?? "editmode";
       for (const checkoutOutcome of ["skipped", "failure", "cancelled", "success"]) {
         for (const status of ["success", "failure", "cancelled"]) {
           const context = {
@@ -265,6 +274,7 @@ for (const file of fs.readdirSync(workflowDirectory).filter((name) => /\.ya?ml$/
             needs: {
               "matrix-config": { outputs: { "test-modes": '["editmode","playmode","standalone"]' } }
             },
+            matrix: { "test-mode": legMode },
             success: status === "success",
             failure: status === "failure",
             cancelled: status === "cancelled",

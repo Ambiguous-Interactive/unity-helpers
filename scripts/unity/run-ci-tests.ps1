@@ -43,8 +43,6 @@ param(
 
     [string]$UnityEditorPath = $env:UNITY_EDITOR_PATH,
 
-    [string]$UnityInstallRoot = $(if ($env:UNITY_EDITOR_INSTALL_ROOT) { $env:UNITY_EDITOR_INSTALL_ROOT } else { 'C:\Unity\Editors' }),
-
     [string]$TestFilter = '',
 
     [string]$TestCategory = $(if ($env:UH_UNITY_TEST_CATEGORY) { $env:UH_UNITY_TEST_CATEGORY } else { '' }),
