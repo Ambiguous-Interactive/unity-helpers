@@ -17,6 +17,7 @@ Static helper classes and utilities that solve common programming problems witho
 - [Path & File Helpers](#path--file-helpers): Path resolution, file operations
 - [Scene Helpers](#scene-helpers): Scene queries and loading
 - [Advanced Utilities](#advanced-utilities): `RestorableGlobal<T>`, `BitOps`, statistics, null checks, hashing, SHA-256, formatting
+- [Texture and Sprite Pixel Helpers](#texture-and-sprite-pixel-helpers): Rotation and sprite-region extraction
 - [Environment Detection](#environment-detection): CI, batch mode, and runtime environment
 
 ---
@@ -1197,6 +1198,47 @@ bool changed =
 
 Debug.Log($"Texture changed: {changed}");
 ```
+
+---
+
+### Texture and Sprite Pixel Helpers
+
+`SpriteHelpers.RotateTexture90`, `RotateTexture180` and `ExtractSpriteRect` produce a new texture
+and leave the source untouched. Each preserves the source's format and swaps dimensions for a
+quarter turn.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.Helper;
+using UnityEngine;
+
+Texture2D source = new Texture2D(64, 128, TextureFormat.RGBA32, false);
+source.SetPixels32(new Color32[64 * 128]);
+source.Apply();
+
+Texture2D clockwise = source.RotateTexture90(clockwise: true);
+Texture2D upsideDown = source.RotateTexture180();
+```
+
+Both return null, with a logged reason, when the texture is not readable or its format refuses
+pixel writes, so a compressed atlas never throws mid-load.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.Helper;
+using UnityEngine;
+
+Texture2D atlas = new Texture2D(256, 256, TextureFormat.RGBA32, false);
+atlas.Apply();
+Sprite sprite = Sprite.Create(atlas, new Rect(0, 0, 32, 32), new Vector2(0.5f, 0.5f));
+
+Texture2D extracted = sprite.ExtractSpriteRect();
+```
+
+`ExtractSpriteRect` copies the sprite's `textureRect` region, so it works for packed atlases where
+the sprite occupies a sub-rectangle of a larger sheet.
 
 ---
 
