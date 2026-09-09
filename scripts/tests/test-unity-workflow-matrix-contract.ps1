@@ -1758,7 +1758,7 @@ foreach ($version in @('2021.3.45f1', '2022.3.45f1', '6000.3.16f1', '6000.5.2f1'
     )
 }
 if (-not $defaultMatrixIsVersionGrouped) {
-    Write-Host '::error file=.github/workflows/unity-tests.yml::The default Unity matrix must contain exactly the four supported Unity versions and the reviewed STATIC test-mode triple (editmode, playmode, standalone), and exclude only unselected versions through matrix-config. The static test-mode axis is what authorizes the central editor gate to provision the StandaloneWindowsIl2Cpp profile on standalone legs (enrollment contract item 3); its values must stay static and exact.'
+    Write-Host '::error file=.github/workflows/unity-tests.yml::The default Unity matrix must contain exactly the four supported Unity versions and the reviewed STATIC test-mode triple (editmode, playmode, standalone), and exclude unselected versions and unselected modes through matrix-config. The static test-mode axis is what authorizes the central editor gate to provision the StandaloneWindowsIl2Cpp profile on standalone legs (enrollment contract item 3); its values must stay static and exact.'
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info 'Checked the default Unity matrix groups the reviewed static test-mode axis into four version legs.'

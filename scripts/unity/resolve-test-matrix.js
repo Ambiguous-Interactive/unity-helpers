@@ -42,9 +42,19 @@ function resolveTestMatrix(
   return {
     "unity-versions": selectedVersions,
     "test-modes": selectedModes,
-    "matrix-exclude": versions
-      .filter((entry) => !selectedVersions.includes(entry))
-      .map((entry) => ({ "unity-version": entry }))
+    // Excluding an unselected MODE removes the leg entirely. The per-step guards already skip
+    // an unselected mode's tests, but the leg itself still provisioned the editor and acquired
+    // the organization lock before reaching them, so a lock or editor failure on an unused leg
+    // failed the whole job after the requested mode had already passed. A leg that never starts
+    // can do neither.
+    "matrix-exclude": [
+      ...versions
+        .filter((entry) => !selectedVersions.includes(entry))
+        .map((entry) => ({ "unity-version": entry })),
+      ...TEST_MODES.filter((mode) => !selectedModes.includes(mode)).map((mode) => ({
+        "test-mode": mode
+      }))
+    ]
   };
 }
 

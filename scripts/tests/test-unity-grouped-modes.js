@@ -20,14 +20,18 @@ for (const requestedVersion of ["", ...versions]) {
     const selectedModes = TEST_MODES.includes(requestedMode) ? [requestedMode] : TEST_MODES;
     assert.deepEqual(result["unity-versions"], selectedVersions);
     assert.deepEqual(result["test-modes"], selectedModes);
-    assert.deepEqual(
-      result["matrix-exclude"],
-      versions
+    // An unselected MODE is excluded like an unselected version: the leg would otherwise start,
+    // provision the editor, and acquire the organization lock only to skip every test step.
+    assert.deepEqual(result["matrix-exclude"], [
+      ...versions
         .filter((version) => !selectedVersions.includes(version))
         .map((version) => ({
           "unity-version": version
-        }))
-    );
+        })),
+      ...TEST_MODES.filter((mode) => !selectedModes.includes(mode)).map((mode) => ({
+        "test-mode": mode
+      }))
+    ]);
     cases++;
   }
 }
