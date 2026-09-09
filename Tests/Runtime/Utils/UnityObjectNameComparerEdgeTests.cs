@@ -19,6 +19,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     [NUnit.Framework.Category("Fast")]
     public sealed class UnityObjectNameComparerEdgeTests : CommonTestBase
     {
+        private static IEnumerable<TestCaseData> UnparsableNumericSuffixes()
+        {
+            // A millisecond epoch stamp overflows int; a name is not required to fit one.
+            yield return new TestCaseData("Save_1755720000000", "Save_1755720000001", -1).SetName(
+                "Suffix.ThirteenDigits.OrdersNumerically"
+            );
+            yield return new TestCaseData("Save_9", "Save_1755720000000", -1).SetName(
+                "Suffix.ShortVersusOverflowing.OrdersNumerically"
+            );
+            yield return new TestCaseData(
+                "Chunk_99999999999999999999",
+                "Chunk_99999999999999999998",
+                1
+            ).SetName("Suffix.TwentyDigits.OrdersNumerically");
+            // \d matches every Unicode digit; int.Parse accepts only ASCII ones.
+            yield return new TestCaseData("Enemy\u0663", "Enemy\u0664", -1).SetName(
+                "Suffix.ArabicIndicDigits.OrdersAsText"
+            );
+            // Equal names fall through to object identity; assert ordering rather than object equality.
+            yield return new TestCaseData("Item\uFF13", "Item\uFF14", -1).SetName(
+                "Suffix.FullWidthDigits.OrdersAsText"
+            );
+        }
+
         [UnityTest]
         public IEnumerator CompareTreatsOnlyTrailingNumbersAsNumeric()
         {
@@ -61,30 +85,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             int comparison = UnityObjectNameComparer<GameObject>.Instance.Compare(a, b);
             Assert.Greater(comparison, 0);
             yield break;
-        }
-
-        private static IEnumerable<TestCaseData> UnparsableNumericSuffixes()
-        {
-            // A millisecond epoch stamp overflows int; a name is not required to fit one.
-            yield return new TestCaseData("Save_1755720000000", "Save_1755720000001", -1).SetName(
-                "Suffix.ThirteenDigits.OrdersNumerically"
-            );
-            yield return new TestCaseData("Save_9", "Save_1755720000000", -1).SetName(
-                "Suffix.ShortVersusOverflowing.OrdersNumerically"
-            );
-            yield return new TestCaseData(
-                "Chunk_99999999999999999999",
-                "Chunk_99999999999999999998",
-                1
-            ).SetName("Suffix.TwentyDigits.OrdersNumerically");
-            // \d matches every Unicode digit; int.Parse accepts only ASCII ones.
-            yield return new TestCaseData("Enemy\u0663", "Enemy\u0664", -1).SetName(
-                "Suffix.ArabicIndicDigits.OrdersAsText"
-            );
-            // Equal names fall through to object identity; assert ordering rather than object equality.
-            yield return new TestCaseData("Item\uFF13", "Item\uFF14", -1).SetName(
-                "Suffix.FullWidthDigits.OrdersAsText"
-            );
         }
 
         [TestCaseSource(nameof(UnparsableNumericSuffixes))]

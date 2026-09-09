@@ -29,22 +29,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         internal const string ReservedAttribute =
             "WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoReservedAttribute";
 
+        /// <summary>A map for a contract that reserves nothing.</summary>
+        internal static ReservedMap Empty => EmptyMap;
+
         private static readonly ReservedMap EmptyMap = new ReservedMap(
             new HashSet<int>(),
             new HashSet<string>(StringComparer.Ordinal)
         );
-
-        private readonly HashSet<int> _numbers;
-        private readonly HashSet<string> _names;
-
-        private ReservedMap(HashSet<int> numbers, HashSet<string> names)
-        {
-            _numbers = numbers;
-            _names = names;
-        }
-
-        /// <summary>A map for a contract that reserves nothing.</summary>
-        internal static ReservedMap Empty => EmptyMap;
 
         /// <summary>Whether this contract reserves anything at all.</summary>
         internal bool IsEmpty => _numbers.Count == 0 && _names.Count == 0;
@@ -69,6 +60,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 ordered.Sort(StringComparer.Ordinal);
                 return ordered;
             }
+        }
+
+        private readonly HashSet<int> _numbers;
+        private readonly HashSet<string> _names;
+
+        private ReservedMap(HashSet<int> numbers, HashSet<string> names)
+        {
+            _numbers = numbers;
+            _names = names;
         }
 
         /// <summary>
@@ -113,14 +113,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 : new ReservedMap(numbers, names);
         }
 
-        /// <summary>Whether a field number may not be used.</summary>
-        /// <param name="fieldNumber">The number a member is claiming.</param>
-        /// <returns><c>true</c> when the contract reserves it.</returns>
-        internal bool ReservesNumber(int fieldNumber)
-        {
-            return _numbers.Contains(fieldNumber);
-        }
-
         /// <summary>
         /// Explains why a reserved field number cannot be taken by a subtype declaration.
         /// </summary>
@@ -143,14 +135,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 + "still carries that field, and a discriminator sharing it reads those saves back "
                 + "as the wrong type. Use a free number, or delete the matching [WProtoReserved] if "
                 + "this really is the removed declaration coming back";
-        }
-
-        /// <summary>Whether a member name may not be used.</summary>
-        /// <param name="memberName">The name a member is declared under.</param>
-        /// <returns><c>true</c> when the contract reserves it.</returns>
-        internal bool ReservesName(string memberName)
-        {
-            return !string.IsNullOrEmpty(memberName) && _names.Contains(memberName);
         }
 
         /// <summary>
@@ -179,6 +163,22 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
                 yield return argument;
             }
+        }
+
+        /// <summary>Whether a field number may not be used.</summary>
+        /// <param name="fieldNumber">The number a member is claiming.</param>
+        /// <returns><c>true</c> when the contract reserves it.</returns>
+        internal bool ReservesNumber(int fieldNumber)
+        {
+            return _numbers.Contains(fieldNumber);
+        }
+
+        /// <summary>Whether a member name may not be used.</summary>
+        /// <param name="memberName">The name a member is declared under.</param>
+        /// <returns><c>true</c> when the contract reserves it.</returns>
+        internal bool ReservesName(string memberName)
+        {
+            return !string.IsNullOrEmpty(memberName) && _names.Contains(memberName);
         }
     }
 }

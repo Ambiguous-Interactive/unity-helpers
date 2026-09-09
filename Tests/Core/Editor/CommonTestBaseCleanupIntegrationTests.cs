@@ -38,6 +38,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
     {
         private const string TestFolderRoot = "Assets/TempCleanupIntegrationTests";
 
+        private static void CleanupIntegrationTestFolders()
+        {
+            CleanupAllKnownTestFolders();
+            AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+        }
+
         [OneTimeSetUp]
         public void FixtureSetUp()
         {
@@ -546,12 +552,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             }
 
             TrackFolder(folderPath);
-        }
-
-        private static void CleanupIntegrationTestFolders()
-        {
-            CleanupAllKnownTestFolders();
-            AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
         }
     }
 

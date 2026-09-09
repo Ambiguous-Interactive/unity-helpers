@@ -16,6 +16,159 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     [NUnit.Framework.Category("Fast")]
     public sealed class EnumExtensionTests : CommonTestBase
     {
+        private static IEnumerable<TestCaseData> EnumContractCases()
+        {
+            yield return Contract<TestEnum>(nameof(TestEnum));
+            yield return Contract<TinyTestEnum>(nameof(TinyTestEnum));
+            yield return Contract<SmallTestEnum>(nameof(SmallTestEnum));
+            yield return Contract<BigTestEnum>(nameof(BigTestEnum));
+            yield return Contract<SignedByteEnum>(nameof(SignedByteEnum));
+            yield return Contract<SignedByteFlagsEnum>(nameof(SignedByteFlagsEnum));
+            yield return Contract<SignedShortNearEnum>(nameof(SignedShortNearEnum));
+            yield return Contract<SignedIntNearEnum>(nameof(SignedIntNearEnum));
+            yield return Contract<SignedLongNearEnum>(nameof(SignedLongNearEnum));
+            yield return Contract<SignedIntWideEnum>(nameof(SignedIntWideEnum));
+            yield return Contract<SignedLongAllNegativeEnum>(nameof(SignedLongAllNegativeEnum));
+            yield return Contract<UnsignedShortEnum>(nameof(UnsignedShortEnum));
+            yield return Contract<UnsignedIntEnum>(nameof(UnsignedIntEnum));
+            yield return Contract<UnsignedLongEnum>(nameof(UnsignedLongEnum));
+            yield return Contract<SingleValueEnum>(nameof(SingleValueEnum));
+            yield return Contract<NonFlagsEnum>(nameof(NonFlagsEnum));
+        }
+
+        private static TestCaseData Contract<T>(string name)
+            where T : unmanaged, Enum
+        {
+            return new TestCaseData((Action)AssertEnumContract<T>).SetName(name);
+        }
+
+        private static void AssertEnumContract<T>()
+            where T : unmanaged, Enum
+        {
+            T[] values = (T[])Enum.GetValues(typeof(T));
+            string[] names = Enum.GetNames(typeof(T));
+
+            for (int i = 0; i < values.Length; i++)
+            {
+                Assert.AreEqual(
+                    names[i],
+                    values[i].ToCachedName(),
+                    $"{typeof(T).Name}.{names[i]} did not round-trip through the name cache."
+                );
+                Assert.IsNotEmpty(
+                    values[i].ToDisplayName(),
+                    $"{typeof(T).Name}.{names[i]} produced an empty display name."
+                );
+            }
+
+            foreach (T value in values)
+            {
+                foreach (T flag in values)
+                {
+                    Assert.AreEqual(
+                        value.HasFlag(flag),
+                        value.HasFlagNoAlloc(flag),
+                        $"{typeof(T).Name}: HasFlagNoAlloc({value}, {flag}) disagreed with Enum.HasFlag."
+                    );
+                }
+            }
+
+            /*
+                Neither signed nor unsigned conversion alone covers every enum shape; the boxed path must
+                support both extremes.
+            */
+            foreach (T value in values)
+            {
+                // A statically typed enum selects this public overload, so it must agree with the boxed editor path.
+                Assert.IsTrue(
+                    value.TryConvertToUInt64(out ulong generic),
+                    $"{typeof(T).Name}.{value} failed the generic conversion."
+                );
+                Assert.IsTrue(
+                    ((Enum)value).TryConvertToUInt64(out ulong boxed),
+                    $"{typeof(T).Name}.{value} failed the boxed conversion."
+                );
+                Assert.AreEqual(
+                    generic,
+                    boxed,
+                    $"{typeof(T).Name}.{value}: the boxed conversion disagreed with the generic one."
+                );
+
+                Assert.IsTrue(
+                    ((Enum)value).TryConvertToInt64(out long signed),
+                    $"{typeof(T).Name}.{value} failed the signed boxed conversion."
+                );
+                Assert.IsTrue(
+                    value.TryConvertToInt64(out long genericSigned),
+                    $"{typeof(T).Name}.{value} failed the generic signed conversion."
+                );
+                Assert.AreEqual(
+                    signed,
+                    genericSigned,
+                    $"{typeof(T).Name}.{value}: the generic signed conversion disagreed with the boxed one."
+                );
+                Assert.AreEqual(
+                    unchecked((long)boxed),
+                    signed,
+                    $"{typeof(T).Name}.{value}: the signed conversion is not the same bit pattern."
+                );
+                Assert.AreEqual(
+                    value,
+                    (T)Enum.ToObject(typeof(T), signed),
+                    $"{typeof(T).Name}.{value} did not survive a round trip through its bit pattern."
+                );
+            }
+        }
+
+        private static void AssertArrayWindow<T>(int expectedLength, T expectedMinimum)
+            where T : unmanaged, Enum
+        {
+            T[] values = (T[])Enum.GetValues(typeof(T));
+            bool useArray = EnumLookupStrategy<T>.TryComputeArrayWindow(
+                values,
+                out ulong minValue,
+                out int arrayLength
+            );
+
+            Assert.IsTrue(useArray, $"{typeof(T).Name} should use the array lookup strategy.");
+            Assert.AreEqual(
+                expectedLength,
+                arrayLength,
+                $"{typeof(T).Name} allocated the wrong number of array slots."
+            );
+            Assert.IsTrue(
+                EnumNumericHelper<T>.TryConvertToUInt64(expectedMinimum, out ulong expectedKey),
+                $"{typeof(T).Name}.{expectedMinimum} could not be converted."
+            );
+            Assert.AreEqual(
+                expectedKey,
+                minValue,
+                $"{typeof(T).Name} anchored its array window at the wrong member."
+            );
+
+            // ToString fallback would hide an out-of-window member at runtime.
+            foreach (T value in values)
+            {
+                Assert.IsTrue(EnumNumericHelper<T>.TryConvertToUInt64(value, out ulong key));
+                Assert.Less(
+                    unchecked(key - minValue),
+                    (ulong)arrayLength,
+                    $"{typeof(T).Name}.{value} fell outside its own array window."
+                );
+            }
+        }
+
+        private static void AssertNoArrayWindow<T>()
+            where T : unmanaged, Enum
+        {
+            T[] values = (T[])Enum.GetValues(typeof(T));
+            bool useArray = EnumLookupStrategy<T>.TryComputeArrayWindow(values, out _, out _);
+            Assert.IsFalse(
+                useArray,
+                $"{typeof(T).Name} spans more than {EnumLookupStrategy<T>.MaximumArrayLength} values and must not allocate an array."
+            );
+        }
+
         [Test]
         public void DisplayName()
         {
@@ -742,110 +895,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.AreEqual(3000, cachedNames.Length);
         }
 
-        private static IEnumerable<TestCaseData> EnumContractCases()
-        {
-            yield return Contract<TestEnum>(nameof(TestEnum));
-            yield return Contract<TinyTestEnum>(nameof(TinyTestEnum));
-            yield return Contract<SmallTestEnum>(nameof(SmallTestEnum));
-            yield return Contract<BigTestEnum>(nameof(BigTestEnum));
-            yield return Contract<SignedByteEnum>(nameof(SignedByteEnum));
-            yield return Contract<SignedByteFlagsEnum>(nameof(SignedByteFlagsEnum));
-            yield return Contract<SignedShortNearEnum>(nameof(SignedShortNearEnum));
-            yield return Contract<SignedIntNearEnum>(nameof(SignedIntNearEnum));
-            yield return Contract<SignedLongNearEnum>(nameof(SignedLongNearEnum));
-            yield return Contract<SignedIntWideEnum>(nameof(SignedIntWideEnum));
-            yield return Contract<SignedLongAllNegativeEnum>(nameof(SignedLongAllNegativeEnum));
-            yield return Contract<UnsignedShortEnum>(nameof(UnsignedShortEnum));
-            yield return Contract<UnsignedIntEnum>(nameof(UnsignedIntEnum));
-            yield return Contract<UnsignedLongEnum>(nameof(UnsignedLongEnum));
-            yield return Contract<SingleValueEnum>(nameof(SingleValueEnum));
-            yield return Contract<NonFlagsEnum>(nameof(NonFlagsEnum));
-        }
-
-        private static TestCaseData Contract<T>(string name)
-            where T : unmanaged, Enum
-        {
-            return new TestCaseData((Action)AssertEnumContract<T>).SetName(name);
-        }
-
-        private static void AssertEnumContract<T>()
-            where T : unmanaged, Enum
-        {
-            T[] values = (T[])Enum.GetValues(typeof(T));
-            string[] names = Enum.GetNames(typeof(T));
-
-            for (int i = 0; i < values.Length; i++)
-            {
-                Assert.AreEqual(
-                    names[i],
-                    values[i].ToCachedName(),
-                    $"{typeof(T).Name}.{names[i]} did not round-trip through the name cache."
-                );
-                Assert.IsNotEmpty(
-                    values[i].ToDisplayName(),
-                    $"{typeof(T).Name}.{names[i]} produced an empty display name."
-                );
-            }
-
-            foreach (T value in values)
-            {
-                foreach (T flag in values)
-                {
-                    Assert.AreEqual(
-                        value.HasFlag(flag),
-                        value.HasFlagNoAlloc(flag),
-                        $"{typeof(T).Name}: HasFlagNoAlloc({value}, {flag}) disagreed with Enum.HasFlag."
-                    );
-                }
-            }
-
-            /*
-                Neither signed nor unsigned conversion alone covers every enum shape; the boxed path must
-                support both extremes.
-            */
-            foreach (T value in values)
-            {
-                // A statically typed enum selects this public overload, so it must agree with the boxed editor path.
-                Assert.IsTrue(
-                    value.TryConvertToUInt64(out ulong generic),
-                    $"{typeof(T).Name}.{value} failed the generic conversion."
-                );
-                Assert.IsTrue(
-                    ((Enum)value).TryConvertToUInt64(out ulong boxed),
-                    $"{typeof(T).Name}.{value} failed the boxed conversion."
-                );
-                Assert.AreEqual(
-                    generic,
-                    boxed,
-                    $"{typeof(T).Name}.{value}: the boxed conversion disagreed with the generic one."
-                );
-
-                Assert.IsTrue(
-                    ((Enum)value).TryConvertToInt64(out long signed),
-                    $"{typeof(T).Name}.{value} failed the signed boxed conversion."
-                );
-                Assert.IsTrue(
-                    value.TryConvertToInt64(out long genericSigned),
-                    $"{typeof(T).Name}.{value} failed the generic signed conversion."
-                );
-                Assert.AreEqual(
-                    signed,
-                    genericSigned,
-                    $"{typeof(T).Name}.{value}: the generic signed conversion disagreed with the boxed one."
-                );
-                Assert.AreEqual(
-                    unchecked((long)boxed),
-                    signed,
-                    $"{typeof(T).Name}.{value}: the signed conversion is not the same bit pattern."
-                );
-                Assert.AreEqual(
-                    value,
-                    (T)Enum.ToObject(typeof(T), signed),
-                    $"{typeof(T).Name}.{value} did not survive a round trip through its bit pattern."
-                );
-            }
-        }
-
         [Test]
         public void BoxedConversionRejectsNull()
         {
@@ -892,55 +941,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             AssertNoArrayWindow<UnsignedIntEnum>();
             AssertNoArrayWindow<UnsignedLongEnum>();
             AssertNoArrayWindow<BigTestEnum>();
-        }
-
-        private static void AssertArrayWindow<T>(int expectedLength, T expectedMinimum)
-            where T : unmanaged, Enum
-        {
-            T[] values = (T[])Enum.GetValues(typeof(T));
-            bool useArray = EnumLookupStrategy<T>.TryComputeArrayWindow(
-                values,
-                out ulong minValue,
-                out int arrayLength
-            );
-
-            Assert.IsTrue(useArray, $"{typeof(T).Name} should use the array lookup strategy.");
-            Assert.AreEqual(
-                expectedLength,
-                arrayLength,
-                $"{typeof(T).Name} allocated the wrong number of array slots."
-            );
-            Assert.IsTrue(
-                EnumNumericHelper<T>.TryConvertToUInt64(expectedMinimum, out ulong expectedKey),
-                $"{typeof(T).Name}.{expectedMinimum} could not be converted."
-            );
-            Assert.AreEqual(
-                expectedKey,
-                minValue,
-                $"{typeof(T).Name} anchored its array window at the wrong member."
-            );
-
-            // ToString fallback would hide an out-of-window member at runtime.
-            foreach (T value in values)
-            {
-                Assert.IsTrue(EnumNumericHelper<T>.TryConvertToUInt64(value, out ulong key));
-                Assert.Less(
-                    unchecked(key - minValue),
-                    (ulong)arrayLength,
-                    $"{typeof(T).Name}.{value} fell outside its own array window."
-                );
-            }
-        }
-
-        private static void AssertNoArrayWindow<T>()
-            where T : unmanaged, Enum
-        {
-            T[] values = (T[])Enum.GetValues(typeof(T));
-            bool useArray = EnumLookupStrategy<T>.TryComputeArrayWindow(values, out _, out _);
-            Assert.IsFalse(
-                useArray,
-                $"{typeof(T).Name} spans more than {EnumLookupStrategy<T>.MaximumArrayLength} values and must not allocate an array."
-            );
         }
 
         [Test]

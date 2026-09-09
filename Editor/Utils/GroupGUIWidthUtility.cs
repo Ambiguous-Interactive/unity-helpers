@@ -13,12 +13,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
     /// </summary>
     public static class WGroupThemingDiagnostics
     {
+        private const string LogPrefix = "[WGroupTheming] ";
+
         /// <summary>
         /// When true, enables diagnostic logging for WGroup theming operations.
         /// </summary>
         public static bool Enabled { get; set; } = false;
-
-        private const string LogPrefix = "[WGroupTheming] ";
 
         internal static void LogCaptureColors(
             Color contentColor,
@@ -135,13 +135,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
     internal static class GroupGUIWidthUtility
     {
-        private static float _totalPadding;
-        private static float _totalLeftPadding;
-        private static float _totalRightPadding;
-        private static int _scopeDepth;
-        private static bool _isInsideWGroupPropertyDraw;
-        private static WGroupThemeState? _currentThemeState;
-
         internal static float CurrentHorizontalPadding => _totalPadding;
         internal static float CurrentLeftPadding => _totalLeftPadding;
         internal static float CurrentRightPadding => _totalRightPadding;
@@ -150,6 +143,23 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         internal static bool IsInsideWGroupPropertyDraw => _isInsideWGroupPropertyDraw;
 
         internal static WGroupThemeState? CurrentThemeState => _currentThemeState;
+
+        private static float _totalPadding;
+        private static float _totalLeftPadding;
+        private static float _totalRightPadding;
+        private static int _scopeDepth;
+        private static bool _isInsideWGroupPropertyDraw;
+        private static WGroupThemeState? _currentThemeState;
+
+        /// <summary>
+        /// Cached foldout arrow texture for drawing themed foldouts.
+        /// </summary>
+        private static Texture2D _foldoutArrowRight;
+
+        /// <summary>
+        /// Cached expanded foldout arrow texture for drawing themed foldouts.
+        /// </summary>
+        private static Texture2D _foldoutArrowDown;
 
         [System.Diagnostics.Conditional("UNITY_EDITOR")]
         internal static void ResetForTests()
@@ -246,16 +256,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
             return colors;
         }
-
-        /// <summary>
-        /// Cached foldout arrow texture for drawing themed foldouts.
-        /// </summary>
-        private static Texture2D _foldoutArrowRight;
-
-        /// <summary>
-        /// Cached expanded foldout arrow texture for drawing themed foldouts.
-        /// </summary>
-        private static Texture2D _foldoutArrowDown;
 
         /// <summary>
         /// Draws a foldout with proper WGroup theming. Unity's built-in EditorGUI.Foldout
@@ -370,60 +370,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             return isExpanded;
         }
 
-        private static StyleState SaveFullStyleState(GUIStyle style)
-        {
-            if (style == null)
-            {
-                return default;
-            }
-
-            return new StyleState
-            {
-                NormalBackground = style.normal.background,
-                FocusedBackground = style.focused.background,
-                ActiveBackground = style.active.background,
-                HoverBackground = style.hover.background,
-                OnNormalBackground = style.onNormal.background,
-                OnFocusedBackground = style.onFocused.background,
-                OnActiveBackground = style.onActive.background,
-                OnHoverBackground = style.onHover.background,
-                NormalTextColor = style.normal.textColor,
-                FocusedTextColor = style.focused.textColor,
-                ActiveTextColor = style.active.textColor,
-                HoverTextColor = style.hover.textColor,
-                OnNormalTextColor = style.onNormal.textColor,
-                OnFocusedTextColor = style.onFocused.textColor,
-                OnActiveTextColor = style.onActive.textColor,
-                OnHoverTextColor = style.onHover.textColor,
-                IsValid = true,
-            };
-        }
-
-        private static void RestoreFullStyleState(GUIStyle style, StyleState saved)
-        {
-            if (style == null || !saved.IsValid)
-            {
-                return;
-            }
-
-            style.normal.background = saved.NormalBackground;
-            style.focused.background = saved.FocusedBackground;
-            style.active.background = saved.ActiveBackground;
-            style.hover.background = saved.HoverBackground;
-            style.onNormal.background = saved.OnNormalBackground;
-            style.onFocused.background = saved.OnFocusedBackground;
-            style.onActive.background = saved.OnActiveBackground;
-            style.onHover.background = saved.OnHoverBackground;
-            style.normal.textColor = saved.NormalTextColor;
-            style.focused.textColor = saved.FocusedTextColor;
-            style.active.textColor = saved.ActiveTextColor;
-            style.hover.textColor = saved.HoverTextColor;
-            style.onNormal.textColor = saved.OnNormalTextColor;
-            style.onFocused.textColor = saved.OnFocusedTextColor;
-            style.onActive.textColor = saved.OnActiveTextColor;
-            style.onHover.textColor = saved.OnHoverTextColor;
-        }
-
         internal static IDisposable PushContentPadding(float horizontalPadding)
         {
             return new WidthPaddingScope(horizontalPadding);
@@ -488,6 +434,60 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             leftPadding = Mathf.Max(0f, padding.left);
             rightPadding = Mathf.Max(0f, padding.right);
             return Mathf.Max(0f, total);
+        }
+
+        private static StyleState SaveFullStyleState(GUIStyle style)
+        {
+            if (style == null)
+            {
+                return default;
+            }
+
+            return new StyleState
+            {
+                NormalBackground = style.normal.background,
+                FocusedBackground = style.focused.background,
+                ActiveBackground = style.active.background,
+                HoverBackground = style.hover.background,
+                OnNormalBackground = style.onNormal.background,
+                OnFocusedBackground = style.onFocused.background,
+                OnActiveBackground = style.onActive.background,
+                OnHoverBackground = style.onHover.background,
+                NormalTextColor = style.normal.textColor,
+                FocusedTextColor = style.focused.textColor,
+                ActiveTextColor = style.active.textColor,
+                HoverTextColor = style.hover.textColor,
+                OnNormalTextColor = style.onNormal.textColor,
+                OnFocusedTextColor = style.onFocused.textColor,
+                OnActiveTextColor = style.onActive.textColor,
+                OnHoverTextColor = style.onHover.textColor,
+                IsValid = true,
+            };
+        }
+
+        private static void RestoreFullStyleState(GUIStyle style, StyleState saved)
+        {
+            if (style == null || !saved.IsValid)
+            {
+                return;
+            }
+
+            style.normal.background = saved.NormalBackground;
+            style.focused.background = saved.FocusedBackground;
+            style.active.background = saved.ActiveBackground;
+            style.hover.background = saved.HoverBackground;
+            style.onNormal.background = saved.OnNormalBackground;
+            style.onFocused.background = saved.OnFocusedBackground;
+            style.onActive.background = saved.OnActiveBackground;
+            style.onHover.background = saved.OnHoverBackground;
+            style.normal.textColor = saved.NormalTextColor;
+            style.focused.textColor = saved.FocusedTextColor;
+            style.active.textColor = saved.ActiveTextColor;
+            style.hover.textColor = saved.HoverTextColor;
+            style.onNormal.textColor = saved.OnNormalTextColor;
+            style.onFocused.textColor = saved.OnFocusedTextColor;
+            style.onActive.textColor = saved.OnActiveTextColor;
+            style.onHover.textColor = saved.OnHoverTextColor;
         }
 
         private sealed class WidthPaddingScope : IDisposable

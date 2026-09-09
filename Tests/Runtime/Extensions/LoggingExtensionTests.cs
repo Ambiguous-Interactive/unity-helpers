@@ -20,6 +20,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     [NUnit.Framework.Category("Fast")]
     public sealed class LoggingExtensionTests : CommonTestBase
     {
+        private static void ExpectLogContaining(string value)
+        {
+            LogAssert.Expect(LogType.Log, new Regex(Regex.Escape(value)));
+        }
+
         [Test]
         public void Registration()
         {
@@ -905,11 +910,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             {
                 WallstopStudiosLogger.SetGlobalLoggingEnabled(previousGlobalLogging);
             }
-        }
-
-        private static void ExpectLogContaining(string value)
-        {
-            LogAssert.Expect(LogType.Log, new Regex(Regex.Escape(value)));
         }
     }
 }

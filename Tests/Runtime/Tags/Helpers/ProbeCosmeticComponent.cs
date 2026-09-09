@@ -9,13 +9,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags.Helpers
 
     internal sealed class ProbeCosmeticComponent : CosmeticEffectComponent
     {
+        public override bool RequiresInstance => requiresInstance;
+        public override bool CleansUpSelf => cleansSelf;
+
         public bool requiresInstance;
         public bool cleansSelf;
         public readonly List<GameObject> appliedTargets = new();
         public readonly List<GameObject> removedTargets = new();
-
-        public override bool RequiresInstance => requiresInstance;
-        public override bool CleansUpSelf => cleansSelf;
 
         public override void OnApplyEffect(GameObject target)
         {

@@ -28,6 +28,62 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
         private const string StructDeclaration =
             "public struct Point { public int X; public void Bump() { X = X + 1; } }";
 
+        private static ImmutableArray<Diagnostic> Analyze(string body)
+        {
+            return Analyze(body, ReportDiagnostic.Warn);
+        }
+
+        private static ImmutableArray<Diagnostic> Analyze(string body, ReportDiagnostic reportedAs)
+        {
+            string source = "namespace Consumer { public static class Subject { " + body + " } }";
+
+            List<MetadataReference> references = new List<MetadataReference>();
+            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
+                {
+                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
+                }
+            }
+
+            CSharpCompilation compilation = CSharpCompilation.Create(
+                "ConsumerAssembly",
+                new[]
+                {
+                    CSharpSyntaxTree.ParseText(
+                        source,
+                        new CSharpParseOptions(LanguageVersion.CSharp9)
+                    ),
+                },
+                references,
+                new CSharpCompilationOptions(
+                    OutputKind.DynamicallyLinkedLibrary
+                ).WithSpecificDiagnosticOptions(
+                    ImmutableDictionary<string, ReportDiagnostic>.Empty.Add(
+                        DiagnosticId,
+                        reportedAs
+                    )
+                )
+            );
+
+            ImmutableArray<Diagnostic> compileErrors = compilation
+                .GetDiagnostics()
+                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+                .ToImmutableArray();
+            Assert.IsEmpty(
+                compileErrors.Select(diagnostic => diagnostic.ToString()).ToArray(),
+                "The fixture must compile"
+            );
+
+            return compilation
+                .WithAnalyzers(
+                    ImmutableArray.Create<DiagnosticAnalyzer>(new CountingLoopAnalyzer())
+                )
+                .GetAnalyzerDiagnosticsAsync()
+                .GetAwaiter()
+                .GetResult();
+        }
+
         [TestCase("string[] rows", "rows.Length")]
         [TestCase("System.Collections.Generic.List<string> rows", "rows.Count")]
         public void ACountingWalkOfAnAllocationFreeSequenceIsReported(
@@ -330,62 +386,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                 ),
                 "Consumer opt-in remains independent of package gate enforcement."
             );
-        }
-
-        private static ImmutableArray<Diagnostic> Analyze(string body)
-        {
-            return Analyze(body, ReportDiagnostic.Warn);
-        }
-
-        private static ImmutableArray<Diagnostic> Analyze(string body, ReportDiagnostic reportedAs)
-        {
-            string source = "namespace Consumer { public static class Subject { " + body + " } }";
-
-            List<MetadataReference> references = new List<MetadataReference>();
-            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
-                {
-                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
-                }
-            }
-
-            CSharpCompilation compilation = CSharpCompilation.Create(
-                "ConsumerAssembly",
-                new[]
-                {
-                    CSharpSyntaxTree.ParseText(
-                        source,
-                        new CSharpParseOptions(LanguageVersion.CSharp9)
-                    ),
-                },
-                references,
-                new CSharpCompilationOptions(
-                    OutputKind.DynamicallyLinkedLibrary
-                ).WithSpecificDiagnosticOptions(
-                    ImmutableDictionary<string, ReportDiagnostic>.Empty.Add(
-                        DiagnosticId,
-                        reportedAs
-                    )
-                )
-            );
-
-            ImmutableArray<Diagnostic> compileErrors = compilation
-                .GetDiagnostics()
-                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-                .ToImmutableArray();
-            Assert.IsEmpty(
-                compileErrors.Select(diagnostic => diagnostic.ToString()).ToArray(),
-                "The fixture must compile"
-            );
-
-            return compilation
-                .WithAnalyzers(
-                    ImmutableArray.Create<DiagnosticAnalyzer>(new CountingLoopAnalyzer())
-                )
-                .GetAnalyzerDiagnosticsAsync()
-                .GetAwaiter()
-                .GetResult();
         }
     }
 }

@@ -131,17 +131,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         // Scratch for InternalState only; never part of the generator's value or its serialized form.
         private byte[] _payload;
 
-        private void EnsureNonZeroState()
-        {
-            if ((_s0 | _s1 | _s2 | _s3) == 0)
-            {
-                _s0 = 0x9E3779B97F4A7C15UL;
-                _s1 = 0xBF58476D1CE4E5B9UL;
-                _s2 = 0x94D049BB133111EBUL;
-                _s3 = 0xD1B54A32D192ED03UL;
-            }
-        }
-
         public Xoshiro256StarStar()
             : this(Guid.NewGuid()) { }
 
@@ -179,48 +168,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
             RestoreCommonState(internalState);
             EnsureNonZeroState();
-        }
-
-        protected override void OnAfterDeserialization()
-        {
-            EnsureNonZeroState();
-        }
-
-        public override ulong NextUlong()
-        {
-            return NextWord();
-        }
-
-        public override uint NextUint()
-        {
-            unchecked
-            {
-                return (uint)(NextWord() >> 32);
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private ulong NextWord()
-        {
-            unchecked
-            {
-                ulong result = Rotl(_s1 * 5UL, 7) * 9UL;
-
-                ulong t = _s1 << 17;
-                _s2 ^= _s0;
-                _s3 ^= _s1;
-                _s1 ^= _s2;
-                _s0 ^= _s3;
-                _s2 ^= t;
-                _s3 = Rotl(_s3, 45);
-
-                return result;
-            }
-        }
-
-        public override IRandom Copy()
-        {
-            return new Xoshiro256StarStar(InternalState);
         }
 
         private static bool TryReadStatePayload(
@@ -264,6 +211,24 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         private static ulong Rotl(ulong x, int k)
         {
             return (x << k) | (x >> (64 - k));
+        }
+
+        public override ulong NextUlong()
+        {
+            return NextWord();
+        }
+
+        public override uint NextUint()
+        {
+            unchecked
+            {
+                return (uint)(NextWord() >> 32);
+            }
+        }
+
+        public override IRandom Copy()
+        {
+            return new Xoshiro256StarStar(InternalState);
         }
 
         public override bool Equals(object obj)
@@ -322,6 +287,41 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
 
             return _s3.CompareTo(other._s3);
+        }
+
+        protected override void OnAfterDeserialization()
+        {
+            EnsureNonZeroState();
+        }
+
+        private void EnsureNonZeroState()
+        {
+            if ((_s0 | _s1 | _s2 | _s3) == 0)
+            {
+                _s0 = 0x9E3779B97F4A7C15UL;
+                _s1 = 0xBF58476D1CE4E5B9UL;
+                _s2 = 0x94D049BB133111EBUL;
+                _s3 = 0xD1B54A32D192ED03UL;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private ulong NextWord()
+        {
+            unchecked
+            {
+                ulong result = Rotl(_s1 * 5UL, 7) * 9UL;
+
+                ulong t = _s1 << 17;
+                _s2 ^= _s0;
+                _s3 ^= _s1;
+                _s1 ^= _s2;
+                _s0 ^= _s3;
+                _s2 ^= t;
+                _s3 = Rotl(_s3, 45);
+
+                return result;
+            }
         }
     }
 }

@@ -29,6 +29,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [TestFixture]
     public sealed class DeclaredRootTests
     {
+        private static void AssertServedAndIdentical(IncludeBase value)
+        {
+            Assert.IsTrue(WProtoFacade.TrySerialize<IIncludeThing>(value, out byte[] mine));
+
+            using MemoryStream stream = new();
+            ProtoBuf.Serializer.Serialize<IncludeBase>(stream, value);
+
+            CollectionAssert.AreEqual(stream.ToArray(), mine, value.GetType().Name);
+        }
+
         [TearDown]
         public void ReleaseClaims()
         {
@@ -293,16 +303,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 adapter.CanWrite(typeof(UndeclaredAlpha)),
                 "a subtype no include names is refused through the interface too"
             );
-        }
-
-        private static void AssertServedAndIdentical(IncludeBase value)
-        {
-            Assert.IsTrue(WProtoFacade.TrySerialize<IIncludeThing>(value, out byte[] mine));
-
-            using MemoryStream stream = new();
-            ProtoBuf.Serializer.Serialize<IncludeBase>(stream, value);
-
-            CollectionAssert.AreEqual(stream.ToArray(), mine, value.GetType().Name);
         }
 
         /// <summary>

@@ -24,6 +24,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     /// </remarks>
     public readonly struct ValidationTarget : IEquatable<ValidationTarget>
     {
+        /// <summary>The asset's GUID. This is the identity a finding is remembered under.</summary>
+        public string AssetGuid { get; }
+
+        /// <summary>The asset's project-relative path, for display and for loading.</summary>
+        public string AssetPath { get; }
+
+        /// <summary>The main asset's type, or <c>null</c> when Unity reports none.</summary>
+        public Type MainAssetType { get; }
+
         /// <summary>
         /// Initializes a new instance of the <see cref="ValidationTarget"/> struct.
         /// </summary>
@@ -36,15 +45,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             AssetPath = assetPath;
             MainAssetType = mainAssetType;
         }
-
-        /// <summary>The asset's GUID. This is the identity a finding is remembered under.</summary>
-        public string AssetGuid { get; }
-
-        /// <summary>The asset's project-relative path, for display and for loading.</summary>
-        public string AssetPath { get; }
-
-        /// <summary>The main asset's type, or <c>null</c> when Unity reports none.</summary>
-        public Type MainAssetType { get; }
 
         /// <summary>Reports whether this target names an asset at all.</summary>
         /// <returns><c>true</c> when both the GUID and the path are present.</returns>

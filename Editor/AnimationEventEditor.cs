@@ -107,8 +107,6 @@ namespace WallstopStudios.UnityHelpers.Editor
     /// </example>
     public sealed class AnimationEventEditor : EditorWindow
     {
-        private static IReadOnlyDictionary<Type, IReadOnlyList<MethodInfo>> _cachedTypesToMethods;
-
         private static IReadOnlyDictionary<Type, IReadOnlyList<MethodInfo>> TypesToMethods
         {
             get
@@ -120,6 +118,30 @@ namespace WallstopStudios.UnityHelpers.Editor
                 return _cachedTypesToMethods;
             }
         }
+
+        private static IReadOnlyDictionary<Type, IReadOnlyList<MethodInfo>> _cachedTypesToMethods;
+
+        private IReadOnlyDictionary<Type, IReadOnlyList<MethodInfo>> Lookup =>
+            _explicitMode ? AnimationEventHelpers.TypesToMethods : TypesToMethods;
+
+        private int MaxFrameIndex =>
+            _viewModel.CurrentClip == null
+                ? 0
+                : (int)Math.Round(_viewModel.FrameRate * _viewModel.CurrentClip.length);
+
+        internal readonly SpritePreviewCache _spriteTextureCache = new();
+
+        private readonly AnimationEventEditorViewModel _viewModel = new();
+
+        private Vector2 _scrollPosition;
+        private Animator _sourceAnimator;
+        private bool _explicitMode = true;
+        private bool _controlFrameTime;
+        private string _animationSearchString = string.Empty;
+
+        private int _selectedFrameIndex = -1;
+
+        private int _focusedEventIndex = -1;
 
         private static void InitializeTypeCache()
         {
@@ -171,36 +193,14 @@ namespace WallstopStudios.UnityHelpers.Editor
             GetWindow(typeof(AnimationEventEditor));
         }
 
-        private readonly AnimationEventEditorViewModel _viewModel = new();
-
-        private IReadOnlyDictionary<Type, IReadOnlyList<MethodInfo>> Lookup =>
-            _explicitMode ? AnimationEventHelpers.TypesToMethods : TypesToMethods;
-
-        private int MaxFrameIndex =>
-            _viewModel.CurrentClip == null
-                ? 0
-                : (int)Math.Round(_viewModel.FrameRate * _viewModel.CurrentClip.length);
-
-        private Vector2 _scrollPosition;
-        private Animator _sourceAnimator;
-        private bool _explicitMode = true;
-        private bool _controlFrameTime;
-        private string _animationSearchString = string.Empty;
-
-        internal readonly SpritePreviewCache _spriteTextureCache = new();
-
-        private int _selectedFrameIndex = -1;
-
-        private int _focusedEventIndex = -1;
+        internal void ReleaseSpritePreviews()
+        {
+            _spriteTextureCache.Clear();
+        }
 
         private void OnDisable()
         {
             ReleaseSpritePreviews();
-        }
-
-        internal void ReleaseSpritePreviews()
-        {
-            _spriteTextureCache.Clear();
         }
 
         private void OnGUI()

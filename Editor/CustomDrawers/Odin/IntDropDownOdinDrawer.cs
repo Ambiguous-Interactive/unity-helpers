@@ -35,6 +35,48 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             DisplayOptionsCache.Clear();
         }
 
+        internal static string[] GetOrCreateDisplayOptions(int[] options)
+        {
+            if (options == null || options.Length == 0)
+            {
+                return Array.Empty<string>();
+            }
+
+            int hashCode = DropDownShared.ComputeOptionsHash(options);
+            if (DisplayOptionsCache.TryGetValue(hashCode, out string[] cached))
+            {
+                if (cached.Length == options.Length)
+                {
+                    bool match = true;
+                    for (int i = 0; i < options.Length && match; i++)
+                    {
+                        if (
+                            !string.Equals(
+                                cached[i],
+                                DropDownShared.GetCachedIntString(options[i]),
+                                StringComparison.Ordinal
+                            )
+                        )
+                        {
+                            match = false;
+                        }
+                    }
+                    if (match)
+                    {
+                        return cached;
+                    }
+                }
+            }
+
+            string[] displayOptions = new string[options.Length];
+            for (int i = 0; i < options.Length; i++)
+            {
+                displayOptions[i] = DropDownShared.GetCachedIntString(options[i]);
+            }
+            DisplayOptionsCache[hashCode] = displayOptions;
+            return displayOptions;
+        }
+
         /// <summary>
         /// Draws the property as a dropdown selector with the integer options provided by the attribute.
         /// </summary>
@@ -208,48 +250,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             Property.ValueEntry.WeakSmartValue = value;
-        }
-
-        internal static string[] GetOrCreateDisplayOptions(int[] options)
-        {
-            if (options == null || options.Length == 0)
-            {
-                return Array.Empty<string>();
-            }
-
-            int hashCode = DropDownShared.ComputeOptionsHash(options);
-            if (DisplayOptionsCache.TryGetValue(hashCode, out string[] cached))
-            {
-                if (cached.Length == options.Length)
-                {
-                    bool match = true;
-                    for (int i = 0; i < options.Length && match; i++)
-                    {
-                        if (
-                            !string.Equals(
-                                cached[i],
-                                DropDownShared.GetCachedIntString(options[i]),
-                                StringComparison.Ordinal
-                            )
-                        )
-                        {
-                            match = false;
-                        }
-                    }
-                    if (match)
-                    {
-                        return cached;
-                    }
-                }
-            }
-
-            string[] displayOptions = new string[options.Length];
-            for (int i = 0; i < options.Length; i++)
-            {
-                displayOptions[i] = DropDownShared.GetCachedIntString(options[i]);
-            }
-            DisplayOptionsCache[hashCode] = displayOptions;
-            return displayOptions;
         }
     }
 #endif

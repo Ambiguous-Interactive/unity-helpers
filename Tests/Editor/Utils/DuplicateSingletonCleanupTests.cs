@@ -33,107 +33,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         private bool _previousIgnoreCompilationState;
         private bool _cleanedUp;
 
-        [OneTimeSetUp]
-        public void OneTimeSetUp()
-        {
-            CleanupAllKnownTestFolders();
-        }
-
-        [SetUp]
-        public override void BaseSetUp()
-        {
-            base.BaseSetUp();
-            _cleanedUp = false;
-            _previousEditorUiSuppress = EditorUi.Suppress;
-            EditorUi.Suppress = true;
-            ScriptableObjectSingletonCreator.IncludeTestAssemblies = true;
-            ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = true;
-            ScriptableObjectSingletonCreator.DisableAutomaticRetries = true;
-            // Unity may report isCompiling/isUpdating during a test run after AssetDatabase operations.
-            _previousIgnoreCompilationState =
-                ScriptableObjectSingletonCreator.IgnoreCompilationState;
-            ScriptableObjectSingletonCreator.IgnoreCompilationState = true;
-            ScriptableObjectSingletonCreator.TypeFilter = static type =>
-                type == typeof(CleanupEnabledSingleton)
-                || type == typeof(CleanupDisabledSingleton)
-                || type == typeof(CleanupWithDataSingleton);
-
-            // A stale asset from an earlier test would otherwise be found by EnsureSingletonAssets.
-            CleanupAllTestAssetsAndFolders();
-
-            EnsureFolder("Assets/Resources");
-            EnsureFolder(TestRoot);
-            // Ensure the metadata folder exists to prevent modal dialogs
-            EnsureFolder("Assets/Resources/Wallstop Studios/Unity Helpers");
-            ScriptableObjectSingletonCreator.ResetRetryStateForTests();
-        }
-
-        [TearDown]
-        public override void TearDown()
-        {
-            LogAssert.ignoreFailingMessages = false;
-
-            CleanupTestAssets();
-
-            ScriptableObjectSingletonCreator.TypeFilter = null;
-            ScriptableObjectSingletonCreator.IncludeTestAssemblies = false;
-            ScriptableObjectSingletonCreator.DisableAutomaticRetries = false;
-            ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = false;
-            ScriptableObjectSingletonCreator.IgnoreCompilationState =
-                _previousIgnoreCompilationState;
-            ScriptableObjectSingletonCreator.ResetRetryStateForTests();
-
-            base.TearDown();
-            EditorUi.Suppress = _previousEditorUiSuppress;
-        }
-
-        [UnityTearDown]
-        public override IEnumerator UnityTearDown()
-        {
-            LogAssert.ignoreFailingMessages = false;
-
-            // Before base teardown: the assets must go before any tracked object is destroyed.
-            CleanupTestAssets();
-            yield return null;
-
-            ScriptableObjectSingletonCreator.TypeFilter = null;
-            ScriptableObjectSingletonCreator.IncludeTestAssemblies = false;
-            ScriptableObjectSingletonCreator.DisableAutomaticRetries = false;
-            ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = false;
-            ScriptableObjectSingletonCreator.IgnoreCompilationState =
-                _previousIgnoreCompilationState;
-            ScriptableObjectSingletonCreator.ResetRetryStateForTests();
-
-            IEnumerator baseEnumerator = base.UnityTearDown();
-            while (baseEnumerator.MoveNext())
-            {
-                yield return baseEnumerator.Current;
-            }
-
-            EditorUi.Suppress = _previousEditorUiSuppress;
-
-            CleanupAllKnownTestFolders();
-        }
-
-        public override void OneTimeTearDown()
-        {
-            base.OneTimeTearDown();
-
-            CleanupAllKnownTestFolders();
-        }
-
-        private void CleanupTestAssets()
-        {
-            // Avoid double cleanup
-            if (_cleanedUp)
-            {
-                return;
-            }
-            _cleanedUp = true;
-
-            CleanupAllTestAssetsAndFolders();
-        }
-
         /// <summary>
         /// Aggressively cleans up all test assets and folders.
         /// Can be called multiple times safely (from SetUp and TearDown).
@@ -285,6 +184,103 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             {
                 AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
             }
+        }
+
+        private static void TryDeleteFolder(string folderPath)
+        {
+            if (AssetDatabase.IsValidFolder(folderPath))
+            {
+                AssetDatabase.DeleteAsset(folderPath);
+            }
+        }
+
+        [OneTimeSetUp]
+        public void OneTimeSetUp()
+        {
+            CleanupAllKnownTestFolders();
+        }
+
+        [SetUp]
+        public override void BaseSetUp()
+        {
+            base.BaseSetUp();
+            _cleanedUp = false;
+            _previousEditorUiSuppress = EditorUi.Suppress;
+            EditorUi.Suppress = true;
+            ScriptableObjectSingletonCreator.IncludeTestAssemblies = true;
+            ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = true;
+            ScriptableObjectSingletonCreator.DisableAutomaticRetries = true;
+            // Unity may report isCompiling/isUpdating during a test run after AssetDatabase operations.
+            _previousIgnoreCompilationState =
+                ScriptableObjectSingletonCreator.IgnoreCompilationState;
+            ScriptableObjectSingletonCreator.IgnoreCompilationState = true;
+            ScriptableObjectSingletonCreator.TypeFilter = static type =>
+                type == typeof(CleanupEnabledSingleton)
+                || type == typeof(CleanupDisabledSingleton)
+                || type == typeof(CleanupWithDataSingleton);
+
+            // A stale asset from an earlier test would otherwise be found by EnsureSingletonAssets.
+            CleanupAllTestAssetsAndFolders();
+
+            EnsureFolder("Assets/Resources");
+            EnsureFolder(TestRoot);
+            // Ensure the metadata folder exists to prevent modal dialogs
+            EnsureFolder("Assets/Resources/Wallstop Studios/Unity Helpers");
+            ScriptableObjectSingletonCreator.ResetRetryStateForTests();
+        }
+
+        [TearDown]
+        public override void TearDown()
+        {
+            LogAssert.ignoreFailingMessages = false;
+
+            CleanupTestAssets();
+
+            ScriptableObjectSingletonCreator.TypeFilter = null;
+            ScriptableObjectSingletonCreator.IncludeTestAssemblies = false;
+            ScriptableObjectSingletonCreator.DisableAutomaticRetries = false;
+            ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = false;
+            ScriptableObjectSingletonCreator.IgnoreCompilationState =
+                _previousIgnoreCompilationState;
+            ScriptableObjectSingletonCreator.ResetRetryStateForTests();
+
+            base.TearDown();
+            EditorUi.Suppress = _previousEditorUiSuppress;
+        }
+
+        [UnityTearDown]
+        public override IEnumerator UnityTearDown()
+        {
+            LogAssert.ignoreFailingMessages = false;
+
+            // Before base teardown: the assets must go before any tracked object is destroyed.
+            CleanupTestAssets();
+            yield return null;
+
+            ScriptableObjectSingletonCreator.TypeFilter = null;
+            ScriptableObjectSingletonCreator.IncludeTestAssemblies = false;
+            ScriptableObjectSingletonCreator.DisableAutomaticRetries = false;
+            ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = false;
+            ScriptableObjectSingletonCreator.IgnoreCompilationState =
+                _previousIgnoreCompilationState;
+            ScriptableObjectSingletonCreator.ResetRetryStateForTests();
+
+            IEnumerator baseEnumerator = base.UnityTearDown();
+            while (baseEnumerator.MoveNext())
+            {
+                yield return baseEnumerator.Current;
+            }
+
+            EditorUi.Suppress = _previousEditorUiSuppress;
+
+            CleanupAllKnownTestFolders();
+        }
+
+        public override void OneTimeTearDown()
+        {
+            base.OneTimeTearDown();
+
+            CleanupAllKnownTestFolders();
         }
 
         [UnityTest]
@@ -982,12 +978,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             */
         }
 
-        private static void TryDeleteFolder(string folderPath)
+        private void CleanupTestAssets()
         {
-            if (AssetDatabase.IsValidFolder(folderPath))
+            // Avoid double cleanup
+            if (_cleanedUp)
             {
-                AssetDatabase.DeleteAsset(folderPath);
+                return;
             }
+            _cleanedUp = true;
+
+            CleanupAllTestAssetsAndFolders();
         }
     }
 }

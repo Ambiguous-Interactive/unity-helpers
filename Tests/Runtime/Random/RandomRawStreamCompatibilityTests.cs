@@ -14,6 +14,59 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
     {
         private const int StreamBytes = 1024 * 1024;
 
+        private static IRandom Create(string generator, Guid seed)
+        {
+            byte[] seedBytes = seed.ToByteArray();
+            int integerSeed =
+                seedBytes[0] | (seedBytes[1] << 8) | (seedBytes[2] << 16) | (seedBytes[3] << 24);
+            switch (generator)
+            {
+                case nameof(BlastCircuitRandom):
+                    return new BlastCircuitRandom(seed);
+                case nameof(DotNetRandom):
+                    return new DotNetRandom(seed);
+                case nameof(FlurryBurstRandom):
+                    return new FlurryBurstRandom(seed);
+                case nameof(IllusionFlow):
+                    return new IllusionFlow(seed);
+                case nameof(LinearCongruentialGenerator):
+                    return new LinearCongruentialGenerator(seed);
+                case nameof(PcgRandom):
+                    return new PcgRandom(seed);
+                case nameof(PhotonSpinRandom):
+                    return new PhotonSpinRandom(seed);
+                case nameof(RomuDuo):
+                    return new RomuDuo(seed);
+                case nameof(Sfc64Random):
+                    return new Sfc64Random(seed);
+                case nameof(SplitMix64):
+                    return new SplitMix64(seed);
+                case nameof(SquirrelRandom):
+                    return new SquirrelRandom(integerSeed);
+                case nameof(StormDropRandom):
+                    return new StormDropRandom(seed);
+                case nameof(SystemRandom):
+                    return new SystemRandom(integerSeed);
+                case nameof(WaveSplatRandom):
+                    return new WaveSplatRandom(seed);
+                case nameof(WDoomRandom):
+                    return new WDoomRandom(integerSeed);
+                case nameof(WyRandom):
+                    return new WyRandom(seed);
+                case nameof(XoroShiroRandom):
+                    return new XoroShiroRandom(seed);
+                case nameof(XorShiftRandom):
+                    return new XorShiftRandom(seed);
+                case nameof(Xoshiro128StarStar):
+                    return new Xoshiro128StarStar(seed);
+                case nameof(Xoshiro256StarStar):
+                    return new Xoshiro256StarStar(seed);
+                default:
+                    Assert.Fail($"Missing constructor for frozen stream {generator}.");
+                    return null;
+            }
+        }
+
         // The host gate checks these frozen hashes against raw-stream-vectors.json; never regenerate them from the candidate.
         [TestCase(
             nameof(BlastCircuitRandom),
@@ -522,59 +575,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                 .Replace("-", "")
                 .ToLowerInvariant();
             Assert.AreEqual(expectedHash, actualHash, $"{generator}/{width}/{seedText}");
-        }
-
-        private static IRandom Create(string generator, Guid seed)
-        {
-            byte[] seedBytes = seed.ToByteArray();
-            int integerSeed =
-                seedBytes[0] | (seedBytes[1] << 8) | (seedBytes[2] << 16) | (seedBytes[3] << 24);
-            switch (generator)
-            {
-                case nameof(BlastCircuitRandom):
-                    return new BlastCircuitRandom(seed);
-                case nameof(DotNetRandom):
-                    return new DotNetRandom(seed);
-                case nameof(FlurryBurstRandom):
-                    return new FlurryBurstRandom(seed);
-                case nameof(IllusionFlow):
-                    return new IllusionFlow(seed);
-                case nameof(LinearCongruentialGenerator):
-                    return new LinearCongruentialGenerator(seed);
-                case nameof(PcgRandom):
-                    return new PcgRandom(seed);
-                case nameof(PhotonSpinRandom):
-                    return new PhotonSpinRandom(seed);
-                case nameof(RomuDuo):
-                    return new RomuDuo(seed);
-                case nameof(Sfc64Random):
-                    return new Sfc64Random(seed);
-                case nameof(SplitMix64):
-                    return new SplitMix64(seed);
-                case nameof(SquirrelRandom):
-                    return new SquirrelRandom(integerSeed);
-                case nameof(StormDropRandom):
-                    return new StormDropRandom(seed);
-                case nameof(SystemRandom):
-                    return new SystemRandom(integerSeed);
-                case nameof(WaveSplatRandom):
-                    return new WaveSplatRandom(seed);
-                case nameof(WDoomRandom):
-                    return new WDoomRandom(integerSeed);
-                case nameof(WyRandom):
-                    return new WyRandom(seed);
-                case nameof(XoroShiroRandom):
-                    return new XoroShiroRandom(seed);
-                case nameof(XorShiftRandom):
-                    return new XorShiftRandom(seed);
-                case nameof(Xoshiro128StarStar):
-                    return new Xoshiro128StarStar(seed);
-                case nameof(Xoshiro256StarStar):
-                    return new Xoshiro256StarStar(seed);
-                default:
-                    Assert.Fail($"Missing constructor for frozen stream {generator}.");
-                    return null;
-            }
         }
     }
 }

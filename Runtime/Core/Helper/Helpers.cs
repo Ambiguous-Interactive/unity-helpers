@@ -42,13 +42,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             Func<object, object[], object>
         > AwakeMethodsByType = new();
 #endif
-        private static readonly Object LogObject = new();
-        private static readonly Dictionary<string, Object> ObjectsByTag = new(
-            StringComparer.Ordinal
-        );
 
         internal static readonly Dictionary<string, string[]> CachedLabels = new(
             StringComparer.OrdinalIgnoreCase
+        );
+        private static readonly Object LogObject = new();
+        private static readonly Dictionary<string, Object> ObjectsByTag = new(
+            StringComparer.Ordinal
         );
 
         private static string[] CachedLayerNames = Array.Empty<string>();
@@ -122,25 +122,19 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             "Assets/TileMaps",
         };
 
+        internal static void HandleProjectChangedForHelpers()
+        {
+            ResetLayerCache();
+            ResetSpriteLabelCache();
+        }
+
         [InitializeOnLoadMethod]
         private static void RegisterProjectChangeHandlers()
         {
             EditorApplication.projectChanged -= HandleProjectChangedForHelpers;
             EditorApplication.projectChanged += HandleProjectChangedForHelpers;
         }
-
-        internal static void HandleProjectChangedForHelpers()
-        {
-            ResetLayerCache();
-            ResetSpriteLabelCache();
-        }
 #endif
-
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-        internal static void CLearLayerNames()
-        {
-            ResetLayerCache();
-        }
 
         /// <summary>
         /// Indicates whether Unity is running in batch mode (no graphics device, command-line mode).
@@ -195,6 +189,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
+        internal static string[] AllSpriteLabels { get; private set; } = Array.Empty<string>();
+
         /// <summary>
         /// Checks if a specific environment variable is set to a non-empty, non-whitespace value.
         /// </summary>
@@ -207,7 +203,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             );
         }
 
-        internal static string[] AllSpriteLabels { get; private set; } = Array.Empty<string>();
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        internal static void CLearLayerNames()
+        {
+            ResetLayerCache();
+        }
+
 #if UNITY_EDITOR
         private static bool SpriteLabelCacheInitialized;
 #endif
@@ -410,57 +411,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 #endif
 
-        internal static void SetSpriteLabelCache(
-            IReadOnlyCollection<string> labels,
-            bool alreadySorted = false
-        )
-        {
-            if (labels == null || labels.Count == 0)
-            {
-                AllSpriteLabels = Array.Empty<string>();
-#if UNITY_EDITOR
-                SpriteLabelCacheInitialized = true;
-#endif
-                return;
-            }
-
-            string[] cache =
-                AllSpriteLabels.Length == labels.Count ? AllSpriteLabels : new string[labels.Count];
-
-            if (labels is IReadOnlyList<string> list)
-            {
-                for (int i = 0; i < list.Count; ++i)
-                {
-                    cache[i] = list[i];
-                }
-            }
-            else
-            {
-                int index = 0;
-                foreach (string label in labels)
-                {
-                    cache[index++] = label;
-                }
-            }
-
-            if (!alreadySorted)
-            {
-                Array.Sort(cache, StringComparer.Ordinal);
-            }
-
-            AllSpriteLabels = cache;
-#if UNITY_EDITOR
-            SpriteLabelCacheInitialized = true;
-#endif
-        }
-
-        internal static void ResetSpriteLabelCache()
-        {
-#if UNITY_EDITOR
-            SpriteLabelCacheInitialized = false;
-#endif
-            AllSpriteLabels = Array.Empty<string>();
-        }
+        // Float rounding can move a sampled point outside the radius; resample and use the center when no offset fits.
+        private const int RandomPointInShapeAttempts = 8;
 
         // https://gamedevelopment.tutsplus.com/tutorials/unity-solution-for-hitting-moving-targets--cms-29633
         /// <summary>
@@ -685,94 +637,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             );
         }
 
-        private static IEnumerator FunctionAsCoroutine(
-            Object context,
-            Action action,
-            float updateRate,
-            bool useJitter,
-            bool waitBefore
-        )
-        {
-            float interval = ResolveInvocationDelay(updateRate);
-            float initialDelay = waitBefore ? interval : 0f;
-
-            if (useJitter)
-            {
-                initialDelay += SampleInitialJitter(interval);
-            }
-
-            if (0f < initialDelay)
-            {
-                yield return WaitForDelay(initialDelay);
-            }
-
-            bool reportedFailure = false;
-            while (true)
-            {
-                try
-                {
-                    action();
-                }
-                catch (Exception e)
-                {
-                    if (!reportedFailure)
-                    {
-                        ReportRepeatingJobFailure(e, context);
-                        reportedFailure = true;
-                    }
-                }
-
-                if (interval <= 0f)
-                {
-                    yield return null;
-                    continue;
-                }
-
-                yield return WaitForDelay(interval);
-            }
-        }
-
-        // Unity stops a coroutine after an exception; isolate callback failures and report only the first.
-        private static void ReportRepeatingJobFailure(Exception e, Object context)
-        {
-            Debug.LogError(
-                "A repeating job threw; it will keep running, and further failures of this job "
-                    + $"will not be reported. {e}",
-                context
-            );
-        }
-
-        private static float ResolveInvocationDelay(float baseDelay)
-        {
-            return 0f < baseDelay && float.IsFinite(baseDelay) ? baseDelay : 0f;
-        }
-
-        private static float SampleInitialJitter(float interval)
-        {
-            if (interval <= 0f)
-            {
-                return 0f;
-            }
-
-            float jitter = JitterSampler(interval);
-            if (float.IsNaN(jitter) || jitter <= 0f)
-            {
-                return 0f;
-            }
-
-            return Mathf.Min(jitter, interval);
-        }
-
-        private static IEnumerator WaitForDelay(float duration)
-        {
-            float clamped = Mathf.Max(0f, duration);
-            float startTime = Time.time;
-            do
-            {
-                yield return null;
-            } while (!HasEnoughTimePassed(startTime, clamped));
-        }
-
         public static Coroutine ExecuteFunctionAfterDelay(
             this MonoBehaviour monoBehaviour,
             Action action,
@@ -889,31 +753,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
-        private static IEnumerator FunctionDelayAsCoroutine(Action action, float delay)
-        {
-            float startTime = Time.time;
-            while (!HasEnoughTimePassed(startTime, delay))
-            {
-                yield return null;
-            }
-
-            action();
-        }
-
-        private static IEnumerator FunctionAfterFrame(Action action)
-        {
-            if (IsRunningInBatchMode)
-            {
-                // Headless batch mode has no end-of-frame rendering signal; wait for the next frame instead.
-                yield return null;
-            }
-            else
-            {
-                yield return Buffers.WaitForEndOfFrame;
-            }
-            action();
-        }
-
         public static bool HasEnoughTimePassed(float timestamp, float desiredDuration)
         {
             return timestamp + desiredDuration < Time.time;
@@ -1021,9 +860,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             Vector3Int size = self.size;
             return new Rect(self.x, self.y, size.x, size.y);
         }
-
-        // Float rounding can move a sampled point outside the radius; resample and use the center when no offset fits.
-        private const int RandomPointInShapeAttempts = 8;
 
         /// <summary>
         /// Returns a uniformly random point inside a circle.
@@ -1246,7 +1082,219 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return null;
         }
 
+        internal static void SetSpriteLabelCache(
+            IReadOnlyCollection<string> labels,
+            bool alreadySorted = false
+        )
+        {
+            if (labels == null || labels.Count == 0)
+            {
+                AllSpriteLabels = Array.Empty<string>();
 #if UNITY_EDITOR
+                SpriteLabelCacheInitialized = true;
+#endif
+                return;
+            }
+
+            string[] cache =
+                AllSpriteLabels.Length == labels.Count ? AllSpriteLabels : new string[labels.Count];
+
+            if (labels is IReadOnlyList<string> list)
+            {
+                for (int i = 0; i < list.Count; ++i)
+                {
+                    cache[i] = list[i];
+                }
+            }
+            else
+            {
+                int index = 0;
+                foreach (string label in labels)
+                {
+                    cache[index++] = label;
+                }
+            }
+
+            if (!alreadySorted)
+            {
+                Array.Sort(cache, StringComparer.Ordinal);
+            }
+
+            AllSpriteLabels = cache;
+#if UNITY_EDITOR
+            SpriteLabelCacheInitialized = true;
+#endif
+        }
+
+        internal static void ResetSpriteLabelCache()
+        {
+#if UNITY_EDITOR
+            SpriteLabelCacheInitialized = false;
+#endif
+            AllSpriteLabels = Array.Empty<string>();
+        }
+
+        private static IEnumerator FunctionAsCoroutine(
+            Object context,
+            Action action,
+            float updateRate,
+            bool useJitter,
+            bool waitBefore
+        )
+        {
+            float interval = ResolveInvocationDelay(updateRate);
+            float initialDelay = waitBefore ? interval : 0f;
+
+            if (useJitter)
+            {
+                initialDelay += SampleInitialJitter(interval);
+            }
+
+            if (0f < initialDelay)
+            {
+                yield return WaitForDelay(initialDelay);
+            }
+
+            bool reportedFailure = false;
+            while (true)
+            {
+                try
+                {
+                    action();
+                }
+                catch (Exception e)
+                {
+                    if (!reportedFailure)
+                    {
+                        ReportRepeatingJobFailure(e, context);
+                        reportedFailure = true;
+                    }
+                }
+
+                if (interval <= 0f)
+                {
+                    yield return null;
+                    continue;
+                }
+
+                yield return WaitForDelay(interval);
+            }
+        }
+
+        // Unity stops a coroutine after an exception; isolate callback failures and report only the first.
+        private static void ReportRepeatingJobFailure(Exception e, Object context)
+        {
+            Debug.LogError(
+                "A repeating job threw; it will keep running, and further failures of this job "
+                    + $"will not be reported. {e}",
+                context
+            );
+        }
+
+        private static float ResolveInvocationDelay(float baseDelay)
+        {
+            return 0f < baseDelay && float.IsFinite(baseDelay) ? baseDelay : 0f;
+        }
+
+        private static float SampleInitialJitter(float interval)
+        {
+            if (interval <= 0f)
+            {
+                return 0f;
+            }
+
+            float jitter = JitterSampler(interval);
+            if (float.IsNaN(jitter) || jitter <= 0f)
+            {
+                return 0f;
+            }
+
+            return Mathf.Min(jitter, interval);
+        }
+
+        private static IEnumerator WaitForDelay(float duration)
+        {
+            float clamped = Mathf.Max(0f, duration);
+            float startTime = Time.time;
+            do
+            {
+                yield return null;
+            } while (!HasEnoughTimePassed(startTime, clamped));
+        }
+
+        private static IEnumerator FunctionDelayAsCoroutine(Action action, float delay)
+        {
+            float startTime = Time.time;
+            while (!HasEnoughTimePassed(startTime, delay))
+            {
+                yield return null;
+            }
+
+            action();
+        }
+
+        private static IEnumerator FunctionAfterFrame(Action action)
+        {
+            if (IsRunningInBatchMode)
+            {
+                // Headless batch mode has no end-of-frame rendering signal; wait for the next frame instead.
+                yield return null;
+            }
+            else
+            {
+                yield return Buffers.WaitForEndOfFrame;
+            }
+            action();
+        }
+
+#if UNITY_EDITOR
+
+        /// <summary>
+        /// Enumerates Prefab assets in the project (Editor only). Uses search folders when provided.
+        /// </summary>
+        public static IEnumerable<GameObject> EnumeratePrefabs(
+            IEnumerable<string> assetPaths = null
+        )
+        {
+            string[] searchFolders = PrepareSearchFolders(assetPaths, DefaultPrefabSearchFolders);
+
+            foreach (string assetGuid in AssetDatabase.FindAssets("t:prefab", searchFolders))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(assetGuid);
+                GameObject go = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                if (go != null)
+                {
+                    yield return go;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Enumerates ScriptableObject assets of type <typeparamref name="T"/> in the project (Editor only).
+        /// </summary>
+        public static IEnumerable<T> EnumerateScriptableObjects<T>(
+            IEnumerable<string> assetPaths = null
+        )
+            where T : ScriptableObject
+        {
+            string[] searchFolders = PrepareSearchFolders(
+                assetPaths,
+                DefaultScriptableObjectSearchFolders
+            );
+
+            foreach (
+                string assetGuid in AssetDatabase.FindAssets("t:" + typeof(T).Name, searchFolders)
+            )
+            {
+                string path = AssetDatabase.GUIDToAssetPath(assetGuid);
+                T so = AssetDatabase.LoadAssetAtPath<T>(path);
+                if (so != null)
+                {
+                    yield return so;
+                }
+            }
+        }
+
         /// <summary>
         /// Narrows a caller-supplied set of asset paths to the exactly-sized array that
         /// <c>AssetDatabase.FindAssets</c> requires.
@@ -1297,52 +1345,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             list.AddRange(assetPaths);
             return list.ToArray();
         }
-
-        /// <summary>
-        /// Enumerates Prefab assets in the project (Editor only). Uses search folders when provided.
-        /// </summary>
-        public static IEnumerable<GameObject> EnumeratePrefabs(
-            IEnumerable<string> assetPaths = null
-        )
-        {
-            string[] searchFolders = PrepareSearchFolders(assetPaths, DefaultPrefabSearchFolders);
-
-            foreach (string assetGuid in AssetDatabase.FindAssets("t:prefab", searchFolders))
-            {
-                string path = AssetDatabase.GUIDToAssetPath(assetGuid);
-                GameObject go = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-                if (go != null)
-                {
-                    yield return go;
-                }
-            }
-        }
-
-        /// <summary>
-        /// Enumerates ScriptableObject assets of type <typeparamref name="T"/> in the project (Editor only).
-        /// </summary>
-        public static IEnumerable<T> EnumerateScriptableObjects<T>(
-            IEnumerable<string> assetPaths = null
-        )
-            where T : ScriptableObject
-        {
-            string[] searchFolders = PrepareSearchFolders(
-                assetPaths,
-                DefaultScriptableObjectSearchFolders
-            );
-
-            foreach (
-                string assetGuid in AssetDatabase.FindAssets("t:" + typeof(T).Name, searchFolders)
-            )
-            {
-                string path = AssetDatabase.GUIDToAssetPath(assetGuid);
-                T so = AssetDatabase.LoadAssetAtPath<T>(path);
-                if (so != null)
-                {
-                    yield return so;
-                }
-            }
-        }
 #endif
 
         public static bool NameEquals(Object lhs, Object rhs)
@@ -1387,30 +1389,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             return StringComparer.Ordinal.GetHashCode(NormalizeCloneName(instance.name));
-        }
-
-        private static string NormalizeCloneName(string name)
-        {
-            if (string.IsNullOrEmpty(name))
-            {
-                return string.Empty;
-            }
-
-            string normalized = name;
-            const string clone = "(Clone)";
-            while (true)
-            {
-                string trimmedEnd = normalized.TrimEnd();
-                if (!trimmedEnd.EndsWith(clone, StringComparison.Ordinal))
-                {
-                    normalized = trimmedEnd;
-                    break;
-                }
-
-                normalized = trimmedEnd.Substring(0, trimmedEnd.Length - clone.Length);
-            }
-
-            return normalized.Trim();
         }
 
         /// <summary>
@@ -1588,6 +1566,30 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 bounds.yMax = position.y;
             }
+        }
+
+        private static string NormalizeCloneName(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+            {
+                return string.Empty;
+            }
+
+            string normalized = name;
+            const string clone = "(Clone)";
+            while (true)
+            {
+                string trimmedEnd = normalized.TrimEnd();
+                if (!trimmedEnd.EndsWith(clone, StringComparison.Ordinal))
+                {
+                    normalized = trimmedEnd;
+                    break;
+                }
+
+                normalized = trimmedEnd.Substring(0, trimmedEnd.Length - clone.Length);
+            }
+
+            return normalized.Trim();
         }
 
         /// <summary>

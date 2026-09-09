@@ -33,18 +33,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 #pragma warning restore WPROTO030
     public sealed class SparseSet : IReadOnlyList<int>
     {
-        [SerializeField]
-        [ProtoMember(1)]
-        private int[] _sparse;
-
-        [SerializeField]
-        [ProtoMember(2)]
-        private int[] _dense;
-
-        [SerializeField]
-        [ProtoMember(3)]
-        private int _count;
-
         /// <summary>
         /// Gets the number of elements in the set.
         /// </summary>
@@ -77,12 +65,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
         }
 
-        private SparseSet()
-        {
-            _sparse = Array.Empty<int>();
-            _dense = Array.Empty<int>();
-            _count = 0;
-        }
+        [SerializeField]
+        [ProtoMember(1)]
+        private int[] _sparse;
+
+        [SerializeField]
+        [ProtoMember(2)]
+        private int[] _dense;
+
+        [SerializeField]
+        [ProtoMember(3)]
+        private int _count;
 
         /// <summary>
         /// Constructs a sparse set with the specified universe size.
@@ -100,6 +93,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             _sparse = new int[universeSize];
             _dense = new int[universeSize];
+            _count = 0;
+        }
+
+        private SparseSet()
+        {
+            _sparse = Array.Empty<int>();
+            _dense = Array.Empty<int>();
             _count = 0;
         }
 
@@ -265,6 +265,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         public struct SparseSetEnumerator : IEnumerator<int>
         {
+            public int Current => _current;
+
+            object IEnumerator.Current => Current;
+
             private readonly int[] _dense;
             private readonly int _count;
             private int _index;
@@ -290,10 +294,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return false;
             }
 
-            public int Current => _current;
-
-            object IEnumerator.Current => Current;
-
             public void Reset()
             {
                 _index = -1;
@@ -311,14 +311,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     [Serializable]
     public sealed class SparseSet<T> : IReadOnlyList<T>
     {
-        private readonly Dictionary<T, int> _elementToIndex;
-        private readonly T[] _elements;
-        private readonly int[] _sparse;
-        private readonly int[] _dense;
-        private int _count;
-        private int _nextIndex;
-        private readonly IEqualityComparer<T> _comparer;
-
         /// <summary>
         /// Gets the number of elements in the set.
         /// </summary>
@@ -351,6 +343,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return _elements[elementIndex];
             }
         }
+
+        private readonly Dictionary<T, int> _elementToIndex;
+        private readonly T[] _elements;
+        private readonly int[] _sparse;
+        private readonly int[] _dense;
+        private int _count;
+        private int _nextIndex;
+        private readonly IEqualityComparer<T> _comparer;
 
         /// <summary>
         /// Constructs a sparse set with the specified capacity.
@@ -545,6 +545,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         public struct SparseSetEnumerator : IEnumerator<T>
         {
+            public T Current => _current;
+
+            object IEnumerator.Current => Current;
+
             private readonly T[] _elements;
             private readonly int[] _dense;
             private readonly int _count;
@@ -582,10 +586,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 _current = default;
                 return false;
             }
-
-            public T Current => _current;
-
-            object IEnumerator.Current => Current;
 
             public void Reset()
             {

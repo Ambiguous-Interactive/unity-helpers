@@ -71,21 +71,6 @@ namespace WallstopStudios.UnityHelpers.Visuals.UGUI
         private static readonly int MainTex = Shader.PropertyToID("_MainTex");
 
         /// <summary>
-        /// Stores the dedicated material instance produced by <see cref="UpdateMaterialInstance"/>.
-        /// This is a runtime-only object that doesn't survive domain reloads.
-        /// </summary>
-        private Material _cachedMaterialInstance;
-        internal Material CachedMaterialInstanceForTests => _cachedMaterialInstance;
-
-        /// <summary>
-        /// Stores the original user-assigned material before we replace it with our instance.
-        /// Serialized so we can recreate the material instance after domain reload.
-        /// </summary>
-        [SerializeField]
-        [HideInInspector]
-        private Material _baseMaterial;
-
-        /// <summary>
         /// HDR-capable tint applied to the instantiated material. Values above 1 keep their intensity instead of being clamped.
         /// </summary>
         /// <remarks>
@@ -105,6 +90,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UGUI
                 UpdateMaterialInstance();
             }
         }
+        internal Material CachedMaterialInstanceForTests => _cachedMaterialInstance;
 
         /// <summary>
         /// Optional shape mask texture assigned to the material's `_ShapeMask` slot to drive custom shader based masking.
@@ -123,6 +109,20 @@ namespace WallstopStudios.UnityHelpers.Visuals.UGUI
         [SerializeField]
         [ColorUsage(showAlpha: true, hdr: true)]
         internal Color _hdrColor = Color.white;
+
+        /// <summary>
+        /// Stores the dedicated material instance produced by <see cref="UpdateMaterialInstance"/>.
+        /// This is a runtime-only object that doesn't survive domain reloads.
+        /// </summary>
+        private Material _cachedMaterialInstance;
+
+        /// <summary>
+        /// Stores the original user-assigned material before we replace it with our instance.
+        /// Serialized so we can recreate the material instance after domain reload.
+        /// </summary>
+        [SerializeField]
+        [HideInInspector]
+        private Material _baseMaterial;
 
         /// <inheritdoc/>
         protected override void Start()
@@ -156,6 +156,12 @@ namespace WallstopStudios.UnityHelpers.Visuals.UGUI
             UpdateMaterialInstance();
         }
 #endif
+
+        internal Material BaseMaterialForTests => _baseMaterial;
+
+        internal void InvokeStartForTests() => Start();
+
+        internal void InvokeOnDestroyForTests() => OnDestroy();
 
         /// <summary>
         /// Ensures this component owns a dedicated material instance and reapplies mask and color data.
@@ -276,11 +282,5 @@ namespace WallstopStudios.UnityHelpers.Visuals.UGUI
             }
             _baseMaterial = null;
         }
-
-        internal void InvokeStartForTests() => Start();
-
-        internal void InvokeOnDestroyForTests() => OnDestroy();
-
-        internal Material BaseMaterialForTests => _baseMaterial;
     }
 }

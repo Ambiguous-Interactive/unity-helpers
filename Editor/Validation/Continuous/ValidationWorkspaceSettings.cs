@@ -22,26 +22,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         internal static event Action Changed;
 
-        private void OnEnable()
-        {
-            Normalize();
-            ValidationPreferences.Changed += UpdateUndoSubscription;
-            UpdateUndoSubscription();
-        }
-
-        private void OnDisable()
-        {
-            ValidationPreferences.Changed -= UpdateUndoSubscription;
-            Undo.undoRedoPerformed -= SaveAfterUndo;
-        }
-
-        private void UpdateUndoSubscription()
-        {
-            Undo.undoRedoPerformed -= SaveAfterUndo;
-            if (ValidationPreferences.Enabled)
-                Undo.undoRedoPerformed += SaveAfterUndo;
-        }
-
         internal static readonly string[] Categories =
         {
             "Prefabs",
@@ -85,6 +65,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             SetImportMaxSizeFix,
         };
 
+        internal Profile ActiveProfile
+        {
+            get
+            {
+                foreach (Profile profile in profiles)
+                {
+                    if (string.Equals(profile.name, selectedProfile, StringComparison.Ordinal))
+                    {
+                        return profile;
+                    }
+                }
+                return profiles.Count == 0 ? new Profile() : profiles[0];
+            }
+        }
+
         [SerializeField]
         internal string selectedProfile = "Default";
 
@@ -119,19 +114,34 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         [SerializeField]
         internal List<RuleDefinition> projectRules = new List<RuleDefinition>();
 
-        internal Profile ActiveProfile
+        internal static string CategoryFor(string path)
         {
-            get
+            string normalized = (path ?? string.Empty).Replace('\\', '/');
+            if (normalized.IndexOf("/BuildProfiles/", StringComparison.OrdinalIgnoreCase) != -1)
             {
-                foreach (Profile profile in profiles)
-                {
-                    if (string.Equals(profile.name, selectedProfile, StringComparison.Ordinal))
-                    {
-                        return profile;
-                    }
-                }
-                return profiles.Count == 0 ? new Profile() : profiles[0];
+                return "Build Profiles";
             }
+            if (normalized.StartsWith("ProjectSettings/", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Settings";
+            }
+            if (
+                normalized.IndexOf("/AddressableAssetsData/", StringComparison.OrdinalIgnoreCase)
+                != -1
+            )
+            {
+                return "Addressables";
+            }
+            string extension = System.IO.Path.GetExtension(normalized);
+            if (string.Equals(extension, ".prefab", StringComparison.OrdinalIgnoreCase))
+                return "Prefabs";
+            if (string.Equals(extension, ".unity", StringComparison.OrdinalIgnoreCase))
+                return "Scenes";
+            if (string.Equals(extension, ".cs", StringComparison.OrdinalIgnoreCase))
+                return "Scripts";
+            if (string.Equals(extension, ".asset", StringComparison.OrdinalIgnoreCase))
+                return "ScriptableObjects";
+            return "Materials";
         }
 
         internal void Normalize()
@@ -270,34 +280,24 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             Changed?.Invoke();
         }
 
-        internal static string CategoryFor(string path)
+        private void OnEnable()
         {
-            string normalized = (path ?? string.Empty).Replace('\\', '/');
-            if (normalized.IndexOf("/BuildProfiles/", StringComparison.OrdinalIgnoreCase) != -1)
-            {
-                return "Build Profiles";
-            }
-            if (normalized.StartsWith("ProjectSettings/", StringComparison.OrdinalIgnoreCase))
-            {
-                return "Settings";
-            }
-            if (
-                normalized.IndexOf("/AddressableAssetsData/", StringComparison.OrdinalIgnoreCase)
-                != -1
-            )
-            {
-                return "Addressables";
-            }
-            string extension = System.IO.Path.GetExtension(normalized);
-            if (string.Equals(extension, ".prefab", StringComparison.OrdinalIgnoreCase))
-                return "Prefabs";
-            if (string.Equals(extension, ".unity", StringComparison.OrdinalIgnoreCase))
-                return "Scenes";
-            if (string.Equals(extension, ".cs", StringComparison.OrdinalIgnoreCase))
-                return "Scripts";
-            if (string.Equals(extension, ".asset", StringComparison.OrdinalIgnoreCase))
-                return "ScriptableObjects";
-            return "Materials";
+            Normalize();
+            ValidationPreferences.Changed += UpdateUndoSubscription;
+            UpdateUndoSubscription();
+        }
+
+        private void OnDisable()
+        {
+            ValidationPreferences.Changed -= UpdateUndoSubscription;
+            Undo.undoRedoPerformed -= SaveAfterUndo;
+        }
+
+        private void UpdateUndoSubscription()
+        {
+            Undo.undoRedoPerformed -= SaveAfterUndo;
+            if (ValidationPreferences.Enabled)
+                Undo.undoRedoPerformed += SaveAfterUndo;
         }
 
         [Serializable]

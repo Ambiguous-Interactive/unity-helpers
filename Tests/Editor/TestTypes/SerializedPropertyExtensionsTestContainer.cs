@@ -11,13 +11,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
     {
         public int publicInt = 5;
 
-        [SerializeField]
-        internal string privateString = "hello";
-
         public int[] intArray = new[] { 10, 20, 30 };
         public List<int> intList = new() { 1, 2, 3 };
 
         public Nested nested = new();
+
+        [SerializeField]
+        internal string privateString = "hello";
 
         public string GetPrivateString() => privateString;
 

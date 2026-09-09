@@ -39,11 +39,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             EditorApplication.projectChanged += ClearCache;
         }
 
-        private static void ClearCache()
-        {
-            _cached = null;
-        }
-
         public static string[] GetKnownPlatformNames()
         {
             if (_cached != null)
@@ -85,6 +80,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             Array.Sort(arr, StringComparer.Ordinal);
             _cached = arr;
             return arr;
+        }
+
+        private static void ClearCache()
+        {
+            _cached = null;
         }
     }
 #endif

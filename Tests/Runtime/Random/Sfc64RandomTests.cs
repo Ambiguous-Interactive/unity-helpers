@@ -35,7 +35,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             0x5B36BD06958F78F2UL,
         };
 
-        protected override IRandom NewRandom() => new Sfc64Random(Seed0, Seed1, Seed2);
+        private static byte[] ToBytes(IReadOnlyList<byte> payload)
+        {
+            byte[] bytes = new byte[payload.Count];
+            for (int i = 0; i < bytes.Length; ++i)
+            {
+                bytes[i] = payload[i];
+            }
+
+            return bytes;
+        }
 
         [Test]
         public void NextUlongMatchesReferenceImplementation()
@@ -161,15 +170,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             }
         }
 
-        private static byte[] ToBytes(IReadOnlyList<byte> payload)
-        {
-            byte[] bytes = new byte[payload.Count];
-            for (int i = 0; i < bytes.Length; ++i)
-            {
-                bytes[i] = payload[i];
-            }
-
-            return bytes;
-        }
+        protected override IRandom NewRandom() => new Sfc64Random(Seed0, Seed1, Seed2);
     }
 }

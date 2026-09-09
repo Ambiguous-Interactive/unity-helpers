@@ -21,6 +21,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
     [NUnit.Framework.Category("Integration")]
     public sealed class WShowIfPropertyDrawerTests : CommonTestBase
     {
+        private static WShowIfPropertyDrawer CreateDrawer(WShowIfAttribute attribute)
+        {
+            WShowIfPropertyDrawer drawer = new();
+            drawer.InitializeForTesting(attribute);
+            return drawer;
+        }
+
+        private static bool InvokeShouldShow(
+            WShowIfPropertyDrawer drawer,
+            SerializedProperty property
+        )
+        {
+            return drawer.ShouldShow(property);
+        }
+
+        private static SerializedProperty RefreshProperty(
+            SerializedObjectTracker tracker,
+            ScriptableObject owner,
+            string propertyName
+        )
+        {
+            return tracker.Refresh(owner, propertyName);
+        }
+
         /// <summary>
         /// A condition naming an auto-property serialized through <c>[field: SerializeField]</c>.
         /// </summary>
@@ -1634,36 +1658,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             );
         }
 
-        private static WShowIfPropertyDrawer CreateDrawer(WShowIfAttribute attribute)
-        {
-            WShowIfPropertyDrawer drawer = new();
-            drawer.InitializeForTesting(attribute);
-            return drawer;
-        }
-
-        private static bool InvokeShouldShow(
-            WShowIfPropertyDrawer drawer,
-            SerializedProperty property
-        )
-        {
-            return drawer.ShouldShow(property);
-        }
-
-        private static SerializedProperty RefreshProperty(
-            SerializedObjectTracker tracker,
-            ScriptableObject owner,
-            string propertyName
-        )
-        {
-            return tracker.Refresh(owner, propertyName);
-        }
-
         private sealed class SerializedObjectTracker : IDisposable
         {
+            public SerializedObject Current => _current;
+
             private readonly List<SerializedObject> _trackedObjects = new();
             private SerializedObject _current;
-
-            public SerializedObject Current => _current;
 
             public SerializedProperty Refresh(ScriptableObject owner, string propertyName)
             {

@@ -36,13 +36,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     [Serializable]
     public sealed class RTree3D<T> : ISpatialTree3D<T>
     {
-        internal const float MinimumNodeSize = 0.001f;
-
         /// <summary>Default number of elements per leaf node.</summary>
         public const int DefaultBucketSize = 10;
         public const int DefaultBranchFactor = 4;
 
-        public readonly ImmutableArray<T> elements;
+        internal const float MinimumNodeSize = 0.001f;
 
         /// <summary>
         /// Gets the overall bounding box of the tree (as Unity Bounds).
@@ -51,6 +49,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// when the enclosing span is not representable; queries still test the stored geometry.</remarks>
         public Bounds Boundary =>
             SpatialQueryMath.CreateConservativeBounds(_bounds.min, _bounds.max);
+
+        public readonly ImmutableArray<T> elements;
 
         private readonly BoundingBox3D _bounds;
         private readonly ElementData[] _elementData;
@@ -220,388 +220,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             _head = head;
             _bounds = _head.boundary;
-        }
-
-        private void CollectElementIndicesInBounds(BoundingBox3D bounds, List<int> indices)
-        {
-            indices.Clear();
-            if (_head._count == 0)
-            {
-                return;
-            }
-
-            if (!bounds.Intersects(_bounds))
-            {
-                return;
-            }
-
-            using PooledResource<Stack<RTreeNode>> nodeBufferResource =
-                Buffers<RTreeNode>.Stack.Get(out Stack<RTreeNode> nodesToVisit);
-            nodesToVisit.Push(_head);
-
-            while (nodesToVisit.TryPop(out RTreeNode currentNode))
-            {
-                if (!bounds.Intersects(currentNode.boundary))
-                {
-                    continue;
-                }
-
-                if (currentNode.isTerminal)
-                {
-                    int start = currentNode._startIndex;
-                    int end = start + currentNode._count;
-                    for (int i = start; i < end; ++i)
-                    {
-                        ElementData elementData = _elementData[i];
-                        if (bounds.Intersects(elementData._bounds))
-                        {
-                            indices.Add(i);
-                        }
-                    }
-
-                    continue;
-                }
-
-                RTreeNode[] childNodes = currentNode._children;
-                foreach (RTreeNode child in childNodes)
-                {
-                    if (child._count <= 0)
-                    {
-                        continue;
-                    }
-
-                    if (!bounds.Intersects(child.boundary))
-                    {
-                        continue;
-                    }
-
-                    nodesToVisit.Push(child);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Finds all elements whose bounds fall within distance <paramref name="range"/> of
-        /// <paramref name="position"/> (sphere query).
-        /// </summary>
-        /// <param name="position">Query center. A non-finite center returns no results.</param>
-        /// <param name="range">Query radius, measured to the nearest point of an element's box, so
-        /// zero returns exactly the elements whose box the query point touches. A negative or NaN
-        /// radius returns nothing. The comparison is exact: no epsilon widens the sphere, because an
-        /// absolute epsilon is most of a zero-radius query and nothing at all at world scale.</param>
-        /// <param name="elementsInRange">Destination list, cleared exactly once before use.</param>
-        /// <param name="minimumRange">Optional inner exclusion radius, compared the same way.</param>
-        /// <returns>The destination list, for chaining.</returns>
-        /// <exception cref="ArgumentNullException">Thrown when <paramref name="elementsInRange"/> is null.</exception>
-        public List<T> GetElementsInRange(
-            Vector3 position,
-            float range,
-            List<T> elementsInRange,
-            float minimumRange = 0f
-        )
-        {
-            if (elementsInRange == null)
-            {
-                throw new ArgumentNullException(nameof(elementsInRange));
-            }
-
-            elementsInRange.Clear();
-            if (float.IsNaN(range) || range < 0f || !SpatialQueryMath.IsFinite(position))
-            {
-                return elementsInRange;
-            }
-
-            // Include points exactly on the positive range boundary.
-            BoundingBox3D queryBounds = BoundingBox3D.FromClosedBoundsInclusiveMax(
-                new Bounds(position, new Vector3(range * 2f, range * 2f, range * 2f))
-            );
-
-            if (!queryBounds.Intersects(_bounds))
-            {
-                return elementsInRange;
-            }
-
-            using PooledResource<List<int>> candidateIndicesResource = Buffers<int>.List.Get(
-                out List<int> candidateIndices
-            );
-            CollectElementIndicesInBounds(queryBounds, candidateIndices);
-            if (candidateIndices.Count == 0)
-            {
-                return elementsInRange;
-            }
-
-            float rangeSquared = range * range;
-            bool hasMinimumRange = 0f < minimumRange;
-            float minimumRangeSquared = minimumRange * minimumRange;
-            bool exactComparison =
-                SpatialQueryMath.SquareSaturates(range)
-                || (hasMinimumRange && SpatialQueryMath.SquareSaturates(minimumRange));
-            double exactRangeSquared = (double)range * range;
-            double exactMinimumRangeSquared = (double)minimumRange * minimumRange;
-
-            foreach (int index in candidateIndices)
-            {
-                ElementData elementData = _elementData[index];
-                if (exactComparison)
-                {
-                    double exactDistance = SpatialQueryMath.DistanceSquaredToBox(
-                        elementData._bounds.min,
-                        elementData._closedMaximum,
-                        position
-                    );
-                    if (!(exactDistance <= exactRangeSquared))
-                    {
-                        continue;
-                    }
-
-                    if (hasMinimumRange && exactDistance <= exactMinimumRangeSquared)
-                    {
-                        continue;
-                    }
-
-                    elementsInRange.Add(elementData._value);
-                    continue;
-                }
-
-                float distanceSquared = (float)
-                    SpatialQueryMath.DistanceSquaredToBox(
-                        elementData._bounds.min,
-                        elementData._closedMaximum,
-                        position
-                    );
-                if (!(distanceSquared <= rangeSquared))
-                {
-                    continue;
-                }
-
-                if (hasMinimumRange && distanceSquared <= minimumRangeSquared)
-                {
-                    continue;
-                }
-
-                elementsInRange.Add(elementData._value);
-            }
-
-            return elementsInRange;
-        }
-
-        /// <summary>
-        /// Finds all elements whose bounds intersect the specified axis-aligned box.
-        /// </summary>
-        /// <param name="bounds">Axis-aligned query bounds. The max face is inclusive, matching
-        /// <see cref="KdTree3D{T}"/> and <see cref="OctTree3D{T}"/>, so a zero-size box finds every
-        /// element touching it -- including an element built from a zero-size
-        /// <see cref="Bounds"/>, whose extent is that point. A box with a NaN edge returns
-        /// nothing.</param>
-        /// <param name="elementsInBounds">Destination list, cleared exactly once before use.</param>
-        /// <returns>The destination list, for chaining.</returns>
-        /// <remarks>An element straddling the query boundary is returned, matching
-        /// <see cref="RTree2D{T}"/> and this tree's own
-        /// <see cref="GetElementsInRange(UnityEngine.Vector3,float,System.Collections.Generic.List{T},float)"/>,
-        /// which measures to the element's box rather than its center. For the partitioning
-        /// semantics that assign each element to exactly one region, use
-        /// <see cref="GetElementsWithCentersInBounds"/>.</remarks>
-        /// <exception cref="ArgumentNullException">Thrown when <paramref name="elementsInBounds"/> is null.</exception>
-        public List<T> GetElementsInBounds(Bounds bounds, List<T> elementsInBounds)
-        {
-            return CollectElementsInBounds(bounds, elementsInBounds, centersOnly: false);
-        }
-
-        /// <summary>
-        /// Finds all elements whose <see cref="Bounds.center"/> lies inside the specified
-        /// axis-aligned box.
-        /// </summary>
-        /// <param name="bounds">Axis-aligned query bounds. The max face is inclusive, so a zero-size
-        /// box finds every element whose center is exactly on it. A box with a NaN edge returns
-        /// nothing.</param>
-        /// <param name="elementsWithCentersInBounds">Destination list, cleared exactly once before use.</param>
-        /// <returns>The destination list, for chaining.</returns>
-        /// <remarks>Each element belongs to exactly one region of a tiling, so a sweep over
-        /// adjacent boxes visits it once. That is the opposite trade to
-        /// <see cref="GetElementsInBounds"/>, which never omits an element that touches the
-        /// box.</remarks>
-        /// <exception cref="ArgumentNullException">Thrown when
-        /// <paramref name="elementsWithCentersInBounds"/> is null.</exception>
-        public List<T> GetElementsWithCentersInBounds(
-            Bounds bounds,
-            List<T> elementsWithCentersInBounds
-        )
-        {
-            return CollectElementsInBounds(bounds, elementsWithCentersInBounds, centersOnly: true);
-        }
-
-        private List<T> CollectElementsInBounds(
-            Bounds bounds,
-            List<T> elementsInBounds,
-            bool centersOnly
-        )
-        {
-            if (elementsInBounds == null)
-            {
-                throw new ArgumentNullException(nameof(elementsInBounds));
-            }
-
-            elementsInBounds.Clear();
-            if (SpatialQueryMath.IsInvalidQueryBounds(bounds))
-            {
-                return elementsInBounds;
-            }
-
-            BoundingBox3D queryBounds = BoundingBox3D.FromClosedBoundsInclusiveMax(bounds);
-            if (!queryBounds.Intersects(_bounds))
-            {
-                return elementsInBounds;
-            }
-
-            using PooledResource<List<int>> indicesResource = Buffers<int>.List.Get(
-                out List<int> indices
-            );
-            CollectElementIndicesInBounds(queryBounds, indices);
-            foreach (int index in indices)
-            {
-                ElementData elementData = _elementData[index];
-                if (centersOnly && !queryBounds.Contains(elementData._center))
-                {
-                    continue;
-                }
-
-                elementsInBounds.Add(elementData._value);
-            }
-
-            return elementsInBounds;
-        }
-
-        /// <summary>
-        /// Returns an approximate set of the nearest <paramref name="count"/> neighbors to <paramref name="position"/>.
-        /// </summary>
-        /// <param name="position">Query center. A non-finite center returns no results.</param>
-        /// <param name="count">How many neighbors with non-NaN distances to return. Zero or fewer returns nothing.</param>
-        /// <param name="nearestNeighbors">Destination list, cleared exactly once before use.</param>
-        /// <returns>The destination list, for chaining.</returns>
-        /// <remarks>
-        /// <para>Returns exactly <c>min(count, eligibleElementCount)</c> entries, excluding NaN distances.
-        /// Equal-valued elements stay
-        /// distinct: identity is the element's insertion index, not its value. What comes back is
-        /// ordered by ascending distance and then by ascending insertion index.</para>
-        /// <para><b>Which</b> equidistant elements come back is a separate question, and it is not
-        /// specified. This tree admits a candidate only when it is strictly closer than the current
-        /// worst, so among equidistant elements the one the traversal reaches first wins -- for an
-        /// R-tree that is Morton-curve order, which no caller should depend on. The
-        /// collect-then-sort trees (<see cref="KdTree3D{T}"/>) resolve the same tie the other way,
-        /// by lowest insertion index among whatever the descent visited.</para>
-        /// <para><b>Cost:</b> a best-first descent, keyed on each node's distance to
-        /// <paramref name="position"/>, that stops once <paramref name="count"/> candidates are held
-        /// and the nearest unexpanded node is no closer than the worst of them. That makes the
-        /// answer exact for the elements it indexes, and it makes a <paramref name="count"/> near
-        /// the element count visit every leaf.</para>
-        /// </remarks>
-        /// <exception cref="ArgumentNullException">Thrown when <paramref name="nearestNeighbors"/> is null.</exception>
-        public List<T> GetApproximateNearestNeighbors(
-            Vector3 position,
-            int count,
-            List<T> nearestNeighbors
-        )
-        {
-            if (nearestNeighbors == null)
-            {
-                throw new ArgumentNullException(nameof(nearestNeighbors));
-            }
-
-            nearestNeighbors.Clear();
-            if (count <= 0 || _head._count == 0 || !SpatialQueryMath.IsFinite(position))
-            {
-                return nearestNeighbors;
-            }
-
-            using PooledResource<List<NodeDistance>> nodeHeapResource =
-                Buffers<NodeDistance>.List.Get(out List<NodeDistance> nodeHeap);
-            PushNode(nodeHeap, _head, position);
-
-            using PooledResource<List<Candidate>> candidateBufferResource =
-                Buffers<Candidate>.List.Get(out List<Candidate> candidates);
-            double currentWorstDistanceSquared = float.PositiveInfinity;
-
-            while (0 < nodeHeap.Count)
-            {
-                NodeDistance best = PopNode(nodeHeap);
-
-                if (
-                    count <= candidates.Count
-                    && currentWorstDistanceSquared <= best._distanceSquared
-                )
-                {
-                    break;
-                }
-
-                RTreeNode currentNode = best._node;
-                if (!currentNode.isTerminal)
-                {
-                    RTreeNode[] childNodes = currentNode._children;
-                    foreach (RTreeNode child in childNodes)
-                    {
-                        if (0 < child._count)
-                        {
-                            PushNode(nodeHeap, child, position);
-                        }
-                    }
-                    continue;
-                }
-
-                int startIndex = currentNode._startIndex;
-                int endIndex = startIndex + currentNode._count;
-                for (int i = startIndex; i < endIndex; ++i)
-                {
-                    ElementData elementData = _elementData[i];
-                    double distanceSquared = SpatialQueryMath.DistanceSquared(
-                        elementData._center,
-                        position
-                    );
-                    if (!(0f <= distanceSquared))
-                    {
-                        continue;
-                    }
-
-                    if (candidates.Count < count)
-                    {
-                        candidates.Add(
-                            new Candidate(i, elementData._insertionIndex, distanceSquared)
-                        );
-                        if (candidates.Count == count)
-                        {
-                            currentWorstDistanceSquared = FindWorstDistance(candidates);
-                        }
-
-                        continue;
-                    }
-
-                    if (currentWorstDistanceSquared <= distanceSquared)
-                    {
-                        continue;
-                    }
-
-                    int worstCandidateIndex = FindIndexOfWorstCandidate(candidates);
-                    candidates[worstCandidateIndex] = new Candidate(
-                        i,
-                        elementData._insertionIndex,
-                        distanceSquared
-                    );
-
-                    currentWorstDistanceSquared = FindWorstDistance(candidates);
-                }
-            }
-
-            if (candidates.Count == 0)
-            {
-                return nearestNeighbors;
-            }
-
-            candidates.Sort(CandidateComparer.Instance);
-            int resultCount = Math.Min(count, candidates.Count);
-            for (int i = 0; i < resultCount; ++i)
-            {
-                nearestNeighbors.Add(_elementData[candidates[i].elementIndex]._value);
-            }
-            return nearestNeighbors;
         }
 
         private static void PushNode(List<NodeDistance> heap, RTreeNode node, Vector3 point)
@@ -872,6 +490,388 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return value;
         }
 
+        /// <summary>
+        /// Finds all elements whose bounds fall within distance <paramref name="range"/> of
+        /// <paramref name="position"/> (sphere query).
+        /// </summary>
+        /// <param name="position">Query center. A non-finite center returns no results.</param>
+        /// <param name="range">Query radius, measured to the nearest point of an element's box, so
+        /// zero returns exactly the elements whose box the query point touches. A negative or NaN
+        /// radius returns nothing. The comparison is exact: no epsilon widens the sphere, because an
+        /// absolute epsilon is most of a zero-radius query and nothing at all at world scale.</param>
+        /// <param name="elementsInRange">Destination list, cleared exactly once before use.</param>
+        /// <param name="minimumRange">Optional inner exclusion radius, compared the same way.</param>
+        /// <returns>The destination list, for chaining.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="elementsInRange"/> is null.</exception>
+        public List<T> GetElementsInRange(
+            Vector3 position,
+            float range,
+            List<T> elementsInRange,
+            float minimumRange = 0f
+        )
+        {
+            if (elementsInRange == null)
+            {
+                throw new ArgumentNullException(nameof(elementsInRange));
+            }
+
+            elementsInRange.Clear();
+            if (float.IsNaN(range) || range < 0f || !SpatialQueryMath.IsFinite(position))
+            {
+                return elementsInRange;
+            }
+
+            // Include points exactly on the positive range boundary.
+            BoundingBox3D queryBounds = BoundingBox3D.FromClosedBoundsInclusiveMax(
+                new Bounds(position, new Vector3(range * 2f, range * 2f, range * 2f))
+            );
+
+            if (!queryBounds.Intersects(_bounds))
+            {
+                return elementsInRange;
+            }
+
+            using PooledResource<List<int>> candidateIndicesResource = Buffers<int>.List.Get(
+                out List<int> candidateIndices
+            );
+            CollectElementIndicesInBounds(queryBounds, candidateIndices);
+            if (candidateIndices.Count == 0)
+            {
+                return elementsInRange;
+            }
+
+            float rangeSquared = range * range;
+            bool hasMinimumRange = 0f < minimumRange;
+            float minimumRangeSquared = minimumRange * minimumRange;
+            bool exactComparison =
+                SpatialQueryMath.SquareSaturates(range)
+                || (hasMinimumRange && SpatialQueryMath.SquareSaturates(minimumRange));
+            double exactRangeSquared = (double)range * range;
+            double exactMinimumRangeSquared = (double)minimumRange * minimumRange;
+
+            foreach (int index in candidateIndices)
+            {
+                ElementData elementData = _elementData[index];
+                if (exactComparison)
+                {
+                    double exactDistance = SpatialQueryMath.DistanceSquaredToBox(
+                        elementData._bounds.min,
+                        elementData._closedMaximum,
+                        position
+                    );
+                    if (!(exactDistance <= exactRangeSquared))
+                    {
+                        continue;
+                    }
+
+                    if (hasMinimumRange && exactDistance <= exactMinimumRangeSquared)
+                    {
+                        continue;
+                    }
+
+                    elementsInRange.Add(elementData._value);
+                    continue;
+                }
+
+                float distanceSquared = (float)
+                    SpatialQueryMath.DistanceSquaredToBox(
+                        elementData._bounds.min,
+                        elementData._closedMaximum,
+                        position
+                    );
+                if (!(distanceSquared <= rangeSquared))
+                {
+                    continue;
+                }
+
+                if (hasMinimumRange && distanceSquared <= minimumRangeSquared)
+                {
+                    continue;
+                }
+
+                elementsInRange.Add(elementData._value);
+            }
+
+            return elementsInRange;
+        }
+
+        /// <summary>
+        /// Finds all elements whose bounds intersect the specified axis-aligned box.
+        /// </summary>
+        /// <param name="bounds">Axis-aligned query bounds. The max face is inclusive, matching
+        /// <see cref="KdTree3D{T}"/> and <see cref="OctTree3D{T}"/>, so a zero-size box finds every
+        /// element touching it -- including an element built from a zero-size
+        /// <see cref="Bounds"/>, whose extent is that point. A box with a NaN edge returns
+        /// nothing.</param>
+        /// <param name="elementsInBounds">Destination list, cleared exactly once before use.</param>
+        /// <returns>The destination list, for chaining.</returns>
+        /// <remarks>An element straddling the query boundary is returned, matching
+        /// <see cref="RTree2D{T}"/> and this tree's own
+        /// <see cref="GetElementsInRange(UnityEngine.Vector3,float,System.Collections.Generic.List{T},float)"/>,
+        /// which measures to the element's box rather than its center. For the partitioning
+        /// semantics that assign each element to exactly one region, use
+        /// <see cref="GetElementsWithCentersInBounds"/>.</remarks>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="elementsInBounds"/> is null.</exception>
+        public List<T> GetElementsInBounds(Bounds bounds, List<T> elementsInBounds)
+        {
+            return CollectElementsInBounds(bounds, elementsInBounds, centersOnly: false);
+        }
+
+        /// <summary>
+        /// Finds all elements whose <see cref="Bounds.center"/> lies inside the specified
+        /// axis-aligned box.
+        /// </summary>
+        /// <param name="bounds">Axis-aligned query bounds. The max face is inclusive, so a zero-size
+        /// box finds every element whose center is exactly on it. A box with a NaN edge returns
+        /// nothing.</param>
+        /// <param name="elementsWithCentersInBounds">Destination list, cleared exactly once before use.</param>
+        /// <returns>The destination list, for chaining.</returns>
+        /// <remarks>Each element belongs to exactly one region of a tiling, so a sweep over
+        /// adjacent boxes visits it once. That is the opposite trade to
+        /// <see cref="GetElementsInBounds"/>, which never omits an element that touches the
+        /// box.</remarks>
+        /// <exception cref="ArgumentNullException">Thrown when
+        /// <paramref name="elementsWithCentersInBounds"/> is null.</exception>
+        public List<T> GetElementsWithCentersInBounds(
+            Bounds bounds,
+            List<T> elementsWithCentersInBounds
+        )
+        {
+            return CollectElementsInBounds(bounds, elementsWithCentersInBounds, centersOnly: true);
+        }
+
+        /// <summary>
+        /// Returns an approximate set of the nearest <paramref name="count"/> neighbors to <paramref name="position"/>.
+        /// </summary>
+        /// <param name="position">Query center. A non-finite center returns no results.</param>
+        /// <param name="count">How many neighbors with non-NaN distances to return. Zero or fewer returns nothing.</param>
+        /// <param name="nearestNeighbors">Destination list, cleared exactly once before use.</param>
+        /// <returns>The destination list, for chaining.</returns>
+        /// <remarks>
+        /// <para>Returns exactly <c>min(count, eligibleElementCount)</c> entries, excluding NaN distances.
+        /// Equal-valued elements stay
+        /// distinct: identity is the element's insertion index, not its value. What comes back is
+        /// ordered by ascending distance and then by ascending insertion index.</para>
+        /// <para><b>Which</b> equidistant elements come back is a separate question, and it is not
+        /// specified. This tree admits a candidate only when it is strictly closer than the current
+        /// worst, so among equidistant elements the one the traversal reaches first wins -- for an
+        /// R-tree that is Morton-curve order, which no caller should depend on. The
+        /// collect-then-sort trees (<see cref="KdTree3D{T}"/>) resolve the same tie the other way,
+        /// by lowest insertion index among whatever the descent visited.</para>
+        /// <para><b>Cost:</b> a best-first descent, keyed on each node's distance to
+        /// <paramref name="position"/>, that stops once <paramref name="count"/> candidates are held
+        /// and the nearest unexpanded node is no closer than the worst of them. That makes the
+        /// answer exact for the elements it indexes, and it makes a <paramref name="count"/> near
+        /// the element count visit every leaf.</para>
+        /// </remarks>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="nearestNeighbors"/> is null.</exception>
+        public List<T> GetApproximateNearestNeighbors(
+            Vector3 position,
+            int count,
+            List<T> nearestNeighbors
+        )
+        {
+            if (nearestNeighbors == null)
+            {
+                throw new ArgumentNullException(nameof(nearestNeighbors));
+            }
+
+            nearestNeighbors.Clear();
+            if (count <= 0 || _head._count == 0 || !SpatialQueryMath.IsFinite(position))
+            {
+                return nearestNeighbors;
+            }
+
+            using PooledResource<List<NodeDistance>> nodeHeapResource =
+                Buffers<NodeDistance>.List.Get(out List<NodeDistance> nodeHeap);
+            PushNode(nodeHeap, _head, position);
+
+            using PooledResource<List<Candidate>> candidateBufferResource =
+                Buffers<Candidate>.List.Get(out List<Candidate> candidates);
+            double currentWorstDistanceSquared = float.PositiveInfinity;
+
+            while (0 < nodeHeap.Count)
+            {
+                NodeDistance best = PopNode(nodeHeap);
+
+                if (
+                    count <= candidates.Count
+                    && currentWorstDistanceSquared <= best._distanceSquared
+                )
+                {
+                    break;
+                }
+
+                RTreeNode currentNode = best._node;
+                if (!currentNode.isTerminal)
+                {
+                    RTreeNode[] childNodes = currentNode._children;
+                    foreach (RTreeNode child in childNodes)
+                    {
+                        if (0 < child._count)
+                        {
+                            PushNode(nodeHeap, child, position);
+                        }
+                    }
+                    continue;
+                }
+
+                int startIndex = currentNode._startIndex;
+                int endIndex = startIndex + currentNode._count;
+                for (int i = startIndex; i < endIndex; ++i)
+                {
+                    ElementData elementData = _elementData[i];
+                    double distanceSquared = SpatialQueryMath.DistanceSquared(
+                        elementData._center,
+                        position
+                    );
+                    if (!(0f <= distanceSquared))
+                    {
+                        continue;
+                    }
+
+                    if (candidates.Count < count)
+                    {
+                        candidates.Add(
+                            new Candidate(i, elementData._insertionIndex, distanceSquared)
+                        );
+                        if (candidates.Count == count)
+                        {
+                            currentWorstDistanceSquared = FindWorstDistance(candidates);
+                        }
+
+                        continue;
+                    }
+
+                    if (currentWorstDistanceSquared <= distanceSquared)
+                    {
+                        continue;
+                    }
+
+                    int worstCandidateIndex = FindIndexOfWorstCandidate(candidates);
+                    candidates[worstCandidateIndex] = new Candidate(
+                        i,
+                        elementData._insertionIndex,
+                        distanceSquared
+                    );
+
+                    currentWorstDistanceSquared = FindWorstDistance(candidates);
+                }
+            }
+
+            if (candidates.Count == 0)
+            {
+                return nearestNeighbors;
+            }
+
+            candidates.Sort(CandidateComparer.Instance);
+            int resultCount = Math.Min(count, candidates.Count);
+            for (int i = 0; i < resultCount; ++i)
+            {
+                nearestNeighbors.Add(_elementData[candidates[i].elementIndex]._value);
+            }
+            return nearestNeighbors;
+        }
+
+        private void CollectElementIndicesInBounds(BoundingBox3D bounds, List<int> indices)
+        {
+            indices.Clear();
+            if (_head._count == 0)
+            {
+                return;
+            }
+
+            if (!bounds.Intersects(_bounds))
+            {
+                return;
+            }
+
+            using PooledResource<Stack<RTreeNode>> nodeBufferResource =
+                Buffers<RTreeNode>.Stack.Get(out Stack<RTreeNode> nodesToVisit);
+            nodesToVisit.Push(_head);
+
+            while (nodesToVisit.TryPop(out RTreeNode currentNode))
+            {
+                if (!bounds.Intersects(currentNode.boundary))
+                {
+                    continue;
+                }
+
+                if (currentNode.isTerminal)
+                {
+                    int start = currentNode._startIndex;
+                    int end = start + currentNode._count;
+                    for (int i = start; i < end; ++i)
+                    {
+                        ElementData elementData = _elementData[i];
+                        if (bounds.Intersects(elementData._bounds))
+                        {
+                            indices.Add(i);
+                        }
+                    }
+
+                    continue;
+                }
+
+                RTreeNode[] childNodes = currentNode._children;
+                foreach (RTreeNode child in childNodes)
+                {
+                    if (child._count <= 0)
+                    {
+                        continue;
+                    }
+
+                    if (!bounds.Intersects(child.boundary))
+                    {
+                        continue;
+                    }
+
+                    nodesToVisit.Push(child);
+                }
+            }
+        }
+
+        private List<T> CollectElementsInBounds(
+            Bounds bounds,
+            List<T> elementsInBounds,
+            bool centersOnly
+        )
+        {
+            if (elementsInBounds == null)
+            {
+                throw new ArgumentNullException(nameof(elementsInBounds));
+            }
+
+            elementsInBounds.Clear();
+            if (SpatialQueryMath.IsInvalidQueryBounds(bounds))
+            {
+                return elementsInBounds;
+            }
+
+            BoundingBox3D queryBounds = BoundingBox3D.FromClosedBoundsInclusiveMax(bounds);
+            if (!queryBounds.Intersects(_bounds))
+            {
+                return elementsInBounds;
+            }
+
+            using PooledResource<List<int>> indicesResource = Buffers<int>.List.Get(
+                out List<int> indices
+            );
+            CollectElementIndicesInBounds(queryBounds, indices);
+            foreach (int index in indices)
+            {
+                ElementData elementData = _elementData[index];
+                if (centersOnly && !queryBounds.Contains(elementData._center))
+                {
+                    continue;
+                }
+
+                elementsInBounds.Add(elementData._value);
+            }
+
+            return elementsInBounds;
+        }
+
         [Serializable]
         internal struct ElementData
         {
@@ -889,10 +889,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         public sealed class RTreeNode
         {
             public readonly BoundingBox3D boundary;
+            public readonly bool isTerminal;
             internal readonly RTreeNode[] _children;
             internal readonly int _startIndex;
             internal readonly int _count;
-            public readonly bool isTerminal;
 
             private RTreeNode(
                 int startIndex,

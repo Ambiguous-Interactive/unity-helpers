@@ -47,7 +47,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     {
         private const string ScriptPropertyPath = "m_Script";
 
+        private const string NewAtlasConfigDirectory = "Assets/Data";
+
         private static bool SuppressUserPrompts { get; set; }
+
+        private readonly Dictionary<ScriptableSpriteAtlas, SerializedObject> _serializedConfigs =
+            new();
+        private List<ScriptableSpriteAtlas> _atlasConfigs = new();
+        private Vector2 _scrollPosition;
+        private bool _packAfterGenerate;
+
+        private readonly Dictionary<ScriptableSpriteAtlas, ScanResult> _scanResultsCache = new();
+        private readonly Dictionary<ScriptableSpriteAtlas, bool> _foldoutStates = new();
 
         static ScriptableSpriteAtlasEditor()
         {
@@ -59,6 +70,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
             catch { }
+        }
+
+        [MenuItem("Tools/Wallstop Studios/Unity Helpers/Sprite Atlas Generator")]
+        public static void ShowWindow()
+        {
+            GetWindow<ScriptableSpriteAtlasEditor>("Sprite Atlas Generator");
         }
 
         private static bool IsInvokedByTestRunner()
@@ -78,48 +95,171 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             return false;
         }
 
-        private readonly Dictionary<ScriptableSpriteAtlas, SerializedObject> _serializedConfigs =
-            new();
-        private List<ScriptableSpriteAtlas> _atlasConfigs = new();
-        private Vector2 _scrollPosition;
-        private bool _packAfterGenerate;
-
-        private readonly Dictionary<ScriptableSpriteAtlas, ScanResult> _scanResultsCache = new();
-        private readonly Dictionary<ScriptableSpriteAtlas, bool> _foldoutStates = new();
-
-        private const string NewAtlasConfigDirectory = "Assets/Data";
-
-        [MenuItem("Tools/Wallstop Studios/Unity Helpers/Sprite Atlas Generator")]
-        public static void ShowWindow()
+        private static void AppendNonEmptyStrings(
+            IReadOnlyList<string> source,
+            List<string> destination
+        )
         {
-            GetWindow<ScriptableSpriteAtlasEditor>("Sprite Atlas Generator");
-        }
-
-        private void OnEnable()
-        {
-            LoadAtlasConfigs();
-        }
-
-        private void OnProjectChange()
-        {
-            LoadAtlasConfigs();
-        }
-
-        private void OnDisable()
-        {
-            ReleaseSerializedConfigs();
-            _atlasConfigs.Clear();
-            _scanResultsCache.Clear();
-            _foldoutStates.Clear();
-        }
-
-        private void ReleaseSerializedConfigs()
-        {
-            foreach (SerializedObject serialized in _serializedConfigs.Values)
+            if (source == null || destination == null)
             {
-                serialized?.Dispose();
+                return;
             }
-            _serializedConfigs.Clear();
+
+            for (int i = 0; i < source.Count; ++i)
+            {
+                string value = source[i];
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    destination.Add(value);
+                }
+            }
+        }
+
+        private static void AppendSanitizedPrefixes(
+            IReadOnlyList<string> source,
+            List<string> destination
+        )
+        {
+            if (source == null || destination == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < source.Count; ++i)
+            {
+                string prefix = source[i];
+                if (string.IsNullOrWhiteSpace(prefix))
+                {
+                    continue;
+                }
+
+                destination.Add(prefix.SanitizePath());
+            }
+        }
+
+        private static bool MatchesLabelRule(
+            IReadOnlyList<string> configuredLabels,
+            LabelSelectionMode selectionMode,
+            IReadOnlyList<string> assetLabels
+        )
+        {
+            if (configuredLabels == null || configuredLabels.Count == 0)
+            {
+                return true;
+            }
+
+            if (assetLabels == null || assetLabels.Count == 0)
+            {
+                return false;
+            }
+
+            switch (selectionMode)
+            {
+                case LabelSelectionMode.All:
+                {
+                    for (int i = 0; i < configuredLabels.Count; ++i)
+                    {
+                        if (!AssetLabelsContain(assetLabels, configuredLabels[i]))
+                        {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+                case LabelSelectionMode.AnyOf:
+                {
+                    for (int i = 0; i < configuredLabels.Count; ++i)
+                    {
+                        if (AssetLabelsContain(assetLabels, configuredLabels[i]))
+                        {
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+                default:
+                    return false;
+            }
+        }
+
+        private static bool AssetLabelsContain(IReadOnlyList<string> assetLabels, string label)
+        {
+            if (assetLabels == null || assetLabels.Count == 0 || string.IsNullOrWhiteSpace(label))
+            {
+                return false;
+            }
+
+            for (int i = 0; i < assetLabels.Count; ++i)
+            {
+                if (string.Equals(assetLabels[i], label, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsValidLabelSelectionMode(LabelSelectionMode mode)
+        {
+            return mode == LabelSelectionMode.All || mode == LabelSelectionMode.AnyOf;
+        }
+
+        private static string[] LoadAssetLabels(string assetPath)
+        {
+            Object mainAsset = AssetDatabase.LoadMainAssetAtPath(assetPath);
+            if (mainAsset == null)
+            {
+                return Array.Empty<string>();
+            }
+
+            string[] labels = AssetDatabase.GetLabels(mainAsset);
+            return labels ?? Array.Empty<string>();
+        }
+
+        private static void ApplyPlatformSettings(
+            SpriteAtlas atlas,
+            string platformName,
+            int maxTextureSize,
+            TextureImporterCompression compression,
+            bool useCrunch,
+            int crunchLevel
+        )
+        {
+            TextureImporterPlatformSettings ps = atlas.GetPlatformSettings(platformName);
+            if (string.IsNullOrWhiteSpace(ps.name))
+            {
+                ps.name = platformName;
+            }
+            ps.overridden = true;
+            ps.maxTextureSize = maxTextureSize;
+            ps.textureCompression = compression;
+            ps.crunchedCompression = useCrunch;
+            ps.compressionQuality = Mathf.Clamp(crunchLevel, 0, 100);
+            atlas.SetPlatformSettings(ps);
+        }
+
+        private static void PingAtlas(string outputPath)
+        {
+            if (string.IsNullOrWhiteSpace(outputPath))
+            {
+                return;
+            }
+            Object obj = AssetDatabase.LoadAssetAtPath<Object>(outputPath);
+            if (obj != null)
+            {
+                Selection.activeObject = obj;
+                EditorGUIUtility.PingObject(obj);
+            }
+        }
+
+        private static void RevealInExplorer(string outputPath)
+        {
+            if (string.IsNullOrWhiteSpace(outputPath))
+            {
+                return;
+            }
+            EditorUtility.RevealInFinder(outputPath);
         }
 
         internal SerializedObject GetSerializedConfig(ScriptableSpriteAtlas config)
@@ -180,6 +320,254 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     _ = _foldoutStates.Remove(config);
                 }
             }
+        }
+
+        internal void GenerateAllAtlases()
+        {
+            if (_atlasConfigs.Count == 0)
+            {
+                Utils.EditorUi.Info(
+                    "No Configurations",
+                    "No ScriptableSpriteAtlas configurations found to generate."
+                );
+                return;
+            }
+
+            int totalConfigs = _atlasConfigs.Count;
+            int currentConfig = 0;
+
+            try
+            {
+                using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
+                {
+                    foreach (ScriptableSpriteAtlas config in _atlasConfigs)
+                    {
+                        if (config == null)
+                        {
+                            continue;
+                        }
+
+                        currentConfig++;
+                        float progress = (float)currentConfig / totalConfigs;
+                        Utils.EditorUi.ShowProgress(
+                            "Generating Sprite Atlases",
+                            $"Processing: {config.name}",
+                            progress
+                        );
+                        GenerateSingleAtlas(config, false);
+                    }
+                }
+            }
+            finally
+            {
+                Utils.EditorUi.ClearProgress();
+            }
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+        }
+
+        internal void PackAllProjectAtlases()
+        {
+            this.Log(
+                $"Starting to pack all Sprite Atlases in the project for target: {EditorUserBuildSettings.activeBuildTarget}"
+            );
+            SpriteAtlasUtility.PackAllAtlases(EditorUserBuildSettings.activeBuildTarget);
+            this.Log($"Finished packing all Sprite Atlases.");
+            AssetDatabase.Refresh();
+        }
+
+        internal void ForceUncompressedSourceSprites(ScriptableSpriteAtlas config)
+        {
+            if (config == null)
+            {
+                return;
+            }
+
+            List<Sprite> spritesToProcess = config
+                .spritesToPack.Where(s => s != null && s.texture != null)
+                .ToList();
+            if (spritesToProcess.Count == 0)
+            {
+                this.LogWarn(
+                    $"'{config.name}': No valid sprites with textures in the list to modify."
+                );
+                Utils.EditorUi.Info(
+                    "No Sprites",
+                    "No valid sprites found in the configuration's list to process."
+                );
+                return;
+            }
+
+            int modifiedCount = 0;
+            int errorCount = 0;
+            using PooledResource<HashSet<string>> processedAssetPathsLease =
+                Buffers<string>.HashSet.Get(out HashSet<string> processedAssetPaths);
+            using PooledResource<List<TextureImporter>> importersLease =
+                Buffers<TextureImporter>.List.Get(out List<TextureImporter> importers);
+            {
+                try
+                {
+                    using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
+                    {
+                        for (int i = 0; i < spritesToProcess.Count; ++i)
+                        {
+                            Sprite sprite = spritesToProcess[i];
+                            Utils.EditorUi.ShowProgress(
+                                "Modifying Source Sprite Import Settings",
+                                $"Processing: {sprite.name} ({i + 1}/{spritesToProcess.Count})",
+                                (float)(i + 1) / spritesToProcess.Count
+                            );
+
+                            string assetPath = AssetDatabase.GetAssetPath(sprite.texture);
+                            if (string.IsNullOrWhiteSpace(assetPath))
+                            {
+                                this.LogWarn(
+                                    $"Could not find asset path for sprite's texture: {sprite.name}. Skipping."
+                                );
+                                errorCount++;
+                                continue;
+                            }
+
+                            if (!processedAssetPaths.Add(assetPath))
+                            {
+                                continue;
+                            }
+
+                            TextureImporter importer =
+                                AssetImporter.GetAtPath(assetPath) as TextureImporter;
+                            if (importer == null)
+                            {
+                                this.LogWarn(
+                                    $"Could not get TextureImporter for asset: {assetPath} (from sprite: {sprite.name}). Skipping."
+                                );
+                                errorCount++;
+                                continue;
+                            }
+
+                            bool undoRecorded = false;
+                            bool settingsActuallyModified = false;
+
+                            void EnsureUndoRecorded()
+                            {
+                                if (undoRecorded)
+                                {
+                                    return;
+                                }
+                                Undo.RecordObject(importer, "Set Sprite Texture To Uncompressed");
+                                undoRecorded = true;
+                            }
+
+                            if (importer.crunchedCompression)
+                            {
+                                EnsureUndoRecorded();
+                                importer.crunchedCompression = false;
+                                settingsActuallyModified = true;
+                            }
+
+                            if (
+                                importer.textureCompression
+                                != TextureImporterCompression.Uncompressed
+                            )
+                            {
+                                EnsureUndoRecorded();
+                                importer.textureCompression =
+                                    TextureImporterCompression.Uncompressed;
+                                settingsActuallyModified = true;
+                            }
+
+                            TextureImporterPlatformSettings platformSettings =
+                                importer.GetDefaultPlatformTextureSettings();
+                            bool platformSettingsChangedThisTime = false;
+                            TextureImporterFormat targetFormat =
+                                importer.DoesSourceTextureHaveAlpha()
+                                    ? TextureImporterFormat.RGBA32
+                                    : TextureImporterFormat.RGB24;
+
+                            if (platformSettings.format != targetFormat)
+                            {
+                                platformSettings.format = targetFormat;
+                                platformSettingsChangedThisTime = true;
+                            }
+                            if (platformSettings.crunchedCompression)
+                            {
+                                platformSettings.crunchedCompression = false;
+                                platformSettingsChangedThisTime = true;
+                            }
+                            if (platformSettings.compressionQuality != 100)
+                            {
+                                platformSettings.compressionQuality = 100;
+                                platformSettingsChangedThisTime = true;
+                            }
+
+                            if (platformSettingsChangedThisTime || !platformSettings.overridden)
+                            {
+                                EnsureUndoRecorded();
+                                platformSettings.overridden = true;
+                                importer.SetPlatformTextureSettings(platformSettings);
+                                settingsActuallyModified = true;
+                            }
+
+                            if (settingsActuallyModified)
+                            {
+                                importer.SaveAndReimport();
+                                importers.Add(importer);
+                                modifiedCount++;
+                                this.Log(
+                                    $"Set import settings for texture: {assetPath} (from sprite: {sprite.name}) to uncompressed ({targetFormat})."
+                                );
+                            }
+                        }
+                    }
+                }
+                finally
+                {
+                    Utils.EditorUi.ClearProgress();
+                }
+
+                foreach (TextureImporter importer in importers)
+                {
+                    importer.SaveAndReimport();
+                }
+
+                if (0 < modifiedCount || 0 < errorCount)
+                {
+                    AssetDatabase.SaveAssets();
+                    AssetDatabase.Refresh();
+                }
+
+                string summaryMessage =
+                    $"Finished processing source sprite textures for '{config.name}'.\n"
+                    + $"Successfully modified importers for: {modifiedCount} textures.\n"
+                    + $"Errors/Skipped duplicates: {errorCount + (spritesToProcess.Count - processedAssetPaths.Count)}.";
+                this.Log($"{summaryMessage}");
+            }
+        }
+
+        private void OnEnable()
+        {
+            LoadAtlasConfigs();
+        }
+
+        private void OnProjectChange()
+        {
+            LoadAtlasConfigs();
+        }
+
+        private void OnDisable()
+        {
+            ReleaseSerializedConfigs();
+            _atlasConfigs.Clear();
+            _scanResultsCache.Clear();
+            _foldoutStates.Clear();
+        }
+
+        private void ReleaseSerializedConfigs()
+        {
+            foreach (SerializedObject serialized in _serializedConfigs.Values)
+            {
+                serialized?.Dispose();
+            }
+            _serializedConfigs.Clear();
         }
 
         private void OnGUI()
@@ -1130,128 +1518,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
         }
 
-        private static void AppendNonEmptyStrings(
-            IReadOnlyList<string> source,
-            List<string> destination
-        )
-        {
-            if (source == null || destination == null)
-            {
-                return;
-            }
-
-            for (int i = 0; i < source.Count; ++i)
-            {
-                string value = source[i];
-                if (!string.IsNullOrWhiteSpace(value))
-                {
-                    destination.Add(value);
-                }
-            }
-        }
-
-        private static void AppendSanitizedPrefixes(
-            IReadOnlyList<string> source,
-            List<string> destination
-        )
-        {
-            if (source == null || destination == null)
-            {
-                return;
-            }
-
-            for (int i = 0; i < source.Count; ++i)
-            {
-                string prefix = source[i];
-                if (string.IsNullOrWhiteSpace(prefix))
-                {
-                    continue;
-                }
-
-                destination.Add(prefix.SanitizePath());
-            }
-        }
-
-        private static bool MatchesLabelRule(
-            IReadOnlyList<string> configuredLabels,
-            LabelSelectionMode selectionMode,
-            IReadOnlyList<string> assetLabels
-        )
-        {
-            if (configuredLabels == null || configuredLabels.Count == 0)
-            {
-                return true;
-            }
-
-            if (assetLabels == null || assetLabels.Count == 0)
-            {
-                return false;
-            }
-
-            switch (selectionMode)
-            {
-                case LabelSelectionMode.All:
-                {
-                    for (int i = 0; i < configuredLabels.Count; ++i)
-                    {
-                        if (!AssetLabelsContain(assetLabels, configuredLabels[i]))
-                        {
-                            return false;
-                        }
-                    }
-                    return true;
-                }
-                case LabelSelectionMode.AnyOf:
-                {
-                    for (int i = 0; i < configuredLabels.Count; ++i)
-                    {
-                        if (AssetLabelsContain(assetLabels, configuredLabels[i]))
-                        {
-                            return true;
-                        }
-                    }
-                    return false;
-                }
-                default:
-                    return false;
-            }
-        }
-
-        private static bool AssetLabelsContain(IReadOnlyList<string> assetLabels, string label)
-        {
-            if (assetLabels == null || assetLabels.Count == 0 || string.IsNullOrWhiteSpace(label))
-            {
-                return false;
-            }
-
-            for (int i = 0; i < assetLabels.Count; ++i)
-            {
-                if (string.Equals(assetLabels[i], label, StringComparison.Ordinal))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool IsValidLabelSelectionMode(LabelSelectionMode mode)
-        {
-            return mode == LabelSelectionMode.All || mode == LabelSelectionMode.AnyOf;
-        }
-
-        private static string[] LoadAssetLabels(string assetPath)
-        {
-            Object mainAsset = AssetDatabase.LoadMainAssetAtPath(assetPath);
-            if (mainAsset == null)
-            {
-                return Array.Empty<string>();
-            }
-
-            string[] labels = AssetDatabase.GetLabels(mainAsset);
-            return labels ?? Array.Empty<string>();
-        }
-
         private void AddScannedSprites(ScriptableSpriteAtlas config, ScanResult result)
         {
             if (result.spritesToAdd.Count <= 0)
@@ -1346,50 +1612,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             result.spritesToRemove.Clear();
             ScanFoldersForConfig(config);
             Repaint();
-        }
-
-        internal void GenerateAllAtlases()
-        {
-            if (_atlasConfigs.Count == 0)
-            {
-                Utils.EditorUi.Info(
-                    "No Configurations",
-                    "No ScriptableSpriteAtlas configurations found to generate."
-                );
-                return;
-            }
-
-            int totalConfigs = _atlasConfigs.Count;
-            int currentConfig = 0;
-
-            try
-            {
-                using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
-                {
-                    foreach (ScriptableSpriteAtlas config in _atlasConfigs)
-                    {
-                        if (config == null)
-                        {
-                            continue;
-                        }
-
-                        currentConfig++;
-                        float progress = (float)currentConfig / totalConfigs;
-                        Utils.EditorUi.ShowProgress(
-                            "Generating Sprite Atlases",
-                            $"Processing: {config.name}",
-                            progress
-                        );
-                        GenerateSingleAtlas(config, false);
-                    }
-                }
-            }
-            finally
-            {
-                Utils.EditorUi.ClearProgress();
-            }
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
         }
 
         private void GenerateSingleAtlas(
@@ -1531,228 +1753,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             this.Log(
                 $"'{config.name}': Successfully generated/updated at {outputPath}. Sprites included: {config.spritesToPack.Count}."
             );
-        }
-
-        private static void ApplyPlatformSettings(
-            SpriteAtlas atlas,
-            string platformName,
-            int maxTextureSize,
-            TextureImporterCompression compression,
-            bool useCrunch,
-            int crunchLevel
-        )
-        {
-            TextureImporterPlatformSettings ps = atlas.GetPlatformSettings(platformName);
-            if (string.IsNullOrWhiteSpace(ps.name))
-            {
-                ps.name = platformName;
-            }
-            ps.overridden = true;
-            ps.maxTextureSize = maxTextureSize;
-            ps.textureCompression = compression;
-            ps.crunchedCompression = useCrunch;
-            ps.compressionQuality = Mathf.Clamp(crunchLevel, 0, 100);
-            atlas.SetPlatformSettings(ps);
-        }
-
-        internal void PackAllProjectAtlases()
-        {
-            this.Log(
-                $"Starting to pack all Sprite Atlases in the project for target: {EditorUserBuildSettings.activeBuildTarget}"
-            );
-            SpriteAtlasUtility.PackAllAtlases(EditorUserBuildSettings.activeBuildTarget);
-            this.Log($"Finished packing all Sprite Atlases.");
-            AssetDatabase.Refresh();
-        }
-
-        private static void PingAtlas(string outputPath)
-        {
-            if (string.IsNullOrWhiteSpace(outputPath))
-            {
-                return;
-            }
-            Object obj = AssetDatabase.LoadAssetAtPath<Object>(outputPath);
-            if (obj != null)
-            {
-                Selection.activeObject = obj;
-                EditorGUIUtility.PingObject(obj);
-            }
-        }
-
-        private static void RevealInExplorer(string outputPath)
-        {
-            if (string.IsNullOrWhiteSpace(outputPath))
-            {
-                return;
-            }
-            EditorUtility.RevealInFinder(outputPath);
-        }
-
-        internal void ForceUncompressedSourceSprites(ScriptableSpriteAtlas config)
-        {
-            if (config == null)
-            {
-                return;
-            }
-
-            List<Sprite> spritesToProcess = config
-                .spritesToPack.Where(s => s != null && s.texture != null)
-                .ToList();
-            if (spritesToProcess.Count == 0)
-            {
-                this.LogWarn(
-                    $"'{config.name}': No valid sprites with textures in the list to modify."
-                );
-                Utils.EditorUi.Info(
-                    "No Sprites",
-                    "No valid sprites found in the configuration's list to process."
-                );
-                return;
-            }
-
-            int modifiedCount = 0;
-            int errorCount = 0;
-            using PooledResource<HashSet<string>> processedAssetPathsLease =
-                Buffers<string>.HashSet.Get(out HashSet<string> processedAssetPaths);
-            using PooledResource<List<TextureImporter>> importersLease =
-                Buffers<TextureImporter>.List.Get(out List<TextureImporter> importers);
-            {
-                try
-                {
-                    using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
-                    {
-                        for (int i = 0; i < spritesToProcess.Count; ++i)
-                        {
-                            Sprite sprite = spritesToProcess[i];
-                            Utils.EditorUi.ShowProgress(
-                                "Modifying Source Sprite Import Settings",
-                                $"Processing: {sprite.name} ({i + 1}/{spritesToProcess.Count})",
-                                (float)(i + 1) / spritesToProcess.Count
-                            );
-
-                            string assetPath = AssetDatabase.GetAssetPath(sprite.texture);
-                            if (string.IsNullOrWhiteSpace(assetPath))
-                            {
-                                this.LogWarn(
-                                    $"Could not find asset path for sprite's texture: {sprite.name}. Skipping."
-                                );
-                                errorCount++;
-                                continue;
-                            }
-
-                            if (!processedAssetPaths.Add(assetPath))
-                            {
-                                continue;
-                            }
-
-                            TextureImporter importer =
-                                AssetImporter.GetAtPath(assetPath) as TextureImporter;
-                            if (importer == null)
-                            {
-                                this.LogWarn(
-                                    $"Could not get TextureImporter for asset: {assetPath} (from sprite: {sprite.name}). Skipping."
-                                );
-                                errorCount++;
-                                continue;
-                            }
-
-                            bool undoRecorded = false;
-                            bool settingsActuallyModified = false;
-
-                            void EnsureUndoRecorded()
-                            {
-                                if (undoRecorded)
-                                {
-                                    return;
-                                }
-                                Undo.RecordObject(importer, "Set Sprite Texture To Uncompressed");
-                                undoRecorded = true;
-                            }
-
-                            if (importer.crunchedCompression)
-                            {
-                                EnsureUndoRecorded();
-                                importer.crunchedCompression = false;
-                                settingsActuallyModified = true;
-                            }
-
-                            if (
-                                importer.textureCompression
-                                != TextureImporterCompression.Uncompressed
-                            )
-                            {
-                                EnsureUndoRecorded();
-                                importer.textureCompression =
-                                    TextureImporterCompression.Uncompressed;
-                                settingsActuallyModified = true;
-                            }
-
-                            TextureImporterPlatformSettings platformSettings =
-                                importer.GetDefaultPlatformTextureSettings();
-                            bool platformSettingsChangedThisTime = false;
-                            TextureImporterFormat targetFormat =
-                                importer.DoesSourceTextureHaveAlpha()
-                                    ? TextureImporterFormat.RGBA32
-                                    : TextureImporterFormat.RGB24;
-
-                            if (platformSettings.format != targetFormat)
-                            {
-                                platformSettings.format = targetFormat;
-                                platformSettingsChangedThisTime = true;
-                            }
-                            if (platformSettings.crunchedCompression)
-                            {
-                                platformSettings.crunchedCompression = false;
-                                platformSettingsChangedThisTime = true;
-                            }
-                            if (platformSettings.compressionQuality != 100)
-                            {
-                                platformSettings.compressionQuality = 100;
-                                platformSettingsChangedThisTime = true;
-                            }
-
-                            if (platformSettingsChangedThisTime || !platformSettings.overridden)
-                            {
-                                EnsureUndoRecorded();
-                                platformSettings.overridden = true;
-                                importer.SetPlatformTextureSettings(platformSettings);
-                                settingsActuallyModified = true;
-                            }
-
-                            if (settingsActuallyModified)
-                            {
-                                importer.SaveAndReimport();
-                                importers.Add(importer);
-                                modifiedCount++;
-                                this.Log(
-                                    $"Set import settings for texture: {assetPath} (from sprite: {sprite.name}) to uncompressed ({targetFormat})."
-                                );
-                            }
-                        }
-                    }
-                }
-                finally
-                {
-                    Utils.EditorUi.ClearProgress();
-                }
-
-                foreach (TextureImporter importer in importers)
-                {
-                    importer.SaveAndReimport();
-                }
-
-                if (0 < modifiedCount || 0 < errorCount)
-                {
-                    AssetDatabase.SaveAssets();
-                    AssetDatabase.Refresh();
-                }
-
-                string summaryMessage =
-                    $"Finished processing source sprite textures for '{config.name}'.\n"
-                    + $"Successfully modified importers for: {modifiedCount} textures.\n"
-                    + $"Errors/Skipped duplicates: {errorCount + (spritesToProcess.Count - processedAssetPaths.Count)}.";
-                this.Log($"{summaryMessage}");
-            }
         }
 
         private void SyncListToScanResult(ScriptableSpriteAtlas config, ScanResult result)

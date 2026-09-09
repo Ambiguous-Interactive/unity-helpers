@@ -82,121 +82,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         */
         private static int _sink;
 
-        [Test]
-        [Timeout(0)]
-        public void GeneratedConverterShapeComparedAgainstReflection()
-        {
-            UnityEngine.Debug.Log("| Workload | Ratio | Reference Spread | Subject Spread |");
-            UnityEngine.Debug.Log("| -------- | -----:| ----------------:| --------------:|");
-
-            List<string> unstable = new List<string>();
-            List<string> unmeasurable = new List<string>();
-            int stableWorkloads = 0;
-
-            ArrayBufferWriter<byte> buffer = new ArrayBufferWriter<byte>();
-            /*
-                Not a `using` statement: Utf8JsonWriter also implements IAsyncDisposable, whose metadata this
-                test assembly does not reference (overrideReferences).
-            */
-            Utf8JsonWriter writer = new Utf8JsonWriter(buffer);
-            try
-            {
-                foreach (bool fastOptions in FastOptionChoices)
-                {
-                    string optionsLabel = fastOptions ? "Fast" : "Normal";
-                    JsonSerializerOptions reference = CreateOptions(fastOptions);
-                    JsonSerializerOptions subject = CreateOptions(fastOptions);
-                    /*
-                        Register first so the package converter cannot claim the record; match its normal and
-                        fast enum contracts.
-                    */
-                    subject.Converters.Insert(
-                        0,
-                        new SaveSlotConverter(writeEnumNames: !fastOptions)
-                    );
-
-                    foreach (int abilityCount in AbilityCounts)
-                    {
-                        bool small = abilityCount <= SmallAbilityCount;
-                        string sizeLabel = small ? "small" : "large";
-                        int iterations = small ? SmallIterations : LargeIterations;
-                        SaveSlot record = BuildRecord(abilityCount);
-                        AssertBothAgree(record, reference, subject);
-
-                        byte[] payload = JsonSerializer.SerializeToUtf8Bytes(record, reference);
-
-                        // The control must prove clock resolution before an apparent subject improvement is measurable.
-                        double controlWrite = MeasureSerialize(
-                            record,
-                            reference,
-                            buffer,
-                            writer,
-                            iterations
-                        );
-                        double controlRead = MeasureDeserialize(payload, reference, iterations);
-                        if (controlWrite <= 0 || controlRead <= 0)
-                        {
-                            unmeasurable.Add($"{optionsLabel} {sizeLabel}");
-                            continue;
-                        }
-
-                        // Warm the subject so its first measured slot is not its first execution.
-                        MeasureSerialize(record, subject, buffer, writer, iterations);
-                        MeasureDeserialize(payload, subject, iterations);
-
-                        PairedMeasurement write = BenchmarkProtocol.MeasurePaired(
-                            () => MeasureSerialize(record, reference, buffer, writer, iterations),
-                            () => MeasureSerialize(record, subject, buffer, writer, iterations),
-                            MeasurementBatches
-                        );
-                        stableWorkloads += Publish(
-                            $"{optionsLabel} serialize {sizeLabel}",
-                            write,
-                            unstable
-                        )
-                            ? 1
-                            : 0;
-
-                        PairedMeasurement read = BenchmarkProtocol.MeasurePaired(
-                            () => MeasureDeserialize(payload, reference, iterations),
-                            () => MeasureDeserialize(payload, subject, iterations),
-                            MeasurementBatches
-                        );
-                        stableWorkloads += Publish(
-                            $"{optionsLabel} deserialize {sizeLabel}",
-                            read,
-                            unstable
-                        )
-                            ? 1
-                            : 0;
-                    }
-                }
-            }
-            finally
-            {
-                writer.Dispose();
-            }
-
-            foreach (string workload in unmeasurable)
-            {
-                UnityEngine.Debug.Log($"not measurable, the clock did not move: {workload}");
-            }
-
-            foreach (string workload in unstable)
-            {
-                UnityEngine.Debug.Log($"unstable, not published: {workload}");
-            }
-
-            if (stableWorkloads == 0)
-            {
-                Assert.Ignore(
-                    "Every workload read the machine rather than the code: none came inside the "
-                        + $"{BenchmarkProtocol.DefaultSpreadLimit:P0} spread limit on "
-                        + $"{Application.platform}."
-                );
-            }
-        }
-
         private static bool Publish(
             string workload,
             PairedMeasurement measurement,
@@ -377,6 +262,121 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             return state;
         }
 
+        [Test]
+        [Timeout(0)]
+        public void GeneratedConverterShapeComparedAgainstReflection()
+        {
+            UnityEngine.Debug.Log("| Workload | Ratio | Reference Spread | Subject Spread |");
+            UnityEngine.Debug.Log("| -------- | -----:| ----------------:| --------------:|");
+
+            List<string> unstable = new List<string>();
+            List<string> unmeasurable = new List<string>();
+            int stableWorkloads = 0;
+
+            ArrayBufferWriter<byte> buffer = new ArrayBufferWriter<byte>();
+            /*
+                Not a `using` statement: Utf8JsonWriter also implements IAsyncDisposable, whose metadata this
+                test assembly does not reference (overrideReferences).
+            */
+            Utf8JsonWriter writer = new Utf8JsonWriter(buffer);
+            try
+            {
+                foreach (bool fastOptions in FastOptionChoices)
+                {
+                    string optionsLabel = fastOptions ? "Fast" : "Normal";
+                    JsonSerializerOptions reference = CreateOptions(fastOptions);
+                    JsonSerializerOptions subject = CreateOptions(fastOptions);
+                    /*
+                        Register first so the package converter cannot claim the record; match its normal and
+                        fast enum contracts.
+                    */
+                    subject.Converters.Insert(
+                        0,
+                        new SaveSlotConverter(writeEnumNames: !fastOptions)
+                    );
+
+                    foreach (int abilityCount in AbilityCounts)
+                    {
+                        bool small = abilityCount <= SmallAbilityCount;
+                        string sizeLabel = small ? "small" : "large";
+                        int iterations = small ? SmallIterations : LargeIterations;
+                        SaveSlot record = BuildRecord(abilityCount);
+                        AssertBothAgree(record, reference, subject);
+
+                        byte[] payload = JsonSerializer.SerializeToUtf8Bytes(record, reference);
+
+                        // The control must prove clock resolution before an apparent subject improvement is measurable.
+                        double controlWrite = MeasureSerialize(
+                            record,
+                            reference,
+                            buffer,
+                            writer,
+                            iterations
+                        );
+                        double controlRead = MeasureDeserialize(payload, reference, iterations);
+                        if (controlWrite <= 0 || controlRead <= 0)
+                        {
+                            unmeasurable.Add($"{optionsLabel} {sizeLabel}");
+                            continue;
+                        }
+
+                        // Warm the subject so its first measured slot is not its first execution.
+                        MeasureSerialize(record, subject, buffer, writer, iterations);
+                        MeasureDeserialize(payload, subject, iterations);
+
+                        PairedMeasurement write = BenchmarkProtocol.MeasurePaired(
+                            () => MeasureSerialize(record, reference, buffer, writer, iterations),
+                            () => MeasureSerialize(record, subject, buffer, writer, iterations),
+                            MeasurementBatches
+                        );
+                        stableWorkloads += Publish(
+                            $"{optionsLabel} serialize {sizeLabel}",
+                            write,
+                            unstable
+                        )
+                            ? 1
+                            : 0;
+
+                        PairedMeasurement read = BenchmarkProtocol.MeasurePaired(
+                            () => MeasureDeserialize(payload, reference, iterations),
+                            () => MeasureDeserialize(payload, subject, iterations),
+                            MeasurementBatches
+                        );
+                        stableWorkloads += Publish(
+                            $"{optionsLabel} deserialize {sizeLabel}",
+                            read,
+                            unstable
+                        )
+                            ? 1
+                            : 0;
+                    }
+                }
+            }
+            finally
+            {
+                writer.Dispose();
+            }
+
+            foreach (string workload in unmeasurable)
+            {
+                UnityEngine.Debug.Log($"not measurable, the clock did not move: {workload}");
+            }
+
+            foreach (string workload in unstable)
+            {
+                UnityEngine.Debug.Log($"unstable, not published: {workload}");
+            }
+
+            if (stableWorkloads == 0)
+            {
+                Assert.Ignore(
+                    "Every workload read the machine rather than the code: none came inside the "
+                        + $"{BenchmarkProtocol.DefaultSpreadLimit:P0} spread limit on "
+                        + $"{Application.platform}."
+                );
+            }
+        }
+
         private enum SaveDifficulty
         {
             Unset = 0,
@@ -515,6 +515,159 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             public SaveSlotConverter(bool writeEnumNames)
             {
                 _writeEnumNames = writeEnumNames;
+            }
+
+            private static byte[] EncodeDifficulty(SaveDifficulty value)
+            {
+                switch (value)
+                {
+                    case SaveDifficulty.Story:
+                        return StoryDifficulty;
+                    case SaveDifficulty.Normal:
+                        return NormalDifficulty;
+                    case SaveDifficulty.Hard:
+                        return HardDifficulty;
+                    case SaveDifficulty.Nightmare:
+                        return NightmareDifficulty;
+                    default:
+                        return UnsetDifficulty;
+                }
+            }
+
+            private static SaveDifficulty DecodeDifficulty(ref Utf8JsonReader reader)
+            {
+                if (reader.ValueTextEquals(StoryDifficulty))
+                {
+                    return SaveDifficulty.Story;
+                }
+
+                if (reader.ValueTextEquals(NormalDifficulty))
+                {
+                    return SaveDifficulty.Normal;
+                }
+
+                if (reader.ValueTextEquals(HardDifficulty))
+                {
+                    return SaveDifficulty.Hard;
+                }
+
+                if (reader.ValueTextEquals(NightmareDifficulty))
+                {
+                    return SaveDifficulty.Nightmare;
+                }
+
+                return SaveDifficulty.Unset;
+            }
+
+            private static Vector3 ReadPosition(ref Utf8JsonReader reader)
+            {
+                float x = 0;
+                float y = 0;
+                float z = 0;
+                while (reader.Read())
+                {
+                    if (reader.TokenType == JsonTokenType.EndObject)
+                    {
+                        return new Vector3(x, y, z);
+                    }
+
+                    if (reader.TokenType != JsonTokenType.PropertyName)
+                    {
+                        continue;
+                    }
+
+                    if (reader.ValueTextEquals(XName))
+                    {
+                        reader.Read();
+                        x = reader.GetSingle();
+                    }
+                    else if (reader.ValueTextEquals(YName))
+                    {
+                        reader.Read();
+                        y = reader.GetSingle();
+                    }
+                    else if (reader.ValueTextEquals(ZName))
+                    {
+                        reader.Read();
+                        z = reader.GetSingle();
+                    }
+                    else
+                    {
+                        reader.Read();
+                        reader.Skip();
+                    }
+                }
+
+                throw new JsonException($"Incomplete JSON for {nameof(Vector3)}");
+            }
+
+            private static List<int> ReadAbilities(ref Utf8JsonReader reader)
+            {
+                if (reader.TokenType == JsonTokenType.Null)
+                {
+                    return null;
+                }
+
+                List<int> abilities = new List<int>();
+                while (reader.Read())
+                {
+                    if (reader.TokenType == JsonTokenType.EndArray)
+                    {
+                        return abilities;
+                    }
+
+                    abilities.Add(reader.GetInt32());
+                }
+
+                throw new JsonException(
+                    $"Incomplete JSON for {nameof(SaveSlot.UnlockedAbilities)}"
+                );
+            }
+
+            private static EquippedItem ReadEquipped(ref Utf8JsonReader reader)
+            {
+                if (reader.TokenType == JsonTokenType.Null)
+                {
+                    return null;
+                }
+
+                EquippedItem equipped = new EquippedItem();
+                while (reader.Read())
+                {
+                    if (reader.TokenType == JsonTokenType.EndObject)
+                    {
+                        return equipped;
+                    }
+
+                    if (reader.TokenType != JsonTokenType.PropertyName)
+                    {
+                        continue;
+                    }
+
+                    if (reader.ValueTextEquals(ItemIdName))
+                    {
+                        reader.Read();
+                        equipped.ItemId =
+                            reader.TokenType == JsonTokenType.Null ? null : reader.GetString();
+                    }
+                    else if (reader.ValueTextEquals(QuantityName))
+                    {
+                        reader.Read();
+                        equipped.Quantity = reader.GetInt32();
+                    }
+                    else if (reader.ValueTextEquals(DurabilityName))
+                    {
+                        reader.Read();
+                        equipped.Durability = reader.GetSingle();
+                    }
+                    else
+                    {
+                        reader.Read();
+                        reader.Skip();
+                    }
+                }
+
+                throw new JsonException($"Incomplete JSON for {nameof(EquippedItem)}");
             }
 
             public override SaveSlot Read(
@@ -691,159 +844,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 }
 
                 writer.WriteEndObject();
-            }
-
-            private static byte[] EncodeDifficulty(SaveDifficulty value)
-            {
-                switch (value)
-                {
-                    case SaveDifficulty.Story:
-                        return StoryDifficulty;
-                    case SaveDifficulty.Normal:
-                        return NormalDifficulty;
-                    case SaveDifficulty.Hard:
-                        return HardDifficulty;
-                    case SaveDifficulty.Nightmare:
-                        return NightmareDifficulty;
-                    default:
-                        return UnsetDifficulty;
-                }
-            }
-
-            private static SaveDifficulty DecodeDifficulty(ref Utf8JsonReader reader)
-            {
-                if (reader.ValueTextEquals(StoryDifficulty))
-                {
-                    return SaveDifficulty.Story;
-                }
-
-                if (reader.ValueTextEquals(NormalDifficulty))
-                {
-                    return SaveDifficulty.Normal;
-                }
-
-                if (reader.ValueTextEquals(HardDifficulty))
-                {
-                    return SaveDifficulty.Hard;
-                }
-
-                if (reader.ValueTextEquals(NightmareDifficulty))
-                {
-                    return SaveDifficulty.Nightmare;
-                }
-
-                return SaveDifficulty.Unset;
-            }
-
-            private static Vector3 ReadPosition(ref Utf8JsonReader reader)
-            {
-                float x = 0;
-                float y = 0;
-                float z = 0;
-                while (reader.Read())
-                {
-                    if (reader.TokenType == JsonTokenType.EndObject)
-                    {
-                        return new Vector3(x, y, z);
-                    }
-
-                    if (reader.TokenType != JsonTokenType.PropertyName)
-                    {
-                        continue;
-                    }
-
-                    if (reader.ValueTextEquals(XName))
-                    {
-                        reader.Read();
-                        x = reader.GetSingle();
-                    }
-                    else if (reader.ValueTextEquals(YName))
-                    {
-                        reader.Read();
-                        y = reader.GetSingle();
-                    }
-                    else if (reader.ValueTextEquals(ZName))
-                    {
-                        reader.Read();
-                        z = reader.GetSingle();
-                    }
-                    else
-                    {
-                        reader.Read();
-                        reader.Skip();
-                    }
-                }
-
-                throw new JsonException($"Incomplete JSON for {nameof(Vector3)}");
-            }
-
-            private static List<int> ReadAbilities(ref Utf8JsonReader reader)
-            {
-                if (reader.TokenType == JsonTokenType.Null)
-                {
-                    return null;
-                }
-
-                List<int> abilities = new List<int>();
-                while (reader.Read())
-                {
-                    if (reader.TokenType == JsonTokenType.EndArray)
-                    {
-                        return abilities;
-                    }
-
-                    abilities.Add(reader.GetInt32());
-                }
-
-                throw new JsonException(
-                    $"Incomplete JSON for {nameof(SaveSlot.UnlockedAbilities)}"
-                );
-            }
-
-            private static EquippedItem ReadEquipped(ref Utf8JsonReader reader)
-            {
-                if (reader.TokenType == JsonTokenType.Null)
-                {
-                    return null;
-                }
-
-                EquippedItem equipped = new EquippedItem();
-                while (reader.Read())
-                {
-                    if (reader.TokenType == JsonTokenType.EndObject)
-                    {
-                        return equipped;
-                    }
-
-                    if (reader.TokenType != JsonTokenType.PropertyName)
-                    {
-                        continue;
-                    }
-
-                    if (reader.ValueTextEquals(ItemIdName))
-                    {
-                        reader.Read();
-                        equipped.ItemId =
-                            reader.TokenType == JsonTokenType.Null ? null : reader.GetString();
-                    }
-                    else if (reader.ValueTextEquals(QuantityName))
-                    {
-                        reader.Read();
-                        equipped.Quantity = reader.GetInt32();
-                    }
-                    else if (reader.ValueTextEquals(DurabilityName))
-                    {
-                        reader.Read();
-                        equipped.Durability = reader.GetSingle();
-                    }
-                    else
-                    {
-                        reader.Read();
-                        reader.Skip();
-                    }
-                }
-
-                throw new JsonException($"Incomplete JSON for {nameof(EquippedItem)}");
             }
         }
     }

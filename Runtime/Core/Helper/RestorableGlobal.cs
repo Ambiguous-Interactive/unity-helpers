@@ -117,6 +117,24 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private readonly object _gate = new object();
 #endif
 
+        /// <summary>
+        /// How many borrows are currently live.
+        /// </summary>
+        public int Depth
+        {
+            get
+            {
+#if SINGLE_THREADED
+                return DepthCore();
+#else
+                lock (_gate)
+                {
+                    return DepthCore();
+                }
+#endif
+            }
+        }
+
         private Entry[] _entries;
         private long _nextIdentifier;
         private int _slotsCreated;
@@ -162,24 +180,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         + $"{(read == null ? nameof(read) : nameof(write))} delegate, so every borrow "
                         + "will be a no-op that changes nothing."
                 );
-            }
-        }
-
-        /// <summary>
-        /// How many borrows are currently live.
-        /// </summary>
-        public int Depth
-        {
-            get
-            {
-#if SINGLE_THREADED
-                return DepthCore();
-#else
-                lock (_gate)
-                {
-                    return DepthCore();
-                }
-#endif
             }
         }
 
@@ -452,6 +452,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </remarks>
         public readonly struct Scope : IDisposable
         {
+            /// <summary>
+            /// True while this borrow is still live, on every copy of the scope at once.
+            /// </summary>
+            public bool IsHeld => _owner != null && _owner.Holds(_slot, _identifier);
+
             private readonly RestorableGlobal<T> _owner;
             private readonly int _slot;
             private readonly long _identifier;
@@ -462,11 +467,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 _slot = slot;
                 _identifier = identifier;
             }
-
-            /// <summary>
-            /// True while this borrow is still live, on every copy of the scope at once.
-            /// </summary>
-            public bool IsHeld => _owner != null && _owner.Holds(_slot, _identifier);
 
             /// <summary>
             /// Gives the borrow back. Safe to call any number of times, on any number of copies.

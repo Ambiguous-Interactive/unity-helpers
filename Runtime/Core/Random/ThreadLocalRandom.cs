@@ -22,8 +22,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 #if SINGLE_THREADED
         public static readonly T Instance = new();
 #else
-        private static readonly ThreadLocal<T> RandomCache = new(() => new T());
         public static T Instance => RandomCache.Value;
+        private static readonly ThreadLocal<T> RandomCache = new(() => new T());
 #endif
     }
 }

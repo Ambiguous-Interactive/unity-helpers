@@ -22,6 +22,100 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     {
         private const int Iterations = 1024;
 
+        private static void FuzzThrowing(Action<byte[]> action)
+        {
+            Random rng = new(unchecked((int)0xCafeBabe));
+            for (int i = 0; i < Iterations; i++)
+            {
+                byte[] payload = RandomPayload(rng, i);
+                try
+                {
+                    action(payload);
+                }
+                catch (SerializationFailureException) { }
+                catch (Exception other)
+                {
+                    Assert.Fail(
+                        "Iteration "
+                            + i
+                            + " (len="
+                            + (payload?.Length.ToString() ?? "null")
+                            + "): leaked non-SerializationFailureException: "
+                            + other.GetType().FullName
+                            + ": "
+                            + other.Message
+                    );
+                }
+            }
+        }
+
+        private static void FuzzTry(Func<byte[], bool> action)
+        {
+            Random rng = new(unchecked((int)0xDeadBeef));
+            for (int i = 0; i < Iterations; i++)
+            {
+                byte[] payload = RandomPayload(rng, i);
+                try
+                {
+                    _ = action(payload);
+                }
+                catch (SerializationTypeException)
+                {
+                    /*
+                        Programmer-error path is allowed to propagate even from Try* — not relevant here because
+                        Sample is concrete.
+                    */
+                }
+                catch (SerializationConfigurationException) { }
+                catch (Exception other)
+                {
+                    Assert.Fail(
+                        "Iteration "
+                            + i
+                            + " (len="
+                            + (payload?.Length.ToString() ?? "null")
+                            + "): Try* must not throw, but it did: "
+                            + other.GetType().FullName
+                            + ": "
+                            + other.Message
+                    );
+                }
+            }
+        }
+
+        private static byte[] RandomPayload(Random rng, int i)
+        {
+            int kind = i % 8;
+            return kind switch
+            {
+                0 => null,
+                1 => Array.Empty<byte>(),
+                2 => new byte[] { 0x00 },
+                3 => Repeat((byte)0xFF, rng.Next(1, 32)),
+                4 => Repeat((byte)0x00, rng.Next(1, 32)),
+                5 => RandomBytes(rng, rng.Next(1, 256)),
+                6 => RandomBytes(rng, rng.Next(256, 4096)),
+                _ => RandomBytes(rng, rng.Next(4096, 16384)),
+            };
+        }
+
+        private static byte[] Repeat(byte value, int count)
+        {
+            byte[] buf = new byte[count];
+            for (int i = 0; i < count; i++)
+            {
+                buf[i] = value;
+            }
+            return buf;
+        }
+
+        private static byte[] RandomBytes(Random rng, int count)
+        {
+            byte[] buf = new byte[count];
+            rng.NextBytes(buf);
+            return buf;
+        }
+
         [Test]
         public void ProtoDeserializeRandomBytesOnlyLeaksSerializationFailureException()
         {
@@ -142,100 +236,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 "Throwing SerializationInputException allocated more than 2KB without Message access; "
                     + "check that the constructor does not eagerly format the message string."
             );
-        }
-
-        private static void FuzzThrowing(Action<byte[]> action)
-        {
-            Random rng = new(unchecked((int)0xCafeBabe));
-            for (int i = 0; i < Iterations; i++)
-            {
-                byte[] payload = RandomPayload(rng, i);
-                try
-                {
-                    action(payload);
-                }
-                catch (SerializationFailureException) { }
-                catch (Exception other)
-                {
-                    Assert.Fail(
-                        "Iteration "
-                            + i
-                            + " (len="
-                            + (payload?.Length.ToString() ?? "null")
-                            + "): leaked non-SerializationFailureException: "
-                            + other.GetType().FullName
-                            + ": "
-                            + other.Message
-                    );
-                }
-            }
-        }
-
-        private static void FuzzTry(Func<byte[], bool> action)
-        {
-            Random rng = new(unchecked((int)0xDeadBeef));
-            for (int i = 0; i < Iterations; i++)
-            {
-                byte[] payload = RandomPayload(rng, i);
-                try
-                {
-                    _ = action(payload);
-                }
-                catch (SerializationTypeException)
-                {
-                    /*
-                        Programmer-error path is allowed to propagate even from Try* — not relevant here because
-                        Sample is concrete.
-                    */
-                }
-                catch (SerializationConfigurationException) { }
-                catch (Exception other)
-                {
-                    Assert.Fail(
-                        "Iteration "
-                            + i
-                            + " (len="
-                            + (payload?.Length.ToString() ?? "null")
-                            + "): Try* must not throw, but it did: "
-                            + other.GetType().FullName
-                            + ": "
-                            + other.Message
-                    );
-                }
-            }
-        }
-
-        private static byte[] RandomPayload(Random rng, int i)
-        {
-            int kind = i % 8;
-            return kind switch
-            {
-                0 => null,
-                1 => Array.Empty<byte>(),
-                2 => new byte[] { 0x00 },
-                3 => Repeat((byte)0xFF, rng.Next(1, 32)),
-                4 => Repeat((byte)0x00, rng.Next(1, 32)),
-                5 => RandomBytes(rng, rng.Next(1, 256)),
-                6 => RandomBytes(rng, rng.Next(256, 4096)),
-                _ => RandomBytes(rng, rng.Next(4096, 16384)),
-            };
-        }
-
-        private static byte[] Repeat(byte value, int count)
-        {
-            byte[] buf = new byte[count];
-            for (int i = 0; i < count; i++)
-            {
-                buf[i] = value;
-            }
-            return buf;
-        }
-
-        private static byte[] RandomBytes(Random rng, int count)
-        {
-            byte[] buf = new byte[count];
-            rng.NextBytes(buf);
-            return buf;
         }
 
         [ProtoContract]

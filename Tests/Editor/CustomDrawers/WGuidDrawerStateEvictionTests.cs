@@ -19,6 +19,27 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         private const int EvictionChurnPathCount = MaxDrawerStateEntries + 128;
         private const string PendingInvalidText = "not-a-guid";
 
+        private static SerializedProperty ResizeGuidArray(
+            SerializedObject serializedObject,
+            int length
+        )
+        {
+            serializedObject.Update();
+            SerializedProperty guids = serializedObject.FindProperty(
+                nameof(BoundedDrawerCacheChurnHost.guids)
+            );
+            Assert.NotNull(guids);
+            guids.arraySize = length;
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+            serializedObject.Update();
+
+            SerializedProperty resized = serializedObject.FindProperty(
+                nameof(BoundedDrawerCacheChurnHost.guids)
+            );
+            Assert.AreEqual(length, resized.arraySize);
+            return resized;
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -163,27 +184,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 oldestStateAfterChurn.hasPendingInvalid,
                 "An evicted path must be rebuilt as a clean state rather than a stale one."
             );
-        }
-
-        private static SerializedProperty ResizeGuidArray(
-            SerializedObject serializedObject,
-            int length
-        )
-        {
-            serializedObject.Update();
-            SerializedProperty guids = serializedObject.FindProperty(
-                nameof(BoundedDrawerCacheChurnHost.guids)
-            );
-            Assert.NotNull(guids);
-            guids.arraySize = length;
-            serializedObject.ApplyModifiedPropertiesWithoutUndo();
-            serializedObject.Update();
-
-            SerializedProperty resized = serializedObject.FindProperty(
-                nameof(BoundedDrawerCacheChurnHost.guids)
-            );
-            Assert.AreEqual(length, resized.arraySize);
-            return resized;
         }
     }
 }

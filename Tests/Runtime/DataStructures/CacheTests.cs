@@ -21,11 +21,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     {
         private float _currentTime;
 
-        private float TimeProvider()
-        {
-            return _currentTime;
-        }
-
         [SetUp]
         public void SetUp()
         {
@@ -341,6 +336,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.IsTrue(cache.TryGet("b", out int vb) && vb == 2);
             Assert.IsTrue(cache.TryGet("c", out int vc) && vc == 3);
         }
+
+        private float TimeProvider()
+        {
+            return _currentTime;
+        }
     }
 
     [TestFixture]
@@ -348,11 +348,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     public sealed class CacheLruEvictionTests
     {
         private float _currentTime;
-
-        private float TimeProvider()
-        {
-            return _currentTime;
-        }
 
         [SetUp]
         public void SetUp()
@@ -422,6 +417,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.IsTrue(cache.ContainsKey("d"), "Key 'd' should remain");
             Assert.IsTrue(cache.ContainsKey("e"), "Key 'e' should be present (just added)");
         }
+
+        private float TimeProvider()
+        {
+            return _currentTime;
+        }
     }
 
     [TestFixture]
@@ -429,11 +429,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     public sealed class CacheFifoEvictionTests
     {
         private float _currentTime;
-
-        private float TimeProvider()
-        {
-            return _currentTime;
-        }
 
         [SetUp]
         public void SetUp()
@@ -492,6 +487,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.IsTrue(cache.ContainsKey("c"), "Key 'c' should remain");
             Assert.IsTrue(cache.ContainsKey("d"), "Key 'd' should be present (just added)");
         }
+
+        private float TimeProvider()
+        {
+            return _currentTime;
+        }
     }
 
     [TestFixture]
@@ -499,11 +499,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     public sealed class CacheLfuEvictionTests
     {
         private float _currentTime;
-
-        private float TimeProvider()
-        {
-            return _currentTime;
-        }
 
         [SetUp]
         public void SetUp()
@@ -561,6 +556,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.IsTrue(cache.ContainsKey("c"));
             Assert.IsTrue(cache.ContainsKey("d"));
         }
+
+        private float TimeProvider()
+        {
+            return _currentTime;
+        }
     }
 
     [TestFixture]
@@ -568,11 +568,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     public sealed class CacheSlruEvictionTests
     {
         private float _currentTime;
-
-        private float TimeProvider()
-        {
-            return _currentTime;
-        }
 
         [SetUp]
         public void SetUp()
@@ -708,6 +703,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(15, cache.Capacity);
             Assert.AreEqual(12, cache.ProtectedCapacityForTesting);
         }
+
+        private float TimeProvider()
+        {
+            return _currentTime;
+        }
     }
 
     [TestFixture]
@@ -715,11 +715,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     public sealed class CacheRandomEvictionTests
     {
         private float _currentTime;
-
-        private float TimeProvider()
-        {
-            return _currentTime;
-        }
 
         [SetUp]
         public void SetUp()
@@ -746,6 +741,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(3, cache.Count);
             Assert.IsTrue(cache.ContainsKey("d"));
         }
+
+        private float TimeProvider()
+        {
+            return _currentTime;
+        }
     }
 
     [TestFixture]
@@ -753,11 +753,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     public sealed class CacheExpirationTests
     {
         private float _currentTime;
-
-        private float TimeProvider()
-        {
-            return _currentTime;
-        }
 
         [SetUp]
         public void SetUp()
@@ -861,6 +856,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.IsFalse(cache.TryGet("short", out _));
             Assert.IsTrue(cache.TryGet("long", out _));
         }
+
+        private float TimeProvider()
+        {
+            return _currentTime;
+        }
     }
 
     [TestFixture]
@@ -868,11 +868,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     public sealed class CacheStatisticsTests
     {
         private float _currentTime;
-
-        private float TimeProvider()
-        {
-            return _currentTime;
-        }
 
         [SetUp]
         public void SetUp()
@@ -984,6 +979,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(0, stats.HitCount);
             Assert.AreEqual(0, stats.MissCount);
         }
+
+        private float TimeProvider()
+        {
+            return _currentTime;
+        }
     }
 
     [TestFixture]
@@ -991,11 +991,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     public sealed class CacheCallbackTests
     {
         private float _currentTime;
-
-        private float TimeProvider()
-        {
-            return _currentTime;
-        }
 
         [SetUp]
         public void SetUp()
@@ -1149,6 +1144,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             Assert.Pass("No exceptions propagated");
         }
+
+        private float TimeProvider()
+        {
+            return _currentTime;
+        }
     }
 
     [TestFixture]
@@ -1156,11 +1156,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     public sealed class CacheWeightedTests
     {
         private float _currentTime;
-
-        private float TimeProvider()
-        {
-            return _currentTime;
-        }
 
         [SetUp]
         public void SetUp()
@@ -1343,6 +1338,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
             Assert.That(cache.ContainsKey("d"), Is.True, "Newly added item 'd' should be present");
         }
+
+        private float TimeProvider()
+        {
+            return _currentTime;
+        }
     }
 
     /// <summary>
@@ -1353,11 +1353,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     public sealed class CacheSizeOneTests
     {
         private float _currentTime;
-
-        private float TimeProvider()
-        {
-            return _currentTime;
-        }
 
         [SetUp]
         public void SetUp()
@@ -1485,6 +1480,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.That(cache.TryGet("key", out _), Is.False, "Key should be expired after TTL");
             Assert.That(cache.Count, Is.EqualTo(0), "Cache should be empty after expiration");
         }
+
+        private float TimeProvider()
+        {
+            return _currentTime;
+        }
     }
 
     [TestFixture]
@@ -1492,11 +1492,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     public sealed class CacheDynamicSizingTests
     {
         private float _currentTime;
-
-        private float TimeProvider()
-        {
-            return _currentTime;
-        }
 
         [SetUp]
         public void SetUp()
@@ -1590,6 +1585,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             Assert.AreEqual(5, cache.Count);
             Assert.AreEqual(10, cache.MaximumSize);
+        }
+
+        private float TimeProvider()
+        {
+            return _currentTime;
         }
     }
 
@@ -1816,11 +1816,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     {
         private float _currentTime;
 
-        private float TimeProvider()
-        {
-            return _currentTime;
-        }
-
         [SetUp]
         public void SetUp()
         {
@@ -1985,6 +1980,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             cache.Resize(-5);
             Assert.AreEqual(1, cache.Count);
         }
+
+        private float TimeProvider()
+        {
+            return _currentTime;
+        }
     }
 
     [TestFixture]
@@ -1992,11 +1992,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     public sealed class CacheJitterTests
     {
         private float _currentTime;
-
-        private float TimeProvider()
-        {
-            return _currentTime;
-        }
 
         [SetUp]
         public void SetUp()
@@ -2020,6 +2015,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             _currentTime = 1.0f;
 
             Assert.IsTrue(cache.TryGet("key", out _));
+        }
+
+        private float TimeProvider()
+        {
+            return _currentTime;
         }
     }
 
@@ -2063,11 +2063,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     public sealed class CacheGetKeysMethodTests
     {
         private float _currentTime;
-
-        private float TimeProvider()
-        {
-            return _currentTime;
-        }
 
         [SetUp]
         public void SetUp()
@@ -2182,6 +2177,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             Assert.AreEqual(0, keys.Count);
         }
+
+        private float TimeProvider()
+        {
+            return _currentTime;
+        }
     }
 
     [TestFixture]
@@ -2189,11 +2189,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     public sealed class CacheIListOverloadTests
     {
         private float _currentTime;
-
-        private float TimeProvider()
-        {
-            return _currentTime;
-        }
 
         [SetUp]
         public void SetUp()
@@ -2308,6 +2303,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.IsTrue(cache.TryGet("a", out int va) && va == 100);
             Assert.IsTrue(cache.TryGet("b", out int vb) && vb == 200);
         }
+
+        private float TimeProvider()
+        {
+            return _currentTime;
+        }
     }
 
     [TestFixture]
@@ -2315,11 +2315,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     public sealed class CacheSlruSegmentCountTests
     {
         private float _currentTime;
-
-        private float TimeProvider()
-        {
-            return _currentTime;
-        }
 
         [SetUp]
         public void SetUp()
@@ -2407,6 +2402,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             Assert.AreEqual(4, cache.Count);
         }
+
+        private float TimeProvider()
+        {
+            return _currentTime;
+        }
     }
 
     [TestFixture]
@@ -2414,11 +2414,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     public sealed class CacheExtremeCaseTests
     {
         private float _currentTime;
-
-        private float TimeProvider()
-        {
-            return _currentTime;
-        }
 
         [SetUp]
         public void SetUp()
@@ -2570,6 +2565,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             Assert.AreEqual(5000, cache.Count);
         }
+
+        private float TimeProvider()
+        {
+            return _currentTime;
+        }
     }
 
     [TestFixture]
@@ -2578,9 +2578,38 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     {
         private float _currentTime;
 
-        private float TimeProvider()
+        private static IEnumerable<TestCaseData> EvictionPolicyTestData()
         {
-            return _currentTime;
+            yield return new TestCaseData(EvictionPolicy.Lru, 10, 20).SetName(
+                "Policy.Lru.CapacityReached"
+            );
+            yield return new TestCaseData(EvictionPolicy.Fifo, 10, 20).SetName(
+                "Policy.Fifo.CapacityReached"
+            );
+            yield return new TestCaseData(EvictionPolicy.Lfu, 10, 20).SetName(
+                "Policy.Lfu.CapacityReached"
+            );
+            yield return new TestCaseData(EvictionPolicy.Random, 10, 20).SetName(
+                "Policy.Random.CapacityReached"
+            );
+            yield return new TestCaseData(EvictionPolicy.Slru, 10, 20).SetName(
+                "Policy.Slru.CapacityReached"
+            );
+            yield return new TestCaseData(EvictionPolicy.Lru, 10, 5).SetName(
+                "Policy.Lru.UnderCapacity"
+            );
+            yield return new TestCaseData(EvictionPolicy.Fifo, 10, 5).SetName(
+                "Policy.Fifo.UnderCapacity"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> CompactPercentageTestData()
+        {
+            yield return new TestCaseData(0.0f, 10, 10).SetName("Compact.0Percent");
+            yield return new TestCaseData(0.25f, 100, 75).SetName("Compact.25Percent");
+            yield return new TestCaseData(0.5f, 100, 50).SetName("Compact.50Percent");
+            yield return new TestCaseData(0.75f, 100, 25).SetName("Compact.75Percent");
+            yield return new TestCaseData(1.0f, 100, 0).SetName("Compact.100Percent");
         }
 
         [SetUp]
@@ -2655,31 +2684,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
         }
 
-        private static IEnumerable<TestCaseData> EvictionPolicyTestData()
-        {
-            yield return new TestCaseData(EvictionPolicy.Lru, 10, 20).SetName(
-                "Policy.Lru.CapacityReached"
-            );
-            yield return new TestCaseData(EvictionPolicy.Fifo, 10, 20).SetName(
-                "Policy.Fifo.CapacityReached"
-            );
-            yield return new TestCaseData(EvictionPolicy.Lfu, 10, 20).SetName(
-                "Policy.Lfu.CapacityReached"
-            );
-            yield return new TestCaseData(EvictionPolicy.Random, 10, 20).SetName(
-                "Policy.Random.CapacityReached"
-            );
-            yield return new TestCaseData(EvictionPolicy.Slru, 10, 20).SetName(
-                "Policy.Slru.CapacityReached"
-            );
-            yield return new TestCaseData(EvictionPolicy.Lru, 10, 5).SetName(
-                "Policy.Lru.UnderCapacity"
-            );
-            yield return new TestCaseData(EvictionPolicy.Fifo, 10, 5).SetName(
-                "Policy.Fifo.UnderCapacity"
-            );
-        }
-
         [Test]
         [TestCase(0.5f, TestName = "Ttl.HalfSecond")]
         [TestCase(1.0f, TestName = "Ttl.OneSecond")]
@@ -2734,13 +2738,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
         }
 
-        private static IEnumerable<TestCaseData> CompactPercentageTestData()
+        private float TimeProvider()
         {
-            yield return new TestCaseData(0.0f, 10, 10).SetName("Compact.0Percent");
-            yield return new TestCaseData(0.25f, 100, 75).SetName("Compact.25Percent");
-            yield return new TestCaseData(0.5f, 100, 50).SetName("Compact.50Percent");
-            yield return new TestCaseData(0.75f, 100, 25).SetName("Compact.75Percent");
-            yield return new TestCaseData(1.0f, 100, 0).SetName("Compact.100Percent");
+            return _currentTime;
         }
     }
 
@@ -2750,11 +2750,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     public sealed class CacheConcurrentAccessTests
     {
         private float _currentTime;
-
-        private float TimeProvider()
-        {
-            return _currentTime;
-        }
 
         [SetUp]
         public void SetUp()
@@ -3064,6 +3059,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 $"Exception during concurrent GetOrAdd: {capturedException}"
             );
             Assert.AreEqual(sharedKeyRange, cache.Count);
+        }
+
+        private float TimeProvider()
+        {
+            return _currentTime;
         }
     }
 #endif
@@ -3500,11 +3500,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     {
         private float _currentTime;
 
-        private float TimeProvider()
-        {
-            return _currentTime;
-        }
-
         [SetUp]
         public void SetUp()
         {
@@ -3659,6 +3654,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 "TryGet should not cause eviction"
             );
         }
+
+        private float TimeProvider()
+        {
+            return _currentTime;
+        }
     }
 
     /// <summary>
@@ -3670,11 +3670,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     public sealed class CacheCapacityDiagnosticTests
     {
         private float _currentTime;
-
-        private float TimeProvider()
-        {
-            return _currentTime;
-        }
 
         [SetUp]
         public void SetUp()
@@ -3990,6 +3985,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     $"Capacity should be at least Count after round {round}"
                 );
             }
+        }
+
+        private float TimeProvider()
+        {
+            return _currentTime;
         }
     }
 }

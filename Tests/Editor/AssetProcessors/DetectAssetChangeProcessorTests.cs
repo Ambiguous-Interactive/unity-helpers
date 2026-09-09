@@ -124,24 +124,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             }
         }
 
-        private void InternalTeardown()
-        {
-            ClearTestState();
-            DetectAssetChangeProcessor.ResetForTesting(_settings);
-
-            UnityHelpersSettings settings = UnityHelpersSettings.instance;
-            if (
-                settings != null
-                && !Mathf.Approximately(
-                    settings.DetectAssetChangeLoopWindowSeconds,
-                    _originalLoopWindowSeconds
-                )
-            )
-            {
-                settings.DetectAssetChangeLoopWindowSeconds = _originalLoopWindowSeconds;
-            }
-        }
-
         [Test]
         public void InvokesHandlersWhenAssetsAreCreated()
         {
@@ -980,6 +962,24 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 $"Expected at least 1 handler invocation for moved asset (hasCreated={hasCreated}, hasDeleted={hasDeleted}, "
                     + $"hasMoved={hasMoved}, hasMovedFrom={hasMovedFrom}), but got {TestDetectAssetChangeHandler.RecordedContexts.Count}"
             );
+        }
+
+        private void InternalTeardown()
+        {
+            ClearTestState();
+            DetectAssetChangeProcessor.ResetForTesting(_settings);
+
+            UnityHelpersSettings settings = UnityHelpersSettings.instance;
+            if (
+                settings != null
+                && !Mathf.Approximately(
+                    settings.DetectAssetChangeLoopWindowSeconds,
+                    _originalLoopWindowSeconds
+                )
+            )
+            {
+                settings.DetectAssetChangeLoopWindowSeconds = _originalLoopWindowSeconds;
+            }
         }
     }
 }

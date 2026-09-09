@@ -489,204 +489,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return NextOfExceptCore(random, materializedList, exceptions);
         }
 
-        private static T NextOfExceptCore<T>(IRandom random, IReadOnlyList<T> source, T exception1)
-        {
-            if (source.Count == 0)
-            {
-                throw new ArgumentException("Collection cannot be empty", nameof(source));
-            }
-
-            EqualityComparer<T> comparer = EqualityComparer<T>.Default;
-            using PooledArray<T> pooled = SystemArrayPool<T>.Get(source.Count, out T[] buffer);
-            int n = 0;
-            for (int i = 0; i < source.Count; ++i)
-            {
-                T v = source[i];
-                if (!comparer.Equals(v, exception1))
-                {
-                    buffer[n++] = v;
-                }
-            }
-
-            if (n == 0)
-            {
-                throw new ArgumentException("All values are excluded", nameof(exception1));
-            }
-
-            return n == 1 ? buffer[0] : buffer[random.Next(n)];
-        }
-
-        private static T NextOfExceptCore<T>(
-            IRandom random,
-            IReadOnlyList<T> source,
-            T exception1,
-            T exception2
-        )
-        {
-            if (source.Count == 0)
-            {
-                throw new ArgumentException("Collection cannot be empty", nameof(source));
-            }
-
-            EqualityComparer<T> comparer = EqualityComparer<T>.Default;
-            using PooledArray<T> pooled = SystemArrayPool<T>.Get(source.Count, out T[] buffer);
-            int n = 0;
-            for (int i = 0; i < source.Count; ++i)
-            {
-                T v = source[i];
-                if (!comparer.Equals(v, exception1) && !comparer.Equals(v, exception2))
-                {
-                    buffer[n++] = v;
-                }
-            }
-
-            if (n == 0)
-            {
-                throw new ArgumentException("All values are excluded", nameof(exception1));
-            }
-
-            return n == 1 ? buffer[0] : buffer[random.Next(n)];
-        }
-
-        private static T NextOfExceptCore<T>(
-            IRandom random,
-            IReadOnlyList<T> source,
-            T exception1,
-            T exception2,
-            T exception3
-        )
-        {
-            if (source.Count == 0)
-            {
-                throw new ArgumentException("Collection cannot be empty", nameof(source));
-            }
-
-            EqualityComparer<T> comparer = EqualityComparer<T>.Default;
-            using PooledArray<T> pooled = SystemArrayPool<T>.Get(source.Count, out T[] buffer);
-            int n = 0;
-            for (int i = 0; i < source.Count; ++i)
-            {
-                T v = source[i];
-                if (
-                    !comparer.Equals(v, exception1)
-                    && !comparer.Equals(v, exception2)
-                    && !comparer.Equals(v, exception3)
-                )
-                {
-                    buffer[n++] = v;
-                }
-            }
-
-            if (n == 0)
-            {
-                throw new ArgumentException("All values are excluded", nameof(exception1));
-            }
-
-            return n == 1 ? buffer[0] : buffer[random.Next(n)];
-        }
-
-        private static T NextOfExceptCore<T>(
-            IRandom random,
-            IReadOnlyList<T> source,
-            IEnumerable<T> exceptions
-        )
-        {
-            if (source.Count == 0)
-            {
-                throw new ArgumentException("Collection cannot be empty", nameof(source));
-            }
-
-            if (exceptions == null)
-            {
-                return random.NextOf(source);
-            }
-
-            using PooledResource<HashSet<T>> excludeLease = Buffers<T>.HashSet.Get(
-                out HashSet<T> exclude
-            );
-
-            if (exceptions is IReadOnlyList<T> exceptionList)
-            {
-                for (int i = 0; i < exceptionList.Count; ++i)
-                {
-                    exclude.Add(exceptionList[i]);
-                }
-            }
-            else
-            {
-                foreach (T exception in exceptions)
-                {
-                    exclude.Add(exception);
-                }
-            }
-
-            if (exclude.Count == 0)
-            {
-                return random.NextOf(source);
-            }
-
-            using PooledArray<T> pooled = SystemArrayPool<T>.Get(source.Count, out T[] buffer);
-            int n = 0;
-            for (int i = 0; i < source.Count; ++i)
-            {
-                T v = source[i];
-                if (!exclude.Contains(v))
-                {
-                    buffer[n++] = v;
-                }
-            }
-
-            if (n == 0)
-            {
-                throw new ArgumentException("All values are excluded", nameof(exceptions));
-            }
-
-            return n == 1 ? buffer[0] : buffer[random.Next(n)];
-        }
-
-        private static T NextOfExceptCore<T>(
-            IRandom random,
-            IReadOnlyList<T> source,
-            T[] exceptions
-        )
-        {
-            if (source.Count == 0)
-            {
-                throw new ArgumentException("Collection cannot be empty", nameof(source));
-            }
-
-            if (exceptions == null || exceptions.Length == 0)
-            {
-                return random.NextOf(source);
-            }
-
-            using PooledResource<HashSet<T>> excludeLease = Buffers<T>.HashSet.Get(
-                out HashSet<T> exclude
-            );
-            foreach (T exception in exceptions)
-            {
-                exclude.Add(exception);
-            }
-
-            using PooledArray<T> pooled = SystemArrayPool<T>.Get(source.Count, out T[] buffer);
-            int n = 0;
-            for (int i = 0; i < source.Count; ++i)
-            {
-                T v = source[i];
-                if (!exclude.Contains(v))
-                {
-                    buffer[n++] = v;
-                }
-            }
-
-            if (n == 0)
-            {
-                throw new ArgumentException("All values are excluded", nameof(exceptions));
-            }
-
-            return n == 1 ? buffer[0] : buffer[random.Next(n)];
-        }
-
         /// <summary>
         /// Generates a random 2D vector with components in the specified range.
         /// </summary>
@@ -1036,22 +838,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return varied;
         }
 
-        private static float NextSymmetricVariance(IRandom random, float variance)
-        {
-            if (float.IsNaN(variance) || float.IsInfinity(variance))
-            {
-                return 0f;
-            }
-
-            float magnitude = Mathf.Abs(variance);
-            if (magnitude <= 0f)
-            {
-                return 0f;
-            }
-
-            return random.NextFloat(-magnitude, magnitude);
-        }
-
         /// <summary>
         /// Generates a random 32-bit color with RGB components uniformly distributed in [0, 255].
         /// </summary>
@@ -1388,53 +1174,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return NextWeightedCore(random, materializedList);
         }
 
-        private static T NextWeightedCore<T>(IRandom random, IReadOnlyList<(T, float)> items)
-        {
-            if (items.Count == 0)
-            {
-                throw new ArgumentException("Weighted collection cannot be empty", nameof(items));
-            }
-
-            float totalWeight = 0f;
-            for (int i = 0; i < items.Count; ++i)
-            {
-                float weight = items[i].Item2;
-                if (!(0f <= weight && weight <= float.MaxValue))
-                {
-                    throw new ArgumentException(
-                        "Weights must be finite and nonnegative",
-                        nameof(items)
-                    );
-                }
-
-                totalWeight += weight;
-            }
-
-            if (!(0f < totalWeight && totalWeight <= float.MaxValue))
-            {
-                throw new ArgumentException(
-                    "Total weight must be finite and greater than zero",
-                    nameof(items)
-                );
-            }
-
-            float randomValue = random.NextFloat(0f, totalWeight);
-            float cumulative = 0f;
-
-            for (int i = 0; i < items.Count; ++i)
-            {
-                (T item, float weight) = items[i];
-                cumulative += weight;
-                if (randomValue < cumulative)
-                {
-                    return item;
-                }
-            }
-
-            // Fallback due to floating point precision
-            return items[items.Count - 1].Item1;
-        }
-
         /// <summary>
         /// Selects a random index from an array of weights, where each weight determines selection probability.
         /// </summary>
@@ -1665,6 +1404,267 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             // The deferred iterator outlives this pool lease; give it an owned copy.
             return NextSubsetIterator(random, materializedList.ToArray(), count);
+        }
+
+        private static T NextOfExceptCore<T>(IRandom random, IReadOnlyList<T> source, T exception1)
+        {
+            if (source.Count == 0)
+            {
+                throw new ArgumentException("Collection cannot be empty", nameof(source));
+            }
+
+            EqualityComparer<T> comparer = EqualityComparer<T>.Default;
+            using PooledArray<T> pooled = SystemArrayPool<T>.Get(source.Count, out T[] buffer);
+            int n = 0;
+            for (int i = 0; i < source.Count; ++i)
+            {
+                T v = source[i];
+                if (!comparer.Equals(v, exception1))
+                {
+                    buffer[n++] = v;
+                }
+            }
+
+            if (n == 0)
+            {
+                throw new ArgumentException("All values are excluded", nameof(exception1));
+            }
+
+            return n == 1 ? buffer[0] : buffer[random.Next(n)];
+        }
+
+        private static T NextOfExceptCore<T>(
+            IRandom random,
+            IReadOnlyList<T> source,
+            T exception1,
+            T exception2
+        )
+        {
+            if (source.Count == 0)
+            {
+                throw new ArgumentException("Collection cannot be empty", nameof(source));
+            }
+
+            EqualityComparer<T> comparer = EqualityComparer<T>.Default;
+            using PooledArray<T> pooled = SystemArrayPool<T>.Get(source.Count, out T[] buffer);
+            int n = 0;
+            for (int i = 0; i < source.Count; ++i)
+            {
+                T v = source[i];
+                if (!comparer.Equals(v, exception1) && !comparer.Equals(v, exception2))
+                {
+                    buffer[n++] = v;
+                }
+            }
+
+            if (n == 0)
+            {
+                throw new ArgumentException("All values are excluded", nameof(exception1));
+            }
+
+            return n == 1 ? buffer[0] : buffer[random.Next(n)];
+        }
+
+        private static T NextOfExceptCore<T>(
+            IRandom random,
+            IReadOnlyList<T> source,
+            T exception1,
+            T exception2,
+            T exception3
+        )
+        {
+            if (source.Count == 0)
+            {
+                throw new ArgumentException("Collection cannot be empty", nameof(source));
+            }
+
+            EqualityComparer<T> comparer = EqualityComparer<T>.Default;
+            using PooledArray<T> pooled = SystemArrayPool<T>.Get(source.Count, out T[] buffer);
+            int n = 0;
+            for (int i = 0; i < source.Count; ++i)
+            {
+                T v = source[i];
+                if (
+                    !comparer.Equals(v, exception1)
+                    && !comparer.Equals(v, exception2)
+                    && !comparer.Equals(v, exception3)
+                )
+                {
+                    buffer[n++] = v;
+                }
+            }
+
+            if (n == 0)
+            {
+                throw new ArgumentException("All values are excluded", nameof(exception1));
+            }
+
+            return n == 1 ? buffer[0] : buffer[random.Next(n)];
+        }
+
+        private static T NextOfExceptCore<T>(
+            IRandom random,
+            IReadOnlyList<T> source,
+            IEnumerable<T> exceptions
+        )
+        {
+            if (source.Count == 0)
+            {
+                throw new ArgumentException("Collection cannot be empty", nameof(source));
+            }
+
+            if (exceptions == null)
+            {
+                return random.NextOf(source);
+            }
+
+            using PooledResource<HashSet<T>> excludeLease = Buffers<T>.HashSet.Get(
+                out HashSet<T> exclude
+            );
+
+            if (exceptions is IReadOnlyList<T> exceptionList)
+            {
+                for (int i = 0; i < exceptionList.Count; ++i)
+                {
+                    exclude.Add(exceptionList[i]);
+                }
+            }
+            else
+            {
+                foreach (T exception in exceptions)
+                {
+                    exclude.Add(exception);
+                }
+            }
+
+            if (exclude.Count == 0)
+            {
+                return random.NextOf(source);
+            }
+
+            using PooledArray<T> pooled = SystemArrayPool<T>.Get(source.Count, out T[] buffer);
+            int n = 0;
+            for (int i = 0; i < source.Count; ++i)
+            {
+                T v = source[i];
+                if (!exclude.Contains(v))
+                {
+                    buffer[n++] = v;
+                }
+            }
+
+            if (n == 0)
+            {
+                throw new ArgumentException("All values are excluded", nameof(exceptions));
+            }
+
+            return n == 1 ? buffer[0] : buffer[random.Next(n)];
+        }
+
+        private static T NextOfExceptCore<T>(
+            IRandom random,
+            IReadOnlyList<T> source,
+            T[] exceptions
+        )
+        {
+            if (source.Count == 0)
+            {
+                throw new ArgumentException("Collection cannot be empty", nameof(source));
+            }
+
+            if (exceptions == null || exceptions.Length == 0)
+            {
+                return random.NextOf(source);
+            }
+
+            using PooledResource<HashSet<T>> excludeLease = Buffers<T>.HashSet.Get(
+                out HashSet<T> exclude
+            );
+            foreach (T exception in exceptions)
+            {
+                exclude.Add(exception);
+            }
+
+            using PooledArray<T> pooled = SystemArrayPool<T>.Get(source.Count, out T[] buffer);
+            int n = 0;
+            for (int i = 0; i < source.Count; ++i)
+            {
+                T v = source[i];
+                if (!exclude.Contains(v))
+                {
+                    buffer[n++] = v;
+                }
+            }
+
+            if (n == 0)
+            {
+                throw new ArgumentException("All values are excluded", nameof(exceptions));
+            }
+
+            return n == 1 ? buffer[0] : buffer[random.Next(n)];
+        }
+
+        private static float NextSymmetricVariance(IRandom random, float variance)
+        {
+            if (float.IsNaN(variance) || float.IsInfinity(variance))
+            {
+                return 0f;
+            }
+
+            float magnitude = Mathf.Abs(variance);
+            if (magnitude <= 0f)
+            {
+                return 0f;
+            }
+
+            return random.NextFloat(-magnitude, magnitude);
+        }
+
+        private static T NextWeightedCore<T>(IRandom random, IReadOnlyList<(T, float)> items)
+        {
+            if (items.Count == 0)
+            {
+                throw new ArgumentException("Weighted collection cannot be empty", nameof(items));
+            }
+
+            float totalWeight = 0f;
+            for (int i = 0; i < items.Count; ++i)
+            {
+                float weight = items[i].Item2;
+                if (!(0f <= weight && weight <= float.MaxValue))
+                {
+                    throw new ArgumentException(
+                        "Weights must be finite and nonnegative",
+                        nameof(items)
+                    );
+                }
+
+                totalWeight += weight;
+            }
+
+            if (!(0f < totalWeight && totalWeight <= float.MaxValue))
+            {
+                throw new ArgumentException(
+                    "Total weight must be finite and greater than zero",
+                    nameof(items)
+                );
+            }
+
+            float randomValue = random.NextFloat(0f, totalWeight);
+            float cumulative = 0f;
+
+            for (int i = 0; i < items.Count; ++i)
+            {
+                (T item, float weight) = items[i];
+                cumulative += weight;
+                if (randomValue < cumulative)
+                {
+                    return item;
+                }
+            }
+
+            // Fallback due to floating point precision
+            return items[items.Count - 1].Item1;
         }
 
         private static IEnumerable<T> NextSubsetIterator<T>(

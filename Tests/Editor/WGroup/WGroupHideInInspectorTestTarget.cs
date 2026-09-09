@@ -31,24 +31,24 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [WGroup("Test Group", autoIncludeCount: 4)]
         public int groupAnchor;
 
+        public int visibleField1;
+
+        public int visibleField2;
+        public int visibleField3;
+        public int visibleField4;
+        public int notIncluded;
+
         [HideInInspector]
         [SerializeField]
 #pragma warning disable CS0649 // Field is never assigned to
         internal int _hiddenField1;
 #pragma warning restore CS0649 // Field is never assigned to
 
-        public int visibleField1;
-
         [HideInInspector]
         [SerializeField]
 #pragma warning disable CS0649 // Field is never assigned to
         internal int _hiddenField2;
 #pragma warning restore CS0649 // Field is never assigned to
-
-        public int visibleField2;
-        public int visibleField3;
-        public int visibleField4;
-        public int notIncluded;
     }
 }
 #endif

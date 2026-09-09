@@ -28,6 +28,123 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [TestFixture]
     public sealed class RectangularArrayTests
     {
+        private static void AssertSameShape<T>(T[,] expected, T[,] actual, string what)
+        {
+            Assert.AreEqual(expected.GetLength(0), actual.GetLength(0), what + " rows");
+            Assert.AreEqual(expected.GetLength(1), actual.GetLength(1), what + " columns");
+            for (int row = 0; row < expected.GetLength(0); row++)
+            {
+                for (int column = 0; column < expected.GetLength(1); column++)
+                {
+                    Assert.AreEqual(
+                        expected[row, column],
+                        actual[row, column],
+                        what + "[" + row + "," + column + "]"
+                    );
+                }
+            }
+        }
+
+        private static void AssertSameShape<T>(T[,,] expected, T[,,] actual, string what)
+        {
+            for (int axis = 0; axis < 3; axis++)
+            {
+                Assert.AreEqual(
+                    expected.GetLength(axis),
+                    actual.GetLength(axis),
+                    what + " axis " + axis
+                );
+            }
+
+            for (int x = 0; x < expected.GetLength(0); x++)
+            {
+                for (int y = 0; y < expected.GetLength(1); y++)
+                {
+                    for (int z = 0; z < expected.GetLength(2); z++)
+                    {
+                        Assert.AreEqual(expected[x, y, z], actual[x, y, z], what);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Builds a wrapper message for the contract member at <paramref name="tag"/>, from the
+        /// dimension header's bytes and the element run's bytes.
+        /// </summary>
+        /// <remarks>
+        /// Every length prefix is computed rather than typed. A prefix that disagrees with its
+        /// content makes the reader refuse the payload for being malformed, which is a different
+        /// answer from the one these tests are about -- and a test that gets the right verdict for
+        /// the wrong reason proves nothing.
+        /// </remarks>
+        private static byte[] Wrapper(int tag, string dimensionsHex, string valuesHex)
+        {
+            List<byte> payload = new List<byte>();
+            Append(payload, 1, dimensionsHex);
+            Append(payload, 2, valuesHex);
+
+            Assert.Less(payload.Count, 128, "the builder writes single-byte length prefixes");
+
+            List<byte> message = new List<byte> { (byte)((tag << 3) | 2), (byte)payload.Count };
+            message.AddRange(payload);
+            return message.ToArray();
+        }
+
+        private static void Append(List<byte> payload, int field, string hex)
+        {
+            if (hex == null)
+            {
+                return;
+            }
+
+            byte[] content = Bytes(hex);
+            Assert.Less(content.Length, 128, "the builder writes single-byte length prefixes");
+            payload.Add((byte)((field << 3) | 2));
+            payload.Add((byte)content.Length);
+            payload.AddRange(content);
+        }
+
+        private static byte[] Bytes(string hex)
+        {
+            byte[] bytes = new byte[hex.Length / 2];
+            for (int index = 0; index < bytes.Length; index++)
+            {
+                bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
+            }
+
+            return bytes;
+        }
+
+        private static RectangularArrayContract Bare(Action<RectangularArrayContract> set)
+        {
+            RectangularArrayContract value = new RectangularArrayContract();
+            set(value);
+            return value;
+        }
+
+        private static string Encode<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new WProtoWriter(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+            Assert.AreEqual(buffer.Length, writer.Position, "Measure disagreed with Write");
+            return BitConverter.ToString(buffer).Replace("-", string.Empty);
+        }
+
+        private static T RoundTrip<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new WProtoWriter(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+
+            WProtoReader reader = new WProtoReader(buffer);
+            Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
+            return restored;
+        }
+
         [Test]
         public void TheOracleRefusesEveryRectangularShape()
         {
@@ -515,123 +632,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.AreEqual(4, packed.Grid[1, 1]);
             Assert.AreEqual(1, loose.Grid.GetLength(0));
             Assert.AreEqual("b", loose.Grid[0, 1]);
-        }
-
-        private static void AssertSameShape<T>(T[,] expected, T[,] actual, string what)
-        {
-            Assert.AreEqual(expected.GetLength(0), actual.GetLength(0), what + " rows");
-            Assert.AreEqual(expected.GetLength(1), actual.GetLength(1), what + " columns");
-            for (int row = 0; row < expected.GetLength(0); row++)
-            {
-                for (int column = 0; column < expected.GetLength(1); column++)
-                {
-                    Assert.AreEqual(
-                        expected[row, column],
-                        actual[row, column],
-                        what + "[" + row + "," + column + "]"
-                    );
-                }
-            }
-        }
-
-        private static void AssertSameShape<T>(T[,,] expected, T[,,] actual, string what)
-        {
-            for (int axis = 0; axis < 3; axis++)
-            {
-                Assert.AreEqual(
-                    expected.GetLength(axis),
-                    actual.GetLength(axis),
-                    what + " axis " + axis
-                );
-            }
-
-            for (int x = 0; x < expected.GetLength(0); x++)
-            {
-                for (int y = 0; y < expected.GetLength(1); y++)
-                {
-                    for (int z = 0; z < expected.GetLength(2); z++)
-                    {
-                        Assert.AreEqual(expected[x, y, z], actual[x, y, z], what);
-                    }
-                }
-            }
-        }
-
-        /// <summary>
-        /// Builds a wrapper message for the contract member at <paramref name="tag"/>, from the
-        /// dimension header's bytes and the element run's bytes.
-        /// </summary>
-        /// <remarks>
-        /// Every length prefix is computed rather than typed. A prefix that disagrees with its
-        /// content makes the reader refuse the payload for being malformed, which is a different
-        /// answer from the one these tests are about -- and a test that gets the right verdict for
-        /// the wrong reason proves nothing.
-        /// </remarks>
-        private static byte[] Wrapper(int tag, string dimensionsHex, string valuesHex)
-        {
-            List<byte> payload = new List<byte>();
-            Append(payload, 1, dimensionsHex);
-            Append(payload, 2, valuesHex);
-
-            Assert.Less(payload.Count, 128, "the builder writes single-byte length prefixes");
-
-            List<byte> message = new List<byte> { (byte)((tag << 3) | 2), (byte)payload.Count };
-            message.AddRange(payload);
-            return message.ToArray();
-        }
-
-        private static void Append(List<byte> payload, int field, string hex)
-        {
-            if (hex == null)
-            {
-                return;
-            }
-
-            byte[] content = Bytes(hex);
-            Assert.Less(content.Length, 128, "the builder writes single-byte length prefixes");
-            payload.Add((byte)((field << 3) | 2));
-            payload.Add((byte)content.Length);
-            payload.AddRange(content);
-        }
-
-        private static byte[] Bytes(string hex)
-        {
-            byte[] bytes = new byte[hex.Length / 2];
-            for (int index = 0; index < bytes.Length; index++)
-            {
-                bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
-            }
-
-            return bytes;
-        }
-
-        private static RectangularArrayContract Bare(Action<RectangularArrayContract> set)
-        {
-            RectangularArrayContract value = new RectangularArrayContract();
-            set(value);
-            return value;
-        }
-
-        private static string Encode<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new WProtoWriter(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-            Assert.AreEqual(buffer.Length, writer.Position, "Measure disagreed with Write");
-            return BitConverter.ToString(buffer).Replace("-", string.Empty);
-        }
-
-        private static T RoundTrip<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new WProtoWriter(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-
-            WProtoReader reader = new WProtoReader(buffer);
-            Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
-            return restored;
         }
     }
 }

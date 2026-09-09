@@ -15,6 +15,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     [NUnit.Framework.Category("Fast")]
     public sealed class GeometryTests : CommonTestBase
     {
+        private static Vector2 RotateAndQuantize(int x, int y, float cos, float sin)
+        {
+            float fx = x;
+            float fy = y;
+            float rotatedX = fx * cos - fy * sin;
+            float rotatedY = fx * sin + fy * cos;
+            rotatedX = Mathf.Round(rotatedX * 1000f) * 0.001f;
+            rotatedY = Mathf.Round(rotatedY * 1000f) * 0.001f;
+            return new Vector2(rotatedX, rotatedY);
+        }
+
+        private static double ComputeAreaTolerance(Vector2 a, Vector2 b, Vector2 c)
+        {
+            double maxComponent = Math.Max(
+                Math.Max(
+                    Math.Max(Math.Abs(a.x), Math.Abs(a.y)),
+                    Math.Max(Math.Abs(b.x), Math.Abs(b.y))
+                ),
+                Math.Max(Math.Abs(c.x), Math.Abs(c.y))
+            );
+            double scale = Math.Max(1d, maxComponent);
+            return 1e-5d * scale * scale;
+        }
+
         [Test]
         public void AccumulateSingleRect()
         {
@@ -574,30 +598,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Vector2Int p = new(15000, 15001);
             int result = Geometry.IsAPointLeftOfVectorOrOnTheLine(a, b, p);
             Assert.IsTrue(0 < result, "Should handle large values without overflow.");
-        }
-
-        private static Vector2 RotateAndQuantize(int x, int y, float cos, float sin)
-        {
-            float fx = x;
-            float fy = y;
-            float rotatedX = fx * cos - fy * sin;
-            float rotatedY = fx * sin + fy * cos;
-            rotatedX = Mathf.Round(rotatedX * 1000f) * 0.001f;
-            rotatedY = Mathf.Round(rotatedY * 1000f) * 0.001f;
-            return new Vector2(rotatedX, rotatedY);
-        }
-
-        private static double ComputeAreaTolerance(Vector2 a, Vector2 b, Vector2 c)
-        {
-            double maxComponent = Math.Max(
-                Math.Max(
-                    Math.Max(Math.Abs(a.x), Math.Abs(a.y)),
-                    Math.Max(Math.Abs(b.x), Math.Abs(b.y))
-                ),
-                Math.Max(Math.Abs(c.x), Math.Abs(c.y))
-            );
-            double scale = Math.Max(1d, maxComponent);
-            return 1e-5d * scale * scale;
         }
     }
 }

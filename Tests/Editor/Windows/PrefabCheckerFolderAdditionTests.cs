@@ -23,45 +23,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         private const string Root = "Assets/Temp/PrefabCheckerFolderAdditionTests";
         private const string TempRoot = "Assets/Temp";
 
-        [OneTimeSetUp]
-        public void OneTimeSetUp()
-        {
-            CleanupAllKnownTestFolders();
-            CleanupTempFoldersAndDuplicates();
-        }
-
-        [SetUp]
-        public override void BaseSetUp()
-        {
-            base.BaseSetUp();
-            EnsureFolder(Root);
-
-            AssetDatabaseBatchHelper.RefreshIfNotBatching(
-                UnityEditor.ImportAssetOptions.ForceSynchronousImport
-            );
-        }
-
-        [TearDown]
-        public override void TearDown()
-        {
-            base.TearDown();
-
-            CleanupTrackedFoldersAndAssets();
-
-            DeleteFolderAndContents(Root);
-        }
-
-        [OneTimeTearDown]
-        public override void OneTimeTearDown()
-        {
-            base.OneTimeTearDown();
-
-            DeleteFolderAndContents(Root);
-
-            CleanupTempFoldersAndDuplicates();
-            CleanupAllKnownTestFolders();
-        }
-
         /// <summary>
         /// Cleans up the Assets/Temp folder and all its duplicates (Temp 1, Temp 2, etc.).
         /// </summary>
@@ -223,6 +184,240 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
             }
         }
 
+        /// <summary>
+        /// Data source for testing various edge case folder paths.
+        /// </summary>
+        private static IEnumerable<TestCaseData> EdgeCaseFolderPaths()
+        {
+            yield return new TestCaseData(null, false)
+                .SetName("NullPath")
+                .SetDescription("Null path should be rejected");
+            yield return new TestCaseData(string.Empty, false)
+                .SetName("EmptyPath")
+                .SetDescription("Empty path should be rejected");
+            yield return new TestCaseData("   ", false)
+                .SetName("WhitespacePath")
+                .SetDescription("Whitespace-only path should be rejected");
+            yield return new TestCaseData("Assets", true)
+                .SetName("AssetsRoot")
+                .SetDescription("Assets root folder should be accepted");
+        }
+
+        /// <summary>
+        /// Data source for testing various paths outside the Unity project.
+        /// All of these paths should be rejected with an error log.
+        /// </summary>
+        private static IEnumerable<TestCaseData> OutsideProjectPaths()
+        {
+            yield return new TestCaseData(Path.GetTempPath())
+                .SetName("SystemTempPath")
+                .SetDescription("System temp directory should be rejected");
+
+            // Windows-specific paths (will only be tested on Windows)
+            if (Application.platform == RuntimePlatform.WindowsEditor)
+            {
+                yield return new TestCaseData(@"C:\Windows")
+                    .SetName("WindowsSystemFolder")
+                    .SetDescription("Windows system folder should be rejected");
+
+                yield return new TestCaseData(@"C:\Program Files")
+                    .SetName("ProgramFilesFolder")
+                    .SetDescription("Program Files folder should be rejected");
+
+                yield return new TestCaseData(@"C:\")
+                    .SetName("DriveRoot")
+                    .SetDescription("Drive root should be rejected");
+            }
+
+            // macOS/Linux paths (will only be tested on those platforms)
+            if (
+                Application.platform == RuntimePlatform.OSXEditor
+                || Application.platform == RuntimePlatform.LinuxEditor
+            )
+            {
+                yield return new TestCaseData("/tmp")
+                    .SetName("UnixTmpFolder")
+                    .SetDescription("Unix /tmp folder should be rejected");
+
+                yield return new TestCaseData("/usr")
+                    .SetName("UnixUsrFolder")
+                    .SetDescription("Unix /usr folder should be rejected");
+
+                yield return new TestCaseData("/")
+                    .SetName("RootFolder")
+                    .SetDescription("Root folder should be rejected");
+            }
+
+            string userProfile = System.Environment.GetFolderPath(
+                System.Environment.SpecialFolder.UserProfile
+            );
+            if (!string.IsNullOrEmpty(userProfile) && Directory.Exists(userProfile))
+            {
+                yield return new TestCaseData(userProfile)
+                    .SetName("UserProfileFolder")
+                    .SetDescription("User profile folder should be rejected");
+            }
+        }
+
+        /// <summary>
+        /// Data source for testing edge cases of TryAddFolderFromAbsolute.
+        /// </summary>
+        private static IEnumerable<TestCaseData> TryAddFolderFromAbsoluteEdgeCases()
+        {
+            yield return new TestCaseData(null, false, false)
+                .SetName("NullPath")
+                .SetDescription("Null path should return false without error");
+
+            yield return new TestCaseData(string.Empty, false, false)
+                .SetName("EmptyPath")
+                .SetDescription("Empty path should return false without error");
+
+            yield return new TestCaseData("   ", false, false)
+                .SetName("WhitespacePath")
+                .SetDescription("Whitespace-only path should return false without error");
+
+            // "///" is not whitespace, so it reaches path validation and is rejected as outside the project.
+            yield return new TestCaseData("///", false, true)
+                .SetName("OnlySlashes")
+                .SetDescription("Path with only slashes should return false with error");
+
+            yield return new TestCaseData(
+                Path.Combine(Path.GetTempPath(), "NonExistentFolder12345"),
+                false,
+                true
+            )
+                .SetName("NonExistentAbsolutePath")
+                .SetDescription("Non-existent absolute path should return false with error");
+        }
+
+        /// <summary>
+        /// Data source for testing paths with various trailing slash combinations.
+        /// </summary>
+        private static IEnumerable<TestCaseData> TrailingSlashVariations()
+        {
+            yield return new TestCaseData("/")
+                .SetName("SingleTrailingForwardSlash")
+                .SetDescription(
+                    "Path with single trailing forward slash should normalize to Assets"
+                );
+
+            yield return new TestCaseData("\\")
+                .SetName("SingleTrailingBackslash")
+                .SetDescription("Path with single trailing backslash should normalize to Assets");
+
+            yield return new TestCaseData("///")
+                .SetName("MultipleTrailingForwardSlashes")
+                .SetDescription(
+                    "Path with multiple trailing forward slashes should normalize to Assets"
+                );
+
+            yield return new TestCaseData("/\\")
+                .SetName("MixedTrailingSlashes")
+                .SetDescription("Path with mixed trailing slashes should normalize to Assets");
+
+            yield return new TestCaseData("\\\\")
+                .SetName("DoubleBackslash")
+                .SetDescription("Path with double backslash should normalize to Assets");
+        }
+
+        /// <summary>
+        /// Data source for testing paths with special characters that should be handled gracefully.
+        /// </summary>
+        private static IEnumerable<TestCaseData> SpecialCharacterPaths()
+        {
+            yield return new TestCaseData("\t", false, false)
+                .SetName("TabOnlyPath")
+                .SetDescription("Tab-only path should return false without error");
+
+            yield return new TestCaseData("\n", false, false)
+                .SetName("NewlineOnlyPath")
+                .SetDescription("Newline-only path should return false without error");
+
+            yield return new TestCaseData("\r", false, false)
+                .SetName("CarriageReturnOnlyPath")
+                .SetDescription("Carriage return only path should return false without error");
+
+            yield return new TestCaseData(" \t\n\r ", false, false)
+                .SetName("MixedWhitespacePath")
+                .SetDescription("Mixed whitespace path should return false without error");
+
+            yield return new TestCaseData("Assets<>*?|", false, true)
+                .SetName("PathWithInvalidChars")
+                .SetDescription("Path with invalid filesystem chars should be rejected");
+        }
+
+        /// <summary>
+        /// Data source for testing case sensitivity in path handling via TryAddFolderFromAbsolute.
+        /// TryAddFolderFromAbsolute normalizes "Assets" casing through TryGetUnityFolderFromAbsolute.
+        /// </summary>
+        private static IEnumerable<TestCaseData> CaseSensitivityAbsolutePaths()
+        {
+            yield return new TestCaseData("Assets")
+                .SetName("NormalCaseAssets")
+                .SetDescription("Normal casing 'Assets' should work");
+
+            /*
+                On case-insensitive filesystems the OS controls the root casing; assert only the normalized
+                relative suffix.
+            */
+        }
+
+        /// <summary>
+        /// Helper to escape control characters for display in test messages.
+        /// </summary>
+        private static string EscapeForDisplay(string input)
+        {
+            if (input == null)
+            {
+                return "null";
+            }
+
+            return input
+                .Replace("\t", "\\t")
+                .Replace("\n", "\\n")
+                .Replace("\r", "\\r")
+                .Replace(" ", "·");
+        }
+
+        [OneTimeSetUp]
+        public void OneTimeSetUp()
+        {
+            CleanupAllKnownTestFolders();
+            CleanupTempFoldersAndDuplicates();
+        }
+
+        [SetUp]
+        public override void BaseSetUp()
+        {
+            base.BaseSetUp();
+            EnsureFolder(Root);
+
+            AssetDatabaseBatchHelper.RefreshIfNotBatching(
+                UnityEditor.ImportAssetOptions.ForceSynchronousImport
+            );
+        }
+
+        [TearDown]
+        public override void TearDown()
+        {
+            base.TearDown();
+
+            CleanupTrackedFoldersAndAssets();
+
+            DeleteFolderAndContents(Root);
+        }
+
+        [OneTimeTearDown]
+        public override void OneTimeTearDown()
+        {
+            base.OneTimeTearDown();
+
+            DeleteFolderAndContents(Root);
+
+            CleanupTempFoldersAndDuplicates();
+            CleanupAllKnownTestFolders();
+        }
+
         [Test]
         public void TryAddFolderFromAbsoluteAddsAssetsRoot()
         {
@@ -290,25 +485,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
             CollectionAssert.DoesNotContain(checker._assetPaths, invalid);
         }
 
-        /// <summary>
-        /// Data source for testing various edge case folder paths.
-        /// </summary>
-        private static IEnumerable<TestCaseData> EdgeCaseFolderPaths()
-        {
-            yield return new TestCaseData(null, false)
-                .SetName("NullPath")
-                .SetDescription("Null path should be rejected");
-            yield return new TestCaseData(string.Empty, false)
-                .SetName("EmptyPath")
-                .SetDescription("Empty path should be rejected");
-            yield return new TestCaseData("   ", false)
-                .SetName("WhitespacePath")
-                .SetDescription("Whitespace-only path should be rejected");
-            yield return new TestCaseData("Assets", true)
-                .SetName("AssetsRoot")
-                .SetDescription("Assets root folder should be accepted");
-        }
-
         [Test]
         [TestCaseSource(nameof(EdgeCaseFolderPaths))]
         public void AddAssetFolderHandlesEdgeCases(string path, bool expectedResult)
@@ -359,62 +535,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
             Assert.AreEqual(2, checker._assetPaths.Count, "Both folders should be in the list");
         }
 
-        /// <summary>
-        /// Data source for testing various paths outside the Unity project.
-        /// All of these paths should be rejected with an error log.
-        /// </summary>
-        private static IEnumerable<TestCaseData> OutsideProjectPaths()
-        {
-            yield return new TestCaseData(Path.GetTempPath())
-                .SetName("SystemTempPath")
-                .SetDescription("System temp directory should be rejected");
-
-            // Windows-specific paths (will only be tested on Windows)
-            if (Application.platform == RuntimePlatform.WindowsEditor)
-            {
-                yield return new TestCaseData(@"C:\Windows")
-                    .SetName("WindowsSystemFolder")
-                    .SetDescription("Windows system folder should be rejected");
-
-                yield return new TestCaseData(@"C:\Program Files")
-                    .SetName("ProgramFilesFolder")
-                    .SetDescription("Program Files folder should be rejected");
-
-                yield return new TestCaseData(@"C:\")
-                    .SetName("DriveRoot")
-                    .SetDescription("Drive root should be rejected");
-            }
-
-            // macOS/Linux paths (will only be tested on those platforms)
-            if (
-                Application.platform == RuntimePlatform.OSXEditor
-                || Application.platform == RuntimePlatform.LinuxEditor
-            )
-            {
-                yield return new TestCaseData("/tmp")
-                    .SetName("UnixTmpFolder")
-                    .SetDescription("Unix /tmp folder should be rejected");
-
-                yield return new TestCaseData("/usr")
-                    .SetName("UnixUsrFolder")
-                    .SetDescription("Unix /usr folder should be rejected");
-
-                yield return new TestCaseData("/")
-                    .SetName("RootFolder")
-                    .SetDescription("Root folder should be rejected");
-            }
-
-            string userProfile = System.Environment.GetFolderPath(
-                System.Environment.SpecialFolder.UserProfile
-            );
-            if (!string.IsNullOrEmpty(userProfile) && Directory.Exists(userProfile))
-            {
-                yield return new TestCaseData(userProfile)
-                    .SetName("UserProfileFolder")
-                    .SetDescription("User profile folder should be rejected");
-            }
-        }
-
         [Test]
         [TestCaseSource(nameof(OutsideProjectPaths))]
         public void TryAddFolderFromAbsoluteRejectsOutsideProject(string outsidePath)
@@ -453,37 +573,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                 outsidePath,
                 $"Outside path should not be in _assetPaths list: {outsidePath}"
             );
-        }
-
-        /// <summary>
-        /// Data source for testing edge cases of TryAddFolderFromAbsolute.
-        /// </summary>
-        private static IEnumerable<TestCaseData> TryAddFolderFromAbsoluteEdgeCases()
-        {
-            yield return new TestCaseData(null, false, false)
-                .SetName("NullPath")
-                .SetDescription("Null path should return false without error");
-
-            yield return new TestCaseData(string.Empty, false, false)
-                .SetName("EmptyPath")
-                .SetDescription("Empty path should return false without error");
-
-            yield return new TestCaseData("   ", false, false)
-                .SetName("WhitespacePath")
-                .SetDescription("Whitespace-only path should return false without error");
-
-            // "///" is not whitespace, so it reaches path validation and is rejected as outside the project.
-            yield return new TestCaseData("///", false, true)
-                .SetName("OnlySlashes")
-                .SetDescription("Path with only slashes should return false with error");
-
-            yield return new TestCaseData(
-                Path.Combine(Path.GetTempPath(), "NonExistentFolder12345"),
-                false,
-                true
-            )
-                .SetName("NonExistentAbsolutePath")
-                .SetDescription("Non-existent absolute path should return false with error");
         }
 
         [Test]
@@ -648,36 +737,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
             CollectionAssert.Contains(checker._assetPaths, folder3);
         }
 
-        /// <summary>
-        /// Data source for testing paths with various trailing slash combinations.
-        /// </summary>
-        private static IEnumerable<TestCaseData> TrailingSlashVariations()
-        {
-            yield return new TestCaseData("/")
-                .SetName("SingleTrailingForwardSlash")
-                .SetDescription(
-                    "Path with single trailing forward slash should normalize to Assets"
-                );
-
-            yield return new TestCaseData("\\")
-                .SetName("SingleTrailingBackslash")
-                .SetDescription("Path with single trailing backslash should normalize to Assets");
-
-            yield return new TestCaseData("///")
-                .SetName("MultipleTrailingForwardSlashes")
-                .SetDescription(
-                    "Path with multiple trailing forward slashes should normalize to Assets"
-                );
-
-            yield return new TestCaseData("/\\")
-                .SetName("MixedTrailingSlashes")
-                .SetDescription("Path with mixed trailing slashes should normalize to Assets");
-
-            yield return new TestCaseData("\\\\")
-                .SetName("DoubleBackslash")
-                .SetDescription("Path with double backslash should normalize to Assets");
-        }
-
         [Test]
         [TestCaseSource(nameof(TrailingSlashVariations))]
         public void TryAddFolderFromAbsoluteNormalizesTrailingSlashes(string trailingSuffix)
@@ -708,32 +767,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
             );
         }
 
-        /// <summary>
-        /// Data source for testing paths with special characters that should be handled gracefully.
-        /// </summary>
-        private static IEnumerable<TestCaseData> SpecialCharacterPaths()
-        {
-            yield return new TestCaseData("\t", false, false)
-                .SetName("TabOnlyPath")
-                .SetDescription("Tab-only path should return false without error");
-
-            yield return new TestCaseData("\n", false, false)
-                .SetName("NewlineOnlyPath")
-                .SetDescription("Newline-only path should return false without error");
-
-            yield return new TestCaseData("\r", false, false)
-                .SetName("CarriageReturnOnlyPath")
-                .SetDescription("Carriage return only path should return false without error");
-
-            yield return new TestCaseData(" \t\n\r ", false, false)
-                .SetName("MixedWhitespacePath")
-                .SetDescription("Mixed whitespace path should return false without error");
-
-            yield return new TestCaseData("Assets<>*?|", false, true)
-                .SetName("PathWithInvalidChars")
-                .SetDescription("Path with invalid filesystem chars should be rejected");
-        }
-
         [Test]
         [TestCaseSource(nameof(SpecialCharacterPaths))]
         public void TryAddFolderFromAbsoluteHandlesSpecialCharacters(
@@ -760,22 +793,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                 $"TryAddFolderFromAbsolute with special characters should return {expectedResult}.\n"
                     + $"  Input: '{EscapeForDisplay(path)}'"
             );
-        }
-
-        /// <summary>
-        /// Data source for testing case sensitivity in path handling via TryAddFolderFromAbsolute.
-        /// TryAddFolderFromAbsolute normalizes "Assets" casing through TryGetUnityFolderFromAbsolute.
-        /// </summary>
-        private static IEnumerable<TestCaseData> CaseSensitivityAbsolutePaths()
-        {
-            yield return new TestCaseData("Assets")
-                .SetName("NormalCaseAssets")
-                .SetDescription("Normal casing 'Assets' should work");
-
-            /*
-                On case-insensitive filesystems the OS controls the root casing; assert only the normalized
-                relative suffix.
-            */
         }
 
         [Test]
@@ -856,23 +873,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
                 checker._assetPaths.Exists(p => p.EndsWith("/") || p.EndsWith("\\")),
                 "No path should have trailing slashes"
             );
-        }
-
-        /// <summary>
-        /// Helper to escape control characters for display in test messages.
-        /// </summary>
-        private static string EscapeForDisplay(string input)
-        {
-            if (input == null)
-            {
-                return "null";
-            }
-
-            return input
-                .Replace("\t", "\\t")
-                .Replace("\n", "\\n")
-                .Replace("\r", "\\r")
-                .Replace(" ", "·");
         }
     }
 #endif

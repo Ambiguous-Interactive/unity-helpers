@@ -18,7 +18,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
     {
         internal const string HostWindowTitle = "Editor Surface Capture Host";
         private const string CreateEditorPanelMethodName = "CreateEditorPanel";
-        internal IDisposable OwnedPanel { get; set; }
 
         /// <summary>
         /// How many hosts are alive right now. Tests assert this returns to zero, because a
@@ -26,6 +25,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
         /// </summary>
         internal static int LiveHostCount =>
             Resources.FindObjectsOfTypeAll<EditorSurfaceCaptureHostWindow>().Length;
+        internal IDisposable OwnedPanel { get; set; }
 
         internal static EditorSurfaceCaptureHostWindow Create(int canvasWidth, int canvasHeight)
         {
@@ -117,18 +117,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
             }
         }
 
-        private static void DestroyHost(EditorSurfaceCaptureHostWindow window)
-        {
-            try
-            {
-                Object.DestroyImmediate(window); // UNH-SUPPRESS: batch or failed host has no native parent to close.
-            }
-            catch (Exception exception)
-            {
-                Debug.LogException(exception);
-            }
-        }
-
         /// <summary>
         /// Closes every host window still alive, including ones an interrupted run left behind,
         /// and reports how many there were.
@@ -145,6 +133,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
             }
 
             return leaked.Length;
+        }
+
+        private static void DestroyHost(EditorSurfaceCaptureHostWindow window)
+        {
+            try
+            {
+                Object.DestroyImmediate(window); // UNH-SUPPRESS: batch or failed host has no native parent to close.
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+            }
         }
     }
 #endif

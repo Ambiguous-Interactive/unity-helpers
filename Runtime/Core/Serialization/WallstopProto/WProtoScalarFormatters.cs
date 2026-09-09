@@ -186,6 +186,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         private sealed class EnumFormatter<T> : IWProtoScalarFormatter<T>
             where T : struct
         {
+            public int WireType => WProtoWireType.Varint;
+
             private readonly int _size;
             private readonly bool _signed;
 
@@ -194,8 +196,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 _size = size;
                 _signed = signed;
             }
-
-            public int WireType => WProtoWireType.Varint;
 
             public bool IsDefault(in T value) => Numeric(value) == 0;
 

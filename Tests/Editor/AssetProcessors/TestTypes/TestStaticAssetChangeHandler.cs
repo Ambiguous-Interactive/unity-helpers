@@ -12,9 +12,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     /// </summary>
     internal static class TestStaticAssetChangeHandler
     {
-        private static readonly List<AssetChangeContext> Recorded = new();
-
         public static IReadOnlyList<AssetChangeContext> RecordedContexts => Recorded;
+
+        private static readonly List<AssetChangeContext> Recorded = new();
 
         public static void Clear()
         {

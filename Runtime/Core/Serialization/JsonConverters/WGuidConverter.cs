@@ -18,58 +18,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
 
         private WGuidConverter() { }
 
-        public override WGuid Read(
-            ref Utf8JsonReader reader,
-            Type typeToConvert,
-            JsonSerializerOptions options
-        )
-        {
-            if (reader.TokenType == JsonTokenType.String)
-            {
-                string value = reader.GetString();
-                if (string.IsNullOrEmpty(value))
-                {
-                    return WGuid.Empty;
-                }
-
-                if (TryReadText(value, out WGuid parsed))
-                {
-                    return parsed;
-                }
-
-                throw new JsonException($"Invalid {nameof(WGuid)} string value.");
-            }
-
-            if (reader.TokenType == JsonTokenType.StartObject)
-            {
-                return ReadFromObject(ref reader);
-            }
-
-            if (reader.TokenType == JsonTokenType.Null)
-            {
-                return WGuid.Empty;
-            }
-
-            throw new JsonException($"{nameof(WGuid)} must be encoded as a JSON string.");
-        }
-
-        public override void Write(
-            Utf8JsonWriter writer,
-            WGuid value,
-            JsonSerializerOptions options
-        )
-        {
-            // Format directly into stack storage to avoid a temporary string for every entity ID.
-            Span<char> text = stackalloc char[36];
-            if (value.TryFormat(text, out int written))
-            {
-                writer.WriteStringValue(text.Slice(0, written));
-                return;
-            }
-
-            writer.WriteStringValue(value.ToString());
-        }
-
         /// <summary>
         /// The single place a GUID's text becomes a <see cref="WGuid"/>, because this converter
         /// accepts it in two shapes and they must agree.
@@ -181,6 +129,58 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             throw new JsonException(
                 $"Unexpected end of JSON while reading {nameof(WGuid)} object."
             );
+        }
+
+        public override WGuid Read(
+            ref Utf8JsonReader reader,
+            Type typeToConvert,
+            JsonSerializerOptions options
+        )
+        {
+            if (reader.TokenType == JsonTokenType.String)
+            {
+                string value = reader.GetString();
+                if (string.IsNullOrEmpty(value))
+                {
+                    return WGuid.Empty;
+                }
+
+                if (TryReadText(value, out WGuid parsed))
+                {
+                    return parsed;
+                }
+
+                throw new JsonException($"Invalid {nameof(WGuid)} string value.");
+            }
+
+            if (reader.TokenType == JsonTokenType.StartObject)
+            {
+                return ReadFromObject(ref reader);
+            }
+
+            if (reader.TokenType == JsonTokenType.Null)
+            {
+                return WGuid.Empty;
+            }
+
+            throw new JsonException($"{nameof(WGuid)} must be encoded as a JSON string.");
+        }
+
+        public override void Write(
+            Utf8JsonWriter writer,
+            WGuid value,
+            JsonSerializerOptions options
+        )
+        {
+            // Format directly into stack storage to avoid a temporary string for every entity ID.
+            Span<char> text = stackalloc char[36];
+            if (value.TryFormat(text, out int written))
+            {
+                writer.WriteStringValue(text.Slice(0, written));
+                return;
+            }
+
+            writer.WriteStringValue(value.ToString());
         }
     }
 }

@@ -22,6 +22,28 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
     [NUnit.Framework.Category("Integration")]
     public sealed class StringInListDrawerTests : CommonTestBase
     {
+        private static T GetAttributeFromProperty<T>(SerializedProperty property)
+            where T : Attribute
+        {
+            return PropertyDrawerTestHelper.GetAttributeFromProperty<T>(property);
+        }
+
+        private static void AssignAttribute(PropertyDrawer drawer, PropertyAttribute attribute)
+        {
+            PropertyDrawerTestHelper.AssignAttribute(drawer, attribute);
+        }
+
+        private static void InvokeApplySelection(BaseField<string> selector, int optionIndex)
+        {
+            WDropDownSelectorBase<string> dropDownSelector =
+                selector as WDropDownSelectorBase<string>;
+            Assert.IsTrue(
+                dropDownSelector != null,
+                $"Expected selector to derive from WDropDownSelectorBase<string>, but was {selector?.GetType().FullName ?? "null"}."
+            );
+            dropDownSelector.ApplySelection(optionIndex);
+        }
+
         [Test]
         public void CreatePropertyGUIWithoutOptionsReturnsHelpBox()
         {
@@ -459,28 +481,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             DropdownField dropdown = selector.Q<DropdownField>();
             Assert.IsTrue(dropdown != null, "DropDown field was not created.");
             Assert.That(dropdown.value, Is.EqualTo("Low"));
-        }
-
-        private static T GetAttributeFromProperty<T>(SerializedProperty property)
-            where T : Attribute
-        {
-            return PropertyDrawerTestHelper.GetAttributeFromProperty<T>(property);
-        }
-
-        private static void AssignAttribute(PropertyDrawer drawer, PropertyAttribute attribute)
-        {
-            PropertyDrawerTestHelper.AssignAttribute(drawer, attribute);
-        }
-
-        private static void InvokeApplySelection(BaseField<string> selector, int optionIndex)
-        {
-            WDropDownSelectorBase<string> dropDownSelector =
-                selector as WDropDownSelectorBase<string>;
-            Assert.IsTrue(
-                dropDownSelector != null,
-                $"Expected selector to derive from WDropDownSelectorBase<string>, but was {selector?.GetType().FullName ?? "null"}."
-            );
-            dropDownSelector.ApplySelection(optionIndex);
         }
     }
 #endif

@@ -39,135 +39,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         private bool _previousEditorUiSuppress;
         private bool _previousIgnoreCompilationState;
 
-        [UnitySetUp]
-        public IEnumerator UnitySetUp()
-        {
-            AssetPostprocessorTestHandlers.AssertCleanAndClearAll();
-
-            _previousEditorUiSuppress = EditorUi.Suppress;
-            EditorUi.Suppress = true;
-            ScriptableObjectSingletonCreator.IncludeTestAssemblies = true;
-
-            ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = true;
-            // Unity may report isCompiling/isUpdating during a test run after AssetDatabase operations.
-            _previousIgnoreCompilationState =
-                ScriptableObjectSingletonCreator.IgnoreCompilationState;
-            ScriptableObjectSingletonCreator.IgnoreCompilationState = true;
-            ScriptableObjectSingletonCreator.TypeFilter = static type =>
-                type == typeof(CreatorPathSingleton) || type == typeof(NestedDiskSingleton);
-            ScriptableObjectSingletonCreator.DisableAutomaticRetries = false;
-            ScriptableObjectSingletonCreator.ResetRetryStateForTests();
-            // Ensure the metadata folder exists to prevent modal dialogs
-            EnsureFolder("Assets/Resources/Wallstop Studios/Unity Helpers");
-            DeleteAssetIfExists(TargetAssetPath);
-            yield return null;
-            DeleteAssetIfExists(WrongAssetPath);
-            yield return null;
-            DeleteAssetIfExists(WrongAssetPathCaseVariant);
-            yield return null;
-            DeleteAssetIfExists(NestedTargetAssetPath);
-            yield return null;
-            DeleteFolderHierarchy(TargetFolder);
-            yield return null;
-            DeleteFolderHierarchy(WrongFolder);
-            ;
-            yield return null;
-            DeleteFolderHierarchy(WrongFolderCaseVariant);
-            yield return null;
-            DeleteFolderHierarchy(NestedTargetFolder);
-            yield return null;
-            AssetDatabase.SaveAssets();
-            AssetDatabaseBatchHelper.RefreshIfNotBatching(
-                ImportAssetOptions.ForceSynchronousImport
-            );
-            yield return null;
-        }
-
-        [UnityTearDown]
-        public override IEnumerator UnityTearDown()
-        {
-            LogAssert.ignoreFailingMessages = false;
-            yield return base.UnityTearDown();
-            yield return null;
-            DeleteAssetIfExists(TargetAssetPath);
-            yield return null;
-            DeleteAssetIfExists(WrongAssetPath);
-            yield return null;
-            DeleteAssetIfExists(WrongAssetPathCaseVariant);
-            yield return null;
-            DeleteAssetIfExists(NestedTargetAssetPath);
-            yield return null;
-            DeleteFolderHierarchy(TargetFolder);
-            yield return null;
-            DeleteFolderHierarchy(WrongFolder);
-            yield return null;
-            DeleteFolderHierarchy(WrongFolderCaseVariant);
-            yield return null;
-            DeleteFolderHierarchy(NestedTargetFolder);
-            yield return null;
-            TryDeleteEmptyFolderCaseInsensitive(ResourcesRoot + "/Tests");
-            yield return null;
-            TryDeleteEmptyFolderCaseInsensitive(ResourcesRoot + "/TestS");
-            yield return null;
-            TryDeleteEmptyFolder(ResourcesRoot);
-            yield return null;
-            ScriptableObjectSingletonCreator.IncludeTestAssemblies = false;
-            ScriptableObjectSingletonCreator.TypeFilter = null;
-            ScriptableObjectSingletonCreator.DisableAutomaticRetries = false;
-            ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = false;
-            ScriptableObjectSingletonCreator.IgnoreCompilationState =
-                _previousIgnoreCompilationState;
-            ScriptableObjectSingletonCreator.ResetRetryStateForTests();
-            AssetDatabase.SaveAssets();
-            AssetDatabaseBatchHelper.RefreshIfNotBatching(
-                ImportAssetOptions.ForceSynchronousImport
-            );
-            AssetPostprocessorDeferral.FlushForTesting();
-            EditorUi.Suppress = _previousEditorUiSuppress;
-            yield return null;
-        }
-
-        [UnityTest]
-        public IEnumerator CreatesAssetAtAttributePath()
-        {
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
-            yield return null;
-            AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
-            yield return null;
-
-            CreatorPathSingleton asset = AssetDatabase.LoadAssetAtPath<CreatorPathSingleton>(
-                TargetAssetPath
-            );
-            Assert.IsTrue(asset != null);
-        }
-
-        [UnityTest]
-        public IEnumerator RelocatesExistingAssetToAttributePath()
-        {
-            EnsureFolder(ResourcesRoot);
-            yield return null;
-            EnsureFolder(WrongFolder);
-            yield return null;
-            CreatorPathSingleton instance = ScriptableObject.CreateInstance<CreatorPathSingleton>(); // UNH-SUPPRESS: UNH002 - Asset managed by test cleanup
-            AssetDatabase.CreateAsset(instance, WrongAssetPath);
-            AssetDatabase.SaveAssets();
-            yield return null;
-
-            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
-            AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
-            yield return null;
-            CreatorPathSingleton relocated = AssetDatabase.LoadAssetAtPath<CreatorPathSingleton>(
-                TargetAssetPath
-            );
-            Assert.IsTrue(relocated != null);
-            yield return null;
-            AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
-            yield return null;
-            Assert.IsTrue(
-                AssetDatabase.LoadAssetAtPath<CreatorPathSingleton>(WrongAssetPath) == null
-            );
-        }
-
         private static void DeleteAssetIfExists(string assetPath)
         {
             if (AssetDatabase.LoadAssetAtPath<Object>(assetPath) != null)
@@ -299,6 +170,203 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             return current;
         }
 
+        private static IEnumerable<DiskFolderScenario> DiskOnlyFolderScenarios()
+        {
+            yield return new DiskFolderScenario(
+                "CreatorPath",
+                TargetFolder,
+                TargetAssetPath,
+                typeof(CreatorPathSingleton)
+            );
+
+            yield return new DiskFolderScenario(
+                "NestedDeepPath",
+                NestedTargetFolder,
+                NestedTargetAssetPath,
+                typeof(NestedDiskSingleton)
+            );
+        }
+
+        private static void IgnoreVersionSpecificInvalidAssetImportLogs()
+        {
+            /*
+                Invalid asset YAML produces Unity-version-specific importer errors before the stable package
+                warning.
+            */
+            LogAssert.ignoreFailingMessages = true;
+        }
+
+        private static string GetAbsolutePath(string assetsRelativePath)
+        {
+            if (string.IsNullOrWhiteSpace(assetsRelativePath))
+            {
+                return string.Empty;
+            }
+
+            string projectRoot = Path.GetDirectoryName(Application.dataPath);
+            if (string.IsNullOrEmpty(projectRoot))
+            {
+                return string.Empty;
+            }
+
+            string normalized = assetsRelativePath.Replace('/', Path.DirectorySeparatorChar);
+            return Path.Combine(projectRoot, normalized);
+        }
+
+        private static void DeleteFileIfExists(string assetsRelativePath)
+        {
+            if (string.IsNullOrWhiteSpace(assetsRelativePath))
+            {
+                return;
+            }
+
+            if (AssetDatabase.DeleteAsset(assetsRelativePath))
+            {
+                return;
+            }
+
+            string absolutePath = GetAbsolutePath(assetsRelativePath);
+            if (!string.IsNullOrEmpty(absolutePath) && File.Exists(absolutePath))
+            {
+                File.Delete(absolutePath);
+            }
+
+            string metaPath = absolutePath + ".meta";
+            if (!string.IsNullOrEmpty(metaPath) && File.Exists(metaPath))
+            {
+                File.Delete(metaPath);
+            }
+        }
+
+        [UnitySetUp]
+        public IEnumerator UnitySetUp()
+        {
+            AssetPostprocessorTestHandlers.AssertCleanAndClearAll();
+
+            _previousEditorUiSuppress = EditorUi.Suppress;
+            EditorUi.Suppress = true;
+            ScriptableObjectSingletonCreator.IncludeTestAssemblies = true;
+
+            ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = true;
+            // Unity may report isCompiling/isUpdating during a test run after AssetDatabase operations.
+            _previousIgnoreCompilationState =
+                ScriptableObjectSingletonCreator.IgnoreCompilationState;
+            ScriptableObjectSingletonCreator.IgnoreCompilationState = true;
+            ScriptableObjectSingletonCreator.TypeFilter = static type =>
+                type == typeof(CreatorPathSingleton) || type == typeof(NestedDiskSingleton);
+            ScriptableObjectSingletonCreator.DisableAutomaticRetries = false;
+            ScriptableObjectSingletonCreator.ResetRetryStateForTests();
+            // Ensure the metadata folder exists to prevent modal dialogs
+            EnsureFolder("Assets/Resources/Wallstop Studios/Unity Helpers");
+            DeleteAssetIfExists(TargetAssetPath);
+            yield return null;
+            DeleteAssetIfExists(WrongAssetPath);
+            yield return null;
+            DeleteAssetIfExists(WrongAssetPathCaseVariant);
+            yield return null;
+            DeleteAssetIfExists(NestedTargetAssetPath);
+            yield return null;
+            DeleteFolderHierarchy(TargetFolder);
+            yield return null;
+            DeleteFolderHierarchy(WrongFolder);
+            ;
+            yield return null;
+            DeleteFolderHierarchy(WrongFolderCaseVariant);
+            yield return null;
+            DeleteFolderHierarchy(NestedTargetFolder);
+            yield return null;
+            AssetDatabase.SaveAssets();
+            AssetDatabaseBatchHelper.RefreshIfNotBatching(
+                ImportAssetOptions.ForceSynchronousImport
+            );
+            yield return null;
+        }
+
+        [UnityTearDown]
+        public override IEnumerator UnityTearDown()
+        {
+            LogAssert.ignoreFailingMessages = false;
+            yield return base.UnityTearDown();
+            yield return null;
+            DeleteAssetIfExists(TargetAssetPath);
+            yield return null;
+            DeleteAssetIfExists(WrongAssetPath);
+            yield return null;
+            DeleteAssetIfExists(WrongAssetPathCaseVariant);
+            yield return null;
+            DeleteAssetIfExists(NestedTargetAssetPath);
+            yield return null;
+            DeleteFolderHierarchy(TargetFolder);
+            yield return null;
+            DeleteFolderHierarchy(WrongFolder);
+            yield return null;
+            DeleteFolderHierarchy(WrongFolderCaseVariant);
+            yield return null;
+            DeleteFolderHierarchy(NestedTargetFolder);
+            yield return null;
+            TryDeleteEmptyFolderCaseInsensitive(ResourcesRoot + "/Tests");
+            yield return null;
+            TryDeleteEmptyFolderCaseInsensitive(ResourcesRoot + "/TestS");
+            yield return null;
+            TryDeleteEmptyFolder(ResourcesRoot);
+            yield return null;
+            ScriptableObjectSingletonCreator.IncludeTestAssemblies = false;
+            ScriptableObjectSingletonCreator.TypeFilter = null;
+            ScriptableObjectSingletonCreator.DisableAutomaticRetries = false;
+            ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression = false;
+            ScriptableObjectSingletonCreator.IgnoreCompilationState =
+                _previousIgnoreCompilationState;
+            ScriptableObjectSingletonCreator.ResetRetryStateForTests();
+            AssetDatabase.SaveAssets();
+            AssetDatabaseBatchHelper.RefreshIfNotBatching(
+                ImportAssetOptions.ForceSynchronousImport
+            );
+            AssetPostprocessorDeferral.FlushForTesting();
+            EditorUi.Suppress = _previousEditorUiSuppress;
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator CreatesAssetAtAttributePath()
+        {
+            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            yield return null;
+            AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
+            yield return null;
+
+            CreatorPathSingleton asset = AssetDatabase.LoadAssetAtPath<CreatorPathSingleton>(
+                TargetAssetPath
+            );
+            Assert.IsTrue(asset != null);
+        }
+
+        [UnityTest]
+        public IEnumerator RelocatesExistingAssetToAttributePath()
+        {
+            EnsureFolder(ResourcesRoot);
+            yield return null;
+            EnsureFolder(WrongFolder);
+            yield return null;
+            CreatorPathSingleton instance = ScriptableObject.CreateInstance<CreatorPathSingleton>(); // UNH-SUPPRESS: UNH002 - Asset managed by test cleanup
+            AssetDatabase.CreateAsset(instance, WrongAssetPath);
+            AssetDatabase.SaveAssets();
+            yield return null;
+
+            ScriptableObjectSingletonCreator.EnsureSingletonAssets();
+            AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
+            yield return null;
+            CreatorPathSingleton relocated = AssetDatabase.LoadAssetAtPath<CreatorPathSingleton>(
+                TargetAssetPath
+            );
+            Assert.IsTrue(relocated != null);
+            yield return null;
+            AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
+            yield return null;
+            Assert.IsTrue(
+                AssetDatabase.LoadAssetAtPath<CreatorPathSingleton>(WrongAssetPath) == null
+            );
+        }
+
         [UnityTest]
         public IEnumerator RelocatesExistingAssetToAttributePathFromMismatchedParentCase()
         {
@@ -324,23 +392,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.IsTrue(
                 AssetDatabase.LoadAssetAtPath<CreatorPathSingleton>(WrongAssetPathCaseVariant)
                     == null
-            );
-        }
-
-        private static IEnumerable<DiskFolderScenario> DiskOnlyFolderScenarios()
-        {
-            yield return new DiskFolderScenario(
-                "CreatorPath",
-                TargetFolder,
-                TargetAssetPath,
-                typeof(CreatorPathSingleton)
-            );
-
-            yield return new DiskFolderScenario(
-                "NestedDeepPath",
-                NestedTargetFolder,
-                NestedTargetAssetPath,
-                typeof(NestedDiskSingleton)
             );
         }
 
@@ -479,15 +530,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             );
         }
 
-        private static void IgnoreVersionSpecificInvalidAssetImportLogs()
-        {
-            /*
-                Invalid asset YAML produces Unity-version-specific importer errors before the stable package
-                warning.
-            */
-            LogAssert.ignoreFailingMessages = true;
-        }
-
         [UnityTest]
         public IEnumerator RecreatesAssetWhenGuidRemainsButFileIsMissing()
         {
@@ -587,50 +629,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             yield return null;
         }
 
-        private static string GetAbsolutePath(string assetsRelativePath)
-        {
-            if (string.IsNullOrWhiteSpace(assetsRelativePath))
-            {
-                return string.Empty;
-            }
-
-            string projectRoot = Path.GetDirectoryName(Application.dataPath);
-            if (string.IsNullOrEmpty(projectRoot))
-            {
-                return string.Empty;
-            }
-
-            string normalized = assetsRelativePath.Replace('/', Path.DirectorySeparatorChar);
-            return Path.Combine(projectRoot, normalized);
-        }
-
-        private static void DeleteFileIfExists(string assetsRelativePath)
-        {
-            if (string.IsNullOrWhiteSpace(assetsRelativePath))
-            {
-                return;
-            }
-
-            if (AssetDatabase.DeleteAsset(assetsRelativePath))
-            {
-                return;
-            }
-
-            string absolutePath = GetAbsolutePath(assetsRelativePath);
-            if (!string.IsNullOrEmpty(absolutePath) && File.Exists(absolutePath))
-            {
-                File.Delete(absolutePath);
-            }
-
-            string metaPath = absolutePath + ".meta";
-            if (!string.IsNullOrEmpty(metaPath) && File.Exists(metaPath))
-            {
-                File.Delete(metaPath);
-            }
-        }
-
         public sealed class DiskFolderScenario
         {
+            public string Name { get; }
+            public string FolderPath { get; }
+            public string AssetPath { get; }
+            public Type SingletonType { get; }
+
             public DiskFolderScenario(
                 string name,
                 string folderPath,
@@ -643,11 +648,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 AssetPath = assetPath;
                 SingletonType = singletonType;
             }
-
-            public string Name { get; }
-            public string FolderPath { get; }
-            public string AssetPath { get; }
-            public Type SingletonType { get; }
 
             public override string ToString()
             {

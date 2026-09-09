@@ -17,6 +17,86 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.Utils
     [NUnit.Framework.Category("Integration")]
     public sealed class InLineEditorSharedCacheTests : CommonTestBase
     {
+        private static IEnumerable<TestCaseData> FoldoutStateCases()
+        {
+            yield return new TestCaseData(1, 1).SetName("FoldoutStates.Single.AcceptsEntry");
+
+            yield return new TestCaseData(10, 10).SetName("FoldoutStates.Small.AcceptsAll");
+
+            yield return new TestCaseData(100, 100).SetName("FoldoutStates.Medium.AcceptsAll");
+
+            yield return new TestCaseData(500, 500).SetName("FoldoutStates.Large.AcceptsAll");
+        }
+
+        private static IEnumerable<TestCaseData> ScrollPositionCases()
+        {
+            yield return new TestCaseData(1).SetName("ScrollPositions.Single.AcceptsEntry");
+
+            yield return new TestCaseData(10).SetName("ScrollPositions.Small.AcceptsAll");
+
+            yield return new TestCaseData(100).SetName("ScrollPositions.Medium.AcceptsAll");
+
+            yield return new TestCaseData(500).SetName("ScrollPositions.Large.AcceptsAll");
+        }
+
+        private static IEnumerable<TestCaseData> IntToStringCases()
+        {
+            yield return new TestCaseData(0, "0").SetName("IntToString.Zero.ReturnsZero");
+
+            yield return new TestCaseData(1, "1").SetName("IntToString.One.ReturnsOne");
+
+            yield return new TestCaseData(-1, "-1").SetName(
+                "IntToString.NegativeOne.ReturnsNegative"
+            );
+
+            yield return new TestCaseData(12345, "12345").SetName(
+                "IntToString.PositiveLarge.ReturnsCorrect"
+            );
+
+            yield return new TestCaseData(-99999, "-99999").SetName(
+                "IntToString.NegativeLarge.ReturnsCorrect"
+            );
+
+            yield return new TestCaseData(int.MaxValue, "2147483647").SetName(
+                "IntToString.MaxValue.ReturnsCorrect"
+            );
+
+            yield return new TestCaseData(int.MinValue, "-2147483648").SetName(
+                "IntToString.MinValue.ReturnsCorrect"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> SpecialKeyCharacterCases()
+        {
+            yield return new TestCaseData("key with spaces", true).SetName(
+                "SpecialKeys.Spaces.Stored"
+            );
+
+            yield return new TestCaseData("key::with::colons", false).SetName(
+                "SpecialKeys.Colons.Stored"
+            );
+
+            yield return new TestCaseData("key\twith\ttabs", true).SetName(
+                "SpecialKeys.Tabs.Stored"
+            );
+
+            yield return new TestCaseData("key.with.dots", false).SetName(
+                "SpecialKeys.Dots.Stored"
+            );
+
+            yield return new TestCaseData("key/with/slashes", true).SetName(
+                "SpecialKeys.Slashes.Stored"
+            );
+
+            yield return new TestCaseData("key[with]brackets", false).SetName(
+                "SpecialKeys.Brackets.Stored"
+            );
+
+            yield return new TestCaseData("123::propertyPath.nested[0]", true).SetName(
+                "SpecialKeys.RealisticKey.Stored"
+            );
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -54,17 +134,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.Utils
                     $"Foldout state for foldout{i} should be {expected}"
                 );
             }
-        }
-
-        private static IEnumerable<TestCaseData> FoldoutStateCases()
-        {
-            yield return new TestCaseData(1, 1).SetName("FoldoutStates.Single.AcceptsEntry");
-
-            yield return new TestCaseData(10, 10).SetName("FoldoutStates.Small.AcceptsAll");
-
-            yield return new TestCaseData(100, 100).SetName("FoldoutStates.Medium.AcceptsAll");
-
-            yield return new TestCaseData(500, 500).SetName("FoldoutStates.Large.AcceptsAll");
         }
 
         [Test]
@@ -129,17 +198,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.Utils
                 Assert.That(position.x, Is.EqualTo(i).Within(0.001f));
                 Assert.That(position.y, Is.EqualTo(i * 2).Within(0.001f));
             }
-        }
-
-        private static IEnumerable<TestCaseData> ScrollPositionCases()
-        {
-            yield return new TestCaseData(1).SetName("ScrollPositions.Single.AcceptsEntry");
-
-            yield return new TestCaseData(10).SetName("ScrollPositions.Small.AcceptsAll");
-
-            yield return new TestCaseData(100).SetName("ScrollPositions.Medium.AcceptsAll");
-
-            yield return new TestCaseData(500).SetName("ScrollPositions.Large.AcceptsAll");
         }
 
         [Test]
@@ -260,33 +318,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.Utils
             Assert.That(result, Is.EqualTo(expected));
         }
 
-        private static IEnumerable<TestCaseData> IntToStringCases()
-        {
-            yield return new TestCaseData(0, "0").SetName("IntToString.Zero.ReturnsZero");
-
-            yield return new TestCaseData(1, "1").SetName("IntToString.One.ReturnsOne");
-
-            yield return new TestCaseData(-1, "-1").SetName(
-                "IntToString.NegativeOne.ReturnsNegative"
-            );
-
-            yield return new TestCaseData(12345, "12345").SetName(
-                "IntToString.PositiveLarge.ReturnsCorrect"
-            );
-
-            yield return new TestCaseData(-99999, "-99999").SetName(
-                "IntToString.NegativeLarge.ReturnsCorrect"
-            );
-
-            yield return new TestCaseData(int.MaxValue, "2147483647").SetName(
-                "IntToString.MaxValue.ReturnsCorrect"
-            );
-
-            yield return new TestCaseData(int.MinValue, "-2147483648").SetName(
-                "IntToString.MinValue.ReturnsCorrect"
-            );
-        }
-
         [Test]
         public void ClearCacheClearsAllCaches()
         {
@@ -375,37 +406,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.Utils
 
             bool result = InLineEditorShared.GetFoldoutStateForTesting(key);
             Assert.That(result, Is.EqualTo(value));
-        }
-
-        private static IEnumerable<TestCaseData> SpecialKeyCharacterCases()
-        {
-            yield return new TestCaseData("key with spaces", true).SetName(
-                "SpecialKeys.Spaces.Stored"
-            );
-
-            yield return new TestCaseData("key::with::colons", false).SetName(
-                "SpecialKeys.Colons.Stored"
-            );
-
-            yield return new TestCaseData("key\twith\ttabs", true).SetName(
-                "SpecialKeys.Tabs.Stored"
-            );
-
-            yield return new TestCaseData("key.with.dots", false).SetName(
-                "SpecialKeys.Dots.Stored"
-            );
-
-            yield return new TestCaseData("key/with/slashes", true).SetName(
-                "SpecialKeys.Slashes.Stored"
-            );
-
-            yield return new TestCaseData("key[with]brackets", false).SetName(
-                "SpecialKeys.Brackets.Stored"
-            );
-
-            yield return new TestCaseData("123::propertyPath.nested[0]", true).SetName(
-                "SpecialKeys.RealisticKey.Stored"
-            );
         }
 
         [Test]

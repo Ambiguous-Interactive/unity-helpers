@@ -22,162 +22,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         private static readonly TimeSpan BenchmarkDuration = TimeSpan.FromMilliseconds(250);
         private static int sink;
 
-        [Test]
-        [Timeout(BenchmarkTimeoutMilliseconds)]
-        public void Benchmark()
-        {
-            StrategyConfig[] strategies =
-            {
-                new("Default (auto)", null, null),
-                new("Expressions", true, false),
-                new("Dynamic IL", false, true),
-                new("Reflection Fallback", false, false),
-            };
-
-            List<StrategyRunResult> supportedRuns = new();
-
-            foreach (StrategyConfig config in strategies)
-            {
-                StrategyRunResult result = RunStrategy(config);
-                if (!result.Supported)
-                {
-                    UnityEngine.Debug.LogWarning(
-                        $"[ReflectionPerf] Skipping {config.Label}: {result.SkipReason}"
-                    );
-                    continue;
-                }
-
-                supportedRuns.Add(result);
-            }
-
-            List<string> outputLines = new()
-            {
-                string.Format(
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    "Generated on {0:yyyy-MM-dd HH:mm:ss} UTC",
-                    DateTime.UtcNow
-                ),
-                string.Empty,
-            };
-
-            foreach (StrategyRunResult run in supportedRuns)
-            {
-                outputLines.Add($"### Strategy: {run.Label}");
-                outputLines.Add(string.Empty);
-                outputLines.Add("#### Boxed Access (object)");
-                outputLines.Add(string.Empty);
-                outputLines.Add("<table data-sortable>");
-                outputLines.Add("  <thead>");
-                outputLines.Add("    <tr>");
-                outputLines.Add("      <th align=\"left\">Scenario</th>");
-                outputLines.Add("      <th align=\"right\">Helper (ops/sec)</th>");
-                outputLines.Add("      <th align=\"right\">System.Reflection (ops/sec)</th>");
-                outputLines.Add("      <th align=\"right\">Speedup vs Reflection</th>");
-                outputLines.Add("    </tr>");
-                outputLines.Add("  </thead>");
-                outputLines.Add("  <tbody>");
-
-                foreach (ScenarioResult result in run.BoxedResults)
-                {
-                    string row = string.Format(
-                        System.Globalization.CultureInfo.InvariantCulture,
-                        "    <tr><td align=\"left\">{0}</td><td align=\"right\">{1}</td><td align=\"right\">{2}</td><td align=\"right\">{3:F2}x</td></tr>",
-                        result.Name,
-                        FormatOps(result.HelperOpsPerSecond),
-                        FormatOps(result.BaselineOpsPerSecond),
-                        result.Speedup
-                    );
-                    outputLines.Add(row);
-                    UnityEngine.Debug.Log(
-                        string.Format(
-                            System.Globalization.CultureInfo.InvariantCulture,
-                            "[ReflectionPerf][{0}][Boxed] {1}: helpers={2:N0} ops/s, reflection={3:N0} ops/s",
-                            run.Label,
-                            result.Name,
-                            result.HelperOpsPerSecond,
-                            result.BaselineOpsPerSecond
-                        )
-                    );
-                }
-
-                outputLines.Add("  </tbody>");
-                outputLines.Add("</table>");
-                outputLines.Add(string.Empty);
-                outputLines.Add("#### Typed Access (no boxing)");
-                outputLines.Add(string.Empty);
-                outputLines.Add("<table data-sortable>");
-                outputLines.Add("  <thead>");
-                outputLines.Add("    <tr>");
-                outputLines.Add("      <th align=\"left\">Scenario</th>");
-                outputLines.Add("      <th align=\"right\">Helper (ops/sec)</th>");
-                outputLines.Add("      <th align=\"right\">Baseline Delegate (ops/sec)</th>");
-                outputLines.Add("      <th align=\"right\">System.Reflection (ops/sec)</th>");
-                outputLines.Add("      <th align=\"right\">Speedup vs Delegate</th>");
-                outputLines.Add("      <th align=\"right\">Speedup vs Reflection</th>");
-                outputLines.Add("    </tr>");
-                outputLines.Add("  </thead>");
-                outputLines.Add("  <tbody>");
-
-                Dictionary<string, double> reflectionBaselineLookup = new(StringComparer.Ordinal);
-                foreach (ScenarioResult boxed in run.BoxedResults)
-                {
-                    reflectionBaselineLookup[GetScenarioKey(boxed.Name)] =
-                        boxed.BaselineOpsPerSecond;
-                }
-
-                foreach (ScenarioResult result in run.TypedResults)
-                {
-                    double reflectionOps = reflectionBaselineLookup.GetValueOrDefault(
-                        GetScenarioKey(result.Name),
-                        double.NaN
-                    );
-                    double speedupVsReflection =
-                        reflectionOps <= 0.0
-                            ? double.PositiveInfinity
-                            : result.HelperOpsPerSecond / reflectionOps;
-
-                    string row = string.Format(
-                        System.Globalization.CultureInfo.InvariantCulture,
-                        "    <tr><td align=\"left\">{0}</td><td align=\"right\">{1}</td><td align=\"right\">{2}</td><td align=\"right\">{3}</td><td align=\"right\">{4:F2}x</td><td align=\"right\">{5:F2}x</td></tr>",
-                        result.Name,
-                        FormatOps(result.HelperOpsPerSecond),
-                        FormatOps(result.BaselineOpsPerSecond),
-                        FormatOps(reflectionOps),
-                        result.Speedup,
-                        speedupVsReflection
-                    );
-                    outputLines.Add(row);
-                    UnityEngine.Debug.Log(
-                        string.Format(
-                            System.Globalization.CultureInfo.InvariantCulture,
-                            "[ReflectionPerf][{0}][Typed] {1}: helpers={2:N0} ops/s, delegate={3:N0} ops/s, reflection={4:N0} ops/s",
-                            run.Label,
-                            result.Name,
-                            result.HelperOpsPerSecond,
-                            result.BaselineOpsPerSecond,
-                            reflectionOps
-                        )
-                    );
-                }
-
-                outputLines.Add("  </tbody>");
-                outputLines.Add("</table>");
-                outputLines.Add(string.Empty);
-            }
-
-            string token = string.Format(
-                System.Globalization.CultureInfo.InvariantCulture,
-                "REFLECTION_PERFORMANCE_{0}",
-                GetOsToken()
-            );
-
-            BenchmarkReadmeUpdater.UpdateSection(
-                token,
-                outputLines,
-                "docs/performance/reflection-performance.md"
-            );
-        }
-
         private static ReflectionPerfTarget CreateTargetInstance()
         {
             ReflectionPerfTarget instance = new() { InstanceField = 5, InstanceProperty = 7 };
@@ -1133,20 +977,176 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             return scenarioName;
         }
 
+        [Test]
+        [Timeout(BenchmarkTimeoutMilliseconds)]
+        public void Benchmark()
+        {
+            StrategyConfig[] strategies =
+            {
+                new("Default (auto)", null, null),
+                new("Expressions", true, false),
+                new("Dynamic IL", false, true),
+                new("Reflection Fallback", false, false),
+            };
+
+            List<StrategyRunResult> supportedRuns = new();
+
+            foreach (StrategyConfig config in strategies)
+            {
+                StrategyRunResult result = RunStrategy(config);
+                if (!result.Supported)
+                {
+                    UnityEngine.Debug.LogWarning(
+                        $"[ReflectionPerf] Skipping {config.Label}: {result.SkipReason}"
+                    );
+                    continue;
+                }
+
+                supportedRuns.Add(result);
+            }
+
+            List<string> outputLines = new()
+            {
+                string.Format(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    "Generated on {0:yyyy-MM-dd HH:mm:ss} UTC",
+                    DateTime.UtcNow
+                ),
+                string.Empty,
+            };
+
+            foreach (StrategyRunResult run in supportedRuns)
+            {
+                outputLines.Add($"### Strategy: {run.Label}");
+                outputLines.Add(string.Empty);
+                outputLines.Add("#### Boxed Access (object)");
+                outputLines.Add(string.Empty);
+                outputLines.Add("<table data-sortable>");
+                outputLines.Add("  <thead>");
+                outputLines.Add("    <tr>");
+                outputLines.Add("      <th align=\"left\">Scenario</th>");
+                outputLines.Add("      <th align=\"right\">Helper (ops/sec)</th>");
+                outputLines.Add("      <th align=\"right\">System.Reflection (ops/sec)</th>");
+                outputLines.Add("      <th align=\"right\">Speedup vs Reflection</th>");
+                outputLines.Add("    </tr>");
+                outputLines.Add("  </thead>");
+                outputLines.Add("  <tbody>");
+
+                foreach (ScenarioResult result in run.BoxedResults)
+                {
+                    string row = string.Format(
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        "    <tr><td align=\"left\">{0}</td><td align=\"right\">{1}</td><td align=\"right\">{2}</td><td align=\"right\">{3:F2}x</td></tr>",
+                        result.Name,
+                        FormatOps(result.HelperOpsPerSecond),
+                        FormatOps(result.BaselineOpsPerSecond),
+                        result.Speedup
+                    );
+                    outputLines.Add(row);
+                    UnityEngine.Debug.Log(
+                        string.Format(
+                            System.Globalization.CultureInfo.InvariantCulture,
+                            "[ReflectionPerf][{0}][Boxed] {1}: helpers={2:N0} ops/s, reflection={3:N0} ops/s",
+                            run.Label,
+                            result.Name,
+                            result.HelperOpsPerSecond,
+                            result.BaselineOpsPerSecond
+                        )
+                    );
+                }
+
+                outputLines.Add("  </tbody>");
+                outputLines.Add("</table>");
+                outputLines.Add(string.Empty);
+                outputLines.Add("#### Typed Access (no boxing)");
+                outputLines.Add(string.Empty);
+                outputLines.Add("<table data-sortable>");
+                outputLines.Add("  <thead>");
+                outputLines.Add("    <tr>");
+                outputLines.Add("      <th align=\"left\">Scenario</th>");
+                outputLines.Add("      <th align=\"right\">Helper (ops/sec)</th>");
+                outputLines.Add("      <th align=\"right\">Baseline Delegate (ops/sec)</th>");
+                outputLines.Add("      <th align=\"right\">System.Reflection (ops/sec)</th>");
+                outputLines.Add("      <th align=\"right\">Speedup vs Delegate</th>");
+                outputLines.Add("      <th align=\"right\">Speedup vs Reflection</th>");
+                outputLines.Add("    </tr>");
+                outputLines.Add("  </thead>");
+                outputLines.Add("  <tbody>");
+
+                Dictionary<string, double> reflectionBaselineLookup = new(StringComparer.Ordinal);
+                foreach (ScenarioResult boxed in run.BoxedResults)
+                {
+                    reflectionBaselineLookup[GetScenarioKey(boxed.Name)] =
+                        boxed.BaselineOpsPerSecond;
+                }
+
+                foreach (ScenarioResult result in run.TypedResults)
+                {
+                    double reflectionOps = reflectionBaselineLookup.GetValueOrDefault(
+                        GetScenarioKey(result.Name),
+                        double.NaN
+                    );
+                    double speedupVsReflection =
+                        reflectionOps <= 0.0
+                            ? double.PositiveInfinity
+                            : result.HelperOpsPerSecond / reflectionOps;
+
+                    string row = string.Format(
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        "    <tr><td align=\"left\">{0}</td><td align=\"right\">{1}</td><td align=\"right\">{2}</td><td align=\"right\">{3}</td><td align=\"right\">{4:F2}x</td><td align=\"right\">{5:F2}x</td></tr>",
+                        result.Name,
+                        FormatOps(result.HelperOpsPerSecond),
+                        FormatOps(result.BaselineOpsPerSecond),
+                        FormatOps(reflectionOps),
+                        result.Speedup,
+                        speedupVsReflection
+                    );
+                    outputLines.Add(row);
+                    UnityEngine.Debug.Log(
+                        string.Format(
+                            System.Globalization.CultureInfo.InvariantCulture,
+                            "[ReflectionPerf][{0}][Typed] {1}: helpers={2:N0} ops/s, delegate={3:N0} ops/s, reflection={4:N0} ops/s",
+                            run.Label,
+                            result.Name,
+                            result.HelperOpsPerSecond,
+                            result.BaselineOpsPerSecond,
+                            reflectionOps
+                        )
+                    );
+                }
+
+                outputLines.Add("  </tbody>");
+                outputLines.Add("</table>");
+                outputLines.Add(string.Empty);
+            }
+
+            string token = string.Format(
+                System.Globalization.CultureInfo.InvariantCulture,
+                "REFLECTION_PERFORMANCE_{0}",
+                GetOsToken()
+            );
+
+            BenchmarkReadmeUpdater.UpdateSection(
+                token,
+                outputLines,
+                "docs/performance/reflection-performance.md"
+            );
+        }
+
         private sealed class Scenario
         {
+            public string Name { get; }
+
+            public Func<int> Baseline { get; }
+
+            public Func<int> Helper { get; }
+
             private Scenario(string name, Func<int> baseline, Func<int> helper)
             {
                 Name = name;
                 Baseline = baseline;
                 Helper = helper;
             }
-
-            public string Name { get; }
-
-            public Func<int> Baseline { get; }
-
-            public Func<int> Helper { get; }
 
             public static Scenario Create(string name, Func<int> baseline, Func<int> helper)
             {
@@ -1177,6 +1177,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
         private readonly struct ScenarioResult
         {
+            public string Name { get; }
+
+            public double HelperOpsPerSecond { get; }
+
+            public double BaselineOpsPerSecond { get; }
+
+            public double Speedup { get; }
+
             public ScenarioResult(
                 string name,
                 double helperOpsPerSecond,
@@ -1189,25 +1197,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 BaselineOpsPerSecond = baselineOpsPerSecond;
                 Speedup = speedup;
             }
-
-            public string Name { get; }
-
-            public double HelperOpsPerSecond { get; }
-
-            public double BaselineOpsPerSecond { get; }
-
-            public double Speedup { get; }
         }
 
         private sealed class ReflectionPerfTarget
         {
-            public static int StaticField;
-
             public static int StaticProperty { get; set; }
 
-            public int InstanceField;
+            public static int StaticField;
 
             public int InstanceProperty { get; set; }
+
+            public int InstanceField;
 
             public ReflectionPerfTarget() { }
 
@@ -1217,19 +1217,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 InstanceProperty = value;
             }
 
-            public int Combine(int first, int second)
-            {
-                return InstanceField + first + second;
-            }
-
             public static int StaticCombine(int first, int second)
             {
                 return StaticField + first + second;
+            }
+
+            public int Combine(int first, int second)
+            {
+                return InstanceField + first + second;
             }
         }
 
         private sealed class StrategyConfig
         {
+            internal string Label { get; }
+
+            internal bool? ExpressionsOverride { get; }
+
+            internal bool? DynamicIlOverride { get; }
+
+            internal bool RequiresOverride =>
+                ExpressionsOverride.HasValue || DynamicIlOverride.HasValue;
+
             internal StrategyConfig(
                 string label,
                 bool? expressionsOverride,
@@ -1240,19 +1249,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 ExpressionsOverride = expressionsOverride;
                 DynamicIlOverride = dynamicIlOverride;
             }
-
-            internal string Label { get; }
-
-            internal bool? ExpressionsOverride { get; }
-
-            internal bool? DynamicIlOverride { get; }
-
-            internal bool RequiresOverride =>
-                ExpressionsOverride.HasValue || DynamicIlOverride.HasValue;
         }
 
         private sealed class StrategyRunResult
         {
+            internal string Label { get; }
+
+            internal bool Supported { get; }
+
+            internal IReadOnlyList<ScenarioResult> BoxedResults { get; }
+
+            internal IReadOnlyList<ScenarioResult> TypedResults { get; }
+
+            internal string SkipReason { get; }
+
             private StrategyRunResult(
                 string label,
                 bool supported,
@@ -1267,16 +1277,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 TypedResults = typed ?? new List<ScenarioResult>();
                 SkipReason = skipReason;
             }
-
-            internal string Label { get; }
-
-            internal bool Supported { get; }
-
-            internal IReadOnlyList<ScenarioResult> BoxedResults { get; }
-
-            internal IReadOnlyList<ScenarioResult> TypedResults { get; }
-
-            internal string SkipReason { get; }
 
             internal static StrategyRunResult Create(
                 string label,

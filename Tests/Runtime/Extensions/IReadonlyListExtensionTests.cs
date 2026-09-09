@@ -247,16 +247,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
         private sealed class TestReadOnlyList<T> : IReadOnlyList<T>
         {
+            public T this[int index] => _items[index];
+
+            public int Count => _items.Length;
+
             private readonly T[] _items;
 
             public TestReadOnlyList(IEnumerable<T> items)
             {
                 _items = items.ToArray();
             }
-
-            public T this[int index] => _items[index];
-
-            public int Count => _items.Length;
 
             public IEnumerator<T> GetEnumerator()
             {

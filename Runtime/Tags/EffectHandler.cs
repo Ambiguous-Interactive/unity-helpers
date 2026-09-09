@@ -72,6 +72,14 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// </summary>
         public event Action<EffectHandle> OnEffectRemoved;
 
+        internal int TraversalDepthForTesting => _traversalDepth;
+
+        internal int DeferredLeaseCountForTesting =>
+            _deferredBehaviorLeases.Count
+            + _deferredPeriodicLeases.Count
+            + _deferredHandleLeases.Count
+            + _deferredCosmeticLeases.Count;
+
         [SiblingComponent]
 #pragma warning disable CS0649
         private TagHandler _tagHandler;
@@ -122,39 +130,100 @@ namespace WallstopStudios.UnityHelpers.Tags
 
         private bool _initialized;
 
-        internal int TraversalDepthForTesting => _traversalDepth;
-
-        internal int DeferredLeaseCountForTesting =>
-            _deferredBehaviorLeases.Count
-            + _deferredPeriodicLeases.Count
-            + _deferredHandleLeases.Count
-            + _deferredCosmeticLeases.Count;
-
-        private void Awake()
+        private static void DestroyCosmeticInstance(CosmeticEffectData data)
         {
-            this.AssignRelationalComponents();
-            _initialized = true;
+            bool shouldDestroyGameObject = true;
+            using PooledResource<List<CosmeticEffectComponent>> cosmeticEffectsResource =
+                Buffers<CosmeticEffectComponent>.List.Get(
+                    out List<CosmeticEffectComponent> cosmeticEffectsBuffer
+                );
+            data.GetComponents(cosmeticEffectsBuffer);
+            foreach (CosmeticEffectComponent cosmeticEffect in cosmeticEffectsBuffer)
+            {
+                // Skip destroyed entries without treating sibling destruction as an opt-out from GameObject cleanup.
+                if (cosmeticEffect == null)
+                {
+                    continue;
+                }
+
+                if (cosmeticEffect.CleansUpSelf)
+                {
+                    shouldDestroyGameObject = false;
+                    continue;
+                }
+
+                cosmeticEffect.Destroy();
+            }
+
+            if (shouldDestroyGameObject && data != null)
+            {
+                data.gameObject.Destroy();
+            }
         }
 
-        /// <summary>
-        /// Registers an AttributesComponent to receive effect modifications.
-        /// Called automatically by AttributesComponent during Awake.
-        /// </summary>
-        /// <param name="attributesComponent">The component to register.</param>
-        internal void Register(AttributesComponent attributesComponent)
+        private static PooledResource<List<EffectHandle>> RentHandleList(
+            out List<EffectHandle> handles
+        )
         {
-            _attributes ??= new HashSet<AttributesComponent>();
-            _ = _attributes.Add(attributesComponent);
+            return Buffers<EffectHandle>.List.Get(out handles);
         }
 
-        /// <summary>
-        /// Unregisters an AttributesComponent from receiving effect modifications.
-        /// Called automatically by AttributesComponent during OnDestroy.
-        /// </summary>
-        /// <param name="attributesComponent">The component to unregister.</param>
-        internal void Remove(AttributesComponent attributesComponent)
+        private static PooledResource<List<EffectBehavior>> RentBehaviorList(
+            out List<EffectBehavior> behaviors
+        )
         {
-            _attributes?.Remove(attributesComponent);
+            return Buffers<EffectBehavior>.List.Get(out behaviors);
+        }
+
+        private static PooledResource<List<PeriodicEffectRuntimeState>> RentPeriodicStateList(
+            out List<PeriodicEffectRuntimeState> states
+        )
+        {
+            return Buffers<PeriodicEffectRuntimeState>.List.Get(out states);
+        }
+
+        private static PooledResource<List<CosmeticEffectData>> RentCosmeticDataList(
+            out List<CosmeticEffectData> cosmeticData
+        )
+        {
+            return Buffers<CosmeticEffectData>.List.Get(out cosmeticData);
+        }
+
+        private static void ClearAndDispose<T>(PooledResource<List<T>> lease)
+        {
+            List<T> list = lease.resource;
+            list?.Clear();
+            lease.Dispose();
+        }
+
+        private static void RecycleBehaviorList(PooledResource<List<EffectBehavior>> lease)
+        {
+            ClearAndDispose(lease);
+        }
+
+        private static void RecyclePeriodicStateList(
+            PooledResource<List<PeriodicEffectRuntimeState>> lease
+        )
+        {
+            ClearAndDispose(lease);
+        }
+
+        private static void RecycleCosmeticDataList(
+            PooledResource<List<CosmeticEffectData>> cosmeticLease
+        )
+        {
+            List<CosmeticEffectData> cosmeticData = cosmeticLease.resource;
+            if (cosmeticData != null)
+            {
+                for (int i = cosmeticData.Count - 1; 0 <= i; --i)
+                {
+                    cosmeticData[i] = null;
+                }
+
+                cosmeticData.Clear();
+            }
+
+            cosmeticLease.Dispose();
         }
 
         /// <summary>
@@ -194,9 +263,311 @@ namespace WallstopStudios.UnityHelpers.Tags
             return ApplyEffect(effect, Time.time);
         }
 
+        /// <summary>
+        /// Removes a specific effect by its handle, cleaning up tags, cosmetic effects, and attribute modifications.
+        /// </summary>
+        /// <param name="handle">The handle of the effect to remove.</param>
+        /// <remarks>
+        /// <para>
+        /// Removal is a two-phase transition. The handle is first detached: it leaves every index
+        /// this handler keeps before a single line of user code runs. Only then are the teardown
+        /// callbacks delivered. A callback therefore observes the handle as already inactive --
+        /// <see cref="IsEffectActive"/> is <c>false</c>, <see cref="GetEffectStackCount"/> no longer
+        /// counts it and <see cref="GetActiveEffects"/> no longer lists it -- and calling this
+        /// method again for the same handle, or for one that was never applied, is a no-op rather
+        /// than a recursion.
+        /// </para>
+        /// <para>
+        /// Callbacks are delivered in a fixed order: attribute modifications are removed, then
+        /// tags, then cosmetic effects, then <see cref="OnEffectRemoved"/>, then
+        /// <see cref="EffectBehavior.OnRemove"/> on each cloned behaviour. Re-applying the effect
+        /// from any of them produces an independent new handle.
+        /// </para>
+        /// <para>
+        /// If a callback throws, the remaining phases still run and every pooled buffer, behaviour
+        /// clone and cosmetic instance is still released; the first exception is rethrown once the
+        /// handler's state is consistent, and any later one is logged.
+        /// </para>
+        /// </remarks>
+        public void RemoveEffect(EffectHandle handle)
+        {
+            Exception teardownFailure = RemoveEffectCore(handle);
+            if (teardownFailure != null)
+            {
+                ExceptionDispatchInfo.Capture(teardownFailure).Throw();
+            }
+        }
+
+        /// <summary>
+        /// Removes every effect currently active on this handler.
+        /// </summary>
+        /// <remarks>
+        /// Each handle goes through the same transition as <see cref="RemoveEffect"/>, over a
+        /// snapshot taken before teardown begins. An effect applied by a teardown callback is
+        /// therefore left active rather than silently forgotten.
+        /// </remarks>
+        public void RemoveAllEffects()
+        {
+            Exception teardownFailure = RemoveAllEffectsCore();
+            if (teardownFailure != null)
+            {
+                ExceptionDispatchInfo.Capture(teardownFailure).Throw();
+            }
+        }
+
+        /// <summary>
+        /// Determines whether the specified effect is currently active on this handler.
+        /// </summary>
+        /// <param name="effect">The effect to check.</param>
+        /// <returns><c>true</c> if at least one handle for the effect is active; otherwise, <c>false</c>.</returns>
+        public bool IsEffectActive(AttributeEffect effect)
+        {
+            if (effect == null)
+            {
+                return false;
+            }
+
+            foreach (EffectHandle handle in _appliedEffects)
+            {
+                if (handle.effect == effect)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Gets the number of active handles for the specified effect.
+        /// </summary>
+        /// <param name="effect">The effect to count.</param>
+        /// <returns>The number of active handles associated with <paramref name="effect"/>.</returns>
+        public int GetEffectStackCount(AttributeEffect effect)
+        {
+            if (effect == null)
+            {
+                return 0;
+            }
+
+            int count = 0;
+            foreach (EffectHandle handle in _appliedEffects)
+            {
+                if (handle.effect == effect)
+                {
+                    ++count;
+                }
+            }
+
+            return count;
+        }
+
+        /// <summary>
+        /// Copies all active effect handles into the provided buffer.
+        /// </summary>
+        /// <param name="buffer">
+        /// Optional list to populate. When <c>null</c>, a new list is created. The buffer is cleared before population.
+        /// </param>
+        /// <returns>The populated buffer containing all currently active effect handles.</returns>
+        public List<EffectHandle> GetActiveEffects(List<EffectHandle> buffer = null)
+        {
+            buffer ??= new List<EffectHandle>();
+            buffer.Clear();
+            buffer.AddRange(_appliedEffects);
+            return buffer;
+        }
+
+        /// <summary>
+        /// Attempts to retrieve the remaining duration for the specified effect handle.
+        /// </summary>
+        /// <param name="handle">The handle to inspect.</param>
+        /// <param name="remainingDuration">When this method returns, contains the remaining time in seconds, or zero if unavailable.</param>
+        /// <returns><c>true</c> if the handle has a tracked duration; otherwise, <c>false</c>.</returns>
+        public bool TryGetRemainingDuration(EffectHandle handle, out float remainingDuration)
+        {
+            return TryGetRemainingDuration(handle, Time.time, out remainingDuration);
+        }
+
+        /// <summary>
+        /// Ensures an effect handle exists for the specified effect, optionally refreshing its duration if already active.
+        /// </summary>
+        /// <param name="effect">The effect to apply or refresh.</param>
+        /// <returns>
+        /// An active handle for the effect, or <c>null</c> when <see cref="ApplyEffect(AttributeEffect)"/> produces
+        /// none.
+        /// </returns>
+        public EffectHandle? EnsureHandle(AttributeEffect effect)
+        {
+            return EnsureHandle(effect, refreshDuration: true);
+        }
+
+        /// <summary>
+        /// Ensures an effect handle exists for the specified effect, optionally refreshing its duration if already active.
+        /// </summary>
+        /// <param name="effect">The effect to apply or refresh.</param>
+        /// <param name="refreshDuration">
+        /// When <c>true</c>, attempts to refresh the effect's duration when it is already active and supports reapplication.
+        /// </param>
+        /// <returns>
+        /// An active handle for the effect, or <c>null</c> when <see cref="ApplyEffect(AttributeEffect)"/> produces
+        /// none.
+        /// </returns>
+        public EffectHandle? EnsureHandle(AttributeEffect effect, bool refreshDuration)
+        {
+            return EnsureHandle(effect, refreshDuration, Time.time);
+        }
+
+        /// <summary>
+        /// Attempts to refresh the duration of the specified effect handle.
+        /// </summary>
+        /// <param name="handle">The handle to refresh.</param>
+        /// <returns><c>true</c> if the duration was refreshed; otherwise, <c>false</c>.</returns>
+        public bool RefreshEffect(EffectHandle handle)
+        {
+            return RefreshEffect(handle, ignoreReapplicationPolicy: false);
+        }
+
+        /// <summary>
+        /// Attempts to refresh the duration of the specified effect handle.
+        /// </summary>
+        /// <param name="handle">The handle to refresh.</param>
+        /// <param name="ignoreReapplicationPolicy">
+        /// When <c>true</c>, refreshes the duration even if <see cref="AttributeEffect.resetDurationOnReapplication"/> is <c>false</c>.
+        /// </param>
+        /// <returns><c>true</c> if the duration was refreshed; otherwise, <c>false</c>.</returns>
+        public bool RefreshEffect(EffectHandle handle, bool ignoreReapplicationPolicy)
+        {
+            return RefreshEffect(handle, ignoreReapplicationPolicy, Time.time);
+        }
+
+        /// <summary>
+        /// Registers an AttributesComponent to receive effect modifications.
+        /// Called automatically by AttributesComponent during Awake.
+        /// </summary>
+        /// <param name="attributesComponent">The component to register.</param>
+        internal void Register(AttributesComponent attributesComponent)
+        {
+            _attributes ??= new HashSet<AttributesComponent>();
+            _ = _attributes.Add(attributesComponent);
+        }
+
+        /// <summary>
+        /// Unregisters an AttributesComponent from receiving effect modifications.
+        /// Called automatically by AttributesComponent during OnDestroy.
+        /// </summary>
+        /// <param name="attributesComponent">The component to unregister.</param>
+        internal void Remove(AttributesComponent attributesComponent)
+        {
+            _attributes?.Remove(attributesComponent);
+        }
+
         internal EffectHandle? ApplyEffectForTesting(AttributeEffect effect, float currentTime)
         {
             return ApplyEffect(effect, currentTime);
+        }
+
+        internal bool TryGetRemainingDuration(
+            EffectHandle handle,
+            float currentTime,
+            out float remainingDuration
+        )
+        {
+            long handleId = handle.id;
+            if (!_effectExpirations.TryGetValue(handleId, out float expiration))
+            {
+                remainingDuration = 0f;
+                return false;
+            }
+
+            float timeRemaining = expiration - currentTime;
+            if (timeRemaining < 0f)
+            {
+                timeRemaining = 0f;
+            }
+
+            remainingDuration = timeRemaining;
+            return true;
+        }
+
+        internal EffectHandle? EnsureHandle(
+            AttributeEffect effect,
+            bool refreshDuration,
+            float currentTime
+        )
+        {
+            if (effect == null)
+            {
+                return null;
+            }
+
+            foreach (EffectHandle handle in _appliedEffects)
+            {
+                if (handle.effect == effect)
+                {
+                    if (refreshDuration)
+                    {
+                        _ = RefreshEffect(
+                            handle,
+                            ignoreReapplicationPolicy: false,
+                            currentTime: currentTime
+                        );
+                    }
+
+                    return handle;
+                }
+            }
+
+            return ApplyEffect(effect, currentTime);
+        }
+
+        internal bool RefreshEffect(
+            EffectHandle handle,
+            bool ignoreReapplicationPolicy,
+            float currentTime
+        )
+        {
+            AttributeEffect effect = handle.effect;
+            if (effect == null)
+            {
+                return false;
+            }
+
+            if (effect.durationType != ModifierDurationType.Duration)
+            {
+                return false;
+            }
+
+            if (!ignoreReapplicationPolicy && !effect.resetDurationOnReapplication)
+            {
+                return false;
+            }
+
+            long handleId = handle.id;
+            if (!_effectExpirations.ContainsKey(handleId))
+            {
+                return false;
+            }
+
+            float newExpiration = currentTime + effect.duration;
+            _effectExpirations[handleId] = newExpiration;
+            _effectHandlesById[handleId] = handle;
+            return true;
+        }
+
+        internal int ProcessBehaviorTicksForTesting(float deltaTime)
+        {
+            return ProcessBehaviorTicks(deltaTime);
+        }
+
+        internal int ProcessPeriodicEffectsForTesting(float currentTime, float deltaTime)
+        {
+            return ProcessPeriodicEffects(currentTime, deltaTime);
+        }
+
+        private void Awake()
+        {
+            this.AssignRelationalComponents();
+            _initialized = true;
         }
 
         private EffectHandle? ApplyEffect(AttributeEffect effect, float currentTime)
@@ -360,58 +731,6 @@ namespace WallstopStudios.UnityHelpers.Tags
             return true;
         }
 
-        /// <summary>
-        /// Removes a specific effect by its handle, cleaning up tags, cosmetic effects, and attribute modifications.
-        /// </summary>
-        /// <param name="handle">The handle of the effect to remove.</param>
-        /// <remarks>
-        /// <para>
-        /// Removal is a two-phase transition. The handle is first detached: it leaves every index
-        /// this handler keeps before a single line of user code runs. Only then are the teardown
-        /// callbacks delivered. A callback therefore observes the handle as already inactive --
-        /// <see cref="IsEffectActive"/> is <c>false</c>, <see cref="GetEffectStackCount"/> no longer
-        /// counts it and <see cref="GetActiveEffects"/> no longer lists it -- and calling this
-        /// method again for the same handle, or for one that was never applied, is a no-op rather
-        /// than a recursion.
-        /// </para>
-        /// <para>
-        /// Callbacks are delivered in a fixed order: attribute modifications are removed, then
-        /// tags, then cosmetic effects, then <see cref="OnEffectRemoved"/>, then
-        /// <see cref="EffectBehavior.OnRemove"/> on each cloned behaviour. Re-applying the effect
-        /// from any of them produces an independent new handle.
-        /// </para>
-        /// <para>
-        /// If a callback throws, the remaining phases still run and every pooled buffer, behaviour
-        /// clone and cosmetic instance is still released; the first exception is rethrown once the
-        /// handler's state is consistent, and any later one is logged.
-        /// </para>
-        /// </remarks>
-        public void RemoveEffect(EffectHandle handle)
-        {
-            Exception teardownFailure = RemoveEffectCore(handle);
-            if (teardownFailure != null)
-            {
-                ExceptionDispatchInfo.Capture(teardownFailure).Throw();
-            }
-        }
-
-        /// <summary>
-        /// Removes every effect currently active on this handler.
-        /// </summary>
-        /// <remarks>
-        /// Each handle goes through the same transition as <see cref="RemoveEffect"/>, over a
-        /// snapshot taken before teardown begins. An effect applied by a teardown callback is
-        /// therefore left active rather than silently forgotten.
-        /// </remarks>
-        public void RemoveAllEffects()
-        {
-            Exception teardownFailure = RemoveAllEffectsCore();
-            if (teardownFailure != null)
-            {
-                ExceptionDispatchInfo.Capture(teardownFailure).Throw();
-            }
-        }
-
         private Exception RemoveAllEffectsCore()
         {
             using PooledResource<List<EffectHandle>> handleBufferResource =
@@ -532,219 +851,6 @@ namespace WallstopStudios.UnityHelpers.Tags
                 _ = _handlesByStackKey.Remove(stackKey);
                 ReleaseHandleList(handlesLease);
             }
-        }
-
-        /// <summary>
-        /// Determines whether the specified effect is currently active on this handler.
-        /// </summary>
-        /// <param name="effect">The effect to check.</param>
-        /// <returns><c>true</c> if at least one handle for the effect is active; otherwise, <c>false</c>.</returns>
-        public bool IsEffectActive(AttributeEffect effect)
-        {
-            if (effect == null)
-            {
-                return false;
-            }
-
-            foreach (EffectHandle handle in _appliedEffects)
-            {
-                if (handle.effect == effect)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        /// <summary>
-        /// Gets the number of active handles for the specified effect.
-        /// </summary>
-        /// <param name="effect">The effect to count.</param>
-        /// <returns>The number of active handles associated with <paramref name="effect"/>.</returns>
-        public int GetEffectStackCount(AttributeEffect effect)
-        {
-            if (effect == null)
-            {
-                return 0;
-            }
-
-            int count = 0;
-            foreach (EffectHandle handle in _appliedEffects)
-            {
-                if (handle.effect == effect)
-                {
-                    ++count;
-                }
-            }
-
-            return count;
-        }
-
-        /// <summary>
-        /// Copies all active effect handles into the provided buffer.
-        /// </summary>
-        /// <param name="buffer">
-        /// Optional list to populate. When <c>null</c>, a new list is created. The buffer is cleared before population.
-        /// </param>
-        /// <returns>The populated buffer containing all currently active effect handles.</returns>
-        public List<EffectHandle> GetActiveEffects(List<EffectHandle> buffer = null)
-        {
-            buffer ??= new List<EffectHandle>();
-            buffer.Clear();
-            buffer.AddRange(_appliedEffects);
-            return buffer;
-        }
-
-        /// <summary>
-        /// Attempts to retrieve the remaining duration for the specified effect handle.
-        /// </summary>
-        /// <param name="handle">The handle to inspect.</param>
-        /// <param name="remainingDuration">When this method returns, contains the remaining time in seconds, or zero if unavailable.</param>
-        /// <returns><c>true</c> if the handle has a tracked duration; otherwise, <c>false</c>.</returns>
-        public bool TryGetRemainingDuration(EffectHandle handle, out float remainingDuration)
-        {
-            return TryGetRemainingDuration(handle, Time.time, out remainingDuration);
-        }
-
-        internal bool TryGetRemainingDuration(
-            EffectHandle handle,
-            float currentTime,
-            out float remainingDuration
-        )
-        {
-            long handleId = handle.id;
-            if (!_effectExpirations.TryGetValue(handleId, out float expiration))
-            {
-                remainingDuration = 0f;
-                return false;
-            }
-
-            float timeRemaining = expiration - currentTime;
-            if (timeRemaining < 0f)
-            {
-                timeRemaining = 0f;
-            }
-
-            remainingDuration = timeRemaining;
-            return true;
-        }
-
-        /// <summary>
-        /// Ensures an effect handle exists for the specified effect, optionally refreshing its duration if already active.
-        /// </summary>
-        /// <param name="effect">The effect to apply or refresh.</param>
-        /// <returns>
-        /// An active handle for the effect, or <c>null</c> when <see cref="ApplyEffect(AttributeEffect)"/> produces
-        /// none.
-        /// </returns>
-        public EffectHandle? EnsureHandle(AttributeEffect effect)
-        {
-            return EnsureHandle(effect, refreshDuration: true);
-        }
-
-        /// <summary>
-        /// Ensures an effect handle exists for the specified effect, optionally refreshing its duration if already active.
-        /// </summary>
-        /// <param name="effect">The effect to apply or refresh.</param>
-        /// <param name="refreshDuration">
-        /// When <c>true</c>, attempts to refresh the effect's duration when it is already active and supports reapplication.
-        /// </param>
-        /// <returns>
-        /// An active handle for the effect, or <c>null</c> when <see cref="ApplyEffect(AttributeEffect)"/> produces
-        /// none.
-        /// </returns>
-        public EffectHandle? EnsureHandle(AttributeEffect effect, bool refreshDuration)
-        {
-            return EnsureHandle(effect, refreshDuration, Time.time);
-        }
-
-        internal EffectHandle? EnsureHandle(
-            AttributeEffect effect,
-            bool refreshDuration,
-            float currentTime
-        )
-        {
-            if (effect == null)
-            {
-                return null;
-            }
-
-            foreach (EffectHandle handle in _appliedEffects)
-            {
-                if (handle.effect == effect)
-                {
-                    if (refreshDuration)
-                    {
-                        _ = RefreshEffect(
-                            handle,
-                            ignoreReapplicationPolicy: false,
-                            currentTime: currentTime
-                        );
-                    }
-
-                    return handle;
-                }
-            }
-
-            return ApplyEffect(effect, currentTime);
-        }
-
-        /// <summary>
-        /// Attempts to refresh the duration of the specified effect handle.
-        /// </summary>
-        /// <param name="handle">The handle to refresh.</param>
-        /// <returns><c>true</c> if the duration was refreshed; otherwise, <c>false</c>.</returns>
-        public bool RefreshEffect(EffectHandle handle)
-        {
-            return RefreshEffect(handle, ignoreReapplicationPolicy: false);
-        }
-
-        /// <summary>
-        /// Attempts to refresh the duration of the specified effect handle.
-        /// </summary>
-        /// <param name="handle">The handle to refresh.</param>
-        /// <param name="ignoreReapplicationPolicy">
-        /// When <c>true</c>, refreshes the duration even if <see cref="AttributeEffect.resetDurationOnReapplication"/> is <c>false</c>.
-        /// </param>
-        /// <returns><c>true</c> if the duration was refreshed; otherwise, <c>false</c>.</returns>
-        public bool RefreshEffect(EffectHandle handle, bool ignoreReapplicationPolicy)
-        {
-            return RefreshEffect(handle, ignoreReapplicationPolicy, Time.time);
-        }
-
-        internal bool RefreshEffect(
-            EffectHandle handle,
-            bool ignoreReapplicationPolicy,
-            float currentTime
-        )
-        {
-            AttributeEffect effect = handle.effect;
-            if (effect == null)
-            {
-                return false;
-            }
-
-            if (effect.durationType != ModifierDurationType.Duration)
-            {
-                return false;
-            }
-
-            if (!ignoreReapplicationPolicy && !effect.resetDurationOnReapplication)
-            {
-                return false;
-            }
-
-            long handleId = handle.id;
-            if (!_effectExpirations.ContainsKey(handleId))
-            {
-                return false;
-            }
-
-            float newExpiration = currentTime + effect.duration;
-            _effectExpirations[handleId] = newExpiration;
-            _effectHandlesById[handleId] = handle;
-            return true;
         }
 
         // Complete teardown before reporting the first callback failure; callers decide whether to propagate it.
@@ -1455,102 +1561,6 @@ namespace WallstopStudios.UnityHelpers.Tags
             return firstFailure;
         }
 
-        private static void DestroyCosmeticInstance(CosmeticEffectData data)
-        {
-            bool shouldDestroyGameObject = true;
-            using PooledResource<List<CosmeticEffectComponent>> cosmeticEffectsResource =
-                Buffers<CosmeticEffectComponent>.List.Get(
-                    out List<CosmeticEffectComponent> cosmeticEffectsBuffer
-                );
-            data.GetComponents(cosmeticEffectsBuffer);
-            foreach (CosmeticEffectComponent cosmeticEffect in cosmeticEffectsBuffer)
-            {
-                // Skip destroyed entries without treating sibling destruction as an opt-out from GameObject cleanup.
-                if (cosmeticEffect == null)
-                {
-                    continue;
-                }
-
-                if (cosmeticEffect.CleansUpSelf)
-                {
-                    shouldDestroyGameObject = false;
-                    continue;
-                }
-
-                cosmeticEffect.Destroy();
-            }
-
-            if (shouldDestroyGameObject && data != null)
-            {
-                data.gameObject.Destroy();
-            }
-        }
-
-        private static PooledResource<List<EffectHandle>> RentHandleList(
-            out List<EffectHandle> handles
-        )
-        {
-            return Buffers<EffectHandle>.List.Get(out handles);
-        }
-
-        private static PooledResource<List<EffectBehavior>> RentBehaviorList(
-            out List<EffectBehavior> behaviors
-        )
-        {
-            return Buffers<EffectBehavior>.List.Get(out behaviors);
-        }
-
-        private static PooledResource<List<PeriodicEffectRuntimeState>> RentPeriodicStateList(
-            out List<PeriodicEffectRuntimeState> states
-        )
-        {
-            return Buffers<PeriodicEffectRuntimeState>.List.Get(out states);
-        }
-
-        private static PooledResource<List<CosmeticEffectData>> RentCosmeticDataList(
-            out List<CosmeticEffectData> cosmeticData
-        )
-        {
-            return Buffers<CosmeticEffectData>.List.Get(out cosmeticData);
-        }
-
-        private static void ClearAndDispose<T>(PooledResource<List<T>> lease)
-        {
-            List<T> list = lease.resource;
-            list?.Clear();
-            lease.Dispose();
-        }
-
-        private static void RecycleBehaviorList(PooledResource<List<EffectBehavior>> lease)
-        {
-            ClearAndDispose(lease);
-        }
-
-        private static void RecyclePeriodicStateList(
-            PooledResource<List<PeriodicEffectRuntimeState>> lease
-        )
-        {
-            ClearAndDispose(lease);
-        }
-
-        private static void RecycleCosmeticDataList(
-            PooledResource<List<CosmeticEffectData>> cosmeticLease
-        )
-        {
-            List<CosmeticEffectData> cosmeticData = cosmeticLease.resource;
-            if (cosmeticData != null)
-            {
-                for (int i = cosmeticData.Count - 1; 0 <= i; --i)
-                {
-                    cosmeticData[i] = null;
-                }
-
-                cosmeticData.Clear();
-            }
-
-            cosmeticLease.Dispose();
-        }
-
         private void ReleaseBehaviorList(PooledResource<List<EffectBehavior>> lease)
         {
             if (0 < _traversalDepth)
@@ -1717,11 +1727,6 @@ namespace WallstopStudios.UnityHelpers.Tags
             _ = ProcessBehaviorTicks(Time.deltaTime);
         }
 
-        internal int ProcessBehaviorTicksForTesting(float deltaTime)
-        {
-            return ProcessBehaviorTicks(deltaTime);
-        }
-
         private int ProcessBehaviorTicks(float deltaTime)
         {
             if (_behaviorsByHandleId.Count <= 0)
@@ -1785,11 +1790,6 @@ namespace WallstopStudios.UnityHelpers.Tags
         private void ProcessPeriodicEffects()
         {
             _ = ProcessPeriodicEffects(Time.time, Time.deltaTime);
-        }
-
-        internal int ProcessPeriodicEffectsForTesting(float currentTime, float deltaTime)
-        {
-            return ProcessPeriodicEffects(currentTime, deltaTime);
         }
 
         private int ProcessPeriodicEffects(float currentTime, float deltaTime)

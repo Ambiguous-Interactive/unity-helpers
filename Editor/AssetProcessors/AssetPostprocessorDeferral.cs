@@ -27,6 +27,23 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
     /// </remarks>
     internal static class AssetPostprocessorDeferral
     {
+        /// <summary>
+        /// Safety cap on <see cref="FlushForTesting"/> iterations. A handler whose
+        /// drain re-schedules itself (directly or transitively) would loop forever;
+        /// <see cref="FlushIterationCap"/> bounds that to the smallest number that
+        /// still absorbs realistic reentrant fan-out (tests that create N assets,
+        /// each of whose handlers re-schedules a cleanup). Reaching the cap surfaces
+        /// a warning so the caller can investigate rather than silently leaking drains.
+        /// </summary>
+        private const int FlushIterationCap = 32;
+
+        /// <summary>
+        /// Test-only snapshot of the pending-drain count. Used by regression
+        /// tests that verify cap/drain behavior without pulling in the full
+        /// reflection machinery.
+        /// </summary>
+        internal static int PendingDrainCountForTesting => PendingDrains.Count;
+
         private static readonly List<Action> PendingDrains = new();
         private static bool _scheduled;
         private static bool _draining;
@@ -87,16 +104,6 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             _scheduled = true;
             EditorApplication.delayCall += DrainScheduled;
         }
-
-        /// <summary>
-        /// Safety cap on <see cref="FlushForTesting"/> iterations. A handler whose
-        /// drain re-schedules itself (directly or transitively) would loop forever;
-        /// <see cref="FlushIterationCap"/> bounds that to the smallest number that
-        /// still absorbs realistic reentrant fan-out (tests that create N assets,
-        /// each of whose handlers re-schedules a cleanup). Reaching the cap surfaces
-        /// a warning so the caller can investigate rather than silently leaking drains.
-        /// </summary>
-        private const int FlushIterationCap = 32;
 
         /// <summary>
         /// Synchronously drains any pending actions, iterating until the queue is
@@ -163,6 +170,32 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                     + " drain(s) still pending. A drain handler is likely re-scheduling itself. "
                     + "Remaining drains will fire on the next editor tick, which may pollute the next test."
             );
+        }
+
+        /// <summary>
+        /// Test-only reset hook. Wipes <see cref="PendingDrains"/> and the
+        /// scheduling flags, mirroring <see cref="ResetForDomainReload"/>. Tests
+        /// that deliberately exercise edge cases (e.g. hitting
+        /// <see cref="FlushIterationCap"/>) may leave drains queued; calling
+        /// this from a TearDown guarantees the next test starts with a
+        /// quiescent deferral.
+        ///
+        /// Caveat — dormant <see cref="EditorApplication.delayCall"/> subscriptions
+        /// are NOT purged by this reset. Each call to <see cref="Schedule"/> or
+        /// <see cref="DrainPending"/>'s fallback appends <see cref="DrainScheduled"/>
+        /// to Unity's multicast <c>delayCall</c>, and Unity does not expose a
+        /// safe way to dequeue a specific subscription mid-flight. Those
+        /// subscriptions remain pending and fire on subsequent editor ticks —
+        /// but because <see cref="DrainPending"/> early-returns on an empty
+        /// <see cref="PendingDrains"/>, each dormant fire is a harmless no-op.
+        /// Consequence: do NOT treat <see cref="PendingDrainCountForTesting"/>
+        /// as a proxy for "no delayCall callback is pending". It only reflects
+        /// the drain queue; the delayCall multicast may still hold stale
+        /// subscriptions that will quietly no-op when they fire.
+        /// </summary>
+        internal static void ResetForTesting()
+        {
+            ResetForDomainReload();
         }
 
         private static void DrainScheduled()
@@ -249,39 +282,6 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             _scheduled = false;
             _draining = false;
         }
-
-        /// <summary>
-        /// Test-only reset hook. Wipes <see cref="PendingDrains"/> and the
-        /// scheduling flags, mirroring <see cref="ResetForDomainReload"/>. Tests
-        /// that deliberately exercise edge cases (e.g. hitting
-        /// <see cref="FlushIterationCap"/>) may leave drains queued; calling
-        /// this from a TearDown guarantees the next test starts with a
-        /// quiescent deferral.
-        ///
-        /// Caveat — dormant <see cref="EditorApplication.delayCall"/> subscriptions
-        /// are NOT purged by this reset. Each call to <see cref="Schedule"/> or
-        /// <see cref="DrainPending"/>'s fallback appends <see cref="DrainScheduled"/>
-        /// to Unity's multicast <c>delayCall</c>, and Unity does not expose a
-        /// safe way to dequeue a specific subscription mid-flight. Those
-        /// subscriptions remain pending and fire on subsequent editor ticks —
-        /// but because <see cref="DrainPending"/> early-returns on an empty
-        /// <see cref="PendingDrains"/>, each dormant fire is a harmless no-op.
-        /// Consequence: do NOT treat <see cref="PendingDrainCountForTesting"/>
-        /// as a proxy for "no delayCall callback is pending". It only reflects
-        /// the drain queue; the delayCall multicast may still hold stale
-        /// subscriptions that will quietly no-op when they fire.
-        /// </summary>
-        internal static void ResetForTesting()
-        {
-            ResetForDomainReload();
-        }
-
-        /// <summary>
-        /// Test-only snapshot of the pending-drain count. Used by regression
-        /// tests that verify cap/drain behavior without pulling in the full
-        /// reflection machinery.
-        /// </summary>
-        internal static int PendingDrainCountForTesting => PendingDrains.Count;
 
         [System.Diagnostics.Conditional("UNITY_ASSERTIONS")]
         [System.Diagnostics.Conditional("DEBUG")]

@@ -17,6 +17,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     [NUnit.Framework.Category("Fast")]
     public sealed class PairedMeasurementTests
     {
+        private static CalibratedBenchmarkMeasurement CreateSamples(
+            double[] reference,
+            double[] subject
+        )
+        {
+            return new CalibratedBenchmarkMeasurement(reference, subject, 1, 12345, 100, 100, 3, 3);
+        }
+
         [TestCase(0.90, true, true)]
         [TestCase(0.96, false, true)]
         [TestCase(1.04, false, true)]
@@ -192,14 +200,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     1
                 )
             );
-        }
-
-        private static CalibratedBenchmarkMeasurement CreateSamples(
-            double[] reference,
-            double[] subject
-        )
-        {
-            return new CalibratedBenchmarkMeasurement(reference, subject, 1, 12345, 100, 100, 3, 3);
         }
 
         [Test]

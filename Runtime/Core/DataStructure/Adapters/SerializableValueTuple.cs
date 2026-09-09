@@ -44,6 +44,28 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             IEquatable<ValueTuple<T1, T2>>,
             IUnderlyingValueProvider
     {
+        /// <summary>Reports whether both components are equal.</summary>
+        /// <param name="left">The first value.</param>
+        /// <param name="right">The second value.</param>
+        public static bool operator ==(
+            SerializableValueTuple<T1, T2> left,
+            SerializableValueTuple<T1, T2> right
+        )
+        {
+            return left.Equals(right);
+        }
+
+        /// <summary>Reports whether either component differs.</summary>
+        /// <param name="left">The first value.</param>
+        /// <param name="right">The second value.</param>
+        public static bool operator !=(
+            SerializableValueTuple<T1, T2> left,
+            SerializableValueTuple<T1, T2> right
+        )
+        {
+            return !left.Equals(right);
+        }
+
         /// <summary>The first component.</summary>
         [ProtoMember(1, IsRequired = true)]
         [WProtoMember(1, IsRequired = true)]
@@ -75,28 +97,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         public static implicit operator ValueTuple<T1, T2>(SerializableValueTuple<T1, T2> value)
         {
             return new ValueTuple<T1, T2>(value.Item1, value.Item2);
-        }
-
-        /// <summary>Reports whether both components are equal.</summary>
-        /// <param name="left">The first value.</param>
-        /// <param name="right">The second value.</param>
-        public static bool operator ==(
-            SerializableValueTuple<T1, T2> left,
-            SerializableValueTuple<T1, T2> right
-        )
-        {
-            return left.Equals(right);
-        }
-
-        /// <summary>Reports whether either component differs.</summary>
-        /// <param name="left">The first value.</param>
-        /// <param name="right">The second value.</param>
-        public static bool operator !=(
-            SerializableValueTuple<T1, T2> left,
-            SerializableValueTuple<T1, T2> right
-        )
-        {
-            return !left.Equals(right);
         }
 
         /// <summary>Copies both components out.</summary>
@@ -135,12 +135,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             return obj is SerializableValueTuple<T1, T2> serializable && Equals(serializable);
         }
 
-        bool IUnderlyingValueProvider.TryGetUnderlyingValue(out object value)
-        {
-            value = new ValueTuple<T1, T2>(Item1, Item2);
-            return true;
-        }
-
         /// <inheritdoc/>
         public override int GetHashCode()
         {
@@ -151,6 +145,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         public override string ToString()
         {
             return "(" + Item1 + ", " + Item2 + ")";
+        }
+
+        bool IUnderlyingValueProvider.TryGetUnderlyingValue(out object value)
+        {
+            value = new ValueTuple<T1, T2>(Item1, Item2);
+            return true;
         }
     }
 
@@ -172,6 +172,28 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             IEquatable<ValueTuple<T1, T2, T3>>,
             IUnderlyingValueProvider
     {
+        /// <summary>Reports whether every component is equal.</summary>
+        /// <param name="left">The first value.</param>
+        /// <param name="right">The second value.</param>
+        public static bool operator ==(
+            SerializableValueTuple<T1, T2, T3> left,
+            SerializableValueTuple<T1, T2, T3> right
+        )
+        {
+            return left.Equals(right);
+        }
+
+        /// <summary>Reports whether any component differs.</summary>
+        /// <param name="left">The first value.</param>
+        /// <param name="right">The second value.</param>
+        public static bool operator !=(
+            SerializableValueTuple<T1, T2, T3> left,
+            SerializableValueTuple<T1, T2, T3> right
+        )
+        {
+            return !left.Equals(right);
+        }
+
         /// <summary>The first component.</summary>
         [ProtoMember(1, IsRequired = true)]
         [WProtoMember(1, IsRequired = true)]
@@ -216,28 +238,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             return new ValueTuple<T1, T2, T3>(value.Item1, value.Item2, value.Item3);
         }
 
-        /// <summary>Reports whether every component is equal.</summary>
-        /// <param name="left">The first value.</param>
-        /// <param name="right">The second value.</param>
-        public static bool operator ==(
-            SerializableValueTuple<T1, T2, T3> left,
-            SerializableValueTuple<T1, T2, T3> right
-        )
-        {
-            return left.Equals(right);
-        }
-
-        /// <summary>Reports whether any component differs.</summary>
-        /// <param name="left">The first value.</param>
-        /// <param name="right">The second value.</param>
-        public static bool operator !=(
-            SerializableValueTuple<T1, T2, T3> left,
-            SerializableValueTuple<T1, T2, T3> right
-        )
-        {
-            return !left.Equals(right);
-        }
-
         /// <summary>Copies every component out.</summary>
         /// <param name="item1">Receives the first component.</param>
         /// <param name="item2">Receives the second component.</param>
@@ -279,12 +279,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             return obj is SerializableValueTuple<T1, T2, T3> serializable && Equals(serializable);
         }
 
-        bool IUnderlyingValueProvider.TryGetUnderlyingValue(out object value)
-        {
-            value = new ValueTuple<T1, T2, T3>(Item1, Item2, Item3);
-            return true;
-        }
-
         /// <inheritdoc/>
         public override int GetHashCode()
         {
@@ -295,6 +289,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         public override string ToString()
         {
             return "(" + Item1 + ", " + Item2 + ", " + Item3 + ")";
+        }
+
+        bool IUnderlyingValueProvider.TryGetUnderlyingValue(out object value)
+        {
+            value = new ValueTuple<T1, T2, T3>(Item1, Item2, Item3);
+            return true;
         }
     }
 }

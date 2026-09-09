@@ -42,6 +42,60 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
             );
         }
 
+        private static IEnumerable<TestCaseData> TryGetValueAtNormalizedTestCases()
+        {
+            yield return new TestCaseData(10f, 20f, 0f, true, 0f).SetName(
+                "TryGetValueAtNormalized.AtZero.ReturnsZero"
+            );
+            yield return new TestCaseData(10f, 20f, 1f, true, 0f).SetName(
+                "TryGetValueAtNormalized.AtOne.ReturnsZero"
+            );
+            yield return new TestCaseData(10f, 20f, 0.5f, true, 10f).SetName(
+                "TryGetValueAtNormalized.AtHalf.ReturnsMaxHeight"
+            );
+            yield return new TestCaseData(10f, 20f, 0.25f, true, 7.5f).SetName(
+                "TryGetValueAtNormalized.AtQuarter.ReturnsCalculatedValue"
+            );
+            yield return new TestCaseData(10f, 20f, -0.1f, false, float.NaN).SetName(
+                "TryGetValueAtNormalized.NegativeT.ReturnsFalse"
+            );
+            yield return new TestCaseData(10f, 20f, 1.1f, false, float.NaN).SetName(
+                "TryGetValueAtNormalized.TGreaterThanOne.ReturnsFalse"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> ConstructorInvalidParametersTestCases()
+        {
+            yield return new TestCaseData(10f, 0f).SetName(
+                "Constructor.ZeroLength.ThrowsArgumentException"
+            );
+            yield return new TestCaseData(10f, -5f).SetName(
+                "Constructor.NegativeLength.ThrowsArgumentException"
+            );
+            yield return new TestCaseData(0f, 10f).SetName(
+                "Constructor.ZeroMaxHeight.ThrowsArgumentException"
+            );
+            yield return new TestCaseData(-5f, 10f).SetName(
+                "Constructor.NegativeMaxHeight.ThrowsArgumentException"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> FromCoefficientsInvalidTestCases()
+        {
+            yield return new TestCaseData(0.1f, 2f, 20f).SetName(
+                "FromCoefficients.PositiveA.ThrowsArgumentException"
+            );
+            yield return new TestCaseData(0f, 2f, 20f).SetName(
+                "FromCoefficients.ZeroA.ThrowsArgumentException"
+            );
+            yield return new TestCaseData(-0.1f, 1f, 20f).SetName(
+                "FromCoefficients.InvalidIntercept.ThrowsArgumentException"
+            );
+            yield return new TestCaseData(-0.1f, 2f, -20f).SetName(
+                "FromCoefficients.NegativeLength.ThrowsArgumentException"
+            );
+        }
+
         [TestCaseSource(nameof(TryGetValueAtTestCases))]
         public void TryGetValueAtReturnsExpected(
             float maxHeight,
@@ -64,28 +118,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
             {
                 Assert.IsTrue(float.IsNaN(y));
             }
-        }
-
-        private static IEnumerable<TestCaseData> TryGetValueAtNormalizedTestCases()
-        {
-            yield return new TestCaseData(10f, 20f, 0f, true, 0f).SetName(
-                "TryGetValueAtNormalized.AtZero.ReturnsZero"
-            );
-            yield return new TestCaseData(10f, 20f, 1f, true, 0f).SetName(
-                "TryGetValueAtNormalized.AtOne.ReturnsZero"
-            );
-            yield return new TestCaseData(10f, 20f, 0.5f, true, 10f).SetName(
-                "TryGetValueAtNormalized.AtHalf.ReturnsMaxHeight"
-            );
-            yield return new TestCaseData(10f, 20f, 0.25f, true, 7.5f).SetName(
-                "TryGetValueAtNormalized.AtQuarter.ReturnsCalculatedValue"
-            );
-            yield return new TestCaseData(10f, 20f, -0.1f, false, float.NaN).SetName(
-                "TryGetValueAtNormalized.NegativeT.ReturnsFalse"
-            );
-            yield return new TestCaseData(10f, 20f, 1.1f, false, float.NaN).SetName(
-                "TryGetValueAtNormalized.TGreaterThanOne.ReturnsFalse"
-            );
         }
 
         [TestCaseSource(nameof(TryGetValueAtNormalizedTestCases))]
@@ -112,43 +144,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
             }
         }
 
-        private static IEnumerable<TestCaseData> ConstructorInvalidParametersTestCases()
-        {
-            yield return new TestCaseData(10f, 0f).SetName(
-                "Constructor.ZeroLength.ThrowsArgumentException"
-            );
-            yield return new TestCaseData(10f, -5f).SetName(
-                "Constructor.NegativeLength.ThrowsArgumentException"
-            );
-            yield return new TestCaseData(0f, 10f).SetName(
-                "Constructor.ZeroMaxHeight.ThrowsArgumentException"
-            );
-            yield return new TestCaseData(-5f, 10f).SetName(
-                "Constructor.NegativeMaxHeight.ThrowsArgumentException"
-            );
-        }
-
         [TestCaseSource(nameof(ConstructorInvalidParametersTestCases))]
         public void ConstructorThrowsForInvalidParameters(float maxHeight, float length)
         {
             Assert.Throws<ArgumentException>(() =>
                 new Parabola(maxHeight: maxHeight, length: length)
-            );
-        }
-
-        private static IEnumerable<TestCaseData> FromCoefficientsInvalidTestCases()
-        {
-            yield return new TestCaseData(0.1f, 2f, 20f).SetName(
-                "FromCoefficients.PositiveA.ThrowsArgumentException"
-            );
-            yield return new TestCaseData(0f, 2f, 20f).SetName(
-                "FromCoefficients.ZeroA.ThrowsArgumentException"
-            );
-            yield return new TestCaseData(-0.1f, 1f, 20f).SetName(
-                "FromCoefficients.InvalidIntercept.ThrowsArgumentException"
-            );
-            yield return new TestCaseData(-0.1f, 2f, -20f).SetName(
-                "FromCoefficients.NegativeLength.ThrowsArgumentException"
             );
         }
 

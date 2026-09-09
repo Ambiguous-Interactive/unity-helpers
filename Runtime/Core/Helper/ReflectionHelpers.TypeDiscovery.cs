@@ -26,6 +26,21 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private const string IndexerPropertyName = "Item";
 
         /// <summary>
+        /// Attempts to resolve a type by name using Type.GetType first, then scans loaded assemblies.
+        /// Returns null if not found.
+        /// </summary>
+        /// <param name="typeName">The type name to resolve.</param>
+        /// <returns>The resolved type, or <c>null</c> when no loaded assembly declares it.</returns>
+        /// <remarks>
+        /// Only a successful resolution is cached, so the cache is bounded by the types actually
+        /// loaded. A name is routinely payload data -- a serialized <c>Type</c> field naming a class
+        /// a later build renamed -- and caching those would grow without bound on a string the
+        /// process can never use. It would also be wrong: an assembly loaded afterwards can make a
+        /// name resolvable, and a cached failure would outlive it.
+        /// </remarks>
+        internal static int ResolvedTypeCacheCountForTesting => TypeResolutionCache.Count;
+
+        /// <summary>
         /// Returns all loaded types across accessible assemblies, swallowing reflection errors.
         /// </summary>
         public static IEnumerable<Type> GetAllLoadedTypes()
@@ -75,21 +90,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return Type.EmptyTypes;
             }
         }
-
-        /// <summary>
-        /// Attempts to resolve a type by name using Type.GetType first, then scans loaded assemblies.
-        /// Returns null if not found.
-        /// </summary>
-        /// <param name="typeName">The type name to resolve.</param>
-        /// <returns>The resolved type, or <c>null</c> when no loaded assembly declares it.</returns>
-        /// <remarks>
-        /// Only a successful resolution is cached, so the cache is bounded by the types actually
-        /// loaded. A name is routinely payload data -- a serialized <c>Type</c> field naming a class
-        /// a later build renamed -- and caching those would grow without bound on a string the
-        /// process can never use. It would also be wrong: an assembly loaded afterwards can make a
-        /// name resolvable, and a cached failure would outlive it.
-        /// </remarks>
-        internal static int ResolvedTypeCacheCountForTesting => TypeResolutionCache.Count;
 
         public static Type TryResolveType(string typeName)
         {
@@ -378,79 +378,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 .Where(p => p != null && HasAttributeSafe<TAttribute>(p));
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static IEnumerable<MethodInfo> SafeGetMethods(Type t, BindingFlags flags)
-        {
-            try
-            {
-                return t?.GetMethods(flags) ?? Array.Empty<MethodInfo>();
-            }
-            catch
-            {
-                return Array.Empty<MethodInfo>();
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        /// <summary>
-        /// Walks <paramref name="type"/> and its base types, asking each level only for what it
-        /// declares, so an inherited private field is reported rather than skipped.
-        /// </summary>
-        private static IEnumerable<FieldInfo> EnumerateDeclaredAndInheritedFields(
-            Type type,
-            BindingFlags flags
-        )
-        {
-            BindingFlags declaredFlags = flags | BindingFlags.DeclaredOnly;
-            Type current = type;
-            while (current != null && current != typeof(object))
-            {
-                foreach (FieldInfo field in SafeGetFields(current, declaredFlags))
-                {
-                    yield return field;
-                }
-
-                current = SafeGetBaseType(current);
-            }
-        }
-
-        private static Type SafeGetBaseType(Type type)
-        {
-            try
-            {
-                return type.BaseType;
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        private static IEnumerable<FieldInfo> SafeGetFields(Type t, BindingFlags flags)
-        {
-            try
-            {
-                return t?.GetFields(flags) ?? Array.Empty<FieldInfo>();
-            }
-            catch
-            {
-                return Array.Empty<FieldInfo>();
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static IEnumerable<PropertyInfo> SafeGetProperties(Type t, BindingFlags flags)
-        {
-            try
-            {
-                return t?.GetProperties(flags) ?? Array.Empty<PropertyInfo>();
-            }
-            catch
-            {
-                return Array.Empty<PropertyInfo>();
-            }
-        }
-
         /// <summary>
         /// Tries to get a field by name from a type with caching.
         /// </summary>
@@ -594,49 +521,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return resolved != null;
         }
 
-        private static PropertyInfo ValidateIndexerProperty(
-            PropertyInfo found,
-            Type expectedReturnType,
-            Type[] expectedIndexParameterTypes
-        )
-        {
-            if (found == null)
-            {
-                return null;
-            }
-
-            if (found.PropertyType != expectedReturnType)
-            {
-                return null;
-            }
-
-            ParameterInfo[] indexParams = found.GetIndexParameters();
-            if (indexParams.Length != expectedIndexParameterTypes.Length)
-            {
-                return null;
-            }
-
-            for (int i = 0; i < indexParams.Length; i++)
-            {
-                if (indexParams[i].ParameterType != expectedIndexParameterTypes[i])
-                {
-                    return null;
-                }
-            }
-
-            return found;
-        }
-
-        private static string BuildIndexerSignatureKey(Type[] paramTypes)
-        {
-            if (paramTypes == null || paramTypes.Length == 0)
-            {
-                return "[]";
-            }
-
-            return "[" + string.Join(",", paramTypes.Select(t => t?.FullName ?? "null")) + "]";
-        }
-
         /// <summary>
         /// Tries to get a method by name from a type with caching.
         /// </summary>
@@ -697,6 +581,122 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 #endif
             method = resolved;
             return resolved != null;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static IEnumerable<MethodInfo> SafeGetMethods(Type t, BindingFlags flags)
+        {
+            try
+            {
+                return t?.GetMethods(flags) ?? Array.Empty<MethodInfo>();
+            }
+            catch
+            {
+                return Array.Empty<MethodInfo>();
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        /// <summary>
+        /// Walks <paramref name="type"/> and its base types, asking each level only for what it
+        /// declares, so an inherited private field is reported rather than skipped.
+        /// </summary>
+        private static IEnumerable<FieldInfo> EnumerateDeclaredAndInheritedFields(
+            Type type,
+            BindingFlags flags
+        )
+        {
+            BindingFlags declaredFlags = flags | BindingFlags.DeclaredOnly;
+            Type current = type;
+            while (current != null && current != typeof(object))
+            {
+                foreach (FieldInfo field in SafeGetFields(current, declaredFlags))
+                {
+                    yield return field;
+                }
+
+                current = SafeGetBaseType(current);
+            }
+        }
+
+        private static Type SafeGetBaseType(Type type)
+        {
+            try
+            {
+                return type.BaseType;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static IEnumerable<FieldInfo> SafeGetFields(Type t, BindingFlags flags)
+        {
+            try
+            {
+                return t?.GetFields(flags) ?? Array.Empty<FieldInfo>();
+            }
+            catch
+            {
+                return Array.Empty<FieldInfo>();
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static IEnumerable<PropertyInfo> SafeGetProperties(Type t, BindingFlags flags)
+        {
+            try
+            {
+                return t?.GetProperties(flags) ?? Array.Empty<PropertyInfo>();
+            }
+            catch
+            {
+                return Array.Empty<PropertyInfo>();
+            }
+        }
+
+        private static PropertyInfo ValidateIndexerProperty(
+            PropertyInfo found,
+            Type expectedReturnType,
+            Type[] expectedIndexParameterTypes
+        )
+        {
+            if (found == null)
+            {
+                return null;
+            }
+
+            if (found.PropertyType != expectedReturnType)
+            {
+                return null;
+            }
+
+            ParameterInfo[] indexParams = found.GetIndexParameters();
+            if (indexParams.Length != expectedIndexParameterTypes.Length)
+            {
+                return null;
+            }
+
+            for (int i = 0; i < indexParams.Length; i++)
+            {
+                if (indexParams[i].ParameterType != expectedIndexParameterTypes[i])
+                {
+                    return null;
+                }
+            }
+
+            return found;
+        }
+
+        private static string BuildIndexerSignatureKey(Type[] paramTypes)
+        {
+            if (paramTypes == null || paramTypes.Length == 0)
+            {
+                return "[]";
+            }
+
+            return "[" + string.Join(",", paramTypes.Select(t => t?.FullName ?? "null")) + "]";
         }
 
         private static string BuildMethodSignatureKey(string name, Type[] paramTypes)

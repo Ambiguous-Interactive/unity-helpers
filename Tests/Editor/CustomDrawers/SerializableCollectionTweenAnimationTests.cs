@@ -48,6 +48,42 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         private float _originalSortedSetSpeed;
         private float _originalWGroupSpeed;
 
+        private static WGroupDefinition CreateGroupDefinition(string name)
+        {
+            List<string> propertyPaths = new List<string> { name };
+            return new WGroupDefinition(
+                name: name,
+                displayName: name,
+                collapsible: true,
+                startCollapsed: false,
+                hideHeader: false,
+                propertyPaths: propertyPaths,
+                anchorPropertyPath: name,
+                anchorIndex: 0,
+                declarationOrder: 0
+            );
+        }
+
+        private static void SetFoldoutSpeed(string propertyPath, float speed)
+        {
+            UnityHelpersSettings settings = UnityHelpersSettings.instance;
+            using SerializedObject serializedSettings = new SerializedObject(settings);
+            serializedSettings.Update();
+
+            SerializedProperty property = serializedSettings.FindProperty(propertyPath);
+            Assert.IsTrue(property != null, $"Settings did not contain property '{propertyPath}'.");
+
+            float clamped = Mathf.Clamp(
+                speed,
+                UnityHelpersSettings.MinFoldoutSpeed,
+                UnityHelpersSettings.MaxFoldoutSpeed
+            );
+            property.floatValue = clamped;
+
+            serializedSettings.ApplyModifiedPropertiesWithoutUndo();
+            settings.SaveSettings();
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -728,42 +764,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 0.001f,
                 "Second pending entry progress should stay at collapsed state."
             );
-        }
-
-        private static WGroupDefinition CreateGroupDefinition(string name)
-        {
-            List<string> propertyPaths = new List<string> { name };
-            return new WGroupDefinition(
-                name: name,
-                displayName: name,
-                collapsible: true,
-                startCollapsed: false,
-                hideHeader: false,
-                propertyPaths: propertyPaths,
-                anchorPropertyPath: name,
-                anchorIndex: 0,
-                declarationOrder: 0
-            );
-        }
-
-        private static void SetFoldoutSpeed(string propertyPath, float speed)
-        {
-            UnityHelpersSettings settings = UnityHelpersSettings.instance;
-            using SerializedObject serializedSettings = new SerializedObject(settings);
-            serializedSettings.Update();
-
-            SerializedProperty property = serializedSettings.FindProperty(propertyPath);
-            Assert.IsTrue(property != null, $"Settings did not contain property '{propertyPath}'.");
-
-            float clamped = Mathf.Clamp(
-                speed,
-                UnityHelpersSettings.MinFoldoutSpeed,
-                UnityHelpersSettings.MaxFoldoutSpeed
-            );
-            property.floatValue = clamped;
-
-            serializedSettings.ApplyModifiedPropertiesWithoutUndo();
-            settings.SaveSettings();
         }
 
         [Test]

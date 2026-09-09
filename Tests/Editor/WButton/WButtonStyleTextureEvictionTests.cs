@@ -24,6 +24,20 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
     [NUnit.Framework.Category("Fast")]
     public sealed class WButtonStyleTextureEvictionTests
     {
+        /*
+            Spread probes across color channels so quantization cannot collapse them and prevent the cache from
+            filling.
+        */
+        private static Color DistinctColor(int index)
+        {
+            return new Color(
+                (index % 32) / 32f,
+                ((index / 32) % 32) / 32f,
+                ((index / 1024) % 32) / 32f,
+                1f
+            );
+        }
+
         [SetUp]
         public void SetUp()
         {
@@ -128,20 +142,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             Assert.AreEqual(0, WButtonStyles.TestHooks.ColoredButtonStyleCount);
             Assert.IsTrue(background == null, "Clear dropped a texture without destroying it");
-        }
-
-        /*
-            Spread probes across color channels so quantization cannot collapse them and prevent the cache from
-            filling.
-        */
-        private static Color DistinctColor(int index)
-        {
-            return new Color(
-                (index % 32) / 32f,
-                ((index / 32) % 32) / 32f,
-                ((index / 1024) % 32) / 32f,
-                1f
-            );
         }
     }
 }

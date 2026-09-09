@@ -31,6 +31,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     {
         private const int ScratchSize = 512;
 
+        private static string ToHex(ReadOnlySpan<byte> bytes)
+        {
+            StringBuilder builder = new(bytes.Length * 2);
+            for (int index = 0; index < bytes.Length; index++)
+            {
+                builder.Append(bytes[index].ToString("X2"));
+            }
+
+            return builder.ToString();
+        }
+
+        private static byte[] FromHex(string hex)
+        {
+            byte[] bytes = new byte[hex.Length / 2];
+            for (int index = 0; index < bytes.Length; index++)
+            {
+                bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
+            }
+
+            return bytes;
+        }
+
         [TestCase(1, "0801")]
         [TestCase(-1, "08FFFFFFFFFFFFFFFFFF01")]
         [TestCase(127, "087F")]
@@ -871,28 +893,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     $"Varint64Size disagreed with the encoder for {value}."
                 );
             }
-        }
-
-        private static string ToHex(ReadOnlySpan<byte> bytes)
-        {
-            StringBuilder builder = new(bytes.Length * 2);
-            for (int index = 0; index < bytes.Length; index++)
-            {
-                builder.Append(bytes[index].ToString("X2"));
-            }
-
-            return builder.ToString();
-        }
-
-        private static byte[] FromHex(string hex)
-        {
-            byte[] bytes = new byte[hex.Length / 2];
-            for (int index = 0; index < bytes.Length; index++)
-            {
-                bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
-            }
-
-            return bytes;
         }
 
         /// <summary>A formatter that reports success whether or not its writes were accepted.</summary>

@@ -21,14 +21,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     /// </remarks>
     public static class AuthoredAssetYaml
     {
-        /// <summary>The extensions Unity writes authored objects into.</summary>
-        public static readonly IReadOnlyList<string> AuthoredExtensions = new[]
-        {
-            ".unity",
-            ".prefab",
-            ".asset",
-        };
-
         /// <summary>The <c>!u!</c> class id Unity writes for a <c>MonoBehaviour</c> document.</summary>
         public const int MonoBehaviourTypeId = 114;
 
@@ -37,6 +29,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
         /// <summary>The value Unity writes for a sequence with no elements.</summary>
         public const string EmptySequence = "[]";
+
+        /// <summary>The extensions Unity writes authored objects into.</summary>
+        public static readonly IReadOnlyList<string> AuthoredExtensions = new[]
+        {
+            ".unity",
+            ".prefab",
+            ".asset",
+        };
 
         /// <summary>
         /// Every file under <paramref name="rootDirectory"/> whose extension is one of
@@ -323,6 +323,85 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             }
         }
 
+        internal static bool TrySplitEntry(string content, out string key, out string inlineValue)
+        {
+            int separator = -1;
+            for (int index = 0; index < content.Length; ++index)
+            {
+                char character = content[index];
+                if (character == ':')
+                {
+                    bool terminated = content.Length <= index + 1 || content[index + 1] == ' ';
+                    if (terminated)
+                    {
+                        separator = index;
+                    }
+
+                    break;
+                }
+
+                if (!IsKeyCharacter(character))
+                {
+                    key = null;
+                    inlineValue = string.Empty;
+                    return false;
+                }
+            }
+
+            if (separator <= 0)
+            {
+                key = null;
+                inlineValue = string.Empty;
+                return false;
+            }
+
+            key = content.Substring(0, separator);
+            inlineValue = content.Substring(separator + 1).Trim();
+            return true;
+        }
+
+        /// <summary>Whether <paramref name="path"/> sits under one of <paramref name="prefixes"/>.</summary>
+        /// <param name="path">The asset path to test.</param>
+        /// <param name="prefixes">The prefixes to accept.</param>
+        /// <returns><c>true</c> when the path is in scope.</returns>
+        /// <remarks>
+        /// Shared so two checks cannot drift into two contracts. They had: one returned false for a
+        /// null path and the other threw, which is what exposing them for test found.
+        /// </remarks>
+        internal static bool IsUnderAnyPrefix(string path, IReadOnlyList<string> prefixes)
+        {
+            if (string.IsNullOrEmpty(path) || prefixes == null)
+            {
+                return false;
+            }
+
+            string normalized = path.Replace('\\', '/');
+            for (int index = 0; index < prefixes.Count; ++index)
+            {
+                string prefix = prefixes[index];
+                if (
+                    !string.IsNullOrEmpty(prefix)
+                    && normalized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                )
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        internal static int LeadingSpaces(string line)
+        {
+            int index = 0;
+            while (index < line.Length && line[index] == ' ')
+            {
+                ++index;
+            }
+
+            return index;
+        }
+
         private static bool IsZeroGuid(string guid)
         {
             for (int index = 0; index < guid.Length; ++index)
@@ -500,43 +579,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             return first == '|' || first == '>';
         }
 
-        internal static bool TrySplitEntry(string content, out string key, out string inlineValue)
-        {
-            int separator = -1;
-            for (int index = 0; index < content.Length; ++index)
-            {
-                char character = content[index];
-                if (character == ':')
-                {
-                    bool terminated = content.Length <= index + 1 || content[index + 1] == ' ';
-                    if (terminated)
-                    {
-                        separator = index;
-                    }
-
-                    break;
-                }
-
-                if (!IsKeyCharacter(character))
-                {
-                    key = null;
-                    inlineValue = string.Empty;
-                    return false;
-                }
-            }
-
-            if (separator <= 0)
-            {
-                key = null;
-                inlineValue = string.Empty;
-                return false;
-            }
-
-            key = content.Substring(0, separator);
-            inlineValue = content.Substring(separator + 1).Trim();
-            return true;
-        }
-
         private static bool IsKeyCharacter(char character)
         {
             return character == '_'
@@ -557,48 +599,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             }
 
             return line.Substring(start, end - start);
-        }
-
-        /// <summary>Whether <paramref name="path"/> sits under one of <paramref name="prefixes"/>.</summary>
-        /// <param name="path">The asset path to test.</param>
-        /// <param name="prefixes">The prefixes to accept.</param>
-        /// <returns><c>true</c> when the path is in scope.</returns>
-        /// <remarks>
-        /// Shared so two checks cannot drift into two contracts. They had: one returned false for a
-        /// null path and the other threw, which is what exposing them for test found.
-        /// </remarks>
-        internal static bool IsUnderAnyPrefix(string path, IReadOnlyList<string> prefixes)
-        {
-            if (string.IsNullOrEmpty(path) || prefixes == null)
-            {
-                return false;
-            }
-
-            string normalized = path.Replace('\\', '/');
-            for (int index = 0; index < prefixes.Count; ++index)
-            {
-                string prefix = prefixes[index];
-                if (
-                    !string.IsNullOrEmpty(prefix)
-                    && normalized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
-                )
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        internal static int LeadingSpaces(string line)
-        {
-            int index = 0;
-            while (index < line.Length && line[index] == ' ')
-            {
-                ++index;
-            }
-
-            return index;
         }
     }
 #endif

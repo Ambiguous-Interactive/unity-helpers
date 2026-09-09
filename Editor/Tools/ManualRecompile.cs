@@ -19,12 +19,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             "Tools/Wallstop Studios/Unity Helpers/Request Script Compilation";
         private const string LogPrefix = "[Unity Helpers]";
 
-        private static readonly ImportAssetOptions RefreshOptions =
-            ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport;
-
-        internal static Func<bool> isCompilationPendingEvaluator = () =>
-            EditorApplication.isCompiling;
-
         internal static Func<bool> IsCompilationPendingEvaluator
         {
             get => isCompilationPendingEvaluator;
@@ -45,6 +39,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         internal static Action AssetsRefreshedForTests { get; set; }
 
         internal static Action CompilationRequestedForTests { get; set; }
+
+        internal static Func<bool> isCompilationPendingEvaluator = () =>
+            EditorApplication.isCompiling;
+
+        private static readonly ImportAssetOptions RefreshOptions =
+            ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport;
 
         [MenuItem(MenuItemPath)]
         public static void RequestFromMenu()

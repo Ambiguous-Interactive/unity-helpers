@@ -17,22 +17,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     public readonly struct ValidationRuleFailure
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="ValidationRuleFailure"/> struct.
-        /// </summary>
-        /// <param name="ruleId">
-        /// The rule that threw, or <c>null</c> when the asset itself failed to load, which is not
-        /// any one rule's fault.
-        /// </param>
-        /// <param name="assetPath">The asset it was validating.</param>
-        /// <param name="exception">What it threw.</param>
-        public ValidationRuleFailure(string ruleId, string assetPath, Exception exception)
-        {
-            RuleId = ruleId;
-            AssetPath = assetPath;
-            Exception = exception;
-        }
-
-        /// <summary>
         /// The rule that threw, or <c>null</c> when loading the asset threw.
         /// </summary>
         /// <remarks>
@@ -50,6 +34,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         /// <summary>What it threw.</summary>
         public Exception Exception { get; }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ValidationRuleFailure"/> struct.
+        /// </summary>
+        /// <param name="ruleId">
+        /// The rule that threw, or <c>null</c> when the asset itself failed to load, which is not
+        /// any one rule's fault.
+        /// </param>
+        /// <param name="assetPath">The asset it was validating.</param>
+        /// <param name="exception">What it threw.</param>
+        public ValidationRuleFailure(string ruleId, string assetPath, Exception exception)
+        {
+            RuleId = ruleId;
+            AssetPath = assetPath;
+            Exception = exception;
+        }
 
         /// <inheritdoc />
         public override string ToString()

@@ -23,22 +23,22 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
     {
         public int visibleField1;
 
+        [WGroup("Test Group", autoIncludeCount: 0)]
+        public int groupedField;
+
+        public int visibleField2;
+
         [HideInInspector]
         [SerializeField]
 #pragma warning disable CS0169 // Field is never used
         private int _ungroupedHiddenField1;
 #pragma warning restore CS0169 // Field is never used
 
-        [WGroup("Test Group", autoIncludeCount: 0)]
-        public int groupedField;
-
         [HideInInspector]
         [SerializeField]
 #pragma warning disable CS0169 // Field is never used
         private int _ungroupedHiddenField2;
 #pragma warning restore CS0169 // Field is never used
-
-        public int visibleField2;
     }
 }
 #endif

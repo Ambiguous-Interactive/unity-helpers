@@ -24,23 +24,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     [ExecuteAlways]
     public sealed class UnityMainThreadDispatcher : RuntimeSingleton<UnityMainThreadDispatcher>
     {
-        private readonly ConcurrentQueue<Action> _actions = new();
         private const int DefaultQueueLimit = 4096;
+
+        private readonly ConcurrentQueue<Action> _actions = new();
         private int _pendingActionCount;
         private int _lastOverflowFrame = -1;
 #if UNITY_EDITOR
         private const HideFlags EditorDispatcherHideFlags = HideFlags.None;
 #endif
-
-        [SerializeField]
-        [Tooltip(
-            "Maximum number of queued actions before new submissions are dropped. Set to 0 for unlimited."
-        )]
-        private int maxPendingActions = DefaultQueueLimit;
-
-        protected override bool Preserve => false;
-
-        protected override bool LogErrorOnDestruction => false;
 
         internal static bool AutoCreationEnabled { get; private set; } = false;
 
@@ -58,6 +49,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             get => maxPendingActions;
             set => maxPendingActions = Mathf.Max(0, value);
         }
+
+        protected override bool Preserve => false;
+
+        protected override bool LogErrorOnDestruction => false;
+
+        [SerializeField]
+        [Tooltip(
+            "Maximum number of queued actions before new submissions are dropped. Set to 0 for unlimited."
+        )]
+        private int maxPendingActions = DefaultQueueLimit;
 
         internal static bool TryGetInstance(out UnityMainThreadDispatcher dispatcher)
         {
@@ -164,13 +165,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private bool _attachedEditorUpdate;
 #endif
 
-        public UnityMainThreadDispatcher()
-        {
-#if UNITY_EDITOR
-            _update = Update;
-#endif
-        }
-
         /// <summary>
         /// Gets the singleton dispatcher, creating it automatically when auto-creation is enabled.
         /// When auto-creation is disabled (for example inside tests) this simply returns the existing instance, which may be <c>null</c>.
@@ -195,6 +189,48 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
                 return RuntimeSingleton<UnityMainThreadDispatcher>.Instance;
             }
+        }
+
+        public UnityMainThreadDispatcher()
+        {
+#if UNITY_EDITOR
+            _update = Update;
+#endif
+        }
+
+        /// <summary>
+        /// Creates a dispatcher test scope that follows the recommended pattern: disable auto-creation, destroy lingering instances immediately, re-enable auto-creation for the test body, and clean everything up on dispose.
+        /// </summary>
+        /// <param name="destroyImmediate">When <c>true</c>, uses <see cref="UnityEngine.Object.DestroyImmediate(UnityEngine.Object)"/> for cleanup. Set to <c>false</c> in play mode so Unity can process destruction safely.</param>
+        /// <returns>An <see cref="AutoCreationScope"/> that automatically restores the previous auto-creation state when disposed.</returns>
+        /// <example>
+        /// <code>
+        /// private UnityMainThreadDispatcher.AutoCreationScope _scope;
+        ///
+        /// [SetUp]
+        /// public void SetUp()
+        /// {
+        ///     _scope = UnityMainThreadDispatcher.CreateTestScope(destroyImmediate: true);
+        /// }
+        ///
+        /// [TearDown]
+        /// public void TearDown()
+        /// {
+        ///     _scope?.Dispose();
+        ///     _scope = null;
+        /// }
+        /// </code>
+        /// </example>
+        public static AutoCreationScope CreateTestScope(bool destroyImmediate = true)
+        {
+            AutoCreationScope scope = AutoCreationScope.Disabled(
+                destroyExistingInstanceOnEnter: true,
+                destroyInstancesOnDispose: true,
+                destroyImmediate: destroyImmediate
+            );
+
+            SetAutoCreationEnabled(true);
+            return scope;
         }
 
         internal static void SetAutoCreationEnabled(bool enabled)
@@ -256,41 +292,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return true;
         }
 
-        /// <summary>
-        /// Creates a dispatcher test scope that follows the recommended pattern: disable auto-creation, destroy lingering instances immediately, re-enable auto-creation for the test body, and clean everything up on dispose.
-        /// </summary>
-        /// <param name="destroyImmediate">When <c>true</c>, uses <see cref="UnityEngine.Object.DestroyImmediate(UnityEngine.Object)"/> for cleanup. Set to <c>false</c> in play mode so Unity can process destruction safely.</param>
-        /// <returns>An <see cref="AutoCreationScope"/> that automatically restores the previous auto-creation state when disposed.</returns>
-        /// <example>
-        /// <code>
-        /// private UnityMainThreadDispatcher.AutoCreationScope _scope;
-        ///
-        /// [SetUp]
-        /// public void SetUp()
-        /// {
-        ///     _scope = UnityMainThreadDispatcher.CreateTestScope(destroyImmediate: true);
-        /// }
-        ///
-        /// [TearDown]
-        /// public void TearDown()
-        /// {
-        ///     _scope?.Dispose();
-        ///     _scope = null;
-        /// }
-        /// </code>
-        /// </example>
-        public static AutoCreationScope CreateTestScope(bool destroyImmediate = true)
-        {
-            AutoCreationScope scope = AutoCreationScope.Disabled(
-                destroyExistingInstanceOnEnter: true,
-                destroyInstancesOnDispose: true,
-                destroyImmediate: destroyImmediate
-            );
-
-            SetAutoCreationEnabled(true);
-            return scope;
-        }
-
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSplashScreen)]
         private static void EnsureDispatcherBootstrap()
         {
@@ -342,6 +343,83 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
+        private static void CompleteFromTask(
+            Task task,
+            TaskCompletionSource<bool> completion,
+            CancellationToken cancellationToken
+        )
+        {
+            if (task == null || completion == null)
+            {
+                return;
+            }
+
+            if (task.IsCanceled)
+            {
+                // Report the token that actually canceled the operation, which may differ from the caller token.
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    completion.TrySetCanceled(cancellationToken);
+                    return;
+                }
+
+                CancellationToken cancelingToken = ObserveCancellationToken(task);
+                if (cancelingToken.IsCancellationRequested)
+                {
+                    completion.TrySetCanceled(cancelingToken);
+                }
+                else
+                {
+                    completion.TrySetCanceled();
+                }
+
+                return;
+            }
+
+            if (task.IsFaulted)
+            {
+                AggregateException aggregateException = task.Exception;
+                if (aggregateException != null)
+                {
+                    AggregateException flattened = aggregateException.Flatten();
+                    completion.TrySetException(flattened.InnerExceptions);
+                }
+                else
+                {
+                    completion.TrySetException(
+                        new InvalidOperationException("Dispatcher task faulted.")
+                    );
+                }
+
+                return;
+            }
+
+            completion.TrySetResult(true);
+        }
+
+        /// <summary>
+        /// Reads the token a canceled task was canceled with, observing its exception so it cannot
+        /// resurface as an unobserved-task fault. A task canceled without one answers
+        /// <see cref="CancellationToken.None"/>.
+        /// </summary>
+        private static CancellationToken ObserveCancellationToken(Task task)
+        {
+            try
+            {
+                task.GetAwaiter().GetResult();
+            }
+            catch (OperationCanceledException canceled)
+            {
+                return canceled.CancellationToken;
+            }
+            catch (Exception)
+            {
+                return CancellationToken.None;
+            }
+
+            return CancellationToken.None;
+        }
+
         /// <summary>
         /// Enqueues an action to be executed on the main thread during the next Update.
         /// </summary>
@@ -378,133 +456,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         public bool TryRunOnMainThread(Action action)
         {
             return Enqueue(action, logOverflow: false);
-        }
-
-        private bool Enqueue(Action action, bool logOverflow)
-        {
-            if (action == null)
-            {
-                throw new ArgumentNullException(nameof(action));
-            }
-
-            if (!TryEnqueueInternal(action))
-            {
-                if (logOverflow)
-                {
-                    LogOverflow();
-                }
-                return false;
-            }
-
-            return true;
-        }
-
-        private bool TryEnqueueInternal(Action action)
-        {
-            int newCount = Interlocked.Increment(ref _pendingActionCount);
-            if (0 < maxPendingActions && maxPendingActions < newCount)
-            {
-                Interlocked.Decrement(ref _pendingActionCount);
-                return false;
-            }
-
-            _actions.Enqueue(action);
-            return true;
-        }
-
-        private void LogOverflow()
-        {
-            string message = BuildOverflowMessage();
-
-            if (!Application.isPlaying)
-            {
-                FormattableString formatted = FormattableStringFactory.Create("{0}", message);
-                Debug.LogWarning(formatted);
-                return;
-            }
-
-            int currentFrame = Time.frameCount;
-            if (currentFrame == _lastOverflowFrame)
-            {
-                return;
-            }
-
-            _lastOverflowFrame = currentFrame;
-            FormattableString throttled = FormattableStringFactory.Create("{0}", message);
-            Debug.LogWarning(throttled);
-        }
-
-        private string BuildOverflowMessage()
-        {
-            int limit = maxPendingActions;
-            if (limit <= 0)
-            {
-                limit = 0;
-            }
-
-            int pending = PendingActionCount;
-            return $"UnityMainThreadDispatcher queue overflow (limit {limit}). Dropping action. Pending count: {pending}.";
-        }
-
-        private void OnEnable()
-        {
-#if UNITY_EDITOR
-            if (!_attachedEditorUpdate && !Application.isPlaying)
-            {
-                EditorApplication.update += _update;
-                _attachedEditorUpdate = true;
-                ApplyEditorHideFlags();
-            }
-#endif
-        }
-
-        private void OnDisable()
-        {
-#if UNITY_EDITOR
-            if (_attachedEditorUpdate)
-            {
-                EditorApplication.update -= _update;
-                _attachedEditorUpdate = false;
-            }
-#endif
-        }
-
-        protected override void OnDestroy()
-        {
-#if UNITY_EDITOR
-            if (_attachedEditorUpdate)
-            {
-                EditorApplication.update -= _update;
-                _attachedEditorUpdate = false;
-            }
-
-            ApplyEditorHideFlags();
-#endif
-            base.OnDestroy();
-        }
-
-        private void Update()
-        {
-            while (_actions.TryDequeue(out Action action))
-            {
-                ExecuteQueuedAction(action);
-            }
-        }
-
-        private void ExecuteQueuedAction(Action action)
-        {
-            try
-            {
-                action();
-            }
-            catch (Exception e)
-            {
-                Debug.LogError($"UnityMainThreadDispatcher action threw an exception: {e}");
-            }
-            finally
-            {
-                Interlocked.Decrement(ref _pendingActionCount);
-            }
         }
 
         /// <summary>
@@ -670,83 +621,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return taskCompletionSource.Task;
         }
 
-        private static void CompleteFromTask(
-            Task task,
-            TaskCompletionSource<bool> completion,
-            CancellationToken cancellationToken
-        )
-        {
-            if (task == null || completion == null)
-            {
-                return;
-            }
-
-            if (task.IsCanceled)
-            {
-                // Report the token that actually canceled the operation, which may differ from the caller token.
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    completion.TrySetCanceled(cancellationToken);
-                    return;
-                }
-
-                CancellationToken cancelingToken = ObserveCancellationToken(task);
-                if (cancelingToken.IsCancellationRequested)
-                {
-                    completion.TrySetCanceled(cancelingToken);
-                }
-                else
-                {
-                    completion.TrySetCanceled();
-                }
-
-                return;
-            }
-
-            if (task.IsFaulted)
-            {
-                AggregateException aggregateException = task.Exception;
-                if (aggregateException != null)
-                {
-                    AggregateException flattened = aggregateException.Flatten();
-                    completion.TrySetException(flattened.InnerExceptions);
-                }
-                else
-                {
-                    completion.TrySetException(
-                        new InvalidOperationException("Dispatcher task faulted.")
-                    );
-                }
-
-                return;
-            }
-
-            completion.TrySetResult(true);
-        }
-
-        /// <summary>
-        /// Reads the token a canceled task was canceled with, observing its exception so it cannot
-        /// resurface as an unobserved-task fault. A task canceled without one answers
-        /// <see cref="CancellationToken.None"/>.
-        /// </summary>
-        private static CancellationToken ObserveCancellationToken(Task task)
-        {
-            try
-            {
-                task.GetAwaiter().GetResult();
-            }
-            catch (OperationCanceledException canceled)
-            {
-                return canceled.CancellationToken;
-            }
-            catch (Exception)
-            {
-                return CancellationToken.None;
-            }
-
-            return CancellationToken.None;
-        }
-
         /// <summary>
         /// Posts a function to run on the main thread and returns its result via Task.
         /// </summary>
@@ -785,6 +659,133 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             return taskCompletionSource.Task;
+        }
+
+        protected override void OnDestroy()
+        {
+#if UNITY_EDITOR
+            if (_attachedEditorUpdate)
+            {
+                EditorApplication.update -= _update;
+                _attachedEditorUpdate = false;
+            }
+
+            ApplyEditorHideFlags();
+#endif
+            base.OnDestroy();
+        }
+
+        private bool Enqueue(Action action, bool logOverflow)
+        {
+            if (action == null)
+            {
+                throw new ArgumentNullException(nameof(action));
+            }
+
+            if (!TryEnqueueInternal(action))
+            {
+                if (logOverflow)
+                {
+                    LogOverflow();
+                }
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool TryEnqueueInternal(Action action)
+        {
+            int newCount = Interlocked.Increment(ref _pendingActionCount);
+            if (0 < maxPendingActions && maxPendingActions < newCount)
+            {
+                Interlocked.Decrement(ref _pendingActionCount);
+                return false;
+            }
+
+            _actions.Enqueue(action);
+            return true;
+        }
+
+        private void LogOverflow()
+        {
+            string message = BuildOverflowMessage();
+
+            if (!Application.isPlaying)
+            {
+                FormattableString formatted = FormattableStringFactory.Create("{0}", message);
+                Debug.LogWarning(formatted);
+                return;
+            }
+
+            int currentFrame = Time.frameCount;
+            if (currentFrame == _lastOverflowFrame)
+            {
+                return;
+            }
+
+            _lastOverflowFrame = currentFrame;
+            FormattableString throttled = FormattableStringFactory.Create("{0}", message);
+            Debug.LogWarning(throttled);
+        }
+
+        private string BuildOverflowMessage()
+        {
+            int limit = maxPendingActions;
+            if (limit <= 0)
+            {
+                limit = 0;
+            }
+
+            int pending = PendingActionCount;
+            return $"UnityMainThreadDispatcher queue overflow (limit {limit}). Dropping action. Pending count: {pending}.";
+        }
+
+        private void OnEnable()
+        {
+#if UNITY_EDITOR
+            if (!_attachedEditorUpdate && !Application.isPlaying)
+            {
+                EditorApplication.update += _update;
+                _attachedEditorUpdate = true;
+                ApplyEditorHideFlags();
+            }
+#endif
+        }
+
+        private void OnDisable()
+        {
+#if UNITY_EDITOR
+            if (_attachedEditorUpdate)
+            {
+                EditorApplication.update -= _update;
+                _attachedEditorUpdate = false;
+            }
+#endif
+        }
+
+        private void Update()
+        {
+            while (_actions.TryDequeue(out Action action))
+            {
+                ExecuteQueuedAction(action);
+            }
+        }
+
+        private void ExecuteQueuedAction(Action action)
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"UnityMainThreadDispatcher action threw an exception: {e}");
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _pendingActionCount);
+            }
         }
 
 #if UNITY_EDITOR

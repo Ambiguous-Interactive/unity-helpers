@@ -17,9 +17,6 @@ namespace WallstopStudios.UnityHelpers.Tests
     [NUnit.Framework.Category("Integration")]
     public sealed class MultiFileSelectorElementTests
     {
-        private string _baseRel;
-        private string _baseAbs;
-        private string _baseMeta;
         private static readonly string[] PrefKeys =
         {
             "WallstopStudios.MultiFileSelector.lastSearch.TestScope1",
@@ -32,6 +29,10 @@ namespace WallstopStudios.UnityHelpers.Tests
             "WallstopStudios.MultiFileSelector.lastUsed.KeyB",
             "WallstopStudios.MultiFileSelector.scopes",
         };
+
+        private string _baseRel;
+        private string _baseAbs;
+        private string _baseMeta;
 
         [SetUp]
         public void SetUp()

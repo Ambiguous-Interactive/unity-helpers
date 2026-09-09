@@ -123,20 +123,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     )]
     public sealed class ScriptableSpriteAtlas : ScriptableObject
     {
-        [Header("Sprite Sources")]
-        [Tooltip(
-            "Manually added sprites. These will always be included in addition to scanned sprites."
-        )]
-        public List<Sprite> spritesToPack = new();
-
-        [Tooltip("Define folders and their specific regex patterns for finding sprites.")]
-        public List<SourceFolderEntry> sourceFolderEntries = new();
-
-        [Header("Output Atlas Settings")]
-        [Tooltip("Directory where the .spriteatlas asset will be saved. Relative to Assets/.")]
-        public string outputSpriteAtlasDirectory = "Assets/Sprites/Atlases";
-        public string outputSpriteAtlasName = "MyNewAtlas";
-
         public string FullOutputPath
         {
             get
@@ -157,6 +143,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     .SanitizePath();
             }
         }
+
+        [Header("Sprite Sources")]
+        [Tooltip(
+            "Manually added sprites. These will always be included in addition to scanned sprites."
+        )]
+        public List<Sprite> spritesToPack = new();
+
+        [Tooltip("Define folders and their specific regex patterns for finding sprites.")]
+        public List<SourceFolderEntry> sourceFolderEntries = new();
+
+        [Header("Output Atlas Settings")]
+        [Tooltip("Directory where the .spriteatlas asset will be saved. Relative to Assets/.")]
+        public string outputSpriteAtlasDirectory = "Assets/Sprites/Atlases";
+        public string outputSpriteAtlasName = "MyNewAtlas";
 
         [Header("Packing Settings")]
         [IntDropDown(32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384)]

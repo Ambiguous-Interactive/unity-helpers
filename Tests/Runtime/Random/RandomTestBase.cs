@@ -29,6 +29,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
     public abstract class RandomTestBase
     {
+        protected const uint DeterministicSeed32 = 0xC0FFEE11U;
+        protected const ulong DeterministicSeed64 = 0x0123456789ABCDEFUL;
+        protected const ulong DeterministicSeed64B = 0xF0E1D2C3B4A59687UL;
+        protected const int DeterministicSeedInt = 0x1BADC0DE;
+
         private const int NumGeneratorChecks = 1_000;
         private const int NormalIterations = 1_000;
         private const int DefaultFastNoiseMapIterations = 6;
@@ -42,6 +47,36 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             restore broader statistical coverage.
         */
         private const int DefaultFastSampleCount = 250_000;
+
+        // A sigma-based floor prevents reduced-sample variance from exceeding a fixed relative tolerance.
+        private const double DeviationSigmaFloor = 5.5;
+
+        private static IEnumerable<(int Width, int Height)> EnumerateNoiseMapDimensions(
+            IRandom random
+        )
+        {
+            if (NoiseMapIterationCount <= FastNoiseMapDimensions.Length)
+            {
+                for (int i = 0; i < NoiseMapIterationCount; ++i)
+                {
+                    yield return FastNoiseMapDimensions[i];
+                }
+
+                yield break;
+            }
+
+            for (int i = 0; i < NoiseMapIterationCount; ++i)
+            {
+                yield return (
+                    random.Next(1, NoiseMapExclusiveMaxDimension),
+                    random.Next(1, NoiseMapExclusiveMaxDimension)
+                );
+            }
+        }
+
+        protected static readonly Guid DeterministicGuid = new(
+            "11223344-5566-7788-99AA-BBCCDDEEFF00"
+        );
         private static readonly int SampleCount = ResolvePositiveIntEnvironmentVariable(
             RandomSampleCountEnvironmentVariable,
             DefaultFastSampleCount
@@ -60,19 +95,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             (NoiseMapExclusiveMaxDimension - 1, NoiseMapExclusiveMaxDimension - 1),
         };
 
-        // A sigma-based floor prevents reduced-sample variance from exceeding a fixed relative tolerance.
-        private const double DeviationSigmaFloor = 5.5;
-        protected const uint DeterministicSeed32 = 0xC0FFEE11U;
-        protected const ulong DeterministicSeed64 = 0x0123456789ABCDEFUL;
-        protected const ulong DeterministicSeed64B = 0xF0E1D2C3B4A59687UL;
-        protected const int DeterministicSeedInt = 0x1BADC0DE;
-        protected static readonly Guid DeterministicGuid = new(
-            "11223344-5566-7788-99AA-BBCCDDEEFF00"
-        );
-
         private readonly int[] _samples = new int[1_000];
 
-        protected abstract IRandom NewRandom();
+        private static bool CheckApproximateNormality(IEnumerable<double> data)
+        {
+            IReadOnlyList<double> input = data as IReadOnlyList<double> ?? data.ToArray();
+            int n = input.Count;
+            if (n < 3)
+            {
+                return true;
+            }
+
+            double mean = input.Average();
+            double variance = input.Sum(x => Math.Pow(x - mean, 2)) / n;
+            double stdDev = Math.Sqrt(variance);
+
+            double skewness = input.Sum(x => Math.Pow((x - mean) / stdDev, 3)) / n;
+            double kurtosis = input.Sum(x => Math.Pow((x - mean) / stdDev, 4)) / n - 3;
+
+            const double skewnessThreshold = 0.5;
+            const double kurtosisThreshold = 1.0;
+
+            return Math.Abs(skewness) < skewnessThreshold && Math.Abs(kurtosis) < kurtosisThreshold;
+        }
+
+        private static int ResolvePositiveIntEnvironmentVariable(
+            string variableName,
+            int defaultValue
+        )
+        {
+            string raw = Environment.GetEnvironmentVariable(variableName);
+            if (!string.IsNullOrWhiteSpace(raw) && int.TryParse(raw, out int parsed) && 0 < parsed)
+            {
+                return parsed;
+            }
+
+            return defaultValue;
+        }
 
         [SetUp]
         public virtual void Setup()
@@ -830,73 +889,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             }
         }
 
+        protected abstract IRandom NewRandom();
+
         protected virtual double GetDeviationFor(string caller)
         {
             return 0.0625;
         }
 
-        private static bool CheckApproximateNormality(IEnumerable<double> data)
-        {
-            IReadOnlyList<double> input = data as IReadOnlyList<double> ?? data.ToArray();
-            int n = input.Count;
-            if (n < 3)
-            {
-                return true;
-            }
-
-            double mean = input.Average();
-            double variance = input.Sum(x => Math.Pow(x - mean, 2)) / n;
-            double stdDev = Math.Sqrt(variance);
-
-            double skewness = input.Sum(x => Math.Pow((x - mean) / stdDev, 3)) / n;
-            double kurtosis = input.Sum(x => Math.Pow((x - mean) / stdDev, 4)) / n - 3;
-
-            const double skewnessThreshold = 0.5;
-            const double kurtosisThreshold = 1.0;
-
-            return Math.Abs(skewness) < skewnessThreshold && Math.Abs(kurtosis) < kurtosisThreshold;
-        }
-
         protected int GetSampleLength(int? sampleLength = null)
         {
             return Math.Min(_samples.Length, sampleLength ?? _samples.Length);
-        }
-
-        private static int ResolvePositiveIntEnvironmentVariable(
-            string variableName,
-            int defaultValue
-        )
-        {
-            string raw = Environment.GetEnvironmentVariable(variableName);
-            if (!string.IsNullOrWhiteSpace(raw) && int.TryParse(raw, out int parsed) && 0 < parsed)
-            {
-                return parsed;
-            }
-
-            return defaultValue;
-        }
-
-        private static IEnumerable<(int Width, int Height)> EnumerateNoiseMapDimensions(
-            IRandom random
-        )
-        {
-            if (NoiseMapIterationCount <= FastNoiseMapDimensions.Length)
-            {
-                for (int i = 0; i < NoiseMapIterationCount; ++i)
-                {
-                    yield return FastNoiseMapDimensions[i];
-                }
-
-                yield break;
-            }
-
-            for (int i = 0; i < NoiseMapIterationCount; ++i)
-            {
-                yield return (
-                    random.Next(1, NoiseMapExclusiveMaxDimension),
-                    random.Next(1, NoiseMapExclusiveMaxDimension)
-                );
-            }
         }
 
         private void TestAndVerify(

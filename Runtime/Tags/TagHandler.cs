@@ -96,17 +96,6 @@ namespace WallstopStudios.UnityHelpers.Tags
         // Track the applied prefix so partial teardown cannot decrement tags owned by another effect.
         private readonly Dictionary<long, int> _appliedTagCountByHandle = new();
 
-        private void Awake()
-        {
-            if (_initialEffectTags is { Count: > 0 })
-            {
-                foreach (string effectTag in _initialEffectTags)
-                {
-                    InternalApplyTag(effectTag);
-                }
-            }
-        }
-
         /// <summary>
         /// Checks whether the specified tag is currently active (has a count > 0).
         /// </summary>
@@ -792,6 +781,39 @@ namespace WallstopStudios.UnityHelpers.Tags
             return true;
         }
 
+        /// <summary>
+        /// Provides an allocation-free enumerable view of the currently active tags.
+        /// </summary>
+        /// <returns>A struct enumerable that yields each active tag exactly once.</returns>
+        /// <remarks>
+        /// <b>Read-only for the duration of the loop.</b> This walks the live tag table, so
+        /// applying or removing a tag from inside the loop -- reacting to an observed tag, which
+        /// is the obvious thing to want -- mutates the collection being enumerated and leaves the
+        /// rest of the tags unvisited. Take the buffered
+        /// <see cref="GetActiveTags(List{string})"/> overload for that: it copies first, and the
+        /// buffer is the caller's, so it costs nothing per call either.
+        /// </remarks>
+        public ActiveTagEnumerable EnumerateActiveTags()
+        {
+            if (_tagCount.Count == 0)
+            {
+                return ActiveTagEnumerable.Empty;
+            }
+
+            return new ActiveTagEnumerable(_tagCount);
+        }
+
+        private void Awake()
+        {
+            if (_initialEffectTags is { Count: > 0 })
+            {
+                foreach (string effectTag in _initialEffectTags)
+                {
+                    InternalApplyTag(effectTag);
+                }
+            }
+        }
+
         private void InternalApplyTag(string effectTag)
         {
             NotifyTagApplied(effectTag, RaiseTagCount(effectTag));
@@ -933,40 +955,18 @@ namespace WallstopStudios.UnityHelpers.Tags
         }
 
         /// <summary>
-        /// Provides an allocation-free enumerable view of the currently active tags.
-        /// </summary>
-        /// <returns>A struct enumerable that yields each active tag exactly once.</returns>
-        /// <remarks>
-        /// <b>Read-only for the duration of the loop.</b> This walks the live tag table, so
-        /// applying or removing a tag from inside the loop -- reacting to an observed tag, which
-        /// is the obvious thing to want -- mutates the collection being enumerated and leaves the
-        /// rest of the tags unvisited. Take the buffered
-        /// <see cref="GetActiveTags(List{string})"/> overload for that: it copies first, and the
-        /// buffer is the caller's, so it costs nothing per call either.
-        /// </remarks>
-        public ActiveTagEnumerable EnumerateActiveTags()
-        {
-            if (_tagCount.Count == 0)
-            {
-                return ActiveTagEnumerable.Empty;
-            }
-
-            return new ActiveTagEnumerable(_tagCount);
-        }
-
-        /// <summary>
         /// Struct-backed enumerable over the active tags without additional allocations.
         /// </summary>
         public readonly struct ActiveTagEnumerable
         {
+            public static ActiveTagEnumerable Empty => new ActiveTagEnumerable(null);
+
             private readonly Dictionary<string, uint> _source;
 
             internal ActiveTagEnumerable(Dictionary<string, uint> source)
             {
                 _source = source;
             }
-
-            public static ActiveTagEnumerable Empty => new ActiveTagEnumerable(null);
 
             public ActiveTagEnumerator GetEnumerator()
             {
@@ -984,6 +984,8 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// </summary>
         public readonly struct HandleEnumerable
         {
+            public static HandleEnumerable Empty => new HandleEnumerable(default, string.Empty);
+
             private readonly Dictionary<long, EffectHandle>.Enumerator _enumerator;
             private readonly string _effectTag;
             private readonly bool _hasData;
@@ -997,8 +999,6 @@ namespace WallstopStudios.UnityHelpers.Tags
                 _effectTag = effectTag;
                 _hasData = true;
             }
-
-            public static HandleEnumerable Empty => new HandleEnumerable(default, string.Empty);
 
             public HandleEnumerator GetEnumerator()
             {
@@ -1016,6 +1016,8 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// </summary>
         public struct HandleEnumerator
         {
+            public readonly EffectHandle Current => _current;
+
             private Dictionary<long, EffectHandle>.Enumerator _enumerator;
             private readonly string _effectTag;
             private bool _hasEnumerator;
@@ -1031,8 +1033,6 @@ namespace WallstopStudios.UnityHelpers.Tags
                 _hasEnumerator = true;
                 _current = default;
             }
-
-            public readonly EffectHandle Current => _current;
 
             public bool MoveNext()
             {
@@ -1067,6 +1067,8 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// </summary>
         public struct ActiveTagEnumerator
         {
+            public readonly string Current => _current ?? string.Empty;
+
             private Dictionary<string, uint>.Enumerator _enumerator;
             private bool _hasEnumerator;
             private string _current;
@@ -1077,8 +1079,6 @@ namespace WallstopStudios.UnityHelpers.Tags
                 _hasEnumerator = true;
                 _current = string.Empty;
             }
-
-            public readonly string Current => _current ?? string.Empty;
 
             public bool MoveNext()
             {

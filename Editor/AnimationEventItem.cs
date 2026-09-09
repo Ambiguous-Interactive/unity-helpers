@@ -14,13 +14,6 @@ namespace WallstopStudios.UnityHelpers.Editor
     /// </summary>
     internal sealed class AnimationEventItem
     {
-        public AnimationEventItem(AnimationEvent animationEvent)
-        {
-            this.animationEvent = animationEvent;
-            search = string.Empty;
-            typeSearch = string.Empty;
-        }
-
         public Type selectedType;
         public MethodInfo selectedMethod;
         public string search;
@@ -37,6 +30,13 @@ namespace WallstopStudios.UnityHelpers.Editor
 
         public IReadOnlyDictionary<Type, IReadOnlyList<MethodInfo>> cachedLookup;
         public string lastSearchForCache;
+
+        public AnimationEventItem(AnimationEvent animationEvent)
+        {
+            this.animationEvent = animationEvent;
+            search = string.Empty;
+            typeSearch = string.Empty;
+        }
     }
 #endif
 }

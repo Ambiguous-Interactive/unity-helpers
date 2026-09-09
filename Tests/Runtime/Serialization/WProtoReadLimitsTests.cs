@@ -13,6 +13,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [Category("Serialization")]
     public sealed class WProtoReadLimitsTests
     {
+        private static void AssertDepthLimit(ref WProtoReader reader, int depth)
+        {
+            if (reader.Depth < depth)
+            {
+                WProtoReader child = new WProtoReader(default, in reader);
+                Assert.IsFalse(child.Malformed);
+                AssertDepthLimit(ref child, depth);
+                return;
+            }
+
+            Assert.AreEqual(depth, reader.Depth);
+            WProtoReader refused = new WProtoReader(default, in reader);
+            Assert.IsTrue(refused.Malformed);
+            Assert.IsFalse(reader.TryReadMessage(out WProtoReader nested));
+            Assert.IsTrue(reader.Malformed);
+            Assert.IsTrue(nested.Malformed);
+        }
+
+        private static bool ReadPackedValue(ref WProtoReader reader, int wireType)
+        {
+            switch (wireType)
+            {
+                case WProtoWireType.Fixed32:
+                    return reader.TryReadFixed32(out _);
+                case WProtoWireType.Fixed64:
+                    return reader.TryReadFixed64(out _);
+                default:
+                    return reader.TryReadInt32(out _);
+            }
+        }
+
+        private static T CreateDefault<T>()
+            where T : class, new()
+        {
+            return new T();
+        }
+
         [Test]
         public void ParameterlessConstructionSupportsGenericFactories()
         {
@@ -231,24 +268,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 new WProtoReadLimits(maximumNestingDepth: depth)
             );
             AssertDepthLimit(ref reader, depth);
-        }
-
-        private static void AssertDepthLimit(ref WProtoReader reader, int depth)
-        {
-            if (reader.Depth < depth)
-            {
-                WProtoReader child = new WProtoReader(default, in reader);
-                Assert.IsFalse(child.Malformed);
-                AssertDepthLimit(ref child, depth);
-                return;
-            }
-
-            Assert.AreEqual(depth, reader.Depth);
-            WProtoReader refused = new WProtoReader(default, in reader);
-            Assert.IsTrue(refused.Malformed);
-            Assert.IsFalse(reader.TryReadMessage(out WProtoReader nested));
-            Assert.IsTrue(reader.Malformed);
-            Assert.IsTrue(nested.Malformed);
         }
 
         [Test]
@@ -543,25 +562,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.IsFalse(packedCopy.TryReadInt32(out _));
             Assert.IsTrue(packedCopy.Malformed);
             Assert.AreEqual(0, packedCopy.Position);
-        }
-
-        private static bool ReadPackedValue(ref WProtoReader reader, int wireType)
-        {
-            switch (wireType)
-            {
-                case WProtoWireType.Fixed32:
-                    return reader.TryReadFixed32(out _);
-                case WProtoWireType.Fixed64:
-                    return reader.TryReadFixed64(out _);
-                default:
-                    return reader.TryReadInt32(out _);
-            }
-        }
-
-        private static T CreateDefault<T>()
-            where T : class, new()
-        {
-            return new T();
         }
 
         private sealed class PackedFormatter : IWProtoFormatter<int>

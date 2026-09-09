@@ -30,6 +30,22 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [TestFixture]
     public sealed class SkipConstructorTests
     {
+        private static T Read<T>(string hex)
+        {
+            byte[] bytes = new byte[hex.Length / 2];
+            for (int index = 0; index < bytes.Length; index++)
+            {
+                bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
+            }
+
+            WProtoReader reader = new WProtoReader(bytes);
+            Assert.IsTrue(
+                WProtoFormatterProvider.Get<T>().TryRead(ref reader, out T value),
+                "read refused " + hex
+            );
+            return value;
+        }
+
         [SetUp]
         public void Reset()
         {
@@ -149,22 +165,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.IsTrue(formatter.Write(ref writer, value));
 
             Assert.AreEqual(BitConverter.ToString(stream.ToArray()), BitConverter.ToString(mine));
-        }
-
-        private static T Read<T>(string hex)
-        {
-            byte[] bytes = new byte[hex.Length / 2];
-            for (int index = 0; index < bytes.Length; index++)
-            {
-                bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
-            }
-
-            WProtoReader reader = new WProtoReader(bytes);
-            Assert.IsTrue(
-                WProtoFormatterProvider.Get<T>().TryRead(ref reader, out T value),
-                "read refused " + hex
-            );
-            return value;
         }
     }
 }

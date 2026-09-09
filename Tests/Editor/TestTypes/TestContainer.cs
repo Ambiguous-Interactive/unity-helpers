@@ -11,14 +11,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
 
     internal sealed class TestContainer : ScriptableObject
     {
+        // Unity stores the compiler-generated backing-field name, not the property name used by the condition.
+        [field: SerializeField]
+        public bool AutoPropertyCondition { get; set; }
+
+        public bool ComputedProperty => boolCondition && 0 < intCondition;
+
         public bool boolCondition;
 
         [WShowIf(nameof(boolCondition))]
         public int boolDependent;
-
-        // Unity stores the compiler-generated backing-field name, not the property name used by the condition.
-        [field: SerializeField]
-        public bool AutoPropertyCondition { get; set; }
 
         [WShowIf(nameof(AutoPropertyCondition))]
         public int autoPropertyDependent;
@@ -93,13 +95,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
 
         public int genericComparableDependent;
 
-        public bool ComputedProperty => boolCondition && 0 < intCondition;
-
-        public bool HasPositiveDuration()
-        {
-            return durationType == ModifierDurationType.Duration && 0 < durationAmount;
-        }
-
         [WShowIf(nameof(boolCondition))]
         public List<string> conditionalStringList = new();
 
@@ -123,6 +118,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
             }
         )]
         public int flagsDependent;
+
+        public bool HasPositiveDuration()
+        {
+            return durationType == ModifierDurationType.Duration && 0 < durationAmount;
+        }
 
         [Flags]
         public enum TestFlags

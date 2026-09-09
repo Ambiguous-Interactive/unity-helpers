@@ -143,15 +143,6 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
             Signal();
         }
 
-        private void Signal()
-        {
-            try
-            {
-                _workAvailable.Release();
-            }
-            catch { }
-        }
-
         /// <summary>
         /// Stops accepting new work and waits for everything already queued to finish running.
         /// </summary>
@@ -264,6 +255,15 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
         public void Dispose()
         {
             DisposeAsync().AsTask().GetAwaiter().GetResult();
+        }
+
+        private void Signal()
+        {
+            try
+            {
+                _workAvailable.Release();
+            }
+            catch { }
         }
 
         private async Task DoWorkAsync()

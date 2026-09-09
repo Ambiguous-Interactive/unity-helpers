@@ -21,6 +21,363 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     [NUnit.Framework.Category("Fast")]
     public sealed class SpatialTree3DOracleTests
     {
+        private static Sample Sentinel => new(new Vector3(987f, 654f, 321f), -99, -1);
+
+        private static Vector3 NearestCenter => new(0.25f, -0.75f, 0.5f);
+
+        private static float DistanceSquared(Sample sample, Vector3 center)
+        {
+            Vector3 position = sample.position;
+            float deltaX = position.x - center.x;
+            float deltaY = position.y - center.y;
+            float deltaZ = position.z - center.z;
+            return (deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ);
+        }
+
+        private static void AssertOrderedByDistance(
+            List<Sample> results,
+            Vector3 center,
+            string structureName,
+            string corpusName
+        )
+        {
+            float previous = float.NegativeInfinity;
+            for (int i = 0; i < results.Count; ++i)
+            {
+                float distanceSquared = DistanceSquared(results[i], center);
+                Assert.LessOrEqual(
+                    previous,
+                    distanceSquared,
+                    "{0} / {1}: neighbor {2} is closer than its predecessor",
+                    structureName,
+                    corpusName,
+                    i
+                );
+                previous = distanceSquared;
+            }
+        }
+
+        private static void AssertSubMultiset(
+            List<Sample> results,
+            Sample[] samples,
+            string structureName,
+            string corpusName
+        )
+        {
+            Dictionary<Sample, int> available = new();
+            foreach (Sample sample in samples)
+            {
+                if (!available.TryGetValue(sample, out int existing))
+                {
+                    existing = 0;
+                }
+
+                available[sample] = existing + 1;
+            }
+
+            foreach (Sample result in results)
+            {
+                if (!available.TryGetValue(result, out int remaining))
+                {
+                    remaining = 0;
+                }
+
+                Assert.Less(
+                    0,
+                    remaining,
+                    "{0} / {1}: {2} was returned more often than it was inserted",
+                    structureName,
+                    corpusName,
+                    result
+                );
+                available[result] = remaining - 1;
+            }
+        }
+
+        private static Bounds FromCorners(Vector3 minimum, Vector3 maximum)
+        {
+            Vector3 center = (minimum + maximum) * 0.5f;
+            Vector3 size = maximum - minimum;
+            return new Bounds(center, size);
+        }
+
+        private static IEnumerable<int> NeighborCounts(int size)
+        {
+            yield return 0;
+            yield return 1;
+            if (0 < size)
+            {
+                yield return size;
+            }
+
+            yield return size + 1;
+        }
+
+        private static IEnumerable<Structure> Structures(Sample[] samples)
+        {
+            yield return new Structure(
+                "KdTree3D balanced",
+                new KdTree3D<Sample>(samples, ToPosition, balanced: true)
+            );
+            yield return new Structure(
+                "KdTree3D unbalanced",
+                new KdTree3D<Sample>(samples, ToPosition, balanced: false)
+            );
+            yield return new Structure("OctTree3D", new OctTree3D<Sample>(samples, ToPosition));
+            yield return new Structure("RTree3D", new RTree3D<Sample>(samples, ToPointBounds));
+        }
+
+        private static Vector3 ToPosition(Sample sample)
+        {
+            return sample.position;
+        }
+
+        /// <summary>
+        /// The natural point transformer: a zero-size box whose center is the sample. The R-trees
+        /// index boxes, so this is what makes their answers comparable with the point trees' -- and
+        /// it is the shape that caught <c>RTree3D</c> dropping a point on a zero-size query box.
+        /// </summary>
+        private static Bounds ToPointBounds(Sample sample)
+        {
+            return new Bounds(sample.position, Vector3.zero);
+        }
+
+        private static IEnumerable<RangeQuery> RangeQueries()
+        {
+            yield return new RangeQuery(Vector3.zero, 0f, 0f);
+            yield return new RangeQuery(new Vector3(2f, 2f, 2f), 0f, 0f);
+            yield return new RangeQuery(Vector3.zero, 1f, 0f);
+            yield return new RangeQuery(Vector3.zero, 2f, 0f);
+            yield return new RangeQuery(new Vector3(-3f, -3f, -3f), 4f, 0f);
+            yield return new RangeQuery(Vector3.zero, 2f, 1f);
+            yield return new RangeQuery(Vector3.zero, 1000f, 0f);
+            /*
+                This radius overflows when squared; comparing saturated squared distances would incorrectly
+                admit farther points.
+            */
+            yield return new RangeQuery(Vector3.zero, 1e20f, 0f);
+            yield return new RangeQuery(Vector3.zero, float.PositiveInfinity, 0f);
+            yield return new RangeQuery(Vector3.zero, float.NaN, 0f);
+            yield return new RangeQuery(Vector3.zero, -1f, 0f);
+            yield return new RangeQuery(Vector3.zero, float.NegativeInfinity, 0f);
+            yield return new RangeQuery(new Vector3(float.NaN, 0f, 0f), 2f, 0f);
+            yield return new RangeQuery(new Vector3(0f, 0f, float.PositiveInfinity), 2f, 0f);
+        }
+
+        private static IEnumerable<BoxQuery> BoxQueries()
+        {
+            yield return new BoxQuery(new Vector3(-2f, -2f, -2f), new Vector3(2f, 2f, 2f));
+            yield return new BoxQuery(Vector3.zero, Vector3.zero);
+            yield return new BoxQuery(new Vector3(1f, 1f, 1f), new Vector3(1f, 1f, 1f));
+            yield return new BoxQuery(new Vector3(-8f, -8f, -8f), new Vector3(-4f, -4f, -4f));
+            yield return new BoxQuery(
+                new Vector3(-1024f, -1024f, -1024f),
+                new Vector3(1024f, 1024f, 1024f)
+            );
+            yield return new BoxQuery(new Vector3(float.NaN, -2f, -2f), new Vector3(2f, 2f, 2f));
+            yield return new BoxQuery(new Vector3(-2f, -2f, -2f), new Vector3(2f, 2f, float.NaN));
+            yield return new BoxQuery(new Vector3(2f, 2f, 2f), new Vector3(-2f, -2f, -2f));
+        }
+
+        private static IEnumerable<Corpus> Corpora()
+        {
+            yield return new Corpus("empty", Array.Empty<Sample>());
+            yield return new Corpus(
+                "singleton",
+                new[] { new Sample(new Vector3(3f, -7f, 4f), 5, 0) }
+            );
+            yield return new Corpus("duplicates", DuplicateCorpus());
+            yield return new Corpus("grid", GridCorpus());
+            yield return new Corpus("negative", NegativeCorpus());
+            yield return new Corpus("huge", HugeCorpus());
+        }
+
+        private static IEnumerable<Corpus> NonFiniteCorpora()
+        {
+            yield return new Corpus("all non-finite", AllNonFiniteCorpus());
+            yield return new Corpus("non-finite sibling", NonFiniteSiblingCorpus());
+            yield return new Corpus("non-finite tail", NonFiniteTailCorpus());
+        }
+
+        private static IEnumerable<NamedBoundary> UnusableBoundaries()
+        {
+            yield return new NamedBoundary(
+                "inverted",
+                new Bounds(Vector3.zero, new Vector3(-4f, -4f, -4f))
+            );
+            yield return new NamedBoundary(
+                "inverted on one axis",
+                new Bounds(Vector3.zero, new Vector3(4f, -4f, 4f))
+            );
+            yield return new NamedBoundary(
+                "NaN center",
+                new Bounds(new Vector3(float.NaN, 0f, 0f), Vector3.one * 8f)
+            );
+            yield return new NamedBoundary(
+                "NaN size",
+                new Bounds(Vector3.zero, new Vector3(float.NaN, 8f, 8f))
+            );
+        }
+
+        private static Sample[] FiniteSamples(Sample[] samples)
+        {
+            List<Sample> finite = new();
+            foreach (Sample sample in samples)
+            {
+                Vector3 position = sample.position;
+                if (
+                    float.IsFinite(position.x)
+                    && float.IsFinite(position.y)
+                    && float.IsFinite(position.z)
+                )
+                {
+                    finite.Add(sample);
+                }
+            }
+
+            return finite.ToArray();
+        }
+
+        private static Sample[] AllNonFiniteCorpus()
+        {
+            return new[]
+            {
+                new Sample(new Vector3(float.NaN, float.NaN, float.NaN), 1, 0),
+                new Sample(new Vector3(float.NaN, float.NaN, float.NaN), 2, 1),
+                new Sample(new Vector3(float.NaN, 3f, float.NaN), 3, 2),
+            };
+        }
+
+        private static Sample[] NonFiniteSiblingCorpus()
+        {
+            return new[]
+            {
+                new Sample(new Vector3(1f, 1f, 1f), 1, 0),
+                new Sample(new Vector3(float.NaN, float.NaN, float.NaN), 2, 1),
+                new Sample(new Vector3(-1f, -1f, -1f), 3, 2),
+                new Sample(new Vector3(0.5f, 0.5f, 0.5f), 4, 3),
+                new Sample(new Vector3(float.NaN, 2f, 2f), 5, 4),
+            };
+        }
+
+        /// <summary>
+        /// Enough elements that the non-finite ones land in leaves of their own, which is the shape
+        /// a single mixed leaf cannot reach: a node whose every element is non-finite.
+        /// </summary>
+        private static Sample[] NonFiniteTailCorpus()
+        {
+            List<Sample> samples = new();
+            int insertionIndex = 0;
+            for (int i = 0; i < 16; ++i)
+            {
+                samples.Add(
+                    new Sample(new Vector3(i * 0.5f, -i * 0.5f, i * 0.25f), i, insertionIndex)
+                );
+                ++insertionIndex;
+            }
+
+            for (int i = 0; i < 16; ++i)
+            {
+                samples.Add(
+                    new Sample(
+                        new Vector3(float.NaN, float.NaN, float.NaN),
+                        100 + i,
+                        insertionIndex
+                    )
+                );
+                ++insertionIndex;
+            }
+
+            return samples.ToArray();
+        }
+
+        /// <summary>
+        /// Coordinates large enough that a squared distance saturates float. The corner sample is
+        /// 1.56e20 from the origin, so a 1e20 radius has to reject it -- which a filter comparing
+        /// two saturated infinities cannot do.
+        /// </summary>
+        private static Sample[] HugeCorpus()
+        {
+            return new[]
+            {
+                new Sample(Vector3.zero, 0, 0),
+                new Sample(new Vector3(1e18f, 0f, 0f), 1, 1),
+                new Sample(new Vector3(-1e18f, 0f, 0f), 1, 2),
+                new Sample(new Vector3(3e18f, 0f, 0f), 2, 3),
+                new Sample(new Vector3(9e19f, 9e19f, 9e19f), 3, 4),
+            };
+        }
+
+        private static Sample[] DuplicateCorpus()
+        {
+            return new[]
+            {
+                new Sample(new Vector3(1f, 1f, 1f), 1, 0),
+                new Sample(new Vector3(1f, 1f, 1f), 1, 1),
+                new Sample(new Vector3(1f, 1f, 1f), 1, 2),
+                new Sample(new Vector3(-5f, 4f, -2f), 2, 3),
+                new Sample(new Vector3(-5f, 4f, -2f), 2, 4),
+                new Sample(Vector3.zero, 3, 5),
+            };
+        }
+
+        private static Sample[] GridCorpus()
+        {
+            List<Sample> samples = new();
+            int insertionIndex = 0;
+            for (int x = -1; x <= 1; ++x)
+            {
+                for (int y = -1; y <= 1; ++y)
+                {
+                    for (int z = -1; z <= 1; ++z)
+                    {
+                        samples.Add(new Sample(new Vector3(x, y, z), x + y + z, insertionIndex));
+                        ++insertionIndex;
+                    }
+                }
+            }
+
+            return samples.ToArray();
+        }
+
+        /// <summary>
+        /// Sixteen samples whose squared distances to <see cref="NearestCenter"/> are all distinct,
+        /// so "the k nearest" is one answer rather than a family of tied ones.
+        /// </summary>
+        private static Sample[] NearestCorpus()
+        {
+            List<Sample> samples = new();
+            Vector3 center = NearestCenter;
+            for (int i = 0; i < 16; ++i)
+            {
+                float offset = 0.5f + (i * 1.25f);
+                samples.Add(
+                    new Sample(
+                        new Vector3(
+                            center.x + offset,
+                            center.y + (offset * 0.5f),
+                            center.z + (offset * 0.25f)
+                        ),
+                        i,
+                        i
+                    )
+                );
+            }
+
+            return samples.ToArray();
+        }
+
+        private static Sample[] NegativeCorpus()
+        {
+            return new[]
+            {
+                new Sample(new Vector3(-1f, -1f, -1f), 7, 0),
+                new Sample(new Vector3(-4f, -4f, -4f), 7, 1),
+                new Sample(new Vector3(-6f, -6f, -6f), 8, 2),
+                new Sample(new Vector3(-0.5f, -0.5f, -0.5f), 9, 3),
+            };
+        }
+
         [Test]
         [Timeout(120000)]
         public void RangeQueriesMatchOracle()
@@ -415,363 +772,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     structure.name
                 );
             }
-        }
-
-        private static Sample Sentinel => new(new Vector3(987f, 654f, 321f), -99, -1);
-
-        private static Vector3 NearestCenter => new(0.25f, -0.75f, 0.5f);
-
-        private static float DistanceSquared(Sample sample, Vector3 center)
-        {
-            Vector3 position = sample.position;
-            float deltaX = position.x - center.x;
-            float deltaY = position.y - center.y;
-            float deltaZ = position.z - center.z;
-            return (deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ);
-        }
-
-        private static void AssertOrderedByDistance(
-            List<Sample> results,
-            Vector3 center,
-            string structureName,
-            string corpusName
-        )
-        {
-            float previous = float.NegativeInfinity;
-            for (int i = 0; i < results.Count; ++i)
-            {
-                float distanceSquared = DistanceSquared(results[i], center);
-                Assert.LessOrEqual(
-                    previous,
-                    distanceSquared,
-                    "{0} / {1}: neighbor {2} is closer than its predecessor",
-                    structureName,
-                    corpusName,
-                    i
-                );
-                previous = distanceSquared;
-            }
-        }
-
-        private static void AssertSubMultiset(
-            List<Sample> results,
-            Sample[] samples,
-            string structureName,
-            string corpusName
-        )
-        {
-            Dictionary<Sample, int> available = new();
-            foreach (Sample sample in samples)
-            {
-                if (!available.TryGetValue(sample, out int existing))
-                {
-                    existing = 0;
-                }
-
-                available[sample] = existing + 1;
-            }
-
-            foreach (Sample result in results)
-            {
-                if (!available.TryGetValue(result, out int remaining))
-                {
-                    remaining = 0;
-                }
-
-                Assert.Less(
-                    0,
-                    remaining,
-                    "{0} / {1}: {2} was returned more often than it was inserted",
-                    structureName,
-                    corpusName,
-                    result
-                );
-                available[result] = remaining - 1;
-            }
-        }
-
-        private static Bounds FromCorners(Vector3 minimum, Vector3 maximum)
-        {
-            Vector3 center = (minimum + maximum) * 0.5f;
-            Vector3 size = maximum - minimum;
-            return new Bounds(center, size);
-        }
-
-        private static IEnumerable<int> NeighborCounts(int size)
-        {
-            yield return 0;
-            yield return 1;
-            if (0 < size)
-            {
-                yield return size;
-            }
-
-            yield return size + 1;
-        }
-
-        private static IEnumerable<Structure> Structures(Sample[] samples)
-        {
-            yield return new Structure(
-                "KdTree3D balanced",
-                new KdTree3D<Sample>(samples, ToPosition, balanced: true)
-            );
-            yield return new Structure(
-                "KdTree3D unbalanced",
-                new KdTree3D<Sample>(samples, ToPosition, balanced: false)
-            );
-            yield return new Structure("OctTree3D", new OctTree3D<Sample>(samples, ToPosition));
-            yield return new Structure("RTree3D", new RTree3D<Sample>(samples, ToPointBounds));
-        }
-
-        private static Vector3 ToPosition(Sample sample)
-        {
-            return sample.position;
-        }
-
-        /// <summary>
-        /// The natural point transformer: a zero-size box whose center is the sample. The R-trees
-        /// index boxes, so this is what makes their answers comparable with the point trees' -- and
-        /// it is the shape that caught <c>RTree3D</c> dropping a point on a zero-size query box.
-        /// </summary>
-        private static Bounds ToPointBounds(Sample sample)
-        {
-            return new Bounds(sample.position, Vector3.zero);
-        }
-
-        private static IEnumerable<RangeQuery> RangeQueries()
-        {
-            yield return new RangeQuery(Vector3.zero, 0f, 0f);
-            yield return new RangeQuery(new Vector3(2f, 2f, 2f), 0f, 0f);
-            yield return new RangeQuery(Vector3.zero, 1f, 0f);
-            yield return new RangeQuery(Vector3.zero, 2f, 0f);
-            yield return new RangeQuery(new Vector3(-3f, -3f, -3f), 4f, 0f);
-            yield return new RangeQuery(Vector3.zero, 2f, 1f);
-            yield return new RangeQuery(Vector3.zero, 1000f, 0f);
-            /*
-                This radius overflows when squared; comparing saturated squared distances would incorrectly
-                admit farther points.
-            */
-            yield return new RangeQuery(Vector3.zero, 1e20f, 0f);
-            yield return new RangeQuery(Vector3.zero, float.PositiveInfinity, 0f);
-            yield return new RangeQuery(Vector3.zero, float.NaN, 0f);
-            yield return new RangeQuery(Vector3.zero, -1f, 0f);
-            yield return new RangeQuery(Vector3.zero, float.NegativeInfinity, 0f);
-            yield return new RangeQuery(new Vector3(float.NaN, 0f, 0f), 2f, 0f);
-            yield return new RangeQuery(new Vector3(0f, 0f, float.PositiveInfinity), 2f, 0f);
-        }
-
-        private static IEnumerable<BoxQuery> BoxQueries()
-        {
-            yield return new BoxQuery(new Vector3(-2f, -2f, -2f), new Vector3(2f, 2f, 2f));
-            yield return new BoxQuery(Vector3.zero, Vector3.zero);
-            yield return new BoxQuery(new Vector3(1f, 1f, 1f), new Vector3(1f, 1f, 1f));
-            yield return new BoxQuery(new Vector3(-8f, -8f, -8f), new Vector3(-4f, -4f, -4f));
-            yield return new BoxQuery(
-                new Vector3(-1024f, -1024f, -1024f),
-                new Vector3(1024f, 1024f, 1024f)
-            );
-            yield return new BoxQuery(new Vector3(float.NaN, -2f, -2f), new Vector3(2f, 2f, 2f));
-            yield return new BoxQuery(new Vector3(-2f, -2f, -2f), new Vector3(2f, 2f, float.NaN));
-            yield return new BoxQuery(new Vector3(2f, 2f, 2f), new Vector3(-2f, -2f, -2f));
-        }
-
-        private static IEnumerable<Corpus> Corpora()
-        {
-            yield return new Corpus("empty", Array.Empty<Sample>());
-            yield return new Corpus(
-                "singleton",
-                new[] { new Sample(new Vector3(3f, -7f, 4f), 5, 0) }
-            );
-            yield return new Corpus("duplicates", DuplicateCorpus());
-            yield return new Corpus("grid", GridCorpus());
-            yield return new Corpus("negative", NegativeCorpus());
-            yield return new Corpus("huge", HugeCorpus());
-        }
-
-        private static IEnumerable<Corpus> NonFiniteCorpora()
-        {
-            yield return new Corpus("all non-finite", AllNonFiniteCorpus());
-            yield return new Corpus("non-finite sibling", NonFiniteSiblingCorpus());
-            yield return new Corpus("non-finite tail", NonFiniteTailCorpus());
-        }
-
-        private static IEnumerable<NamedBoundary> UnusableBoundaries()
-        {
-            yield return new NamedBoundary(
-                "inverted",
-                new Bounds(Vector3.zero, new Vector3(-4f, -4f, -4f))
-            );
-            yield return new NamedBoundary(
-                "inverted on one axis",
-                new Bounds(Vector3.zero, new Vector3(4f, -4f, 4f))
-            );
-            yield return new NamedBoundary(
-                "NaN center",
-                new Bounds(new Vector3(float.NaN, 0f, 0f), Vector3.one * 8f)
-            );
-            yield return new NamedBoundary(
-                "NaN size",
-                new Bounds(Vector3.zero, new Vector3(float.NaN, 8f, 8f))
-            );
-        }
-
-        private static Sample[] FiniteSamples(Sample[] samples)
-        {
-            List<Sample> finite = new();
-            foreach (Sample sample in samples)
-            {
-                Vector3 position = sample.position;
-                if (
-                    float.IsFinite(position.x)
-                    && float.IsFinite(position.y)
-                    && float.IsFinite(position.z)
-                )
-                {
-                    finite.Add(sample);
-                }
-            }
-
-            return finite.ToArray();
-        }
-
-        private static Sample[] AllNonFiniteCorpus()
-        {
-            return new[]
-            {
-                new Sample(new Vector3(float.NaN, float.NaN, float.NaN), 1, 0),
-                new Sample(new Vector3(float.NaN, float.NaN, float.NaN), 2, 1),
-                new Sample(new Vector3(float.NaN, 3f, float.NaN), 3, 2),
-            };
-        }
-
-        private static Sample[] NonFiniteSiblingCorpus()
-        {
-            return new[]
-            {
-                new Sample(new Vector3(1f, 1f, 1f), 1, 0),
-                new Sample(new Vector3(float.NaN, float.NaN, float.NaN), 2, 1),
-                new Sample(new Vector3(-1f, -1f, -1f), 3, 2),
-                new Sample(new Vector3(0.5f, 0.5f, 0.5f), 4, 3),
-                new Sample(new Vector3(float.NaN, 2f, 2f), 5, 4),
-            };
-        }
-
-        /// <summary>
-        /// Enough elements that the non-finite ones land in leaves of their own, which is the shape
-        /// a single mixed leaf cannot reach: a node whose every element is non-finite.
-        /// </summary>
-        private static Sample[] NonFiniteTailCorpus()
-        {
-            List<Sample> samples = new();
-            int insertionIndex = 0;
-            for (int i = 0; i < 16; ++i)
-            {
-                samples.Add(
-                    new Sample(new Vector3(i * 0.5f, -i * 0.5f, i * 0.25f), i, insertionIndex)
-                );
-                ++insertionIndex;
-            }
-
-            for (int i = 0; i < 16; ++i)
-            {
-                samples.Add(
-                    new Sample(
-                        new Vector3(float.NaN, float.NaN, float.NaN),
-                        100 + i,
-                        insertionIndex
-                    )
-                );
-                ++insertionIndex;
-            }
-
-            return samples.ToArray();
-        }
-
-        /// <summary>
-        /// Coordinates large enough that a squared distance saturates float. The corner sample is
-        /// 1.56e20 from the origin, so a 1e20 radius has to reject it -- which a filter comparing
-        /// two saturated infinities cannot do.
-        /// </summary>
-        private static Sample[] HugeCorpus()
-        {
-            return new[]
-            {
-                new Sample(Vector3.zero, 0, 0),
-                new Sample(new Vector3(1e18f, 0f, 0f), 1, 1),
-                new Sample(new Vector3(-1e18f, 0f, 0f), 1, 2),
-                new Sample(new Vector3(3e18f, 0f, 0f), 2, 3),
-                new Sample(new Vector3(9e19f, 9e19f, 9e19f), 3, 4),
-            };
-        }
-
-        private static Sample[] DuplicateCorpus()
-        {
-            return new[]
-            {
-                new Sample(new Vector3(1f, 1f, 1f), 1, 0),
-                new Sample(new Vector3(1f, 1f, 1f), 1, 1),
-                new Sample(new Vector3(1f, 1f, 1f), 1, 2),
-                new Sample(new Vector3(-5f, 4f, -2f), 2, 3),
-                new Sample(new Vector3(-5f, 4f, -2f), 2, 4),
-                new Sample(Vector3.zero, 3, 5),
-            };
-        }
-
-        private static Sample[] GridCorpus()
-        {
-            List<Sample> samples = new();
-            int insertionIndex = 0;
-            for (int x = -1; x <= 1; ++x)
-            {
-                for (int y = -1; y <= 1; ++y)
-                {
-                    for (int z = -1; z <= 1; ++z)
-                    {
-                        samples.Add(new Sample(new Vector3(x, y, z), x + y + z, insertionIndex));
-                        ++insertionIndex;
-                    }
-                }
-            }
-
-            return samples.ToArray();
-        }
-
-        /// <summary>
-        /// Sixteen samples whose squared distances to <see cref="NearestCenter"/> are all distinct,
-        /// so "the k nearest" is one answer rather than a family of tied ones.
-        /// </summary>
-        private static Sample[] NearestCorpus()
-        {
-            List<Sample> samples = new();
-            Vector3 center = NearestCenter;
-            for (int i = 0; i < 16; ++i)
-            {
-                float offset = 0.5f + (i * 1.25f);
-                samples.Add(
-                    new Sample(
-                        new Vector3(
-                            center.x + offset,
-                            center.y + (offset * 0.5f),
-                            center.z + (offset * 0.25f)
-                        ),
-                        i,
-                        i
-                    )
-                );
-            }
-
-            return samples.ToArray();
-        }
-
-        private static Sample[] NegativeCorpus()
-        {
-            return new[]
-            {
-                new Sample(new Vector3(-1f, -1f, -1f), 7, 0),
-                new Sample(new Vector3(-4f, -4f, -4f), 7, 1),
-                new Sample(new Vector3(-6f, -6f, -6f), 8, 2),
-                new Sample(new Vector3(-0.5f, -0.5f, -0.5f), 9, 3),
-            };
         }
 
         private readonly struct Structure

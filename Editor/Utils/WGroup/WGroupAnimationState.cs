@@ -28,6 +28,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
         /// </remarks>
         private const int MaxFoldoutAnimations = 256;
 
+        /// <summary>
+        /// The number of foldout animations currently retained, for testing.
+        /// </summary>
+        internal static int CachedAnimationCount => FoldoutAnimations.Count;
+
+        /// <summary>
+        /// The bound this cache evicts at, for testing.
+        /// </summary>
+        internal static int MaxCachedAnimations => MaxFoldoutAnimations;
+
         private static readonly Cache<int, AnimBool> FoldoutAnimations = CacheBuilder<int, AnimBool>
             .NewBuilder()
             .MaximumSize(MaxFoldoutAnimations)
@@ -98,16 +108,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
         {
             FoldoutAnimations.Clear();
         }
-
-        /// <summary>
-        /// The number of foldout animations currently retained, for testing.
-        /// </summary>
-        internal static int CachedAnimationCount => FoldoutAnimations.Count;
-
-        /// <summary>
-        /// The bound this cache evicts at, for testing.
-        /// </summary>
-        internal static int MaxCachedAnimations => MaxFoldoutAnimations;
 
         private static void Unsubscribe(AnimBool anim)
         {

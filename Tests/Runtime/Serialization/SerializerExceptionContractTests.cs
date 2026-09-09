@@ -20,6 +20,40 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [NUnit.Framework.Category("Fast")]
     public sealed class SerializerExceptionContractTests
     {
+        private static IEnumerable<TestCaseData> AllBadInputCases()
+        {
+            byte[][] badBytes =
+            {
+                null,
+                Array.Empty<byte>(),
+                new byte[] { 0xFF },
+                new byte[] { 0xFF, 0xFE, 0xFD, 0xFC, 0xFB, 0xFA },
+            };
+            foreach (byte[] b in badBytes)
+            {
+                yield return new TestCaseData(b);
+            }
+        }
+
+        private static void AssertOnlySerializationFailure(TestDelegate action)
+        {
+            try
+            {
+                action();
+                // Successful decoding is allowed here; only leaked framework exceptions violate this contract.
+            }
+            catch (SerializationFailureException) { }
+            catch (Exception other)
+            {
+                Assert.Fail(
+                    "Serializer leaked a non-SerializationFailureException type: "
+                        + other.GetType().FullName
+                        + ": "
+                        + other.Message
+                );
+            }
+        }
+
         [Test]
         public void ProtoDeserializeNullBytesThrowsSerializationInputException()
         {
@@ -227,21 +261,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
         }
 
-        private static IEnumerable<TestCaseData> AllBadInputCases()
-        {
-            byte[][] badBytes =
-            {
-                null,
-                Array.Empty<byte>(),
-                new byte[] { 0xFF },
-                new byte[] { 0xFF, 0xFE, 0xFD, 0xFC, 0xFB, 0xFA },
-            };
-            foreach (byte[] b in badBytes)
-            {
-                yield return new TestCaseData(b);
-            }
-        }
-
         [TestCaseSource(nameof(AllBadInputCases))]
         public void EveryDeserializerBadInputThrowsOnlySerializationFailure(byte[] bad)
         {
@@ -255,25 +274,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             AssertOnlySerializationFailure(() =>
                 Serializer.Deserialize<Sample>(bad, SerializationType.Json)
             );
-        }
-
-        private static void AssertOnlySerializationFailure(TestDelegate action)
-        {
-            try
-            {
-                action();
-                // Successful decoding is allowed here; only leaked framework exceptions violate this contract.
-            }
-            catch (SerializationFailureException) { }
-            catch (Exception other)
-            {
-                Assert.Fail(
-                    "Serializer leaked a non-SerializationFailureException type: "
-                        + other.GetType().FullName
-                        + ": "
-                        + other.Message
-                );
-            }
         }
 
         /*

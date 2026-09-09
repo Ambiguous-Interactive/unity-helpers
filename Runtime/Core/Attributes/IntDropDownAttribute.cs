@@ -54,16 +54,29 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     {
         private static readonly int[] Empty = Array.Empty<int>();
 
-        private readonly WValueDropDownAttribute _backingAttribute;
-
-        private object[] _cachedSourceOptions;
-        private int[] _cachedIntOptions;
+        /// <summary>
+        /// Gets the set of allowed integer values that the dropdown will display without context.
+        /// Note: when the attribute targets an instance method, this returns an empty array.
+        /// The array is fetched from the configured provider whenever the inspector requests it.
+        /// </summary>
+        public int[] Options => GetOptions(null);
 
         /// <summary>
         /// Gets the underlying <see cref="WValueDropDownAttribute"/> that powers this attribute.
         /// This enables sharing of infrastructure between both attribute types.
         /// </summary>
         internal WValueDropDownAttribute BackingAttribute => _backingAttribute;
+
+        /// <summary>
+        /// Indicates whether this attribute uses an instance method provider.
+        /// </summary>
+        internal bool RequiresInstanceContext =>
+            _backingAttribute?.RequiresInstanceContext ?? false;
+
+        private readonly WValueDropDownAttribute _backingAttribute;
+
+        private object[] _cachedSourceOptions;
+        private int[] _cachedIntOptions;
 
         /// <summary>
         /// Initializes the attribute with an inline list of integer values that should be exposed in the inspector.
@@ -97,13 +110,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         {
             _backingAttribute = new WValueDropDownAttribute(methodName, typeof(int));
         }
-
-        /// <summary>
-        /// Gets the set of allowed integer values that the dropdown will display without context.
-        /// Note: when the attribute targets an instance method, this returns an empty array.
-        /// The array is fetched from the configured provider whenever the inspector requests it.
-        /// </summary>
-        public int[] Options => GetOptions(null);
 
         /// <summary>
         /// Retrieves the allowed integer options for the supplied context object.
@@ -153,11 +159,5 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             return result;
         }
-
-        /// <summary>
-        /// Indicates whether this attribute uses an instance method provider.
-        /// </summary>
-        internal bool RequiresInstanceContext =>
-            _backingAttribute?.RequiresInstanceContext ?? false;
     }
 }

@@ -15,7 +15,6 @@ namespace WallstopStudios.UnityHelpers.Utils
     internal static class ScriptableObjectSingletonInitState
     {
 #if UNITY_EDITOR
-        private static bool _initialEnsureCompleted;
 
         /// <summary>
         /// Indicates whether the initial singleton asset creation pass has completed globally.
@@ -26,6 +25,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             get => _initialEnsureCompleted;
             set => _initialEnsureCompleted = value;
         }
+        private static bool _initialEnsureCompleted;
 #endif
     }
 
@@ -82,6 +82,28 @@ namespace WallstopStudios.UnityHelpers.Utils
         }
 
 #if UNITY_EDITOR
+
+        /// <summary>
+        /// Delegate that performs the actual sync operation. Set by the Editor assembly.
+        /// </summary>
+        internal static Action<ScriptableObjectSingletonMetadata> SyncImplementation { get; set; }
+
+        private static bool EntriesEqual(Entry left, Entry right)
+        {
+            return string.Equals(
+                    left.assemblyQualifiedTypeName,
+                    right.assemblyQualifiedTypeName,
+                    StringComparison.Ordinal
+                )
+                && string.Equals(
+                    left.resourcesLoadPath,
+                    right.resourcesLoadPath,
+                    StringComparison.Ordinal
+                )
+                && string.Equals(left.resourcesPath, right.resourcesPath, StringComparison.Ordinal)
+                && string.Equals(left.assetGuid, right.assetGuid, StringComparison.Ordinal);
+        }
+
         /// <summary>
         /// Adds or updates a singleton metadata entry.
         /// </summary>
@@ -114,22 +136,6 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             _entries.Add(entry);
             return true;
-        }
-
-        private static bool EntriesEqual(Entry left, Entry right)
-        {
-            return string.Equals(
-                    left.assemblyQualifiedTypeName,
-                    right.assemblyQualifiedTypeName,
-                    StringComparison.Ordinal
-                )
-                && string.Equals(
-                    left.resourcesLoadPath,
-                    right.resourcesLoadPath,
-                    StringComparison.Ordinal
-                )
-                && string.Equals(left.resourcesPath, right.resourcesPath, StringComparison.Ordinal)
-                && string.Equals(left.assetGuid, right.assetGuid, StringComparison.Ordinal);
         }
 
         /// <summary>
@@ -178,11 +184,6 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             _entries?.Clear();
         }
-
-        /// <summary>
-        /// Delegate that performs the actual sync operation. Set by the Editor assembly.
-        /// </summary>
-        internal static Action<ScriptableObjectSingletonMetadata> SyncImplementation { get; set; }
 
         /// <summary>
         /// Re-scans all assemblies for ScriptableObjectSingleton types and updates their metadata entries.

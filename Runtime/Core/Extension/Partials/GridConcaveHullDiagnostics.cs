@@ -155,6 +155,85 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return isPositionInside;
         }
 
+        public static bool Intersects(
+            Vector2 lhsFrom,
+            Vector2 lhsTo,
+            Vector2 rhsFrom,
+            Vector2 rhsTo
+        )
+        {
+            if (lhsFrom == rhsFrom || lhsFrom == rhsTo || lhsTo == rhsFrom || lhsTo == rhsTo)
+            {
+                return false;
+            }
+
+            OrientationType orientation1 = Orientation(lhsFrom, lhsTo, rhsFrom);
+            OrientationType orientation2 = Orientation(lhsFrom, lhsTo, rhsTo);
+            OrientationType orientation3 = Orientation(rhsFrom, rhsTo, lhsFrom);
+            OrientationType orientation4 = Orientation(rhsFrom, rhsTo, lhsTo);
+
+            if (orientation1 != orientation2 && orientation3 != orientation4)
+            {
+                return true;
+            }
+
+            if (orientation1 == OrientationType.Colinear && LiesOnSegment(lhsFrom, rhsFrom, lhsTo))
+            {
+                return true;
+            }
+
+            if (orientation2 == OrientationType.Colinear && LiesOnSegment(lhsFrom, rhsTo, lhsTo))
+            {
+                return true;
+            }
+
+            if (orientation3 == OrientationType.Colinear && LiesOnSegment(rhsFrom, lhsFrom, rhsTo))
+            {
+                return true;
+            }
+
+            if (orientation4 == OrientationType.Colinear && LiesOnSegment(rhsFrom, lhsTo, rhsTo))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        public static bool LiesOnSegment(Vector2 p, Vector2 q, Vector2 r)
+        {
+            return q.x <= Math.Max(p.x, r.x)
+                && Math.Min(p.x, r.x) <= q.x
+                && q.y <= Math.Max(p.y, r.y)
+                && Math.Min(p.y, r.y) <= q.y;
+        }
+
+        public static OrientationType Orientation(Vector2 p, Vector2 q, Vector2 r)
+        {
+            float value = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
+            if (Mathf.Approximately(value, 0))
+            {
+                return OrientationType.Colinear;
+            }
+
+            return 0 < value ? OrientationType.Clockwise : OrientationType.Counterclockwise;
+        }
+
+        public static Vector2 Rotate(this Vector2 v, float degrees)
+        {
+            float sin = Mathf.Sin(degrees * Mathf.Deg2Rad);
+            float cos = Mathf.Cos(degrees * Mathf.Deg2Rad);
+
+            float tx = v.x;
+            float ty = v.y;
+
+            Vector2 rotatedVector;
+            rotatedVector.x = cos * tx - sin * ty;
+            rotatedVector.y = sin * tx + cos * ty;
+
+            return rotatedVector;
+        }
+
         private static bool ShouldRepairConcaveCorners(float angleThreshold)
         {
             return ConcaveCornerRepairThresholdDegrees <= angleThreshold;
@@ -816,85 +895,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return delta;
         }
 
-        public static bool Intersects(
-            Vector2 lhsFrom,
-            Vector2 lhsTo,
-            Vector2 rhsFrom,
-            Vector2 rhsTo
-        )
-        {
-            if (lhsFrom == rhsFrom || lhsFrom == rhsTo || lhsTo == rhsFrom || lhsTo == rhsTo)
-            {
-                return false;
-            }
-
-            OrientationType orientation1 = Orientation(lhsFrom, lhsTo, rhsFrom);
-            OrientationType orientation2 = Orientation(lhsFrom, lhsTo, rhsTo);
-            OrientationType orientation3 = Orientation(rhsFrom, rhsTo, lhsFrom);
-            OrientationType orientation4 = Orientation(rhsFrom, rhsTo, lhsTo);
-
-            if (orientation1 != orientation2 && orientation3 != orientation4)
-            {
-                return true;
-            }
-
-            if (orientation1 == OrientationType.Colinear && LiesOnSegment(lhsFrom, rhsFrom, lhsTo))
-            {
-                return true;
-            }
-
-            if (orientation2 == OrientationType.Colinear && LiesOnSegment(lhsFrom, rhsTo, lhsTo))
-            {
-                return true;
-            }
-
-            if (orientation3 == OrientationType.Colinear && LiesOnSegment(rhsFrom, lhsFrom, rhsTo))
-            {
-                return true;
-            }
-
-            if (orientation4 == OrientationType.Colinear && LiesOnSegment(rhsFrom, lhsTo, rhsTo))
-            {
-                return true;
-            }
-
-            return false;
-        }
-
-        public static bool LiesOnSegment(Vector2 p, Vector2 q, Vector2 r)
-        {
-            return q.x <= Math.Max(p.x, r.x)
-                && Math.Min(p.x, r.x) <= q.x
-                && q.y <= Math.Max(p.y, r.y)
-                && Math.Min(p.y, r.y) <= q.y;
-        }
-
-        public static OrientationType Orientation(Vector2 p, Vector2 q, Vector2 r)
-        {
-            float value = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
-            if (Mathf.Approximately(value, 0))
-            {
-                return OrientationType.Colinear;
-            }
-
-            return 0 < value ? OrientationType.Clockwise : OrientationType.Counterclockwise;
-        }
-
-        public static Vector2 Rotate(this Vector2 v, float degrees)
-        {
-            float sin = Mathf.Sin(degrees * Mathf.Deg2Rad);
-            float cos = Mathf.Cos(degrees * Mathf.Deg2Rad);
-
-            float tx = v.x;
-            float ty = v.y;
-
-            Vector2 rotatedVector;
-            rotatedVector.x = cos * tx - sin * ty;
-            rotatedVector.y = sin * tx + cos * ty;
-
-            return rotatedVector;
-        }
-
 #if ENABLE_CONCAVE_HULL_STATS
         public static ConcaveHullRepairStats ProfileConcaveHullRepair(
             List<FastVector3Int> hull,
@@ -996,12 +996,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 #if ENABLE_CONCAVE_HULL_STATS
         public sealed class ConcaveHullRepairStats
         {
-            public ConcaveHullRepairStats(int startHullCount, int originalPointsCount)
-            {
-                StartHullCount = startHullCount;
-                OriginalPointsCount = originalPointsCount;
-            }
-
             public int StartHullCount { get; }
             public int OriginalPointsCount { get; }
             public int FinalHullCount { get; private set; }
@@ -1012,6 +1006,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             public int DiagonalPruned { get; private set; }
             public int AxisNeighborVisits { get; private set; }
             public int MaxFrontierSize { get; private set; }
+
+            public ConcaveHullRepairStats(int startHullCount, int originalPointsCount)
+            {
+                StartHullCount = startHullCount;
+                OriginalPointsCount = originalPointsCount;
+            }
 
             internal ConcaveHullRepairStats Clone()
             {

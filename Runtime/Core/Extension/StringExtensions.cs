@@ -58,6 +58,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     /// </remarks>
     public static class StringExtensions
     {
+        private const char CombiningDotAbove = '\u0307';
+        private const char CapitalIWithDot = '\u0130';
+
+        private const char SlugSeparator = '-';
+
         private static readonly ImmutableHashSet<char> WordSeparators = new HashSet<char>
         {
             '_',
@@ -74,9 +79,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         {
             '\'',
         }.ToImmutableHashSet();
-
-        private const char CombiningDotAbove = '\u0307';
-        private const char CapitalIWithDot = '\u0130';
         private static readonly string CombiningDotAboveString = CombiningDotAbove.ToString();
         private static readonly string CapitalIWithDotString = CapitalIWithDot.ToString();
 
@@ -223,6 +225,638 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             return prev[len2];
+        }
+
+        public static string ToPascalCase(this string value, string separator = "")
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return string.Empty;
+            }
+
+            List<CaseToken> tokens = TokenizeForCase(value);
+            if (tokens.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            using PooledResource<StringBuilder> stringBuilderBuffer = Buffers.GetStringBuilder(
+                value.Length,
+                out StringBuilder stringBuilder
+            );
+
+            bool isFirstWord = true;
+            foreach (CaseToken token in tokens)
+            {
+                if (token.Kind != CaseTokenKind.Word)
+                {
+                    continue;
+                }
+
+                string sanitized = SanitizeWord(token.Value, removeStripChars: true);
+                if (string.IsNullOrEmpty(sanitized))
+                {
+                    continue;
+                }
+
+                if (!isFirstWord && !string.IsNullOrEmpty(separator))
+                {
+                    _ = stringBuilder.Append(separator);
+                }
+
+                AppendWordWithCasing(stringBuilder, sanitized, uppercaseFirstLetter: true);
+                isFirstWord = false;
+            }
+
+            return stringBuilder.ToString();
+        }
+
+        public static bool NeedsLowerInvariantConversion(this string input)
+        {
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                return false;
+            }
+
+            foreach (char inputCharacter in input)
+            {
+                if (char.ToLowerInvariant(inputCharacter) != inputCharacter)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public static bool NeedsTrim(this string input)
+        {
+            if (string.IsNullOrEmpty(input))
+            {
+                return false;
+            }
+
+            return char.IsWhiteSpace(input[0]) || char.IsWhiteSpace(input[^1]);
+        }
+
+        /// <summary>
+        /// Shortens a string to at most <paramref name="maxLength"/> characters, marking what was
+        /// removed with <paramref name="ellipsis"/>.
+        /// </summary>
+        /// <param name="input">The string to shorten.</param>
+        /// <param name="maxLength">The maximum length of the result.</param>
+        /// <param name="ellipsis">The marker appended in place of the removed text.</param>
+        /// <returns>The original string when it already fits, otherwise a string of at most <paramref name="maxLength"/> characters.</returns>
+        /// <remarks>
+        /// The result never exceeds <paramref name="maxLength"/>. When the ellipsis alone would not
+        /// fit there is no room to mark the elision, so it is dropped and the input is cut instead.
+        /// The cut never lands between the halves of a surrogate pair, so the result is always
+        /// well-formed UTF-16 and may be one character shorter than requested.
+        /// </remarks>
+        public static string Truncate(this string input, int maxLength, string ellipsis = "...")
+        {
+            if (string.IsNullOrEmpty(input) || maxLength < 0)
+            {
+                return input;
+            }
+
+            if (input.Length <= maxLength)
+            {
+                return input;
+            }
+
+            if (string.IsNullOrEmpty(ellipsis) || maxLength < ellipsis.Length)
+            {
+                return input.Substring(0, WholeCharacterLength(input, maxLength));
+            }
+
+            int truncateLength = WholeCharacterLength(input, maxLength - ellipsis.Length);
+            return input.Substring(0, truncateLength) + ellipsis;
+        }
+
+        public static string ToCamelCase(this string value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return string.Empty;
+            }
+
+            if (IsAlreadyCamelCase(value))
+            {
+                return value;
+            }
+
+            string pascalCase = value.ToPascalCase();
+            if (pascalCase.Length == 0)
+            {
+                return string.Empty;
+            }
+
+            if (pascalCase.Length == 1)
+            {
+                return char.ToLowerInvariant(pascalCase[0]).ToString();
+            }
+
+            pascalCase = RemoveCombiningDotAboveIfPresent(pascalCase);
+            using PooledResource<StringBuilder> stringBuilderBuffer = Buffers.GetStringBuilder(
+                value.Length,
+                out StringBuilder stringBuilder
+            );
+            _ = stringBuilder.Append(char.ToLowerInvariant(pascalCase[0]));
+
+            for (int i = 1; i < pascalCase.Length; ++i)
+            {
+                _ = stringBuilder.Append(pascalCase[i]);
+            }
+
+            return stringBuilder.ToString();
+        }
+
+        public static string ToSnakeCase(this string value)
+        {
+            return ToDelimitedCase(value, '_');
+        }
+
+        public static string ToKebabCase(this string value)
+        {
+            return ToDelimitedCase(value, '-');
+        }
+
+        public static string ToTitleCase(this string value, bool preserveSeparators = true)
+        {
+            return ToTitleCaseInternal(value, preserveSeparators);
+        }
+
+        /// <summary>
+        /// Converts a string to a URL- and filename-safe slug: lowercase ASCII letters and digits,
+        /// single hyphens between words, no leading or trailing hyphen.
+        /// </summary>
+        /// <param name="value">The text to slugify.</param>
+        /// <returns>
+        /// The slug, or <see cref="string.Empty"/> when the input is null, empty, or contains no
+        /// ASCII letter or digit once accents are folded.
+        /// </returns>
+        /// <remarks>
+        /// <para>
+        /// Word boundaries come from the same tokenizer the casing family uses, so
+        /// <c>"PlayerHPMax"</c> slugs to <c>"player-hp-max"</c> rather than to one run.
+        /// </para>
+        /// <para>
+        /// Accents are folded to their ASCII base rather than dropped, so <c>"Café"</c> keeps all
+        /// four of its letters and slugs to <c>"cafe"</c>. Characters with no ASCII form, emoji and
+        /// ideographic scripts among them, are removed, which is why a string written entirely in
+        /// such a script slugs to empty. Check for that rather than assuming a non-empty input
+        /// yields a non-empty slug.
+        /// </para>
+        /// <para>
+        /// <see cref="ToKebabCase"/> is not a substitute: it preserves punctuation and accents, so
+        /// <c>"Café Menu -- 50% Off!"</c> kebabs to <c>"café-menu-50%-off!"</c> and slugs to
+        /// <c>"cafe-menu-50-off"</c>.
+        /// </para>
+        /// </remarks>
+        /// <example>
+        /// <code>
+        /// string key = "Level 10: The Descent".Slugify();   // "level-10-the-descent"
+        /// </code>
+        /// </example>
+        public static string Slugify(this string value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return string.Empty;
+            }
+
+            string delimited = ToDelimitedCase(FoldDiacritics(value), SlugSeparator);
+            if (string.IsNullOrEmpty(delimited))
+            {
+                return string.Empty;
+            }
+
+            using PooledResource<StringBuilder> pooled = Buffers.GetStringBuilder(
+                delimited.Length,
+                out StringBuilder builder
+            );
+
+            bool separatorPending = false;
+            for (int i = 0; i < delimited.Length; ++i)
+            {
+                char current = delimited[i];
+                bool isAsciiAlphanumeric =
+                    current is >= '0' and <= '9'
+                    || current is >= 'a' and <= 'z'
+                    || current is >= 'A' and <= 'Z';
+                if (!isAsciiAlphanumeric)
+                {
+                    separatorPending = 0 < builder.Length;
+                    continue;
+                }
+
+                if (separatorPending)
+                {
+                    builder.Append(SlugSeparator);
+                    separatorPending = false;
+                }
+
+                // Invariant casing keeps Turkish I from becoming a non-ASCII character.
+                builder.Append(char.ToLowerInvariant(current));
+            }
+
+            return builder.ToString();
+        }
+
+        public static bool ContainsIgnoreCase(this string input, string value)
+        {
+            if (input == null || value == null)
+            {
+                return false;
+            }
+
+            return 0 <= input.IndexOf(value, StringComparison.OrdinalIgnoreCase);
+        }
+
+        public static bool EqualsIgnoreCase(this string input, string value)
+        {
+            return string.Equals(input, value, StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Reverses the characters of a string.
+        /// </summary>
+        /// <param name="input">The string to reverse.</param>
+        /// <returns>The reversed string, or the input when it is null or a single character.</returns>
+        /// <remarks>
+        /// Surrogate pairs are kept intact, so a string containing emoji or any other non-BMP
+        /// character reverses to well-formed UTF-16 rather than to replacement characters.
+        /// Combining marks are reversed along with everything else, so text that uses them is
+        /// re-ordered rather than re-rendered; reversing twice still returns the original.
+        /// </remarks>
+        public static string Reverse(this string input)
+        {
+            if (input == null || input.Length <= 1)
+            {
+                return input;
+            }
+
+            int len = input.Length;
+            return string.Create(
+                len,
+                input,
+                static (span, src) =>
+                {
+                    int write = 0;
+                    for (int read = src.Length - 1; 0 <= read; --read)
+                    {
+                        char current = src[read];
+                        if (
+                            0 < read
+                            && char.IsLowSurrogate(current)
+                            && char.IsHighSurrogate(src[read - 1])
+                        )
+                        {
+                            span[write++] = src[read - 1];
+                            span[write++] = current;
+                            --read;
+                            continue;
+                        }
+
+                        span[write++] = current;
+                    }
+                }
+            );
+        }
+
+        public static string RemoveWhitespace(this string input)
+        {
+            if (string.IsNullOrEmpty(input))
+            {
+                return input;
+            }
+
+            using PooledResource<StringBuilder> stringBuilderBuffer = Buffers.GetStringBuilder(
+                input.Length,
+                out StringBuilder stringBuilder
+            );
+
+            foreach (char c in input)
+            {
+                if (!char.IsWhiteSpace(c))
+                {
+                    _ = stringBuilder.Append(c);
+                }
+            }
+
+            return stringBuilder.ToString();
+        }
+
+        public static int CountOccurrences(this string input, char character)
+        {
+            if (string.IsNullOrEmpty(input))
+            {
+                return 0;
+            }
+
+            int count = 0;
+            foreach (char c in input)
+            {
+                if (c == character)
+                {
+                    ++count;
+                }
+            }
+
+            return count;
+        }
+
+        public static int CountOccurrences(this string input, string substring)
+        {
+            if (string.IsNullOrEmpty(input) || string.IsNullOrEmpty(substring))
+            {
+                return 0;
+            }
+
+            int count = 0;
+            int index = 0;
+
+            while (0 <= (index = input.IndexOf(substring, index, StringComparison.Ordinal)))
+            {
+                ++count;
+                index += substring.Length;
+            }
+
+            return count;
+        }
+
+        public static bool IsNumeric(this string input)
+        {
+            if (string.IsNullOrEmpty(input))
+            {
+                return false;
+            }
+
+            foreach (char c in input)
+            {
+                if (!char.IsDigit(c))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        public static bool IsAlphabetic(this string input)
+        {
+            if (string.IsNullOrEmpty(input))
+            {
+                return false;
+            }
+
+            foreach (char c in input)
+            {
+                if (!char.IsLetter(c))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        public static bool IsAlphanumeric(this string input)
+        {
+            if (string.IsNullOrEmpty(input))
+            {
+                return false;
+            }
+
+            foreach (char c in input)
+            {
+                if (!char.IsLetterOrDigit(c))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        public static string ToBase64(this string input)
+        {
+            if (string.IsNullOrEmpty(input))
+            {
+                return string.Empty;
+            }
+
+            byte[] bytes = Encoding.UTF8.GetBytes(input);
+            return Convert.ToBase64String(bytes);
+        }
+
+        public static string FromBase64(this string input)
+        {
+            if (string.IsNullOrEmpty(input))
+            {
+                return string.Empty;
+            }
+
+            if (TryDecodeBase64Utf8(input, out string decoded))
+            {
+                return decoded;
+            }
+
+            return string.Empty;
+        }
+
+        public static string Repeat(this string input, int count)
+        {
+            if (string.IsNullOrEmpty(input) || count <= 0)
+            {
+                return string.Empty;
+            }
+
+            if (count == 1)
+            {
+                return input;
+            }
+
+            int estimated = 0;
+            if (1 < count && 0 < input.Length)
+            {
+                int maxMultiplier = int.MaxValue / input.Length;
+                if (count <= maxMultiplier)
+                {
+                    estimated = input.Length * count;
+                }
+            }
+            using PooledResource<StringBuilder> stringBuilderBuffer = Buffers.GetStringBuilder(
+                estimated,
+                out StringBuilder stringBuilder
+            );
+
+            for (int i = 0; i < count; ++i)
+            {
+                _ = stringBuilder.Append(input);
+            }
+
+            return stringBuilder.ToString();
+        }
+
+        public static string[] SplitCamelCase(this string input)
+        {
+            if (string.IsNullOrEmpty(input))
+            {
+                return Array.Empty<string>();
+            }
+
+            using PooledResource<List<string>> listBuffer = Buffers<string>.List.Get(
+                out List<string> words
+            );
+            using PooledResource<StringBuilder> stringBuilderBuffer = Buffers.GetStringBuilder(
+                input.Length,
+                out StringBuilder currentWord
+            );
+
+            for (int i = 0; i < input.Length; ++i)
+            {
+                char current = input[i];
+
+                if (WordSeparators.Contains(current))
+                {
+                    if (0 < currentWord.Length)
+                    {
+                        words.Add(currentWord.ToString());
+                        currentWord.Clear();
+                    }
+                    continue;
+                }
+
+                if (char.IsUpper(current) && 0 < i)
+                {
+                    char previous = input[i - 1];
+                    if (!char.IsUpper(previous) && !WordSeparators.Contains(previous))
+                    {
+                        if (0 < currentWord.Length)
+                        {
+                            words.Add(currentWord.ToString());
+                            currentWord.Clear();
+                        }
+                    }
+                    else if (i + 1 < input.Length && char.IsLower(input[i + 1]))
+                    {
+                        if (0 < currentWord.Length)
+                        {
+                            words.Add(currentWord.ToString());
+                            currentWord.Clear();
+                        }
+                    }
+                }
+
+                _ = currentWord.Append(current);
+            }
+
+            if (0 < currentWord.Length)
+            {
+                words.Add(currentWord.ToString());
+            }
+
+            return words.ToArray();
+        }
+
+        public static string ReplaceFirst(this string input, string oldValue, string newValue)
+        {
+            if (string.IsNullOrEmpty(input) || string.IsNullOrEmpty(oldValue))
+            {
+                return input;
+            }
+
+            int index = input.IndexOf(oldValue, StringComparison.Ordinal);
+            if (index < 0)
+            {
+                return input;
+            }
+
+            int oldLen = oldValue.Length;
+            int newLen = input.Length - oldLen + (newValue?.Length ?? 0);
+            return string.Create(
+                newLen,
+                (input, index, oldLen, newValue),
+                static (dst, state) =>
+                {
+                    state.input.AsSpan(0, state.index).CopyTo(dst);
+                    int pos = state.index;
+                    if (state.newValue != null)
+                    {
+                        state.newValue.AsSpan().CopyTo(dst.Slice(pos));
+                        pos += state.newValue.Length;
+                    }
+                    state.input.AsSpan(state.index + state.oldLen).CopyTo(dst.Slice(pos));
+                }
+            );
+        }
+
+        public static string ReplaceLast(this string input, string oldValue, string newValue)
+        {
+            if (string.IsNullOrEmpty(input) || string.IsNullOrEmpty(oldValue))
+            {
+                return input;
+            }
+
+            int index = input.LastIndexOf(oldValue, StringComparison.Ordinal);
+            if (index < 0)
+            {
+                return input;
+            }
+
+            int oldLen = oldValue.Length;
+            int newLen = input.Length - oldLen + (newValue?.Length ?? 0);
+            return string.Create(
+                newLen,
+                (input, index, oldLen, newValue),
+                static (dst, state) =>
+                {
+                    state.input.AsSpan(0, state.index).CopyTo(dst);
+                    int pos = state.index;
+                    if (state.newValue != null)
+                    {
+                        state.newValue.AsSpan().CopyTo(dst.Slice(pos));
+                        pos += state.newValue.Length;
+                    }
+                    state.input.AsSpan(state.index + state.oldLen).CopyTo(dst.Slice(pos));
+                }
+            );
+        }
+
+        public static string ToCase(this string value, StringCase stringCase)
+        {
+            switch (stringCase)
+            {
+                case StringCase.PascalCase:
+                    return value.ToPascalCase();
+                case StringCase.CamelCase:
+                    return value.ToCamelCase();
+                case StringCase.SnakeCase:
+                    return value.ToSnakeCase();
+                case StringCase.KebabCase:
+                    return value.ToKebabCase();
+                case StringCase.TitleCase:
+                    return value.ToTitleCase(preserveSeparators: false);
+                case StringCase.LowerCase:
+                    return value == null
+                        ? string.Empty
+                        : RemoveCombiningDotAboveIfPresent(value.ToLowerInvariant());
+                case StringCase.UpperCase:
+                    return value?.ToUpperInvariant() ?? string.Empty;
+                case StringCase.LowerInvariant:
+                    return value == null
+                        ? string.Empty
+                        : RemoveCombiningDotAboveIfPresent(value.ToLowerInvariant());
+                case StringCase.UpperInvariant:
+                    return value?.ToUpperInvariant() ?? string.Empty;
+#pragma warning disable CS0618
+                case StringCase.None:
+#pragma warning restore CS0618
+                default:
+                    return value ?? string.Empty;
+            }
         }
 
         private static List<CaseToken> TokenizeForCase(string value)
@@ -488,8 +1122,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 _ = builder.Append(char.ToLowerInvariant(c));
             }
         }
-
-        private const char SlugSeparator = '-';
 
         /// <summary>
         /// Replaces accented characters with their unaccented ASCII base, leaving everything else
@@ -913,113 +1545,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return stringBuilder.ToString();
         }
 
-        public static string ToPascalCase(this string value, string separator = "")
-        {
-            if (string.IsNullOrEmpty(value))
-            {
-                return string.Empty;
-            }
-
-            List<CaseToken> tokens = TokenizeForCase(value);
-            if (tokens.Count == 0)
-            {
-                return string.Empty;
-            }
-
-            using PooledResource<StringBuilder> stringBuilderBuffer = Buffers.GetStringBuilder(
-                value.Length,
-                out StringBuilder stringBuilder
-            );
-
-            bool isFirstWord = true;
-            foreach (CaseToken token in tokens)
-            {
-                if (token.Kind != CaseTokenKind.Word)
-                {
-                    continue;
-                }
-
-                string sanitized = SanitizeWord(token.Value, removeStripChars: true);
-                if (string.IsNullOrEmpty(sanitized))
-                {
-                    continue;
-                }
-
-                if (!isFirstWord && !string.IsNullOrEmpty(separator))
-                {
-                    _ = stringBuilder.Append(separator);
-                }
-
-                AppendWordWithCasing(stringBuilder, sanitized, uppercaseFirstLetter: true);
-                isFirstWord = false;
-            }
-
-            return stringBuilder.ToString();
-        }
-
-        public static bool NeedsLowerInvariantConversion(this string input)
-        {
-            if (string.IsNullOrWhiteSpace(input))
-            {
-                return false;
-            }
-
-            foreach (char inputCharacter in input)
-            {
-                if (char.ToLowerInvariant(inputCharacter) != inputCharacter)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        public static bool NeedsTrim(this string input)
-        {
-            if (string.IsNullOrEmpty(input))
-            {
-                return false;
-            }
-
-            return char.IsWhiteSpace(input[0]) || char.IsWhiteSpace(input[^1]);
-        }
-
-        /// <summary>
-        /// Shortens a string to at most <paramref name="maxLength"/> characters, marking what was
-        /// removed with <paramref name="ellipsis"/>.
-        /// </summary>
-        /// <param name="input">The string to shorten.</param>
-        /// <param name="maxLength">The maximum length of the result.</param>
-        /// <param name="ellipsis">The marker appended in place of the removed text.</param>
-        /// <returns>The original string when it already fits, otherwise a string of at most <paramref name="maxLength"/> characters.</returns>
-        /// <remarks>
-        /// The result never exceeds <paramref name="maxLength"/>. When the ellipsis alone would not
-        /// fit there is no room to mark the elision, so it is dropped and the input is cut instead.
-        /// The cut never lands between the halves of a surrogate pair, so the result is always
-        /// well-formed UTF-16 and may be one character shorter than requested.
-        /// </remarks>
-        public static string Truncate(this string input, int maxLength, string ellipsis = "...")
-        {
-            if (string.IsNullOrEmpty(input) || maxLength < 0)
-            {
-                return input;
-            }
-
-            if (input.Length <= maxLength)
-            {
-                return input;
-            }
-
-            if (string.IsNullOrEmpty(ellipsis) || maxLength < ellipsis.Length)
-            {
-                return input.Substring(0, WholeCharacterLength(input, maxLength));
-            }
-
-            int truncateLength = WholeCharacterLength(input, maxLength - ellipsis.Length);
-            return input.Substring(0, truncateLength) + ellipsis;
-        }
-
         // Cut before a surrogate pair so truncation cannot create an unencodable character.
         private static int WholeCharacterLength(string input, int length)
         {
@@ -1082,338 +1607,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             return true;
-        }
-
-        public static string ToCamelCase(this string value)
-        {
-            if (string.IsNullOrEmpty(value))
-            {
-                return string.Empty;
-            }
-
-            if (IsAlreadyCamelCase(value))
-            {
-                return value;
-            }
-
-            string pascalCase = value.ToPascalCase();
-            if (pascalCase.Length == 0)
-            {
-                return string.Empty;
-            }
-
-            if (pascalCase.Length == 1)
-            {
-                return char.ToLowerInvariant(pascalCase[0]).ToString();
-            }
-
-            pascalCase = RemoveCombiningDotAboveIfPresent(pascalCase);
-            using PooledResource<StringBuilder> stringBuilderBuffer = Buffers.GetStringBuilder(
-                value.Length,
-                out StringBuilder stringBuilder
-            );
-            _ = stringBuilder.Append(char.ToLowerInvariant(pascalCase[0]));
-
-            for (int i = 1; i < pascalCase.Length; ++i)
-            {
-                _ = stringBuilder.Append(pascalCase[i]);
-            }
-
-            return stringBuilder.ToString();
-        }
-
-        public static string ToSnakeCase(this string value)
-        {
-            return ToDelimitedCase(value, '_');
-        }
-
-        public static string ToKebabCase(this string value)
-        {
-            return ToDelimitedCase(value, '-');
-        }
-
-        public static string ToTitleCase(this string value, bool preserveSeparators = true)
-        {
-            return ToTitleCaseInternal(value, preserveSeparators);
-        }
-
-        /// <summary>
-        /// Converts a string to a URL- and filename-safe slug: lowercase ASCII letters and digits,
-        /// single hyphens between words, no leading or trailing hyphen.
-        /// </summary>
-        /// <param name="value">The text to slugify.</param>
-        /// <returns>
-        /// The slug, or <see cref="string.Empty"/> when the input is null, empty, or contains no
-        /// ASCII letter or digit once accents are folded.
-        /// </returns>
-        /// <remarks>
-        /// <para>
-        /// Word boundaries come from the same tokenizer the casing family uses, so
-        /// <c>"PlayerHPMax"</c> slugs to <c>"player-hp-max"</c> rather than to one run.
-        /// </para>
-        /// <para>
-        /// Accents are folded to their ASCII base rather than dropped, so <c>"Café"</c> keeps all
-        /// four of its letters and slugs to <c>"cafe"</c>. Characters with no ASCII form, emoji and
-        /// ideographic scripts among them, are removed, which is why a string written entirely in
-        /// such a script slugs to empty. Check for that rather than assuming a non-empty input
-        /// yields a non-empty slug.
-        /// </para>
-        /// <para>
-        /// <see cref="ToKebabCase"/> is not a substitute: it preserves punctuation and accents, so
-        /// <c>"Café Menu -- 50% Off!"</c> kebabs to <c>"café-menu-50%-off!"</c> and slugs to
-        /// <c>"cafe-menu-50-off"</c>.
-        /// </para>
-        /// </remarks>
-        /// <example>
-        /// <code>
-        /// string key = "Level 10: The Descent".Slugify();   // "level-10-the-descent"
-        /// </code>
-        /// </example>
-        public static string Slugify(this string value)
-        {
-            if (string.IsNullOrEmpty(value))
-            {
-                return string.Empty;
-            }
-
-            string delimited = ToDelimitedCase(FoldDiacritics(value), SlugSeparator);
-            if (string.IsNullOrEmpty(delimited))
-            {
-                return string.Empty;
-            }
-
-            using PooledResource<StringBuilder> pooled = Buffers.GetStringBuilder(
-                delimited.Length,
-                out StringBuilder builder
-            );
-
-            bool separatorPending = false;
-            for (int i = 0; i < delimited.Length; ++i)
-            {
-                char current = delimited[i];
-                bool isAsciiAlphanumeric =
-                    current is >= '0' and <= '9'
-                    || current is >= 'a' and <= 'z'
-                    || current is >= 'A' and <= 'Z';
-                if (!isAsciiAlphanumeric)
-                {
-                    separatorPending = 0 < builder.Length;
-                    continue;
-                }
-
-                if (separatorPending)
-                {
-                    builder.Append(SlugSeparator);
-                    separatorPending = false;
-                }
-
-                // Invariant casing keeps Turkish I from becoming a non-ASCII character.
-                builder.Append(char.ToLowerInvariant(current));
-            }
-
-            return builder.ToString();
-        }
-
-        public static bool ContainsIgnoreCase(this string input, string value)
-        {
-            if (input == null || value == null)
-            {
-                return false;
-            }
-
-            return 0 <= input.IndexOf(value, StringComparison.OrdinalIgnoreCase);
-        }
-
-        public static bool EqualsIgnoreCase(this string input, string value)
-        {
-            return string.Equals(input, value, StringComparison.OrdinalIgnoreCase);
-        }
-
-        /// <summary>
-        /// Reverses the characters of a string.
-        /// </summary>
-        /// <param name="input">The string to reverse.</param>
-        /// <returns>The reversed string, or the input when it is null or a single character.</returns>
-        /// <remarks>
-        /// Surrogate pairs are kept intact, so a string containing emoji or any other non-BMP
-        /// character reverses to well-formed UTF-16 rather than to replacement characters.
-        /// Combining marks are reversed along with everything else, so text that uses them is
-        /// re-ordered rather than re-rendered; reversing twice still returns the original.
-        /// </remarks>
-        public static string Reverse(this string input)
-        {
-            if (input == null || input.Length <= 1)
-            {
-                return input;
-            }
-
-            int len = input.Length;
-            return string.Create(
-                len,
-                input,
-                static (span, src) =>
-                {
-                    int write = 0;
-                    for (int read = src.Length - 1; 0 <= read; --read)
-                    {
-                        char current = src[read];
-                        if (
-                            0 < read
-                            && char.IsLowSurrogate(current)
-                            && char.IsHighSurrogate(src[read - 1])
-                        )
-                        {
-                            span[write++] = src[read - 1];
-                            span[write++] = current;
-                            --read;
-                            continue;
-                        }
-
-                        span[write++] = current;
-                    }
-                }
-            );
-        }
-
-        public static string RemoveWhitespace(this string input)
-        {
-            if (string.IsNullOrEmpty(input))
-            {
-                return input;
-            }
-
-            using PooledResource<StringBuilder> stringBuilderBuffer = Buffers.GetStringBuilder(
-                input.Length,
-                out StringBuilder stringBuilder
-            );
-
-            foreach (char c in input)
-            {
-                if (!char.IsWhiteSpace(c))
-                {
-                    _ = stringBuilder.Append(c);
-                }
-            }
-
-            return stringBuilder.ToString();
-        }
-
-        public static int CountOccurrences(this string input, char character)
-        {
-            if (string.IsNullOrEmpty(input))
-            {
-                return 0;
-            }
-
-            int count = 0;
-            foreach (char c in input)
-            {
-                if (c == character)
-                {
-                    ++count;
-                }
-            }
-
-            return count;
-        }
-
-        public static int CountOccurrences(this string input, string substring)
-        {
-            if (string.IsNullOrEmpty(input) || string.IsNullOrEmpty(substring))
-            {
-                return 0;
-            }
-
-            int count = 0;
-            int index = 0;
-
-            while (0 <= (index = input.IndexOf(substring, index, StringComparison.Ordinal)))
-            {
-                ++count;
-                index += substring.Length;
-            }
-
-            return count;
-        }
-
-        public static bool IsNumeric(this string input)
-        {
-            if (string.IsNullOrEmpty(input))
-            {
-                return false;
-            }
-
-            foreach (char c in input)
-            {
-                if (!char.IsDigit(c))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        public static bool IsAlphabetic(this string input)
-        {
-            if (string.IsNullOrEmpty(input))
-            {
-                return false;
-            }
-
-            foreach (char c in input)
-            {
-                if (!char.IsLetter(c))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        public static bool IsAlphanumeric(this string input)
-        {
-            if (string.IsNullOrEmpty(input))
-            {
-                return false;
-            }
-
-            foreach (char c in input)
-            {
-                if (!char.IsLetterOrDigit(c))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        public static string ToBase64(this string input)
-        {
-            if (string.IsNullOrEmpty(input))
-            {
-                return string.Empty;
-            }
-
-            byte[] bytes = Encoding.UTF8.GetBytes(input);
-            return Convert.ToBase64String(bytes);
-        }
-
-        public static string FromBase64(this string input)
-        {
-            if (string.IsNullOrEmpty(input))
-            {
-                return string.Empty;
-            }
-
-            if (TryDecodeBase64Utf8(input, out string decoded))
-            {
-                return decoded;
-            }
-
-            return string.Empty;
         }
 
         private static bool IsLikelyBase64(string s)
@@ -1555,165 +1748,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return -1;
         }
 
-        public static string Repeat(this string input, int count)
-        {
-            if (string.IsNullOrEmpty(input) || count <= 0)
-            {
-                return string.Empty;
-            }
-
-            if (count == 1)
-            {
-                return input;
-            }
-
-            int estimated = 0;
-            if (1 < count && 0 < input.Length)
-            {
-                int maxMultiplier = int.MaxValue / input.Length;
-                if (count <= maxMultiplier)
-                {
-                    estimated = input.Length * count;
-                }
-            }
-            using PooledResource<StringBuilder> stringBuilderBuffer = Buffers.GetStringBuilder(
-                estimated,
-                out StringBuilder stringBuilder
-            );
-
-            for (int i = 0; i < count; ++i)
-            {
-                _ = stringBuilder.Append(input);
-            }
-
-            return stringBuilder.ToString();
-        }
-
-        public static string[] SplitCamelCase(this string input)
-        {
-            if (string.IsNullOrEmpty(input))
-            {
-                return Array.Empty<string>();
-            }
-
-            using PooledResource<List<string>> listBuffer = Buffers<string>.List.Get(
-                out List<string> words
-            );
-            using PooledResource<StringBuilder> stringBuilderBuffer = Buffers.GetStringBuilder(
-                input.Length,
-                out StringBuilder currentWord
-            );
-
-            for (int i = 0; i < input.Length; ++i)
-            {
-                char current = input[i];
-
-                if (WordSeparators.Contains(current))
-                {
-                    if (0 < currentWord.Length)
-                    {
-                        words.Add(currentWord.ToString());
-                        currentWord.Clear();
-                    }
-                    continue;
-                }
-
-                if (char.IsUpper(current) && 0 < i)
-                {
-                    char previous = input[i - 1];
-                    if (!char.IsUpper(previous) && !WordSeparators.Contains(previous))
-                    {
-                        if (0 < currentWord.Length)
-                        {
-                            words.Add(currentWord.ToString());
-                            currentWord.Clear();
-                        }
-                    }
-                    else if (i + 1 < input.Length && char.IsLower(input[i + 1]))
-                    {
-                        if (0 < currentWord.Length)
-                        {
-                            words.Add(currentWord.ToString());
-                            currentWord.Clear();
-                        }
-                    }
-                }
-
-                _ = currentWord.Append(current);
-            }
-
-            if (0 < currentWord.Length)
-            {
-                words.Add(currentWord.ToString());
-            }
-
-            return words.ToArray();
-        }
-
-        public static string ReplaceFirst(this string input, string oldValue, string newValue)
-        {
-            if (string.IsNullOrEmpty(input) || string.IsNullOrEmpty(oldValue))
-            {
-                return input;
-            }
-
-            int index = input.IndexOf(oldValue, StringComparison.Ordinal);
-            if (index < 0)
-            {
-                return input;
-            }
-
-            int oldLen = oldValue.Length;
-            int newLen = input.Length - oldLen + (newValue?.Length ?? 0);
-            return string.Create(
-                newLen,
-                (input, index, oldLen, newValue),
-                static (dst, state) =>
-                {
-                    state.input.AsSpan(0, state.index).CopyTo(dst);
-                    int pos = state.index;
-                    if (state.newValue != null)
-                    {
-                        state.newValue.AsSpan().CopyTo(dst.Slice(pos));
-                        pos += state.newValue.Length;
-                    }
-                    state.input.AsSpan(state.index + state.oldLen).CopyTo(dst.Slice(pos));
-                }
-            );
-        }
-
-        public static string ReplaceLast(this string input, string oldValue, string newValue)
-        {
-            if (string.IsNullOrEmpty(input) || string.IsNullOrEmpty(oldValue))
-            {
-                return input;
-            }
-
-            int index = input.LastIndexOf(oldValue, StringComparison.Ordinal);
-            if (index < 0)
-            {
-                return input;
-            }
-
-            int oldLen = oldValue.Length;
-            int newLen = input.Length - oldLen + (newValue?.Length ?? 0);
-            return string.Create(
-                newLen,
-                (input, index, oldLen, newValue),
-                static (dst, state) =>
-                {
-                    state.input.AsSpan(0, state.index).CopyTo(dst);
-                    int pos = state.index;
-                    if (state.newValue != null)
-                    {
-                        state.newValue.AsSpan().CopyTo(dst.Slice(pos));
-                        pos += state.newValue.Length;
-                    }
-                    state.input.AsSpan(state.index + state.oldLen).CopyTo(dst.Slice(pos));
-                }
-            );
-        }
-
         private static string RemoveCombiningDotAboveIfPresent(string value)
         {
             if (string.IsNullOrEmpty(value))
@@ -1762,40 +1796,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return builder.ToString();
         }
 
-        public static string ToCase(this string value, StringCase stringCase)
-        {
-            switch (stringCase)
-            {
-                case StringCase.PascalCase:
-                    return value.ToPascalCase();
-                case StringCase.CamelCase:
-                    return value.ToCamelCase();
-                case StringCase.SnakeCase:
-                    return value.ToSnakeCase();
-                case StringCase.KebabCase:
-                    return value.ToKebabCase();
-                case StringCase.TitleCase:
-                    return value.ToTitleCase(preserveSeparators: false);
-                case StringCase.LowerCase:
-                    return value == null
-                        ? string.Empty
-                        : RemoveCombiningDotAboveIfPresent(value.ToLowerInvariant());
-                case StringCase.UpperCase:
-                    return value?.ToUpperInvariant() ?? string.Empty;
-                case StringCase.LowerInvariant:
-                    return value == null
-                        ? string.Empty
-                        : RemoveCombiningDotAboveIfPresent(value.ToLowerInvariant());
-                case StringCase.UpperInvariant:
-                    return value?.ToUpperInvariant() ?? string.Empty;
-#pragma warning disable CS0618
-                case StringCase.None:
-#pragma warning restore CS0618
-                default:
-                    return value ?? string.Empty;
-            }
-        }
-
         private enum CharacterCategory
         {
             None,
@@ -1813,6 +1813,18 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
         private readonly struct CaseToken
         {
+            public CaseTokenKind Kind { get; }
+
+            public string Value { get; }
+
+            public bool HasLetter { get; }
+
+            public bool HasDigit { get; }
+
+            public bool HasUppercase { get; }
+
+            public bool IsNumeric => !HasLetter && HasDigit;
+
             public CaseToken(
                 CaseTokenKind kind,
                 string value,
@@ -1827,18 +1839,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 HasDigit = hasDigit;
                 HasUppercase = hasUppercase;
             }
-
-            public CaseTokenKind Kind { get; }
-
-            public string Value { get; }
-
-            public bool HasLetter { get; }
-
-            public bool HasDigit { get; }
-
-            public bool HasUppercase { get; }
-
-            public bool IsNumeric => !HasLetter && HasDigit;
         }
     }
 }

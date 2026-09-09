@@ -20,6 +20,37 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Reflex.Runtime
     [NUnit.Framework.Category("Fast")]
     public sealed class RelationalComponentsReflexTests : CommonTestBase
     {
+        /*
+            Reflex 14 renamed registration APIs; this test assembly needs its own version define. Empty contract
+            arrays bind nothing, so use the concrete-type overload.
+        */
+        private static void RegisterInstance(
+            ContainerBuilder builder,
+            object instance,
+            params Type[] contracts
+        )
+        {
+#if REFLEX_14_0_OR_NEWER
+            if (contracts.Length == 0)
+            {
+                builder.RegisterValue(instance);
+            }
+            else
+            {
+                builder.RegisterValue(instance, contracts);
+            }
+#else
+            if (contracts.Length == 0)
+            {
+                builder.AddSingleton(instance);
+            }
+            else
+            {
+                builder.AddSingleton(instance, contracts);
+            }
+#endif
+        }
+
         [Test]
         public void ContainerExtensionsUseBoundAssigner()
         {
@@ -379,46 +410,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Reflex.Runtime
             return cache;
         }
 
-        /*
-            Reflex 14 renamed registration APIs; this test assembly needs its own version define. Empty contract
-            arrays bind nothing, so use the concrete-type overload.
-        */
-        private static void RegisterInstance(
-            ContainerBuilder builder,
-            object instance,
-            params Type[] contracts
-        )
-        {
-#if REFLEX_14_0_OR_NEWER
-            if (contracts.Length == 0)
-            {
-                builder.RegisterValue(instance);
-            }
-            else
-            {
-                builder.RegisterValue(instance, contracts);
-            }
-#else
-            if (contracts.Length == 0)
-            {
-                builder.AddSingleton(instance);
-            }
-            else
-            {
-                builder.AddSingleton(instance, contracts);
-            }
-#endif
-        }
-
         private sealed class RecordingAssigner : IRelationalComponentAssigner
         {
-            private readonly List<Component> _assignedComponents = new();
-
             public int CallCount { get; private set; }
 
             public Component LastComponent { get; private set; }
 
             public IReadOnlyList<Component> AssignedComponents => _assignedComponents;
+
+            private readonly List<Component> _assignedComponents = new();
 
             public bool HasRelationalAssignments(Type componentType)
             {

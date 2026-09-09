@@ -35,6 +35,64 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             AllOnes32,
         };
 
+        private static uint[] CreateBounds32()
+        {
+            HashSet<uint> bounds = new() { uint.MaxValue, 1000u };
+            for (int shift = 0; shift < 32; shift++)
+            {
+                uint power = 1u << shift;
+                bounds.Add(power);
+                bounds.Add(power + 1);
+                if (1 < power)
+                {
+                    bounds.Add(power - 1);
+                }
+            }
+            uint[] result = new uint[bounds.Count];
+            bounds.CopyTo(result);
+            return result;
+        }
+
+        private static ulong[] CreateBounds64()
+        {
+            HashSet<ulong> bounds = new() { ulong.MaxValue, 1000UL };
+            for (int shift = 0; shift < 64; shift++)
+            {
+                ulong power = 1UL << shift;
+                bounds.Add(power);
+                bounds.Add(power + 1);
+                if (1 < power)
+                {
+                    bounds.Add(power - 1);
+                }
+            }
+            ulong[] result = new ulong[bounds.Count];
+            bounds.CopyTo(result);
+            return result;
+        }
+
+        private static bool IsAccepted32(uint draw, uint bound)
+        {
+            BigInteger domain = BigInteger.One << 32;
+            return domain % bound <= new BigInteger(draw) * bound % domain;
+        }
+
+        private static bool IsAccepted64(ulong draw, ulong bound)
+        {
+            BigInteger domain = BigInteger.One << 64;
+            return domain % bound <= new BigInteger(draw) * bound % domain;
+        }
+
+        private static BigInteger ExpectedMultiplyHigh(ulong draw, ulong bound, int width)
+        {
+            if ((bound & (bound - 1)) == 0)
+            {
+                return draw & (bound - 1);
+            }
+
+            return new BigInteger(draw) * bound >> width;
+        }
+
         [Test]
         public void NextExcludesIntMaxValueWhenTheDrawSaysOtherwise()
         {
@@ -620,64 +678,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             }
         }
 
-        private static uint[] CreateBounds32()
-        {
-            HashSet<uint> bounds = new() { uint.MaxValue, 1000u };
-            for (int shift = 0; shift < 32; shift++)
-            {
-                uint power = 1u << shift;
-                bounds.Add(power);
-                bounds.Add(power + 1);
-                if (1 < power)
-                {
-                    bounds.Add(power - 1);
-                }
-            }
-            uint[] result = new uint[bounds.Count];
-            bounds.CopyTo(result);
-            return result;
-        }
-
-        private static ulong[] CreateBounds64()
-        {
-            HashSet<ulong> bounds = new() { ulong.MaxValue, 1000UL };
-            for (int shift = 0; shift < 64; shift++)
-            {
-                ulong power = 1UL << shift;
-                bounds.Add(power);
-                bounds.Add(power + 1);
-                if (1 < power)
-                {
-                    bounds.Add(power - 1);
-                }
-            }
-            ulong[] result = new ulong[bounds.Count];
-            bounds.CopyTo(result);
-            return result;
-        }
-
-        private static bool IsAccepted32(uint draw, uint bound)
-        {
-            BigInteger domain = BigInteger.One << 32;
-            return domain % bound <= new BigInteger(draw) * bound % domain;
-        }
-
-        private static bool IsAccepted64(ulong draw, ulong bound)
-        {
-            BigInteger domain = BigInteger.One << 64;
-            return domain % bound <= new BigInteger(draw) * bound % domain;
-        }
-
-        private static BigInteger ExpectedMultiplyHigh(ulong draw, ulong bound, int width)
-        {
-            if ((bound & (bound - 1)) == 0)
-            {
-                return draw & (bound - 1);
-            }
-
-            return new BigInteger(draw) * bound >> width;
-        }
-
         /// <remarks>
         /// WallstopProto resolves a subtype by a number the owning assembly's manifest has to
         /// declare, so an undeclared subclass throws on the first save. This one never reaches the
@@ -688,17 +688,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         [WProtoNotSerialized]
         private sealed class ScriptedRandom : AbstractRandom
         {
-            private readonly Queue<uint> _values = new();
-            private bool _hasConstant;
-            private uint _constant;
-            private uint _prefix;
-            private int _prefixRemaining;
-
             public int UintCalls { get; private set; }
 
             public int MaximumUintCalls { get; set; } = int.MaxValue;
 
             public override RandomState InternalState => new(0UL);
+
+            private readonly Queue<uint> _values = new();
+            private bool _hasConstant;
+            private uint _constant;
+            private uint _prefix;
+            private int _prefixRemaining;
 
             public void EnqueueUint(uint value)
             {

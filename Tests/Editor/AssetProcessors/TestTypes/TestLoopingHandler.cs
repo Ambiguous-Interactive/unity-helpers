@@ -11,9 +11,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     /// </summary>
     internal static class TestLoopingHandler
     {
-        private static int _invocationCount;
-
         public static int InvocationCount => _invocationCount;
+
+        private static int _invocationCount;
 
         public static void Clear()
         {

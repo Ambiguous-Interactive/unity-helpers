@@ -122,46 +122,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         private static readonly ConcurrentDictionary<Type, FieldInfo[]> FieldsByType = new();
 #endif
 
-        private static FieldInfo[] GetOrAdd(Type objectType)
-        {
-            return FieldsByType.GetOrAdd(
-                objectType,
-                static type =>
-                {
-                    FieldInfo[] allFields = ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(
-                        type
-                    );
-
-                    if (allFields.Length == 0)
-                    {
-                        return Array.Empty<FieldInfo>();
-                    }
-
-                    using PooledResource<List<FieldInfo>> bufferResource =
-                        Buffers<FieldInfo>.List.Get(out List<FieldInfo> result);
-                    foreach (FieldInfo field in allFields)
-                    {
-                        if (
-                            field.IsAttributeDefined<ValidateAssignmentAttribute>(
-                                out _,
-                                inherit: false
-                            )
-                        )
-                        {
-                            result.Add(field);
-                        }
-                    }
-
-                    if (result.Count == 0)
-                    {
-                        return Array.Empty<FieldInfo>();
-                    }
-
-                    return result.ToArray();
-                }
-            );
-        }
-
         /// <summary>
         /// Logs a warning for every <see cref="ValidateAssignmentAttribute"/> field on
         /// <paramref name="o"/> that is null, empty, or has no elements.
@@ -222,6 +182,60 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             return false;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static bool IsValueInvalid(object value)
+        {
+            return value switch
+            {
+                Object unityObject => unityObject == null,
+                string stringValue => string.IsNullOrWhiteSpace(stringValue),
+                IList list => list.Count <= 0,
+                ICollection collection => collection.Count <= 0,
+                IEnumerable enumerable => IsInvalid(enumerable),
+                _ => value == null,
+            };
+        }
+
+        private static FieldInfo[] GetOrAdd(Type objectType)
+        {
+            return FieldsByType.GetOrAdd(
+                objectType,
+                static type =>
+                {
+                    FieldInfo[] allFields = ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(
+                        type
+                    );
+
+                    if (allFields.Length == 0)
+                    {
+                        return Array.Empty<FieldInfo>();
+                    }
+
+                    using PooledResource<List<FieldInfo>> bufferResource =
+                        Buffers<FieldInfo>.List.Get(out List<FieldInfo> result);
+                    foreach (FieldInfo field in allFields)
+                    {
+                        if (
+                            field.IsAttributeDefined<ValidateAssignmentAttribute>(
+                                out _,
+                                inherit: false
+                            )
+                        )
+                        {
+                            result.Add(field);
+                        }
+                    }
+
+                    if (result.Count == 0)
+                    {
+                        return Array.Empty<FieldInfo>();
+                    }
+
+                    return result.ToArray();
+                }
+            );
+        }
+
         private static bool IsInvalid(IEnumerable enumerable)
         {
             try
@@ -249,20 +263,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         {
             object fieldValue = field.GetValue(o);
             return IsValueInvalid(fieldValue);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static bool IsValueInvalid(object value)
-        {
-            return value switch
-            {
-                Object unityObject => unityObject == null,
-                string stringValue => string.IsNullOrWhiteSpace(stringValue),
-                IList list => list.Count <= 0,
-                ICollection collection => collection.Count <= 0,
-                IEnumerable enumerable => IsInvalid(enumerable),
-                _ => value == null,
-            };
         }
     }
 }

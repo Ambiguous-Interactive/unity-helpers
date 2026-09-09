@@ -34,6 +34,62 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [NUnit.Framework.Category("Serialization")]
     public sealed class WProtoStdlibCollectionTests
     {
+        private static string Encode<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new WProtoWriter(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+            Assert.AreEqual(buffer.Length, writer.Position, "Measure disagreed with Write");
+            return ToHex(buffer);
+        }
+
+        private static T RoundTrip<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new WProtoWriter(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+
+            WProtoReader reader = new WProtoReader(buffer);
+            Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
+            return restored;
+        }
+
+        private static WProtoSeededStdlibContract Decode(string hex)
+        {
+            WProtoReader reader = new WProtoReader(Parse(hex));
+            Assert.IsTrue(
+                WProtoFormatterProvider
+                    .Get<WProtoSeededStdlibContract>()
+                    .TryRead(ref reader, out WProtoSeededStdlibContract value),
+                hex
+            );
+            return value;
+        }
+
+        private static string ToHex(byte[] bytes)
+        {
+            StringBuilder builder = new StringBuilder(bytes.Length * 2);
+            foreach (byte current in bytes)
+            {
+                builder.Append(current.ToString("X2"));
+            }
+
+            return builder.ToString();
+        }
+
+        private static byte[] Parse(string hex)
+        {
+            byte[] bytes = new byte[hex.Length / 2];
+            for (int index = 0; index < bytes.Length; index++)
+            {
+                bytes[index] = System.Convert.ToByte(hex.Substring(index * 2, 2), 16);
+            }
+
+            return bytes;
+        }
+
         [Test]
         public void EveryStdlibShapeMatchesItsGoldenBytes()
         {
@@ -283,62 +339,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 )
             );
             Assert.AreEqual(string.Empty, Encode(new WProtoConstructedCollectionContract()));
-        }
-
-        private static string Encode<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new WProtoWriter(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-            Assert.AreEqual(buffer.Length, writer.Position, "Measure disagreed with Write");
-            return ToHex(buffer);
-        }
-
-        private static T RoundTrip<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new WProtoWriter(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-
-            WProtoReader reader = new WProtoReader(buffer);
-            Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
-            return restored;
-        }
-
-        private static WProtoSeededStdlibContract Decode(string hex)
-        {
-            WProtoReader reader = new WProtoReader(Parse(hex));
-            Assert.IsTrue(
-                WProtoFormatterProvider
-                    .Get<WProtoSeededStdlibContract>()
-                    .TryRead(ref reader, out WProtoSeededStdlibContract value),
-                hex
-            );
-            return value;
-        }
-
-        private static string ToHex(byte[] bytes)
-        {
-            StringBuilder builder = new StringBuilder(bytes.Length * 2);
-            foreach (byte current in bytes)
-            {
-                builder.Append(current.ToString("X2"));
-            }
-
-            return builder.ToString();
-        }
-
-        private static byte[] Parse(string hex)
-        {
-            byte[] bytes = new byte[hex.Length / 2];
-            for (int index = 0; index < bytes.Length; index++)
-            {
-                bytes[index] = System.Convert.ToByte(hex.Substring(index * 2, 2), 16);
-            }
-
-            return bytes;
         }
     }
 }

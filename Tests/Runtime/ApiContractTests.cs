@@ -25,11 +25,6 @@ namespace WallstopStudios.UnityHelpers.Tests
     {
         private float _currentTime;
 
-        private float TimeProvider()
-        {
-            return _currentTime;
-        }
-
         [SetUp]
         public void SetUp()
         {
@@ -237,6 +232,11 @@ namespace WallstopStudios.UnityHelpers.Tests
             bool foundNull = cache.TryGet("nullKey", out string nullValue);
 
             Assert.IsTrue(nullValue == null, "Value should be null when null was stored");
+        }
+
+        private float TimeProvider()
+        {
+            return _currentTime;
         }
     }
 
@@ -640,6 +640,18 @@ namespace WallstopStudios.UnityHelpers.Tests
     [NUnit.Framework.Category("Fast")]
     public sealed class ApiDocumentationTests
     {
+        private static string GetMethodAlternativeMessage(string methodName)
+        {
+            return methodName switch
+            {
+                "TryGetValue" => "Use TryGet instead.",
+                "Add" => "Use Set instead (it handles both add and update).",
+                "Remove" => "Use TryRemove instead.",
+                "Get" => "Use TryGet for safe retrieval or GetOrAdd for lazy loading.",
+                _ => string.Empty,
+            };
+        }
+
         /// <summary>
         /// Documents that JsonStringify is for string output.
         /// </summary>
@@ -810,18 +822,6 @@ namespace WallstopStudios.UnityHelpers.Tests
                         + GetMethodAlternativeMessage(methodName)
                 );
             }
-        }
-
-        private static string GetMethodAlternativeMessage(string methodName)
-        {
-            return methodName switch
-            {
-                "TryGetValue" => "Use TryGet instead.",
-                "Add" => "Use Set instead (it handles both add and update).",
-                "Remove" => "Use TryRemove instead.",
-                "Get" => "Use TryGet for safe retrieval or GetOrAdd for lazy loading.",
-                _ => string.Empty,
-            };
         }
 
         /// <summary>

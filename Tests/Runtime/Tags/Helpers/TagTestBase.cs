@@ -11,6 +11,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags.Helpers
 
     public abstract class TagsTestBase : AttributeTagsTestBase
     {
+        protected static void ClearAttributeUtilitiesCaches()
+        {
+            AttributeUtilities.AllAttributeNames = null;
+            AttributeUtilities.AttributeFields.Clear();
+        }
+
         protected GameObject CreateTrackedGameObject(string name, params Type[] componentTypes)
         {
             GameObject gameObject = Track(new GameObject(name));
@@ -43,12 +49,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags.Helpers
             effect.duration = 1f;
             configure?.Invoke(effect);
             return effect;
-        }
-
-        protected static void ClearAttributeUtilitiesCaches()
-        {
-            AttributeUtilities.AllAttributeNames = null;
-            AttributeUtilities.AttributeFields.Clear();
         }
     }
 }

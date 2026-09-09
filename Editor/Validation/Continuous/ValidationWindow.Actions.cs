@@ -42,27 +42,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
         }
 
-        private void WorkspaceChanged()
-        {
-            _lastCompletedRun = null;
-            Refresh();
-            RefreshRules();
-            RefreshSettings();
-        }
-
-        private void Say(string message, Action undo = null)
-        {
-            _status = message;
-            _undoAction = undo;
-            if (_toast == null)
-                _toast = Element(rootVisualElement, "sentinel-toast", "dx-row");
-            _toast.Clear();
-            AddLabel(_toast, message, "dx-grow");
-            if (undo != null)
-                _toast.Add(new Button(() => _undoAction?.Invoke()) { text = "Undo" });
-            _toast.Add(new Button(() => _toast.Clear()) { text = "×", tooltip = "Dismiss" });
-        }
-
         internal static string WithSuppression(
             string original,
             ValidationFinding finding,
@@ -89,6 +68,27 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 if (!string.Equals(line.Trim(), id, StringComparison.Ordinal))
                     remaining.Append(line).Append('\n');
             return remaining.ToString();
+        }
+
+        private void WorkspaceChanged()
+        {
+            _lastCompletedRun = null;
+            Refresh();
+            RefreshRules();
+            RefreshSettings();
+        }
+
+        private void Say(string message, Action undo = null)
+        {
+            _status = message;
+            _undoAction = undo;
+            if (_toast == null)
+                _toast = Element(rootVisualElement, "sentinel-toast", "dx-row");
+            _toast.Clear();
+            AddLabel(_toast, message, "dx-grow");
+            if (undo != null)
+                _toast.Add(new Button(() => _undoAction?.Invoke()) { text = "Undo" });
+            _toast.Add(new Button(() => _toast.Clear()) { text = "×", tooltip = "Dismiss" });
         }
 
         private void SetSuppressed(ValidationFinding finding, bool suppress)

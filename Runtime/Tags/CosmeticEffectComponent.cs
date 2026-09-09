@@ -68,27 +68,6 @@ namespace WallstopStudios.UnityHelpers.Tags
         protected readonly List<GameObject> _appliedTargets = new();
 
         /// <summary>
-        /// Cleanup method that removes the effect from all targets when this component is destroyed.
-        /// </summary>
-        protected virtual void OnDestroy()
-        {
-            if (_appliedTargets.Count <= 0)
-            {
-                return;
-            }
-
-            foreach (GameObject appliedTarget in _appliedTargets.ToArray())
-            {
-                if (appliedTarget == null)
-                {
-                    continue;
-                }
-
-                OnRemoveEffect(appliedTarget);
-            }
-        }
-
-        /// <summary>
         /// Called when the associated effect is applied to a target GameObject.
         /// Override this to implement custom behavior (e.g., play particles, show UI).
         /// </summary>
@@ -109,6 +88,27 @@ namespace WallstopStudios.UnityHelpers.Tags
             if (0 <= appliedIndex)
             {
                 _appliedTargets.RemoveAtSwapBack(appliedIndex);
+            }
+        }
+
+        /// <summary>
+        /// Cleanup method that removes the effect from all targets when this component is destroyed.
+        /// </summary>
+        protected virtual void OnDestroy()
+        {
+            if (_appliedTargets.Count <= 0)
+            {
+                return;
+            }
+
+            foreach (GameObject appliedTarget in _appliedTargets.ToArray())
+            {
+                if (appliedTarget == null)
+                {
+                    continue;
+                }
+
+                OnRemoveEffect(appliedTarget);
             }
         }
     }

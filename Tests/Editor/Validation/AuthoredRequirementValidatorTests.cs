@@ -21,6 +21,36 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     [TestFixture]
     public sealed class AuthoredRequirementValidatorTests
     {
+        private const string TestTypesFolder = "/TestTypes/";
+
+        private string _filled;
+        private string _empty;
+        private string _inherited;
+
+        private static string Describe(AuthoredRequirementFinding finding)
+        {
+            return $"{finding.FieldName}@{finding.LineNumber}";
+        }
+
+        private static List<AuthoredRequirementFinding> Scan(
+            string assetPath,
+            out int documentsInspected
+        )
+        {
+            List<AuthoredRequirementFinding> findings = new();
+            List<AuthoredRequirementExemption> exemptions = new();
+            Assert.IsTrue(
+                AuthoredRequirementValidator.TryScan(
+                    new[] { assetPath },
+                    findings,
+                    exemptions,
+                    out documentsInspected
+                )
+            );
+
+            return findings;
+        }
+
         [SetUp]
         public void ResolveFixturePaths()
         {
@@ -151,35 +181,5 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 )
             );
         }
-
-        private static string Describe(AuthoredRequirementFinding finding)
-        {
-            return $"{finding.FieldName}@{finding.LineNumber}";
-        }
-
-        private static List<AuthoredRequirementFinding> Scan(
-            string assetPath,
-            out int documentsInspected
-        )
-        {
-            List<AuthoredRequirementFinding> findings = new();
-            List<AuthoredRequirementExemption> exemptions = new();
-            Assert.IsTrue(
-                AuthoredRequirementValidator.TryScan(
-                    new[] { assetPath },
-                    findings,
-                    exemptions,
-                    out documentsInspected
-                )
-            );
-
-            return findings;
-        }
-
-        private const string TestTypesFolder = "/TestTypes/";
-
-        private string _filled;
-        private string _empty;
-        private string _inherited;
     }
 }

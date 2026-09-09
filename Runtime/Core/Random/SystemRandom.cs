@@ -106,44 +106,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             InitializeSeedArray(seed);
         }
 
-        private void InitializeSeedArray(int seed)
-        {
-            if (_seedArray == null || _seedArray.Length != SeedArraySize)
-            {
-                _seedArray = new int[SeedArraySize];
-            }
-
-            int num1 = 161803398 - (seed == int.MinValue ? int.MaxValue : Math.Abs(seed));
-            _seedArray[LastSeedIndex] = num1;
-            int num2 = 1;
-            for (int index1 = 1; index1 < LastSeedIndex; ++index1)
-            {
-                int index2 = 21 * index1 % LastSeedIndex;
-                _seedArray[index2] = num2;
-                num2 = num1 - num2;
-                if (num2 < 0)
-                {
-                    num2 += int.MaxValue;
-                }
-
-                num1 = _seedArray[index2];
-            }
-            for (int index3 = 1; index3 < 5; ++index3)
-            {
-                for (int index4 = 1; index4 < SeedArraySize; ++index4)
-                {
-                    int value = _seedArray[index4] -= _seedArray[1 + (index4 + 30) % LastSeedIndex];
-                    if (value < 0)
-                    {
-                        _seedArray[index4] += int.MaxValue;
-                    }
-                }
-            }
-
-            _inext = 0;
-            _inextp = 21;
-        }
-
         [JsonConstructor]
         public SystemRandom(RandomState internalState)
         {
@@ -157,45 +119,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 internalState._payload?.Length == SeedArraySize * sizeof(int)
                     ? ArrayConverter.ByteArrayToIntArrayBlockCopy(internalState._payload)
                     : null;
-            EnsureSeedArray();
-            EnsureValidIndices();
-        }
-
-        private void EnsureSeedArray()
-        {
-            if (_seedArray == null || _seedArray.Length != SeedArraySize)
-            {
-                InitializeSeedArray(0);
-                return;
-            }
-
-            for (int index = 1; index < _seedArray.Length; index++)
-            {
-                if (_seedArray[index] != 0)
-                {
-                    return;
-                }
-            }
-
-            InitializeSeedArray(0);
-        }
-
-        private void EnsureValidIndices()
-        {
-            if (_inext < 0 || LastSeedIndex < _inext)
-            {
-                _inext = 0;
-            }
-
-            int expectedInextp = (_inext + 20) % LastSeedIndex + 1;
-            if (_inextp != expectedInextp)
-            {
-                _inextp = expectedInextp;
-            }
-        }
-
-        protected override void OnAfterDeserialization()
-        {
             EnsureSeedArray();
             EnsureValidIndices();
         }
@@ -274,6 +197,83 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             SystemRandom copy = new(InternalState);
             Array.Copy(_seedArray, copy._seedArray, _seedArray.Length);
             return copy;
+        }
+
+        protected override void OnAfterDeserialization()
+        {
+            EnsureSeedArray();
+            EnsureValidIndices();
+        }
+
+        private void InitializeSeedArray(int seed)
+        {
+            if (_seedArray == null || _seedArray.Length != SeedArraySize)
+            {
+                _seedArray = new int[SeedArraySize];
+            }
+
+            int num1 = 161803398 - (seed == int.MinValue ? int.MaxValue : Math.Abs(seed));
+            _seedArray[LastSeedIndex] = num1;
+            int num2 = 1;
+            for (int index1 = 1; index1 < LastSeedIndex; ++index1)
+            {
+                int index2 = 21 * index1 % LastSeedIndex;
+                _seedArray[index2] = num2;
+                num2 = num1 - num2;
+                if (num2 < 0)
+                {
+                    num2 += int.MaxValue;
+                }
+
+                num1 = _seedArray[index2];
+            }
+            for (int index3 = 1; index3 < 5; ++index3)
+            {
+                for (int index4 = 1; index4 < SeedArraySize; ++index4)
+                {
+                    int value = _seedArray[index4] -= _seedArray[1 + (index4 + 30) % LastSeedIndex];
+                    if (value < 0)
+                    {
+                        _seedArray[index4] += int.MaxValue;
+                    }
+                }
+            }
+
+            _inext = 0;
+            _inextp = 21;
+        }
+
+        private void EnsureSeedArray()
+        {
+            if (_seedArray == null || _seedArray.Length != SeedArraySize)
+            {
+                InitializeSeedArray(0);
+                return;
+            }
+
+            for (int index = 1; index < _seedArray.Length; index++)
+            {
+                if (_seedArray[index] != 0)
+                {
+                    return;
+                }
+            }
+
+            InitializeSeedArray(0);
+        }
+
+        private void EnsureValidIndices()
+        {
+            if (_inext < 0 || LastSeedIndex < _inext)
+            {
+                _inext = 0;
+            }
+
+            int expectedInextp = (_inext + 20) % LastSeedIndex + 1;
+            if (_inextp != expectedInextp)
+            {
+                _inextp = expectedInextp;
+            }
         }
     }
 }

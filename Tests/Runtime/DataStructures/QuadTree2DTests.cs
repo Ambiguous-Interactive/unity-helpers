@@ -18,19 +18,14 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         // Reseed each test so a failing tree can be reproduced alone or within the fixture.
         private const uint RandomSeed = 0x5EED0202;
 
-        private IRandom _random = new PcgRandom(RandomSeed);
-
         private IRandom Random => _random;
+
+        private IRandom _random = new PcgRandom(RandomSeed);
 
         [SetUp]
         public void SeedQuadTree2DRandom()
         {
             _random = new PcgRandom(RandomSeed);
-        }
-
-        protected override QuadTree2D<Vector2> CreateTree(IEnumerable<Vector2> points)
-        {
-            return new QuadTree2D<Vector2>(points, _ => _);
         }
 
         [Test]
@@ -721,6 +716,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             tree.GetElementsInBounds(new Bounds(Vector3.zero, Vector3.one * 10), results);
             Assert.IsTrue(results.All(v => points.Contains(v)));
+        }
+
+        protected override QuadTree2D<Vector2> CreateTree(IEnumerable<Vector2> points)
+        {
+            return new QuadTree2D<Vector2>(points, _ => _);
         }
     }
 }

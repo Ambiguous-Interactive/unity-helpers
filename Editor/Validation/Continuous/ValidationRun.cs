@@ -35,6 +35,38 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         private static readonly IValidationRule[] NoRules = Array.Empty<IValidationRule>();
         private static readonly ValidationTarget[] NoTargets = Array.Empty<ValidationTarget>();
 
+        /// <summary>How many assets this run will consider.</summary>
+        public int TotalCount => _targets.Length;
+
+        /// <summary>
+        /// The assets this run considers, invalid entries already dropped.
+        /// </summary>
+        /// <remarks>
+        /// Published because <see cref="Findings"/> cannot answer "which assets were checked": a
+        /// clean asset produces none, and it is precisely the clean ones whose stale results have
+        /// to be cleared when a scoped re-check folds into a store.
+        /// </remarks>
+        public IReadOnlyList<ValidationTarget> Targets => _targets;
+
+        /// <summary>How many assets it has considered so far.</summary>
+        public int ProcessedCount => _nextTarget;
+
+        /// <summary>
+        /// Whether every asset has been considered, or the run was cancelled.
+        /// </summary>
+        public bool IsComplete => _cancelled || _targets.Length <= _nextTarget;
+
+        /// <summary>Whether <see cref="Cancel"/> ended the run before it finished.</summary>
+        public bool IsCancelled => _cancelled;
+
+        /// <summary>Everything the rules have found so far, in the order it was reported.</summary>
+        public IReadOnlyList<ValidationFinding> Findings => _findings;
+
+        /// <summary>
+        /// Everything that threw, and the asset it threw on -- a rule, or the asset's own load.
+        /// </summary>
+        public IReadOnlyList<ValidationRuleFailure> Failures => _failures;
+
         private readonly IValidationRule[] _rules;
         private readonly ValidationTarget[] _targets;
         private readonly Func<ValidationTarget, Object> _loader;
@@ -76,37 +108,64 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             _loader = loader ?? LoadMainAsset;
         }
 
-        /// <summary>How many assets this run will consider.</summary>
-        public int TotalCount => _targets.Length;
+        private static string RuleIdOf(IValidationRule rule)
+        {
+            // Reserve an empty rule ID for loader failures.
+            try
+            {
+                string declared = rule.RuleId;
+                return string.IsNullOrEmpty(declared) ? rule.GetType().FullName : declared;
+            }
+            catch (Exception)
+            {
+                return rule.GetType().FullName;
+            }
+        }
 
-        /// <summary>
-        /// The assets this run considers, invalid entries already dropped.
-        /// </summary>
-        /// <remarks>
-        /// Published because <see cref="Findings"/> cannot answer "which assets were checked": a
-        /// clean asset produces none, and it is precisely the clean ones whose stale results have
-        /// to be cleared when a scoped re-check folds into a store.
-        /// </remarks>
-        public IReadOnlyList<ValidationTarget> Targets => _targets;
+        private static Object LoadMainAsset(ValidationTarget target)
+        {
+            return AssetDatabase.LoadMainAssetAtPath(target.AssetPath);
+        }
 
-        /// <summary>How many assets it has considered so far.</summary>
-        public int ProcessedCount => _nextTarget;
+        private static IValidationRule[] Compact(IReadOnlyList<IValidationRule> rules)
+        {
+            if (rules == null)
+            {
+                return NoRules;
+            }
 
-        /// <summary>
-        /// Whether every asset has been considered, or the run was cancelled.
-        /// </summary>
-        public bool IsComplete => _cancelled || _targets.Length <= _nextTarget;
+            List<IValidationRule> kept = new List<IValidationRule>(rules.Count);
+            for (int index = 0; index < rules.Count; index++)
+            {
+                IValidationRule rule = rules[index];
+                if (rule != null)
+                {
+                    kept.Add(rule);
+                }
+            }
 
-        /// <summary>Whether <see cref="Cancel"/> ended the run before it finished.</summary>
-        public bool IsCancelled => _cancelled;
+            return kept.Count == 0 ? NoRules : kept.ToArray();
+        }
 
-        /// <summary>Everything the rules have found so far, in the order it was reported.</summary>
-        public IReadOnlyList<ValidationFinding> Findings => _findings;
+        private static ValidationTarget[] Compact(IReadOnlyList<ValidationTarget> targets)
+        {
+            if (targets == null)
+            {
+                return NoTargets;
+            }
 
-        /// <summary>
-        /// Everything that threw, and the asset it threw on -- a rule, or the asset's own load.
-        /// </summary>
-        public IReadOnlyList<ValidationRuleFailure> Failures => _failures;
+            List<ValidationTarget> kept = new List<ValidationTarget>(targets.Count);
+            for (int index = 0; index < targets.Count; index++)
+            {
+                ValidationTarget target = targets[index];
+                if (target.IsValid())
+                {
+                    kept.Add(target);
+                }
+            }
+
+            return kept.Count == 0 ? NoTargets : kept.ToArray();
+        }
 
         /// <summary>
         /// Advances the run for up to <paramref name="budgetMilliseconds"/> of wall time.
@@ -212,65 +271,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
 
             _findings.AddRange(_scratch);
-        }
-
-        private static string RuleIdOf(IValidationRule rule)
-        {
-            // Reserve an empty rule ID for loader failures.
-            try
-            {
-                string declared = rule.RuleId;
-                return string.IsNullOrEmpty(declared) ? rule.GetType().FullName : declared;
-            }
-            catch (Exception)
-            {
-                return rule.GetType().FullName;
-            }
-        }
-
-        private static Object LoadMainAsset(ValidationTarget target)
-        {
-            return AssetDatabase.LoadMainAssetAtPath(target.AssetPath);
-        }
-
-        private static IValidationRule[] Compact(IReadOnlyList<IValidationRule> rules)
-        {
-            if (rules == null)
-            {
-                return NoRules;
-            }
-
-            List<IValidationRule> kept = new List<IValidationRule>(rules.Count);
-            for (int index = 0; index < rules.Count; index++)
-            {
-                IValidationRule rule = rules[index];
-                if (rule != null)
-                {
-                    kept.Add(rule);
-                }
-            }
-
-            return kept.Count == 0 ? NoRules : kept.ToArray();
-        }
-
-        private static ValidationTarget[] Compact(IReadOnlyList<ValidationTarget> targets)
-        {
-            if (targets == null)
-            {
-                return NoTargets;
-            }
-
-            List<ValidationTarget> kept = new List<ValidationTarget>(targets.Count);
-            for (int index = 0; index < targets.Count; index++)
-            {
-                ValidationTarget target = targets[index];
-                if (target.IsValid())
-                {
-                    kept.Add(target);
-                }
-            }
-
-            return kept.Count == 0 ? NoTargets : kept.ToArray();
         }
     }
 #endif

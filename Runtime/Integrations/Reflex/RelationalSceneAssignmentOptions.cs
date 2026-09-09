@@ -14,54 +14,9 @@ namespace WallstopStudios.UnityHelpers.Integrations.Reflex
         : IEquatable<RelationalSceneAssignmentOptions>
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="RelationalSceneAssignmentOptions"/> struct.
-        /// </summary>
-        /// <param name="includeInactive">
-        /// When true, relational assignment scans include inactive GameObjects. Defaults to true.
-        /// </param>
-        /// <param name="useSinglePassScan">
-        /// When true, performs a single-pass scan for relational types to maximize performance.
-        /// Defaults to true.
-        /// </param>
-        public RelationalSceneAssignmentOptions(bool includeInactive, bool useSinglePassScan = true)
-        {
-            IncludeInactive = includeInactive;
-            UseSinglePassScan = useSinglePassScan;
-        }
-
-        /// <summary>
         /// Gets default options (include inactive objects, single-pass scan).
         /// </summary>
         public static RelationalSceneAssignmentOptions Default => new(true, true);
-
-        /// <summary>
-        /// Gets whether inactive GameObjects are included during scans.
-        /// </summary>
-        public bool IncludeInactive { get; }
-
-        /// <summary>
-        /// Gets whether to use a single-pass scan strategy.
-        /// </summary>
-        public bool UseSinglePassScan { get; }
-
-        /// <inheritdoc />
-        public bool Equals(RelationalSceneAssignmentOptions other)
-        {
-            return IncludeInactive == other.IncludeInactive
-                && UseSinglePassScan == other.UseSinglePassScan;
-        }
-
-        /// <inheritdoc />
-        public override bool Equals(object obj)
-        {
-            return obj is RelationalSceneAssignmentOptions other && Equals(other);
-        }
-
-        /// <inheritdoc />
-        public override int GetHashCode()
-        {
-            return Objects.HashCode(IncludeInactive, UseSinglePassScan);
-        }
 
         /// <summary>
         /// Equality operator.
@@ -83,6 +38,51 @@ namespace WallstopStudios.UnityHelpers.Integrations.Reflex
         )
         {
             return !left.Equals(right);
+        }
+
+        /// <summary>
+        /// Gets whether inactive GameObjects are included during scans.
+        /// </summary>
+        public bool IncludeInactive { get; }
+
+        /// <summary>
+        /// Gets whether to use a single-pass scan strategy.
+        /// </summary>
+        public bool UseSinglePassScan { get; }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="RelationalSceneAssignmentOptions"/> struct.
+        /// </summary>
+        /// <param name="includeInactive">
+        /// When true, relational assignment scans include inactive GameObjects. Defaults to true.
+        /// </param>
+        /// <param name="useSinglePassScan">
+        /// When true, performs a single-pass scan for relational types to maximize performance.
+        /// Defaults to true.
+        /// </param>
+        public RelationalSceneAssignmentOptions(bool includeInactive, bool useSinglePassScan = true)
+        {
+            IncludeInactive = includeInactive;
+            UseSinglePassScan = useSinglePassScan;
+        }
+
+        /// <inheritdoc />
+        public bool Equals(RelationalSceneAssignmentOptions other)
+        {
+            return IncludeInactive == other.IncludeInactive
+                && UseSinglePassScan == other.UseSinglePassScan;
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            return obj is RelationalSceneAssignmentOptions other && Equals(other);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return Objects.HashCode(IncludeInactive, UseSinglePassScan);
         }
     }
 }

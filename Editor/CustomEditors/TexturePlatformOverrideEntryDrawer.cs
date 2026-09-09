@@ -13,10 +13,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
     [CustomPropertyDrawer(typeof(TextureSettingsApplierWindow.PlatformOverrideEntry))]
     public sealed class TexturePlatformOverrideEntryDrawer : PropertyDrawer
     {
-        private static string[] _cachedChoices;
-        private static string[] _lastKnownRef;
         private const string CustomOptionLabel = "Custom";
         private const string MixedValueIndicator = "\u2014";
+
+        private static string[] _cachedChoices;
+        private static string[] _lastKnownRef;
 
         private static string[] GetChoices()
         {
@@ -35,6 +36,74 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
             _lastKnownRef = known;
             _cachedChoices = arr;
             return _cachedChoices;
+        }
+
+        private static float LineCount(
+            SerializedProperty property,
+            string applyName,
+            bool includeValue
+        )
+        {
+            float h = EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
+            SerializedProperty apply = property.FindPropertyRelative(applyName);
+            if (apply.boolValue && includeValue)
+            {
+                h += EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
+            }
+            return h;
+        }
+
+        private static void DrawToggleWithValue(
+            SerializedProperty property,
+            ref Rect r,
+            string applyName,
+            string valueName,
+            string label
+        )
+        {
+            SerializedProperty apply = property.FindPropertyRelative(applyName);
+            SerializedProperty val = property.FindPropertyRelative(valueName);
+
+            r.y += r.height + EditorGUIUtility.standardVerticalSpacing;
+            bool previousMixed = EditorGUI.showMixedValue;
+            EditorGUI.showMixedValue = apply.hasMultipleDifferentValues;
+            EditorGUI.BeginChangeCheck();
+            bool newApplyValue = EditorGUI.ToggleLeft(r, label, apply.boolValue);
+            if (EditorGUI.EndChangeCheck())
+            {
+                apply.boolValue = newApplyValue;
+            }
+            EditorGUI.showMixedValue = previousMixed;
+            if (apply.boolValue)
+            {
+                r.y += r.height + EditorGUIUtility.standardVerticalSpacing;
+                using (IndentLevelScope.Indent())
+                {
+                    EditorGUI.PropertyField(r, val, GUIContent.none);
+                }
+            }
+        }
+
+        private static int GetSelectedIndex(string name, string[] choices)
+        {
+            if (name == null)
+            {
+                return 0;
+            }
+
+            if (name.Length == 0)
+            {
+                return choices.Length - 1; // Empty string means Custom (user explicitly selected Custom)
+            }
+
+            for (int i = 0; i < choices.Length - 1; i++)
+            {
+                if (choices[i] == name)
+                {
+                    return i;
+                }
+            }
+            return choices.Length - 1; // Unknown platform treated as Custom
         }
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
@@ -58,21 +127,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
             h += LineCount(property, PlatformPropertyNames.ApplyFormat, true);
             h += LineCount(property, PlatformPropertyNames.ApplyCompression, true);
             h += LineCount(property, PlatformPropertyNames.ApplyCrunchCompression, true);
-            return h;
-        }
-
-        private static float LineCount(
-            SerializedProperty property,
-            string applyName,
-            bool includeValue
-        )
-        {
-            float h = EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
-            SerializedProperty apply = property.FindPropertyRelative(applyName);
-            if (apply.boolValue && includeValue)
-            {
-                h += EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
-            }
             return h;
         }
 
@@ -197,59 +251,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
             );
 
             EditorGUI.EndProperty();
-        }
-
-        private static void DrawToggleWithValue(
-            SerializedProperty property,
-            ref Rect r,
-            string applyName,
-            string valueName,
-            string label
-        )
-        {
-            SerializedProperty apply = property.FindPropertyRelative(applyName);
-            SerializedProperty val = property.FindPropertyRelative(valueName);
-
-            r.y += r.height + EditorGUIUtility.standardVerticalSpacing;
-            bool previousMixed = EditorGUI.showMixedValue;
-            EditorGUI.showMixedValue = apply.hasMultipleDifferentValues;
-            EditorGUI.BeginChangeCheck();
-            bool newApplyValue = EditorGUI.ToggleLeft(r, label, apply.boolValue);
-            if (EditorGUI.EndChangeCheck())
-            {
-                apply.boolValue = newApplyValue;
-            }
-            EditorGUI.showMixedValue = previousMixed;
-            if (apply.boolValue)
-            {
-                r.y += r.height + EditorGUIUtility.standardVerticalSpacing;
-                using (IndentLevelScope.Indent())
-                {
-                    EditorGUI.PropertyField(r, val, GUIContent.none);
-                }
-            }
-        }
-
-        private static int GetSelectedIndex(string name, string[] choices)
-        {
-            if (name == null)
-            {
-                return 0;
-            }
-
-            if (name.Length == 0)
-            {
-                return choices.Length - 1; // Empty string means Custom (user explicitly selected Custom)
-            }
-
-            for (int i = 0; i < choices.Length - 1; i++)
-            {
-                if (choices[i] == name)
-                {
-                    return i;
-                }
-            }
-            return choices.Length - 1; // Unknown platform treated as Custom
         }
     }
 #endif

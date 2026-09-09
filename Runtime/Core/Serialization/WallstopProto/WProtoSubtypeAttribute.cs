@@ -50,6 +50,20 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
     public sealed class WProtoSubtypeAttribute : Attribute
     {
+        /// <summary>The immediate base contract this type may be written as.</summary>
+        public Type BaseType { get; }
+
+        /// <summary>
+        /// The field number carrying this subtype on the base message, or <c>0</c> when the manifest
+        /// supplies it.
+        /// </summary>
+        public int Tag { get; }
+
+        /// <summary>
+        /// Whether the declaration states its own field number rather than taking the manifest's.
+        /// </summary>
+        public bool HasTag { get; }
+
         /// <summary>
         /// Initializes the attribute with the base type and this subtype's field number on it.
         /// </summary>
@@ -78,19 +92,5 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             Tag = 0;
             HasTag = false;
         }
-
-        /// <summary>The immediate base contract this type may be written as.</summary>
-        public Type BaseType { get; }
-
-        /// <summary>
-        /// The field number carrying this subtype on the base message, or <c>0</c> when the manifest
-        /// supplies it.
-        /// </summary>
-        public int Tag { get; }
-
-        /// <summary>
-        /// Whether the declaration states its own field number rather than taking the manifest's.
-        /// </summary>
-        public bool HasTag { get; }
     }
 }

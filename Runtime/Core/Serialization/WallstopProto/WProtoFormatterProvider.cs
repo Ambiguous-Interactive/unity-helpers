@@ -103,14 +103,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             return formatter != null;
         }
 
-        private static void ThrowIfReplacementConflict<T>()
-        {
-            if (Cache<T>.Conflict != null)
-            {
-                throw new InvalidOperationException(Cache<T>.Conflict);
-            }
-        }
-
         /// <summary>
         /// Indicates whether a formatter is registered for <typeparamref name="T"/>.
         /// </summary>
@@ -205,6 +197,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     + "serialized at all, the value reaching here is the bug: mark the type "
                     + "[WProtoNotSerialized] and WPROTO044 will refuse the next one at build time."
             );
+        }
+
+        private static void ThrowIfReplacementConflict<T>()
+        {
+            if (Cache<T>.Conflict != null)
+            {
+                throw new InvalidOperationException(Cache<T>.Conflict);
+            }
         }
 
         private static class Cache<T>

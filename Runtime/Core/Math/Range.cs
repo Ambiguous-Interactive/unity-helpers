@@ -28,6 +28,22 @@ namespace WallstopStudios.UnityHelpers.Core.Math
     public partial struct Range<T> : IEquatable<Range<T>>, IComparable<Range<T>>
         where T : IEquatable<T>, IComparable<T>
     {
+        public static bool operator ==(Range<T> left, Range<T> right) => left.Equals(right);
+
+        public static bool operator !=(Range<T> left, Range<T> right) => !left.Equals(right);
+
+        [JsonIgnore]
+        public readonly T Min => min;
+
+        [JsonIgnore]
+        public readonly T Max => max;
+
+        [JsonIgnore]
+        public readonly bool StartInclusive => startInclusive;
+
+        [JsonIgnore]
+        public readonly bool EndInclusive => endInclusive;
+
         [DataMember]
         [JsonInclude]
         [ProtoMember(1)]
@@ -52,18 +68,6 @@ namespace WallstopStudios.UnityHelpers.Core.Math
         [WProtoMember(4)]
         public bool endInclusive;
 
-        [JsonIgnore]
-        public readonly T Min => min;
-
-        [JsonIgnore]
-        public readonly T Max => max;
-
-        [JsonIgnore]
-        public readonly bool StartInclusive => startInclusive;
-
-        [JsonIgnore]
-        public readonly bool EndInclusive => endInclusive;
-
         [JsonConstructor]
         public Range(T min, T max, bool startInclusive = true, bool endInclusive = true)
         {
@@ -76,6 +80,14 @@ namespace WallstopStudios.UnityHelpers.Core.Math
             this.startInclusive = startInclusive;
             this.endInclusive = endInclusive;
         }
+
+        public static Range<T> Inclusive(T min, T max) => new(min, max, true, true);
+
+        public static Range<T> Exclusive(T min, T max) => new(min, max, false, false);
+
+        public static Range<T> InclusiveExclusive(T min, T max) => new(min, max, true, false);
+
+        public static Range<T> ExclusiveInclusive(T min, T max) => new(min, max, false, true);
 
         public bool Equals(Range<T> other)
         {
@@ -176,17 +188,5 @@ namespace WallstopStudios.UnityHelpers.Core.Math
             int startToEnd = min.CompareTo(other.max);
             return startToEnd < 0 || (startToEnd == 0 && startInclusive && other.endInclusive);
         }
-
-        public static Range<T> Inclusive(T min, T max) => new(min, max, true, true);
-
-        public static Range<T> Exclusive(T min, T max) => new(min, max, false, false);
-
-        public static Range<T> InclusiveExclusive(T min, T max) => new(min, max, true, false);
-
-        public static Range<T> ExclusiveInclusive(T min, T max) => new(min, max, false, true);
-
-        public static bool operator ==(Range<T> left, Range<T> right) => left.Equals(right);
-
-        public static bool operator !=(Range<T> left, Range<T> right) => !left.Equals(right);
     }
 }

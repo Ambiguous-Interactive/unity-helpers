@@ -32,6 +32,58 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             return deserialized;
         }
 
+        private static IEnumerable<TestCaseData> DictionaryProtoArraysTestCases()
+        {
+            yield return new TestCaseData(new[] { "single" }, new[] { 1 }).SetName("SingleEntry");
+            yield return new TestCaseData(
+                new[] { "a", "b", "c", "d" },
+                new[] { 1, 2, 3, 4 }
+            ).SetName("MultipleEntries");
+            yield return new TestCaseData(new[] { "empty_value_test" }, new[] { 0 }).SetName(
+                "ZeroValue"
+            );
+            yield return new TestCaseData(new[] { "negative" }, new[] { -100 }).SetName(
+                "NegativeValue"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> HashSetProtoItemsArrayTestCases()
+        {
+            yield return new TestCaseData(new[] { 1 }).SetName("SingleElement");
+            yield return new TestCaseData(new[] { 5, 3, 8, 1, 9 }).SetName(
+                "MultipleElements.Unordered"
+            );
+            yield return new TestCaseData(new[] { 1, 2, 3, 4, 5 }).SetName(
+                "MultipleElements.Ascending"
+            );
+            yield return new TestCaseData(new[] { 5, 4, 3, 2, 1 }).SetName(
+                "MultipleElements.Descending"
+            );
+            yield return new TestCaseData(new[] { 0, -1, 1, -100, 100 }).SetName(
+                "MixedPositiveNegative"
+            );
+            yield return new TestCaseData(new[] { int.MaxValue, int.MinValue, 0 }).SetName(
+                "ExtremeBoundaryValues"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> SortedSetProtoItemsArrayTestCases()
+        {
+            yield return new TestCaseData(new[] { 42 }).SetName("SingleElement");
+            yield return new TestCaseData(new[] { 5, 3, 8, 1, 9 }).SetName(
+                "MultipleElements.Unordered"
+            );
+            yield return new TestCaseData(new[] { 1, 2, 3, 4, 5 }).SetName(
+                "MultipleElements.Ascending"
+            );
+            yield return new TestCaseData(new[] { 5, 4, 3, 2, 1 }).SetName(
+                "MultipleElements.Descending"
+            );
+            yield return new TestCaseData(new[] { 0, -1, 1, -100, 100 }).SetName(
+                "MixedPositiveNegative"
+            );
+        }
+
         [Test]
         public void CyclicBufferSerializesAndDeserializes()
         {
@@ -311,21 +363,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 original._values,
                 deserialized._values,
                 "Values should contain the same elements"
-            );
-        }
-
-        private static IEnumerable<TestCaseData> DictionaryProtoArraysTestCases()
-        {
-            yield return new TestCaseData(new[] { "single" }, new[] { 1 }).SetName("SingleEntry");
-            yield return new TestCaseData(
-                new[] { "a", "b", "c", "d" },
-                new[] { 1, 2, 3, 4 }
-            ).SetName("MultipleEntries");
-            yield return new TestCaseData(new[] { "empty_value_test" }, new[] { 0 }).SetName(
-                "ZeroValue"
-            );
-            yield return new TestCaseData(new[] { "negative" }, new[] { -100 }).SetName(
-                "NegativeValue"
             );
         }
 
@@ -1039,26 +1076,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
         }
 
-        private static IEnumerable<TestCaseData> HashSetProtoItemsArrayTestCases()
-        {
-            yield return new TestCaseData(new[] { 1 }).SetName("SingleElement");
-            yield return new TestCaseData(new[] { 5, 3, 8, 1, 9 }).SetName(
-                "MultipleElements.Unordered"
-            );
-            yield return new TestCaseData(new[] { 1, 2, 3, 4, 5 }).SetName(
-                "MultipleElements.Ascending"
-            );
-            yield return new TestCaseData(new[] { 5, 4, 3, 2, 1 }).SetName(
-                "MultipleElements.Descending"
-            );
-            yield return new TestCaseData(new[] { 0, -1, 1, -100, 100 }).SetName(
-                "MixedPositiveNegative"
-            );
-            yield return new TestCaseData(new[] { int.MaxValue, int.MinValue, 0 }).SetName(
-                "ExtremeBoundaryValues"
-            );
-        }
-
         [TestCaseSource(nameof(HashSetProtoItemsArrayTestCases))]
         public void SerializableHashSetProtoDeserializationRestoresItemsArrayDataDriven(int[] items)
         {
@@ -1241,23 +1258,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 original._items,
                 deserialized._items,
                 "Items should contain the same elements"
-            );
-        }
-
-        private static IEnumerable<TestCaseData> SortedSetProtoItemsArrayTestCases()
-        {
-            yield return new TestCaseData(new[] { 42 }).SetName("SingleElement");
-            yield return new TestCaseData(new[] { 5, 3, 8, 1, 9 }).SetName(
-                "MultipleElements.Unordered"
-            );
-            yield return new TestCaseData(new[] { 1, 2, 3, 4, 5 }).SetName(
-                "MultipleElements.Ascending"
-            );
-            yield return new TestCaseData(new[] { 5, 4, 3, 2, 1 }).SetName(
-                "MultipleElements.Descending"
-            );
-            yield return new TestCaseData(new[] { 0, -1, 1, -100, 100 }).SetName(
-                "MixedPositiveNegative"
             );
         }
 

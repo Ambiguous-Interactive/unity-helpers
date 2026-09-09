@@ -12,6 +12,8 @@ namespace UnityEngine.UI
 {
     public struct ColorBlock
     {
+        public static ColorBlock defaultColorBlock => default;
+
         public Color normalColor;
         public Color highlightedColor;
         public Color pressedColor;
@@ -19,7 +21,5 @@ namespace UnityEngine.UI
         public Color disabledColor;
         public float colorMultiplier;
         public float fadeDuration;
-
-        public static ColorBlock defaultColorBlock => default;
     }
 }

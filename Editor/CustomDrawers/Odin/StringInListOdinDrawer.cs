@@ -23,6 +23,30 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
     /// </remarks>
     public sealed class StringInListOdinDrawer : OdinAttributeDrawer<StringInListAttribute>
     {
+        private static string[] GetDisplayOptions(string[] options, StringInListAttribute attribute)
+        {
+            if (IsSerializableTypeProvider(attribute))
+            {
+                string[] names = SerializableTypeCatalog.GetDisplayNames();
+                if (names != null && names.Length == options.Length)
+                {
+                    return names;
+                }
+            }
+
+            return options;
+        }
+
+        private static bool IsSerializableTypeProvider(StringInListAttribute attribute)
+        {
+            return attribute?.ProviderType == typeof(SerializableTypeCatalog)
+                && string.Equals(
+                    attribute.ProviderMethodName,
+                    nameof(SerializableTypeCatalog.GetAssemblyQualifiedNames),
+                    StringComparison.Ordinal
+                );
+        }
+
         /// <summary>
         /// Draws the property as a dropdown selector with the string options provided by the attribute.
         /// </summary>
@@ -304,30 +328,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 resolvedType = Type.GetType(assemblyQualifiedName, throwOnError: false);
             }
             Property.ValueEntry.WeakSmartValue = new SerializableType(resolvedType);
-        }
-
-        private static string[] GetDisplayOptions(string[] options, StringInListAttribute attribute)
-        {
-            if (IsSerializableTypeProvider(attribute))
-            {
-                string[] names = SerializableTypeCatalog.GetDisplayNames();
-                if (names != null && names.Length == options.Length)
-                {
-                    return names;
-                }
-            }
-
-            return options;
-        }
-
-        private static bool IsSerializableTypeProvider(StringInListAttribute attribute)
-        {
-            return attribute?.ProviderType == typeof(SerializableTypeCatalog)
-                && string.Equals(
-                    attribute.ProviderMethodName,
-                    nameof(SerializableTypeCatalog.GetAssemblyQualifiedNames),
-                    StringComparison.Ordinal
-                );
         }
     }
 #endif

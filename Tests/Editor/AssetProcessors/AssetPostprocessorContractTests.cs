@@ -41,6 +41,10 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     [Category("Contract")]
     public sealed class AssetPostprocessorContractTests
     {
+        private const string DeferralCallExpression = "AssetPostprocessorDeferral.Schedule(";
+
+        private const string FlushCallExpression = "AssetPostprocessorDeferral.FlushForTesting(";
+
         private static readonly string[] EditorAssemblyNames =
         {
             "WallstopStudios.UnityHelpers.Editor",
@@ -96,8 +100,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             "\\bInstantiate\\s*\\(",
             RegexOptions.Compiled | RegexOptions.CultureInvariant
         );
-
-        private const string DeferralCallExpression = "AssetPostprocessorDeferral.Schedule(";
 
         /*
             CommonOneTime lifecycle overrides use package names instead of NUnit names and must obey the same
@@ -173,8 +175,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             "ClearTestState(",
         };
 
-        private const string FlushCallExpression = "AssetPostprocessorDeferral.FlushForTesting(";
-
         // These helpers drain internally, so an additional explicit flush would be redundant.
         private static readonly string[] FlushEquivalentExpressions =
         {
@@ -183,295 +183,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             "AssetPostprocessorTestHandlers.AssertCleanAndClearAll(",
             "ClearTestState(",
         };
-
-        [Test]
-        public void AllAssetPostprocessorCallbacksAvoidForbiddenSynchronousApis()
-        {
-            Type[] processorTypes = DiscoverEditorAssetPostprocessorTypes();
-            Assert.IsNotEmpty(
-                processorTypes,
-                "Expected at least one AssetPostprocessor in the editor assembly."
-            );
-
-            List<string> failures = new();
-            foreach (Type processorType in processorTypes)
-            {
-                IReadOnlyList<string> sourcePaths = ResolveSourcePaths(processorType);
-                if (sourcePaths.Count == 0)
-                {
-                    failures.Add(
-                        $"[{processorType.FullName}] could not locate source (.cs) for method-body scan. "
-                            + "Verify the file lives under Editor/AssetProcessors/ or the package path."
-                    );
-                    continue;
-                }
-
-                IReadOnlyList<MethodInfo> inspected = FindInspectedCallbacks(processorType);
-                if (inspected.Count == 0)
-                {
-                    continue;
-                }
-
-                foreach (MethodInfo method in inspected)
-                {
-                    MethodBodySearchResult result = TryExtractBodyAcrossFiles(
-                        sourcePaths,
-                        method.Name
-                    );
-                    if (result.Status == BodySearchStatus.NotFound)
-                    {
-                        failures.Add(
-                            $"[{processorType.FullName}.{method.Name}] body not found across {sourcePaths.Count} candidate file(s): "
-                                + string.Join(", ", EnumerableSelect(sourcePaths, Path.GetFileName))
-                                + ". Place the override directly in a file whose name matches the type, "
-                                + "or add the filename to the contract test's search roots."
-                        );
-                        continue;
-                    }
-
-                    if (result.Status == BodySearchStatus.ReadError)
-                    {
-                        failures.Add(
-                            $"[{processorType.FullName}.{method.Name}] failed to read candidate source: {result.Detail}"
-                        );
-                        continue;
-                    }
-
-                    string stripped = StripDeferralSchedules(result.Body);
-                    List<string> firedTokens = FindForbiddenTokens(stripped);
-                    if (0 < firedTokens.Count)
-                    {
-                        StringBuilder message = new();
-                        message
-                            .Append('[')
-                            .Append(processorType.FullName)
-                            .Append('.')
-                            .Append(method.Name)
-                            .Append("] contains forbidden tokens: ")
-                            .AppendLine(string.Join(", ", firedTokens));
-                        message.AppendLine(
-                            "Route these calls through AssetPostprocessorDeferral.Schedule(...) "
-                                + "so they run outside Unity's asset-import phase."
-                        );
-                        message.Append("Source file: ").Append(result.SourcePath);
-                        failures.Add(message.ToString());
-                    }
-                }
-            }
-
-            if (0 < failures.Count)
-            {
-                Assert.Fail(string.Join("\n\n", failures));
-            }
-        }
-
-        /// <summary>
-        /// Source-scan contract: any test method that clears a handler test double
-        /// must also drain pending <see cref="AssetPostprocessor"/> deferrals in the
-        /// same body. Accepted as flush-equivalent (see
-        /// <c>FlushEquivalentExpressions</c>):
-        /// <list type="bullet">
-        /// <item><description>A direct
-        /// <c>AssetPostprocessorDeferral.FlushForTesting()</c> call.</description></item>
-        /// <item><description>A call to one of the centralized helpers known to
-        /// flush internally before clearing:
-        /// <c>AssetPostprocessorTestHandlers.FlushAndClearAll</c>,
-        /// <c>AssetPostprocessorTestHandlers.AssertCleanAndClearAll</c>, or
-        /// <c>ClearTestState</c> (whether called as <c>ClearTestState()</c> or
-        /// <c>base.ClearTestState()</c> — both resolve to the single definition
-        /// on <c>DetectAssetChangeTestBase</c>, which itself satisfies the
-        /// contract).</description></item>
-        /// </list>
-        /// Chaining to <c>base.*</c> without naming one of these is NOT
-        /// sufficient, because an arbitrary base method may or may not flush and
-        /// the scanner cannot follow the indirection. The whitelist above is
-        /// maintained in tandem with the helpers' implementations — if a helper
-        /// stops flushing internally, it must be removed from the whitelist (and
-        /// the tree-wide audit test <see cref="CentralizedClearHelpersActuallyFlush"/>
-        /// fails-loudly if that invariant is broken).
-        ///
-        /// Without the flush, a deferred drain scheduled by a prior asset operation
-        /// fires between tests and re-populates the statics we just cleared,
-        /// producing flaky "test pollution detected" failures in the next test's
-        /// setup.
-        /// </summary>
-        [Test]
-        public void TestTeardownsThatClearHandlerStateFlushDeferralsFirst()
-        {
-            string testsRoot = ResolveEditorTestsRoot();
-            if (string.IsNullOrEmpty(testsRoot))
-            {
-                Assert.Inconclusive(
-                    "Could not locate Tests/Editor/ on disk; skipping the teardown-flush contract."
-                );
-                return;
-            }
-
-            string[] testFiles;
-            try
-            {
-                testFiles = Directory.GetFiles(testsRoot, "*.cs", SearchOption.AllDirectories);
-            }
-            catch (Exception ex)
-                when (ex is not OutOfMemoryException and not StackOverflowException)
-            {
-                Assert.Inconclusive(
-                    $"Failed to enumerate {testsRoot}: {ex.Message}. Skipping the teardown-flush contract."
-                );
-                return;
-            }
-
-            List<string> failures = new();
-            foreach (string path in testFiles)
-            {
-                string fileName = Path.GetFileName(path);
-                if (IsContractTestSelf(fileName))
-                {
-                    continue;
-                }
-
-                if (!TryReadSource(path, fileName, failures, out string source))
-                {
-                    continue;
-                }
-
-                foreach (string methodName in TeardownMethodNames)
-                {
-                    string body = ExtractMethodBody(source, methodName);
-                    if (body == null)
-                    {
-                        continue;
-                    }
-
-                    if (!ContainsHandlerClear(body))
-                    {
-                        continue;
-                    }
-
-                    if (ContainsDirectFlush(body))
-                    {
-                        continue;
-                    }
-
-                    failures.Add(
-                        $"[{fileName}:{methodName}] clears handler state (via Test*Handler.Clear(), "
-                            + "AssetPostprocessorTestHandlers.FlushAndClearAll(), "
-                            + "AssetPostprocessorTestHandlers.AssertCleanAndClearAll(), or ClearTestState()) "
-                            + "without either (a) a direct "
-                            + $"{FlushCallExpression}) call, or (b) a call to one of the flush-equivalent "
-                            + "helpers (FlushAndClearAll / AssertCleanAndClearAll / ClearTestState), in the "
-                            + "same method body. A call through 'base.' is accepted only when the called "
-                            + "name matches one of the whitelisted helpers — so 'base.ClearTestState()' IS "
-                            + "accepted (ClearTestState(' is in the whitelist) but 'base.SomeOtherHelper()' "
-                            + "is NOT, because the scanner cannot follow the indirection to confirm the "
-                            + "base method flushes. Either call one of the whitelisted helpers directly, "
-                            + $"or add an explicit {FlushCallExpression}) call right before the clear."
-                    );
-                }
-            }
-
-            if (0 < failures.Count)
-            {
-                Assert.Fail(string.Join("\n\n", failures));
-            }
-        }
-
-        /// <summary>
-        /// Source-scan contract: any <c>OneTimeSetUp</c> / <c>OneTimeTearDown</c>
-        /// that performs an asset mutation (CreateAsset, DeleteAsset, Refresh,
-        /// ImportAsset, CreateFolder, SaveAndRefreshIfNotBatching,
-        /// RefreshIfNotBatching) must end with a DIRECT
-        /// <c>AssetPostprocessorDeferral.FlushForTesting()</c> call so drains
-        /// scheduled by those mutations do not leak into the next fixture.
-        /// Chaining to <c>base.&lt;method&gt;(</c> is NOT sufficient — the base
-        /// may or may not flush, and the indirection produces false negatives
-        /// identical to the teardown-flush contract's reasoning. Every author
-        /// whose OneTime* method mutates assets must pay the one-line cost of
-        /// an explicit flush, matching the stricter rule already enforced for
-        /// per-test teardowns that clear handler state.
-        ///
-        /// Scoped to test files that already interact with asset postprocessors
-        /// (the gate tokens in <see cref="AssetContextTokens"/>) so non-asset
-        /// fixtures aren't forced to flush.
-        /// </summary>
-        [Test]
-        public void OneTimeLifecycleMethodsWithAssetMutationsFlushDeferrals()
-        {
-            string testsRoot = ResolveEditorTestsRoot();
-            if (string.IsNullOrEmpty(testsRoot))
-            {
-                Assert.Inconclusive(
-                    "Could not locate Tests/Editor/ on disk; skipping the OneTime flush contract."
-                );
-                return;
-            }
-
-            string[] testFiles;
-            try
-            {
-                testFiles = Directory.GetFiles(testsRoot, "*.cs", SearchOption.AllDirectories);
-            }
-            catch (Exception ex)
-                when (ex is not OutOfMemoryException and not StackOverflowException)
-            {
-                Assert.Inconclusive(
-                    $"Failed to enumerate {testsRoot}: {ex.Message}. Skipping the OneTime flush contract."
-                );
-                return;
-            }
-
-            List<string> failures = new();
-            foreach (string path in testFiles)
-            {
-                string fileName = Path.GetFileName(path);
-                if (IsContractTestSelf(fileName))
-                {
-                    continue;
-                }
-
-                if (!TryReadSource(path, fileName, failures, out string source))
-                {
-                    continue;
-                }
-
-                if (!FileIsInAssetContext(source))
-                {
-                    continue;
-                }
-
-                foreach (string methodName in OneTimeLifecycleMethodNames)
-                {
-                    string body = ExtractMethodBody(source, methodName);
-                    if (body == null)
-                    {
-                        continue;
-                    }
-
-                    if (!ContainsAssetMutation(body))
-                    {
-                        continue;
-                    }
-
-                    if (ContainsDirectFlush(body))
-                    {
-                        continue;
-                    }
-
-                    failures.Add(
-                        $"[{fileName}:{methodName}] performs asset mutations but does not contain a direct "
-                            + $"{FlushCallExpression}) call in the same method body. "
-                            + "Chaining to base.* is not accepted — the base may or may not flush, "
-                            + "and the indirection hides regressions that leak drains into the next fixture. "
-                            + $"Add an explicit {FlushCallExpression}) call after the asset operations."
-                    );
-                }
-            }
-
-            if (0 < failures.Count)
-            {
-                Assert.Fail(string.Join("\n\n", failures));
-            }
-        }
 
         /// <summary>
         /// Source-scan audit: the centralized helpers whitelisted as
@@ -523,87 +234,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 }
             ),
         };
-
-        [Test]
-        public void CentralizedClearHelpersActuallyFlush()
-        {
-            (string FileName, string MethodName)[] terminalTargets = CentralizedTerminalTargets;
-            (string FileName, string MethodName, string[] AcceptedDelegates)[] delegatingTargets =
-                CentralizedDelegatingTargets;
-
-            string testsRoot = ResolveEditorTestsRoot();
-            if (string.IsNullOrEmpty(testsRoot))
-            {
-                Assert.Inconclusive(
-                    "Could not locate Tests/Editor/ on disk; skipping the centralized-helper flush audit."
-                );
-                return;
-            }
-
-            List<string> failures = new();
-            foreach ((string FileName, string MethodName) terminalTargetsElement in terminalTargets)
-            {
-                (string fileName, string methodName) = terminalTargetsElement;
-                string body = LoadSingleMethodBody(testsRoot, fileName, methodName, failures);
-                if (body == null)
-                {
-                    continue;
-                }
-
-                if (IndexOfOutsideLiteral(body, FlushCallExpression, 0) < 0)
-                {
-                    failures.Add(
-                        $"[{fileName}:{methodName}] is a TERMINAL centralized helper but its body does "
-                            + $"not contain a direct {FlushCallExpression}) call. The teardown-flush "
-                            + "contract relies on this helper being the flush root; remove it from "
-                            + "FlushEquivalentExpressions in AssetPostprocessorContractTests if the "
-                            + "helper is no longer intended to flush."
-                    );
-                }
-            }
-
-            foreach (
-                (
-                    string FileName,
-                    string MethodName,
-                    string[] AcceptedDelegates
-                ) delegatingTargetsElement in delegatingTargets
-            )
-            {
-                (string fileName, string methodName, string[] accepted) = delegatingTargetsElement;
-                string body = LoadSingleMethodBody(testsRoot, fileName, methodName, failures);
-                if (body == null)
-                {
-                    continue;
-                }
-
-                bool satisfied = false;
-                foreach (string acceptedElement in accepted)
-                {
-                    if (0 <= IndexOfOutsideLiteral(body, acceptedElement, 0))
-                    {
-                        satisfied = true;
-                        break;
-                    }
-                }
-
-                if (!satisfied)
-                {
-                    failures.Add(
-                        $"[{fileName}:{methodName}] is a DELEGATING centralized helper but its body "
-                            + "does not call any accepted flush root ("
-                            + string.Join(", ", accepted)
-                            + "). Route the method through one of these, or remove it from "
-                            + "FlushEquivalentExpressions in AssetPostprocessorContractTests."
-                    );
-                }
-            }
-
-            if (0 < failures.Count)
-            {
-                Assert.Fail(string.Join("\n\n", failures));
-            }
-        }
 
         private static string LoadSingleMethodBody(
             string testsRoot,
@@ -661,109 +291,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             return body;
         }
 
-        /// <summary>
-        /// Consistency audit: every helper whitelisted in
-        /// <see cref="FlushEquivalentExpressions"/> (other than the direct flush
-        /// expression itself) must appear in exactly one of
-        /// <see cref="CentralizedTerminalTargets"/> or
-        /// <see cref="CentralizedDelegatingTargets"/>, so the audit test
-        /// <c>CentralizedClearHelpersActuallyFlush</c> actually guards every
-        /// accepted helper. Without this cross-check, a future author can add a
-        /// new accepted helper to <c>FlushEquivalentExpressions</c> and forget
-        /// to register it with the audit — and the new helper's flush behavior
-        /// then has no regression test.
-        /// </summary>
-        [Test]
-        public void FlushEquivalentExpressionsAreFullyCoveredByCentralizedAudit()
-        {
-            List<string> failures = new();
-            foreach (string expression in FlushEquivalentExpressions)
-            {
-                if (string.Equals(expression, FlushCallExpression, StringComparison.Ordinal))
-                {
-                    // A direct flush has no helper implementation to audit.
-                    continue;
-                }
-
-                string methodName = ExtractMethodNameFromExpression(expression);
-                if (methodName == null)
-                {
-                    failures.Add(
-                        $"FlushEquivalentExpressions contains '{expression}' which does not "
-                            + "look like a method-call token (expected 'Name(' or 'Type.Name(')."
-                    );
-                    continue;
-                }
-
-                int terminalMatches = 0;
-                foreach (
-                    (
-                        string FileName,
-                        string MethodName
-                    ) centralizedTerminalTargetsElement in CentralizedTerminalTargets
-                )
-                {
-                    if (
-                        string.Equals(
-                            centralizedTerminalTargetsElement.MethodName,
-                            methodName,
-                            StringComparison.Ordinal
-                        )
-                    )
-                    {
-                        terminalMatches++;
-                    }
-                }
-
-                int delegatingMatches = 0;
-                foreach (
-                    (
-                        string FileName,
-                        string MethodName,
-                        string[] AcceptedDelegates
-                    ) centralizedDelegatingTargetsElement in CentralizedDelegatingTargets
-                )
-                {
-                    if (
-                        string.Equals(
-                            centralizedDelegatingTargetsElement.MethodName,
-                            methodName,
-                            StringComparison.Ordinal
-                        )
-                    )
-                    {
-                        delegatingMatches++;
-                    }
-                }
-
-                int total = terminalMatches + delegatingMatches;
-                if (total == 0)
-                {
-                    failures.Add(
-                        $"FlushEquivalentExpressions contains '{expression}' but no entry in "
-                            + "CentralizedTerminalTargets / CentralizedDelegatingTargets audits "
-                            + "it. Add the helper to the appropriate tier so the audit test "
-                            + "CentralizedClearHelpersActuallyFlush verifies its flush behavior."
-                    );
-                }
-                else if (1 < total)
-                {
-                    failures.Add(
-                        $"FlushEquivalentExpressions contains '{expression}' and it matches "
-                            + $"{total} entries across the terminal + delegating audit tables "
-                            + "(expected exactly 1). Consolidate the audit entry so each helper "
-                            + "is classified as either a terminal or a delegating flush root, "
-                            + "not both."
-                    );
-                }
-            }
-
-            if (0 < failures.Count)
-            {
-                Assert.Fail(string.Join("\n\n", failures));
-            }
-        }
-
         private static string ExtractMethodNameFromExpression(string expression)
         {
             if (
@@ -776,283 +303,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             string withoutParen = expression.Substring(0, expression.Length - 1);
             int lastDot = withoutParen.LastIndexOf('.');
             return lastDot < 0 ? withoutParen : withoutParen.Substring(lastDot + 1);
-        }
-
-        /// <summary>
-        /// Tripwire-coverage contract: every test fixture in
-        /// <c>Tests/Editor/AssetProcessors/</c> that registers a <c>[SetUp]</c>
-        /// method (or overrides <c>BaseSetUp</c>) and passes the
-        /// <see cref="FileIsInAssetContext"/> gate must call
-        /// <c>AssetPostprocessorTestHandlers.AssertCleanAndClearAll(</c> in that
-        /// body. The call pins cross-fixture handler-static pollution to its
-        /// true source rather than rolling it forward invisibly — see the
-        /// canonical rationale on <c>AssertCleanAndClearAll</c>'s XML doc.
-        ///
-        /// Without this contract, future asset-processor fixtures can silently
-        /// omit the tripwire (as happened with <c>LlmArtifactCleanerTests</c>
-        /// before round 9 of the #234 review caught it). Scoped to asset-context
-        /// files so unrelated fixtures aren't forced to call the helper.
-        /// </summary>
-        [Test]
-        public void AssetContextFixturesCallCrossFixturePollutionTripwire()
-        {
-            string testsRoot = ResolveEditorTestsRoot();
-            if (string.IsNullOrEmpty(testsRoot))
-            {
-                Assert.Inconclusive(
-                    "Could not locate Tests/Editor/ on disk; skipping the tripwire-coverage contract."
-                );
-                return;
-            }
-
-            string[] testFiles;
-            try
-            {
-                testFiles = Directory.GetFiles(testsRoot, "*.cs", SearchOption.AllDirectories);
-            }
-            catch (Exception ex)
-                when (ex is not OutOfMemoryException and not StackOverflowException)
-            {
-                Assert.Inconclusive(
-                    $"Failed to enumerate {testsRoot}: {ex.Message}. Skipping the tripwire-coverage contract."
-                );
-                return;
-            }
-
-            const string TripwireCall = "AssetPostprocessorTestHandlers.AssertCleanAndClearAll(";
-            const string BaseSetUpCall = "base.BaseSetUp(";
-            const string TestAttributeToken = "[Test]";
-            /*
-                Deferral-internal tests do not touch handler statics; processor fixtures whose assets reach
-                handlers still need the pollution check.
-            */
-            string[] handlerInvolvementTokens =
-            {
-                "AssetPostprocessorTestHandlers",
-                "DetectAssetChanged",
-                "DetectAssetChangeProcessor",
-                "LlmArtifactCleaner",
-                "SpriteLabelProcessor",
-            };
-
-            List<string> failures = new();
-            foreach (string path in testFiles)
-            {
-                string fileName = Path.GetFileName(path);
-                if (IsContractTestSelf(fileName))
-                {
-                    continue;
-                }
-
-                if (!TryReadSource(path, fileName, failures, out string source))
-                {
-                    continue;
-                }
-
-                if (!FileIsInAssetContext(source))
-                {
-                    continue;
-                }
-
-                if (source.IndexOf(TestAttributeToken, StringComparison.Ordinal) < 0)
-                {
-                    continue;
-                }
-
-                // Deferral-only fixtures have no handler-static pollution for this check to observe.
-                bool handlerInvolved = false;
-                foreach (string handlerInvolvementTokensElement in handlerInvolvementTokens)
-                {
-                    if (
-                        0
-                        <= source.IndexOf(handlerInvolvementTokensElement, StringComparison.Ordinal)
-                    )
-                    {
-                        handlerInvolved = true;
-                        break;
-                    }
-                }
-
-                if (!handlerInvolved)
-                {
-                    continue;
-                }
-
-                // Accept both per-test SetUp and inherited BaseSetUp conventions.
-                int tripwireIndex = IndexOfOutsideLiteral(source, TripwireCall, 0);
-                if (tripwireIndex < 0)
-                {
-                    failures.Add(
-                        $"[{fileName}] is an asset-context test fixture that interacts with "
-                            + "handler statics but does not call "
-                            + "AssetPostprocessorTestHandlers.AssertCleanAndClearAll() anywhere. "
-                            + "Add the call so it precedes base.BaseSetUp( — or anywhere in the "
-                            + "fixture's [SetUp] / BaseSetUp body if no base chain exists — so "
-                            + "cross-fixture handler-state pollution is pinned to its true source. "
-                            + "See AssertCleanAndClearAll's XML doc for the canonical rationale."
-                    );
-                    continue;
-                }
-
-                /*
-                    Check pollution before base setup can change attribution, ignoring base-call text inside
-                    literals and comments.
-                */
-                int baseSetUpIndex = IndexOfOutsideLiteral(source, BaseSetUpCall, 0);
-                if (0 <= baseSetUpIndex && baseSetUpIndex < tripwireIndex)
-                {
-                    failures.Add(
-                        $"[{fileName}] calls AssetPostprocessorTestHandlers.AssertCleanAndClearAll() "
-                            + "AFTER base.BaseSetUp(). The tripwire must precede base.BaseSetUp( so "
-                            + "prior-fixture pollution is snapshotted before the base class performs "
-                            + "any configuration that could shift attribution. Move the "
-                            + "AssetPostprocessorTestHandlers.AssertCleanAndClearAll() call to "
-                            + "precede base.BaseSetUp()."
-                    );
-                }
-            }
-
-            if (0 < failures.Count)
-            {
-                Assert.Fail(string.Join("\n\n", failures));
-            }
-        }
-
-        /// <summary>
-        /// Reflection contract: every type in the test assemblies that declares at
-        /// least one method with <see cref="DetectAssetChangedAttribute"/> must also
-        /// expose a <c>public static void Clear()</c> method so the centralized
-        /// helper can clear its state. Without this, a future author who adds a new
-        /// handler without a Clear() would silently create a new cross-fixture
-        /// pollution vector.
-        /// </summary>
-        [Test]
-        public void AllTestHandlerDoublesExposeClearMethod()
-        {
-            TypeCache.MethodCollection methods =
-                TypeCache.GetMethodsWithAttribute<DetectAssetChangedAttribute>();
-
-            HashSet<Type> candidateTypes = new();
-            foreach (MethodInfo method in methods)
-            {
-                if (method == null)
-                {
-                    continue;
-                }
-
-                Type declaringType = method.DeclaringType;
-                if (declaringType == null)
-                {
-                    continue;
-                }
-
-                Assembly assembly = declaringType.Assembly;
-                if (assembly == null)
-                {
-                    continue;
-                }
-
-                string assemblyName = assembly.GetName().Name;
-                if (
-                    string.IsNullOrEmpty(assemblyName)
-                    || !assemblyName.StartsWith(
-                        "WallstopStudios.UnityHelpers.Tests",
-                        StringComparison.Ordinal
-                    )
-                )
-                {
-                    continue;
-                }
-
-                candidateTypes.Add(declaringType);
-            }
-
-            List<string> offenders = new();
-            foreach (Type type in candidateTypes)
-            {
-                MethodInfo clearMethod = type.GetMethod(
-                    "Clear",
-                    BindingFlags.Public | BindingFlags.Static,
-                    binder: null,
-                    types: Type.EmptyTypes,
-                    modifiers: null
-                );
-                if (clearMethod == null || clearMethod.ReturnType != typeof(void))
-                {
-                    offenders.Add(type.FullName);
-                }
-            }
-
-            if (0 < offenders.Count)
-            {
-                Assert.Fail(
-                    "The following test handler types declare [DetectAssetChanged] methods but "
-                        + "do not expose a `public static void Clear()` method:\n"
-                        + string.Join("\n", offenders.Select(o => $"  - {o}"))
-                        + "\nAdd a Clear() method so the centralized AssetPostprocessorTestHandlers "
-                        + "helper can clear their state and prevent cross-fixture pollution."
-                );
-            }
-        }
-
-        /// <summary>
-        /// Cross-check that the centralized discovery logic (in
-        /// <c>AssetPostprocessorTestHandlers</c>) has not silently dropped any of the
-        /// known-good handler types — e.g. due to an assembly-name filter that is too
-        /// narrow. The expected set below is derived from the current test assemblies;
-        /// if a future change legitimately renames or removes one of these, update
-        /// this test in the same commit.
-        /// </summary>
-        [Test]
-        public void AssetPostprocessorTestHandlersCoversAllDiscoveredTypes()
-        {
-            IReadOnlyList<Type> discovered = AssetPostprocessorTestHandlers.DiscoveredHandlerTypes;
-            Assert.IsNotEmpty(
-                discovered,
-                "AssetPostprocessorTestHandlers.DiscoveredHandlerTypes returned empty. "
-                    + "TypeCache may not have found any [DetectAssetChanged] methods in the test assemblies."
-            );
-
-            string[] expectedTypeNames =
-            {
-                "TestPrefabAssetChangeHandler",
-                "TestSceneAssetChangeHandler",
-                "TestNestedPrefabHandler",
-                "TestCombinedSearchHandler",
-                "TestDetectAssetChangeHandler",
-                "TestDetailedSignatureHandler",
-                "TestStaticAssetChangeHandler",
-                "TestMultiAttributeHandler",
-                "TestReentrantHandler",
-                "TestLoopingHandler",
-                "TestAssignableAssetChangeHandler",
-                "TestExceptionThrowingHandler",
-            };
-
-            HashSet<string> discoveredNames = new(StringComparer.Ordinal);
-            for (int i = 0; i < discovered.Count; i++)
-            {
-                discoveredNames.Add(discovered[i].Name);
-            }
-
-            List<string> missing = new();
-            foreach (string expectedTypeNamesElement in expectedTypeNames)
-            {
-                if (!discoveredNames.Contains(expectedTypeNamesElement))
-                {
-                    missing.Add(expectedTypeNamesElement);
-                }
-            }
-
-            if (0 < missing.Count)
-            {
-                Assert.Fail(
-                    "AssetPostprocessorTestHandlers.DiscoveredHandlerTypes is missing expected handlers:\n"
-                        + string.Join("\n", missing.Select(m => $"  - {m}"))
-                        + "\nCheck the discovery filter (e.g. assembly-name prefix, Clear() method filter). "
-                        + "If a handler was intentionally renamed or removed, update this test in the same commit."
-                );
-            }
         }
 
         private static string ResolveEditorTestsRoot()
@@ -1883,6 +1133,756 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             }
 
             return fired;
+        }
+
+        [Test]
+        public void AllAssetPostprocessorCallbacksAvoidForbiddenSynchronousApis()
+        {
+            Type[] processorTypes = DiscoverEditorAssetPostprocessorTypes();
+            Assert.IsNotEmpty(
+                processorTypes,
+                "Expected at least one AssetPostprocessor in the editor assembly."
+            );
+
+            List<string> failures = new();
+            foreach (Type processorType in processorTypes)
+            {
+                IReadOnlyList<string> sourcePaths = ResolveSourcePaths(processorType);
+                if (sourcePaths.Count == 0)
+                {
+                    failures.Add(
+                        $"[{processorType.FullName}] could not locate source (.cs) for method-body scan. "
+                            + "Verify the file lives under Editor/AssetProcessors/ or the package path."
+                    );
+                    continue;
+                }
+
+                IReadOnlyList<MethodInfo> inspected = FindInspectedCallbacks(processorType);
+                if (inspected.Count == 0)
+                {
+                    continue;
+                }
+
+                foreach (MethodInfo method in inspected)
+                {
+                    MethodBodySearchResult result = TryExtractBodyAcrossFiles(
+                        sourcePaths,
+                        method.Name
+                    );
+                    if (result.Status == BodySearchStatus.NotFound)
+                    {
+                        failures.Add(
+                            $"[{processorType.FullName}.{method.Name}] body not found across {sourcePaths.Count} candidate file(s): "
+                                + string.Join(", ", EnumerableSelect(sourcePaths, Path.GetFileName))
+                                + ". Place the override directly in a file whose name matches the type, "
+                                + "or add the filename to the contract test's search roots."
+                        );
+                        continue;
+                    }
+
+                    if (result.Status == BodySearchStatus.ReadError)
+                    {
+                        failures.Add(
+                            $"[{processorType.FullName}.{method.Name}] failed to read candidate source: {result.Detail}"
+                        );
+                        continue;
+                    }
+
+                    string stripped = StripDeferralSchedules(result.Body);
+                    List<string> firedTokens = FindForbiddenTokens(stripped);
+                    if (0 < firedTokens.Count)
+                    {
+                        StringBuilder message = new();
+                        message
+                            .Append('[')
+                            .Append(processorType.FullName)
+                            .Append('.')
+                            .Append(method.Name)
+                            .Append("] contains forbidden tokens: ")
+                            .AppendLine(string.Join(", ", firedTokens));
+                        message.AppendLine(
+                            "Route these calls through AssetPostprocessorDeferral.Schedule(...) "
+                                + "so they run outside Unity's asset-import phase."
+                        );
+                        message.Append("Source file: ").Append(result.SourcePath);
+                        failures.Add(message.ToString());
+                    }
+                }
+            }
+
+            if (0 < failures.Count)
+            {
+                Assert.Fail(string.Join("\n\n", failures));
+            }
+        }
+
+        /// <summary>
+        /// Source-scan contract: any test method that clears a handler test double
+        /// must also drain pending <see cref="AssetPostprocessor"/> deferrals in the
+        /// same body. Accepted as flush-equivalent (see
+        /// <c>FlushEquivalentExpressions</c>):
+        /// <list type="bullet">
+        /// <item><description>A direct
+        /// <c>AssetPostprocessorDeferral.FlushForTesting()</c> call.</description></item>
+        /// <item><description>A call to one of the centralized helpers known to
+        /// flush internally before clearing:
+        /// <c>AssetPostprocessorTestHandlers.FlushAndClearAll</c>,
+        /// <c>AssetPostprocessorTestHandlers.AssertCleanAndClearAll</c>, or
+        /// <c>ClearTestState</c> (whether called as <c>ClearTestState()</c> or
+        /// <c>base.ClearTestState()</c> — both resolve to the single definition
+        /// on <c>DetectAssetChangeTestBase</c>, which itself satisfies the
+        /// contract).</description></item>
+        /// </list>
+        /// Chaining to <c>base.*</c> without naming one of these is NOT
+        /// sufficient, because an arbitrary base method may or may not flush and
+        /// the scanner cannot follow the indirection. The whitelist above is
+        /// maintained in tandem with the helpers' implementations — if a helper
+        /// stops flushing internally, it must be removed from the whitelist (and
+        /// the tree-wide audit test <see cref="CentralizedClearHelpersActuallyFlush"/>
+        /// fails-loudly if that invariant is broken).
+        ///
+        /// Without the flush, a deferred drain scheduled by a prior asset operation
+        /// fires between tests and re-populates the statics we just cleared,
+        /// producing flaky "test pollution detected" failures in the next test's
+        /// setup.
+        /// </summary>
+        [Test]
+        public void TestTeardownsThatClearHandlerStateFlushDeferralsFirst()
+        {
+            string testsRoot = ResolveEditorTestsRoot();
+            if (string.IsNullOrEmpty(testsRoot))
+            {
+                Assert.Inconclusive(
+                    "Could not locate Tests/Editor/ on disk; skipping the teardown-flush contract."
+                );
+                return;
+            }
+
+            string[] testFiles;
+            try
+            {
+                testFiles = Directory.GetFiles(testsRoot, "*.cs", SearchOption.AllDirectories);
+            }
+            catch (Exception ex)
+                when (ex is not OutOfMemoryException and not StackOverflowException)
+            {
+                Assert.Inconclusive(
+                    $"Failed to enumerate {testsRoot}: {ex.Message}. Skipping the teardown-flush contract."
+                );
+                return;
+            }
+
+            List<string> failures = new();
+            foreach (string path in testFiles)
+            {
+                string fileName = Path.GetFileName(path);
+                if (IsContractTestSelf(fileName))
+                {
+                    continue;
+                }
+
+                if (!TryReadSource(path, fileName, failures, out string source))
+                {
+                    continue;
+                }
+
+                foreach (string methodName in TeardownMethodNames)
+                {
+                    string body = ExtractMethodBody(source, methodName);
+                    if (body == null)
+                    {
+                        continue;
+                    }
+
+                    if (!ContainsHandlerClear(body))
+                    {
+                        continue;
+                    }
+
+                    if (ContainsDirectFlush(body))
+                    {
+                        continue;
+                    }
+
+                    failures.Add(
+                        $"[{fileName}:{methodName}] clears handler state (via Test*Handler.Clear(), "
+                            + "AssetPostprocessorTestHandlers.FlushAndClearAll(), "
+                            + "AssetPostprocessorTestHandlers.AssertCleanAndClearAll(), or ClearTestState()) "
+                            + "without either (a) a direct "
+                            + $"{FlushCallExpression}) call, or (b) a call to one of the flush-equivalent "
+                            + "helpers (FlushAndClearAll / AssertCleanAndClearAll / ClearTestState), in the "
+                            + "same method body. A call through 'base.' is accepted only when the called "
+                            + "name matches one of the whitelisted helpers — so 'base.ClearTestState()' IS "
+                            + "accepted (ClearTestState(' is in the whitelist) but 'base.SomeOtherHelper()' "
+                            + "is NOT, because the scanner cannot follow the indirection to confirm the "
+                            + "base method flushes. Either call one of the whitelisted helpers directly, "
+                            + $"or add an explicit {FlushCallExpression}) call right before the clear."
+                    );
+                }
+            }
+
+            if (0 < failures.Count)
+            {
+                Assert.Fail(string.Join("\n\n", failures));
+            }
+        }
+
+        /// <summary>
+        /// Source-scan contract: any <c>OneTimeSetUp</c> / <c>OneTimeTearDown</c>
+        /// that performs an asset mutation (CreateAsset, DeleteAsset, Refresh,
+        /// ImportAsset, CreateFolder, SaveAndRefreshIfNotBatching,
+        /// RefreshIfNotBatching) must end with a DIRECT
+        /// <c>AssetPostprocessorDeferral.FlushForTesting()</c> call so drains
+        /// scheduled by those mutations do not leak into the next fixture.
+        /// Chaining to <c>base.&lt;method&gt;(</c> is NOT sufficient — the base
+        /// may or may not flush, and the indirection produces false negatives
+        /// identical to the teardown-flush contract's reasoning. Every author
+        /// whose OneTime* method mutates assets must pay the one-line cost of
+        /// an explicit flush, matching the stricter rule already enforced for
+        /// per-test teardowns that clear handler state.
+        ///
+        /// Scoped to test files that already interact with asset postprocessors
+        /// (the gate tokens in <see cref="AssetContextTokens"/>) so non-asset
+        /// fixtures aren't forced to flush.
+        /// </summary>
+        [Test]
+        public void OneTimeLifecycleMethodsWithAssetMutationsFlushDeferrals()
+        {
+            string testsRoot = ResolveEditorTestsRoot();
+            if (string.IsNullOrEmpty(testsRoot))
+            {
+                Assert.Inconclusive(
+                    "Could not locate Tests/Editor/ on disk; skipping the OneTime flush contract."
+                );
+                return;
+            }
+
+            string[] testFiles;
+            try
+            {
+                testFiles = Directory.GetFiles(testsRoot, "*.cs", SearchOption.AllDirectories);
+            }
+            catch (Exception ex)
+                when (ex is not OutOfMemoryException and not StackOverflowException)
+            {
+                Assert.Inconclusive(
+                    $"Failed to enumerate {testsRoot}: {ex.Message}. Skipping the OneTime flush contract."
+                );
+                return;
+            }
+
+            List<string> failures = new();
+            foreach (string path in testFiles)
+            {
+                string fileName = Path.GetFileName(path);
+                if (IsContractTestSelf(fileName))
+                {
+                    continue;
+                }
+
+                if (!TryReadSource(path, fileName, failures, out string source))
+                {
+                    continue;
+                }
+
+                if (!FileIsInAssetContext(source))
+                {
+                    continue;
+                }
+
+                foreach (string methodName in OneTimeLifecycleMethodNames)
+                {
+                    string body = ExtractMethodBody(source, methodName);
+                    if (body == null)
+                    {
+                        continue;
+                    }
+
+                    if (!ContainsAssetMutation(body))
+                    {
+                        continue;
+                    }
+
+                    if (ContainsDirectFlush(body))
+                    {
+                        continue;
+                    }
+
+                    failures.Add(
+                        $"[{fileName}:{methodName}] performs asset mutations but does not contain a direct "
+                            + $"{FlushCallExpression}) call in the same method body. "
+                            + "Chaining to base.* is not accepted — the base may or may not flush, "
+                            + "and the indirection hides regressions that leak drains into the next fixture. "
+                            + $"Add an explicit {FlushCallExpression}) call after the asset operations."
+                    );
+                }
+            }
+
+            if (0 < failures.Count)
+            {
+                Assert.Fail(string.Join("\n\n", failures));
+            }
+        }
+
+        [Test]
+        public void CentralizedClearHelpersActuallyFlush()
+        {
+            (string FileName, string MethodName)[] terminalTargets = CentralizedTerminalTargets;
+            (string FileName, string MethodName, string[] AcceptedDelegates)[] delegatingTargets =
+                CentralizedDelegatingTargets;
+
+            string testsRoot = ResolveEditorTestsRoot();
+            if (string.IsNullOrEmpty(testsRoot))
+            {
+                Assert.Inconclusive(
+                    "Could not locate Tests/Editor/ on disk; skipping the centralized-helper flush audit."
+                );
+                return;
+            }
+
+            List<string> failures = new();
+            foreach ((string FileName, string MethodName) terminalTargetsElement in terminalTargets)
+            {
+                (string fileName, string methodName) = terminalTargetsElement;
+                string body = LoadSingleMethodBody(testsRoot, fileName, methodName, failures);
+                if (body == null)
+                {
+                    continue;
+                }
+
+                if (IndexOfOutsideLiteral(body, FlushCallExpression, 0) < 0)
+                {
+                    failures.Add(
+                        $"[{fileName}:{methodName}] is a TERMINAL centralized helper but its body does "
+                            + $"not contain a direct {FlushCallExpression}) call. The teardown-flush "
+                            + "contract relies on this helper being the flush root; remove it from "
+                            + "FlushEquivalentExpressions in AssetPostprocessorContractTests if the "
+                            + "helper is no longer intended to flush."
+                    );
+                }
+            }
+
+            foreach (
+                (
+                    string FileName,
+                    string MethodName,
+                    string[] AcceptedDelegates
+                ) delegatingTargetsElement in delegatingTargets
+            )
+            {
+                (string fileName, string methodName, string[] accepted) = delegatingTargetsElement;
+                string body = LoadSingleMethodBody(testsRoot, fileName, methodName, failures);
+                if (body == null)
+                {
+                    continue;
+                }
+
+                bool satisfied = false;
+                foreach (string acceptedElement in accepted)
+                {
+                    if (0 <= IndexOfOutsideLiteral(body, acceptedElement, 0))
+                    {
+                        satisfied = true;
+                        break;
+                    }
+                }
+
+                if (!satisfied)
+                {
+                    failures.Add(
+                        $"[{fileName}:{methodName}] is a DELEGATING centralized helper but its body "
+                            + "does not call any accepted flush root ("
+                            + string.Join(", ", accepted)
+                            + "). Route the method through one of these, or remove it from "
+                            + "FlushEquivalentExpressions in AssetPostprocessorContractTests."
+                    );
+                }
+            }
+
+            if (0 < failures.Count)
+            {
+                Assert.Fail(string.Join("\n\n", failures));
+            }
+        }
+
+        /// <summary>
+        /// Consistency audit: every helper whitelisted in
+        /// <see cref="FlushEquivalentExpressions"/> (other than the direct flush
+        /// expression itself) must appear in exactly one of
+        /// <see cref="CentralizedTerminalTargets"/> or
+        /// <see cref="CentralizedDelegatingTargets"/>, so the audit test
+        /// <c>CentralizedClearHelpersActuallyFlush</c> actually guards every
+        /// accepted helper. Without this cross-check, a future author can add a
+        /// new accepted helper to <c>FlushEquivalentExpressions</c> and forget
+        /// to register it with the audit — and the new helper's flush behavior
+        /// then has no regression test.
+        /// </summary>
+        [Test]
+        public void FlushEquivalentExpressionsAreFullyCoveredByCentralizedAudit()
+        {
+            List<string> failures = new();
+            foreach (string expression in FlushEquivalentExpressions)
+            {
+                if (string.Equals(expression, FlushCallExpression, StringComparison.Ordinal))
+                {
+                    // A direct flush has no helper implementation to audit.
+                    continue;
+                }
+
+                string methodName = ExtractMethodNameFromExpression(expression);
+                if (methodName == null)
+                {
+                    failures.Add(
+                        $"FlushEquivalentExpressions contains '{expression}' which does not "
+                            + "look like a method-call token (expected 'Name(' or 'Type.Name(')."
+                    );
+                    continue;
+                }
+
+                int terminalMatches = 0;
+                foreach (
+                    (
+                        string FileName,
+                        string MethodName
+                    ) centralizedTerminalTargetsElement in CentralizedTerminalTargets
+                )
+                {
+                    if (
+                        string.Equals(
+                            centralizedTerminalTargetsElement.MethodName,
+                            methodName,
+                            StringComparison.Ordinal
+                        )
+                    )
+                    {
+                        terminalMatches++;
+                    }
+                }
+
+                int delegatingMatches = 0;
+                foreach (
+                    (
+                        string FileName,
+                        string MethodName,
+                        string[] AcceptedDelegates
+                    ) centralizedDelegatingTargetsElement in CentralizedDelegatingTargets
+                )
+                {
+                    if (
+                        string.Equals(
+                            centralizedDelegatingTargetsElement.MethodName,
+                            methodName,
+                            StringComparison.Ordinal
+                        )
+                    )
+                    {
+                        delegatingMatches++;
+                    }
+                }
+
+                int total = terminalMatches + delegatingMatches;
+                if (total == 0)
+                {
+                    failures.Add(
+                        $"FlushEquivalentExpressions contains '{expression}' but no entry in "
+                            + "CentralizedTerminalTargets / CentralizedDelegatingTargets audits "
+                            + "it. Add the helper to the appropriate tier so the audit test "
+                            + "CentralizedClearHelpersActuallyFlush verifies its flush behavior."
+                    );
+                }
+                else if (1 < total)
+                {
+                    failures.Add(
+                        $"FlushEquivalentExpressions contains '{expression}' and it matches "
+                            + $"{total} entries across the terminal + delegating audit tables "
+                            + "(expected exactly 1). Consolidate the audit entry so each helper "
+                            + "is classified as either a terminal or a delegating flush root, "
+                            + "not both."
+                    );
+                }
+            }
+
+            if (0 < failures.Count)
+            {
+                Assert.Fail(string.Join("\n\n", failures));
+            }
+        }
+
+        /// <summary>
+        /// Tripwire-coverage contract: every test fixture in
+        /// <c>Tests/Editor/AssetProcessors/</c> that registers a <c>[SetUp]</c>
+        /// method (or overrides <c>BaseSetUp</c>) and passes the
+        /// <see cref="FileIsInAssetContext"/> gate must call
+        /// <c>AssetPostprocessorTestHandlers.AssertCleanAndClearAll(</c> in that
+        /// body. The call pins cross-fixture handler-static pollution to its
+        /// true source rather than rolling it forward invisibly — see the
+        /// canonical rationale on <c>AssertCleanAndClearAll</c>'s XML doc.
+        ///
+        /// Without this contract, future asset-processor fixtures can silently
+        /// omit the tripwire (as happened with <c>LlmArtifactCleanerTests</c>
+        /// before round 9 of the #234 review caught it). Scoped to asset-context
+        /// files so unrelated fixtures aren't forced to call the helper.
+        /// </summary>
+        [Test]
+        public void AssetContextFixturesCallCrossFixturePollutionTripwire()
+        {
+            string testsRoot = ResolveEditorTestsRoot();
+            if (string.IsNullOrEmpty(testsRoot))
+            {
+                Assert.Inconclusive(
+                    "Could not locate Tests/Editor/ on disk; skipping the tripwire-coverage contract."
+                );
+                return;
+            }
+
+            string[] testFiles;
+            try
+            {
+                testFiles = Directory.GetFiles(testsRoot, "*.cs", SearchOption.AllDirectories);
+            }
+            catch (Exception ex)
+                when (ex is not OutOfMemoryException and not StackOverflowException)
+            {
+                Assert.Inconclusive(
+                    $"Failed to enumerate {testsRoot}: {ex.Message}. Skipping the tripwire-coverage contract."
+                );
+                return;
+            }
+
+            const string TripwireCall = "AssetPostprocessorTestHandlers.AssertCleanAndClearAll(";
+            const string BaseSetUpCall = "base.BaseSetUp(";
+            const string TestAttributeToken = "[Test]";
+            /*
+                Deferral-internal tests do not touch handler statics; processor fixtures whose assets reach
+                handlers still need the pollution check.
+            */
+            string[] handlerInvolvementTokens =
+            {
+                "AssetPostprocessorTestHandlers",
+                "DetectAssetChanged",
+                "DetectAssetChangeProcessor",
+                "LlmArtifactCleaner",
+                "SpriteLabelProcessor",
+            };
+
+            List<string> failures = new();
+            foreach (string path in testFiles)
+            {
+                string fileName = Path.GetFileName(path);
+                if (IsContractTestSelf(fileName))
+                {
+                    continue;
+                }
+
+                if (!TryReadSource(path, fileName, failures, out string source))
+                {
+                    continue;
+                }
+
+                if (!FileIsInAssetContext(source))
+                {
+                    continue;
+                }
+
+                if (source.IndexOf(TestAttributeToken, StringComparison.Ordinal) < 0)
+                {
+                    continue;
+                }
+
+                // Deferral-only fixtures have no handler-static pollution for this check to observe.
+                bool handlerInvolved = false;
+                foreach (string handlerInvolvementTokensElement in handlerInvolvementTokens)
+                {
+                    if (
+                        0
+                        <= source.IndexOf(handlerInvolvementTokensElement, StringComparison.Ordinal)
+                    )
+                    {
+                        handlerInvolved = true;
+                        break;
+                    }
+                }
+
+                if (!handlerInvolved)
+                {
+                    continue;
+                }
+
+                // Accept both per-test SetUp and inherited BaseSetUp conventions.
+                int tripwireIndex = IndexOfOutsideLiteral(source, TripwireCall, 0);
+                if (tripwireIndex < 0)
+                {
+                    failures.Add(
+                        $"[{fileName}] is an asset-context test fixture that interacts with "
+                            + "handler statics but does not call "
+                            + "AssetPostprocessorTestHandlers.AssertCleanAndClearAll() anywhere. "
+                            + "Add the call so it precedes base.BaseSetUp( — or anywhere in the "
+                            + "fixture's [SetUp] / BaseSetUp body if no base chain exists — so "
+                            + "cross-fixture handler-state pollution is pinned to its true source. "
+                            + "See AssertCleanAndClearAll's XML doc for the canonical rationale."
+                    );
+                    continue;
+                }
+
+                /*
+                    Check pollution before base setup can change attribution, ignoring base-call text inside
+                    literals and comments.
+                */
+                int baseSetUpIndex = IndexOfOutsideLiteral(source, BaseSetUpCall, 0);
+                if (0 <= baseSetUpIndex && baseSetUpIndex < tripwireIndex)
+                {
+                    failures.Add(
+                        $"[{fileName}] calls AssetPostprocessorTestHandlers.AssertCleanAndClearAll() "
+                            + "AFTER base.BaseSetUp(). The tripwire must precede base.BaseSetUp( so "
+                            + "prior-fixture pollution is snapshotted before the base class performs "
+                            + "any configuration that could shift attribution. Move the "
+                            + "AssetPostprocessorTestHandlers.AssertCleanAndClearAll() call to "
+                            + "precede base.BaseSetUp()."
+                    );
+                }
+            }
+
+            if (0 < failures.Count)
+            {
+                Assert.Fail(string.Join("\n\n", failures));
+            }
+        }
+
+        /// <summary>
+        /// Reflection contract: every type in the test assemblies that declares at
+        /// least one method with <see cref="DetectAssetChangedAttribute"/> must also
+        /// expose a <c>public static void Clear()</c> method so the centralized
+        /// helper can clear its state. Without this, a future author who adds a new
+        /// handler without a Clear() would silently create a new cross-fixture
+        /// pollution vector.
+        /// </summary>
+        [Test]
+        public void AllTestHandlerDoublesExposeClearMethod()
+        {
+            TypeCache.MethodCollection methods =
+                TypeCache.GetMethodsWithAttribute<DetectAssetChangedAttribute>();
+
+            HashSet<Type> candidateTypes = new();
+            foreach (MethodInfo method in methods)
+            {
+                if (method == null)
+                {
+                    continue;
+                }
+
+                Type declaringType = method.DeclaringType;
+                if (declaringType == null)
+                {
+                    continue;
+                }
+
+                Assembly assembly = declaringType.Assembly;
+                if (assembly == null)
+                {
+                    continue;
+                }
+
+                string assemblyName = assembly.GetName().Name;
+                if (
+                    string.IsNullOrEmpty(assemblyName)
+                    || !assemblyName.StartsWith(
+                        "WallstopStudios.UnityHelpers.Tests",
+                        StringComparison.Ordinal
+                    )
+                )
+                {
+                    continue;
+                }
+
+                candidateTypes.Add(declaringType);
+            }
+
+            List<string> offenders = new();
+            foreach (Type type in candidateTypes)
+            {
+                MethodInfo clearMethod = type.GetMethod(
+                    "Clear",
+                    BindingFlags.Public | BindingFlags.Static,
+                    binder: null,
+                    types: Type.EmptyTypes,
+                    modifiers: null
+                );
+                if (clearMethod == null || clearMethod.ReturnType != typeof(void))
+                {
+                    offenders.Add(type.FullName);
+                }
+            }
+
+            if (0 < offenders.Count)
+            {
+                Assert.Fail(
+                    "The following test handler types declare [DetectAssetChanged] methods but "
+                        + "do not expose a `public static void Clear()` method:\n"
+                        + string.Join("\n", offenders.Select(o => $"  - {o}"))
+                        + "\nAdd a Clear() method so the centralized AssetPostprocessorTestHandlers "
+                        + "helper can clear their state and prevent cross-fixture pollution."
+                );
+            }
+        }
+
+        /// <summary>
+        /// Cross-check that the centralized discovery logic (in
+        /// <c>AssetPostprocessorTestHandlers</c>) has not silently dropped any of the
+        /// known-good handler types — e.g. due to an assembly-name filter that is too
+        /// narrow. The expected set below is derived from the current test assemblies;
+        /// if a future change legitimately renames or removes one of these, update
+        /// this test in the same commit.
+        /// </summary>
+        [Test]
+        public void AssetPostprocessorTestHandlersCoversAllDiscoveredTypes()
+        {
+            IReadOnlyList<Type> discovered = AssetPostprocessorTestHandlers.DiscoveredHandlerTypes;
+            Assert.IsNotEmpty(
+                discovered,
+                "AssetPostprocessorTestHandlers.DiscoveredHandlerTypes returned empty. "
+                    + "TypeCache may not have found any [DetectAssetChanged] methods in the test assemblies."
+            );
+
+            string[] expectedTypeNames =
+            {
+                "TestPrefabAssetChangeHandler",
+                "TestSceneAssetChangeHandler",
+                "TestNestedPrefabHandler",
+                "TestCombinedSearchHandler",
+                "TestDetectAssetChangeHandler",
+                "TestDetailedSignatureHandler",
+                "TestStaticAssetChangeHandler",
+                "TestMultiAttributeHandler",
+                "TestReentrantHandler",
+                "TestLoopingHandler",
+                "TestAssignableAssetChangeHandler",
+                "TestExceptionThrowingHandler",
+            };
+
+            HashSet<string> discoveredNames = new(StringComparer.Ordinal);
+            for (int i = 0; i < discovered.Count; i++)
+            {
+                discoveredNames.Add(discovered[i].Name);
+            }
+
+            List<string> missing = new();
+            foreach (string expectedTypeNamesElement in expectedTypeNames)
+            {
+                if (!discoveredNames.Contains(expectedTypeNamesElement))
+                {
+                    missing.Add(expectedTypeNamesElement);
+                }
+            }
+
+            if (0 < missing.Count)
+            {
+                Assert.Fail(
+                    "AssetPostprocessorTestHandlers.DiscoveredHandlerTypes is missing expected handlers:\n"
+                        + string.Join("\n", missing.Select(m => $"  - {m}"))
+                        + "\nCheck the discovery filter (e.g. assembly-name prefix, Clear() method filter). "
+                        + "If a handler was intentionally renamed or removed, update this test in the same commit."
+                );
+            }
         }
 
         private enum BodySearchStatus

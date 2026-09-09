@@ -60,6 +60,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true, Inherited = false)]
     public sealed class WProtoDeclaredRootAttribute : Attribute
     {
+        /// <summary>The type a value is held as.</summary>
+        public Type DeclaredType { get; }
+
+        /// <summary>The contract whose formatter serves it.</summary>
+        public Type RootType { get; }
+
         /// <summary>
         /// Initializes a new instance of the <see cref="WProtoDeclaredRootAttribute"/> class.
         /// </summary>
@@ -75,11 +81,5 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             DeclaredType = declaredType;
             RootType = rootType;
         }
-
-        /// <summary>The type a value is held as.</summary>
-        public Type DeclaredType { get; }
-
-        /// <summary>The contract whose formatter serves it.</summary>
-        public Type RootType { get; }
     }
 }

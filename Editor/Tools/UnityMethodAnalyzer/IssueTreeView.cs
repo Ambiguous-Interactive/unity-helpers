@@ -62,6 +62,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
     /// </summary>
     internal sealed class IssueTreeView : UnityMethodAnalyzerTreeView
     {
+        public event Action<AnalyzerIssue> OnIssueSelected;
+        public event Action<string, int> OnOpenFile;
+        public event Action<string> OnRevealInExplorer;
+        public event Action<AnalyzerIssue> OnCopyIssueAsJson;
+        public event Action<AnalyzerIssue> OnCopyIssueAsMarkdown;
+        public event Action OnCopyAllAsJson;
+        public event Action OnCopyAllAsMarkdown;
+
         private IReadOnlyList<AnalyzerIssue> _issues;
         private string _rootPath;
         private bool _groupByFile = true;
@@ -71,14 +79,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
         private IssueCategory? _categoryFilter;
         private string _searchFilter;
 
-        public event Action<AnalyzerIssue> OnIssueSelected;
-        public event Action<string, int> OnOpenFile;
-        public event Action<string> OnRevealInExplorer;
-        public event Action<AnalyzerIssue> OnCopyIssueAsJson;
-        public event Action<AnalyzerIssue> OnCopyIssueAsMarkdown;
-        public event Action OnCopyAllAsJson;
-        public event Action OnCopyAllAsMarkdown;
-
         public IssueTreeView(UnityMethodAnalyzerTreeViewState state)
             : base(state)
         {
@@ -86,6 +86,45 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             showAlternatingRowBackgrounds = true;
             showBorder = true;
             Reload();
+        }
+
+        private static string FormatIssueDisplay(AnalyzerIssue issue)
+        {
+            string severityEmoji = issue.Severity switch
+            {
+                IssueSeverity.Critical => "🔴",
+                IssueSeverity.High => "🟠",
+                IssueSeverity.Medium => "🟡",
+                IssueSeverity.Low => "🟢",
+                IssueSeverity.Info => "🔵",
+                _ => "⚪",
+            };
+
+            return $"{severityEmoji} Line {issue.LineNumber}: {issue.ClassName}.{issue.MethodName} - {issue.IssueType}";
+        }
+
+        private static string GetSeverityDisplayName(IssueSeverity severity)
+        {
+            return severity switch
+            {
+                IssueSeverity.Critical => "🔴 Critical",
+                IssueSeverity.High => "🟠 High",
+                IssueSeverity.Medium => "🟡 Medium",
+                IssueSeverity.Low => "🟢 Low",
+                IssueSeverity.Info => "🔵 Info",
+                _ => "Unknown",
+            };
+        }
+
+        private static string GetCategoryDisplayName(IssueCategory category)
+        {
+            return category switch
+            {
+                IssueCategory.UnityLifecycle => "🎮 Unity Lifecycle",
+                IssueCategory.UnityInheritance => "🔷 Unity Inheritance",
+                IssueCategory.GeneralInheritance => "📦 General Inheritance",
+                _ => "Unknown",
+            };
         }
 
         public void SetIssues(IReadOnlyList<AnalyzerIssue> issues, string rootPath)
@@ -152,6 +191,155 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
             SetupDepthsFromParentsAndChildren(root);
             return root;
+        }
+
+        protected override void RowGUI(RowGUIArgs args)
+        {
+            IssueTreeViewItem item = args.item as IssueTreeViewItem;
+
+            Rect contentRect = args.rowRect;
+            contentRect.xMin += GetContentIndent(args.item);
+
+            if (item?.Issue != null)
+            {
+                GUIStyle style = new(EditorStyles.label);
+
+                Color textColor = item.Severity switch
+                {
+                    IssueSeverity.Critical => new Color(1f, 0.3f, 0.3f),
+                    IssueSeverity.High => new Color(1f, 0.6f, 0.2f),
+                    IssueSeverity.Medium => new Color(1f, 0.9f, 0.2f),
+                    IssueSeverity.Low => new Color(0.5f, 0.9f, 0.5f),
+                    _ => Color.white,
+                };
+
+                style.normal.textColor = textColor;
+                GUI.Label(contentRect, args.item.displayName, style);
+            }
+            else if (item?.IsFile == true)
+            {
+                GUIStyle style = new(EditorStyles.boldLabel);
+
+                if (0 < item.CriticalCount)
+                {
+                    style.normal.textColor = new Color(1f, 0.5f, 0.5f);
+                }
+                else if (0 < item.HighCount)
+                {
+                    style.normal.textColor = new Color(1f, 0.7f, 0.4f);
+                }
+
+                GUI.Label(contentRect, args.item.displayName, style);
+            }
+            else
+            {
+                base.RowGUI(args);
+            }
+        }
+
+        protected override void SingleClickedItem(int id)
+        {
+            UnityMethodAnalyzerTreeViewItem item = FindItem(id, rootItem);
+            if (item is IssueTreeViewItem issueItem)
+            {
+                if (issueItem.Issue != null)
+                {
+                    OnIssueSelected?.Invoke(issueItem.Issue);
+                }
+            }
+        }
+
+        protected override void DoubleClickedItem(int id)
+        {
+            UnityMethodAnalyzerTreeViewItem item = FindItem(id, rootItem);
+            if (item is IssueTreeViewItem issueItem)
+            {
+                string filePath = issueItem.FilePath;
+                int lineNumber = issueItem.LineNumber;
+
+                if (issueItem.Issue != null)
+                {
+                    filePath = issueItem.Issue.FilePath;
+                    lineNumber = issueItem.Issue.LineNumber;
+                }
+
+                if (!string.IsNullOrEmpty(filePath))
+                {
+                    OnOpenFile?.Invoke(filePath, lineNumber);
+                }
+            }
+        }
+
+        protected override void ContextClickedItem(int id)
+        {
+            UnityMethodAnalyzerTreeViewItem item = FindItem(id, rootItem);
+            if (item is IssueTreeViewItem issueItem)
+            {
+                string filePath = issueItem.FilePath;
+                AnalyzerIssue issue = issueItem.Issue;
+                if (issue != null)
+                {
+                    filePath = issue.FilePath;
+                }
+
+                GenericMenu menu = new();
+
+                if (!string.IsNullOrEmpty(filePath))
+                {
+                    menu.AddItem(
+                        new GUIContent("Open File"),
+                        false,
+                        () =>
+                        {
+                            int lineNumber = issueItem.LineNumber;
+                            if (issue != null)
+                            {
+                                lineNumber = issue.LineNumber;
+                            }
+
+                            OnOpenFile?.Invoke(filePath, lineNumber);
+                        }
+                    );
+                    menu.AddItem(
+                        new GUIContent("Reveal in File Browser"),
+                        false,
+                        () => OnRevealInExplorer?.Invoke(filePath)
+                    );
+                }
+
+                if (issue != null)
+                {
+                    if (!string.IsNullOrEmpty(filePath))
+                    {
+                        menu.AddSeparator("");
+                    }
+
+                    menu.AddItem(
+                        new GUIContent("Copy Issue as JSON"),
+                        false,
+                        () => OnCopyIssueAsJson?.Invoke(issue)
+                    );
+                    menu.AddItem(
+                        new GUIContent("Copy Issue as Markdown"),
+                        false,
+                        () => OnCopyIssueAsMarkdown?.Invoke(issue)
+                    );
+                }
+
+                menu.AddSeparator("");
+                menu.AddItem(
+                    new GUIContent("Copy All Issues as JSON"),
+                    false,
+                    () => OnCopyAllAsJson?.Invoke()
+                );
+                menu.AddItem(
+                    new GUIContent("Copy All Issues as Markdown"),
+                    false,
+                    () => OnCopyAllAsMarkdown?.Invoke()
+                );
+
+                menu.ShowAsContext();
+            }
         }
 
         /// <summary>
@@ -633,194 +821,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                     severity: issue.Severity
                 );
                 root.AddChild(issueItem);
-            }
-        }
-
-        private static string FormatIssueDisplay(AnalyzerIssue issue)
-        {
-            string severityEmoji = issue.Severity switch
-            {
-                IssueSeverity.Critical => "🔴",
-                IssueSeverity.High => "🟠",
-                IssueSeverity.Medium => "🟡",
-                IssueSeverity.Low => "🟢",
-                IssueSeverity.Info => "🔵",
-                _ => "⚪",
-            };
-
-            return $"{severityEmoji} Line {issue.LineNumber}: {issue.ClassName}.{issue.MethodName} - {issue.IssueType}";
-        }
-
-        private static string GetSeverityDisplayName(IssueSeverity severity)
-        {
-            return severity switch
-            {
-                IssueSeverity.Critical => "🔴 Critical",
-                IssueSeverity.High => "🟠 High",
-                IssueSeverity.Medium => "🟡 Medium",
-                IssueSeverity.Low => "🟢 Low",
-                IssueSeverity.Info => "🔵 Info",
-                _ => "Unknown",
-            };
-        }
-
-        private static string GetCategoryDisplayName(IssueCategory category)
-        {
-            return category switch
-            {
-                IssueCategory.UnityLifecycle => "🎮 Unity Lifecycle",
-                IssueCategory.UnityInheritance => "🔷 Unity Inheritance",
-                IssueCategory.GeneralInheritance => "📦 General Inheritance",
-                _ => "Unknown",
-            };
-        }
-
-        protected override void RowGUI(RowGUIArgs args)
-        {
-            IssueTreeViewItem item = args.item as IssueTreeViewItem;
-
-            Rect contentRect = args.rowRect;
-            contentRect.xMin += GetContentIndent(args.item);
-
-            if (item?.Issue != null)
-            {
-                GUIStyle style = new(EditorStyles.label);
-
-                Color textColor = item.Severity switch
-                {
-                    IssueSeverity.Critical => new Color(1f, 0.3f, 0.3f),
-                    IssueSeverity.High => new Color(1f, 0.6f, 0.2f),
-                    IssueSeverity.Medium => new Color(1f, 0.9f, 0.2f),
-                    IssueSeverity.Low => new Color(0.5f, 0.9f, 0.5f),
-                    _ => Color.white,
-                };
-
-                style.normal.textColor = textColor;
-                GUI.Label(contentRect, args.item.displayName, style);
-            }
-            else if (item?.IsFile == true)
-            {
-                GUIStyle style = new(EditorStyles.boldLabel);
-
-                if (0 < item.CriticalCount)
-                {
-                    style.normal.textColor = new Color(1f, 0.5f, 0.5f);
-                }
-                else if (0 < item.HighCount)
-                {
-                    style.normal.textColor = new Color(1f, 0.7f, 0.4f);
-                }
-
-                GUI.Label(contentRect, args.item.displayName, style);
-            }
-            else
-            {
-                base.RowGUI(args);
-            }
-        }
-
-        protected override void SingleClickedItem(int id)
-        {
-            UnityMethodAnalyzerTreeViewItem item = FindItem(id, rootItem);
-            if (item is IssueTreeViewItem issueItem)
-            {
-                if (issueItem.Issue != null)
-                {
-                    OnIssueSelected?.Invoke(issueItem.Issue);
-                }
-            }
-        }
-
-        protected override void DoubleClickedItem(int id)
-        {
-            UnityMethodAnalyzerTreeViewItem item = FindItem(id, rootItem);
-            if (item is IssueTreeViewItem issueItem)
-            {
-                string filePath = issueItem.FilePath;
-                int lineNumber = issueItem.LineNumber;
-
-                if (issueItem.Issue != null)
-                {
-                    filePath = issueItem.Issue.FilePath;
-                    lineNumber = issueItem.Issue.LineNumber;
-                }
-
-                if (!string.IsNullOrEmpty(filePath))
-                {
-                    OnOpenFile?.Invoke(filePath, lineNumber);
-                }
-            }
-        }
-
-        protected override void ContextClickedItem(int id)
-        {
-            UnityMethodAnalyzerTreeViewItem item = FindItem(id, rootItem);
-            if (item is IssueTreeViewItem issueItem)
-            {
-                string filePath = issueItem.FilePath;
-                AnalyzerIssue issue = issueItem.Issue;
-                if (issue != null)
-                {
-                    filePath = issue.FilePath;
-                }
-
-                GenericMenu menu = new();
-
-                if (!string.IsNullOrEmpty(filePath))
-                {
-                    menu.AddItem(
-                        new GUIContent("Open File"),
-                        false,
-                        () =>
-                        {
-                            int lineNumber = issueItem.LineNumber;
-                            if (issue != null)
-                            {
-                                lineNumber = issue.LineNumber;
-                            }
-
-                            OnOpenFile?.Invoke(filePath, lineNumber);
-                        }
-                    );
-                    menu.AddItem(
-                        new GUIContent("Reveal in File Browser"),
-                        false,
-                        () => OnRevealInExplorer?.Invoke(filePath)
-                    );
-                }
-
-                if (issue != null)
-                {
-                    if (!string.IsNullOrEmpty(filePath))
-                    {
-                        menu.AddSeparator("");
-                    }
-
-                    menu.AddItem(
-                        new GUIContent("Copy Issue as JSON"),
-                        false,
-                        () => OnCopyIssueAsJson?.Invoke(issue)
-                    );
-                    menu.AddItem(
-                        new GUIContent("Copy Issue as Markdown"),
-                        false,
-                        () => OnCopyIssueAsMarkdown?.Invoke(issue)
-                    );
-                }
-
-                menu.AddSeparator("");
-                menu.AddItem(
-                    new GUIContent("Copy All Issues as JSON"),
-                    false,
-                    () => OnCopyAllAsJson?.Invoke()
-                );
-                menu.AddItem(
-                    new GUIContent("Copy All Issues as Markdown"),
-                    false,
-                    () => OnCopyAllAsMarkdown?.Invoke()
-                );
-
-                menu.ShowAsContext();
             }
         }
     }

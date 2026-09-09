@@ -59,6 +59,130 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                   }
               }";
 
+        private static string FindRepositoryRoot()
+        {
+            DirectoryInfo directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
+            while (directory != null)
+            {
+                if (Directory.Exists(Path.Combine(directory.FullName, "Runtime")))
+                {
+                    return directory.FullName;
+                }
+
+                directory = directory.Parent;
+            }
+
+            throw new DirectoryNotFoundException(
+                "Could not find the repository root above the test directory"
+            );
+        }
+
+        /// <summary>
+        /// An override of <paramref name="hook"/> whose body is <paramref name="first"/> followed by
+        /// <paramref name="following"/> statements that run after it.
+        /// </summary>
+        private static string Override(string hook, string first, int following)
+        {
+            // IDisposable.Dispose must remain public even though the other hooks are protected.
+            string accessibility = hook == "Dispose" ? "public" : "protected";
+            string after = string.Join("\n", Enumerable.Repeat("Release();", following).ToArray());
+            return accessibility
+                + " override void "
+                + hook
+                + "()\n{\n"
+                + first
+                + "\n"
+                + after
+                + "\n}";
+        }
+
+        private static void AssertNothingReported(string shape, string body)
+        {
+            Assert.IsEmpty(
+                Analyze(body).Select(diagnostic => diagnostic.ToString()).ToArray(),
+                shape + " must not be reported"
+            );
+        }
+
+        private static Diagnostic Single(string body)
+        {
+            ImmutableArray<Diagnostic> reported = Analyze(body);
+            Assert.AreEqual(1, reported.Length, "Expected exactly one diagnostic");
+            return reported[0];
+        }
+
+        private static ImmutableArray<Diagnostic> Analyze(string body)
+        {
+            return Analyze(body, ReportDiagnostic.Default);
+        }
+
+        /// <summary>
+        /// Compiles <paramref name="body"/> and runs the analyzer over it.
+        /// </summary>
+        /// <param name="body">Members of a class deriving from the stubbed <c>Package.Component</c>.</param>
+        /// <param name="reportedAs">
+        /// What the compilation says about the diagnostic -- <see cref="ReportDiagnostic.Default"/>
+        /// for a consumer who configures nothing, or anything else for the ruleset /
+        /// <c>.editorconfig</c> entry they would write, expressed as the option Roslyn resolves both
+        /// of them to.
+        /// </param>
+        /// <returns>Everything the analyzer reported.</returns>
+        private static ImmutableArray<Diagnostic> Analyze(string body, ReportDiagnostic reportedAs)
+        {
+            string source =
+                "using System;\n"
+                + "namespace Consumer { public class Subject : Package.Component { "
+                + body
+                + " } }\n"
+                + PackageTeardownBase;
+
+            List<MetadataReference> references = new List<MetadataReference>();
+            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
+                {
+                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
+                }
+            }
+
+            CSharpCompilation compilation = CSharpCompilation.Create(
+                "ConsumerAssembly",
+                new[]
+                {
+                    CSharpSyntaxTree.ParseText(
+                        source,
+                        new CSharpParseOptions(LanguageVersion.CSharp9)
+                    ),
+                },
+                references,
+                new CSharpCompilationOptions(
+                    OutputKind.DynamicallyLinkedLibrary
+                ).WithSpecificDiagnosticOptions(
+                    ImmutableDictionary<string, ReportDiagnostic>.Empty.Add(
+                        DiagnosticId,
+                        reportedAs
+                    )
+                )
+            );
+
+            ImmutableArray<Diagnostic> compileErrors = compilation
+                .GetDiagnostics()
+                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+                .ToImmutableArray();
+            Assert.IsEmpty(
+                compileErrors.Select(diagnostic => diagnostic.ToString()).ToArray(),
+                "The fixture must compile"
+            );
+
+            return compilation
+                .WithAnalyzers(
+                    ImmutableArray.Create<DiagnosticAnalyzer>(new TeardownBaseCallAnalyzer())
+                )
+                .GetAnalyzerDiagnosticsAsync()
+                .GetAwaiter()
+                .GetResult();
+        }
+
         /// <summary>
         /// Every hook, at one statement after the base call and at three, so the count in the
         /// message is asserted rather than assumed.
@@ -382,130 +506,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                     $"{hook} is a shipped teardown hook, so it has to still be in the analyzer's list"
                 );
             }
-        }
-
-        private static string FindRepositoryRoot()
-        {
-            DirectoryInfo directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-            while (directory != null)
-            {
-                if (Directory.Exists(Path.Combine(directory.FullName, "Runtime")))
-                {
-                    return directory.FullName;
-                }
-
-                directory = directory.Parent;
-            }
-
-            throw new DirectoryNotFoundException(
-                "Could not find the repository root above the test directory"
-            );
-        }
-
-        /// <summary>
-        /// An override of <paramref name="hook"/> whose body is <paramref name="first"/> followed by
-        /// <paramref name="following"/> statements that run after it.
-        /// </summary>
-        private static string Override(string hook, string first, int following)
-        {
-            // IDisposable.Dispose must remain public even though the other hooks are protected.
-            string accessibility = hook == "Dispose" ? "public" : "protected";
-            string after = string.Join("\n", Enumerable.Repeat("Release();", following).ToArray());
-            return accessibility
-                + " override void "
-                + hook
-                + "()\n{\n"
-                + first
-                + "\n"
-                + after
-                + "\n}";
-        }
-
-        private static void AssertNothingReported(string shape, string body)
-        {
-            Assert.IsEmpty(
-                Analyze(body).Select(diagnostic => diagnostic.ToString()).ToArray(),
-                shape + " must not be reported"
-            );
-        }
-
-        private static Diagnostic Single(string body)
-        {
-            ImmutableArray<Diagnostic> reported = Analyze(body);
-            Assert.AreEqual(1, reported.Length, "Expected exactly one diagnostic");
-            return reported[0];
-        }
-
-        private static ImmutableArray<Diagnostic> Analyze(string body)
-        {
-            return Analyze(body, ReportDiagnostic.Default);
-        }
-
-        /// <summary>
-        /// Compiles <paramref name="body"/> and runs the analyzer over it.
-        /// </summary>
-        /// <param name="body">Members of a class deriving from the stubbed <c>Package.Component</c>.</param>
-        /// <param name="reportedAs">
-        /// What the compilation says about the diagnostic -- <see cref="ReportDiagnostic.Default"/>
-        /// for a consumer who configures nothing, or anything else for the ruleset /
-        /// <c>.editorconfig</c> entry they would write, expressed as the option Roslyn resolves both
-        /// of them to.
-        /// </param>
-        /// <returns>Everything the analyzer reported.</returns>
-        private static ImmutableArray<Diagnostic> Analyze(string body, ReportDiagnostic reportedAs)
-        {
-            string source =
-                "using System;\n"
-                + "namespace Consumer { public class Subject : Package.Component { "
-                + body
-                + " } }\n"
-                + PackageTeardownBase;
-
-            List<MetadataReference> references = new List<MetadataReference>();
-            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
-                {
-                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
-                }
-            }
-
-            CSharpCompilation compilation = CSharpCompilation.Create(
-                "ConsumerAssembly",
-                new[]
-                {
-                    CSharpSyntaxTree.ParseText(
-                        source,
-                        new CSharpParseOptions(LanguageVersion.CSharp9)
-                    ),
-                },
-                references,
-                new CSharpCompilationOptions(
-                    OutputKind.DynamicallyLinkedLibrary
-                ).WithSpecificDiagnosticOptions(
-                    ImmutableDictionary<string, ReportDiagnostic>.Empty.Add(
-                        DiagnosticId,
-                        reportedAs
-                    )
-                )
-            );
-
-            ImmutableArray<Diagnostic> compileErrors = compilation
-                .GetDiagnostics()
-                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-                .ToImmutableArray();
-            Assert.IsEmpty(
-                compileErrors.Select(diagnostic => diagnostic.ToString()).ToArray(),
-                "The fixture must compile"
-            );
-
-            return compilation
-                .WithAnalyzers(
-                    ImmutableArray.Create<DiagnosticAnalyzer>(new TeardownBaseCallAnalyzer())
-                )
-                .GetAnalyzerDiagnosticsAsync()
-                .GetAwaiter()
-                .GetResult();
         }
     }
 }

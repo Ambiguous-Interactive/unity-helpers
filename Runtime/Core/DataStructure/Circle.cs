@@ -24,6 +24,22 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// </example>
     public readonly struct Circle : IEquatable<Circle>
     {
+        /// <summary>
+        /// Determines whether two circles are equal.
+        /// </summary>
+        public static bool operator ==(Circle left, Circle right)
+        {
+            return left.Equals(right);
+        }
+
+        /// <summary>
+        /// Determines whether two circles are not equal.
+        /// </summary>
+        public static bool operator !=(Circle left, Circle right)
+        {
+            return !left.Equals(right);
+        }
+
         public readonly Vector2 center;
         public readonly float radius;
         private readonly float _radiusSquared;
@@ -209,22 +225,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         public override int GetHashCode()
         {
             return Objects.HashCode(center, radius);
-        }
-
-        /// <summary>
-        /// Determines whether two circles are equal.
-        /// </summary>
-        public static bool operator ==(Circle left, Circle right)
-        {
-            return left.Equals(right);
-        }
-
-        /// <summary>
-        /// Determines whether two circles are not equal.
-        /// </summary>
-        public static bool operator !=(Circle left, Circle right)
-        {
-            return !left.Equals(right);
         }
 
         /// <summary>

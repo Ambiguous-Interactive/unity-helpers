@@ -16,6 +16,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     [NUnit.Framework.Category("Fast")]
     public sealed class CoroutineHandlerTests : CommonTestBase
     {
+        private static IEnumerator WaitUntil(
+            Func<bool> condition,
+            string description,
+            int maxFrames = 30,
+            float maxSeconds = 5f
+        )
+        {
+            /*
+                Require both frame and elapsed-time budgets; fast headless frames alone may not let timed
+                coroutines advance.
+            */
+            float deadline = Time.time + maxSeconds;
+            int frames = 0;
+            while (!condition() && (frames < maxFrames || Time.time < deadline))
+            {
+                yield return null;
+                frames++;
+            }
+
+            Assert.IsTrue(
+                condition(),
+                $"Timed out after {frames} frame(s) / {maxSeconds:0.###}s waiting for {description}. Frame={Time.frameCount}, time={Time.time:0.###}."
+            );
+        }
+
         [UnityTest]
         public IEnumerator CreatesInstanceOnFirstAccess()
         {
@@ -392,31 +417,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                     yield return null;
                 }
             }
-        }
-
-        private static IEnumerator WaitUntil(
-            Func<bool> condition,
-            string description,
-            int maxFrames = 30,
-            float maxSeconds = 5f
-        )
-        {
-            /*
-                Require both frame and elapsed-time budgets; fast headless frames alone may not let timed
-                coroutines advance.
-            */
-            float deadline = Time.time + maxSeconds;
-            int frames = 0;
-            while (!condition() && (frames < maxFrames || Time.time < deadline))
-            {
-                yield return null;
-                frames++;
-            }
-
-            Assert.IsTrue(
-                condition(),
-                $"Timed out after {frames} frame(s) / {maxSeconds:0.###}s waiting for {description}. Frame={Time.frameCount}, time={Time.time:0.###}."
-            );
         }
     }
 }

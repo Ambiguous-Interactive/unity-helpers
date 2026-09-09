@@ -19,9 +19,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     /// <typeparam name="T">The element type.</typeparam>
     public class IndexerOnlyList<T> : IList<T>
     {
-        private T[] _storage = Array.Empty<T>();
-        private int _count;
-
         /// <summary>Gets or sets the element at the given index.</summary>
         /// <param name="index">The index to read or write.</param>
         public T this[int index]
@@ -51,6 +48,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
         /// <summary>Always false; this list is mutable.</summary>
         public bool IsReadOnly => false;
+
+        private T[] _storage = Array.Empty<T>();
+        private int _count;
 
         /// <summary>Appends an element.</summary>
         /// <param name="item">The element to append.</param>
@@ -163,8 +163,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             _storage[_count] = default;
         }
 
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-
         private void Grow(int required)
         {
             if (required <= _storage.Length)
@@ -180,5 +178,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             Array.Resize(ref _storage, capacity);
         }
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

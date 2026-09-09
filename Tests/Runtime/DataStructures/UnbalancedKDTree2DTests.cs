@@ -18,19 +18,14 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         // Reseed each test so a failing tree can be reproduced alone or within the fixture.
         private const uint RandomSeed = 0x5EED0205;
 
-        private IRandom _random = new PcgRandom(RandomSeed);
-
         private IRandom Random => _random;
+
+        private IRandom _random = new PcgRandom(RandomSeed);
 
         [SetUp]
         public void SeedUnbalancedKdTree2DRandom()
         {
             _random = new PcgRandom(RandomSeed);
-        }
-
-        protected override KdTree2D<Vector2> CreateTree(IEnumerable<Vector2> points)
-        {
-            return new KdTree2D<Vector2>(points, _ => _, balanced: false);
         }
 
         [Test]
@@ -553,6 +548,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             List<Vector2> results = new();
             tree.GetElementsInRange(Vector2.zero, 10f, results);
             Assert.Greater(results.Count, 0);
+        }
+
+        protected override KdTree2D<Vector2> CreateTree(IEnumerable<Vector2> points)
+        {
+            return new KdTree2D<Vector2>(points, _ => _, balanced: false);
         }
     }
 }

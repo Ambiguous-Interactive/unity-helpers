@@ -9,12 +9,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     {
         public static int AwakenCount;
 
-        protected override void Awake()
-        {
-            base.Awake();
-            AwakenCount++;
-        }
-
         public static void ClearForTests()
         {
             AwakenCount = 0;
@@ -23,6 +17,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 DestroyImmediate(_instance.gameObject);
             }
             _instance = null;
+        }
+
+        protected override void Awake()
+        {
+            base.Awake();
+            AwakenCount++;
         }
     }
 }

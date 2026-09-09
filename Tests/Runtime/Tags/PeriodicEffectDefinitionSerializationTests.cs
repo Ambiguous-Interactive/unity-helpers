@@ -13,33 +13,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
     [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
     public sealed class PeriodicEffectDefinitionSerializationTests
     {
-        [Test]
-        public void JsonRoundtripPreservesFieldValues()
-        {
-            PeriodicEffectDefinition definition = CreateDefinition();
-
-            string json = Serializer.JsonStringify(definition);
-            PeriodicEffectDefinition deserialized =
-                Serializer.JsonDeserialize<PeriodicEffectDefinition>(json);
-
-            AssertEquivalent(definition, deserialized);
-        }
-
-        [Test]
-        public void ProtoRoundtripPreservesFieldValues()
-        {
-            PeriodicEffectDefinition definition = CreateDefinition();
-
-            byte[] serialized = Serializer.ProtoSerialize(definition);
-            Assert.IsTrue(serialized != null, "Serialized bytes should not be null");
-            Assert.Greater(serialized.Length, 0);
-
-            PeriodicEffectDefinition deserialized =
-                Serializer.ProtoDeserialize<PeriodicEffectDefinition>(serialized);
-
-            AssertEquivalent(definition, deserialized);
-        }
-
         private static PeriodicEffectDefinition CreateDefinition()
         {
             PeriodicEffectDefinition definition = new()
@@ -95,6 +68,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 Assert.AreEqual(expectedModification.action, actualModification.action);
                 Assert.AreEqual(expectedModification.value, actualModification.value);
             }
+        }
+
+        [Test]
+        public void JsonRoundtripPreservesFieldValues()
+        {
+            PeriodicEffectDefinition definition = CreateDefinition();
+
+            string json = Serializer.JsonStringify(definition);
+            PeriodicEffectDefinition deserialized =
+                Serializer.JsonDeserialize<PeriodicEffectDefinition>(json);
+
+            AssertEquivalent(definition, deserialized);
+        }
+
+        [Test]
+        public void ProtoRoundtripPreservesFieldValues()
+        {
+            PeriodicEffectDefinition definition = CreateDefinition();
+
+            byte[] serialized = Serializer.ProtoSerialize(definition);
+            Assert.IsTrue(serialized != null, "Serialized bytes should not be null");
+            Assert.Greater(serialized.Length, 0);
+
+            PeriodicEffectDefinition deserialized =
+                Serializer.ProtoDeserialize<PeriodicEffectDefinition>(serialized);
+
+            AssertEquivalent(definition, deserialized);
         }
     }
 }

@@ -18,8 +18,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     /// <typeparam name="T">The element type.</typeparam>
     public class NodeChainList<T> : IList<T>
     {
-        private readonly LinkedList<T> _chain = new();
-
         /// <summary>Gets or sets the element at the given index.</summary>
         /// <param name="index">The index to read or write.</param>
         public T this[int index]
@@ -33,6 +31,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
         /// <summary>Always false; this list is mutable.</summary>
         public bool IsReadOnly => false;
+
+        private readonly LinkedList<T> _chain = new();
 
         /// <summary>Appends an element.</summary>
         /// <param name="item">The element to append.</param>
@@ -108,8 +108,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         /// <param name="index">The index to remove.</param>
         public void RemoveAt(int index) => _chain.Remove(NodeAt(index));
 
-        IEnumerator IEnumerable.GetEnumerator() => _chain.GetEnumerator();
-
         private LinkedListNode<T> NodeAt(int index)
         {
             if (index < 0 || _chain.Count <= index)
@@ -125,5 +123,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             return node;
         }
+
+        IEnumerator IEnumerable.GetEnumerator() => _chain.GetEnumerator();
     }
 }

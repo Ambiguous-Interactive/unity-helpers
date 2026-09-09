@@ -24,6 +24,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             IncludeFields = true,
         };
 
+        private static readonly object MainThreadQueueLock = new();
+        private static readonly Queue<Action> MainThreadQueue = new();
+        private static bool _isUpdateSubscribed;
+
         internal static void ProcessTriggeredMethods(List<WButtonMethodContext> triggeredContexts)
         {
             if (triggeredContexts == null || triggeredContexts.Count == 0)
@@ -801,10 +805,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         {
             InternalEditorUtility.RepaintAllViews();
         }
-
-        private static readonly object MainThreadQueueLock = new();
-        private static readonly Queue<Action> MainThreadQueue = new();
-        private static bool _isUpdateSubscribed;
 
         private static void EnqueueOnMainThread(Action action)
         {

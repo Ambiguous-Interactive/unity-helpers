@@ -72,6 +72,45 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     )]
     public sealed class WEnumToggleButtonsAttribute : PropertyAttribute
     {
+        /// <summary>
+        /// Gets the desired number of buttons per row.
+        /// A value of zero indicates that the drawer should determine a sensible layout automatically.
+        /// </summary>
+        public int ButtonsPerRow { get; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether a quick action button for selecting every flag should be displayed.
+        /// Only meaningful for <c>[Flags]</c> enums.
+        /// </summary>
+        public bool ShowSelectAll { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether a quick action button for clearing every flag should be displayed.
+        /// Only meaningful for <c>[Flags]</c> enums.
+        /// </summary>
+        public bool ShowSelectNone { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether pagination may be applied when the option count exceeds the configured threshold.
+        /// Disable when all options should always be visible regardless of their count.
+        /// </summary>
+        public bool EnablePagination { get; set; }
+
+        /// <summary>
+        /// Gets or sets the maximum number of options displayed per page before pagination occurs.
+        /// Values less than or equal to zero defer to the project-wide default stored in <c>UnityHelpersSettings</c>.
+        /// </summary>
+        public int PageSize { get; set; }
+
+        /// <summary>
+        /// Gets or sets an optional palette key used to resolve theming for the toggle buttons.
+        /// </summary>
+        public string ColorKey
+        {
+            get => _colorKey;
+            set => _colorKey = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        }
+
         private string _colorKey;
 
         /// <summary>
@@ -154,45 +193,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             EnablePagination = enablePagination;
             PageSize = pageSize;
             ColorKey = colorKey;
-        }
-
-        /// <summary>
-        /// Gets the desired number of buttons per row.
-        /// A value of zero indicates that the drawer should determine a sensible layout automatically.
-        /// </summary>
-        public int ButtonsPerRow { get; }
-
-        /// <summary>
-        /// Gets or sets a value indicating whether a quick action button for selecting every flag should be displayed.
-        /// Only meaningful for <c>[Flags]</c> enums.
-        /// </summary>
-        public bool ShowSelectAll { get; set; }
-
-        /// <summary>
-        /// Gets or sets a value indicating whether a quick action button for clearing every flag should be displayed.
-        /// Only meaningful for <c>[Flags]</c> enums.
-        /// </summary>
-        public bool ShowSelectNone { get; set; }
-
-        /// <summary>
-        /// Gets or sets a value indicating whether pagination may be applied when the option count exceeds the configured threshold.
-        /// Disable when all options should always be visible regardless of their count.
-        /// </summary>
-        public bool EnablePagination { get; set; }
-
-        /// <summary>
-        /// Gets or sets the maximum number of options displayed per page before pagination occurs.
-        /// Values less than or equal to zero defer to the project-wide default stored in <c>UnityHelpersSettings</c>.
-        /// </summary>
-        public int PageSize { get; set; }
-
-        /// <summary>
-        /// Gets or sets an optional palette key used to resolve theming for the toggle buttons.
-        /// </summary>
-        public string ColorKey
-        {
-            get => _colorKey;
-            set => _colorKey = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
         }
     }
 }

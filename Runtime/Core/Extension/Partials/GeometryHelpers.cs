@@ -33,6 +33,317 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return cmp != 0 ? cmp : lhs.y.CompareTo(rhs.y);
         };
 
+        internal static List<Vector2> BuildConvexHullJarvisFallback(
+            List<Vector2> points,
+            List<Vector2> hull,
+            bool includeColinearPoints,
+            List<int> scratchIndices,
+            float[] scratchDistances,
+            bool[] membershipFlags
+        )
+        {
+            hull ??= new List<Vector2>();
+            hull.Clear();
+            int pointCount = points?.Count ?? 0;
+            if (pointCount == 0 || points == null)
+            {
+                return hull;
+            }
+
+            if (pointCount <= 2)
+            {
+                hull.AddRange(points);
+                return hull;
+            }
+
+            ResetBooleanFlags(membershipFlags, pointCount);
+
+            int startIndex = FindLowestPointIndex(points);
+            if (startIndex < 0)
+            {
+                hull.AddRange(points);
+                return hull;
+            }
+
+            int currentIndex = startIndex;
+            int guard = 0;
+            int guardMax = Math.Max(8, pointCount * 8);
+
+            do
+            {
+                Vector2 current = points[currentIndex];
+                hull.Add(current);
+                if (membershipFlags != null && currentIndex < membershipFlags.Length)
+                {
+                    membershipFlags[currentIndex] = true;
+                }
+                if (!includeColinearPoints)
+                {
+                    TrimTailColinear(hull);
+                }
+
+                int candidateIndex = -1;
+                for (int i = 0; i < pointCount; ++i)
+                {
+                    if (i == currentIndex)
+                    {
+                        continue;
+                    }
+
+                    candidateIndex = i;
+                    break;
+                }
+
+                if (candidateIndex < 0)
+                {
+                    break;
+                }
+
+                for (int i = 0; i < pointCount; ++i)
+                {
+                    if (i == currentIndex || i == candidateIndex)
+                    {
+                        continue;
+                    }
+
+                    Vector2 candidate = points[candidateIndex];
+                    Vector2 point = points[i];
+                    float relation = Geometry.IsAPointLeftOfVectorOrOnTheLine(
+                        current,
+                        candidate,
+                        point
+                    );
+                    if (ConvexHullRelationEpsilon < relation)
+                    {
+                        candidateIndex = i;
+                        continue;
+                    }
+
+                    if (Mathf.Abs(relation) <= ConvexHullRelationEpsilon)
+                    {
+                        float candidateDistance = (candidate - current).sqrMagnitude;
+                        float pointDistance = (point - current).sqrMagnitude;
+                        if (candidateDistance < pointDistance)
+                        {
+                            candidateIndex = i;
+                        }
+                    }
+                }
+
+                if (includeColinearPoints && scratchIndices != null)
+                {
+                    scratchIndices.Clear();
+                    for (int i = 0; i < pointCount; ++i)
+                    {
+                        if (i == currentIndex || i == candidateIndex)
+                        {
+                            continue;
+                        }
+
+                        float relation = Geometry.IsAPointLeftOfVectorOrOnTheLine(
+                            current,
+                            points[candidateIndex],
+                            points[i]
+                        );
+                        if (Mathf.Abs(relation) <= ConvexHullRelationEpsilon)
+                        {
+                            scratchIndices.Add(i);
+                        }
+                    }
+
+                    SortIndicesByDistance(points, current, scratchIndices, scratchDistances);
+                    if (0 < scratchIndices.Count)
+                    {
+                        foreach (int index in scratchIndices)
+                        {
+                            if (membershipFlags != null && membershipFlags[index])
+                            {
+                                continue;
+                            }
+
+                            hull.Add(points[index]);
+                            if (membershipFlags != null && index < membershipFlags.Length)
+                            {
+                                membershipFlags[index] = true;
+                            }
+                        }
+                    }
+                }
+
+                currentIndex = candidateIndex;
+                if (guardMax < ++guard)
+                {
+                    break;
+                }
+            } while (currentIndex != startIndex);
+
+            if (!includeColinearPoints && 2 < hull.Count)
+            {
+                PruneColinearOnHull(hull);
+            }
+
+            return hull;
+        }
+
+        internal static List<FastVector3Int> BuildGridConvexHullJarvisFallback(
+            List<FastVector3Int> points,
+            Vector2[] worldPositions,
+            List<FastVector3Int> hull,
+            bool includeColinearPoints,
+            List<int> scratchIndices,
+            float[] scratchDistances,
+            bool[] membershipFlags
+        )
+        {
+            hull ??= new List<FastVector3Int>();
+            hull.Clear();
+            int pointCount = points?.Count ?? 0;
+            if (pointCount == 0 || points == null)
+            {
+                return hull;
+            }
+
+            if (pointCount <= 2)
+            {
+                hull.AddRange(points);
+                return hull;
+            }
+
+            ResetBooleanFlags(membershipFlags, pointCount);
+
+            int startIndex = FindLowestWorldPositionIndex(worldPositions, pointCount);
+            if (startIndex < 0)
+            {
+                hull.AddRange(points);
+                return hull;
+            }
+
+            int currentIndex = startIndex;
+            int guard = 0;
+            int guardMax = Math.Max(8, pointCount * 8);
+
+            do
+            {
+                hull.Add(points[currentIndex]);
+                if (membershipFlags != null && currentIndex < membershipFlags.Length)
+                {
+                    membershipFlags[currentIndex] = true;
+                }
+                if (!includeColinearPoints)
+                {
+                    TrimTailColinear(hull);
+                }
+
+                int candidateIndex = -1;
+                for (int i = 0; i < pointCount; ++i)
+                {
+                    if (i == currentIndex)
+                    {
+                        continue;
+                    }
+
+                    candidateIndex = i;
+                    break;
+                }
+
+                if (candidateIndex < 0)
+                {
+                    break;
+                }
+
+                for (int i = 0; i < pointCount; ++i)
+                {
+                    if (i == currentIndex || i == candidateIndex)
+                    {
+                        continue;
+                    }
+
+                    Vector2 candidate = worldPositions[candidateIndex];
+                    Vector2 point = worldPositions[i];
+                    float relation = Geometry.IsAPointLeftOfVectorOrOnTheLine(
+                        worldPositions[currentIndex],
+                        candidate,
+                        point
+                    );
+                    if (ConvexHullRelationEpsilon < relation)
+                    {
+                        candidateIndex = i;
+                        continue;
+                    }
+
+                    if (Mathf.Abs(relation) <= ConvexHullRelationEpsilon)
+                    {
+                        float candidateDistance = (
+                            candidate - worldPositions[currentIndex]
+                        ).sqrMagnitude;
+                        float pointDistance = (point - worldPositions[currentIndex]).sqrMagnitude;
+                        if (candidateDistance < pointDistance)
+                        {
+                            candidateIndex = i;
+                        }
+                    }
+                }
+
+                if (includeColinearPoints && scratchIndices != null)
+                {
+                    scratchIndices.Clear();
+                    for (int i = 0; i < pointCount; ++i)
+                    {
+                        if (i == currentIndex || i == candidateIndex)
+                        {
+                            continue;
+                        }
+
+                        float relation = Geometry.IsAPointLeftOfVectorOrOnTheLine(
+                            worldPositions[currentIndex],
+                            worldPositions[candidateIndex],
+                            worldPositions[i]
+                        );
+                        if (Mathf.Abs(relation) <= ConvexHullRelationEpsilon)
+                        {
+                            scratchIndices.Add(i);
+                        }
+                    }
+
+                    SortIndicesByDistance(
+                        worldPositions,
+                        worldPositions[currentIndex],
+                        scratchIndices,
+                        scratchDistances
+                    );
+                    if (0 < scratchIndices.Count)
+                    {
+                        foreach (int index in scratchIndices)
+                        {
+                            if (membershipFlags != null && membershipFlags[index])
+                            {
+                                continue;
+                            }
+
+                            hull.Add(points[index]);
+                            if (membershipFlags != null && index < membershipFlags.Length)
+                            {
+                                membershipFlags[index] = true;
+                            }
+                        }
+                    }
+                }
+
+                currentIndex = candidateIndex;
+                if (guardMax < ++guard)
+                {
+                    break;
+                }
+            } while (currentIndex != startIndex);
+
+            if (!includeColinearPoints && 2 < hull.Count)
+            {
+                PruneColinearOnHull(hull);
+            }
+
+            return hull;
+        }
+
         private static double ComputeAreaTolerance(Vector2 a, Vector2 b, Vector2 c)
         {
             double maxComponent = Math.Max(
@@ -630,317 +941,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             return availableCount;
-        }
-
-        internal static List<Vector2> BuildConvexHullJarvisFallback(
-            List<Vector2> points,
-            List<Vector2> hull,
-            bool includeColinearPoints,
-            List<int> scratchIndices,
-            float[] scratchDistances,
-            bool[] membershipFlags
-        )
-        {
-            hull ??= new List<Vector2>();
-            hull.Clear();
-            int pointCount = points?.Count ?? 0;
-            if (pointCount == 0 || points == null)
-            {
-                return hull;
-            }
-
-            if (pointCount <= 2)
-            {
-                hull.AddRange(points);
-                return hull;
-            }
-
-            ResetBooleanFlags(membershipFlags, pointCount);
-
-            int startIndex = FindLowestPointIndex(points);
-            if (startIndex < 0)
-            {
-                hull.AddRange(points);
-                return hull;
-            }
-
-            int currentIndex = startIndex;
-            int guard = 0;
-            int guardMax = Math.Max(8, pointCount * 8);
-
-            do
-            {
-                Vector2 current = points[currentIndex];
-                hull.Add(current);
-                if (membershipFlags != null && currentIndex < membershipFlags.Length)
-                {
-                    membershipFlags[currentIndex] = true;
-                }
-                if (!includeColinearPoints)
-                {
-                    TrimTailColinear(hull);
-                }
-
-                int candidateIndex = -1;
-                for (int i = 0; i < pointCount; ++i)
-                {
-                    if (i == currentIndex)
-                    {
-                        continue;
-                    }
-
-                    candidateIndex = i;
-                    break;
-                }
-
-                if (candidateIndex < 0)
-                {
-                    break;
-                }
-
-                for (int i = 0; i < pointCount; ++i)
-                {
-                    if (i == currentIndex || i == candidateIndex)
-                    {
-                        continue;
-                    }
-
-                    Vector2 candidate = points[candidateIndex];
-                    Vector2 point = points[i];
-                    float relation = Geometry.IsAPointLeftOfVectorOrOnTheLine(
-                        current,
-                        candidate,
-                        point
-                    );
-                    if (ConvexHullRelationEpsilon < relation)
-                    {
-                        candidateIndex = i;
-                        continue;
-                    }
-
-                    if (Mathf.Abs(relation) <= ConvexHullRelationEpsilon)
-                    {
-                        float candidateDistance = (candidate - current).sqrMagnitude;
-                        float pointDistance = (point - current).sqrMagnitude;
-                        if (candidateDistance < pointDistance)
-                        {
-                            candidateIndex = i;
-                        }
-                    }
-                }
-
-                if (includeColinearPoints && scratchIndices != null)
-                {
-                    scratchIndices.Clear();
-                    for (int i = 0; i < pointCount; ++i)
-                    {
-                        if (i == currentIndex || i == candidateIndex)
-                        {
-                            continue;
-                        }
-
-                        float relation = Geometry.IsAPointLeftOfVectorOrOnTheLine(
-                            current,
-                            points[candidateIndex],
-                            points[i]
-                        );
-                        if (Mathf.Abs(relation) <= ConvexHullRelationEpsilon)
-                        {
-                            scratchIndices.Add(i);
-                        }
-                    }
-
-                    SortIndicesByDistance(points, current, scratchIndices, scratchDistances);
-                    if (0 < scratchIndices.Count)
-                    {
-                        foreach (int index in scratchIndices)
-                        {
-                            if (membershipFlags != null && membershipFlags[index])
-                            {
-                                continue;
-                            }
-
-                            hull.Add(points[index]);
-                            if (membershipFlags != null && index < membershipFlags.Length)
-                            {
-                                membershipFlags[index] = true;
-                            }
-                        }
-                    }
-                }
-
-                currentIndex = candidateIndex;
-                if (guardMax < ++guard)
-                {
-                    break;
-                }
-            } while (currentIndex != startIndex);
-
-            if (!includeColinearPoints && 2 < hull.Count)
-            {
-                PruneColinearOnHull(hull);
-            }
-
-            return hull;
-        }
-
-        internal static List<FastVector3Int> BuildGridConvexHullJarvisFallback(
-            List<FastVector3Int> points,
-            Vector2[] worldPositions,
-            List<FastVector3Int> hull,
-            bool includeColinearPoints,
-            List<int> scratchIndices,
-            float[] scratchDistances,
-            bool[] membershipFlags
-        )
-        {
-            hull ??= new List<FastVector3Int>();
-            hull.Clear();
-            int pointCount = points?.Count ?? 0;
-            if (pointCount == 0 || points == null)
-            {
-                return hull;
-            }
-
-            if (pointCount <= 2)
-            {
-                hull.AddRange(points);
-                return hull;
-            }
-
-            ResetBooleanFlags(membershipFlags, pointCount);
-
-            int startIndex = FindLowestWorldPositionIndex(worldPositions, pointCount);
-            if (startIndex < 0)
-            {
-                hull.AddRange(points);
-                return hull;
-            }
-
-            int currentIndex = startIndex;
-            int guard = 0;
-            int guardMax = Math.Max(8, pointCount * 8);
-
-            do
-            {
-                hull.Add(points[currentIndex]);
-                if (membershipFlags != null && currentIndex < membershipFlags.Length)
-                {
-                    membershipFlags[currentIndex] = true;
-                }
-                if (!includeColinearPoints)
-                {
-                    TrimTailColinear(hull);
-                }
-
-                int candidateIndex = -1;
-                for (int i = 0; i < pointCount; ++i)
-                {
-                    if (i == currentIndex)
-                    {
-                        continue;
-                    }
-
-                    candidateIndex = i;
-                    break;
-                }
-
-                if (candidateIndex < 0)
-                {
-                    break;
-                }
-
-                for (int i = 0; i < pointCount; ++i)
-                {
-                    if (i == currentIndex || i == candidateIndex)
-                    {
-                        continue;
-                    }
-
-                    Vector2 candidate = worldPositions[candidateIndex];
-                    Vector2 point = worldPositions[i];
-                    float relation = Geometry.IsAPointLeftOfVectorOrOnTheLine(
-                        worldPositions[currentIndex],
-                        candidate,
-                        point
-                    );
-                    if (ConvexHullRelationEpsilon < relation)
-                    {
-                        candidateIndex = i;
-                        continue;
-                    }
-
-                    if (Mathf.Abs(relation) <= ConvexHullRelationEpsilon)
-                    {
-                        float candidateDistance = (
-                            candidate - worldPositions[currentIndex]
-                        ).sqrMagnitude;
-                        float pointDistance = (point - worldPositions[currentIndex]).sqrMagnitude;
-                        if (candidateDistance < pointDistance)
-                        {
-                            candidateIndex = i;
-                        }
-                    }
-                }
-
-                if (includeColinearPoints && scratchIndices != null)
-                {
-                    scratchIndices.Clear();
-                    for (int i = 0; i < pointCount; ++i)
-                    {
-                        if (i == currentIndex || i == candidateIndex)
-                        {
-                            continue;
-                        }
-
-                        float relation = Geometry.IsAPointLeftOfVectorOrOnTheLine(
-                            worldPositions[currentIndex],
-                            worldPositions[candidateIndex],
-                            worldPositions[i]
-                        );
-                        if (Mathf.Abs(relation) <= ConvexHullRelationEpsilon)
-                        {
-                            scratchIndices.Add(i);
-                        }
-                    }
-
-                    SortIndicesByDistance(
-                        worldPositions,
-                        worldPositions[currentIndex],
-                        scratchIndices,
-                        scratchDistances
-                    );
-                    if (0 < scratchIndices.Count)
-                    {
-                        foreach (int index in scratchIndices)
-                        {
-                            if (membershipFlags != null && membershipFlags[index])
-                            {
-                                continue;
-                            }
-
-                            hull.Add(points[index]);
-                            if (membershipFlags != null && index < membershipFlags.Length)
-                            {
-                                membershipFlags[index] = true;
-                            }
-                        }
-                    }
-                }
-
-                currentIndex = candidateIndex;
-                if (guardMax < ++guard)
-                {
-                    break;
-                }
-            } while (currentIndex != startIndex);
-
-            if (!includeColinearPoints && 2 < hull.Count)
-            {
-                PruneColinearOnHull(hull);
-            }
-
-            return hull;
         }
 
         private static int FindLowestWorldPositionIndex(Vector2[] worldPositions, int count)

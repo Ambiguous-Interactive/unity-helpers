@@ -20,13 +20,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [NUnit.Framework.Category("Fast")]
     public sealed class SerializerApiContractTests
     {
-        private static readonly Type SerializerType = typeof(Serializer);
-
         private static IReadOnlyList<MethodInfo> PublicMethods =>
             SerializerType
                 .GetMethods(BindingFlags.Public | BindingFlags.Static)
                 .Where(m => !m.IsSpecialName)
                 .ToList();
+
+        private static readonly Type SerializerType = typeof(Serializer);
 
         private static bool IsDataParameter(ParameterInfo p) =>
             p.ParameterType == typeof(byte[]) || p.ParameterType == typeof(string);
@@ -65,32 +65,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 || m.Name.Contains("Parse", StringComparison.Ordinal);
         }
 
-        [Test]
-        public void EveryPublicDeserializerHasMatchingTrySibling()
-        {
-            List<string> missing = new();
-            foreach (MethodInfo method in PublicMethods.Where(IsDeserializeMethod))
-            {
-                string expectedTryName = "Try" + method.Name;
-                bool hasSibling = PublicMethods.Any(candidate =>
-                    candidate.Name == expectedTryName && HasMatchingTrySignature(method, candidate)
-                );
-                if (!hasSibling)
-                {
-                    missing.Add(FormatSignature(method));
-                }
-            }
-
-            if (0 < missing.Count)
-            {
-                Assert.Fail(
-                    "The following public Serializer deserialize methods lack a matching Try* sibling — "
-                        + "every new deserializer MUST ship with one (see .llm/skills/serialization-safety.md):\n  "
-                        + string.Join("\n  ", missing)
-                );
-            }
-        }
-
         private static bool HasMatchingTrySignature(MethodInfo source, MethodInfo candidate)
         {
             if (source.IsGenericMethodDefinition != candidate.IsGenericMethodDefinition)
@@ -125,6 +99,32 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 method.GetParameters().Select(p => p.ParameterType.Name + " " + p.Name)
             );
             return method.DeclaringType?.Name + "." + method.Name + "(" + parameters + ")";
+        }
+
+        [Test]
+        public void EveryPublicDeserializerHasMatchingTrySibling()
+        {
+            List<string> missing = new();
+            foreach (MethodInfo method in PublicMethods.Where(IsDeserializeMethod))
+            {
+                string expectedTryName = "Try" + method.Name;
+                bool hasSibling = PublicMethods.Any(candidate =>
+                    candidate.Name == expectedTryName && HasMatchingTrySignature(method, candidate)
+                );
+                if (!hasSibling)
+                {
+                    missing.Add(FormatSignature(method));
+                }
+            }
+
+            if (0 < missing.Count)
+            {
+                Assert.Fail(
+                    "The following public Serializer deserialize methods lack a matching Try* sibling — "
+                        + "every new deserializer MUST ship with one (see .llm/skills/serialization-safety.md):\n  "
+                        + string.Join("\n  ", missing)
+                );
+            }
         }
 
         [Test]

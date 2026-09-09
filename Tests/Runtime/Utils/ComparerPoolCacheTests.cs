@@ -29,6 +29,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     {
         private int _originalBound;
 
+        // Reset closed-generic caches so retained domains cannot carry counts into the next run.
+        private static void DropProbePools()
+        {
+            SetBuffers<HashSetProbe>.ClearPoolsForTesting();
+            SetBuffers<LruProbe>.ClearPoolsForTesting();
+            SetBuffers<SortedSetProbe>.ClearPoolsForTesting();
+            SetBuffers<UnboundedProbe>.ClearPoolsForTesting();
+            SetBuffers<StableProbe>.ClearPoolsForTesting();
+            DictionaryBuffer<DictionaryProbe, int>.ClearPoolsForTesting();
+        }
+
         [SetUp]
         public void SetUp()
         {
@@ -41,17 +52,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         {
             Buffers.ComparerPoolMaxDistinctEntries = _originalBound;
             DropProbePools();
-        }
-
-        // Reset closed-generic caches so retained domains cannot carry counts into the next run.
-        private static void DropProbePools()
-        {
-            SetBuffers<HashSetProbe>.ClearPoolsForTesting();
-            SetBuffers<LruProbe>.ClearPoolsForTesting();
-            SetBuffers<SortedSetProbe>.ClearPoolsForTesting();
-            SetBuffers<UnboundedProbe>.ClearPoolsForTesting();
-            SetBuffers<StableProbe>.ClearPoolsForTesting();
-            DictionaryBuffer<DictionaryProbe, int>.ClearPoolsForTesting();
         }
 
         [Test]

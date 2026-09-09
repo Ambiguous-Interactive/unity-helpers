@@ -11,8 +11,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
     public sealed class TypedHelperEditorTarget
     {
-        public int Field;
         public int Property { get; set; }
+
+        public int Field;
     }
 
     [TestFixture]

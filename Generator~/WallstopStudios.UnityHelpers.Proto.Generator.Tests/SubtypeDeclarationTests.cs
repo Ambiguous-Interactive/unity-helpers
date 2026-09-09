@@ -23,6 +23,142 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [TestFixture]
     public sealed class SubtypeDeclarationTests
     {
+        /// <summary>
+        /// Every shape of the twin hierarchies, paired value for value.
+        /// </summary>
+        /// <returns>A label and the two equivalent values.</returns>
+        /// <remarks>
+        /// One source feeds four assertions -- bytes, bytes under a prefix, the round-tripped type,
+        /// and the measured length -- because they are the same cases asked four questions, and a
+        /// shape added here is covered by all of them at once.
+        /// </remarks>
+        private static IEnumerable<TestCaseData> EquivalentHierarchyValues()
+        {
+            yield return Pair("the root itself", new BaseFormRoot(), new SubtypeFormRoot());
+            yield return Pair(
+                "the root with members",
+                new BaseFormRoot { Id = 1, Label = "a" },
+                new SubtypeFormRoot { Id = 1, Label = "a" }
+            );
+            yield return Pair(
+                "an all-default leaf subtype",
+                new BaseFormAlpha(),
+                new SubtypeFormAlpha()
+            );
+            yield return Pair(
+                "a leaf subtype with members",
+                new BaseFormAlpha
+                {
+                    Id = -1,
+                    Label = string.Empty,
+                    AlphaOnly = int.MinValue,
+                    AlphaText = "é中",
+                },
+                new SubtypeFormAlpha
+                {
+                    Id = -1,
+                    Label = string.Empty,
+                    AlphaOnly = int.MinValue,
+                    AlphaText = "é中",
+                }
+            );
+            yield return Pair(
+                "a middle subtype",
+                new BaseFormBeta { Id = 2, BetaOnly = -0.5 },
+                new SubtypeFormBeta { Id = 2, BetaOnly = -0.5 }
+            );
+            yield return Pair(
+                "an all-default deep subtype",
+                DeepBase(0, null, 0, false),
+                DeepSubtype(0, null, 0, false)
+            );
+            yield return Pair(
+                "a deep subtype with members",
+                DeepBase(3, "g", double.MaxValue, true),
+                DeepSubtype(3, "g", double.MaxValue, true)
+            );
+        }
+
+        private static TestCaseData Pair(
+            string label,
+            BaseFormRoot declaredByBase,
+            SubtypeFormRoot declaredBySubtype
+        )
+        {
+            return new TestCaseData(label, declaredByBase, declaredBySubtype).SetName(
+                "{m} - " + label
+            );
+        }
+
+        private static BaseFormGamma DeepBase(int id, string label, double middle, bool deepest)
+        {
+            return new BaseFormGamma
+            {
+                Id = id,
+                Label = label,
+                BetaOnly = middle,
+                GammaOnly = deepest,
+            };
+        }
+
+        private static SubtypeFormGamma DeepSubtype(
+            int id,
+            string label,
+            double middle,
+            bool deepest
+        )
+        {
+            return new SubtypeFormGamma
+            {
+                Id = id,
+                Label = label,
+                BetaOnly = middle,
+                GammaOnly = deepest,
+            };
+        }
+
+        private static string OracleHex<T>(T value)
+        {
+            using (MemoryStream stream = new MemoryStream())
+            {
+                ProtoBuf.Serializer.Serialize(stream, value);
+                return ToHex(stream.ToArray());
+            }
+        }
+
+        private static string ToHex(byte[] bytes)
+        {
+            StringBuilder builder = new StringBuilder(bytes.Length * 2);
+            foreach (byte current in bytes)
+            {
+                builder.Append(current.ToString("X2"));
+            }
+
+            return builder.ToString();
+        }
+
+        private static string Encode<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new WProtoWriter(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+            Assert.AreEqual(buffer.Length, writer.Position, "Measure disagreed with Write");
+            return ToHex(buffer);
+        }
+
+        private static T RoundTrip<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new WProtoWriter(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+
+            WProtoReader reader = new WProtoReader(buffer);
+            Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
+            return restored;
+        }
+
         [TestCaseSource(nameof(EquivalentHierarchyValues))]
         public void TheTwoDeclarationFormsProduceIdenticalBytes(
             string label,
@@ -236,100 +372,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
-        /// <summary>
-        /// Every shape of the twin hierarchies, paired value for value.
-        /// </summary>
-        /// <returns>A label and the two equivalent values.</returns>
-        /// <remarks>
-        /// One source feeds four assertions -- bytes, bytes under a prefix, the round-tripped type,
-        /// and the measured length -- because they are the same cases asked four questions, and a
-        /// shape added here is covered by all of them at once.
-        /// </remarks>
-        private static IEnumerable<TestCaseData> EquivalentHierarchyValues()
-        {
-            yield return Pair("the root itself", new BaseFormRoot(), new SubtypeFormRoot());
-            yield return Pair(
-                "the root with members",
-                new BaseFormRoot { Id = 1, Label = "a" },
-                new SubtypeFormRoot { Id = 1, Label = "a" }
-            );
-            yield return Pair(
-                "an all-default leaf subtype",
-                new BaseFormAlpha(),
-                new SubtypeFormAlpha()
-            );
-            yield return Pair(
-                "a leaf subtype with members",
-                new BaseFormAlpha
-                {
-                    Id = -1,
-                    Label = string.Empty,
-                    AlphaOnly = int.MinValue,
-                    AlphaText = "é中",
-                },
-                new SubtypeFormAlpha
-                {
-                    Id = -1,
-                    Label = string.Empty,
-                    AlphaOnly = int.MinValue,
-                    AlphaText = "é中",
-                }
-            );
-            yield return Pair(
-                "a middle subtype",
-                new BaseFormBeta { Id = 2, BetaOnly = -0.5 },
-                new SubtypeFormBeta { Id = 2, BetaOnly = -0.5 }
-            );
-            yield return Pair(
-                "an all-default deep subtype",
-                DeepBase(0, null, 0, false),
-                DeepSubtype(0, null, 0, false)
-            );
-            yield return Pair(
-                "a deep subtype with members",
-                DeepBase(3, "g", double.MaxValue, true),
-                DeepSubtype(3, "g", double.MaxValue, true)
-            );
-        }
-
-        private static TestCaseData Pair(
-            string label,
-            BaseFormRoot declaredByBase,
-            SubtypeFormRoot declaredBySubtype
-        )
-        {
-            return new TestCaseData(label, declaredByBase, declaredBySubtype).SetName(
-                "{m} - " + label
-            );
-        }
-
-        private static BaseFormGamma DeepBase(int id, string label, double middle, bool deepest)
-        {
-            return new BaseFormGamma
-            {
-                Id = id,
-                Label = label,
-                BetaOnly = middle,
-                GammaOnly = deepest,
-            };
-        }
-
-        private static SubtypeFormGamma DeepSubtype(
-            int id,
-            string label,
-            double middle,
-            bool deepest
-        )
-        {
-            return new SubtypeFormGamma
-            {
-                Id = id,
-                Label = label,
-                BetaOnly = middle,
-                GammaOnly = deepest,
-            };
-        }
-
         [Test]
         public void ASubtypeClaimedUnderTwoFieldNumbersWritesTheLowerOne()
         {
@@ -341,48 +383,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             StringAssert.StartsWith("2A", mine);
             Assert.AreEqual(OracleHex(value), mine, "the wire has to agree with protobuf-net");
             Assert.IsInstanceOf<TwiceClaimedSubtype>(RoundTrip(value));
-        }
-
-        private static string OracleHex<T>(T value)
-        {
-            using (MemoryStream stream = new MemoryStream())
-            {
-                ProtoBuf.Serializer.Serialize(stream, value);
-                return ToHex(stream.ToArray());
-            }
-        }
-
-        private static string ToHex(byte[] bytes)
-        {
-            StringBuilder builder = new StringBuilder(bytes.Length * 2);
-            foreach (byte current in bytes)
-            {
-                builder.Append(current.ToString("X2"));
-            }
-
-            return builder.ToString();
-        }
-
-        private static string Encode<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new WProtoWriter(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-            Assert.AreEqual(buffer.Length, writer.Position, "Measure disagreed with Write");
-            return ToHex(buffer);
-        }
-
-        private static T RoundTrip<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new WProtoWriter(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-
-            WProtoReader reader = new WProtoReader(buffer);
-            Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
-            return restored;
         }
     }
 }

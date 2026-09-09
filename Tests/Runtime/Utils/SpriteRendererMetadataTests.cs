@@ -16,35 +16,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     [NUnit.Framework.Category("Fast")]
     public sealed class SpriteRendererMetadataTests : CommonTestBase
     {
-        private SpriteRendererMetadata CreateMetadata()
-        {
-            GameObject go = Track(
-                new GameObject(
-                    "TestSpriteRendererMetadata",
-                    typeof(SpriteRenderer),
-                    typeof(SpriteRendererMetadata)
-                )
-            );
-            return go.GetComponent<SpriteRendererMetadata>();
-        }
-
-        private Material CreateMaterial()
-        {
-            return Track(new Material(Shader.Find("Sprites/Default")));
-        }
-
-        private Color CreateColor()
-        {
-            IRandom random = PRNG.Instance;
-            Color color = new(
-                random.NextFloat(),
-                random.NextFloat(),
-                random.NextFloat(),
-                random.NextFloat()
-            );
-            return color;
-        }
-
         [UnityTest]
         public IEnumerator Initialization()
         {
@@ -381,6 +352,35 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.AreEqual(metadata.OriginalMaterial, metadata.CurrentMaterial);
             Assert.AreEqual(1, metadata.Materials.Count());
             yield break;
+        }
+
+        private SpriteRendererMetadata CreateMetadata()
+        {
+            GameObject go = Track(
+                new GameObject(
+                    "TestSpriteRendererMetadata",
+                    typeof(SpriteRenderer),
+                    typeof(SpriteRendererMetadata)
+                )
+            );
+            return go.GetComponent<SpriteRendererMetadata>();
+        }
+
+        private Material CreateMaterial()
+        {
+            return Track(new Material(Shader.Find("Sprites/Default")));
+        }
+
+        private Color CreateColor()
+        {
+            IRandom random = PRNG.Instance;
+            Color color = new(
+                random.NextFloat(),
+                random.NextFloat(),
+                random.NextFloat(),
+                random.NextFloat()
+            );
+            return color;
         }
     }
 }

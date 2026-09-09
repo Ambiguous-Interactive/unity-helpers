@@ -307,6 +307,40 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             NavigateTo(validInitialPath);
         }
 
+        /// <summary>
+        /// Clears selection and navigates to a new starting directory.
+        /// </summary>
+        /// <param name="newInitialPath">Project-relative path (e.g., "Assets/...").</param>
+        public void ResetAndShow(string newInitialPath)
+        {
+            _selectedSet.Clear();
+            NavigateTo(newInitialPath);
+        }
+
+        /// <summary>
+        /// Returns the current visible entry names (folders and files) for diagnostics and tests.
+        /// Folder names are returned without UI decorations.
+        /// </summary>
+        public IReadOnlyList<string> DebugGetVisibleEntryNames()
+        {
+            using Utils.PooledResource<List<string>> lease = Utils.Buffers<string>.List.Get(
+                out List<string> list
+            );
+            foreach (Item item in _items)
+            {
+                list.Add(item.name);
+            }
+            return list.ToArray();
+        }
+
+        /// <summary>
+        /// Returns the currently selected file paths for diagnostics and tests.
+        /// </summary>
+        public IReadOnlyCollection<string> DebugGetSelectedFilePaths()
+        {
+            return _selectedSet;
+        }
+
         internal void NavigateTo(string path)
         {
             string fullPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", path));
@@ -372,6 +406,52 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                 PersistString(dirKey, rel.SanitizePath());
                 UpdateLastUsedNow();
             }
+        }
+
+        internal void SelectAllInView()
+        {
+            foreach (Item it in _items)
+            {
+                if (!it.isDirectory)
+                {
+                    _selectedSet.Add(it.fullPath);
+                }
+            }
+            _listView.RefreshItems();
+            UpdateConfirmButtonText();
+        }
+
+        internal void ClearSelectionInView()
+        {
+            foreach (Item it in _items)
+            {
+                if (!it.isDirectory)
+                {
+                    _selectedSet.Remove(it.fullPath);
+                }
+            }
+            _listView.RefreshItems();
+            UpdateConfirmButtonText();
+        }
+
+        internal void InvertSelectionInView()
+        {
+            foreach (Item it in _items)
+            {
+                if (!it.isDirectory)
+                {
+                    if (_selectedSet.Contains(it.fullPath))
+                    {
+                        _selectedSet.Remove(it.fullPath);
+                    }
+                    else
+                    {
+                        _selectedSet.Add(it.fullPath);
+                    }
+                }
+            }
+            _listView.RefreshItems();
+            UpdateConfirmButtonText();
         }
 
         private void NavigateUp()
@@ -494,16 +574,6 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             }
         }
 
-        /// <summary>
-        /// Clears selection and navigates to a new starting directory.
-        /// </summary>
-        /// <param name="newInitialPath">Project-relative path (e.g., "Assets/...").</param>
-        public void ResetAndShow(string newInitialPath)
-        {
-            _selectedSet.Clear();
-            NavigateTo(newInitialPath);
-        }
-
         private VisualElement MakeRow()
         {
             VisualElement row = new()
@@ -615,30 +685,6 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             _confirmButton.text = $"Add Selected ({_selectedSet.Count})";
         }
 
-        /// <summary>
-        /// Returns the current visible entry names (folders and files) for diagnostics and tests.
-        /// Folder names are returned without UI decorations.
-        /// </summary>
-        public IReadOnlyList<string> DebugGetVisibleEntryNames()
-        {
-            using Utils.PooledResource<List<string>> lease = Utils.Buffers<string>.List.Get(
-                out List<string> list
-            );
-            foreach (Item item in _items)
-            {
-                list.Add(item.name);
-            }
-            return list.ToArray();
-        }
-
-        /// <summary>
-        /// Returns the currently selected file paths for diagnostics and tests.
-        /// </summary>
-        public IReadOnlyCollection<string> DebugGetSelectedFilePaths()
-        {
-            return _selectedSet;
-        }
-
         private void BuildBreadcrumbs()
         {
             _breadcrumbBar.Clear();
@@ -711,52 +757,6 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             }
         }
 
-        internal void SelectAllInView()
-        {
-            foreach (Item it in _items)
-            {
-                if (!it.isDirectory)
-                {
-                    _selectedSet.Add(it.fullPath);
-                }
-            }
-            _listView.RefreshItems();
-            UpdateConfirmButtonText();
-        }
-
-        internal void ClearSelectionInView()
-        {
-            foreach (Item it in _items)
-            {
-                if (!it.isDirectory)
-                {
-                    _selectedSet.Remove(it.fullPath);
-                }
-            }
-            _listView.RefreshItems();
-            UpdateConfirmButtonText();
-        }
-
-        internal void InvertSelectionInView()
-        {
-            foreach (Item it in _items)
-            {
-                if (!it.isDirectory)
-                {
-                    if (_selectedSet.Contains(it.fullPath))
-                    {
-                        _selectedSet.Remove(it.fullPath);
-                    }
-                    else
-                    {
-                        _selectedSet.Add(it.fullPath);
-                    }
-                }
-            }
-            _listView.RefreshItems();
-            UpdateConfirmButtonText();
-        }
-
 #if UNITY_EDITOR
         private void OpenInExplorer()
         {
@@ -770,68 +770,6 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             }
         }
 #endif
-
-        private static string LoadString(string key, string defaultValue)
-        {
-            if (string.IsNullOrEmpty(key))
-            {
-                return defaultValue;
-            }
-#if UNITY_EDITOR
-            return UnityEditor.EditorPrefs.GetString(key, defaultValue);
-#else
-            return PlayerPrefs.GetString(key, defaultValue);
-#endif
-        }
-
-        private static void PersistString(string key, string value)
-        {
-            if (string.IsNullOrEmpty(key))
-            {
-                return;
-            }
-#if UNITY_EDITOR
-            UnityEditor.EditorPrefs.SetString(key, value ?? string.Empty);
-#else
-            PlayerPrefs.SetString(key, value ?? string.Empty);
-            PlayerPrefs.Save();
-#endif
-        }
-
-        private static void RegisterScope(string scope)
-        {
-            if (string.IsNullOrEmpty(scope))
-            {
-                return;
-            }
-
-            string index = LoadString(PrefKey_ScopesIndex, string.Empty);
-            if (string.IsNullOrEmpty(index))
-            {
-                PersistString(PrefKey_ScopesIndex, scope);
-                return;
-            }
-
-            string[] parts = index.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
-            foreach (string part in parts)
-            {
-                if (string.Equals(part, scope, StringComparison.Ordinal))
-                {
-                    return;
-                }
-            }
-            PersistString(PrefKey_ScopesIndex, index + ";" + scope);
-        }
-
-        private void UpdateLastUsedNow()
-        {
-            string key = ScopedKey(PrefKey_LastUsed);
-            if (!string.IsNullOrEmpty(key))
-            {
-                PersistString(key, DateTime.UtcNow.Ticks.ToString());
-                RegisterScope(_prefsScope);
-            }
-        }
 
         /// <summary>
         /// Removes persisted entries for scopes that have not been used within the provided time window.
@@ -892,13 +830,56 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             }
         }
 
-        private string ScopedKey(string baseKey)
+        private static string LoadString(string key, string defaultValue)
         {
-            if (string.IsNullOrEmpty(baseKey) || string.IsNullOrEmpty(_prefsScope))
+            if (string.IsNullOrEmpty(key))
             {
-                return null;
+                return defaultValue;
             }
-            return baseKey + "." + _prefsScope;
+#if UNITY_EDITOR
+            return UnityEditor.EditorPrefs.GetString(key, defaultValue);
+#else
+            return PlayerPrefs.GetString(key, defaultValue);
+#endif
+        }
+
+        private static void PersistString(string key, string value)
+        {
+            if (string.IsNullOrEmpty(key))
+            {
+                return;
+            }
+#if UNITY_EDITOR
+            UnityEditor.EditorPrefs.SetString(key, value ?? string.Empty);
+#else
+            PlayerPrefs.SetString(key, value ?? string.Empty);
+            PlayerPrefs.Save();
+#endif
+        }
+
+        private static void RegisterScope(string scope)
+        {
+            if (string.IsNullOrEmpty(scope))
+            {
+                return;
+            }
+
+            string index = LoadString(PrefKey_ScopesIndex, string.Empty);
+            if (string.IsNullOrEmpty(index))
+            {
+                PersistString(PrefKey_ScopesIndex, scope);
+                return;
+            }
+
+            string[] parts = index.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (string part in parts)
+            {
+                if (string.Equals(part, scope, StringComparison.Ordinal))
+                {
+                    return;
+                }
+            }
+            PersistString(PrefKey_ScopesIndex, index + ";" + scope);
         }
 
         private static string BuildScope(string initialPath, HashSet<string> extensions, string key)
@@ -928,6 +909,25 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                 }
             }
             return new string(buffer, 0, n).Trim('_');
+        }
+
+        private void UpdateLastUsedNow()
+        {
+            string key = ScopedKey(PrefKey_LastUsed);
+            if (!string.IsNullOrEmpty(key))
+            {
+                PersistString(key, DateTime.UtcNow.Ticks.ToString());
+                RegisterScope(_prefsScope);
+            }
+        }
+
+        private string ScopedKey(string baseKey)
+        {
+            if (string.IsNullOrEmpty(baseKey) || string.IsNullOrEmpty(_prefsScope))
+            {
+                return null;
+            }
+            return baseKey + "." + _prefsScope;
         }
 
         private readonly struct Item

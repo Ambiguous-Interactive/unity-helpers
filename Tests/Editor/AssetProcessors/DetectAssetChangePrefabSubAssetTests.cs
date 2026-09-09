@@ -44,6 +44,119 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
         private AssetChangeDetectionEnabledScope _watcherScope;
 
+        private static bool HasSubAssetOfType<T>(string assetPath)
+            where T : Object
+        {
+            Object[] allAssets = AssetDatabase.LoadAllAssetsAtPath(assetPath);
+            if (allAssets == null)
+            {
+                return false;
+            }
+
+            Object mainAsset = AssetDatabase.LoadMainAssetAtPath(assetPath);
+            foreach (Object candidate in allAssets)
+            {
+                if (candidate != null && candidate != mainAsset && candidate is T)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool RecordedCreatedPathsContain(
+            IReadOnlyList<AssetChangeContext> recordedContexts,
+            string assetPath
+        )
+        {
+            if (recordedContexts == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < recordedContexts.Count; i++)
+            {
+                AssetChangeContext context = recordedContexts[i];
+                if (context == null)
+                {
+                    continue;
+                }
+
+                IReadOnlyList<string> createdPaths = context.CreatedAssetPaths;
+                for (int j = 0; j < createdPaths.Count; j++)
+                {
+                    if (
+                        string.Equals(
+                            createdPaths[j],
+                            assetPath,
+                            StringComparison.OrdinalIgnoreCase
+                        )
+                    )
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        /*
+            Unity has changed the native log severity; checking both buckets prevents a vacuous warning
+            assertion.
+        */
+        private static void AssertNoSendMessageErrors(EditorLogScope logScope)
+        {
+            IReadOnlyList<EditorLogScope.LogRecord> errors = logScope.Errors;
+            for (int i = 0; i < errors.Count; i++)
+            {
+                EditorLogScope.LogRecord record = errors[i];
+                Assert.IsFalse(
+                    record.Condition.StartsWith(SendMessageMessagePrefix, StringComparison.Ordinal),
+                    $"Expected no SendMessage diagnostics, but an error was logged: {record.Condition}"
+                );
+            }
+        }
+
+        private static void EnsureTestFolder()
+        {
+            // Use batch-safe folder creation so AssetDatabase recognizes the folder immediately.
+            if (!AssetDatabaseBatchHelper.EnsureAssetFolder(TestRoot))
+            {
+                Debug.LogWarning(
+                    $"EnsureTestFolder: Failed to register folder '{TestRoot}' in the AssetDatabase."
+                );
+            }
+        }
+
+        private static void WriteSolidColorTexture(string path, int width, int height, Color color)
+        {
+            Texture2D texture = new(width, height, TextureFormat.RGBA32, mipChain: false);
+            try
+            {
+                Color[] pixels = new Color[width * height];
+                for (int i = 0; i < pixels.Length; i++)
+                {
+                    pixels[i] = color;
+                }
+
+                texture.SetPixels(pixels);
+                texture.Apply();
+
+                byte[] encoded = texture.EncodeToPNG();
+                string absolutePath = Path.Combine(
+                    Path.GetDirectoryName(Application.dataPath) ?? string.Empty,
+                    path
+                );
+                File.WriteAllBytes(absolutePath, encoded);
+            }
+            finally
+            {
+                Object.DestroyImmediate(texture); // UNH-SUPPRESS: Test cleanup
+            }
+        }
+
         [OneTimeSetUp]
         public override void CommonOneTimeSetUp()
         {
@@ -334,119 +447,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     Object.DestroyImmediate(prefabSource); // UNH-SUPPRESS: Test cleanup
                 }
             });
-        }
-
-        private static bool HasSubAssetOfType<T>(string assetPath)
-            where T : Object
-        {
-            Object[] allAssets = AssetDatabase.LoadAllAssetsAtPath(assetPath);
-            if (allAssets == null)
-            {
-                return false;
-            }
-
-            Object mainAsset = AssetDatabase.LoadMainAssetAtPath(assetPath);
-            foreach (Object candidate in allAssets)
-            {
-                if (candidate != null && candidate != mainAsset && candidate is T)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool RecordedCreatedPathsContain(
-            IReadOnlyList<AssetChangeContext> recordedContexts,
-            string assetPath
-        )
-        {
-            if (recordedContexts == null)
-            {
-                return false;
-            }
-
-            for (int i = 0; i < recordedContexts.Count; i++)
-            {
-                AssetChangeContext context = recordedContexts[i];
-                if (context == null)
-                {
-                    continue;
-                }
-
-                IReadOnlyList<string> createdPaths = context.CreatedAssetPaths;
-                for (int j = 0; j < createdPaths.Count; j++)
-                {
-                    if (
-                        string.Equals(
-                            createdPaths[j],
-                            assetPath,
-                            StringComparison.OrdinalIgnoreCase
-                        )
-                    )
-                    {
-                        return true;
-                    }
-                }
-            }
-
-            return false;
-        }
-
-        /*
-            Unity has changed the native log severity; checking both buckets prevents a vacuous warning
-            assertion.
-        */
-        private static void AssertNoSendMessageErrors(EditorLogScope logScope)
-        {
-            IReadOnlyList<EditorLogScope.LogRecord> errors = logScope.Errors;
-            for (int i = 0; i < errors.Count; i++)
-            {
-                EditorLogScope.LogRecord record = errors[i];
-                Assert.IsFalse(
-                    record.Condition.StartsWith(SendMessageMessagePrefix, StringComparison.Ordinal),
-                    $"Expected no SendMessage diagnostics, but an error was logged: {record.Condition}"
-                );
-            }
-        }
-
-        private static void EnsureTestFolder()
-        {
-            // Use batch-safe folder creation so AssetDatabase recognizes the folder immediately.
-            if (!AssetDatabaseBatchHelper.EnsureAssetFolder(TestRoot))
-            {
-                Debug.LogWarning(
-                    $"EnsureTestFolder: Failed to register folder '{TestRoot}' in the AssetDatabase."
-                );
-            }
-        }
-
-        private static void WriteSolidColorTexture(string path, int width, int height, Color color)
-        {
-            Texture2D texture = new(width, height, TextureFormat.RGBA32, mipChain: false);
-            try
-            {
-                Color[] pixels = new Color[width * height];
-                for (int i = 0; i < pixels.Length; i++)
-                {
-                    pixels[i] = color;
-                }
-
-                texture.SetPixels(pixels);
-                texture.Apply();
-
-                byte[] encoded = texture.EncodeToPNG();
-                string absolutePath = Path.Combine(
-                    Path.GetDirectoryName(Application.dataPath) ?? string.Empty,
-                    path
-                );
-                File.WriteAllBytes(absolutePath, encoded);
-            }
-            finally
-            {
-                Object.DestroyImmediate(texture); // UNH-SUPPRESS: Test cleanup
-            }
         }
     }
 }

@@ -40,6 +40,31 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             .KeyComparer(StringComparer.Ordinal)
             .Build();
 
+        private static SerializedProperty GetCachedTypeNameProperty(SerializedProperty property)
+        {
+            string key = property.propertyPath;
+            int currentFrame = Time.frameCount;
+
+            if (PropertyCache.TryGet(key, out CachedProperty cached))
+            {
+                if (cached.lastCacheFrame == currentFrame && cached.typeNameProperty != null)
+                {
+                    return cached.typeNameProperty;
+                }
+            }
+            else
+            {
+                cached = new CachedProperty();
+                PropertyCache.Set(key, cached);
+            }
+
+            cached.typeNameProperty = property.FindPropertyRelative(
+                SerializableType.SerializedPropertyNames.AssemblyQualifiedName
+            );
+            cached.lastCacheFrame = currentFrame;
+            return cached.typeNameProperty;
+        }
+
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
             SerializedProperty typeNameProperty = GetCachedTypeNameProperty(property);
@@ -73,31 +98,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             return new PropertyField(typeNameProperty, property.displayName);
-        }
-
-        private static SerializedProperty GetCachedTypeNameProperty(SerializedProperty property)
-        {
-            string key = property.propertyPath;
-            int currentFrame = Time.frameCount;
-
-            if (PropertyCache.TryGet(key, out CachedProperty cached))
-            {
-                if (cached.lastCacheFrame == currentFrame && cached.typeNameProperty != null)
-                {
-                    return cached.typeNameProperty;
-                }
-            }
-            else
-            {
-                cached = new CachedProperty();
-                PropertyCache.Set(key, cached);
-            }
-
-            cached.typeNameProperty = property.FindPropertyRelative(
-                SerializableType.SerializedPropertyNames.AssemblyQualifiedName
-            );
-            cached.lastCacheFrame = currentFrame;
-            return cached.typeNameProperty;
         }
 
         private sealed class CachedProperty

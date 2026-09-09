@@ -19,6 +19,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
 
         private Color32Converter() { }
 
+        private static byte ReadByte(ref Utf8JsonReader reader)
+        {
+            int v = reader.GetInt32();
+            if (255u < (uint)v)
+            {
+                throw new JsonException("Color32 channel out of range");
+            }
+            return (byte)v;
+        }
+
         public override Color32 Read(
             ref Utf8JsonReader reader,
             Type typeToConvert,
@@ -72,16 +82,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             }
 
             throw new JsonException("Incomplete JSON for Color32");
-        }
-
-        private static byte ReadByte(ref Utf8JsonReader reader)
-        {
-            int v = reader.GetInt32();
-            if (255u < (uint)v)
-            {
-                throw new JsonException("Color32 channel out of range");
-            }
-            return (byte)v;
         }
 
         public override void Write(

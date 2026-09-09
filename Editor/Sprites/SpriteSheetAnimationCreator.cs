@@ -42,38 +42,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     /// </remarks>
     public sealed class SpriteSheetAnimationCreator : EditorWindow
     {
-        private static bool SuppressUserPrompts { get; set; }
-
-        static SpriteSheetAnimationCreator()
-        {
-            try
-            {
-                if (Application.isBatchMode || IsInvokedByTestRunner())
-                {
-                    SuppressUserPrompts = true;
-                }
-            }
-            catch { }
-        }
-
-        private static bool IsInvokedByTestRunner()
-        {
-            string[] args = Environment.GetCommandLineArgs();
-            foreach (string a in args)
-            {
-                if (
-                    0 <= a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
-                    || 0 <= a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)
-                    || 0 <= a.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase)
-                )
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-
         private const float ThumbnailSize = 64f;
+
+        private static bool SuppressUserPrompts { get; set; }
 
         private Texture2D _selectedSpriteSheet;
         private readonly List<Sprite> _availableSprites = new();
@@ -115,6 +86,23 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private TimeSpan? _lastTick;
 
+        public SpriteSheetAnimationCreator()
+        {
+            _editorUpdateCallback = OnEditorUpdate;
+        }
+
+        static SpriteSheetAnimationCreator()
+        {
+            try
+            {
+                if (Application.isBatchMode || IsInvokedByTestRunner())
+                {
+                    SuppressUserPrompts = true;
+                }
+            }
+            catch { }
+        }
+
         [MenuItem("Tools/Wallstop Studios/Unity Helpers/Sprite Sheet Animation Creator")]
         public static void ShowWindow()
         {
@@ -123,9 +111,190 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             window.minSize = new Vector2(600, 700);
         }
 
-        public SpriteSheetAnimationCreator()
+        private static bool IsInvokedByTestRunner()
         {
-            _editorUpdateCallback = OnEditorUpdate;
+            string[] args = Environment.GetCommandLineArgs();
+            foreach (string a in args)
+            {
+                if (
+                    0 <= a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
+                    || 0 <= a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)
+                    || 0 <= a.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase)
+                )
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static VisualElement MakeAnimationDefinitionItem()
+        {
+            VisualElement container = new()
+            {
+                style =
+                {
+                    flexDirection = FlexDirection.Column,
+                    borderBottomWidth = 1,
+                    borderBottomColor = Color.gray,
+                    paddingBottom = 10,
+                    paddingTop = 5,
+                },
+            };
+            VisualElement firstRow = new()
+            {
+                style =
+                {
+                    flexDirection = FlexDirection.Row,
+                    alignItems = Align.Center,
+                    marginBottom = 3,
+                },
+            };
+            VisualElement secondRow = new()
+            {
+                style =
+                {
+                    flexDirection = FlexDirection.Row,
+                    alignItems = Align.Center,
+                    marginBottom = 3,
+                },
+            };
+            VisualElement thirdRow = new()
+            {
+                style = { flexDirection = FlexDirection.Row, alignItems = Align.Center },
+            };
+            VisualElement fourthRow = new()
+            {
+                style = { flexDirection = FlexDirection.Row, alignItems = Align.Center },
+            };
+
+            TextField nameField = new("Name:")
+            {
+                style =
+                {
+                    flexGrow = 1,
+                    flexShrink = 1,
+                    marginRight = 5,
+                },
+            };
+            Label spriteCountLabel = new("Sprites: 0")
+            {
+                style = { minWidth = 80, marginRight = 5 },
+            };
+            Button removeButton = new() { text = "Remove", style = { minWidth = 60 } };
+
+            firstRow.Add(nameField);
+            firstRow.Add(spriteCountLabel);
+            firstRow.Add(removeButton);
+
+            IntegerField startField = new("Start Idx:")
+            {
+                style =
+                {
+                    flexGrow = 1,
+                    flexShrink = 1,
+                    marginRight = 5,
+                },
+                tooltip = "Index of the first sprite (from 'Available Sprites' above, 0-based).",
+            };
+            IntegerField endField = new("End Idx:")
+            {
+                style =
+                {
+                    flexGrow = 1,
+                    flexShrink = 1,
+                    marginRight = 5,
+                },
+                tooltip = "Index of the last sprite (inclusive).",
+            };
+            Button previewButton = new() { text = "Preview This", style = { minWidth = 100 } };
+
+            secondRow.Add(startField);
+            secondRow.Add(endField);
+            secondRow.Add(previewButton);
+
+            FloatField fpsField = new("Default FPS:")
+            {
+                style =
+                {
+                    flexGrow = 1,
+                    flexShrink = 1,
+                    marginRight = 5,
+                },
+            };
+            CurveField curveField = new("FPS Curve:") { style = { flexGrow = 1, flexShrink = 1 } };
+
+            thirdRow.Add(fpsField);
+            thirdRow.Add(curveField);
+
+            Toggle looping = new("Looping:")
+            {
+                style =
+                {
+                    flexGrow = 1,
+                    flexShrink = 1,
+                    marginRight = 5,
+                },
+            };
+
+            FloatField cycleOffset = new("Cycle Offset:")
+            {
+                style =
+                {
+                    flexGrow = 1,
+                    flexShrink = 1,
+                    marginRight = 5,
+                },
+            };
+
+            fourthRow.Add(looping);
+            fourthRow.Add(cycleOffset);
+
+            container.Add(firstRow);
+            container.Add(secondRow);
+            container.Add(thirdRow);
+            container.Add(fourthRow);
+
+            container.userData = new AnimationDefUITags
+            {
+                nameField = nameField,
+                startIndexField = startField,
+                endIndexField = endField,
+                defaultFrameRateField = fpsField,
+                frameRateCurveField = curveField,
+                spriteCountLabel = spriteCountLabel,
+                previewButton = previewButton,
+                removeButton = removeButton,
+                looping = looping,
+                cycleOffset = cycleOffset,
+            };
+            return container;
+        }
+
+        private static bool IsCurveConstant(AnimationCurve curve)
+        {
+            if (curve == null || curve.keys.Length < 2)
+            {
+                return true;
+            }
+
+            float firstValue = curve.keys[0].value;
+            for (int i = 1; i < curve.keys.Length; ++i)
+            {
+                if (!Mathf.Approximately(curve.keys[i].value, firstValue))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static void OnRootDragUpdated(DragUpdatedEvent evt)
+        {
+            if (DragAndDrop.objectReferences.Any(obj => obj is Texture2D))
+            {
+                DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
+            }
         }
 
         public void CreateGUI()
@@ -456,6 +625,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 LoadAndDisplaySprites();
             }
             _animationDefinitionsListView.Rebuild();
+        }
+
+        public void OnBecameVisible()
+        {
+            rootVisualElement.RegisterCallback<DragUpdatedEvent>(OnRootDragUpdated);
+            rootVisualElement.RegisterCallback<DragPerformEvent>(OnRootDragPerform);
+        }
+
+        public void OnBecameInvisible()
+        {
+            rootVisualElement.UnregisterCallback<DragUpdatedEvent>(OnRootDragUpdated);
+            rootVisualElement.UnregisterCallback<DragPerformEvent>(OnRootDragPerform);
         }
 
         private void OnEnable()
@@ -834,149 +1015,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
         }
 
-        private static VisualElement MakeAnimationDefinitionItem()
-        {
-            VisualElement container = new()
-            {
-                style =
-                {
-                    flexDirection = FlexDirection.Column,
-                    borderBottomWidth = 1,
-                    borderBottomColor = Color.gray,
-                    paddingBottom = 10,
-                    paddingTop = 5,
-                },
-            };
-            VisualElement firstRow = new()
-            {
-                style =
-                {
-                    flexDirection = FlexDirection.Row,
-                    alignItems = Align.Center,
-                    marginBottom = 3,
-                },
-            };
-            VisualElement secondRow = new()
-            {
-                style =
-                {
-                    flexDirection = FlexDirection.Row,
-                    alignItems = Align.Center,
-                    marginBottom = 3,
-                },
-            };
-            VisualElement thirdRow = new()
-            {
-                style = { flexDirection = FlexDirection.Row, alignItems = Align.Center },
-            };
-            VisualElement fourthRow = new()
-            {
-                style = { flexDirection = FlexDirection.Row, alignItems = Align.Center },
-            };
-
-            TextField nameField = new("Name:")
-            {
-                style =
-                {
-                    flexGrow = 1,
-                    flexShrink = 1,
-                    marginRight = 5,
-                },
-            };
-            Label spriteCountLabel = new("Sprites: 0")
-            {
-                style = { minWidth = 80, marginRight = 5 },
-            };
-            Button removeButton = new() { text = "Remove", style = { minWidth = 60 } };
-
-            firstRow.Add(nameField);
-            firstRow.Add(spriteCountLabel);
-            firstRow.Add(removeButton);
-
-            IntegerField startField = new("Start Idx:")
-            {
-                style =
-                {
-                    flexGrow = 1,
-                    flexShrink = 1,
-                    marginRight = 5,
-                },
-                tooltip = "Index of the first sprite (from 'Available Sprites' above, 0-based).",
-            };
-            IntegerField endField = new("End Idx:")
-            {
-                style =
-                {
-                    flexGrow = 1,
-                    flexShrink = 1,
-                    marginRight = 5,
-                },
-                tooltip = "Index of the last sprite (inclusive).",
-            };
-            Button previewButton = new() { text = "Preview This", style = { minWidth = 100 } };
-
-            secondRow.Add(startField);
-            secondRow.Add(endField);
-            secondRow.Add(previewButton);
-
-            FloatField fpsField = new("Default FPS:")
-            {
-                style =
-                {
-                    flexGrow = 1,
-                    flexShrink = 1,
-                    marginRight = 5,
-                },
-            };
-            CurveField curveField = new("FPS Curve:") { style = { flexGrow = 1, flexShrink = 1 } };
-
-            thirdRow.Add(fpsField);
-            thirdRow.Add(curveField);
-
-            Toggle looping = new("Looping:")
-            {
-                style =
-                {
-                    flexGrow = 1,
-                    flexShrink = 1,
-                    marginRight = 5,
-                },
-            };
-
-            FloatField cycleOffset = new("Cycle Offset:")
-            {
-                style =
-                {
-                    flexGrow = 1,
-                    flexShrink = 1,
-                    marginRight = 5,
-                },
-            };
-
-            fourthRow.Add(looping);
-            fourthRow.Add(cycleOffset);
-
-            container.Add(firstRow);
-            container.Add(secondRow);
-            container.Add(thirdRow);
-            container.Add(fourthRow);
-
-            container.userData = new AnimationDefUITags
-            {
-                nameField = nameField,
-                startIndexField = startField,
-                endIndexField = endField,
-                defaultFrameRateField = fpsField,
-                frameRateCurveField = curveField,
-                spriteCountLabel = spriteCountLabel,
-                previewButton = previewButton,
-                removeButton = removeButton,
-                looping = looping,
-                cycleOffset = cycleOffset,
-            };
-            return container;
-        }
-
         private void BindAnimationDefinitionItem(VisualElement element, int index)
         {
             AnimationDefinition definition = _animationDefinitions[index];
@@ -1160,24 +1198,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             definition.cycleOffsetField.userData = cycleOffsetChangeCallback;
 
             UpdateSpritesForDefinition(definition);
-        }
-
-        private static bool IsCurveConstant(AnimationCurve curve)
-        {
-            if (curve == null || curve.keys.Length < 2)
-            {
-                return true;
-            }
-
-            float firstValue = curve.keys[0].value;
-            for (int i = 1; i < curve.keys.Length; ++i)
-            {
-                if (!Mathf.Approximately(curve.keys[i].value, firstValue))
-                {
-                    return false;
-                }
-            }
-            return true;
         }
 
         private void UpdateSpritesForDefinition(AnimationDefinition def)
@@ -1525,14 +1545,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
         }
 
-        private static void OnRootDragUpdated(DragUpdatedEvent evt)
-        {
-            if (DragAndDrop.objectReferences.Any(obj => obj is Texture2D))
-            {
-                DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
-            }
-        }
-
         private void OnRootDragPerform(DragPerformEvent evt)
         {
             Texture2D draggedTexture =
@@ -1542,18 +1554,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 _spriteSheetField.value = draggedTexture;
                 DragAndDrop.AcceptDrag();
             }
-        }
-
-        public void OnBecameVisible()
-        {
-            rootVisualElement.RegisterCallback<DragUpdatedEvent>(OnRootDragUpdated);
-            rootVisualElement.RegisterCallback<DragPerformEvent>(OnRootDragPerform);
-        }
-
-        public void OnBecameInvisible()
-        {
-            rootVisualElement.UnregisterCallback<DragUpdatedEvent>(OnRootDragUpdated);
-            rootVisualElement.UnregisterCallback<DragPerformEvent>(OnRootDragPerform);
         }
 
         [Serializable]

@@ -212,6 +212,370 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         }
 
         /// <summary>
+        /// Finds the best cell divisor by scoring how well grid lines align with transparent regions.
+        /// Searches ALL valid divisors (not just those near base size), but prefers divisors close
+        /// to the base size when scores are similar.
+        /// When texture dimensions aren't cleanly divisible, analyzes remainder pixels:
+        /// - If greater than 90% transparent, discards remainder
+        /// - Otherwise adjusts to include content
+        /// </summary>
+        /// <param name="pixels">Source texture pixel data.</param>
+        /// <param name="textureWidth">Width of the texture in pixels.</param>
+        /// <param name="textureHeight">Height of the texture in pixels.</param>
+        /// <param name="baseCellWidth">Initial computed cell width.</param>
+        /// <param name="baseCellHeight">Initial computed cell height.</param>
+        /// <param name="transparencyThreshold">Alpha threshold (0-1) below which pixels are considered transparent.</param>
+        /// <param name="spriteBounds">Optional list of detected sprite bounds to penalize divisors that would split sprites.</param>
+        /// <returns>Adjusted cell size that best aligns with transparency boundaries.</returns>
+        internal static Vector2Int FindBestTransparencyAlignedDivisor(
+            Color32[] pixels,
+            int textureWidth,
+            int textureHeight,
+            int baseCellWidth,
+            int baseCellHeight,
+            float transparencyThreshold = 0.1f,
+            List<Rect> spriteBounds = null
+        )
+        {
+            int fallbackWidth =
+                textureWidth % baseCellWidth == 0
+                    ? baseCellWidth
+                    : FindNearestDivisor(textureWidth, baseCellWidth);
+            int fallbackHeight =
+                textureHeight % baseCellHeight == 0
+                    ? baseCellHeight
+                    : FindNearestDivisor(textureHeight, baseCellHeight);
+
+            int bestWidth = fallbackWidth;
+            int bestHeight = fallbackHeight;
+
+            using PooledResource<List<int>> widthDivisorsLease = Buffers<int>.List.Get(
+                out List<int> widthDivisors
+            );
+            using PooledResource<List<int>> heightDivisorsLease = Buffers<int>.List.Get(
+                out List<int> heightDivisors
+            );
+
+            for (int div = MinimumCellSize; div * div <= textureWidth; ++div)
+            {
+                if (textureWidth % div == 0)
+                {
+                    widthDivisors.Add(div);
+                    int complement = textureWidth / div;
+                    if (complement != div && MinimumCellSize <= complement)
+                    {
+                        widthDivisors.Add(complement);
+                    }
+                }
+            }
+
+            for (int div = MinimumCellSize; div * div <= textureHeight; ++div)
+            {
+                if (textureHeight % div == 0)
+                {
+                    heightDivisors.Add(div);
+                    int complement = textureHeight / div;
+                    if (complement != div && MinimumCellSize <= complement)
+                    {
+                        heightDivisors.Add(complement);
+                    }
+                }
+            }
+
+            float bestScore = float.MinValue;
+            float bestCombinedBonus = float.MinValue;
+            bool foundCandidate = false;
+
+            // The primary constraint: the chosen grid must not deviate significantly from this count.
+            int baseCols = textureWidth / baseCellWidth;
+            int baseRows = textureHeight / baseCellHeight;
+            int expectedCellCount = baseCols * baseRows;
+            int minCellCount = Math.Max(1, (int)(expectedCellCount / MaxCellCountRatio));
+            int maxCellCount = (int)(expectedCellCount * MaxCellCountRatio);
+
+            float fallbackScore = ScoreDivisorByTransparency(
+                pixels,
+                textureWidth,
+                textureHeight,
+                fallbackWidth,
+                fallbackHeight,
+                transparencyThreshold
+            );
+            bestScore = fallbackScore;
+            bestCombinedBonus = 1.0f;
+
+            foreach (int candidateWidth in widthDivisors)
+            {
+                foreach (int candidateHeight in heightDivisors)
+                {
+                    // Keep divisor refinement near the requested cell count so it cannot choose an unrelated grid.
+                    int candidateCols = textureWidth / candidateWidth;
+                    int candidateRows = textureHeight / candidateHeight;
+                    int candidateCellCount = candidateCols * candidateRows;
+                    if (candidateCellCount < minCellCount || maxCellCount < candidateCellCount)
+                    {
+                        continue;
+                    }
+
+                    float score = ScoreDivisorByTransparency(
+                        pixels,
+                        textureWidth,
+                        textureHeight,
+                        candidateWidth,
+                        candidateHeight,
+                        transparencyThreshold
+                    );
+
+                    if (spriteBounds != null && 0 < spriteBounds.Count)
+                    {
+                        float spriteFitScore = CalculateSpriteFitScore(
+                            spriteBounds,
+                            candidateWidth,
+                            candidateHeight,
+                            textureWidth,
+                            textureHeight
+                        );
+
+                        if (spriteFitScore < SpriteFitHardThresholdStrict)
+                        {
+                            continue;
+                        }
+
+                        if (0.95f <= spriteFitScore)
+                        {
+                            score *= 1.1f;
+                        }
+                    }
+
+                    float widthProximity =
+                        1f
+                        - Mathf.Clamp01(
+                            (float)Math.Abs(candidateWidth - baseCellWidth) / baseCellWidth
+                        );
+                    float heightProximity =
+                        1f
+                        - Mathf.Clamp01(
+                            (float)Math.Abs(candidateHeight - baseCellHeight) / baseCellHeight
+                        );
+                    float proximityBonus = (widthProximity + heightProximity) * 0.5f;
+
+                    float sizeBonus =
+                        (float)(candidateWidth + candidateHeight) / (textureWidth + textureHeight);
+
+                    float combinedBonus = proximityBonus * 0.6f + sizeBonus * 0.4f;
+                    const float scoreDifferenceThreshold = 0.15f;
+                    bool isMuchBetterScore = bestScore + scoreDifferenceThreshold < score;
+                    bool isSimilarScoreButBetter =
+                        Math.Abs(score - bestScore) <= scoreDifferenceThreshold
+                        && bestCombinedBonus < combinedBonus;
+                    if (isMuchBetterScore || isSimilarScoreButBetter)
+                    {
+                        bestScore = score;
+                        bestCombinedBonus = combinedBonus;
+                        bestWidth = candidateWidth;
+                        bestHeight = candidateHeight;
+                        foundCandidate = true;
+                    }
+                }
+            }
+
+            if (!foundCandidate)
+            {
+                bestWidth = fallbackWidth;
+                bestHeight = fallbackHeight;
+            }
+
+            int remainderX = textureWidth % bestWidth;
+            int remainderY = textureHeight % bestHeight;
+
+            if (0 < remainderX)
+            {
+                float remainderTransparency = CalculateColumnTransparency(
+                    pixels,
+                    textureWidth,
+                    textureHeight,
+                    textureWidth - remainderX,
+                    remainderX,
+                    transparencyThreshold
+                );
+
+                if (remainderTransparency < RemainderTransparencyThreshold)
+                {
+                    int cols = textureWidth / bestWidth;
+                    if (0 < cols)
+                    {
+                        bestWidth = textureWidth / cols;
+                    }
+                }
+            }
+
+            if (0 < remainderY)
+            {
+                float remainderTransparency = CalculateRowTransparency(
+                    pixels,
+                    textureWidth,
+                    textureHeight,
+                    textureHeight - remainderY,
+                    remainderY,
+                    transparencyThreshold
+                );
+
+                if (remainderTransparency < RemainderTransparencyThreshold)
+                {
+                    int rows = textureHeight / bestHeight;
+                    if (0 < rows)
+                    {
+                        bestHeight = textureHeight / rows;
+                    }
+                }
+            }
+
+            return new Vector2Int(bestWidth, bestHeight);
+        }
+
+        /// <summary>
+        /// Scores a candidate divisor by how well vertical/horizontal grid lines align with transparent regions.
+        /// Uses contrast scoring: compares boundary transparency to interior opacity.
+        /// A good grid has HIGH boundary transparency and LOW interior transparency.
+        /// Also checks grid line continuity by sampling multiple positions around each grid line.
+        /// </summary>
+        /// <param name="pixels">Source texture pixel data.</param>
+        /// <param name="textureWidth">Width of the texture in pixels.</param>
+        /// <param name="textureHeight">Height of the texture in pixels.</param>
+        /// <param name="cellWidth">Candidate cell width to score.</param>
+        /// <param name="cellHeight">Candidate cell height to score.</param>
+        /// <param name="transparencyThreshold">Alpha threshold (0-1) below which pixels are considered transparent.</param>
+        /// <returns>Score in range [0, 1] where 1 means all grid lines pass through fully transparent pixels with good contrast.</returns>
+        internal static float ScoreDivisorByTransparency(
+            Color32[] pixels,
+            int textureWidth,
+            int textureHeight,
+            int cellWidth,
+            int cellHeight,
+            float transparencyThreshold
+        )
+        {
+            byte alphaThreshold = ColorQuantization.ToThresholdByte(transparencyThreshold);
+
+            int numVerticalLines = (textureWidth / cellWidth) - 1;
+            int numHorizontalLines = (textureHeight / cellHeight) - 1;
+
+            if (numVerticalLines <= 0 && numHorizontalLines <= 0)
+            {
+                return 0f;
+            }
+
+            // Sample exact boundaries to avoid false positives from adjacent transparent pixels.
+            float totalBoundaryTransparency = 0f;
+            int boundaryLineCount = 0;
+
+            for (int baseX = cellWidth; baseX < textureWidth; baseX += cellWidth)
+            {
+                int transparentCount = 0;
+                for (int y = 0; y < textureHeight; ++y)
+                {
+                    int index = y * textureWidth + baseX;
+                    if (pixels[index].a <= alphaThreshold)
+                    {
+                        ++transparentCount;
+                    }
+                }
+                float lineTransparency = (float)transparentCount / textureHeight;
+                totalBoundaryTransparency += lineTransparency;
+                ++boundaryLineCount;
+            }
+
+            for (int baseY = cellHeight; baseY < textureHeight; baseY += cellHeight)
+            {
+                int transparentCount = 0;
+                for (int x = 0; x < textureWidth; ++x)
+                {
+                    int index = baseY * textureWidth + x;
+                    if (pixels[index].a <= alphaThreshold)
+                    {
+                        ++transparentCount;
+                    }
+                }
+                float lineTransparency = (float)transparentCount / textureWidth;
+                totalBoundaryTransparency += lineTransparency;
+                ++boundaryLineCount;
+            }
+
+            if (boundaryLineCount <= 0)
+            {
+                return 0f;
+            }
+
+            float avgBoundaryTransparency = totalBoundaryTransparency / boundaryLineCount;
+
+            float totalInteriorOpacity = 0f;
+            int interiorSampleCount = 0;
+
+            int numColumns = textureWidth / cellWidth;
+            int numRows = textureHeight / cellHeight;
+
+            for (int col = 0; col < numColumns; ++col)
+            {
+                for (int row = 0; row < numRows; ++row)
+                {
+                    int centerX = col * cellWidth + cellWidth / 2;
+                    int centerY = row * cellHeight + cellHeight / 2;
+
+                    if (textureWidth <= centerX || textureHeight <= centerY)
+                    {
+                        continue;
+                    }
+
+                    int sampleRadius = Math.Min(cellWidth, cellHeight) / 4;
+                    sampleRadius = Math.Max(1, sampleRadius);
+
+                    int opaqueCount = 0;
+                    int sampleCount = 0;
+
+                    for (int dy = -sampleRadius; dy <= sampleRadius; ++dy)
+                    {
+                        int y = centerY + dy;
+                        if (y < 0 || textureHeight <= y)
+                        {
+                            continue;
+                        }
+
+                        for (int dx = -sampleRadius; dx <= sampleRadius; ++dx)
+                        {
+                            int x = centerX + dx;
+                            if (x < 0 || textureWidth <= x)
+                            {
+                                continue;
+                            }
+
+                            int index = y * textureWidth + x;
+                            if (alphaThreshold < pixels[index].a)
+                            {
+                                ++opaqueCount;
+                            }
+                            ++sampleCount;
+                        }
+                    }
+
+                    if (0 < sampleCount)
+                    {
+                        totalInteriorOpacity += (float)opaqueCount / sampleCount;
+                        ++interiorSampleCount;
+                    }
+                }
+            }
+
+            float avgInteriorOpacity =
+                0 < interiorSampleCount ? totalInteriorOpacity / interiorSampleCount : 0f;
+
+            // Valid grids combine transparent boundaries with opaque cell interiors.
+            float contrastBonus = avgInteriorOpacity * 0.5f;
+            float score = avgBoundaryTransparency * (1f + contrastBonus);
+
+            return Mathf.Clamp01(score);
+        }
+
+        /// <summary>
         /// AutoBest algorithm: runs algorithms in order of speed until one exceeds 70% confidence.
         /// Order: BoundaryScoring (fastest) -> ClusterCentroid -> DistanceTransform -> RegionGrowing
         /// </summary>
@@ -700,7 +1064,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         selectionScore += 0.05f;
                     }
 
-                    if (IsPowerOfTwo(candidateWidth) && IsPowerOfTwo(candidateHeight))
+                    if (BitOps.IsPowerOfTwo(candidateWidth) && BitOps.IsPowerOfTwo(candidateHeight))
                     {
                         selectionScore += 0.03f;
                     }
@@ -2553,380 +2917,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         }
 
         /// <summary>
-        /// Checks if a value is a power of two.
-        /// </summary>
-        /// <param name="value">The value to check.</param>
-        /// <returns>True if the value is a positive power of two (1, 2, 4, 8, ...).</returns>
-        private static bool IsPowerOfTwo(int value)
-        {
-            return 0 < value && (value & (value - 1)) == 0;
-        }
-
-        /// <summary>
-        /// Finds the best cell divisor by scoring how well grid lines align with transparent regions.
-        /// Searches ALL valid divisors (not just those near base size), but prefers divisors close
-        /// to the base size when scores are similar.
-        /// When texture dimensions aren't cleanly divisible, analyzes remainder pixels:
-        /// - If greater than 90% transparent, discards remainder
-        /// - Otherwise adjusts to include content
-        /// </summary>
-        /// <param name="pixels">Source texture pixel data.</param>
-        /// <param name="textureWidth">Width of the texture in pixels.</param>
-        /// <param name="textureHeight">Height of the texture in pixels.</param>
-        /// <param name="baseCellWidth">Initial computed cell width.</param>
-        /// <param name="baseCellHeight">Initial computed cell height.</param>
-        /// <param name="transparencyThreshold">Alpha threshold (0-1) below which pixels are considered transparent.</param>
-        /// <param name="spriteBounds">Optional list of detected sprite bounds to penalize divisors that would split sprites.</param>
-        /// <returns>Adjusted cell size that best aligns with transparency boundaries.</returns>
-        internal static Vector2Int FindBestTransparencyAlignedDivisor(
-            Color32[] pixels,
-            int textureWidth,
-            int textureHeight,
-            int baseCellWidth,
-            int baseCellHeight,
-            float transparencyThreshold = 0.1f,
-            List<Rect> spriteBounds = null
-        )
-        {
-            int fallbackWidth =
-                textureWidth % baseCellWidth == 0
-                    ? baseCellWidth
-                    : FindNearestDivisor(textureWidth, baseCellWidth);
-            int fallbackHeight =
-                textureHeight % baseCellHeight == 0
-                    ? baseCellHeight
-                    : FindNearestDivisor(textureHeight, baseCellHeight);
-
-            int bestWidth = fallbackWidth;
-            int bestHeight = fallbackHeight;
-
-            using PooledResource<List<int>> widthDivisorsLease = Buffers<int>.List.Get(
-                out List<int> widthDivisors
-            );
-            using PooledResource<List<int>> heightDivisorsLease = Buffers<int>.List.Get(
-                out List<int> heightDivisors
-            );
-
-            for (int div = MinimumCellSize; div * div <= textureWidth; ++div)
-            {
-                if (textureWidth % div == 0)
-                {
-                    widthDivisors.Add(div);
-                    int complement = textureWidth / div;
-                    if (complement != div && MinimumCellSize <= complement)
-                    {
-                        widthDivisors.Add(complement);
-                    }
-                }
-            }
-
-            for (int div = MinimumCellSize; div * div <= textureHeight; ++div)
-            {
-                if (textureHeight % div == 0)
-                {
-                    heightDivisors.Add(div);
-                    int complement = textureHeight / div;
-                    if (complement != div && MinimumCellSize <= complement)
-                    {
-                        heightDivisors.Add(complement);
-                    }
-                }
-            }
-
-            float bestScore = float.MinValue;
-            float bestCombinedBonus = float.MinValue;
-            bool foundCandidate = false;
-
-            // The primary constraint: the chosen grid must not deviate significantly from this count.
-            int baseCols = textureWidth / baseCellWidth;
-            int baseRows = textureHeight / baseCellHeight;
-            int expectedCellCount = baseCols * baseRows;
-            int minCellCount = Math.Max(1, (int)(expectedCellCount / MaxCellCountRatio));
-            int maxCellCount = (int)(expectedCellCount * MaxCellCountRatio);
-
-            float fallbackScore = ScoreDivisorByTransparency(
-                pixels,
-                textureWidth,
-                textureHeight,
-                fallbackWidth,
-                fallbackHeight,
-                transparencyThreshold
-            );
-            bestScore = fallbackScore;
-            bestCombinedBonus = 1.0f;
-
-            foreach (int candidateWidth in widthDivisors)
-            {
-                foreach (int candidateHeight in heightDivisors)
-                {
-                    // Keep divisor refinement near the requested cell count so it cannot choose an unrelated grid.
-                    int candidateCols = textureWidth / candidateWidth;
-                    int candidateRows = textureHeight / candidateHeight;
-                    int candidateCellCount = candidateCols * candidateRows;
-                    if (candidateCellCount < minCellCount || maxCellCount < candidateCellCount)
-                    {
-                        continue;
-                    }
-
-                    float score = ScoreDivisorByTransparency(
-                        pixels,
-                        textureWidth,
-                        textureHeight,
-                        candidateWidth,
-                        candidateHeight,
-                        transparencyThreshold
-                    );
-
-                    if (spriteBounds != null && 0 < spriteBounds.Count)
-                    {
-                        float spriteFitScore = CalculateSpriteFitScore(
-                            spriteBounds,
-                            candidateWidth,
-                            candidateHeight,
-                            textureWidth,
-                            textureHeight
-                        );
-
-                        if (spriteFitScore < SpriteFitHardThresholdStrict)
-                        {
-                            continue;
-                        }
-
-                        if (0.95f <= spriteFitScore)
-                        {
-                            score *= 1.1f;
-                        }
-                    }
-
-                    float widthProximity =
-                        1f
-                        - Mathf.Clamp01(
-                            (float)Math.Abs(candidateWidth - baseCellWidth) / baseCellWidth
-                        );
-                    float heightProximity =
-                        1f
-                        - Mathf.Clamp01(
-                            (float)Math.Abs(candidateHeight - baseCellHeight) / baseCellHeight
-                        );
-                    float proximityBonus = (widthProximity + heightProximity) * 0.5f;
-
-                    float sizeBonus =
-                        (float)(candidateWidth + candidateHeight) / (textureWidth + textureHeight);
-
-                    float combinedBonus = proximityBonus * 0.6f + sizeBonus * 0.4f;
-                    const float scoreDifferenceThreshold = 0.15f;
-                    bool isMuchBetterScore = bestScore + scoreDifferenceThreshold < score;
-                    bool isSimilarScoreButBetter =
-                        Math.Abs(score - bestScore) <= scoreDifferenceThreshold
-                        && bestCombinedBonus < combinedBonus;
-                    if (isMuchBetterScore || isSimilarScoreButBetter)
-                    {
-                        bestScore = score;
-                        bestCombinedBonus = combinedBonus;
-                        bestWidth = candidateWidth;
-                        bestHeight = candidateHeight;
-                        foundCandidate = true;
-                    }
-                }
-            }
-
-            if (!foundCandidate)
-            {
-                bestWidth = fallbackWidth;
-                bestHeight = fallbackHeight;
-            }
-
-            int remainderX = textureWidth % bestWidth;
-            int remainderY = textureHeight % bestHeight;
-
-            if (0 < remainderX)
-            {
-                float remainderTransparency = CalculateColumnTransparency(
-                    pixels,
-                    textureWidth,
-                    textureHeight,
-                    textureWidth - remainderX,
-                    remainderX,
-                    transparencyThreshold
-                );
-
-                if (remainderTransparency < RemainderTransparencyThreshold)
-                {
-                    int cols = textureWidth / bestWidth;
-                    if (0 < cols)
-                    {
-                        bestWidth = textureWidth / cols;
-                    }
-                }
-            }
-
-            if (0 < remainderY)
-            {
-                float remainderTransparency = CalculateRowTransparency(
-                    pixels,
-                    textureWidth,
-                    textureHeight,
-                    textureHeight - remainderY,
-                    remainderY,
-                    transparencyThreshold
-                );
-
-                if (remainderTransparency < RemainderTransparencyThreshold)
-                {
-                    int rows = textureHeight / bestHeight;
-                    if (0 < rows)
-                    {
-                        bestHeight = textureHeight / rows;
-                    }
-                }
-            }
-
-            return new Vector2Int(bestWidth, bestHeight);
-        }
-
-        /// <summary>
-        /// Scores a candidate divisor by how well vertical/horizontal grid lines align with transparent regions.
-        /// Uses contrast scoring: compares boundary transparency to interior opacity.
-        /// A good grid has HIGH boundary transparency and LOW interior transparency.
-        /// Also checks grid line continuity by sampling multiple positions around each grid line.
-        /// </summary>
-        /// <param name="pixels">Source texture pixel data.</param>
-        /// <param name="textureWidth">Width of the texture in pixels.</param>
-        /// <param name="textureHeight">Height of the texture in pixels.</param>
-        /// <param name="cellWidth">Candidate cell width to score.</param>
-        /// <param name="cellHeight">Candidate cell height to score.</param>
-        /// <param name="transparencyThreshold">Alpha threshold (0-1) below which pixels are considered transparent.</param>
-        /// <returns>Score in range [0, 1] where 1 means all grid lines pass through fully transparent pixels with good contrast.</returns>
-        internal static float ScoreDivisorByTransparency(
-            Color32[] pixels,
-            int textureWidth,
-            int textureHeight,
-            int cellWidth,
-            int cellHeight,
-            float transparencyThreshold
-        )
-        {
-            byte alphaThreshold = ColorQuantization.ToThresholdByte(transparencyThreshold);
-
-            int numVerticalLines = (textureWidth / cellWidth) - 1;
-            int numHorizontalLines = (textureHeight / cellHeight) - 1;
-
-            if (numVerticalLines <= 0 && numHorizontalLines <= 0)
-            {
-                return 0f;
-            }
-
-            // Sample exact boundaries to avoid false positives from adjacent transparent pixels.
-            float totalBoundaryTransparency = 0f;
-            int boundaryLineCount = 0;
-
-            for (int baseX = cellWidth; baseX < textureWidth; baseX += cellWidth)
-            {
-                int transparentCount = 0;
-                for (int y = 0; y < textureHeight; ++y)
-                {
-                    int index = y * textureWidth + baseX;
-                    if (pixels[index].a <= alphaThreshold)
-                    {
-                        ++transparentCount;
-                    }
-                }
-                float lineTransparency = (float)transparentCount / textureHeight;
-                totalBoundaryTransparency += lineTransparency;
-                ++boundaryLineCount;
-            }
-
-            for (int baseY = cellHeight; baseY < textureHeight; baseY += cellHeight)
-            {
-                int transparentCount = 0;
-                for (int x = 0; x < textureWidth; ++x)
-                {
-                    int index = baseY * textureWidth + x;
-                    if (pixels[index].a <= alphaThreshold)
-                    {
-                        ++transparentCount;
-                    }
-                }
-                float lineTransparency = (float)transparentCount / textureWidth;
-                totalBoundaryTransparency += lineTransparency;
-                ++boundaryLineCount;
-            }
-
-            if (boundaryLineCount <= 0)
-            {
-                return 0f;
-            }
-
-            float avgBoundaryTransparency = totalBoundaryTransparency / boundaryLineCount;
-
-            float totalInteriorOpacity = 0f;
-            int interiorSampleCount = 0;
-
-            int numColumns = textureWidth / cellWidth;
-            int numRows = textureHeight / cellHeight;
-
-            for (int col = 0; col < numColumns; ++col)
-            {
-                for (int row = 0; row < numRows; ++row)
-                {
-                    int centerX = col * cellWidth + cellWidth / 2;
-                    int centerY = row * cellHeight + cellHeight / 2;
-
-                    if (textureWidth <= centerX || textureHeight <= centerY)
-                    {
-                        continue;
-                    }
-
-                    int sampleRadius = Math.Min(cellWidth, cellHeight) / 4;
-                    sampleRadius = Math.Max(1, sampleRadius);
-
-                    int opaqueCount = 0;
-                    int sampleCount = 0;
-
-                    for (int dy = -sampleRadius; dy <= sampleRadius; ++dy)
-                    {
-                        int y = centerY + dy;
-                        if (y < 0 || textureHeight <= y)
-                        {
-                            continue;
-                        }
-
-                        for (int dx = -sampleRadius; dx <= sampleRadius; ++dx)
-                        {
-                            int x = centerX + dx;
-                            if (x < 0 || textureWidth <= x)
-                            {
-                                continue;
-                            }
-
-                            int index = y * textureWidth + x;
-                            if (alphaThreshold < pixels[index].a)
-                            {
-                                ++opaqueCount;
-                            }
-                            ++sampleCount;
-                        }
-                    }
-
-                    if (0 < sampleCount)
-                    {
-                        totalInteriorOpacity += (float)opaqueCount / sampleCount;
-                        ++interiorSampleCount;
-                    }
-                }
-            }
-
-            float avgInteriorOpacity =
-                0 < interiorSampleCount ? totalInteriorOpacity / interiorSampleCount : 0f;
-
-            // Valid grids combine transparent boundaries with opaque cell interiors.
-            float contrastBonus = avgInteriorOpacity * 0.5f;
-            float score = avgBoundaryTransparency * (1f + contrastBonus);
-
-            return Mathf.Clamp01(score);
-        }
-
-        /// <summary>
         /// Computes a linear score for a transparency ratio.
         /// Uses linear scaling to ensure proportional transparency differences are preserved,
         /// which is important for the proximity-based tiebreaking logic.
@@ -3022,6 +3012,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         public readonly struct AlgorithmResult
         {
             /// <summary>
+            /// Whether this result represents a valid grid detection.
+            /// </summary>
+            public bool IsValid => MinimumCellSize <= CellWidth && MinimumCellSize <= CellHeight;
+
+            /// <summary>
             /// The detected cell width in pixels.
             /// </summary>
             public readonly int CellWidth;
@@ -3040,11 +3035,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             /// The algorithm that produced this result.
             /// </summary>
             public readonly AutoDetectionAlgorithm Algorithm;
-
-            /// <summary>
-            /// Whether this result represents a valid grid detection.
-            /// </summary>
-            public bool IsValid => MinimumCellSize <= CellWidth && MinimumCellSize <= CellHeight;
 
             public AlgorithmResult(
                 int cellWidth,

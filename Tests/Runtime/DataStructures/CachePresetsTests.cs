@@ -1276,27 +1276,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.DataStructures
     [NUnit.Framework.Category("Fast")]
     public sealed class CachePresetsDataDrivenTests
     {
-        [Test]
-        [TestCaseSource(nameof(PresetCapacityTestData))]
-        public void PresetHasExpectedCapacity(string presetName, int expectedCapacity)
-        {
-            Cache<string, int> cache = presetName switch
-            {
-                "ShortLived" => CachePresets.ShortLived<string, int>().Build(),
-                "LongLived" => CachePresets.LongLived<string, int>().Build(),
-                "SessionCache" => CachePresets.SessionCache<string, int>().Build(),
-                "HighThroughput" => CachePresets.HighThroughput<string, int>().Build(),
-                "RenderCache" => CachePresets.RenderCache<string, int>().Build(),
-                "NetworkCache" => CachePresets.NetworkCache<string, int>().Build(),
-                _ => throw new ArgumentException($"Unknown preset: {presetName}"),
-            };
-
-            using (cache)
-            {
-                Assert.AreEqual(expectedCapacity, cache.Capacity);
-            }
-        }
-
         private static IEnumerable<TestCaseData> PresetCapacityTestData()
         {
             yield return new TestCaseData("ShortLived", 100).SetName(
@@ -1317,6 +1296,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.DataStructures
             yield return new TestCaseData("NetworkCache", 100).SetName(
                 "Preset.NetworkCache.Capacity100"
             );
+        }
+
+        [Test]
+        [TestCaseSource(nameof(PresetCapacityTestData))]
+        public void PresetHasExpectedCapacity(string presetName, int expectedCapacity)
+        {
+            Cache<string, int> cache = presetName switch
+            {
+                "ShortLived" => CachePresets.ShortLived<string, int>().Build(),
+                "LongLived" => CachePresets.LongLived<string, int>().Build(),
+                "SessionCache" => CachePresets.SessionCache<string, int>().Build(),
+                "HighThroughput" => CachePresets.HighThroughput<string, int>().Build(),
+                "RenderCache" => CachePresets.RenderCache<string, int>().Build(),
+                "NetworkCache" => CachePresets.NetworkCache<string, int>().Build(),
+                _ => throw new ArgumentException($"Unknown preset: {presetName}"),
+            };
+
+            using (cache)
+            {
+                Assert.AreEqual(expectedCapacity, cache.Capacity);
+            }
         }
 
         [Test]

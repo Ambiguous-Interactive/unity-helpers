@@ -161,6 +161,62 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return true;
         }
 
+        /// <summary>Closes a definition over the given arguments, or returns <c>null</c>.</summary>
+        /// <typeparam name="TArgument">The argument symbol kind.</typeparam>
+        /// <param name="definition">The unbound definition.</param>
+        /// <param name="arguments">The arguments to close it over.</param>
+        /// <returns>The closed construction, or <c>null</c> on an arity mismatch.</returns>
+        internal static INamedTypeSymbol Close<TArgument>(
+            INamedTypeSymbol definition,
+            IReadOnlyList<TArgument> arguments
+        )
+            where TArgument : ITypeSymbol
+        {
+            if (definition.Arity == 0)
+            {
+                return definition;
+            }
+
+            if (definition.Arity != arguments.Count)
+            {
+                return null;
+            }
+
+            ITypeSymbol[] closed = new ITypeSymbol[arguments.Count];
+            for (int index = 0; index < arguments.Count; index++)
+            {
+                closed[index] = arguments[index];
+            }
+
+            return definition.Construct(closed);
+        }
+
+        /// <summary>
+        /// Reports whether <c>new</c> on this type compiles from anywhere.
+        /// </summary>
+        /// <param name="type">The type to construct.</param>
+        /// <returns><c>true</c> when it has a public parameterless constructor.</returns>
+        internal static bool HasPublicParameterlessConstructor(INamedTypeSymbol type)
+        {
+            if (type == null || type.IsAbstract || type.IsStatic)
+            {
+                return false;
+            }
+
+            foreach (IMethodSymbol constructor in type.InstanceConstructors)
+            {
+                if (
+                    constructor.Parameters.Length == 0
+                    && constructor.DeclaredAccessibility == Accessibility.Public
+                )
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static ITypeSymbol Substitute(
             ITypeSymbol type,
             INamedTypeSymbol definition,
@@ -255,62 +311,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             return definitionToClose.Construct(closed);
-        }
-
-        /// <summary>Closes a definition over the given arguments, or returns <c>null</c>.</summary>
-        /// <typeparam name="TArgument">The argument symbol kind.</typeparam>
-        /// <param name="definition">The unbound definition.</param>
-        /// <param name="arguments">The arguments to close it over.</param>
-        /// <returns>The closed construction, or <c>null</c> on an arity mismatch.</returns>
-        internal static INamedTypeSymbol Close<TArgument>(
-            INamedTypeSymbol definition,
-            IReadOnlyList<TArgument> arguments
-        )
-            where TArgument : ITypeSymbol
-        {
-            if (definition.Arity == 0)
-            {
-                return definition;
-            }
-
-            if (definition.Arity != arguments.Count)
-            {
-                return null;
-            }
-
-            ITypeSymbol[] closed = new ITypeSymbol[arguments.Count];
-            for (int index = 0; index < arguments.Count; index++)
-            {
-                closed[index] = arguments[index];
-            }
-
-            return definition.Construct(closed);
-        }
-
-        /// <summary>
-        /// Reports whether <c>new</c> on this type compiles from anywhere.
-        /// </summary>
-        /// <param name="type">The type to construct.</param>
-        /// <returns><c>true</c> when it has a public parameterless constructor.</returns>
-        internal static bool HasPublicParameterlessConstructor(INamedTypeSymbol type)
-        {
-            if (type == null || type.IsAbstract || type.IsStatic)
-            {
-                return false;
-            }
-
-            foreach (IMethodSymbol constructor in type.InstanceConstructors)
-            {
-                if (
-                    constructor.Parameters.Length == 0
-                    && constructor.DeclaredAccessibility == Accessibility.Public
-                )
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         private static bool HasParameterlessConstructor(ITypeSymbol type)

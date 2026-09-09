@@ -34,6 +34,134 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             WEnumToggleButtonsUtility.ClearCache();
         }
 
+        internal static void DrawPagination(
+            Rect rect,
+            WEnumToggleButtonsPagination.PaginationState state
+        )
+        {
+            if (state.TotalPages <= 1)
+            {
+                return;
+            }
+
+            float spacing = EnumShared.ToolbarSpacing;
+            float buttonWidth = Mathf.Min(
+                EnumShared.PaginationButtonWidth,
+                rect.width * EnumShared.MaxPaginationButtonWidthRatio
+            );
+            float labelWidth = Mathf.Max(
+                EnumShared.PaginationLabelMinWidth,
+                rect.width - (buttonWidth * 4f) - spacing * 4f
+            );
+
+            Rect firstRect = new(rect.x, rect.y, buttonWidth, rect.height);
+            Rect prevRect = new(firstRect.xMax + spacing, rect.y, buttonWidth, rect.height);
+            Rect labelRect = new(prevRect.xMax + spacing, rect.y, labelWidth, rect.height);
+            Rect nextRect = new(labelRect.xMax + spacing, rect.y, buttonWidth, rect.height);
+            Rect lastRect = new(nextRect.xMax + spacing, rect.y, buttonWidth, rect.height);
+
+            if (rect.xMax < lastRect.xMax)
+            {
+                float overflow = lastRect.xMax - rect.xMax;
+                firstRect.x -= overflow * EnumShared.OverflowCenteringRatio;
+                prevRect.x -= overflow * EnumShared.OverflowCenteringRatio;
+                labelRect.x -= overflow * EnumShared.OverflowCenteringRatio;
+                nextRect.x -= overflow * EnumShared.OverflowCenteringRatio;
+                lastRect.x -= overflow * EnumShared.OverflowCenteringRatio;
+            }
+
+            bool originalEnabled = GUI.enabled;
+            bool canNavigateBackward = 0 < state.PageIndex;
+            bool canNavigateForward = state.PageIndex < state.TotalPages - 1;
+
+            GUI.enabled = originalEnabled && canNavigateBackward;
+            if (GUI.Button(firstRect, EnumShared.FirstPageContent, EditorStyles.miniButtonLeft))
+            {
+                state.PageIndex = 0;
+            }
+
+            if (GUI.Button(prevRect, EnumShared.PrevPageContent, EditorStyles.miniButtonMid))
+            {
+                state.PageIndex = Mathf.Max(0, state.PageIndex - 1);
+            }
+            GUI.enabled = originalEnabled;
+
+            GUI.Label(
+                labelRect,
+                CacheHelper.GetPaginationLabel(state.PageIndex + 1, state.TotalPages),
+                EditorStyles.miniLabel
+            );
+
+            GUI.enabled = originalEnabled && canNavigateForward;
+            if (GUI.Button(nextRect, EnumShared.NextPageContent, EditorStyles.miniButtonMid))
+            {
+                state.PageIndex = Mathf.Min(state.TotalPages - 1, state.PageIndex + 1);
+            }
+
+            if (GUI.Button(lastRect, EnumShared.LastPageContent, EditorStyles.miniButtonRight))
+            {
+                state.PageIndex = state.TotalPages - 1;
+            }
+
+            GUI.enabled = originalEnabled;
+        }
+
+        internal static EnumShared.SelectionSummary BuildSelectionSummary(
+            ToggleSet toggleSet,
+            SerializedProperty property,
+            int startIndex,
+            int visibleCount,
+            bool usePagination
+        )
+        {
+            if (!usePagination || toggleSet.IsEmpty || property == null)
+            {
+                return EnumShared.SelectionSummary.None;
+            }
+
+            int endIndex = startIndex + visibleCount;
+            PooledResource<List<string>> outOfViewLease = default;
+            try
+            {
+                List<string> outOfView = null;
+                IReadOnlyList<ToggleOption> options = toggleSet.Options;
+                for (int index = 0; index < options.Count; index += 1)
+                {
+                    ToggleOption option = options[index];
+                    if (!WEnumToggleButtonsUtility.IsOptionActive(property, toggleSet, option))
+                    {
+                        continue;
+                    }
+
+                    if (startIndex <= index && index < endIndex)
+                    {
+                        continue;
+                    }
+
+                    if (outOfView == null)
+                    {
+                        outOfViewLease = Buffers<string>.List.Get(out outOfView);
+                    }
+
+                    outOfView.Add(option.Label);
+                }
+
+                if (outOfView == null || outOfView.Count == 0)
+                {
+                    return EnumShared.SelectionSummary.None;
+                }
+
+                string joined = string.Join(", ", outOfView);
+                string text = $"Current (out of view): {joined}";
+                OutOfViewContent.text = text;
+                return new EnumShared.SelectionSummary(true, OutOfViewContent);
+            }
+            finally
+            {
+                outOfViewLease.Dispose();
+            }
+        }
+
         private static float EstimateContentWidth()
         {
             float viewWidth = 600f;
@@ -63,6 +191,145 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             return estimatedWidth;
+        }
+
+        private static void DrawToolbar(
+            Rect rect,
+            ToggleSet toggleSet,
+            SerializedProperty property,
+            WEnumToggleButtonsAttribute toggleAttribute,
+            UnityHelpersSettings.WEnumToggleButtonsPaletteEntry palette
+        )
+        {
+            bool drawSelectAll = toggleAttribute.ShowSelectAll;
+            bool drawSelectNone = toggleAttribute.ShowSelectNone;
+
+            if (!drawSelectAll && !drawSelectNone)
+            {
+                return;
+            }
+
+            bool alignedPair = drawSelectAll && drawSelectNone;
+
+            if (alignedPair)
+            {
+                float availableWidth = rect.width - EnumShared.ToolbarButtonGap;
+                float buttonWidth = Mathf.Max(
+                    EnumShared.ToolbarButtonMinWidth,
+                    Mathf.Floor(availableWidth * EnumShared.EqualSplitRatio)
+                );
+
+                Rect selectAllRect = new(rect.x, rect.y, buttonWidth, rect.height);
+                bool allActive = WEnumToggleButtonsUtility.AreAllFlagsSelected(property, toggleSet);
+                GUIStyle allStyle = EnumShared.GetButtonStyle(
+                    EnumShared.ButtonSegment.Single,
+                    allActive,
+                    palette
+                );
+                bool selectAllPressed = GUI.Toggle(
+                    selectAllRect,
+                    allActive,
+                    EnumShared.AllContent,
+                    allStyle
+                );
+
+                if (selectAllPressed && !allActive)
+                {
+                    WEnumToggleButtonsUtility.ApplySelectAll(property, toggleSet);
+                    property.serializedObject.ApplyModifiedProperties();
+                }
+
+                Rect selectNoneRect = new(
+                    selectAllRect.xMax + EnumShared.ToolbarButtonGap,
+                    rect.y,
+                    rect.width - buttonWidth - EnumShared.ToolbarButtonGap,
+                    rect.height
+                );
+                bool noneActive = WEnumToggleButtonsUtility.AreNoFlagsSelected(property);
+                GUIStyle noneStyle = EnumShared.GetButtonStyle(
+                    EnumShared.ButtonSegment.Single,
+                    noneActive,
+                    palette
+                );
+                bool selectNonePressed = GUI.Toggle(
+                    selectNoneRect,
+                    noneActive,
+                    EnumShared.NoneContent,
+                    noneStyle
+                );
+
+                if (selectNonePressed && !noneActive)
+                {
+                    WEnumToggleButtonsUtility.ApplySelectNone(property);
+                    property.serializedObject.ApplyModifiedProperties();
+                }
+            }
+            else if (drawSelectAll)
+            {
+                bool allActive = WEnumToggleButtonsUtility.AreAllFlagsSelected(property, toggleSet);
+                GUIStyle style = EnumShared.GetButtonStyle(
+                    EnumShared.ButtonSegment.Single,
+                    allActive,
+                    palette
+                );
+                bool selectAllPressed = GUI.Toggle(rect, allActive, EnumShared.AllContent, style);
+
+                if (selectAllPressed && !allActive)
+                {
+                    WEnumToggleButtonsUtility.ApplySelectAll(property, toggleSet);
+                    property.serializedObject.ApplyModifiedProperties();
+                }
+            }
+            else if (drawSelectNone)
+            {
+                bool noneActive = WEnumToggleButtonsUtility.AreNoFlagsSelected(property);
+                GUIStyle style = EnumShared.GetButtonStyle(
+                    EnumShared.ButtonSegment.Single,
+                    noneActive,
+                    palette
+                );
+                bool selectNonePressed = GUI.Toggle(
+                    rect,
+                    noneActive,
+                    EnumShared.NoneContent,
+                    style
+                );
+
+                if (selectNonePressed && !noneActive)
+                {
+                    WEnumToggleButtonsUtility.ApplySelectNone(property);
+                    property.serializedObject.ApplyModifiedProperties();
+                }
+            }
+        }
+
+        private static void DrawToggle(
+            Rect rect,
+            ToggleSet toggleSet,
+            SerializedProperty property,
+            LayoutMetrics metrics,
+            ToggleOption option,
+            int visibleIndex,
+            int visibleCount,
+            UnityHelpersSettings.WEnumToggleButtonsPaletteEntry palette
+        )
+        {
+            bool isActive = WEnumToggleButtonsUtility.IsOptionActive(property, toggleSet, option);
+            EnumShared.ButtonSegment segment = EnumShared.ResolveButtonSegment(
+                visibleIndex,
+                visibleCount,
+                metrics.Columns
+            );
+            GUIStyle style = EnumShared.GetButtonStyle(segment, isActive, palette);
+            bool newState = GUI.Toggle(rect, isActive, option.Label, style);
+
+            if (newState == isActive)
+            {
+                return;
+            }
+
+            WEnumToggleButtonsUtility.ApplyOption(property, toggleSet, option, newState);
+            property.serializedObject.ApplyModifiedProperties();
         }
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
@@ -329,273 +596,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             EditorGUI.EndProperty();
         }
-
-        private static void DrawToolbar(
-            Rect rect,
-            ToggleSet toggleSet,
-            SerializedProperty property,
-            WEnumToggleButtonsAttribute toggleAttribute,
-            UnityHelpersSettings.WEnumToggleButtonsPaletteEntry palette
-        )
-        {
-            bool drawSelectAll = toggleAttribute.ShowSelectAll;
-            bool drawSelectNone = toggleAttribute.ShowSelectNone;
-
-            if (!drawSelectAll && !drawSelectNone)
-            {
-                return;
-            }
-
-            bool alignedPair = drawSelectAll && drawSelectNone;
-
-            if (alignedPair)
-            {
-                float availableWidth = rect.width - EnumShared.ToolbarButtonGap;
-                float buttonWidth = Mathf.Max(
-                    EnumShared.ToolbarButtonMinWidth,
-                    Mathf.Floor(availableWidth * EnumShared.EqualSplitRatio)
-                );
-
-                Rect selectAllRect = new(rect.x, rect.y, buttonWidth, rect.height);
-                bool allActive = WEnumToggleButtonsUtility.AreAllFlagsSelected(property, toggleSet);
-                GUIStyle allStyle = EnumShared.GetButtonStyle(
-                    EnumShared.ButtonSegment.Single,
-                    allActive,
-                    palette
-                );
-                bool selectAllPressed = GUI.Toggle(
-                    selectAllRect,
-                    allActive,
-                    EnumShared.AllContent,
-                    allStyle
-                );
-
-                if (selectAllPressed && !allActive)
-                {
-                    WEnumToggleButtonsUtility.ApplySelectAll(property, toggleSet);
-                    property.serializedObject.ApplyModifiedProperties();
-                }
-
-                Rect selectNoneRect = new(
-                    selectAllRect.xMax + EnumShared.ToolbarButtonGap,
-                    rect.y,
-                    rect.width - buttonWidth - EnumShared.ToolbarButtonGap,
-                    rect.height
-                );
-                bool noneActive = WEnumToggleButtonsUtility.AreNoFlagsSelected(property);
-                GUIStyle noneStyle = EnumShared.GetButtonStyle(
-                    EnumShared.ButtonSegment.Single,
-                    noneActive,
-                    palette
-                );
-                bool selectNonePressed = GUI.Toggle(
-                    selectNoneRect,
-                    noneActive,
-                    EnumShared.NoneContent,
-                    noneStyle
-                );
-
-                if (selectNonePressed && !noneActive)
-                {
-                    WEnumToggleButtonsUtility.ApplySelectNone(property);
-                    property.serializedObject.ApplyModifiedProperties();
-                }
-            }
-            else if (drawSelectAll)
-            {
-                bool allActive = WEnumToggleButtonsUtility.AreAllFlagsSelected(property, toggleSet);
-                GUIStyle style = EnumShared.GetButtonStyle(
-                    EnumShared.ButtonSegment.Single,
-                    allActive,
-                    palette
-                );
-                bool selectAllPressed = GUI.Toggle(rect, allActive, EnumShared.AllContent, style);
-
-                if (selectAllPressed && !allActive)
-                {
-                    WEnumToggleButtonsUtility.ApplySelectAll(property, toggleSet);
-                    property.serializedObject.ApplyModifiedProperties();
-                }
-            }
-            else if (drawSelectNone)
-            {
-                bool noneActive = WEnumToggleButtonsUtility.AreNoFlagsSelected(property);
-                GUIStyle style = EnumShared.GetButtonStyle(
-                    EnumShared.ButtonSegment.Single,
-                    noneActive,
-                    palette
-                );
-                bool selectNonePressed = GUI.Toggle(
-                    rect,
-                    noneActive,
-                    EnumShared.NoneContent,
-                    style
-                );
-
-                if (selectNonePressed && !noneActive)
-                {
-                    WEnumToggleButtonsUtility.ApplySelectNone(property);
-                    property.serializedObject.ApplyModifiedProperties();
-                }
-            }
-        }
-
-        internal static void DrawPagination(
-            Rect rect,
-            WEnumToggleButtonsPagination.PaginationState state
-        )
-        {
-            if (state.TotalPages <= 1)
-            {
-                return;
-            }
-
-            float spacing = EnumShared.ToolbarSpacing;
-            float buttonWidth = Mathf.Min(
-                EnumShared.PaginationButtonWidth,
-                rect.width * EnumShared.MaxPaginationButtonWidthRatio
-            );
-            float labelWidth = Mathf.Max(
-                EnumShared.PaginationLabelMinWidth,
-                rect.width - (buttonWidth * 4f) - spacing * 4f
-            );
-
-            Rect firstRect = new(rect.x, rect.y, buttonWidth, rect.height);
-            Rect prevRect = new(firstRect.xMax + spacing, rect.y, buttonWidth, rect.height);
-            Rect labelRect = new(prevRect.xMax + spacing, rect.y, labelWidth, rect.height);
-            Rect nextRect = new(labelRect.xMax + spacing, rect.y, buttonWidth, rect.height);
-            Rect lastRect = new(nextRect.xMax + spacing, rect.y, buttonWidth, rect.height);
-
-            if (rect.xMax < lastRect.xMax)
-            {
-                float overflow = lastRect.xMax - rect.xMax;
-                firstRect.x -= overflow * EnumShared.OverflowCenteringRatio;
-                prevRect.x -= overflow * EnumShared.OverflowCenteringRatio;
-                labelRect.x -= overflow * EnumShared.OverflowCenteringRatio;
-                nextRect.x -= overflow * EnumShared.OverflowCenteringRatio;
-                lastRect.x -= overflow * EnumShared.OverflowCenteringRatio;
-            }
-
-            bool originalEnabled = GUI.enabled;
-            bool canNavigateBackward = 0 < state.PageIndex;
-            bool canNavigateForward = state.PageIndex < state.TotalPages - 1;
-
-            GUI.enabled = originalEnabled && canNavigateBackward;
-            if (GUI.Button(firstRect, EnumShared.FirstPageContent, EditorStyles.miniButtonLeft))
-            {
-                state.PageIndex = 0;
-            }
-
-            if (GUI.Button(prevRect, EnumShared.PrevPageContent, EditorStyles.miniButtonMid))
-            {
-                state.PageIndex = Mathf.Max(0, state.PageIndex - 1);
-            }
-            GUI.enabled = originalEnabled;
-
-            GUI.Label(
-                labelRect,
-                CacheHelper.GetPaginationLabel(state.PageIndex + 1, state.TotalPages),
-                EditorStyles.miniLabel
-            );
-
-            GUI.enabled = originalEnabled && canNavigateForward;
-            if (GUI.Button(nextRect, EnumShared.NextPageContent, EditorStyles.miniButtonMid))
-            {
-                state.PageIndex = Mathf.Min(state.TotalPages - 1, state.PageIndex + 1);
-            }
-
-            if (GUI.Button(lastRect, EnumShared.LastPageContent, EditorStyles.miniButtonRight))
-            {
-                state.PageIndex = state.TotalPages - 1;
-            }
-
-            GUI.enabled = originalEnabled;
-        }
-
-        private static void DrawToggle(
-            Rect rect,
-            ToggleSet toggleSet,
-            SerializedProperty property,
-            LayoutMetrics metrics,
-            ToggleOption option,
-            int visibleIndex,
-            int visibleCount,
-            UnityHelpersSettings.WEnumToggleButtonsPaletteEntry palette
-        )
-        {
-            bool isActive = WEnumToggleButtonsUtility.IsOptionActive(property, toggleSet, option);
-            EnumShared.ButtonSegment segment = EnumShared.ResolveButtonSegment(
-                visibleIndex,
-                visibleCount,
-                metrics.Columns
-            );
-            GUIStyle style = EnumShared.GetButtonStyle(segment, isActive, palette);
-            bool newState = GUI.Toggle(rect, isActive, option.Label, style);
-
-            if (newState == isActive)
-            {
-                return;
-            }
-
-            WEnumToggleButtonsUtility.ApplyOption(property, toggleSet, option, newState);
-            property.serializedObject.ApplyModifiedProperties();
-        }
-
-        internal static EnumShared.SelectionSummary BuildSelectionSummary(
-            ToggleSet toggleSet,
-            SerializedProperty property,
-            int startIndex,
-            int visibleCount,
-            bool usePagination
-        )
-        {
-            if (!usePagination || toggleSet.IsEmpty || property == null)
-            {
-                return EnumShared.SelectionSummary.None;
-            }
-
-            int endIndex = startIndex + visibleCount;
-            PooledResource<List<string>> outOfViewLease = default;
-            try
-            {
-                List<string> outOfView = null;
-                IReadOnlyList<ToggleOption> options = toggleSet.Options;
-                for (int index = 0; index < options.Count; index += 1)
-                {
-                    ToggleOption option = options[index];
-                    if (!WEnumToggleButtonsUtility.IsOptionActive(property, toggleSet, option))
-                    {
-                        continue;
-                    }
-
-                    if (startIndex <= index && index < endIndex)
-                    {
-                        continue;
-                    }
-
-                    if (outOfView == null)
-                    {
-                        outOfViewLease = Buffers<string>.List.Get(out outOfView);
-                    }
-
-                    outOfView.Add(option.Label);
-                }
-
-                if (outOfView == null || outOfView.Count == 0)
-                {
-                    return EnumShared.SelectionSummary.None;
-                }
-
-                string joined = string.Join(", ", outOfView);
-                string text = $"Current (out of view): {joined}";
-                OutOfViewContent.text = text;
-                return new EnumShared.SelectionSummary(true, OutOfViewContent);
-            }
-            finally
-            {
-                outOfViewLease.Dispose();
-            }
-        }
     }
 
     internal static class WEnumToggleButtonsUtility
@@ -696,18 +696,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
             Type valueType = resolvedFieldInfo != null ? resolvedFieldInfo.FieldType : null;
             return new ToggleSet(dropdownOptions, false, ToggleSource.Dropdown, valueType);
-        }
-
-        private static ToggleOption[] GetCachedEnumOptions(Type enumType, bool isFlags)
-        {
-            if (EnumOptionsCache.TryGetValue(enumType, out ToggleOption[] cached))
-            {
-                return cached;
-            }
-
-            ToggleOption[] options = BuildEnumOptions(enumType, isFlags);
-            EnumOptionsCache[enumType] = options;
-            return options;
         }
 
         internal static LayoutMetrics CalculateLayout(
@@ -862,6 +850,18 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             SetEnumValue(property, 0UL);
         }
 
+        private static ToggleOption[] GetCachedEnumOptions(Type enumType, bool isFlags)
+        {
+            if (EnumOptionsCache.TryGetValue(enumType, out ToggleOption[] cached))
+            {
+                return cached;
+            }
+
+            ToggleOption[] options = BuildEnumOptions(enumType, isFlags);
+            EnumOptionsCache[enumType] = options;
+            return options;
+        }
+
         private static Type ResolveEnumType(FieldInfo fieldInfo)
         {
             if (fieldInfo == null)
@@ -917,7 +917,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
                 ulong numericValue = ConvertToUInt64(value);
                 // Mask sign extension before deciding whether a signed top-bit flag is composite.
-                if (isFlags && numericValue != 0UL && !IsPowerOfTwo(numericValue & underlyingMask))
+                if (
+                    isFlags
+                    && numericValue != 0UL
+                    && !BitOps.IsPowerOfTwo(numericValue & underlyingMask)
+                )
                 {
                     Debug.LogWarning(
                         $"[{nameof(WEnumToggleButtonsUtility)}] Skipping composite flag value {name} "
@@ -1321,11 +1325,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
         }
 
-        private static bool IsPowerOfTwo(ulong value)
-        {
-            return value != 0UL && (value & (value - 1UL)) == 0UL;
-        }
-
         private static TAttribute GetAttribute<TAttribute>(
             FieldInfo fieldInfo,
             SerializedProperty property
@@ -1372,14 +1371,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
     internal readonly struct ToggleOption
     {
-        internal ToggleOption(string label, object value, ulong flagValue, bool isZeroFlag)
-        {
-            Label = string.IsNullOrEmpty(label) ? "(Unnamed)" : label;
-            Value = value;
-            FlagValue = flagValue;
-            IsZeroFlag = isZeroFlag;
-        }
-
         internal string Label { get; }
 
         internal object Value { get; }
@@ -1387,10 +1378,31 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         internal ulong FlagValue { get; }
 
         internal bool IsZeroFlag { get; }
+
+        internal ToggleOption(string label, object value, ulong flagValue, bool isZeroFlag)
+        {
+            Label = string.IsNullOrEmpty(label) ? "(Unnamed)" : label;
+            Value = value;
+            FlagValue = flagValue;
+            IsZeroFlag = isZeroFlag;
+        }
     }
 
     internal readonly struct ToggleSet
     {
+        internal static ToggleSet Empty { get; } =
+            new(Array.Empty<ToggleOption>(), false, ToggleSource.None, null);
+
+        internal IReadOnlyList<ToggleOption> Options => _options;
+
+        internal bool SupportsMultipleSelection { get; }
+
+        internal ToggleSource Source { get; }
+
+        internal Type ValueType { get; }
+
+        internal bool IsEmpty => _options == null || _options.Length == 0;
+
         private readonly ToggleOption[] _options;
 
         internal ToggleSet(
@@ -1405,23 +1417,28 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             Source = source;
             ValueType = valueType;
         }
-
-        internal static ToggleSet Empty { get; } =
-            new(Array.Empty<ToggleOption>(), false, ToggleSource.None, null);
-
-        internal IReadOnlyList<ToggleOption> Options => _options;
-
-        internal bool SupportsMultipleSelection { get; }
-
-        internal ToggleSource Source { get; }
-
-        internal Type ValueType { get; }
-
-        internal bool IsEmpty => _options == null || _options.Length == 0;
     }
 
     internal readonly struct LayoutSignature : IEquatable<LayoutSignature>
     {
+        internal int OptionCount { get; }
+
+        internal int VisibleCount { get; }
+
+        internal int ButtonsPerRow { get; }
+
+        internal bool SupportsMultipleSelection { get; }
+
+        internal bool ShowSelectAll { get; }
+
+        internal bool ShowSelectNone { get; }
+
+        internal bool UsePagination { get; }
+
+        internal bool HasSummary { get; }
+
+        internal int WidthBucket { get; }
+
         internal LayoutSignature(
             int optionCount,
             int visibleCount,
@@ -1444,24 +1461,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             HasSummary = hasSummary;
             WidthBucket = widthBucket;
         }
-
-        internal int OptionCount { get; }
-
-        internal int VisibleCount { get; }
-
-        internal int ButtonsPerRow { get; }
-
-        internal bool SupportsMultipleSelection { get; }
-
-        internal bool ShowSelectAll { get; }
-
-        internal bool ShowSelectNone { get; }
-
-        internal bool UsePagination { get; }
-
-        internal bool HasSummary { get; }
-
-        internal int WidthBucket { get; }
 
         public bool Equals(LayoutSignature other)
         {
@@ -1609,23 +1608,35 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private sealed class Entry
         {
+            internal LayoutSignature Signature { get; }
+
+            internal float Width { get; }
+
+            internal float Height { get; }
+
             internal Entry(LayoutSignature signature, float width, float height)
             {
                 Signature = signature;
                 Width = width;
                 Height = height;
             }
-
-            internal LayoutSignature Signature { get; }
-
-            internal float Width { get; }
-
-            internal float Height { get; }
         }
     }
 
     internal readonly struct LayoutMetrics
     {
+        internal int Columns { get; }
+
+        internal int Rows { get; }
+
+        internal float ButtonWidth { get; }
+
+        internal float ButtonHeight { get; }
+
+        internal float Spacing { get; }
+
+        internal float TotalHeight { get; }
+
         internal LayoutMetrics(
             int columns,
             int rows,
@@ -1642,18 +1653,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             Spacing = spacing;
             TotalHeight = totalHeight;
         }
-
-        internal int Columns { get; }
-
-        internal int Rows { get; }
-
-        internal float ButtonWidth { get; }
-
-        internal float ButtonHeight { get; }
-
-        internal float Spacing { get; }
-
-        internal float TotalHeight { get; }
 
         internal Rect GetItemRect(Rect bounds, int index)
         {
@@ -1744,8 +1743,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         internal sealed class PaginationState
         {
-            private int _pageIndex;
-
             internal int PageSize { get; set; }
 
             internal int TotalItems { get; set; }
@@ -1797,6 +1794,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     return Mathf.Clamp(TotalItems - start, 0, PageSize);
                 }
             }
+
+            private int _pageIndex;
         }
     }
 }

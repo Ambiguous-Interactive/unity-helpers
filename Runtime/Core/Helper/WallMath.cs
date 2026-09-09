@@ -84,72 +84,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         /// <summary>
-        /// The largest <see cref="double"/> below <paramref name="value"/>.
-        /// </summary>
-        /// <remarks>
-        /// Positive values step down in bit space and negative values step up, because the sign bit
-        /// reverses the ordering. Zero is its own case: the value below it is the first negative
-        /// subnormal, whose bit pattern is not adjacent to zero's.
-        /// </remarks>
-        private static double PreviousDouble(double value)
-        {
-            if (double.IsNaN(value))
-            {
-                return double.NaN;
-            }
-
-            if (value == double.NegativeInfinity)
-            {
-                return double.NegativeInfinity;
-            }
-
-            if (value == double.PositiveInfinity)
-            {
-                return double.MaxValue;
-            }
-
-            if (value == 0d)
-            {
-                return -double.Epsilon;
-            }
-
-            long bits = BitConverter.DoubleToInt64Bits(value);
-            bits += 0d < value ? -1L : 1L;
-            return BitConverter.Int64BitsToDouble(bits);
-        }
-
-        /// <summary>
-        /// The largest <see cref="float"/> below <paramref name="value"/>. The <see cref="double"/>
-        /// overload's remark explains the cases.
-        /// </summary>
-        private static float PreviousFloat(float value)
-        {
-            if (float.IsNaN(value))
-            {
-                return float.NaN;
-            }
-
-            if (value == float.NegativeInfinity)
-            {
-                return float.NegativeInfinity;
-            }
-
-            if (value == float.PositiveInfinity)
-            {
-                return float.MaxValue;
-            }
-
-            if (value == 0f)
-            {
-                return -float.Epsilon;
-            }
-
-            int bits = BitConverter.SingleToInt32Bits(value);
-            bits += 0f < value ? -1 : 1;
-            return BitConverter.Int32BitsToSingle(bits);
-        }
-
-        /// <summary>
         /// Computes a positive modulo operation that always returns a non-negative result.
         /// Unlike the % operator which can return negative values, this ensures the result is in [0, max).
         /// </summary>
@@ -769,6 +703,58 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         /// <summary>
+        /// Compares two float values for total equality with special handling for NaN and infinity.
+        /// Unlike standard equality, this treats NaN == NaN as true and properly compares infinities.
+        /// Based on IEEE 754 totalOrder semantics.
+        /// </summary>
+        /// <param name="lhs">The first value</param>
+        /// <param name="rhs">The second value</param>
+        /// <returns>True if the values are equal, including special cases where both are NaN or the same infinity</returns>
+        public static bool TotalEquals(this float lhs, float rhs)
+        {
+            if (float.IsNaN(lhs) && float.IsNaN(rhs))
+            {
+                return true;
+            }
+            if (float.IsPositiveInfinity(lhs) && float.IsPositiveInfinity(rhs))
+            {
+                return true;
+            }
+            if (float.IsNegativeInfinity(lhs) && float.IsNegativeInfinity(rhs))
+            {
+                return true;
+            }
+            // ReSharper disable once CompareOfFloatsByEqualityOperator
+            return lhs == rhs;
+        }
+
+        /// <summary>
+        /// Compares two double values for total equality with special handling for NaN and infinity.
+        /// Unlike standard equality, this treats NaN == NaN as true and properly compares infinities.
+        /// Based on IEEE 754 totalOrder semantics.
+        /// </summary>
+        /// <param name="lhs">The first value</param>
+        /// <param name="rhs">The second value</param>
+        /// <returns>True if the values are equal, including special cases where both are NaN or the same infinity</returns>
+        public static bool TotalEquals(this double lhs, double rhs)
+        {
+            if (double.IsNaN(lhs) && double.IsNaN(rhs))
+            {
+                return true;
+            }
+            if (double.IsPositiveInfinity(lhs) && double.IsPositiveInfinity(rhs))
+            {
+                return true;
+            }
+            if (double.IsNegativeInfinity(lhs) && double.IsNegativeInfinity(rhs))
+            {
+                return true;
+            }
+            // ReSharper disable once CompareOfFloatsByEqualityOperator
+            return lhs == rhs;
+        }
+
+        /// <summary>
         /// Reports whether two values differ by no more than <paramref name="tolerance"/>, with no
         /// relative cushion of any kind. Unlike <see cref="Approximately(float, float, float)"/>,
         /// the tolerance is the whole of the permitted difference, so a caller passing zero gets an
@@ -822,6 +808,72 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 && WithinTolerance(lhs.z, rhs.z, tolerance);
         }
 
+        /// <summary>
+        /// The largest <see cref="double"/> below <paramref name="value"/>.
+        /// </summary>
+        /// <remarks>
+        /// Positive values step down in bit space and negative values step up, because the sign bit
+        /// reverses the ordering. Zero is its own case: the value below it is the first negative
+        /// subnormal, whose bit pattern is not adjacent to zero's.
+        /// </remarks>
+        private static double PreviousDouble(double value)
+        {
+            if (double.IsNaN(value))
+            {
+                return double.NaN;
+            }
+
+            if (value == double.NegativeInfinity)
+            {
+                return double.NegativeInfinity;
+            }
+
+            if (value == double.PositiveInfinity)
+            {
+                return double.MaxValue;
+            }
+
+            if (value == 0d)
+            {
+                return -double.Epsilon;
+            }
+
+            long bits = BitConverter.DoubleToInt64Bits(value);
+            bits += 0d < value ? -1L : 1L;
+            return BitConverter.Int64BitsToDouble(bits);
+        }
+
+        /// <summary>
+        /// The largest <see cref="float"/> below <paramref name="value"/>. The <see cref="double"/>
+        /// overload's remark explains the cases.
+        /// </summary>
+        private static float PreviousFloat(float value)
+        {
+            if (float.IsNaN(value))
+            {
+                return float.NaN;
+            }
+
+            if (value == float.NegativeInfinity)
+            {
+                return float.NegativeInfinity;
+            }
+
+            if (value == float.PositiveInfinity)
+            {
+                return float.MaxValue;
+            }
+
+            if (value == 0f)
+            {
+                return -float.Epsilon;
+            }
+
+            int bits = BitConverter.SingleToInt32Bits(value);
+            bits += 0f < value ? -1 : 1;
+            return BitConverter.Int32BitsToSingle(bits);
+        }
+
         private static bool IsFinite(Vector2 value)
         {
             return IsFinite(value.x) && IsFinite(value.y);
@@ -845,58 +897,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private static bool IsFinite(float value)
         {
             return !float.IsNaN(value) && !float.IsInfinity(value);
-        }
-
-        /// <summary>
-        /// Compares two float values for total equality with special handling for NaN and infinity.
-        /// Unlike standard equality, this treats NaN == NaN as true and properly compares infinities.
-        /// Based on IEEE 754 totalOrder semantics.
-        /// </summary>
-        /// <param name="lhs">The first value</param>
-        /// <param name="rhs">The second value</param>
-        /// <returns>True if the values are equal, including special cases where both are NaN or the same infinity</returns>
-        public static bool TotalEquals(this float lhs, float rhs)
-        {
-            if (float.IsNaN(lhs) && float.IsNaN(rhs))
-            {
-                return true;
-            }
-            if (float.IsPositiveInfinity(lhs) && float.IsPositiveInfinity(rhs))
-            {
-                return true;
-            }
-            if (float.IsNegativeInfinity(lhs) && float.IsNegativeInfinity(rhs))
-            {
-                return true;
-            }
-            // ReSharper disable once CompareOfFloatsByEqualityOperator
-            return lhs == rhs;
-        }
-
-        /// <summary>
-        /// Compares two double values for total equality with special handling for NaN and infinity.
-        /// Unlike standard equality, this treats NaN == NaN as true and properly compares infinities.
-        /// Based on IEEE 754 totalOrder semantics.
-        /// </summary>
-        /// <param name="lhs">The first value</param>
-        /// <param name="rhs">The second value</param>
-        /// <returns>True if the values are equal, including special cases where both are NaN or the same infinity</returns>
-        public static bool TotalEquals(this double lhs, double rhs)
-        {
-            if (double.IsNaN(lhs) && double.IsNaN(rhs))
-            {
-                return true;
-            }
-            if (double.IsPositiveInfinity(lhs) && double.IsPositiveInfinity(rhs))
-            {
-                return true;
-            }
-            if (double.IsNegativeInfinity(lhs) && double.IsNegativeInfinity(rhs))
-            {
-                return true;
-            }
-            // ReSharper disable once CompareOfFloatsByEqualityOperator
-            return lhs == rhs;
         }
 
         /// <summary>

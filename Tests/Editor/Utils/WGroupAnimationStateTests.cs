@@ -23,6 +23,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
         private bool _originalTweenEnabled;
         private float _originalTweenSpeed;
 
+        /// <summary>
+        /// Creates a test WGroupDefinition with the specified name and anchor property path.
+        /// </summary>
+        private static WGroupDefinition CreateTestDefinition(string name, string anchorPropertyPath)
+        {
+            return new WGroupDefinition(
+                name: name,
+                displayName: name,
+                collapsible: true,
+                startCollapsed: false,
+                hideHeader: false,
+                propertyPaths: new List<string> { anchorPropertyPath },
+                anchorPropertyPath: anchorPropertyPath,
+                anchorIndex: 0,
+                declarationOrder: 0
+            );
+        }
+
         [SetUp]
         public void SetUp()
         {
@@ -567,24 +585,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
                 animDefaultBefore,
                 animDefaultAfter,
                 "After ClearCache, a new AnimBool should be created for default targetInstanceId."
-            );
-        }
-
-        /// <summary>
-        /// Creates a test WGroupDefinition with the specified name and anchor property path.
-        /// </summary>
-        private static WGroupDefinition CreateTestDefinition(string name, string anchorPropertyPath)
-        {
-            return new WGroupDefinition(
-                name: name,
-                displayName: name,
-                collapsible: true,
-                startCollapsed: false,
-                hideHeader: false,
-                propertyPaths: new List<string> { anchorPropertyPath },
-                anchorPropertyPath: anchorPropertyPath,
-                anchorIndex: 0,
-                declarationOrder: 0
             );
         }
     }

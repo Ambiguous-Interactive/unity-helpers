@@ -50,28 +50,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             }
         }
 
-        private string CreateTempTexture(bool asSprite = false)
-        {
-            Texture2D tex = Track(new Texture2D(4, 4, TextureFormat.RGBA32, mipChain: false));
-            byte[] png = tex.EncodeToPNG();
-            string path = Path.Combine(TestFolder, "ui_button.png");
-            File.WriteAllBytes(path, png);
-
-            ExecuteWithImmediateImport(() =>
-            {
-                AssetDatabase.ImportAsset(path);
-
-                TextureImporter ti = AssetImporter.GetAtPath(path) as TextureImporter;
-                Assert.IsTrue(ti != null, "TextureImporter not found for path: " + path);
-                if (asSprite)
-                {
-                    ti.textureType = TextureImporterType.Sprite;
-                    ti.SaveAndReimport();
-                }
-            });
-            return path;
-        }
-
         [Test]
         public void AppliesProfileByNameContainsWithPriority()
         {
@@ -196,6 +174,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     + ", Path: "
                     + path
             );
+        }
+
+        private string CreateTempTexture(bool asSprite = false)
+        {
+            Texture2D tex = Track(new Texture2D(4, 4, TextureFormat.RGBA32, mipChain: false));
+            byte[] png = tex.EncodeToPNG();
+            string path = Path.Combine(TestFolder, "ui_button.png");
+            File.WriteAllBytes(path, png);
+
+            ExecuteWithImmediateImport(() =>
+            {
+                AssetDatabase.ImportAsset(path);
+
+                TextureImporter ti = AssetImporter.GetAtPath(path) as TextureImporter;
+                Assert.IsTrue(ti != null, "TextureImporter not found for path: " + path);
+                if (asSprite)
+                {
+                    ti.textureType = TextureImporterType.Sprite;
+                    ti.SaveAndReimport();
+                }
+            });
+            return path;
         }
     }
 }

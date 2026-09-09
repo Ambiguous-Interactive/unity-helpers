@@ -20,6 +20,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             outputDirectory = Path.Combine(Application.dataPath, "HullRegressionSnapshots");
         }
 
+        private static SerializableFastVector3Int[] ToSerializable(
+            IReadOnlyList<FastVector3Int> source
+        )
+        {
+            if (source == null)
+            {
+                return Array.Empty<SerializableFastVector3Int>();
+            }
+
+            SerializableFastVector3Int[] buffer = new SerializableFastVector3Int[source.Count];
+            for (int i = 0; i < source.Count; ++i)
+            {
+                FastVector3Int point = source[i];
+                buffer[i] = new SerializableFastVector3Int
+                {
+                    x = point.x,
+                    y = point.y,
+                    z = point.z,
+                };
+            }
+
+            return buffer;
+        }
+
         public void WriteSnapshot(
             string mode,
             int seed,
@@ -57,30 +81,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             {
                 Debug.LogError($"[HullRegressionRecorder] Failed to write snapshot: {ex}");
             }
-        }
-
-        private static SerializableFastVector3Int[] ToSerializable(
-            IReadOnlyList<FastVector3Int> source
-        )
-        {
-            if (source == null)
-            {
-                return Array.Empty<SerializableFastVector3Int>();
-            }
-
-            SerializableFastVector3Int[] buffer = new SerializableFastVector3Int[source.Count];
-            for (int i = 0; i < source.Count; ++i)
-            {
-                FastVector3Int point = source[i];
-                buffer[i] = new SerializableFastVector3Int
-                {
-                    x = point.x,
-                    y = point.y,
-                    z = point.z,
-                };
-            }
-
-            return buffer;
         }
 
         [Serializable]

@@ -34,18 +34,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous.Rules
     /// </remarks>
     public sealed class AnimationKeyframeRule : IValidationRule
     {
+        /// <inheritdoc />
+        public string RuleId => ValidationRuleIds.AnimationKeyframeEmpty;
+
+        /// <inheritdoc />
+        public string DisplayName => "Animation keyframes resolve";
+
         private readonly List<AnimationKeyframeFinding> _found =
             new List<AnimationKeyframeFinding>();
 
         private readonly Dictionary<string, int> _occurrences = new Dictionary<string, int>(
             StringComparer.Ordinal
         );
-
-        /// <inheritdoc />
-        public string RuleId => ValidationRuleIds.AnimationKeyframeEmpty;
-
-        /// <inheritdoc />
-        public string DisplayName => "Animation keyframes resolve";
 
         /// <inheritdoc />
         public bool AppliesTo(in ValidationTarget target)

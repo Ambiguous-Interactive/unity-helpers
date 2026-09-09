@@ -24,6 +24,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
         private bool _originalDictionaryTweenEnabled;
         private bool _originalSortedDictionaryTweenEnabled;
 
+        /// <summary>
+        /// Helper method to call the internal GetOrCreateCachedSerializedObject.
+        /// </summary>
+        private static SerializedObject GetCachedSerializedObject(UnityHelpersSettings settings)
+        {
+            return UnityHelpersSettings.GetOrCreateCachedSerializedObject(settings);
+        }
+
+        /// <summary>
+        /// Helper method to test null handling.
+        /// </summary>
+        private static SerializedObject GetCachedSerializedObjectWithNull()
+        {
+            return UnityHelpersSettings.GetOrCreateCachedSerializedObject(null);
+        }
+
         [SetUp]
         public void SetUp()
         {
@@ -829,22 +845,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 thirdCached,
                 "After recreation, cache should consistently return the new object."
             );
-        }
-
-        /// <summary>
-        /// Helper method to call the internal GetOrCreateCachedSerializedObject.
-        /// </summary>
-        private static SerializedObject GetCachedSerializedObject(UnityHelpersSettings settings)
-        {
-            return UnityHelpersSettings.GetOrCreateCachedSerializedObject(settings);
-        }
-
-        /// <summary>
-        /// Helper method to test null handling.
-        /// </summary>
-        private static SerializedObject GetCachedSerializedObjectWithNull()
-        {
-            return UnityHelpersSettings.GetOrCreateCachedSerializedObject(null);
         }
     }
 }

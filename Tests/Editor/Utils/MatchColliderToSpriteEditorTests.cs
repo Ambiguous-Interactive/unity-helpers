@@ -16,6 +16,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     [TestFixture]
     public sealed class MatchColliderToSpriteEditorTests : CommonTestBase
     {
+        private static void AssertFinalGeometry(
+            PolygonCollider2D collider,
+            int expectedPaths,
+            Vector2[] exact,
+            string phase
+        )
+        {
+            Assert.AreEqual(expectedPaths, collider.pathCount, phase);
+            if (expectedPaths != 0)
+            {
+                CollectionAssert.AreEquivalent(exact, collider.GetPath(0), phase);
+            }
+        }
+
         [TearDown]
         public override void TearDown()
         {
@@ -211,20 +225,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                     "Explicit rebuild after undo"
                 );
                 Undo.ClearAll();
-            }
-        }
-
-        private static void AssertFinalGeometry(
-            PolygonCollider2D collider,
-            int expectedPaths,
-            Vector2[] exact,
-            string phase
-        )
-        {
-            Assert.AreEqual(expectedPaths, collider.pathCount, phase);
-            if (expectedPaths != 0)
-            {
-                CollectionAssert.AreEquivalent(exact, collider.GetPath(0), phase);
             }
         }
     }

@@ -46,6 +46,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true, Inherited = false)]
     public sealed class WProtoRootMarshalAttribute : Attribute
     {
+        /// <summary>The type being serialized, or its unbound generic definition.</summary>
+        public Type RealType { get; }
+
+        /// <summary>The formatter that encodes it, or its unbound generic definition.</summary>
+        public Type FormatterType { get; }
+
         /// <summary>
         /// Initializes a new instance of the <see cref="WProtoRootMarshalAttribute"/> class.
         /// </summary>
@@ -61,11 +67,5 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             RealType = realType;
             FormatterType = formatterType;
         }
-
-        /// <summary>The type being serialized, or its unbound generic definition.</summary>
-        public Type RealType { get; }
-
-        /// <summary>The formatter that encodes it, or its unbound generic definition.</summary>
-        public Type FormatterType { get; }
     }
 }

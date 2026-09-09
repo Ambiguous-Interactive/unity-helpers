@@ -28,20 +28,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
     [NUnit.Framework.Category("Integration")]
     public sealed class WButtonConflictWarningDisplayTests : BatchedEditorTestBase
     {
-        [SetUp]
-        public void SetUp()
-        {
-            base.BaseSetUp();
-            ClearAllCaches();
-        }
-
-        [TearDown]
-        public override void TearDown()
-        {
-            ClearAllCaches();
-            base.TearDown();
-        }
-
         private static void ClearAllCaches()
         {
             WButtonGUI.ClearGroupDataForTesting();
@@ -69,23 +55,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
         }
 
-        private T CreateAssetAndEditor<T>(out Editor editor)
-            where T : ScriptableObject
-        {
-            T asset = Track(ScriptableObject.CreateInstance<T>());
-            editor = Track(Editor.CreateEditor(asset));
-            return asset;
-        }
-
-        private ScriptableObject CreateAssetAndEditor(Type targetType, out Editor editor)
-        {
-            ScriptableObject asset = Track(
-                ScriptableObject.CreateInstance(targetType) as ScriptableObject
-            );
-            editor = Track(Editor.CreateEditor(asset));
-            return asset;
-        }
-
         private static IReadOnlyDictionary<
             string,
             WButtonGUI.GroupPlacementConflictInfo
@@ -108,41 +77,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
         > GetDrawOrderWarnings()
         {
             return WButtonGUI.GetConflictingDrawOrderWarnings();
-        }
-
-        [Test]
-        [TestCaseSource(nameof(PlacementConflictDetectionCases))]
-        public void PlacementConflictWarningHandlesAllScenarios(
-            Type targetType,
-            string groupName,
-            bool shouldHaveConflict,
-            int expectedConflictCount
-        )
-        {
-            CreateAssetAndEditor(targetType, out Editor editor);
-            Dictionary<WButtonGroupKey, WButtonPaginationState> paginationStates = new();
-            Dictionary<WButtonGroupKey, bool> foldoutStates = new();
-
-            DrawButtonsWithDefaults(editor, paginationStates, foldoutStates);
-            IReadOnlyDictionary<string, WButtonGUI.GroupPlacementConflictInfo> warnings =
-                GetPlacementWarnings();
-
-            Assert.AreEqual(
-                shouldHaveConflict,
-                warnings.ContainsKey(groupName),
-                shouldHaveConflict
-                    ? $"Expected conflict warning for group '{groupName}'. Available groups: [{string.Join(", ", warnings.Keys)}]"
-                    : $"Expected no conflict warning for group '{groupName}'. Available groups: [{string.Join(", ", warnings.Keys)}]"
-            );
-
-            if (shouldHaveConflict && 0 < expectedConflictCount)
-            {
-                Assert.AreEqual(
-                    expectedConflictCount,
-                    warnings.ValueFor(groupName)._allGroupPlacements.Count,
-                    $"Expected {expectedConflictCount} conflicting placement values, but got {warnings.ValueFor(groupName)._allGroupPlacements.Count}: [{string.Join(", ", warnings.ValueFor(groupName)._allGroupPlacements)}]"
-                );
-            }
         }
 
         private static IEnumerable<TestCaseData> PlacementConflictDetectionCases()
@@ -183,92 +117,12 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             ).SetName("Placement.AllSameExplicit.NoWarning");
         }
 
-        [Test]
-        [TestCaseSource(nameof(PlacementConflictContentCases))]
-        public void PlacementConflictWarningContainsExpectedContent(
-            WButtonGroupPlacement expectedCanonicalPlacement,
-            WButtonGroupPlacement[] expectedConflictingPlacements
-        )
-        {
-            CreateAssetAndEditor<WButtonGroupPlacementConflictTarget>(out Editor editor);
-            Dictionary<WButtonGroupKey, WButtonPaginationState> paginationStates = new();
-            Dictionary<WButtonGroupKey, bool> foldoutStates = new();
-
-            DrawButtonsWithDefaults(editor, paginationStates, foldoutStates);
-            IReadOnlyDictionary<string, WButtonGUI.GroupPlacementConflictInfo> warnings =
-                GetPlacementWarnings();
-            WButtonGUI.GroupPlacementConflictInfo conflict = warnings.ValueFor("ConflictGroup");
-
-            Assert.AreEqual(
-                expectedCanonicalPlacement,
-                conflict._canonicalGroupPlacement,
-                "Canonical placement should match first declared button"
-            );
-
-            foreach (WButtonGroupPlacement expected in expectedConflictingPlacements)
-            {
-                Assert.IsTrue(
-                    conflict._allGroupPlacements.Contains(expected),
-                    $"Should include {expected} placement"
-                );
-            }
-
-            Assert.IsFalse(
-                conflict._allGroupPlacements.Contains(WButtonGroupPlacement.UseGlobalSetting),
-                "Should exclude default UseGlobalSetting value"
-            );
-        }
-
         private static IEnumerable<TestCaseData> PlacementConflictContentCases()
         {
             yield return new TestCaseData(
                 WButtonGroupPlacement.Top,
                 new[] { WButtonGroupPlacement.Top, WButtonGroupPlacement.Bottom }
             ).SetName("Content.ConflictGroup.ContainsTopAndBottom");
-        }
-
-        [UnityTest]
-        [TestCaseSource(nameof(CollapsedConflictWarningRenderCases))]
-        public IEnumerator ConflictWarningsRenderAndCacheInImGuiContext(
-            Type targetType,
-            string groupName,
-            string warningType,
-            UnityHelpersSettings.WButtonFoldoutBehavior foldoutBehavior,
-            string expectedSummaryFragment,
-            string expectedCanonicalFragment
-        )
-        {
-            CreateAssetAndEditor(targetType, out Editor editor);
-            Dictionary<WButtonGroupKey, WButtonPaginationState> paginationStates = new();
-            Dictionary<WButtonGroupKey, bool> foldoutStates = new();
-
-            yield return TestIMGUIExecutor.Run(() =>
-            {
-                WButtonGUI.DrawButtons(
-                    editor,
-                    WButtonPlacement.Top,
-                    paginationStates,
-                    foldoutStates,
-                    foldoutBehavior,
-                    triggeredContexts: null,
-                    globalPlacementIsTop: true
-                );
-            });
-
-            bool hasCachedWarning = TryGetCachedWarningText(
-                warningType,
-                groupName,
-                out string warningText
-            );
-
-            LogWarningDiagnostics(warningType, foldoutBehavior, groupName, hasCachedWarning);
-
-            Assert.IsTrue(
-                hasCachedWarning,
-                $"Expected '{warningType}' warning text for group '{groupName}' to be cached after IMGUI draw with behavior '{foldoutBehavior}'."
-            );
-            StringAssert.Contains(expectedSummaryFragment, warningText);
-            StringAssert.Contains(expectedCanonicalFragment, warningText);
         }
 
         private static IEnumerable<TestCaseData> CollapsedConflictWarningRenderCases()
@@ -315,50 +169,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                     .Returns(null)
                     .SetName($"Warning.DrawOrder.{behavior}.RenderedAndCached");
             }
-        }
-
-        [UnityTest]
-        [TestCaseSource(nameof(NonConflictWarningRenderCases))]
-        public IEnumerator ConflictWarningsAreNotCachedWhenNoConflictsExist(
-            Type targetType,
-            string groupName,
-            string warningType
-        )
-        {
-            CreateAssetAndEditor(targetType, out Editor editor);
-            Dictionary<WButtonGroupKey, WButtonPaginationState> paginationStates = new();
-            Dictionary<WButtonGroupKey, bool> foldoutStates = new();
-
-            yield return TestIMGUIExecutor.Run(() =>
-            {
-                WButtonGUI.DrawButtons(
-                    editor,
-                    WButtonPlacement.Top,
-                    paginationStates,
-                    foldoutStates,
-                    UnityHelpersSettings.WButtonFoldoutBehavior.StartCollapsed,
-                    triggeredContexts: null,
-                    globalPlacementIsTop: true
-                );
-            });
-
-            bool hasCachedWarning = TryGetCachedWarningText(
-                warningType,
-                groupName,
-                out string warningText
-            );
-
-            LogWarningDiagnostics(
-                warningType,
-                UnityHelpersSettings.WButtonFoldoutBehavior.StartCollapsed,
-                groupName,
-                hasCachedWarning
-            );
-
-            Assert.IsFalse(
-                hasCachedWarning,
-                $"Did not expect '{warningType}' warning text for group '{groupName}'. Unexpected cached text: '{warningText}'."
-            );
         }
 
         private static IEnumerable<TestCaseData> NonConflictWarningRenderCases()
@@ -449,6 +259,286 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
         }
 
+        private static IEnumerable<TestCaseData> PriorityConflictDetectionCases()
+        {
+            yield return new TestCaseData(
+                typeof(WButtonGroupPriorityConflictTarget),
+                "ConflictGroup",
+                true,
+                2
+            ).SetName("Priority.ConflictingValues.GeneratesWarning");
+
+            yield return new TestCaseData(
+                typeof(WButtonAllSameExplicitPriorityTarget),
+                "SameGroup",
+                false,
+                0
+            ).SetName("Priority.AllSameExplicit.NoWarning");
+
+            yield return new TestCaseData(
+                typeof(WButtonMixedExplicitAndDefaultPriorityTarget),
+                "Setup",
+                false,
+                0
+            ).SetName("Priority.MixedExplicitAndDefault.NoWarning");
+
+            yield return new TestCaseData(
+                typeof(WButtonAllDefaultPriorityTarget),
+                "DefaultGroup",
+                false,
+                0
+            ).SetName("Priority.AllDefaults.NoWarning");
+        }
+
+        private static IEnumerable<TestCaseData> PriorityConflictContentCases()
+        {
+            yield return new TestCaseData(0, new[] { 0, 10 }).SetName(
+                "Content.ConflictGroup.ContainsZeroAndTen"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> DrawOrderConflictDetectionCases()
+        {
+            yield return new TestCaseData(
+                typeof(WButtonConflictingDrawOrderTarget),
+                "Setup",
+                true,
+                2
+            ).SetName("DrawOrder.ConflictingValues.GeneratesWarning");
+
+            yield return new TestCaseData(
+                typeof(WButtonGroupPlacementTopTarget),
+                "TopGroup",
+                false,
+                0
+            ).SetName("DrawOrder.ConsistentValues.NoWarning");
+
+            yield return new TestCaseData(
+                typeof(WButtonThreeWayConflictTarget),
+                "Actions",
+                true,
+                3
+            ).SetName("DrawOrder.ThreeWayConflict.GeneratesWarning");
+        }
+
+        private static IEnumerable<TestCaseData> CachingBehaviorCases()
+        {
+            yield return new TestCaseData(false).SetName("Caching.NoClear.WarningsPersist");
+            yield return new TestCaseData(true).SetName("Caching.WithClear.WarningsCleared");
+        }
+
+        private static IEnumerable<TestCaseData> EdgeCaseTargetsCases()
+        {
+            yield return new TestCaseData(typeof(WButtonSingleButtonTarget)).SetName(
+                "EdgeCase.SingleButton.NoWarnings"
+            );
+            yield return new TestCaseData(typeof(WButtonUngroupedPlacementTarget)).SetName(
+                "EdgeCase.UngroupedButtons.NoWarnings"
+            );
+            yield return new TestCaseData(
+                typeof(WButtonMixedExplicitAndDefaultPlacementTarget)
+            ).SetName("EdgeCase.MixedExplicitDefault.NoWarnings");
+        }
+
+        private static IEnumerable<TestCaseData> NullAndDestroyedEditorCases()
+        {
+            yield return new TestCaseData(false).SetName("Negative.ValidEditor.NoThrow");
+            yield return new TestCaseData(true).SetName("Negative.DestroyedEditor.NoThrow");
+        }
+
+        private static IEnumerable<TestCaseData> InvalidEnumValueCases()
+        {
+            yield return new TestCaseData((WButtonGroupPlacement)999, int.MinValue).SetName(
+                "Impossible.InvalidEnumValues.KeyComparison.Stable"
+            );
+            yield return new TestCaseData((WButtonGroupPlacement)(-1), int.MaxValue).SetName(
+                "Impossible.NegativeEnumValue.KeyComparison.Stable"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> ExtremeScaleTestCases()
+        {
+            yield return new TestCaseData(250)
+                .Returns(null)
+                .SetName("Extreme.DrawLoop.TwoHundredFiftyIterations.Stable");
+            yield return new TestCaseData(1000)
+                .Returns(null)
+                .SetName("Extreme.DrawLoop.ThousandIterations.Stable");
+        }
+
+        [SetUp]
+        public void SetUp()
+        {
+            base.BaseSetUp();
+            ClearAllCaches();
+        }
+
+        [TearDown]
+        public override void TearDown()
+        {
+            ClearAllCaches();
+            base.TearDown();
+        }
+
+        [Test]
+        [TestCaseSource(nameof(PlacementConflictDetectionCases))]
+        public void PlacementConflictWarningHandlesAllScenarios(
+            Type targetType,
+            string groupName,
+            bool shouldHaveConflict,
+            int expectedConflictCount
+        )
+        {
+            CreateAssetAndEditor(targetType, out Editor editor);
+            Dictionary<WButtonGroupKey, WButtonPaginationState> paginationStates = new();
+            Dictionary<WButtonGroupKey, bool> foldoutStates = new();
+
+            DrawButtonsWithDefaults(editor, paginationStates, foldoutStates);
+            IReadOnlyDictionary<string, WButtonGUI.GroupPlacementConflictInfo> warnings =
+                GetPlacementWarnings();
+
+            Assert.AreEqual(
+                shouldHaveConflict,
+                warnings.ContainsKey(groupName),
+                shouldHaveConflict
+                    ? $"Expected conflict warning for group '{groupName}'. Available groups: [{string.Join(", ", warnings.Keys)}]"
+                    : $"Expected no conflict warning for group '{groupName}'. Available groups: [{string.Join(", ", warnings.Keys)}]"
+            );
+
+            if (shouldHaveConflict && 0 < expectedConflictCount)
+            {
+                Assert.AreEqual(
+                    expectedConflictCount,
+                    warnings.ValueFor(groupName)._allGroupPlacements.Count,
+                    $"Expected {expectedConflictCount} conflicting placement values, but got {warnings.ValueFor(groupName)._allGroupPlacements.Count}: [{string.Join(", ", warnings.ValueFor(groupName)._allGroupPlacements)}]"
+                );
+            }
+        }
+
+        [Test]
+        [TestCaseSource(nameof(PlacementConflictContentCases))]
+        public void PlacementConflictWarningContainsExpectedContent(
+            WButtonGroupPlacement expectedCanonicalPlacement,
+            WButtonGroupPlacement[] expectedConflictingPlacements
+        )
+        {
+            CreateAssetAndEditor<WButtonGroupPlacementConflictTarget>(out Editor editor);
+            Dictionary<WButtonGroupKey, WButtonPaginationState> paginationStates = new();
+            Dictionary<WButtonGroupKey, bool> foldoutStates = new();
+
+            DrawButtonsWithDefaults(editor, paginationStates, foldoutStates);
+            IReadOnlyDictionary<string, WButtonGUI.GroupPlacementConflictInfo> warnings =
+                GetPlacementWarnings();
+            WButtonGUI.GroupPlacementConflictInfo conflict = warnings.ValueFor("ConflictGroup");
+
+            Assert.AreEqual(
+                expectedCanonicalPlacement,
+                conflict._canonicalGroupPlacement,
+                "Canonical placement should match first declared button"
+            );
+
+            foreach (WButtonGroupPlacement expected in expectedConflictingPlacements)
+            {
+                Assert.IsTrue(
+                    conflict._allGroupPlacements.Contains(expected),
+                    $"Should include {expected} placement"
+                );
+            }
+
+            Assert.IsFalse(
+                conflict._allGroupPlacements.Contains(WButtonGroupPlacement.UseGlobalSetting),
+                "Should exclude default UseGlobalSetting value"
+            );
+        }
+
+        [UnityTest]
+        [TestCaseSource(nameof(CollapsedConflictWarningRenderCases))]
+        public IEnumerator ConflictWarningsRenderAndCacheInImGuiContext(
+            Type targetType,
+            string groupName,
+            string warningType,
+            UnityHelpersSettings.WButtonFoldoutBehavior foldoutBehavior,
+            string expectedSummaryFragment,
+            string expectedCanonicalFragment
+        )
+        {
+            CreateAssetAndEditor(targetType, out Editor editor);
+            Dictionary<WButtonGroupKey, WButtonPaginationState> paginationStates = new();
+            Dictionary<WButtonGroupKey, bool> foldoutStates = new();
+
+            yield return TestIMGUIExecutor.Run(() =>
+            {
+                WButtonGUI.DrawButtons(
+                    editor,
+                    WButtonPlacement.Top,
+                    paginationStates,
+                    foldoutStates,
+                    foldoutBehavior,
+                    triggeredContexts: null,
+                    globalPlacementIsTop: true
+                );
+            });
+
+            bool hasCachedWarning = TryGetCachedWarningText(
+                warningType,
+                groupName,
+                out string warningText
+            );
+
+            LogWarningDiagnostics(warningType, foldoutBehavior, groupName, hasCachedWarning);
+
+            Assert.IsTrue(
+                hasCachedWarning,
+                $"Expected '{warningType}' warning text for group '{groupName}' to be cached after IMGUI draw with behavior '{foldoutBehavior}'."
+            );
+            StringAssert.Contains(expectedSummaryFragment, warningText);
+            StringAssert.Contains(expectedCanonicalFragment, warningText);
+        }
+
+        [UnityTest]
+        [TestCaseSource(nameof(NonConflictWarningRenderCases))]
+        public IEnumerator ConflictWarningsAreNotCachedWhenNoConflictsExist(
+            Type targetType,
+            string groupName,
+            string warningType
+        )
+        {
+            CreateAssetAndEditor(targetType, out Editor editor);
+            Dictionary<WButtonGroupKey, WButtonPaginationState> paginationStates = new();
+            Dictionary<WButtonGroupKey, bool> foldoutStates = new();
+
+            yield return TestIMGUIExecutor.Run(() =>
+            {
+                WButtonGUI.DrawButtons(
+                    editor,
+                    WButtonPlacement.Top,
+                    paginationStates,
+                    foldoutStates,
+                    UnityHelpersSettings.WButtonFoldoutBehavior.StartCollapsed,
+                    triggeredContexts: null,
+                    globalPlacementIsTop: true
+                );
+            });
+
+            bool hasCachedWarning = TryGetCachedWarningText(
+                warningType,
+                groupName,
+                out string warningText
+            );
+
+            LogWarningDiagnostics(
+                warningType,
+                UnityHelpersSettings.WButtonFoldoutBehavior.StartCollapsed,
+                groupName,
+                hasCachedWarning
+            );
+
+            Assert.IsFalse(
+                hasCachedWarning,
+                $"Did not expect '{warningType}' warning text for group '{groupName}'. Unexpected cached text: '{warningText}'."
+            );
+        }
+
         [Test]
         [TestCaseSource(nameof(PriorityConflictDetectionCases))]
         public void PriorityConflictWarningHandlesAllScenarios(
@@ -482,37 +572,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                     $"Expected {expectedConflictCount} conflicting priority values, but got {warnings.ValueFor(groupName)._allGroupPriorities.Count}: [{string.Join(", ", warnings.ValueFor(groupName)._allGroupPriorities)}]"
                 );
             }
-        }
-
-        private static IEnumerable<TestCaseData> PriorityConflictDetectionCases()
-        {
-            yield return new TestCaseData(
-                typeof(WButtonGroupPriorityConflictTarget),
-                "ConflictGroup",
-                true,
-                2
-            ).SetName("Priority.ConflictingValues.GeneratesWarning");
-
-            yield return new TestCaseData(
-                typeof(WButtonAllSameExplicitPriorityTarget),
-                "SameGroup",
-                false,
-                0
-            ).SetName("Priority.AllSameExplicit.NoWarning");
-
-            yield return new TestCaseData(
-                typeof(WButtonMixedExplicitAndDefaultPriorityTarget),
-                "Setup",
-                false,
-                0
-            ).SetName("Priority.MixedExplicitAndDefault.NoWarning");
-
-            yield return new TestCaseData(
-                typeof(WButtonAllDefaultPriorityTarget),
-                "DefaultGroup",
-                false,
-                0
-            ).SetName("Priority.AllDefaults.NoWarning");
         }
 
         [Test]
@@ -551,13 +610,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
         }
 
-        private static IEnumerable<TestCaseData> PriorityConflictContentCases()
-        {
-            yield return new TestCaseData(0, new[] { 0, 10 }).SetName(
-                "Content.ConflictGroup.ContainsZeroAndTen"
-            );
-        }
-
         [Test]
         [TestCaseSource(nameof(DrawOrderConflictDetectionCases))]
         public void DrawOrderConflictWarningHandlesAllScenarios(
@@ -590,30 +642,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                     $"Expected at least {minExpectedConflictCount} conflicting draw order values, but got {warnings.ValueFor(groupName)._allDrawOrders.Count}: [{string.Join(", ", warnings.ValueFor(groupName)._allDrawOrders)}]"
                 );
             }
-        }
-
-        private static IEnumerable<TestCaseData> DrawOrderConflictDetectionCases()
-        {
-            yield return new TestCaseData(
-                typeof(WButtonConflictingDrawOrderTarget),
-                "Setup",
-                true,
-                2
-            ).SetName("DrawOrder.ConflictingValues.GeneratesWarning");
-
-            yield return new TestCaseData(
-                typeof(WButtonGroupPlacementTopTarget),
-                "TopGroup",
-                false,
-                0
-            ).SetName("DrawOrder.ConsistentValues.NoWarning");
-
-            yield return new TestCaseData(
-                typeof(WButtonThreeWayConflictTarget),
-                "Actions",
-                true,
-                3
-            ).SetName("DrawOrder.ThreeWayConflict.GeneratesWarning");
         }
 
         [Test]
@@ -694,12 +722,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             }
         }
 
-        private static IEnumerable<TestCaseData> CachingBehaviorCases()
-        {
-            yield return new TestCaseData(false).SetName("Caching.NoClear.WarningsPersist");
-            yield return new TestCaseData(true).SetName("Caching.WithClear.WarningsCleared");
-        }
-
         [Test]
         public void MultipleConflictTypesGenerateIndependentWarnings()
         {
@@ -753,19 +775,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Assert.AreEqual(0, placementWarnings.Count, "No placement warnings expected");
         }
 
-        private static IEnumerable<TestCaseData> EdgeCaseTargetsCases()
-        {
-            yield return new TestCaseData(typeof(WButtonSingleButtonTarget)).SetName(
-                "EdgeCase.SingleButton.NoWarnings"
-            );
-            yield return new TestCaseData(typeof(WButtonUngroupedPlacementTarget)).SetName(
-                "EdgeCase.UngroupedButtons.NoWarnings"
-            );
-            yield return new TestCaseData(
-                typeof(WButtonMixedExplicitAndDefaultPlacementTarget)
-            ).SetName("EdgeCase.MixedExplicitDefault.NoWarnings");
-        }
-
         [Test]
         [TestCaseSource(nameof(NullAndDestroyedEditorCases))]
         public void NullAndDestroyedEditorHandledGracefully(bool destroyEditor)
@@ -795,12 +804,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                     DrawButtonsWithDefaults(editor, paginationStates, foldoutStates);
                 });
             }
-        }
-
-        private static IEnumerable<TestCaseData> NullAndDestroyedEditorCases()
-        {
-            yield return new TestCaseData(false).SetName("Negative.ValidEditor.NoThrow");
-            yield return new TestCaseData(true).SetName("Negative.DestroyedEditor.NoThrow");
         }
 
         [UnityTest]
@@ -958,16 +961,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
         }
 
-        private static IEnumerable<TestCaseData> InvalidEnumValueCases()
-        {
-            yield return new TestCaseData((WButtonGroupPlacement)999, int.MinValue).SetName(
-                "Impossible.InvalidEnumValues.KeyComparison.Stable"
-            );
-            yield return new TestCaseData((WButtonGroupPlacement)(-1), int.MaxValue).SetName(
-                "Impossible.NegativeEnumValue.KeyComparison.Stable"
-            );
-        }
-
         [UnityTest]
         [TestCaseSource(nameof(ExtremeScaleTestCases))]
         public IEnumerator ExtremeScaleHandledCorrectly(int drawIterations)
@@ -995,14 +988,21 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
         }
 
-        private static IEnumerable<TestCaseData> ExtremeScaleTestCases()
+        private T CreateAssetAndEditor<T>(out Editor editor)
+            where T : ScriptableObject
         {
-            yield return new TestCaseData(250)
-                .Returns(null)
-                .SetName("Extreme.DrawLoop.TwoHundredFiftyIterations.Stable");
-            yield return new TestCaseData(1000)
-                .Returns(null)
-                .SetName("Extreme.DrawLoop.ThousandIterations.Stable");
+            T asset = Track(ScriptableObject.CreateInstance<T>());
+            editor = Track(Editor.CreateEditor(asset));
+            return asset;
+        }
+
+        private ScriptableObject CreateAssetAndEditor(Type targetType, out Editor editor)
+        {
+            ScriptableObject asset = Track(
+                ScriptableObject.CreateInstance(targetType) as ScriptableObject
+            );
+            editor = Track(Editor.CreateEditor(asset));
+            return asset;
         }
     }
 }

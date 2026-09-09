@@ -30,6 +30,225 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         private bool _previousEditorUiSuppress;
         private bool _previousIgnoreCompilationState;
 
+        private static IEnumerable<string> AssetImportWorkerEnvironmentScenarios()
+        {
+            yield return "UNITY_ASSET_IMPORT_WORKER";
+            yield return "UNITY_ASSETIMPORT_WORKER";
+            yield return "MY_CUSTOM_UNITY_ASSET_IMPORT_WORKER_FLAG";
+        }
+
+        /// <summary>
+        /// Data source for case mismatch folder scenarios.
+        /// Each tuple contains: (existingFolderName, expectedSingletonPath, description)
+        /// </summary>
+        private static IEnumerable<TestCaseData> CaseMismatchFolderScenarios()
+        {
+            yield return new TestCaseData("casetest", "Assets/Resources/casetest")
+                .SetName("AllLowercase")
+                .SetDescription("Existing folder with all lowercase name");
+            yield return new TestCaseData("CASETEST", "Assets/Resources/CASETEST")
+                .SetName("AllUppercase")
+                .SetDescription("Existing folder with all uppercase name");
+            yield return new TestCaseData("cASEtest", "Assets/Resources/cASEtest")
+                .SetName("MixedCase1")
+                .SetDescription("Existing folder with mixed case (cASEtest)");
+            yield return new TestCaseData("CaseTEST", "Assets/Resources/CaseTEST")
+                .SetName("MixedCase2")
+                .SetDescription("Existing folder with mixed case (CaseTEST)");
+        }
+
+        private static void TryDeleteFolder(string folder)
+        {
+            if (!AssetDatabase.IsValidFolder(folder))
+            {
+                return;
+            }
+
+            string[] contents = AssetDatabase.FindAssets(string.Empty, new[] { folder });
+            if (contents == null || contents.Length == 0)
+            {
+                AssetDatabase.DeleteAsset(folder);
+            }
+        }
+
+        private static void TryDeleteFolderCaseInsensitive(string intended)
+        {
+            if (string.IsNullOrWhiteSpace(intended))
+            {
+                return;
+            }
+
+            string[] parts = intended.SanitizePath().Split('/');
+            if (parts.Length == 0)
+            {
+                return;
+            }
+
+            string current = parts[0];
+            for (int i = 1; i < parts.Length; i++)
+            {
+                string desired = parts[i];
+                string next = current + "/" + desired;
+                if (AssetDatabase.IsValidFolder(next))
+                {
+                    current = next;
+                    continue;
+                }
+
+                string[] subs = AssetDatabase.GetSubFolders(current);
+                if (subs == null || subs.Length == 0)
+                {
+                    return;
+                }
+
+                string match = null;
+                foreach (string sub in subs)
+                {
+                    int last = sub.LastIndexOf('/');
+                    string name = 0 <= last ? sub.Substring(last + 1) : sub;
+                    if (string.Equals(name, desired, StringComparison.OrdinalIgnoreCase))
+                    {
+                        match = sub;
+                        break;
+                    }
+                }
+
+                if (string.IsNullOrEmpty(match))
+                {
+                    return;
+                }
+
+                current = match;
+            }
+
+            TryDeleteFolder(current);
+        }
+
+        /// <summary>
+        /// Deletes a folder and all its duplicates (e.g., "Folder", "Folder 1", "Folder 2").
+        /// This handles the case where Unity creates duplicate folders when case-insensitive
+        /// matches aren't detected properly during asset database operations.
+        /// </summary>
+        private static void TryDeleteFolderAndDuplicates(string parentPath, string folderBaseName)
+        {
+            if (string.IsNullOrWhiteSpace(parentPath) || string.IsNullOrWhiteSpace(folderBaseName))
+            {
+                return;
+            }
+
+            if (!AssetDatabase.IsValidFolder(parentPath))
+            {
+                return;
+            }
+
+            string[] subFolders = AssetDatabase.GetSubFolders(parentPath);
+            if (subFolders == null || subFolders.Length == 0)
+            {
+                return;
+            }
+
+            foreach (string folder in subFolders)
+            {
+                string name = Path.GetFileName(folder);
+                if (string.IsNullOrEmpty(name))
+                {
+                    continue;
+                }
+
+                if (string.Equals(name, folderBaseName, StringComparison.OrdinalIgnoreCase))
+                {
+                    DeleteFolderRecursively(folder);
+                    continue;
+                }
+
+                if (name.StartsWith(folderBaseName + " ", StringComparison.OrdinalIgnoreCase))
+                {
+                    string suffix = name.Substring(folderBaseName.Length + 1);
+                    if (int.TryParse(suffix, out _))
+                    {
+                        DeleteFolderRecursively(folder);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Recursively deletes a folder and all its contents.
+        /// </summary>
+        private static void DeleteFolderRecursively(string folderPath)
+        {
+            if (!AssetDatabase.IsValidFolder(folderPath))
+            {
+                return;
+            }
+
+            string[] guids = AssetDatabase.FindAssets(string.Empty, new[] { folderPath });
+            if (guids != null)
+            {
+                foreach (string guid in guids)
+                {
+                    string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                    if (!string.IsNullOrEmpty(assetPath) && !AssetDatabase.IsValidFolder(assetPath))
+                    {
+                        AssetDatabase.DeleteAsset(assetPath);
+                    }
+                }
+            }
+
+            string[] subFolders = AssetDatabase.GetSubFolders(folderPath);
+            if (subFolders != null)
+            {
+                foreach (string sub in subFolders)
+                {
+                    DeleteFolderRecursively(sub);
+                }
+            }
+
+            AssetDatabase.DeleteAsset(folderPath);
+        }
+
+        private static string GetAbsolutePath(string assetsRelativePath)
+        {
+            if (string.IsNullOrWhiteSpace(assetsRelativePath))
+            {
+                return string.Empty;
+            }
+
+            string projectRoot = Path.GetDirectoryName(Application.dataPath);
+            if (string.IsNullOrEmpty(projectRoot))
+            {
+                return string.Empty;
+            }
+
+            string normalized = assetsRelativePath.Replace('/', Path.DirectorySeparatorChar);
+            return Path.Combine(projectRoot, normalized);
+        }
+
+        private static void DeleteFileIfExists(string assetsRelativePath)
+        {
+            if (string.IsNullOrWhiteSpace(assetsRelativePath))
+            {
+                return;
+            }
+
+            if (AssetDatabase.DeleteAsset(assetsRelativePath))
+            {
+                return;
+            }
+
+            string absolutePath = GetAbsolutePath(assetsRelativePath);
+            if (!string.IsNullOrEmpty(absolutePath) && File.Exists(absolutePath))
+            {
+                File.Delete(absolutePath);
+            }
+
+            string metaPath = absolutePath + ".meta";
+            if (!string.IsNullOrEmpty(metaPath) && File.Exists(metaPath))
+            {
+                File.Delete(metaPath);
+            }
+        }
+
         public override void CommonOneTimeSetUp()
         {
             if (Application.isPlaying)
@@ -530,82 +749,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             );
         }
 
-        private void CleanupRetryTestState(
-            string retryFolder,
-            string retryAsset,
-            string blockerMeta,
-            string retryFolderVariant
-        )
-        {
-            // Delete assets through AssetDatabase first - this properly clears Unity's internal state
-            AssetDatabase.DeleteAsset(retryAsset);
-            if (AssetDatabase.IsValidFolder(retryFolder))
-            {
-                AssetDatabase.DeleteAsset(retryFolder);
-            }
-
-            if (!AssetDatabase.IsValidFolder(retryFolder))
-            {
-                AssetDatabase.DeleteAsset(retryFolder);
-            }
-            if (AssetDatabase.IsValidFolder(retryFolderVariant))
-            {
-                AssetDatabase.DeleteAsset(retryFolderVariant);
-            }
-
-            string absoluteFolder = GetAbsolutePath(retryFolder);
-            string absoluteVariant = GetAbsolutePath(retryFolderVariant);
-            string absoluteMeta = GetAbsolutePath(blockerMeta);
-            string absoluteAsset = GetAbsolutePath(retryAsset);
-
-            if (File.Exists(absoluteFolder))
-            {
-                File.Delete(absoluteFolder);
-            }
-
-            if (File.Exists(absoluteMeta))
-            {
-                File.Delete(absoluteMeta);
-            }
-
-            string folderMeta = absoluteFolder + ".meta";
-            if (File.Exists(folderMeta))
-            {
-                File.Delete(folderMeta);
-            }
-
-            if (File.Exists(absoluteAsset))
-            {
-                File.Delete(absoluteAsset);
-            }
-
-            string assetMeta = absoluteAsset + ".meta";
-            if (File.Exists(assetMeta))
-            {
-                File.Delete(assetMeta);
-            }
-
-            if (Directory.Exists(absoluteFolder))
-            {
-                Directory.Delete(absoluteFolder, true);
-
-                if (File.Exists(folderMeta))
-                {
-                    File.Delete(folderMeta);
-                }
-            }
-            if (Directory.Exists(absoluteVariant))
-            {
-                Directory.Delete(absoluteVariant, true);
-            }
-
-            string variantMeta = absoluteVariant + ".meta";
-            if (File.Exists(variantMeta))
-            {
-                File.Delete(variantMeta);
-            }
-        }
-
         [UnityTest]
         public IEnumerator DoesNotCreateAlternateFolderWhenFileConflicts()
         {
@@ -927,33 +1070,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 fileExistsOnDisk,
                 $"Race singleton asset file should exist on disk. Diagnostics: {diagnostics}"
             );
-        }
-
-        private static IEnumerable<string> AssetImportWorkerEnvironmentScenarios()
-        {
-            yield return "UNITY_ASSET_IMPORT_WORKER";
-            yield return "UNITY_ASSETIMPORT_WORKER";
-            yield return "MY_CUSTOM_UNITY_ASSET_IMPORT_WORKER_FLAG";
-        }
-
-        /// <summary>
-        /// Data source for case mismatch folder scenarios.
-        /// Each tuple contains: (existingFolderName, expectedSingletonPath, description)
-        /// </summary>
-        private static IEnumerable<TestCaseData> CaseMismatchFolderScenarios()
-        {
-            yield return new TestCaseData("casetest", "Assets/Resources/casetest")
-                .SetName("AllLowercase")
-                .SetDescription("Existing folder with all lowercase name");
-            yield return new TestCaseData("CASETEST", "Assets/Resources/CASETEST")
-                .SetName("AllUppercase")
-                .SetDescription("Existing folder with all uppercase name");
-            yield return new TestCaseData("cASEtest", "Assets/Resources/cASEtest")
-                .SetName("MixedCase1")
-                .SetDescription("Existing folder with mixed case (cASEtest)");
-            yield return new TestCaseData("CaseTEST", "Assets/Resources/CaseTEST")
-                .SetName("MixedCase2")
-                .SetDescription("Existing folder with mixed case (CaseTEST)");
         }
 
         [UnityTest]
@@ -1564,195 +1680,79 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             return ScriptableObjectSingletonCreator.IsNumberedDuplicate(actualName, desiredName);
         }
 
-        private static void TryDeleteFolder(string folder)
+        private void CleanupRetryTestState(
+            string retryFolder,
+            string retryAsset,
+            string blockerMeta,
+            string retryFolderVariant
+        )
         {
-            if (!AssetDatabase.IsValidFolder(folder))
+            // Delete assets through AssetDatabase first - this properly clears Unity's internal state
+            AssetDatabase.DeleteAsset(retryAsset);
+            if (AssetDatabase.IsValidFolder(retryFolder))
             {
-                return;
+                AssetDatabase.DeleteAsset(retryFolder);
             }
 
-            string[] contents = AssetDatabase.FindAssets(string.Empty, new[] { folder });
-            if (contents == null || contents.Length == 0)
+            if (!AssetDatabase.IsValidFolder(retryFolder))
             {
-                AssetDatabase.DeleteAsset(folder);
+                AssetDatabase.DeleteAsset(retryFolder);
             }
-        }
-
-        private static void TryDeleteFolderCaseInsensitive(string intended)
-        {
-            if (string.IsNullOrWhiteSpace(intended))
+            if (AssetDatabase.IsValidFolder(retryFolderVariant))
             {
-                return;
+                AssetDatabase.DeleteAsset(retryFolderVariant);
             }
 
-            string[] parts = intended.SanitizePath().Split('/');
-            if (parts.Length == 0)
+            string absoluteFolder = GetAbsolutePath(retryFolder);
+            string absoluteVariant = GetAbsolutePath(retryFolderVariant);
+            string absoluteMeta = GetAbsolutePath(blockerMeta);
+            string absoluteAsset = GetAbsolutePath(retryAsset);
+
+            if (File.Exists(absoluteFolder))
             {
-                return;
+                File.Delete(absoluteFolder);
             }
 
-            string current = parts[0];
-            for (int i = 1; i < parts.Length; i++)
+            if (File.Exists(absoluteMeta))
             {
-                string desired = parts[i];
-                string next = current + "/" + desired;
-                if (AssetDatabase.IsValidFolder(next))
+                File.Delete(absoluteMeta);
+            }
+
+            string folderMeta = absoluteFolder + ".meta";
+            if (File.Exists(folderMeta))
+            {
+                File.Delete(folderMeta);
+            }
+
+            if (File.Exists(absoluteAsset))
+            {
+                File.Delete(absoluteAsset);
+            }
+
+            string assetMeta = absoluteAsset + ".meta";
+            if (File.Exists(assetMeta))
+            {
+                File.Delete(assetMeta);
+            }
+
+            if (Directory.Exists(absoluteFolder))
+            {
+                Directory.Delete(absoluteFolder, true);
+
+                if (File.Exists(folderMeta))
                 {
-                    current = next;
-                    continue;
-                }
-
-                string[] subs = AssetDatabase.GetSubFolders(current);
-                if (subs == null || subs.Length == 0)
-                {
-                    return;
-                }
-
-                string match = null;
-                foreach (string sub in subs)
-                {
-                    int last = sub.LastIndexOf('/');
-                    string name = 0 <= last ? sub.Substring(last + 1) : sub;
-                    if (string.Equals(name, desired, StringComparison.OrdinalIgnoreCase))
-                    {
-                        match = sub;
-                        break;
-                    }
-                }
-
-                if (string.IsNullOrEmpty(match))
-                {
-                    return;
-                }
-
-                current = match;
-            }
-
-            TryDeleteFolder(current);
-        }
-
-        /// <summary>
-        /// Deletes a folder and all its duplicates (e.g., "Folder", "Folder 1", "Folder 2").
-        /// This handles the case where Unity creates duplicate folders when case-insensitive
-        /// matches aren't detected properly during asset database operations.
-        /// </summary>
-        private static void TryDeleteFolderAndDuplicates(string parentPath, string folderBaseName)
-        {
-            if (string.IsNullOrWhiteSpace(parentPath) || string.IsNullOrWhiteSpace(folderBaseName))
-            {
-                return;
-            }
-
-            if (!AssetDatabase.IsValidFolder(parentPath))
-            {
-                return;
-            }
-
-            string[] subFolders = AssetDatabase.GetSubFolders(parentPath);
-            if (subFolders == null || subFolders.Length == 0)
-            {
-                return;
-            }
-
-            foreach (string folder in subFolders)
-            {
-                string name = Path.GetFileName(folder);
-                if (string.IsNullOrEmpty(name))
-                {
-                    continue;
-                }
-
-                if (string.Equals(name, folderBaseName, StringComparison.OrdinalIgnoreCase))
-                {
-                    DeleteFolderRecursively(folder);
-                    continue;
-                }
-
-                if (name.StartsWith(folderBaseName + " ", StringComparison.OrdinalIgnoreCase))
-                {
-                    string suffix = name.Substring(folderBaseName.Length + 1);
-                    if (int.TryParse(suffix, out _))
-                    {
-                        DeleteFolderRecursively(folder);
-                    }
+                    File.Delete(folderMeta);
                 }
             }
-        }
-
-        /// <summary>
-        /// Recursively deletes a folder and all its contents.
-        /// </summary>
-        private static void DeleteFolderRecursively(string folderPath)
-        {
-            if (!AssetDatabase.IsValidFolder(folderPath))
+            if (Directory.Exists(absoluteVariant))
             {
-                return;
+                Directory.Delete(absoluteVariant, true);
             }
 
-            string[] guids = AssetDatabase.FindAssets(string.Empty, new[] { folderPath });
-            if (guids != null)
+            string variantMeta = absoluteVariant + ".meta";
+            if (File.Exists(variantMeta))
             {
-                foreach (string guid in guids)
-                {
-                    string assetPath = AssetDatabase.GUIDToAssetPath(guid);
-                    if (!string.IsNullOrEmpty(assetPath) && !AssetDatabase.IsValidFolder(assetPath))
-                    {
-                        AssetDatabase.DeleteAsset(assetPath);
-                    }
-                }
-            }
-
-            string[] subFolders = AssetDatabase.GetSubFolders(folderPath);
-            if (subFolders != null)
-            {
-                foreach (string sub in subFolders)
-                {
-                    DeleteFolderRecursively(sub);
-                }
-            }
-
-            AssetDatabase.DeleteAsset(folderPath);
-        }
-
-        private static string GetAbsolutePath(string assetsRelativePath)
-        {
-            if (string.IsNullOrWhiteSpace(assetsRelativePath))
-            {
-                return string.Empty;
-            }
-
-            string projectRoot = Path.GetDirectoryName(Application.dataPath);
-            if (string.IsNullOrEmpty(projectRoot))
-            {
-                return string.Empty;
-            }
-
-            string normalized = assetsRelativePath.Replace('/', Path.DirectorySeparatorChar);
-            return Path.Combine(projectRoot, normalized);
-        }
-
-        private static void DeleteFileIfExists(string assetsRelativePath)
-        {
-            if (string.IsNullOrWhiteSpace(assetsRelativePath))
-            {
-                return;
-            }
-
-            if (AssetDatabase.DeleteAsset(assetsRelativePath))
-            {
-                return;
-            }
-
-            string absolutePath = GetAbsolutePath(assetsRelativePath);
-            if (!string.IsNullOrEmpty(absolutePath) && File.Exists(absolutePath))
-            {
-                File.Delete(absolutePath);
-            }
-
-            string metaPath = absolutePath + ".meta";
-            if (!string.IsNullOrEmpty(metaPath) && File.Exists(metaPath))
-            {
-                File.Delete(metaPath);
+                File.Delete(variantMeta);
             }
         }
     }

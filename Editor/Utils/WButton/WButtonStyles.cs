@@ -14,17 +14,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
     internal static class WButtonStyles
     {
-        private static GUIStyle _groupStyle;
-        private static GUIStyle _headerStyle;
-        private static GUIStyle _baseButtonStyle;
-        private static GUIStyle _baseMiniButtonStyle;
-        private static GUIStyle _arrayHeaderStyle;
-        private static GUIStyle _foldoutContainerExpanded;
-        private static GUIStyle _foldoutContainerCollapsed;
-        private static GUIStyle _foldoutHeaderStyle;
-        private static GUIContent _topHeaderContent;
-        private static GUIContent _bottomHeaderContent;
-        private static readonly EditorCacheHelper.ColorComparer ColorEquality = new();
+        internal const float ButtonHeight = 18f;
+
+        internal const float FoldoutContentSpacing = 4f;
+        internal const float FoldoutIconOffset = 4f;
 
         /// <remarks>
         /// A key is a settings-authored colour pair, so a colour picker drag mints one entry per
@@ -37,27 +30,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         /// only ever discards a colour the user dragged through.
         /// </remarks>
         private const int MaxColoredButtonStyles = 64;
-
-        private static readonly Cache<ButtonStyleKey, ColoredButtonStyle> ColoredButtonStyles =
-            CacheBuilder<ButtonStyleKey, ColoredButtonStyle>
-                .NewBuilder()
-                .MaximumSize(MaxColoredButtonStyles)
-                .InitialCapacity(16)
-                .KeyComparer(new ButtonStyleKeyComparer())
-                .OnEviction(static (_, evicted, _) => evicted.Destroy())
-                .TransferOwnershipOnRemoval()
-                .Build();
-        private static readonly Cache<ButtonStyleKey, ColoredButtonStyle> ColoredMiniButtonStyles =
-            CacheBuilder<ButtonStyleKey, ColoredButtonStyle>
-                .NewBuilder()
-                .MaximumSize(MaxColoredButtonStyles)
-                .InitialCapacity(16)
-                .KeyComparer(new ButtonStyleKeyComparer())
-                .OnEviction(static (_, evicted, _) => evicted.Destroy())
-                .TransferOwnershipOnRemoval()
-                .Build();
-
-        internal const float ButtonHeight = 18f;
 
         internal static GUIStyle GroupStyle
         {
@@ -82,6 +54,47 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                     fontStyle = FontStyle.Bold,
                 };
                 return _headerStyle;
+            }
+        }
+
+        internal static GUIStyle ArrayHeaderStyle
+        {
+            get
+            {
+                _arrayHeaderStyle ??= new GUIStyle(EditorStyles.boldLabel) { fontSize = 10 };
+                return _arrayHeaderStyle;
+            }
+        }
+
+        internal static GUIStyle FoldoutHeaderStyle
+        {
+            get
+            {
+                _foldoutHeaderStyle ??= new GUIStyle(EditorStyles.foldoutHeader)
+                {
+                    fontStyle = FontStyle.Bold,
+                    padding = new RectOffset(18, 4, 2, 2),
+                    margin = new RectOffset(0, 1, 2, 1),
+                };
+                return _foldoutHeaderStyle;
+            }
+        }
+
+        internal static GUIContent TopGroupLabel
+        {
+            get
+            {
+                _topHeaderContent ??= new GUIContent("Actions");
+                return _topHeaderContent;
+            }
+        }
+
+        internal static GUIContent BottomGroupLabel
+        {
+            get
+            {
+                _bottomHeaderContent ??= new GUIContent("Additional Actions");
+                return _bottomHeaderContent;
             }
         }
 
@@ -120,34 +133,42 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             }
         }
 
-        internal static GUIStyle ArrayHeaderStyle
-        {
-            get
-            {
-                _arrayHeaderStyle ??= new GUIStyle(EditorStyles.boldLabel) { fontSize = 10 };
-                return _arrayHeaderStyle;
-            }
-        }
+        private static GUIStyle _groupStyle;
+        private static GUIStyle _headerStyle;
+        private static GUIStyle _baseButtonStyle;
+        private static GUIStyle _baseMiniButtonStyle;
+        private static GUIStyle _arrayHeaderStyle;
+        private static GUIStyle _foldoutContainerExpanded;
+        private static GUIStyle _foldoutContainerCollapsed;
+        private static GUIStyle _foldoutHeaderStyle;
+        private static GUIContent _topHeaderContent;
+        private static GUIContent _bottomHeaderContent;
+        private static readonly EditorCacheHelper.ColorComparer ColorEquality = new();
+
+        private static readonly Cache<ButtonStyleKey, ColoredButtonStyle> ColoredButtonStyles =
+            CacheBuilder<ButtonStyleKey, ColoredButtonStyle>
+                .NewBuilder()
+                .MaximumSize(MaxColoredButtonStyles)
+                .InitialCapacity(16)
+                .KeyComparer(new ButtonStyleKeyComparer())
+                .OnEviction(static (_, evicted, _) => evicted.Destroy())
+                .TransferOwnershipOnRemoval()
+                .Build();
+        private static readonly Cache<ButtonStyleKey, ColoredButtonStyle> ColoredMiniButtonStyles =
+            CacheBuilder<ButtonStyleKey, ColoredButtonStyle>
+                .NewBuilder()
+                .MaximumSize(MaxColoredButtonStyles)
+                .InitialCapacity(16)
+                .KeyComparer(new ButtonStyleKeyComparer())
+                .OnEviction(static (_, evicted, _) => evicted.Destroy())
+                .TransferOwnershipOnRemoval()
+                .Build();
 
         internal static GUIStyle GetFoldoutContainerStyle(bool expanded)
         {
             _foldoutContainerExpanded ??= CreateFoldoutContainerStyle(expanded: true);
             _foldoutContainerCollapsed ??= CreateFoldoutContainerStyle(expanded: false);
             return expanded ? _foldoutContainerExpanded : _foldoutContainerCollapsed;
-        }
-
-        internal static GUIStyle FoldoutHeaderStyle
-        {
-            get
-            {
-                _foldoutHeaderStyle ??= new GUIStyle(EditorStyles.foldoutHeader)
-                {
-                    fontStyle = FontStyle.Bold,
-                    padding = new RectOffset(18, 4, 2, 2),
-                    margin = new RectOffset(0, 1, 2, 1),
-                };
-                return _foldoutHeaderStyle;
-            }
         }
 
         internal static Color GetFoldoutBackgroundColor(bool expanded)
@@ -162,27 +183,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             return expanded
                 ? new Color(0.89f, 0.92f, 0.97f, 1f)
                 : new Color(0.94f, 0.94f, 0.96f, 1f);
-        }
-
-        internal const float FoldoutContentSpacing = 4f;
-        internal const float FoldoutIconOffset = 4f;
-
-        internal static GUIContent TopGroupLabel
-        {
-            get
-            {
-                _topHeaderContent ??= new GUIContent("Actions");
-                return _topHeaderContent;
-            }
-        }
-
-        internal static GUIContent BottomGroupLabel
-        {
-            get
-            {
-                _bottomHeaderContent ??= new GUIContent("Additional Actions");
-                return _bottomHeaderContent;
-            }
         }
 
         internal static GUIStyle GetColoredButtonStyle(Color buttonColor, Color textColor)
@@ -291,15 +291,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
         private readonly struct ButtonStyleKey : System.IEquatable<ButtonStyleKey>
         {
+            private Color ButtonColor { get; }
+
+            private Color TextColor { get; }
+
             internal ButtonStyleKey(Color buttonColor, Color textColor)
             {
                 ButtonColor = buttonColor;
                 TextColor = textColor;
             }
-
-            private Color ButtonColor { get; }
-
-            private Color TextColor { get; }
 
             public bool Equals(ButtonStyleKey other)
             {
@@ -355,19 +355,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 _active = active;
             }
 
-            internal void Destroy()
-            {
-                DestroyTexture(_normal);
-                DestroyTexture(_hover);
-                DestroyTexture(_active);
-            }
-
             private static void DestroyTexture(Texture2D texture)
             {
                 if (texture != null)
                 {
                     Object.DestroyImmediate(texture);
                 }
+            }
+
+            internal void Destroy()
+            {
+                DestroyTexture(_normal);
+                DestroyTexture(_hover);
+                DestroyTexture(_active);
             }
         }
 

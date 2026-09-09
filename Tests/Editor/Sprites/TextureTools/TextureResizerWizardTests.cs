@@ -23,6 +23,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         private const string Root = "Assets/Temp/TextureResizerWizardTests";
         private const string OutRoot = "Assets/Temp/TextureResizerWizardTests/Out";
 
+        private static string RelToFull(string rel)
+        {
+            return Path.Combine(
+                    Application.dataPath.Substring(
+                        0,
+                        Application.dataPath.Length - "Assets".Length
+                    ),
+                    rel
+                )
+                .SanitizePath();
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -242,18 +254,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             t.Apply();
             byte[] data = t.EncodeToPNG();
             File.WriteAllBytes(RelToFull(relPath), data);
-        }
-
-        private static string RelToFull(string rel)
-        {
-            return Path.Combine(
-                    Application.dataPath.Substring(
-                        0,
-                        Application.dataPath.Length - "Assets".Length
-                    ),
-                    rel
-                )
-                .SanitizePath();
         }
     }
 #endif

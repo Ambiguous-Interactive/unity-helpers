@@ -32,6 +32,36 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private const int Threads = 8;
         private const int Iterations = 400;
 
+        private static List<string> Repeat(string value, int count)
+        {
+            List<string> all = new List<string>(count);
+            for (int index = 0; index < count; index++)
+            {
+                all.Add(value);
+            }
+
+            return all;
+        }
+
+        private static string Encode<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new WProtoWriter(buffer);
+            if (!formatter.Write(ref writer, value))
+            {
+                return "<write failed>";
+            }
+
+            System.Text.StringBuilder hex = new System.Text.StringBuilder(buffer.Length * 2);
+            foreach (byte current in buffer)
+            {
+                hex.Append(current.ToString("X2"));
+            }
+
+            return hex.ToString();
+        }
+
         [Test]
         public void RacingTheFirstResolveNeverProducesTheWrongEncoding()
         {
@@ -134,36 +164,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         + string.Join(", ", observations)
                 );
             }
-        }
-
-        private static List<string> Repeat(string value, int count)
-        {
-            List<string> all = new List<string>(count);
-            for (int index = 0; index < count; index++)
-            {
-                all.Add(value);
-            }
-
-            return all;
-        }
-
-        private static string Encode<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new WProtoWriter(buffer);
-            if (!formatter.Write(ref writer, value))
-            {
-                return "<write failed>";
-            }
-
-            System.Text.StringBuilder hex = new System.Text.StringBuilder(buffer.Length * 2);
-            foreach (byte current in buffer)
-            {
-                hex.Append(current.ToString("X2"));
-            }
-
-            return hex.ToString();
         }
     }
 }

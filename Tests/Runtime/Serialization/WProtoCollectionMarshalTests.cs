@@ -42,110 +42,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [NUnit.Framework.Category("Serialization")]
     public sealed class WProtoCollectionMarshalTests
     {
-        [Test]
-        public void EveryMarshalledCollectionIsServedAtTheRoot()
-        {
-            Assert.IsTrue(WProtoRootMarshalProvider.IsRegistered<SerializableHashSet<int>>());
-            Assert.IsTrue(WProtoRootMarshalProvider.IsRegistered<SerializableSortedSet<int>>());
-            Assert.IsTrue(
-                WProtoRootMarshalProvider.IsRegistered<SerializableDictionary<string, int>>()
-            );
-            Assert.IsTrue(
-                WProtoRootMarshalProvider.IsRegistered<SerializableSortedDictionary<string, int>>()
-            );
-            Assert.IsTrue(WProtoRootMarshalProvider.IsRegistered<Deque<int>>());
-            Assert.IsTrue(WProtoRootMarshalProvider.IsRegistered<CyclicBuffer<int>>());
-            Assert.IsTrue(WProtoRootMarshalProvider.IsRegistered<SparseSet>());
-        }
-
-        /// <summary>
-        /// A marshal is reachable only at the root, never from a member position.
-        /// </summary>
-        /// <remarks>
-        /// <see cref="WProtoGeneric{T}"/> resolves a member whose type a closure decides through
-        /// <see cref="WProtoFormatterProvider"/>. A marshal registered there would be found from a
-        /// member and would write the wrapper where protobuf-net writes a repeated field -- bytes no
-        /// reader on either side ever produced.
-        /// </remarks>
-        [Test]
-        public void AMarshalIsNotVisibleToTheContractFormatterProvider()
-        {
-            Assert.IsFalse(WProtoFormatterProvider.IsRegistered<SerializableHashSet<int>>());
-            Assert.IsFalse(
-                WProtoFormatterProvider.IsRegistered<SerializableDictionary<string, int>>()
-            );
-            Assert.IsFalse(WProtoFormatterProvider.IsRegistered<Deque<int>>());
-            Assert.IsFalse(WProtoFormatterProvider.IsRegistered<SparseSet>());
-        }
-
-        [Test]
-        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
-        public void TheShippedWrapperPathReadsWhatTheMarshalWrites()
-        {
-            foreach (bool empty in new[] { false, true })
-            {
-                foreach (Sample sample in Samples(empty))
-                {
-                    sample.AssertShippedReadsOurs();
-                }
-            }
-            AssertRuntimeSelectedCapacityPolicies();
-        }
-
-        [Test]
-        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
-        public void TheMarshalReadsWhatTheShippedWrapperPathWrote()
-        {
-            foreach (bool empty in new[] { false, true })
-            {
-                foreach (Sample sample in Samples(empty))
-                {
-                    sample.AssertOursReadsShipped();
-                }
-            }
-        }
-
-        [Test]
-        public void EveryMarshalledCollectionRoundTripsThroughTheSeam()
-        {
-            foreach (Sample sample in Samples())
-            {
-                sample.AssertRoundTrips();
-            }
-        }
-
-        /// <summary>
-        /// An empty marshalled collection encodes to nothing and still reads back as itself.
-        /// </summary>
-        /// <remarks>
-        /// A wrapper of nothing but repeated fields writes zero bytes when it is empty, which is why
-        /// <c>Serializer</c>'s empty-payload guard runs after the interception rather than before it.
-        /// Reading that back as <c>null</c> is the failure to watch for.
-        /// </remarks>
-        [Test]
-        public void AnEmptyMarshalledCollectionRoundTrips()
-        {
-            foreach (Sample sample in Samples(true))
-            {
-                sample.AssertRoundTrips();
-            }
-        }
-
-        /// <summary>
-        /// A deque keeps the capacity it was saved with, which only the wrapper carries.
-        /// </summary>
-        [Test]
-        public void AMarshalledDequeKeepsItsCapacity()
-        {
-            Deque<int> deque = new Deque<int>(32);
-            deque.PushBack(1);
-
-            Assert.IsTrue(WProtoFacade.TrySerialize(deque, out byte[] bytes));
-            Assert.IsTrue(WProtoFacade.TryDeserialize(bytes, out Deque<int> restored));
-            Assert.AreEqual(deque.Capacity, restored.Capacity);
-            Assert.AreEqual(1, restored.Count);
-        }
-
         private static void AssertRuntimeSelectedCapacityPolicies()
         {
             int previousLimit = SerializationCapacityLimits.MaximumRestoredCapacity;
@@ -310,6 +206,110 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     Assert.AreEqual(sparse.Capacity, restored.Capacity);
                 }
             );
+        }
+
+        [Test]
+        public void EveryMarshalledCollectionIsServedAtTheRoot()
+        {
+            Assert.IsTrue(WProtoRootMarshalProvider.IsRegistered<SerializableHashSet<int>>());
+            Assert.IsTrue(WProtoRootMarshalProvider.IsRegistered<SerializableSortedSet<int>>());
+            Assert.IsTrue(
+                WProtoRootMarshalProvider.IsRegistered<SerializableDictionary<string, int>>()
+            );
+            Assert.IsTrue(
+                WProtoRootMarshalProvider.IsRegistered<SerializableSortedDictionary<string, int>>()
+            );
+            Assert.IsTrue(WProtoRootMarshalProvider.IsRegistered<Deque<int>>());
+            Assert.IsTrue(WProtoRootMarshalProvider.IsRegistered<CyclicBuffer<int>>());
+            Assert.IsTrue(WProtoRootMarshalProvider.IsRegistered<SparseSet>());
+        }
+
+        /// <summary>
+        /// A marshal is reachable only at the root, never from a member position.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="WProtoGeneric{T}"/> resolves a member whose type a closure decides through
+        /// <see cref="WProtoFormatterProvider"/>. A marshal registered there would be found from a
+        /// member and would write the wrapper where protobuf-net writes a repeated field -- bytes no
+        /// reader on either side ever produced.
+        /// </remarks>
+        [Test]
+        public void AMarshalIsNotVisibleToTheContractFormatterProvider()
+        {
+            Assert.IsFalse(WProtoFormatterProvider.IsRegistered<SerializableHashSet<int>>());
+            Assert.IsFalse(
+                WProtoFormatterProvider.IsRegistered<SerializableDictionary<string, int>>()
+            );
+            Assert.IsFalse(WProtoFormatterProvider.IsRegistered<Deque<int>>());
+            Assert.IsFalse(WProtoFormatterProvider.IsRegistered<SparseSet>());
+        }
+
+        [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
+        public void TheShippedWrapperPathReadsWhatTheMarshalWrites()
+        {
+            foreach (bool empty in new[] { false, true })
+            {
+                foreach (Sample sample in Samples(empty))
+                {
+                    sample.AssertShippedReadsOurs();
+                }
+            }
+            AssertRuntimeSelectedCapacityPolicies();
+        }
+
+        [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
+        public void TheMarshalReadsWhatTheShippedWrapperPathWrote()
+        {
+            foreach (bool empty in new[] { false, true })
+            {
+                foreach (Sample sample in Samples(empty))
+                {
+                    sample.AssertOursReadsShipped();
+                }
+            }
+        }
+
+        [Test]
+        public void EveryMarshalledCollectionRoundTripsThroughTheSeam()
+        {
+            foreach (Sample sample in Samples())
+            {
+                sample.AssertRoundTrips();
+            }
+        }
+
+        /// <summary>
+        /// An empty marshalled collection encodes to nothing and still reads back as itself.
+        /// </summary>
+        /// <remarks>
+        /// A wrapper of nothing but repeated fields writes zero bytes when it is empty, which is why
+        /// <c>Serializer</c>'s empty-payload guard runs after the interception rather than before it.
+        /// Reading that back as <c>null</c> is the failure to watch for.
+        /// </remarks>
+        [Test]
+        public void AnEmptyMarshalledCollectionRoundTrips()
+        {
+            foreach (Sample sample in Samples(true))
+            {
+                sample.AssertRoundTrips();
+            }
+        }
+
+        /// <summary>
+        /// A deque keeps the capacity it was saved with, which only the wrapper carries.
+        /// </summary>
+        [Test]
+        public void AMarshalledDequeKeepsItsCapacity()
+        {
+            Deque<int> deque = new Deque<int>(32);
+            deque.PushBack(1);
+
+            Assert.IsTrue(WProtoFacade.TrySerialize(deque, out byte[] bytes));
+            Assert.IsTrue(WProtoFacade.TryDeserialize(bytes, out Deque<int> restored));
+            Assert.AreEqual(deque.Capacity, restored.Capacity);
+            Assert.AreEqual(1, restored.Count);
         }
 
         private abstract class Sample

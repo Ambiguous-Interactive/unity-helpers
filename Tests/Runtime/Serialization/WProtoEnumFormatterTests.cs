@@ -12,6 +12,41 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [Category("Serialization")]
     public sealed class WProtoEnumFormatterTests
     {
+        private static void AssertShape<T>(int size, bool signed)
+            where T : struct
+        {
+            Assert.Throws<ArgumentException>(() => WProtoScalarFormatters.Enum<T>(size, !signed));
+            foreach (int invalidSize in new[] { 1, 2, 4, 8 })
+            {
+                if (invalidSize != size)
+                {
+                    Assert.Throws<ArgumentException>(() =>
+                        WProtoScalarFormatters.Enum<T>(invalidSize, signed)
+                    );
+                }
+            }
+
+            Assert.That(WProtoScalarFormatters.Enum<T>(size, signed), Is.Not.Null);
+        }
+
+        private static void AssertWire<T>(T value, int size, bool signed, long numeric)
+            where T : struct
+        {
+            IWProtoScalarFormatter<T> formatter = WProtoScalarFormatters.Enum<T>(size, signed);
+            Span<byte> expected = stackalloc byte[10];
+            Span<byte> actual = stackalloc byte[10];
+            WProtoWriter reference = new WProtoWriter(expected);
+            Assert.That(reference.TryWriteInt64(numeric), Is.True);
+            WProtoWriter writer = new WProtoWriter(actual);
+            Assert.That(formatter.WriteValue(ref writer, in value), Is.True);
+            Assert.That(writer.Written.SequenceEqual(reference.Written), Is.True, typeof(T).Name);
+            Assert.That(formatter.MeasureValue(in value), Is.EqualTo(writer.Written.Length));
+            Assert.That(formatter.IsDefault(in value), Is.EqualTo(numeric == 0));
+            WProtoReader reader = new WProtoReader(writer.Written);
+            Assert.That(formatter.TryReadValue(ref reader, out T result), Is.True);
+            Assert.That(result, Is.EqualTo(value));
+        }
+
         [Test]
         public void ReferenceContainingStructCannotAcquireEnumFormatter()
         {
@@ -77,41 +112,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             AssertWire(SignedByte.First | SignedByte.Second, 1, true, 3);
             AssertWire(default(SignedByte), 1, true, 0);
             AssertWire(default(UnsignedLong), 8, false, 0);
-        }
-
-        private static void AssertShape<T>(int size, bool signed)
-            where T : struct
-        {
-            Assert.Throws<ArgumentException>(() => WProtoScalarFormatters.Enum<T>(size, !signed));
-            foreach (int invalidSize in new[] { 1, 2, 4, 8 })
-            {
-                if (invalidSize != size)
-                {
-                    Assert.Throws<ArgumentException>(() =>
-                        WProtoScalarFormatters.Enum<T>(invalidSize, signed)
-                    );
-                }
-            }
-
-            Assert.That(WProtoScalarFormatters.Enum<T>(size, signed), Is.Not.Null);
-        }
-
-        private static void AssertWire<T>(T value, int size, bool signed, long numeric)
-            where T : struct
-        {
-            IWProtoScalarFormatter<T> formatter = WProtoScalarFormatters.Enum<T>(size, signed);
-            Span<byte> expected = stackalloc byte[10];
-            Span<byte> actual = stackalloc byte[10];
-            WProtoWriter reference = new WProtoWriter(expected);
-            Assert.That(reference.TryWriteInt64(numeric), Is.True);
-            WProtoWriter writer = new WProtoWriter(actual);
-            Assert.That(formatter.WriteValue(ref writer, in value), Is.True);
-            Assert.That(writer.Written.SequenceEqual(reference.Written), Is.True, typeof(T).Name);
-            Assert.That(formatter.MeasureValue(in value), Is.EqualTo(writer.Written.Length));
-            Assert.That(formatter.IsDefault(in value), Is.EqualTo(numeric == 0));
-            WProtoReader reader = new WProtoReader(writer.Written);
-            Assert.That(formatter.TryReadValue(ref reader, out T result), Is.True);
-            Assert.That(result, Is.EqualTo(value));
         }
 
         private struct ReferenceSlot

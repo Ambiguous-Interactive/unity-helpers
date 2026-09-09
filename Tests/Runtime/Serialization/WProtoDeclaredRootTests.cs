@@ -43,6 +43,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             yield return new DotNetRandom(new Guid("2f1f0b6c-6f2f-4c4a-9b1e-0d3a5c7e9f11"));
         }
 
+        private static void Advance(IRandom generator)
+        {
+            /*
+                A freshly seeded generator and a used one differ in the reservoir members, which are the ones a
+                naive formatter drops.
+            */
+            for (int index = 0; index < 17; ++index)
+            {
+                generator.NextUint();
+            }
+        }
+
         [TearDown]
         public void ReleaseRoots()
         {
@@ -189,18 +201,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 WProtoFacade.TrySerialize(generator, out byte[] _),
                 "releasing the claim restores the declaration"
             );
-        }
-
-        private static void Advance(IRandom generator)
-        {
-            /*
-                A freshly seeded generator and a used one differ in the reservoir members, which are the ones a
-                naive formatter drops.
-            */
-            for (int index = 0; index < 17; ++index)
-            {
-                generator.NextUint();
-            }
         }
     }
 }

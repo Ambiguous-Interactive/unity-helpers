@@ -27,6 +27,214 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             return new Rect(0f, 0f, 420f, 600f);
         }
 
+        /// <summary>
+        /// Asserts a drawer's element rows form a clean vertical stack: each row advances
+        /// downward by a constant pitch and shares a uniform height. Tolerant to sub-pixel
+        /// rounding (0.25f) but free of hard-coded pixel constants, so it stays valid across
+        /// Unity versions and IMGUI layout tweaks.
+        /// </summary>
+        private static void AssertRowsUniformlyStacked(
+            string label,
+            DrawerVisualSample[] rows,
+            string diagnostics
+        )
+        {
+            if (rows.Length < 2)
+            {
+                return;
+            }
+
+            float pitch = rows[1].Rect.y - rows[0].Rect.y;
+            float height = rows[0].Rect.height;
+            Assert.That(
+                height,
+                Is.GreaterThan(0f),
+                $"{label} rows should have a positive height (guards a collapsed-row regression). {diagnostics}"
+            );
+            Assert.That(
+                pitch,
+                Is.GreaterThanOrEqualTo(height),
+                $"{label} rows should advance top-to-bottom by at least their own height (guards overlap/zero-pitch regressions). {diagnostics}"
+            );
+
+            for (int i = 1; i < rows.Length; i++)
+            {
+                Assert.That(
+                    rows[i].Rect.y - rows[i - 1].Rect.y,
+                    Is.EqualTo(pitch).Within(0.25f),
+                    $"{label} row {i} should be evenly pitched relative to the previous row. {diagnostics}"
+                );
+                Assert.That(
+                    rows[i].Rect.height,
+                    Is.EqualTo(height).Within(0.25f),
+                    $"{label} row {i} should share the uniform row height. {diagnostics}"
+                );
+            }
+        }
+
+        private static string BuildVisualDiagnostics(
+            DrawerVisualSample[] dictionaryRects,
+            DrawerVisualSample[] setRects,
+            DrawerVisualSample[] dictionarySamples = null,
+            DrawerVisualSample[] setSamples = null
+        )
+        {
+            string dictSummary =
+                dictionaryRects.Length == 0
+                    ? "dictionaryRects:[]"
+                    : $"dictionaryRects:[{string.Join(", ", dictionaryRects.Select(SummarizeSample))}]";
+            string setSummary =
+                setRects.Length == 0
+                    ? "setRects:[]"
+                    : $"setRects:[{string.Join(", ", setRects.Select(SummarizeSample))}]";
+            string dictRaw =
+                dictionarySamples == null
+                    ? string.Empty
+                    : $" dictionarySamples:[{string.Join(", ", dictionarySamples.Select(SummarizeSample))}]";
+            string setRaw =
+                setSamples == null
+                    ? string.Empty
+                    : $" setSamples:[{string.Join(", ", setSamples.Select(SummarizeSample))}]";
+            return $"[{dictSummary}; {setSummary};{dictRaw}{setRaw}]";
+
+            static string SummarizeSample(DrawerVisualSample sample)
+            {
+                return $"(role={sample.Role},index={sample.ArrayIndex},rect={sample.Rect})";
+            }
+        }
+
+        private static void PopulateDictionarySerializedState(
+            VisualRegressionDictionaryHost host,
+            SerializedObject dictionaryObject
+        )
+        {
+            if (host == null || dictionaryObject == null)
+            {
+                return;
+            }
+
+            SerializedProperty dictionaryProperty = dictionaryObject.FindProperty(
+                nameof(VisualRegressionDictionaryHost.dictionary)
+            );
+            if (dictionaryProperty == null)
+            {
+                return;
+            }
+
+            SerializedProperty keysProperty = dictionaryProperty.FindPropertyRelative(
+                SerializableDictionarySerializedPropertyNames.Keys
+            );
+            SerializedProperty valuesProperty = dictionaryProperty.FindPropertyRelative(
+                SerializableDictionarySerializedPropertyNames.Values
+            );
+            if (keysProperty == null || valuesProperty == null)
+            {
+                return;
+            }
+
+            List<
+                KeyValuePair<DrawerVisualRegressionKey, DrawerVisualRegressionDictionaryValue>
+            > entries = host.dictionary.ToList();
+
+            keysProperty.arraySize = entries.Count;
+            valuesProperty.arraySize = entries.Count;
+
+            for (int i = 0; i < entries.Count; i++)
+            {
+                DrawerVisualRegressionKey key = entries[i].Key;
+                DormantAssignKey(keysProperty.GetArrayElementAtIndex(i), key);
+
+                DrawerVisualRegressionDictionaryValue value = entries[i].Value;
+                DormantAssignValue(
+                    valuesProperty.GetArrayElementAtIndex(i),
+                    value?.data ?? 0,
+                    nameof(DrawerVisualRegressionDictionaryValue.data)
+                );
+            }
+
+            dictionaryObject.ApplyModifiedPropertiesWithoutUndo();
+            dictionaryObject.UpdateIfRequiredOrScript();
+        }
+
+        private static void PopulateSetSerializedState(
+            VisualRegressionSetHost host,
+            SerializedObject setObject
+        )
+        {
+            if (host == null || setObject == null)
+            {
+                return;
+            }
+
+            SerializedProperty setProperty = setObject.FindProperty(
+                nameof(VisualRegressionSetHost.set)
+            );
+            if (setProperty == null)
+            {
+                return;
+            }
+
+            SerializedProperty itemsProperty = setProperty.FindPropertyRelative(
+                SerializableHashSetSerializedPropertyNames.Items
+            );
+            if (itemsProperty == null)
+            {
+                return;
+            }
+
+            DrawerVisualRegressionSetValue[] values = host.set.ToArray();
+            itemsProperty.arraySize = values.Length;
+            for (int i = 0; i < values.Length; i++)
+            {
+                DrawerVisualRegressionSetValue value = values[i];
+                DormantAssignValue(
+                    itemsProperty.GetArrayElementAtIndex(i),
+                    value?.data ?? 0,
+                    nameof(DrawerVisualRegressionSetValue.data)
+                );
+            }
+
+            setObject.ApplyModifiedPropertiesWithoutUndo();
+            setObject.UpdateIfRequiredOrScript();
+        }
+
+        private static void DormantAssignKey(
+            SerializedProperty property,
+            DrawerVisualRegressionKey key
+        )
+        {
+            if (property == null)
+            {
+                return;
+            }
+
+            SerializedProperty idProperty = property.FindPropertyRelative(
+                nameof(DrawerVisualRegressionKey.id)
+            );
+            if (idProperty != null)
+            {
+                idProperty.intValue = key?.id ?? 0;
+            }
+        }
+
+        private static void DormantAssignValue(
+            SerializedProperty container,
+            int dataValue,
+            string fieldName
+        )
+        {
+            if (container == null || string.IsNullOrEmpty(fieldName))
+            {
+                return;
+            }
+
+            SerializedProperty dataProperty = container.FindPropertyRelative(fieldName);
+            if (dataProperty != null)
+            {
+                dataProperty.intValue = dataValue;
+            }
+        }
+
         [UnityTest]
         public IEnumerator DictionaryKeyAndValueRowsShareAlignment()
         {
@@ -241,214 +449,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
             AssertRowsUniformlyStacked("Dictionary value", dictionaryValueRects, diagnostics);
             AssertRowsUniformlyStacked("Set element", setRects, diagnostics);
-        }
-
-        /// <summary>
-        /// Asserts a drawer's element rows form a clean vertical stack: each row advances
-        /// downward by a constant pitch and shares a uniform height. Tolerant to sub-pixel
-        /// rounding (0.25f) but free of hard-coded pixel constants, so it stays valid across
-        /// Unity versions and IMGUI layout tweaks.
-        /// </summary>
-        private static void AssertRowsUniformlyStacked(
-            string label,
-            DrawerVisualSample[] rows,
-            string diagnostics
-        )
-        {
-            if (rows.Length < 2)
-            {
-                return;
-            }
-
-            float pitch = rows[1].Rect.y - rows[0].Rect.y;
-            float height = rows[0].Rect.height;
-            Assert.That(
-                height,
-                Is.GreaterThan(0f),
-                $"{label} rows should have a positive height (guards a collapsed-row regression). {diagnostics}"
-            );
-            Assert.That(
-                pitch,
-                Is.GreaterThanOrEqualTo(height),
-                $"{label} rows should advance top-to-bottom by at least their own height (guards overlap/zero-pitch regressions). {diagnostics}"
-            );
-
-            for (int i = 1; i < rows.Length; i++)
-            {
-                Assert.That(
-                    rows[i].Rect.y - rows[i - 1].Rect.y,
-                    Is.EqualTo(pitch).Within(0.25f),
-                    $"{label} row {i} should be evenly pitched relative to the previous row. {diagnostics}"
-                );
-                Assert.That(
-                    rows[i].Rect.height,
-                    Is.EqualTo(height).Within(0.25f),
-                    $"{label} row {i} should share the uniform row height. {diagnostics}"
-                );
-            }
-        }
-
-        private static string BuildVisualDiagnostics(
-            DrawerVisualSample[] dictionaryRects,
-            DrawerVisualSample[] setRects,
-            DrawerVisualSample[] dictionarySamples = null,
-            DrawerVisualSample[] setSamples = null
-        )
-        {
-            string dictSummary =
-                dictionaryRects.Length == 0
-                    ? "dictionaryRects:[]"
-                    : $"dictionaryRects:[{string.Join(", ", dictionaryRects.Select(SummarizeSample))}]";
-            string setSummary =
-                setRects.Length == 0
-                    ? "setRects:[]"
-                    : $"setRects:[{string.Join(", ", setRects.Select(SummarizeSample))}]";
-            string dictRaw =
-                dictionarySamples == null
-                    ? string.Empty
-                    : $" dictionarySamples:[{string.Join(", ", dictionarySamples.Select(SummarizeSample))}]";
-            string setRaw =
-                setSamples == null
-                    ? string.Empty
-                    : $" setSamples:[{string.Join(", ", setSamples.Select(SummarizeSample))}]";
-            return $"[{dictSummary}; {setSummary};{dictRaw}{setRaw}]";
-
-            static string SummarizeSample(DrawerVisualSample sample)
-            {
-                return $"(role={sample.Role},index={sample.ArrayIndex},rect={sample.Rect})";
-            }
-        }
-
-        private static void PopulateDictionarySerializedState(
-            VisualRegressionDictionaryHost host,
-            SerializedObject dictionaryObject
-        )
-        {
-            if (host == null || dictionaryObject == null)
-            {
-                return;
-            }
-
-            SerializedProperty dictionaryProperty = dictionaryObject.FindProperty(
-                nameof(VisualRegressionDictionaryHost.dictionary)
-            );
-            if (dictionaryProperty == null)
-            {
-                return;
-            }
-
-            SerializedProperty keysProperty = dictionaryProperty.FindPropertyRelative(
-                SerializableDictionarySerializedPropertyNames.Keys
-            );
-            SerializedProperty valuesProperty = dictionaryProperty.FindPropertyRelative(
-                SerializableDictionarySerializedPropertyNames.Values
-            );
-            if (keysProperty == null || valuesProperty == null)
-            {
-                return;
-            }
-
-            List<
-                KeyValuePair<DrawerVisualRegressionKey, DrawerVisualRegressionDictionaryValue>
-            > entries = host.dictionary.ToList();
-
-            keysProperty.arraySize = entries.Count;
-            valuesProperty.arraySize = entries.Count;
-
-            for (int i = 0; i < entries.Count; i++)
-            {
-                DrawerVisualRegressionKey key = entries[i].Key;
-                DormantAssignKey(keysProperty.GetArrayElementAtIndex(i), key);
-
-                DrawerVisualRegressionDictionaryValue value = entries[i].Value;
-                DormantAssignValue(
-                    valuesProperty.GetArrayElementAtIndex(i),
-                    value?.data ?? 0,
-                    nameof(DrawerVisualRegressionDictionaryValue.data)
-                );
-            }
-
-            dictionaryObject.ApplyModifiedPropertiesWithoutUndo();
-            dictionaryObject.UpdateIfRequiredOrScript();
-        }
-
-        private static void PopulateSetSerializedState(
-            VisualRegressionSetHost host,
-            SerializedObject setObject
-        )
-        {
-            if (host == null || setObject == null)
-            {
-                return;
-            }
-
-            SerializedProperty setProperty = setObject.FindProperty(
-                nameof(VisualRegressionSetHost.set)
-            );
-            if (setProperty == null)
-            {
-                return;
-            }
-
-            SerializedProperty itemsProperty = setProperty.FindPropertyRelative(
-                SerializableHashSetSerializedPropertyNames.Items
-            );
-            if (itemsProperty == null)
-            {
-                return;
-            }
-
-            DrawerVisualRegressionSetValue[] values = host.set.ToArray();
-            itemsProperty.arraySize = values.Length;
-            for (int i = 0; i < values.Length; i++)
-            {
-                DrawerVisualRegressionSetValue value = values[i];
-                DormantAssignValue(
-                    itemsProperty.GetArrayElementAtIndex(i),
-                    value?.data ?? 0,
-                    nameof(DrawerVisualRegressionSetValue.data)
-                );
-            }
-
-            setObject.ApplyModifiedPropertiesWithoutUndo();
-            setObject.UpdateIfRequiredOrScript();
-        }
-
-        private static void DormantAssignKey(
-            SerializedProperty property,
-            DrawerVisualRegressionKey key
-        )
-        {
-            if (property == null)
-            {
-                return;
-            }
-
-            SerializedProperty idProperty = property.FindPropertyRelative(
-                nameof(DrawerVisualRegressionKey.id)
-            );
-            if (idProperty != null)
-            {
-                idProperty.intValue = key?.id ?? 0;
-            }
-        }
-
-        private static void DormantAssignValue(
-            SerializedProperty container,
-            int dataValue,
-            string fieldName
-        )
-        {
-            if (container == null || string.IsNullOrEmpty(fieldName))
-            {
-                return;
-            }
-
-            SerializedProperty dataProperty = container.FindPropertyRelative(fieldName);
-            if (dataProperty != null)
-            {
-                dataProperty.intValue = dataValue;
-            }
         }
     }
 }

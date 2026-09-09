@@ -68,6 +68,87 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                   }
               }";
 
+        private static Diagnostic Single(string body)
+        {
+            ImmutableArray<Diagnostic> reported = Analyze(body);
+            Assert.AreEqual(1, reported.Length, "Expected exactly one diagnostic");
+            return reported[0];
+        }
+
+        private static ImmutableArray<Diagnostic> Analyze(string body)
+        {
+            return Analyze(body, ReportDiagnostic.Default);
+        }
+
+        /// <summary>
+        /// Compiles <paramref name="body"/> and runs the analyzer over it.
+        /// </summary>
+        /// <param name="body">Members of a static class in namespace <c>Consumer</c>.</param>
+        /// <param name="reportedAs">
+        /// What the compilation says about the diagnostic -- <see cref="ReportDiagnostic.Default"/>
+        /// for a consumer who configures nothing, or anything else for the ruleset /
+        /// <c>.editorconfig</c> entry they would write, expressed as the option Roslyn resolves both
+        /// of them to.
+        /// </param>
+        /// <returns>Everything the analyzer reported.</returns>
+        private static ImmutableArray<Diagnostic> Analyze(string body, ReportDiagnostic reportedAs)
+        {
+            string source =
+                "using System;\n"
+                + "using System.Collections.Generic;\n"
+                + "using Support;\n"
+                + "namespace Consumer { public static class Subject { "
+                + body
+                + " } }\n"
+                + SupportTypes;
+
+            List<MetadataReference> references = new List<MetadataReference>();
+            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
+                {
+                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
+                }
+            }
+
+            CSharpCompilation compilation = CSharpCompilation.Create(
+                "ConsumerAssembly",
+                new[]
+                {
+                    CSharpSyntaxTree.ParseText(
+                        source,
+                        new CSharpParseOptions(LanguageVersion.CSharp9)
+                    ),
+                },
+                references,
+                new CSharpCompilationOptions(
+                    OutputKind.DynamicallyLinkedLibrary
+                ).WithSpecificDiagnosticOptions(
+                    ImmutableDictionary<string, ReportDiagnostic>.Empty.Add(
+                        DiagnosticId,
+                        reportedAs
+                    )
+                )
+            );
+
+            ImmutableArray<Diagnostic> compileErrors = compilation
+                .GetDiagnostics()
+                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+                .ToImmutableArray();
+            Assert.IsEmpty(
+                compileErrors.Select(diagnostic => diagnostic.ToString()).ToArray(),
+                "The fixture must compile"
+            );
+
+            return compilation
+                .WithAnalyzers(
+                    ImmutableArray.Create<DiagnosticAnalyzer>(new UntestedTryOutAnalyzer())
+                )
+                .GetAnalyzerDiagnosticsAsync()
+                .GetAwaiter()
+                .GetResult();
+        }
+
         [Test]
         public void AReadOfAnUntestedTryOutIsReportedAtTheRead()
         {
@@ -404,87 +485,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                 Analyze(offending, ReportDiagnostic.Suppress),
                 "and one who does not want it must be able to turn it off"
             );
-        }
-
-        private static Diagnostic Single(string body)
-        {
-            ImmutableArray<Diagnostic> reported = Analyze(body);
-            Assert.AreEqual(1, reported.Length, "Expected exactly one diagnostic");
-            return reported[0];
-        }
-
-        private static ImmutableArray<Diagnostic> Analyze(string body)
-        {
-            return Analyze(body, ReportDiagnostic.Default);
-        }
-
-        /// <summary>
-        /// Compiles <paramref name="body"/> and runs the analyzer over it.
-        /// </summary>
-        /// <param name="body">Members of a static class in namespace <c>Consumer</c>.</param>
-        /// <param name="reportedAs">
-        /// What the compilation says about the diagnostic -- <see cref="ReportDiagnostic.Default"/>
-        /// for a consumer who configures nothing, or anything else for the ruleset /
-        /// <c>.editorconfig</c> entry they would write, expressed as the option Roslyn resolves both
-        /// of them to.
-        /// </param>
-        /// <returns>Everything the analyzer reported.</returns>
-        private static ImmutableArray<Diagnostic> Analyze(string body, ReportDiagnostic reportedAs)
-        {
-            string source =
-                "using System;\n"
-                + "using System.Collections.Generic;\n"
-                + "using Support;\n"
-                + "namespace Consumer { public static class Subject { "
-                + body
-                + " } }\n"
-                + SupportTypes;
-
-            List<MetadataReference> references = new List<MetadataReference>();
-            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
-                {
-                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
-                }
-            }
-
-            CSharpCompilation compilation = CSharpCompilation.Create(
-                "ConsumerAssembly",
-                new[]
-                {
-                    CSharpSyntaxTree.ParseText(
-                        source,
-                        new CSharpParseOptions(LanguageVersion.CSharp9)
-                    ),
-                },
-                references,
-                new CSharpCompilationOptions(
-                    OutputKind.DynamicallyLinkedLibrary
-                ).WithSpecificDiagnosticOptions(
-                    ImmutableDictionary<string, ReportDiagnostic>.Empty.Add(
-                        DiagnosticId,
-                        reportedAs
-                    )
-                )
-            );
-
-            ImmutableArray<Diagnostic> compileErrors = compilation
-                .GetDiagnostics()
-                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-                .ToImmutableArray();
-            Assert.IsEmpty(
-                compileErrors.Select(diagnostic => diagnostic.ToString()).ToArray(),
-                "The fixture must compile"
-            );
-
-            return compilation
-                .WithAnalyzers(
-                    ImmutableArray.Create<DiagnosticAnalyzer>(new UntestedTryOutAnalyzer())
-                )
-                .GetAnalyzerDiagnosticsAsync()
-                .GetAwaiter()
-                .GetResult();
         }
     }
 }

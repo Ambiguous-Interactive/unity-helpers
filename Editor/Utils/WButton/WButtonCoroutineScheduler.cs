@@ -12,12 +12,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
     internal readonly struct WButtonCoroutineTicket : IEquatable<WButtonCoroutineTicket>
     {
+        public static readonly WButtonCoroutineTicket None = new(Guid.Empty);
+
+        internal Guid Id { get; }
+
         internal WButtonCoroutineTicket(Guid id)
         {
             Id = id;
         }
-
-        internal Guid Id { get; }
 
         public bool Equals(WButtonCoroutineTicket other)
         {
@@ -38,8 +40,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         {
             return Id.GetHashCode();
         }
-
-        public static readonly WButtonCoroutineTicket None = new(Guid.Empty);
     }
 
     internal static class WButtonCoroutineScheduler
@@ -148,6 +148,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
         private sealed class CoroutineInstance
         {
+            internal Guid Id { get; }
+
+            internal bool IsCompleted { get; private set; }
+
             private readonly Stack<IEnumerator<object>> _stack = new();
             private readonly CancellationTokenSource _cancellationSource;
             private readonly Action _onCompleted;
@@ -169,10 +173,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 _onFaulted = onFaulted;
                 _onCancelled = onCancelled;
             }
-
-            internal Guid Id { get; }
-
-            internal bool IsCompleted { get; private set; }
 
             internal void RequestCancel()
             {

@@ -23,6 +23,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     [TestFixture]
     public sealed class StaleSerializedKeyValidatorTests
     {
+        private const string TestTypesFolder = "/TestTypes/";
+
+        private string _root;
+        private string _scriptGuid;
+        private string _committedEmpty;
+
         [SetUp]
         public void ResolveFixtureScript()
         {
@@ -276,11 +282,5 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             File.WriteAllLines(assetPath, lines);
             return assetPath;
         }
-
-        private const string TestTypesFolder = "/TestTypes/";
-
-        private string _root;
-        private string _scriptGuid;
-        private string _committedEmpty;
     }
 }

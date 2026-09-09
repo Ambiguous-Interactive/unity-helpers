@@ -46,10 +46,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     [Serializable]
     public sealed class SpatialHash3D<T> : ISpatialHash3D<T>
     {
-        private readonly Dictionary<FastVector3Int, EntryBucket> _grid;
-        private readonly float _cellSize;
-        private readonly IEqualityComparer<T> _comparer;
-
         /// <summary>
         /// Gets the cell size of the spatial hash.
         /// </summary>
@@ -59,6 +55,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// Gets the total number of occupied cells.
         /// </summary>
         public int CellCount => _grid.Count;
+
+        private readonly Dictionary<FastVector3Int, EntryBucket> _grid;
+        private readonly float _cellSize;
+        private readonly IEqualityComparer<T> _comparer;
 
         /// <summary>
         /// Constructs a 3D spatial hash with the specified cell size.
@@ -83,6 +83,80 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _cellSize = cellSize;
             _comparer = comparer ?? EqualityComparer<T>.Default;
             _grid = new Dictionary<FastVector3Int, EntryBucket>();
+        }
+
+        private static void AppendWithinRadius(
+            List<Entry> entries,
+            Vector3 position,
+            float radiusSquared,
+            bool exactComparison,
+            double exactRadiusSquared,
+            bool exactDistance,
+            HashSet<T> seen,
+            List<T> results
+        )
+        {
+            foreach (Entry entry in entries)
+            {
+                if (exactComparison)
+                {
+                    double exactDistanceSquared = SpatialQueryMath.DistanceSquared(
+                        entry.position,
+                        position
+                    );
+                    if (exactRadiusSquared < exactDistanceSquared)
+                    {
+                        continue;
+                    }
+                }
+                else if (exactDistance)
+                {
+                    float distanceSquared = (entry.position - position).sqrMagnitude;
+                    if (radiusSquared < distanceSquared)
+                    {
+                        continue;
+                    }
+                }
+
+                if (seen != null && !seen.Add(entry.item))
+                {
+                    continue;
+                }
+
+                results.Add(entry.item);
+            }
+        }
+
+        private static void AppendWithinBox(
+            List<Entry> entries,
+            Vector3 min,
+            Vector3 max,
+            HashSet<T> seen,
+            List<T> results
+        )
+        {
+            foreach (Entry entry in entries)
+            {
+                Vector3 pos = entry.position;
+                if (
+                    pos.x < min.x
+                    || max.x < pos.x
+                    || pos.y < min.y
+                    || max.y < pos.y
+                    || pos.z < min.z
+                    || max.z < pos.z
+                )
+                {
+                    continue;
+                }
+
+                if (seen != null && !seen.Add(entry.item))
+                {
+                    continue;
+                }
+
+                results.Add(entry.item);
+            }
         }
 
         /// <summary>
@@ -368,48 +442,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
         }
 
-        private static void AppendWithinRadius(
-            List<Entry> entries,
-            Vector3 position,
-            float radiusSquared,
-            bool exactComparison,
-            double exactRadiusSquared,
-            bool exactDistance,
-            HashSet<T> seen,
-            List<T> results
-        )
-        {
-            foreach (Entry entry in entries)
-            {
-                if (exactComparison)
-                {
-                    double exactDistanceSquared = SpatialQueryMath.DistanceSquared(
-                        entry.position,
-                        position
-                    );
-                    if (exactRadiusSquared < exactDistanceSquared)
-                    {
-                        continue;
-                    }
-                }
-                else if (exactDistance)
-                {
-                    float distanceSquared = (entry.position - position).sqrMagnitude;
-                    if (radiusSquared < distanceSquared)
-                    {
-                        continue;
-                    }
-                }
-
-                if (seen != null && !seen.Add(entry.item))
-                {
-                    continue;
-                }
-
-                results.Add(entry.item);
-            }
-        }
-
         private void CollectWithinBox(Vector3 min, Vector3 max, HashSet<T> seen, List<T> results)
         {
             FastVector3Int minCell = GetCell(min);
@@ -462,38 +494,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
         }
 
-        private static void AppendWithinBox(
-            List<Entry> entries,
-            Vector3 min,
-            Vector3 max,
-            HashSet<T> seen,
-            List<T> results
-        )
-        {
-            foreach (Entry entry in entries)
-            {
-                Vector3 pos = entry.position;
-                if (
-                    pos.x < min.x
-                    || max.x < pos.x
-                    || pos.y < min.y
-                    || max.y < pos.y
-                    || pos.z < min.z
-                    || max.z < pos.z
-                )
-                {
-                    continue;
-                }
-
-                if (seen != null && !seen.Add(entry.item))
-                {
-                    continue;
-                }
-
-                results.Add(entry.item);
-            }
-        }
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private FastVector3Int GetCell(Vector3 position)
         {
@@ -518,6 +518,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private readonly struct EntryBucket : IDisposable
         {
+            public List<Entry> Entries => _entries;
+
             private readonly List<Entry> _entries;
             private readonly PooledResource<List<Entry>> _lease;
 
@@ -526,8 +528,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 _lease = lease;
                 _entries = entries;
             }
-
-            public List<Entry> Entries => _entries;
 
             public static EntryBucket Rent()
             {

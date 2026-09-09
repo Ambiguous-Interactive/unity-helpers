@@ -19,6 +19,90 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
     [NUnit.Framework.Category("Fast")]
     public sealed class AttributeEffectTests : AttributeTagsTestBase
     {
+        private static void ConfigureBaseline(AttributeEffect effect)
+        {
+            effect.name = "Stack";
+            effect.durationType = ModifierDurationType.Duration;
+            effect.duration = 2f;
+            effect.resetDurationOnReapplication = false;
+            effect.stackGroup = EffectStackGroup.Reference;
+            effect.stackGroupKey = null;
+            effect.stackingMode = EffectStackingMode.Refresh;
+            effect.maximumStacks = 0;
+        }
+
+        private static PeriodicEffectDefinition CreatePeriodicEffect(float interval)
+        {
+            return new PeriodicEffectDefinition
+            {
+                name = "Tick",
+                initialDelay = 0.5f,
+                interval = interval,
+                maxTicks = 4,
+            };
+        }
+
+        private static IEnumerable<TestCaseData> AuthoredFieldMutations()
+        {
+            yield return new TestCaseData(
+                (Action<AttributeEffect>)(effect => effect.name = "Renamed")
+            ).SetName("Field.Name");
+
+            yield return new TestCaseData(
+                (Action<AttributeEffect>)(
+                    effect => effect.durationType = ModifierDurationType.Infinite
+                )
+            ).SetName("Field.DurationType");
+
+            yield return new TestCaseData(
+                (Action<AttributeEffect>)(effect => effect.duration = 99f)
+            ).SetName("Field.Duration");
+
+            yield return new TestCaseData(
+                (Action<AttributeEffect>)(effect => effect.resetDurationOnReapplication = true)
+            ).SetName("Field.ResetDurationOnReapplication");
+
+            yield return new TestCaseData(
+                (Action<AttributeEffect>)(
+                    effect =>
+                        effect.modifications.Add(
+                            new AttributeModification
+                            {
+                                attribute = "speed",
+                                action = ModificationAction.Addition,
+                                value = 1f,
+                            }
+                        )
+                )
+            ).SetName("Field.Modifications");
+
+            yield return new TestCaseData(
+                (Action<AttributeEffect>)(
+                    effect => effect.periodicEffects.Add(CreatePeriodicEffect(2f))
+                )
+            ).SetName("Field.PeriodicEffects");
+
+            yield return new TestCaseData(
+                (Action<AttributeEffect>)(effect => effect.effectTags.Add("Burning"))
+            ).SetName("Field.EffectTags");
+
+            yield return new TestCaseData(
+                (Action<AttributeEffect>)(effect => effect.stackGroup = EffectStackGroup.CustomKey)
+            ).SetName("Field.StackGroup");
+
+            yield return new TestCaseData(
+                (Action<AttributeEffect>)(effect => effect.stackGroupKey = "DamageOverTime")
+            ).SetName("Field.StackGroupKey");
+
+            yield return new TestCaseData(
+                (Action<AttributeEffect>)(effect => effect.stackingMode = EffectStackingMode.Stack)
+            ).SetName("Field.StackingMode");
+
+            yield return new TestCaseData(
+                (Action<AttributeEffect>)(effect => effect.maximumStacks = 3)
+            ).SetName("Field.MaximumStacks");
+        }
+
         [Test]
         public void AttributeEffectUsesExpectedScriptableObjectBase()
         {
@@ -311,90 +395,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             right.periodicEffects[0] = CreatePeriodicEffect(3f);
 
             Assert.IsFalse(left.Equals(right));
-        }
-
-        private static void ConfigureBaseline(AttributeEffect effect)
-        {
-            effect.name = "Stack";
-            effect.durationType = ModifierDurationType.Duration;
-            effect.duration = 2f;
-            effect.resetDurationOnReapplication = false;
-            effect.stackGroup = EffectStackGroup.Reference;
-            effect.stackGroupKey = null;
-            effect.stackingMode = EffectStackingMode.Refresh;
-            effect.maximumStacks = 0;
-        }
-
-        private static PeriodicEffectDefinition CreatePeriodicEffect(float interval)
-        {
-            return new PeriodicEffectDefinition
-            {
-                name = "Tick",
-                initialDelay = 0.5f,
-                interval = interval,
-                maxTicks = 4,
-            };
-        }
-
-        private static IEnumerable<TestCaseData> AuthoredFieldMutations()
-        {
-            yield return new TestCaseData(
-                (Action<AttributeEffect>)(effect => effect.name = "Renamed")
-            ).SetName("Field.Name");
-
-            yield return new TestCaseData(
-                (Action<AttributeEffect>)(
-                    effect => effect.durationType = ModifierDurationType.Infinite
-                )
-            ).SetName("Field.DurationType");
-
-            yield return new TestCaseData(
-                (Action<AttributeEffect>)(effect => effect.duration = 99f)
-            ).SetName("Field.Duration");
-
-            yield return new TestCaseData(
-                (Action<AttributeEffect>)(effect => effect.resetDurationOnReapplication = true)
-            ).SetName("Field.ResetDurationOnReapplication");
-
-            yield return new TestCaseData(
-                (Action<AttributeEffect>)(
-                    effect =>
-                        effect.modifications.Add(
-                            new AttributeModification
-                            {
-                                attribute = "speed",
-                                action = ModificationAction.Addition,
-                                value = 1f,
-                            }
-                        )
-                )
-            ).SetName("Field.Modifications");
-
-            yield return new TestCaseData(
-                (Action<AttributeEffect>)(
-                    effect => effect.periodicEffects.Add(CreatePeriodicEffect(2f))
-                )
-            ).SetName("Field.PeriodicEffects");
-
-            yield return new TestCaseData(
-                (Action<AttributeEffect>)(effect => effect.effectTags.Add("Burning"))
-            ).SetName("Field.EffectTags");
-
-            yield return new TestCaseData(
-                (Action<AttributeEffect>)(effect => effect.stackGroup = EffectStackGroup.CustomKey)
-            ).SetName("Field.StackGroup");
-
-            yield return new TestCaseData(
-                (Action<AttributeEffect>)(effect => effect.stackGroupKey = "DamageOverTime")
-            ).SetName("Field.StackGroupKey");
-
-            yield return new TestCaseData(
-                (Action<AttributeEffect>)(effect => effect.stackingMode = EffectStackingMode.Stack)
-            ).SetName("Field.StackingMode");
-
-            yield return new TestCaseData(
-                (Action<AttributeEffect>)(effect => effect.maximumStacks = 3)
-            ).SetName("Field.MaximumStacks");
         }
     }
 }

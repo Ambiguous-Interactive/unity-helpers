@@ -44,19 +44,79 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             IFormattable,
             IUnderlyingValueProvider
     {
-        /// <summary>
-        /// Sentinel instance representing the default <see cref="WGuid"/>.
-        /// </summary>
-        public static readonly WGuid EmptyGuid = default;
+        internal const string LowFieldName = nameof(_low);
+        internal const string HighFieldName = nameof(_high);
+        internal const string GuidPropertyName = nameof(Guid);
 
         /// <summary>
         /// Gets an empty <see cref="WGuid"/> value equivalent to <see cref="EmptyGuid"/>.
         /// </summary>
         public static WGuid Empty => default;
 
-        internal const string LowFieldName = nameof(_low);
-        internal const string HighFieldName = nameof(_high);
-        internal const string GuidPropertyName = nameof(Guid);
+        /// <summary>
+        /// Determines equality between two wrappers by comparing their packed representations.
+        /// </summary>
+        /// <param name="lhs">The left-hand value.</param>
+        /// <param name="rhs">The right-hand value.</param>
+        /// <returns><c>true</c> when both wrappers refer to the same GUID.</returns>
+        /// <example>
+        /// <code>
+        /// bool same = WGuid.Empty == default;
+        /// </code>
+        /// </example>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool operator ==(WGuid lhs, WGuid rhs)
+        {
+            return lhs.Equals(rhs);
+        }
+
+        /// <summary>
+        /// Determines inequality between two wrappers.
+        /// </summary>
+        /// <param name="lhs">The left-hand value.</param>
+        /// <param name="rhs">The right-hand value.</param>
+        /// <returns><c>true</c> when the GUIDs differ.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool operator !=(WGuid lhs, WGuid rhs)
+        {
+            return !lhs.Equals(rhs);
+        }
+
+        /// <summary>
+        /// Sentinel instance representing the default <see cref="WGuid"/>.
+        /// </summary>
+        public static readonly WGuid EmptyGuid = default;
+
+        /// <summary>
+        /// Gets a value indicating whether the wrapper stores the empty GUID.
+        /// </summary>
+        public bool IsEmpty => _low == 0L && _high == 0L;
+
+        /// <summary>
+        /// Gets the GUID version encoded in the wrapper.
+        /// </summary>
+        public int Version
+        {
+            get
+            {
+                ulong low = unchecked((ulong)_low);
+                return ExtractVersion(low);
+            }
+        }
+
+        /// <summary>
+        /// Gets a value indicating whether the GUID represents a random version-4 value.
+        /// </summary>
+        public bool IsVersion4 => Version == 4;
+
+        /// <summary>
+        /// Gets a value indicating whether the stored value is either empty or a valid version-4 GUID.
+        /// </summary>
+        public bool IsValid => HasVersionFourLayout(_low, _high);
+
+        [JsonInclude]
+        [DataMember]
+        private string Guid => ToString();
 
         [ProtoMember(1)]
         [SerializeField]
@@ -65,24 +125,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         [ProtoMember(2)]
         [SerializeField]
         private long _high;
-
-        [JsonInclude]
-        [DataMember]
-        private string Guid => ToString();
-
-        /// <summary>
-        /// Generates a new random version-4 <see cref="WGuid"/>.
-        /// </summary>
-        /// <returns>A newly generated GUID wrapper.</returns>
-        /// <example>
-        /// <code>
-        /// WGuid levelId = WGuid.NewGuid();
-        /// </code>
-        /// </example>
-        public static WGuid NewGuid()
-        {
-            return new WGuid(global::System.Guid.NewGuid());
-        }
 
         /// <summary>
         /// Initializes the wrapper from a <see cref="Guid"/> instance.
@@ -146,6 +188,20 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         }
 
         /// <summary>
+        /// Generates a new random version-4 <see cref="WGuid"/>.
+        /// </summary>
+        /// <returns>A newly generated GUID wrapper.</returns>
+        /// <example>
+        /// <code>
+        /// WGuid levelId = WGuid.NewGuid();
+        /// </code>
+        /// </example>
+        public static WGuid NewGuid()
+        {
+            return new WGuid(global::System.Guid.NewGuid());
+        }
+
+        /// <summary>
         /// Converts a <see cref="WGuid"/> into a <see cref="Guid"/>.
         /// </summary>
         /// <param name="guid">The wrapper to convert.</param>
@@ -173,43 +229,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         public static implicit operator WGuid(Guid guid)
         {
             return new WGuid(guid);
-        }
-
-        internal static WGuid CreateUnchecked(long low, long high)
-        {
-            WGuid guid = default;
-            guid._low = low;
-            guid._high = high;
-            return guid;
-        }
-
-        /// <summary>
-        /// Determines equality between two wrappers by comparing their packed representations.
-        /// </summary>
-        /// <param name="lhs">The left-hand value.</param>
-        /// <param name="rhs">The right-hand value.</param>
-        /// <returns><c>true</c> when both wrappers refer to the same GUID.</returns>
-        /// <example>
-        /// <code>
-        /// bool same = WGuid.Empty == default;
-        /// </code>
-        /// </example>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool operator ==(WGuid lhs, WGuid rhs)
-        {
-            return lhs.Equals(rhs);
-        }
-
-        /// <summary>
-        /// Determines inequality between two wrappers.
-        /// </summary>
-        /// <param name="lhs">The left-hand value.</param>
-        /// <param name="rhs">The right-hand value.</param>
-        /// <returns><c>true</c> when the GUIDs differ.</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool operator !=(WGuid lhs, WGuid rhs)
-        {
-            return !lhs.Equals(rhs);
         }
 
         /// <summary>
@@ -304,6 +323,93 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             return false;
         }
 
+        internal static WGuid CreateUnchecked(long low, long high)
+        {
+            WGuid guid = default;
+            guid._low = low;
+            guid._high = high;
+            return guid;
+        }
+
+        internal static bool HasVersionFourLayout(long low, long high)
+        {
+            if (low == 0L && high == 0L)
+            {
+                return true;
+            }
+
+            return HasVersionFourBits(unchecked((ulong)low));
+        }
+
+        private static Guid ParseGuidString(string value)
+        {
+            if (value == null)
+            {
+                throw new ArgumentNullException(nameof(value));
+            }
+
+            Guid parsed = global::System.Guid.Parse(value);
+            if (!IsVersionFour(parsed, out int version))
+            {
+                throw CreateNonVersionFourException(version);
+            }
+
+            return parsed;
+        }
+
+        private static bool IsVersionFour(Guid guid, out int version)
+        {
+            Span<byte> buffer = stackalloc byte[16];
+            bool success = guid.TryWriteBytes(buffer);
+            if (!success)
+            {
+                version = -1;
+                return false;
+            }
+
+            ulong low = BinaryPrimitives.ReadUInt64LittleEndian(buffer.Slice(0, 8));
+            version = ExtractVersion(low);
+            return version == 4;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int ExtractVersion(ulong low)
+        {
+            ushort segment = (ushort)((low >> 48) & 0xFFFF);
+            return (segment >> 12) & 0x0F;
+        }
+
+        private static void EnsureVersionFourLayout(ulong low, ulong high)
+        {
+            if (low == 0UL && high == 0UL)
+            {
+                return;
+            }
+
+            int version = ExtractVersion(low);
+            if (version != 4)
+            {
+                throw CreateNonVersionFourException(version);
+            }
+        }
+
+        private static bool HasVersionFourBits(ulong low)
+        {
+            return ExtractVersion(low) == 4;
+        }
+
+        private static FormatException CreateNonVersionFourException(int? detectedVersion = null)
+        {
+            if (detectedVersion is >= 0)
+            {
+                return new FormatException(
+                    $"{nameof(WGuid)} requires a version 4 {nameof(Guid)}, but found version {detectedVersion.Value}."
+                );
+            }
+
+            return new FormatException($"{nameof(WGuid)} requires a version 4 {nameof(Guid)}.");
+        }
+
         /// <summary>
         /// Formats the GUID into the provided destination span.
         /// </summary>
@@ -360,12 +466,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         public override bool Equals(object obj)
         {
             return obj is WGuid otherWGuid && Equals(otherWGuid);
-        }
-
-        bool IUnderlyingValueProvider.TryGetUnderlyingValue(out object value)
-        {
-            value = ToGuid();
-            return true;
         }
 
         /// <summary>
@@ -475,33 +575,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         }
 
         /// <summary>
-        /// Gets a value indicating whether the wrapper stores the empty GUID.
-        /// </summary>
-        public bool IsEmpty => _low == 0L && _high == 0L;
-
-        /// <summary>
-        /// Gets the GUID version encoded in the wrapper.
-        /// </summary>
-        public int Version
-        {
-            get
-            {
-                ulong low = unchecked((ulong)_low);
-                return ExtractVersion(low);
-            }
-        }
-
-        /// <summary>
-        /// Gets a value indicating whether the GUID represents a random version-4 value.
-        /// </summary>
-        public bool IsVersion4 => Version == 4;
-
-        /// <summary>
-        /// Gets a value indicating whether the stored value is either empty or a valid version-4 GUID.
-        /// </summary>
-        public bool IsValid => HasVersionFourLayout(_low, _high);
-
-        /// <summary>
         /// Converts the wrapper back to a <see cref="Guid"/> instance.
         /// </summary>
         /// <returns>The underlying GUID.</returns>
@@ -551,83 +624,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             BinaryPrimitives.WriteUInt64LittleEndian(destination.Slice(8, 8), high);
         }
 
-        private static Guid ParseGuidString(string value)
+        bool IUnderlyingValueProvider.TryGetUnderlyingValue(out object value)
         {
-            if (value == null)
-            {
-                throw new ArgumentNullException(nameof(value));
-            }
-
-            Guid parsed = global::System.Guid.Parse(value);
-            if (!IsVersionFour(parsed, out int version))
-            {
-                throw CreateNonVersionFourException(version);
-            }
-
-            return parsed;
-        }
-
-        private static bool IsVersionFour(Guid guid, out int version)
-        {
-            Span<byte> buffer = stackalloc byte[16];
-            bool success = guid.TryWriteBytes(buffer);
-            if (!success)
-            {
-                version = -1;
-                return false;
-            }
-
-            ulong low = BinaryPrimitives.ReadUInt64LittleEndian(buffer.Slice(0, 8));
-            version = ExtractVersion(low);
-            return version == 4;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static int ExtractVersion(ulong low)
-        {
-            ushort segment = (ushort)((low >> 48) & 0xFFFF);
-            return (segment >> 12) & 0x0F;
-        }
-
-        internal static bool HasVersionFourLayout(long low, long high)
-        {
-            if (low == 0L && high == 0L)
-            {
-                return true;
-            }
-
-            return HasVersionFourBits(unchecked((ulong)low));
-        }
-
-        private static void EnsureVersionFourLayout(ulong low, ulong high)
-        {
-            if (low == 0UL && high == 0UL)
-            {
-                return;
-            }
-
-            int version = ExtractVersion(low);
-            if (version != 4)
-            {
-                throw CreateNonVersionFourException(version);
-            }
-        }
-
-        private static bool HasVersionFourBits(ulong low)
-        {
-            return ExtractVersion(low) == 4;
-        }
-
-        private static FormatException CreateNonVersionFourException(int? detectedVersion = null)
-        {
-            if (detectedVersion is >= 0)
-            {
-                return new FormatException(
-                    $"{nameof(WGuid)} requires a version 4 {nameof(Guid)}, but found version {detectedVersion.Value}."
-                );
-            }
-
-            return new FormatException($"{nameof(WGuid)} requires a version 4 {nameof(Guid)}.");
+            value = ToGuid();
+            return true;
         }
     }
 }

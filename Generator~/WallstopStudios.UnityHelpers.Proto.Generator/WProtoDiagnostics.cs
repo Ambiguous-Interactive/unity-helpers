@@ -17,6 +17,31 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     /// </remarks>
     internal static class WProtoDiagnostics
     {
+        /// <summary>How an explicitly declared subtype's missing number is introduced.</summary>
+        internal const string SubtypeTagUnassignedDeclared =
+            "'{0}' declares [WProtoSubtype(typeof({1}))] without a field number";
+
+        /// <summary>
+        /// How an INHERITED subtype's missing number is introduced.
+        /// </summary>
+        /// <remarks>
+        /// A separate opening, because the other one would name an attribute the author never wrote.
+        /// Deriving from a contract is the declaration
+        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/613">#613</see>),
+        /// so the message describes the inheritance the developer can see rather than a declaration
+        /// they did not make.
+        /// </remarks>
+        internal const string SubtypeTagUnassignedInherited =
+            "'{0}' derives from '{1}', which is a [WProtoContract], so it is written as one of that type's subtypes and needs a field number of its own";
+
+        /// <summary>The editor half of <see cref="SubtypeTagUnassigned"/>'s message.</summary>
+        internal const string SubtypeTagUnassignedInEditor =
+            "The editor assigns it for you: the number is written to this assembly's WProtoSubtypeTags.cs on the next assembly reload, and this is a warning rather than an error so that the assembly compiles and the assignment tool can see the type at all. Run Tools > Wallstop Studios > Unity Helpers > Assign WallstopProto Subtype Tags if it has not.";
+
+        /// <summary>The player half of <see cref="SubtypeTagUnassigned"/>'s message.</summary>
+        internal const string SubtypeTagUnassignedInPlayer =
+            "UNITY_EDITOR is not defined for this compilation, so it can reach a player and cannot be allowed to. Open the project in the editor, which assigns the number automatically, or run Tools > Wallstop Studios > Unity Helpers > Assign WallstopProto Subtype Tags (headless: -executeMethod WallstopStudios.UnityHelpers.Editor.Tools.WProtoSubtypeTagAssigner.AssignFromCommandLine), then commit the [assembly: WProtoSubtypeTag] entry it writes. Writing the number yourself as [WProtoSubtype(typeof(Base), tag)] also works.";
+
         internal static readonly DiagnosticDescriptor ContractMustBePartial =
             new DiagnosticDescriptor(
                 "WPROTO001",
@@ -432,31 +457,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 DiagnosticSeverity.Error,
                 isEnabledByDefault: true
             );
-
-        /// <summary>How an explicitly declared subtype's missing number is introduced.</summary>
-        internal const string SubtypeTagUnassignedDeclared =
-            "'{0}' declares [WProtoSubtype(typeof({1}))] without a field number";
-
-        /// <summary>
-        /// How an INHERITED subtype's missing number is introduced.
-        /// </summary>
-        /// <remarks>
-        /// A separate opening, because the other one would name an attribute the author never wrote.
-        /// Deriving from a contract is the declaration
-        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/613">#613</see>),
-        /// so the message describes the inheritance the developer can see rather than a declaration
-        /// they did not make.
-        /// </remarks>
-        internal const string SubtypeTagUnassignedInherited =
-            "'{0}' derives from '{1}', which is a [WProtoContract], so it is written as one of that type's subtypes and needs a field number of its own";
-
-        /// <summary>The editor half of <see cref="SubtypeTagUnassigned"/>'s message.</summary>
-        internal const string SubtypeTagUnassignedInEditor =
-            "The editor assigns it for you: the number is written to this assembly's WProtoSubtypeTags.cs on the next assembly reload, and this is a warning rather than an error so that the assembly compiles and the assignment tool can see the type at all. Run Tools > Wallstop Studios > Unity Helpers > Assign WallstopProto Subtype Tags if it has not.";
-
-        /// <summary>The player half of <see cref="SubtypeTagUnassigned"/>'s message.</summary>
-        internal const string SubtypeTagUnassignedInPlayer =
-            "UNITY_EDITOR is not defined for this compilation, so it can reach a player and cannot be allowed to. Open the project in the editor, which assigns the number automatically, or run Tools > Wallstop Studios > Unity Helpers > Assign WallstopProto Subtype Tags (headless: -executeMethod WallstopStudios.UnityHelpers.Editor.Tools.WProtoSubtypeTagAssigner.AssignFromCommandLine), then commit the [assembly: WProtoSubtypeTag] entry it writes. Writing the number yourself as [WProtoSubtype(typeof(Base), tag)] also works.";
 
         internal static readonly DiagnosticDescriptor BadSubtypeTagManifest =
             new DiagnosticDescriptor(

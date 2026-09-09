@@ -17,12 +17,12 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     /// </remarks>
     public sealed class TestCombinedSearchHandler : MonoBehaviour
     {
-        private static readonly List<AssetChangeContext> Recorded = new();
-        private static readonly List<TestCombinedSearchHandler> InvokedInstances = new();
-
         public static IReadOnlyList<AssetChangeContext> RecordedContexts => Recorded;
         public static IReadOnlyList<TestCombinedSearchHandler> RecordedInstances =>
             InvokedInstances;
+
+        private static readonly List<AssetChangeContext> Recorded = new();
+        private static readonly List<TestCombinedSearchHandler> InvokedInstances = new();
 
         public static void Clear()
         {

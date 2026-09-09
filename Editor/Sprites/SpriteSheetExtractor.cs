@@ -59,16 +59,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private const string Name = "Sprite Sheet Extractor";
 
         /// <summary>
-        /// Controls whether diagnostic logging is enabled.
-        /// Set to true for debugging sprite regeneration and cache issues.
-        /// </summary>
-        /// <remarks>
-        /// Using static readonly instead of const to avoid CS0162 unreachable code warnings
-        /// when the value is false, while still allowing JIT optimization.
-        /// </remarks>
-        private static readonly bool DiagnosticsEnabled = false;
-
-        /// <summary>
         /// Minimum score threshold for boundary transparency detection.
         /// Lowered from 0.5 to 0.15 to handle sprite sheets with thin transparent gutters.
         /// </summary>
@@ -79,6 +69,230 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// Entries beyond this limit are evicted using LRU policy.
         /// </summary>
         private const int MaxCachedEntries = 50;
+
+        /// <summary>
+        /// EditorPrefs key for persisting splitter position.
+        /// </summary>
+        private const string SplitterPositionPrefsKey =
+            "WallstopStudios.UnityHelpers.SpriteSheetExtractor.SplitterPosition";
+
+        /// <summary>
+        /// Minimum height for the settings section (Input/Output/Discovery).
+        /// </summary>
+        private const float MinSettingsHeight = 100f;
+
+        /// <summary>
+        /// Minimum height for the preview section.
+        /// </summary>
+        private const float MinPreviewHeight = 150f;
+
+        /// <summary>
+        /// Height of the splitter bar in pixels.
+        /// </summary>
+        private const float SplitterHeight = 5f;
+
+        /// <summary>
+        /// Default splitter position as ratio of window height (0.4 = 40% settings, 60% preview).
+        /// </summary>
+        private const float DefaultSplitterRatio = 0.4f;
+
+        internal static bool SuppressUserPrompts { get; set; }
+
+        /// <summary>
+        /// Detects cell size by analyzing opaque regions using flood-fill.
+        /// Identifies individual sprite regions, computes their median dimensions,
+        /// and finds the nearest divisor that produces multiple cells.
+        /// </summary>
+        /// <param name="pixels">The texture pixel data in Color32 format.</param>
+        /// <param name="textureWidth">Width of the texture in pixels.</param>
+        /// <param name="textureHeight">Height of the texture in pixels.</param>
+        /// <param name="alphaThreshold">Finite alpha value (0-1) below which a pixel is considered transparent.</param>
+        /// <returns>A tuple of (cellWidth, cellHeight), or (0, 0) if detection failed.</returns>
+        internal static (int cellWidth, int cellHeight) DetectCellSizeFromOpaqueRegions(
+            Color32[] pixels,
+            int textureWidth,
+            int textureHeight,
+            float alphaThreshold
+        )
+        {
+            if (!float.IsFinite(alphaThreshold))
+            {
+                return (0, 0);
+            }
+
+            if (pixels == null || pixels.Length == 0)
+            {
+                return (0, 0);
+            }
+
+            if (
+                textureWidth < SpriteSheetAlgorithms.MinimumCellSize
+                || textureHeight < SpriteSheetAlgorithms.MinimumCellSize
+            )
+            {
+                return (0, 0);
+            }
+
+            if (pixels.Length != textureWidth * textureHeight)
+            {
+                return (0, 0);
+            }
+
+            byte alphaThresholdByte = ColorQuantization.ToThresholdByte(alphaThreshold);
+
+            using PooledArray<bool> visitedLease = SystemArrayPool<bool>.Get(
+                pixels.Length,
+                out bool[] visited
+            );
+            Array.Clear(visited, 0, visited.Length);
+
+            using PooledResource<List<int>> widthsLease = Buffers<int>.List.Get(
+                out List<int> regionWidths
+            );
+            using PooledResource<List<int>> heightsLease = Buffers<int>.List.Get(
+                out List<int> regionHeights
+            );
+            using PooledResource<List<int>> stackLease = Buffers<int>.List.Get(out List<int> stack);
+
+            const int minimumRegionSize = SpriteSheetAlgorithms.MinimumCellSize;
+            const int maxRegionCount = 256;
+
+            for (int startY = 0; startY < textureHeight; ++startY)
+            {
+                if (maxRegionCount <= regionWidths.Count)
+                {
+                    break;
+                }
+
+                for (int startX = 0; startX < textureWidth; ++startX)
+                {
+                    int startIdx = startY * textureWidth + startX;
+                    if (visited[startIdx])
+                    {
+                        continue;
+                    }
+
+                    if (pixels[startIdx].a <= alphaThresholdByte)
+                    {
+                        visited[startIdx] = true;
+                        continue;
+                    }
+
+                    int minX = startX;
+                    int maxX = startX;
+                    int minY = startY;
+                    int maxY = startY;
+
+                    stack.Clear();
+                    stack.Add(startIdx);
+                    visited[startIdx] = true;
+
+                    while (0 < stack.Count)
+                    {
+                        int lastIndex = stack.Count - 1;
+                        int idx = stack[lastIndex];
+                        stack.RemoveAt(lastIndex);
+
+                        int px = idx % textureWidth;
+                        int py = idx / textureWidth;
+
+                        if (px < minX)
+                        {
+                            minX = px;
+                        }
+                        if (maxX < px)
+                        {
+                            maxX = px;
+                        }
+                        if (py < minY)
+                        {
+                            minY = py;
+                        }
+                        if (maxY < py)
+                        {
+                            maxY = py;
+                        }
+
+                        if (0 < px)
+                        {
+                            int left = idx - 1;
+                            if (!visited[left] && alphaThresholdByte < pixels[left].a)
+                            {
+                                visited[left] = true;
+                                stack.Add(left);
+                            }
+                        }
+                        if (px < textureWidth - 1)
+                        {
+                            int right = idx + 1;
+                            if (!visited[right] && alphaThresholdByte < pixels[right].a)
+                            {
+                                visited[right] = true;
+                                stack.Add(right);
+                            }
+                        }
+                        if (0 < py)
+                        {
+                            int down = idx - textureWidth;
+                            if (!visited[down] && alphaThresholdByte < pixels[down].a)
+                            {
+                                visited[down] = true;
+                                stack.Add(down);
+                            }
+                        }
+                        if (py < textureHeight - 1)
+                        {
+                            int up = idx + textureWidth;
+                            if (!visited[up] && alphaThresholdByte < pixels[up].a)
+                            {
+                                visited[up] = true;
+                                stack.Add(up);
+                            }
+                        }
+                    }
+
+                    int regionWidth = maxX - minX + 1;
+                    int regionHeight = maxY - minY + 1;
+
+                    if (minimumRegionSize <= regionWidth && minimumRegionSize <= regionHeight)
+                    {
+                        regionWidths.Add(regionWidth);
+                        regionHeights.Add(regionHeight);
+                    }
+                }
+            }
+
+            if (regionWidths.Count < 2)
+            {
+                return (0, 0);
+            }
+
+            regionWidths.Sort();
+            regionHeights.Sort();
+
+            int medianWidth = regionWidths[regionWidths.Count / 2];
+            int medianHeight = regionHeights[regionHeights.Count / 2];
+
+            int cellWidth = FindNearestDivisorWithMinCells(textureWidth, medianWidth, 2);
+            int cellHeight = FindNearestDivisorWithMinCells(textureHeight, medianHeight, 2);
+
+            if (cellWidth < minimumRegionSize || cellHeight < minimumRegionSize)
+            {
+                return (0, 0);
+            }
+
+            return (cellWidth, cellHeight);
+        }
+
+        /// <summary>
+        /// Controls whether diagnostic logging is enabled.
+        /// Set to true for debugging sprite regeneration and cache issues.
+        /// </summary>
+        /// <remarks>
+        /// Using static readonly instead of const to avoid CS0162 unreachable code warnings
+        /// when the value is false, while still allowing JIT optimization.
+        /// </remarks>
+        private static readonly bool DiagnosticsEnabled = false;
 
         private static readonly string[] ImageFileExtensions =
         {
@@ -116,31 +330,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// </summary>
         private static readonly Color SheetPivotColor = new Color(1f, 0.84f, 0f, 0.8f);
 
-        /// <summary>
-        /// EditorPrefs key for persisting splitter position.
-        /// </summary>
-        private const string SplitterPositionPrefsKey =
-            "WallstopStudios.UnityHelpers.SpriteSheetExtractor.SplitterPosition";
-
-        /// <summary>
-        /// Minimum height for the settings section (Input/Output/Discovery).
-        /// </summary>
-        private const float MinSettingsHeight = 100f;
-
-        /// <summary>
-        /// Minimum height for the preview section.
-        /// </summary>
-        private const float MinPreviewHeight = 150f;
-
-        /// <summary>
-        /// Height of the splitter bar in pixels.
-        /// </summary>
-        private const float SplitterHeight = 5f;
-
-        /// <summary>
-        /// Default splitter position as ratio of window height (0.4 = 40% settings, 60% preview).
-        /// </summary>
-        private const float DefaultSplitterRatio = 0.4f;
+        internal SerializedObject SerializedStateForTesting => _serializedObject;
 
         [SerializeField]
         internal List<Object> _inputDirectories = new();
@@ -243,6 +433,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         [SerializeField]
         internal bool _dangerZoneFoldout;
+        internal bool _previewRegenerationScheduled;
+
+        internal List<SpriteSheetEntry> _discoveredSheets;
 
         // Intentionally not serialized - users must re-acknowledge danger each session
         private bool _ackDanger;
@@ -290,10 +483,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private PreviewSizeMode _lastPreviewSizeMode;
         private ExtractionMode _lastExtractionMode;
         private bool _lastShowOverlay;
-        internal bool _previewRegenerationScheduled;
         private bool _regenerationInProgress;
-
-        internal List<SpriteSheetEntry> _discoveredSheets;
         private Vector2 _scrollPosition;
 
         /// <summary>
@@ -323,8 +513,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private int _hoveredSpriteIndex;
         private bool _isHoveringPivot;
 
-        internal static bool SuppressUserPrompts { get; set; }
-
         static SpriteSheetExtractor()
         {
             try
@@ -337,10 +525,3603 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             catch { }
         }
 
+        /// <summary>
+        /// Computes a bounds cache key using static parameters.
+        /// Used for null-safe cache key computation when either extractor or entry may be null.
+        /// </summary>
+        /// <param name="extractor">The extractor to read global settings from. Can be null.</param>
+        /// <param name="entry">The sprite sheet entry to compute a cache key for. Can be null.</param>
+        /// <returns>A hash code representing the current configuration state, or 0 if extractor is null.</returns>
+        internal static int GetBoundsCacheKeyStatic(
+            SpriteSheetExtractor extractor,
+            SpriteSheetEntry entry
+        )
+        {
+            if (extractor == null)
+            {
+                return 0;
+            }
+
+            if (entry == null)
+            {
+                return Objects.HashCode(
+                    extractor._extractionMode,
+                    extractor._gridSizeMode,
+                    extractor._gridColumns,
+                    extractor._gridRows,
+                    extractor._cellWidth,
+                    extractor._cellHeight,
+                    extractor._paddingLeft,
+                    extractor._paddingRight,
+                    extractor._paddingTop,
+                    extractor._paddingBottom,
+                    extractor._alphaThreshold,
+                    extractor._autoDetectionAlgorithm,
+                    extractor._expectedSpriteCountHint,
+                    extractor._snapToTextureDivisor
+                );
+            }
+
+            return entry.GetBoundsCacheKey(extractor);
+        }
+
+        /// <summary>
+        /// Finds the smallest reasonable divisor for a dimension, preferring common sprite sizes.
+        /// This produces better results than GCD for typical sprite sheets.
+        /// </summary>
+        /// <param name="dimension">The texture dimension to find a divisor for.</param>
+        /// <returns>A divisor that produces at least 2 cells if possible, or the dimension itself.</returns>
+        internal static int FindSmallestReasonableDivisor(int dimension)
+        {
+            foreach (int size in CommonCellSizes)
+            {
+                if (8 <= size && size <= dimension && dimension % size == 0)
+                {
+                    int cellCount = dimension / size;
+                    if (2 <= cellCount)
+                    {
+                        return size;
+                    }
+                }
+            }
+
+            for (int divisor = 8; divisor <= dimension / 2; ++divisor)
+            {
+                if (dimension % divisor == 0)
+                {
+                    return divisor;
+                }
+            }
+
+            return dimension;
+        }
+
+        /// <summary>
+        /// Detects optimal grid dimensions by analyzing transparent boundaries in the texture.
+        /// Uses a multi-candidate scoring approach that evaluates various cell sizes and picks
+        /// the one with the highest transparency score along its grid boundaries.
+        /// </summary>
+        /// <param name="pixels">The texture pixel data in Color32 format.</param>
+        /// <param name="textureWidth">Width of the texture in pixels.</param>
+        /// <param name="textureHeight">Height of the texture in pixels.</param>
+        /// <param name="alphaThreshold">Alpha value (0-1) below which a pixel is considered transparent.
+        /// Must be in range [0.0, 1.0); NaN and values outside this range return false immediately.</param>
+        /// <param name="cellWidth">Output: Detected cell width, or 0 if no clear grid was detected.</param>
+        /// <param name="cellHeight">Output: Detected cell height, or 0 if no clear grid was detected.</param>
+        /// <returns>True if a valid grid was detected, false otherwise.</returns>
+        internal static bool DetectOptimalGridFromTransparency(
+            Color32[] pixels,
+            int textureWidth,
+            int textureHeight,
+            float alphaThreshold,
+            out int cellWidth,
+            out int cellHeight
+        )
+        {
+            if (pixels == null || pixels.Length == 0)
+            {
+                cellWidth = 0;
+                cellHeight = 0;
+                return false;
+            }
+
+            if (
+                textureWidth < SpriteSheetAlgorithms.MinimumCellSize
+                || textureHeight < SpriteSheetAlgorithms.MinimumCellSize
+            )
+            {
+                cellWidth = 0;
+                cellHeight = 0;
+                return false;
+            }
+
+            if (pixels.Length != textureWidth * textureHeight)
+            {
+                cellWidth = 0;
+                cellHeight = 0;
+                return false;
+            }
+
+            if (!(0f <= alphaThreshold && alphaThreshold < 1f))
+            {
+                cellWidth = 0;
+                cellHeight = 0;
+                return false;
+            }
+
+            byte alphaThresholdByte = ColorQuantization.ToThresholdByte(alphaThreshold);
+
+            using PooledArray<int> columnTransparencyLease = SystemArrayPool<int>.Get(
+                textureWidth,
+                out int[] columnTransparencyCount
+            );
+            using PooledArray<int> rowTransparencyLease = SystemArrayPool<int>.Get(
+                textureHeight,
+                out int[] rowTransparencyCount
+            );
+
+            Array.Clear(columnTransparencyCount, 0, textureWidth);
+            Array.Clear(rowTransparencyCount, 0, textureHeight);
+
+            int totalTransparent = 0;
+            for (int y = 0; y < textureHeight; ++y)
+            {
+                int rowOffset = y * textureWidth;
+                for (int x = 0; x < textureWidth; ++x)
+                {
+                    if (pixels[rowOffset + x].a <= alphaThresholdByte)
+                    {
+                        ++columnTransparencyCount[x];
+                        ++rowTransparencyCount[y];
+                        ++totalTransparent;
+                    }
+                }
+            }
+
+            // Fully opaque or fully transparent textures have no meaningful grid
+            int totalPixels = textureWidth * textureHeight;
+            if (totalTransparent == 0 || totalTransparent == totalPixels)
+            {
+                cellWidth = 0;
+                cellHeight = 0;
+                return false;
+            }
+
+            using PooledResource<List<int>> widthCandidatesLease = Buffers<int>.List.Get(
+                out List<int> widthCandidates
+            );
+            using PooledResource<List<int>> heightCandidatesLease = Buffers<int>.List.Get(
+                out List<int> heightCandidates
+            );
+
+            GenerateCandidateCellSizes(textureWidth, widthCandidates);
+            GenerateCandidateCellSizes(textureHeight, heightCandidates);
+
+            int bestWidth = 0;
+            int bestHeight = 0;
+            float bestScore = -1f;
+
+            foreach (int candidateWidth in widthCandidates)
+            {
+                float widthScore = ScoreCellSizeForDimension(
+                    columnTransparencyCount,
+                    textureWidth,
+                    textureHeight,
+                    candidateWidth
+                );
+                if (widthScore < MinimumBoundaryScore)
+                {
+                    continue;
+                }
+
+                foreach (int candidateHeight in heightCandidates)
+                {
+                    float heightScore = ScoreCellSizeForDimension(
+                        rowTransparencyCount,
+                        textureHeight,
+                        textureWidth,
+                        candidateHeight
+                    );
+                    if (heightScore < MinimumBoundaryScore)
+                    {
+                        continue;
+                    }
+
+                    float combinedScore = (widthScore + heightScore) * 0.5f;
+                    int columns = textureWidth / candidateWidth;
+                    int rows = textureHeight / candidateHeight;
+
+                    if (2 <= columns && 2 <= rows)
+                    {
+                        combinedScore += 0.15f;
+                    }
+                    else if (2 <= columns || 2 <= rows)
+                    {
+                        combinedScore += 0.08f;
+                    }
+
+                    if (BitOps.IsPowerOfTwo(candidateWidth) && BitOps.IsPowerOfTwo(candidateHeight))
+                    {
+                        combinedScore += 0.05f;
+                    }
+
+                    if (candidateWidth == candidateHeight)
+                    {
+                        combinedScore += 0.02f;
+                    }
+
+                    int cellCount = columns * rows;
+                    if (4 <= cellCount && cellCount <= 64)
+                    {
+                        combinedScore += 0.03f;
+                    }
+
+                    // Choose finer sprites when candidate scores are effectively tied.
+                    const float scoreEpsilon = 0.01f;
+                    bool significantlyBetter = bestScore + scoreEpsilon < combinedScore;
+                    bool essentiallyEqual =
+                        !significantlyBetter
+                        && bestScore - scoreEpsilon <= combinedScore
+                        && combinedScore <= bestScore + scoreEpsilon;
+                    bool smallerCellSize =
+                        candidateWidth < bestWidth || candidateHeight < bestHeight;
+                    if (significantlyBetter || (essentiallyEqual && smallerCellSize))
+                    {
+                        bestScore = combinedScore;
+                        bestWidth = candidateWidth;
+                        bestHeight = candidateHeight;
+                    }
+                }
+            }
+
+            if (MinimumBoundaryScore <= bestScore && 0 < bestWidth && 0 < bestHeight)
+            {
+                cellWidth = bestWidth;
+                cellHeight = bestHeight;
+                return true;
+            }
+
+            int detectedCellWidth = FindConsistentSpacingFromTransparency(
+                columnTransparencyCount,
+                textureWidth,
+                textureHeight,
+                minimumCellSize: 8
+            );
+            int detectedCellHeight = FindConsistentSpacingFromTransparency(
+                rowTransparencyCount,
+                textureHeight,
+                textureWidth,
+                minimumCellSize: 8
+            );
+
+            if (0 < detectedCellWidth && 0 < detectedCellHeight)
+            {
+                cellWidth = detectedCellWidth;
+                cellHeight = detectedCellHeight;
+                return true;
+            }
+
+            // A single detected spacing still provides useful square dimensions even when the other axis does not tile.
+            if (0 < detectedCellWidth)
+            {
+                cellWidth = detectedCellWidth;
+                cellHeight = detectedCellWidth;
+                return textureHeight % detectedCellWidth == 0;
+            }
+
+            if (0 < detectedCellHeight)
+            {
+                cellWidth = detectedCellHeight;
+                cellHeight = detectedCellHeight;
+                return textureWidth % detectedCellHeight == 0;
+            }
+
+            cellWidth = 0;
+            cellHeight = 0;
+            return false;
+        }
+
+        /// <summary>
+        /// Finds the nearest divisor of a dimension to a target value that produces at least minCells cells.
+        /// </summary>
+        /// <param name="dimension">The texture dimension to find a divisor for.</param>
+        /// <param name="target">The target cell size to find the nearest divisor to.</param>
+        /// <param name="minCells">The minimum number of cells the divisor must produce.</param>
+        /// <returns>The nearest divisor that produces at least minCells cells, or target if none found.</returns>
+        internal static int FindNearestDivisorWithMinCells(int dimension, int target, int minCells)
+        {
+            if (dimension <= 0 || target <= 0 || minCells <= 0)
+            {
+                return target;
+            }
+
+            int bestDivisor = target;
+            int bestDiff = int.MaxValue;
+            bool found = false;
+
+            for (int div = 1; div <= dimension; ++div)
+            {
+                if (dimension % div != 0)
+                {
+                    continue;
+                }
+
+                int cellCount = dimension / div;
+                if (cellCount < minCells)
+                {
+                    continue;
+                }
+
+                int diff = Math.Abs(div - target);
+                if (diff < bestDiff)
+                {
+                    bestDiff = diff;
+                    bestDivisor = div;
+                    found = true;
+                }
+            }
+
+            return found ? bestDivisor : target;
+        }
+
+        /// <summary>
+        /// Verifies that grid lines do not cut through opaque sprite content.
+        /// Checks both vertical and horizontal grid boundaries for excessive opaque pixels.
+        /// </summary>
+        /// <param name="pixels">The texture pixel data in Color32 format.</param>
+        /// <param name="textureWidth">Width of the texture in pixels.</param>
+        /// <param name="textureHeight">Height of the texture in pixels.</param>
+        /// <param name="cellWidth">The cell width to verify.</param>
+        /// <param name="cellHeight">The cell height to verify.</param>
+        /// <param name="alphaThreshold">Finite alpha value (0-1) below which a pixel is considered transparent.</param>
+        /// <returns>True if the grid is valid (does not cut sprites), false if more than 30% of grid line pixels are opaque.</returns>
+        internal static bool VerifyGridDoesNotCutSprites(
+            Color32[] pixels,
+            int textureWidth,
+            int textureHeight,
+            int cellWidth,
+            int cellHeight,
+            float alphaThreshold
+        )
+        {
+            if (!float.IsFinite(alphaThreshold))
+            {
+                return false;
+            }
+
+            if (pixels == null || pixels.Length == 0)
+            {
+                return true;
+            }
+
+            if (cellWidth <= 0 || cellHeight <= 0)
+            {
+                return true;
+            }
+
+            if (pixels.Length != textureWidth * textureHeight)
+            {
+                return true;
+            }
+
+            byte alphaThresholdByte = ColorQuantization.ToThresholdByte(alphaThreshold);
+            int opaqueOnGridLines = 0;
+            int totalGridLinePixels = 0;
+
+            for (int col = 1; col < textureWidth / cellWidth; ++col)
+            {
+                int x = col * cellWidth;
+                if (textureWidth <= x)
+                {
+                    break;
+                }
+
+                for (int y = 0; y < textureHeight; ++y)
+                {
+                    int idx = y * textureWidth + x;
+                    ++totalGridLinePixels;
+                    if (alphaThresholdByte < pixels[idx].a)
+                    {
+                        ++opaqueOnGridLines;
+                    }
+                }
+            }
+
+            for (int row = 1; row < textureHeight / cellHeight; ++row)
+            {
+                int y = row * cellHeight;
+                if (textureHeight <= y)
+                {
+                    break;
+                }
+
+                for (int x = 0; x < textureWidth; ++x)
+                {
+                    int idx = y * textureWidth + x;
+                    ++totalGridLinePixels;
+                    if (alphaThresholdByte < pixels[idx].a)
+                    {
+                        ++opaqueOnGridLines;
+                    }
+                }
+            }
+
+            if (totalGridLinePixels == 0)
+            {
+                return true;
+            }
+
+            float opaqueRatio = (float)opaqueOnGridLines / totalGridLinePixels;
+
+            return opaqueRatio < 0.3f;
+        }
+
+        /// <summary>
+        /// Converts a PivotMode enum value to the corresponding normalized Vector2 pivot coordinates.
+        /// </summary>
+        /// <param name="pivotMode">The pivot mode to convert.</param>
+        /// <param name="customPivot">The custom pivot to use when pivotMode is Custom.</param>
+        /// <returns>Normalized pivot coordinates where (0,0) is bottom-left and (1,1) is top-right.</returns>
+        internal static Vector2 PivotModeToVector2(PivotMode pivotMode, Vector2 customPivot)
+        {
+            return pivotMode switch
+            {
+                PivotMode.Center => new Vector2(0.5f, 0.5f),
+                PivotMode.BottomLeft => new Vector2(0f, 0f),
+                PivotMode.TopLeft => new Vector2(0f, 1f),
+                PivotMode.BottomRight => new Vector2(1f, 0f),
+                PivotMode.TopRight => new Vector2(1f, 1f),
+                PivotMode.LeftCenter => new Vector2(0f, 0.5f),
+                PivotMode.RightCenter => new Vector2(1f, 0.5f),
+                PivotMode.TopCenter => new Vector2(0.5f, 1f),
+                PivotMode.BottomCenter => new Vector2(0.5f, 0f),
+                PivotMode.Custom => customPivot,
+                _ => new Vector2(0.5f, 0.5f),
+            };
+        }
+
+        /// <summary>
+        /// Converts a sprite rect (in texture coordinates) to screen coordinates within the preview rect.
+        /// </summary>
+        /// <param name="textureRect">The texture-space rect within the preview.</param>
+        /// <param name="spriteRect">The sprite rect in texture coordinates.</param>
+        /// <param name="textureHeight">The height of the source texture.</param>
+        /// <param name="scale">The scale factor from texture to screen coordinates.</param>
+        /// <returns>The screen-space rect corresponding to the sprite.</returns>
+        internal static Rect ConvertTextureRectToScreenRect(
+            Rect textureRect,
+            Rect spriteRect,
+            int textureHeight,
+            float scale
+        )
+        {
+            float screenX = textureRect.x + spriteRect.x * scale;
+            float screenY =
+                textureRect.y + (textureHeight - spriteRect.y - spriteRect.height) * scale;
+            float screenWidth = spriteRect.width * scale;
+            float screenHeight = spriteRect.height * scale;
+            return new Rect(screenX, screenY, screenWidth, screenHeight);
+        }
+
+        /// <summary>
+        /// Calculates the normalized pivot position within a sprite based on a screen position.
+        /// </summary>
+        /// <param name="screenPosition">The mouse position in screen coordinates.</param>
+        /// <param name="spriteScreenRect">The sprite rect in screen coordinates.</param>
+        /// <returns>Normalized position (0-1) where (0,0) is bottom-left and (1,1) is top-right.</returns>
+        internal static Vector2 CalculateNormalizedPositionInSprite(
+            Vector2 screenPosition,
+            Rect spriteScreenRect
+        )
+        {
+            float normalizedX = (screenPosition.x - spriteScreenRect.x) / spriteScreenRect.width;
+            float normalizedY =
+                1f - (screenPosition.y - spriteScreenRect.y) / spriteScreenRect.height;
+            return new Vector2(Mathf.Clamp01(normalizedX), Mathf.Clamp01(normalizedY));
+        }
+
+        /// <summary>
+        /// Finds which sprite (if any) contains the given screen position.
+        /// </summary>
+        /// <param name="screenPosition">The mouse position in screen coordinates.</param>
+        /// <param name="textureRect">The texture-space rect within the preview.</param>
+        /// <param name="entry">The sprite sheet entry containing the sprites.</param>
+        /// <param name="textureHeight">The height of the source texture.</param>
+        /// <param name="scale">The scale factor from texture to screen coordinates.</param>
+        /// <returns>The index of the sprite containing the position, or -1 if none.</returns>
+        internal static int FindSpriteAtScreenPosition(
+            Vector2 screenPosition,
+            Rect textureRect,
+            SpriteSheetEntry entry,
+            int textureHeight,
+            float scale
+        )
+        {
+            if (entry == null || entry._sprites == null)
+            {
+                return -1;
+            }
+
+            for (int i = 0; i < entry._sprites.Count; ++i)
+            {
+                SpriteEntryData sprite = entry._sprites[i];
+                if (sprite == null)
+                {
+                    continue;
+                }
+
+                Rect screenRect = ConvertTextureRectToScreenRect(
+                    textureRect,
+                    sprite._rect,
+                    textureHeight,
+                    scale
+                );
+
+                if (screenRect.Contains(screenPosition))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        /// <summary>
+        /// Computes the SHA256 hash of a file's contents.
+        /// </summary>
+        /// <param name="filePath">The path to the file to hash.</param>
+        /// <returns>The SHA256 hash as a lowercase hex string, or null if the file cannot be read.</returns>
+        internal static string ComputeFileHash(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+            {
+                return null;
+            }
+
+            try
+            {
+                using SHA256 sha256 = SHA256.Create();
+                using FileStream stream = File.OpenRead(filePath);
+                byte[] hashBytes = sha256.ComputeHash(stream);
+                StringBuilder builder = new(hashBytes.Length * 2);
+                for (int i = 0; i < hashBytes.Length; ++i)
+                {
+                    _ = builder.Append(hashBytes[i].ToString("x2"));
+                }
+                return builder.ToString();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Applies the specified sort mode to a list of sprites, returning a new sorted list.
+        /// </summary>
+        /// <param name="sprites">The source sprites to sort.</param>
+        /// <param name="sortMode">The sort mode to apply.</param>
+        /// <param name="outputList">Optional pre-allocated list to reuse. If null, a new list is created.</param>
+        /// <returns>A sorted copy of the sprites list (does not modify the original).</returns>
+        /// <remarks>
+        /// This method is internal for testability. It creates a copy of the input list and sorts
+        /// the copy, leaving the original list unchanged.
+        /// </remarks>
+        internal static List<SpriteEntryData> ApplySortMode(
+            List<SpriteEntryData> sprites,
+            SortMode sortMode,
+            List<SpriteEntryData> outputList = null
+        )
+        {
+            outputList ??= new List<SpriteEntryData>();
+            outputList.Clear();
+
+            foreach (
+                WallstopStudios.UnityHelpers.Editor.Sprites.SpriteSheetExtractor.SpriteEntryData spritesElement in sprites
+            )
+            {
+                outputList.Add(spritesElement);
+            }
+
+            switch (sortMode)
+            {
+                case SortMode.ByName:
+                    outputList.Sort(
+                        (a, b) =>
+                            string.Compare(
+                                a._originalName,
+                                b._originalName,
+                                StringComparison.Ordinal
+                            )
+                    );
+                    break;
+                case SortMode.ByPositionTopLeft:
+                    outputList.Sort(
+                        (a, b) =>
+                        {
+                            int yCompare = b._rect.y.CompareTo(a._rect.y);
+                            return yCompare != 0 ? yCompare : a._rect.x.CompareTo(b._rect.x);
+                        }
+                    );
+                    break;
+                case SortMode.ByPositionBottomLeft:
+                    outputList.Sort(
+                        (a, b) =>
+                        {
+                            int yCompare = a._rect.y.CompareTo(b._rect.y);
+                            return yCompare != 0 ? yCompare : a._rect.x.CompareTo(b._rect.x);
+                        }
+                    );
+                    break;
+                case SortMode.Reversed:
+                    outputList.Reverse();
+                    break;
+                case SortMode.Original:
+                default:
+                    break;
+            }
+
+            return outputList;
+        }
+
+        internal static void DetectSpriteBoundsByAlpha(
+            Color32[] pixels,
+            int textureWidth,
+            int textureHeight,
+            float alphaThreshold,
+            List<Rect> result
+        )
+        {
+            result.Clear();
+            if (!float.IsFinite(alphaThreshold))
+            {
+                return;
+            }
+
+            byte alphaThresholdByte = ColorQuantization.ToThresholdByte(alphaThreshold);
+            using PooledArray<bool> visitedLease = SystemArrayPool<bool>.Get(
+                pixels.Length,
+                out bool[] visited
+            );
+            Array.Clear(visited, 0, visited.Length);
+
+            for (int y = 0; y < textureHeight; ++y)
+            {
+                for (int x = 0; x < textureWidth; ++x)
+                {
+                    int index = y * textureWidth + x;
+                    if (visited[index])
+                    {
+                        continue;
+                    }
+
+                    if (pixels[index].a <= alphaThresholdByte)
+                    {
+                        visited[index] = true;
+                        continue;
+                    }
+
+                    int minX = x;
+                    int maxX = x;
+                    int minY = y;
+                    int maxY = y;
+
+                    using PooledResource<List<int>> stackLease = Buffers<int>.List.Get(
+                        out List<int> stack
+                    );
+                    stack.Add(index);
+                    visited[index] = true;
+
+                    while (0 < stack.Count)
+                    {
+                        int lastIndex = stack.Count - 1;
+                        int current = stack[lastIndex];
+                        stack.RemoveAt(lastIndex);
+
+                        int currentX = current % textureWidth;
+                        int currentY = current / textureWidth;
+
+                        if (currentX < minX)
+                        {
+                            minX = currentX;
+                        }
+                        if (maxX < currentX)
+                        {
+                            maxX = currentX;
+                        }
+                        if (currentY < minY)
+                        {
+                            minY = currentY;
+                        }
+                        if (maxY < currentY)
+                        {
+                            maxY = currentY;
+                        }
+
+                        if (0 < currentX)
+                        {
+                            int leftIndex = current - 1;
+                            if (!visited[leftIndex] && alphaThresholdByte < pixels[leftIndex].a)
+                            {
+                                visited[leftIndex] = true;
+                                stack.Add(leftIndex);
+                            }
+                        }
+                        if (currentX < textureWidth - 1)
+                        {
+                            int rightIndex = current + 1;
+                            if (!visited[rightIndex] && alphaThresholdByte < pixels[rightIndex].a)
+                            {
+                                visited[rightIndex] = true;
+                                stack.Add(rightIndex);
+                            }
+                        }
+                        if (0 < currentY)
+                        {
+                            int bottomIndex = current - textureWidth;
+                            if (!visited[bottomIndex] && alphaThresholdByte < pixels[bottomIndex].a)
+                            {
+                                visited[bottomIndex] = true;
+                                stack.Add(bottomIndex);
+                            }
+                        }
+                        if (currentY < textureHeight - 1)
+                        {
+                            int topIndex = current + textureWidth;
+                            if (!visited[topIndex] && alphaThresholdByte < pixels[topIndex].a)
+                            {
+                                visited[topIndex] = true;
+                                stack.Add(topIndex);
+                            }
+                        }
+                    }
+
+                    int width = maxX - minX + 1;
+                    int height = maxY - minY + 1;
+
+                    if (2 <= width && 2 <= height)
+                    {
+                        result.Add(new Rect(minX, minY, width, height));
+                    }
+                }
+            }
+
+            if (1 < result.Count)
+            {
+                result.Sort(
+                    (a, b) =>
+                    {
+                        int yCompare = b.y.CompareTo(a.y);
+                        return yCompare != 0 ? yCompare : a.x.CompareTo(b.x);
+                    }
+                );
+            }
+        }
+
         [MenuItem("Tools/Wallstop Studios/Unity Helpers/" + Name)]
         private static void ShowWindow() => GetWindow<SpriteSheetExtractor>(Name);
 
-        internal SerializedObject SerializedStateForTesting => _serializedObject;
+        private static bool IsTextureFormatSupportedForGetPixels(TextureFormat format)
+        {
+            switch (format)
+            {
+                case TextureFormat.Alpha8:
+                case TextureFormat.ARGB4444:
+                case TextureFormat.RGB24:
+                case TextureFormat.RGBA32:
+                case TextureFormat.ARGB32:
+                case TextureFormat.RGB565:
+                case TextureFormat.R16:
+                case TextureFormat.RGBA4444:
+                case TextureFormat.BGRA32:
+                case TextureFormat.RHalf:
+                case TextureFormat.RGHalf:
+                case TextureFormat.RGBAHalf:
+                case TextureFormat.RFloat:
+                case TextureFormat.RGFloat:
+                case TextureFormat.RGBAFloat:
+                case TextureFormat.R8:
+                case TextureFormat.RG16:
+                case TextureFormat.RG32:
+                case TextureFormat.RGB48:
+                case TextureFormat.RGBA64:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private static int CalculateGCD(int a, int b)
+        {
+            while (b != 0)
+            {
+                int temp = b;
+                b = a % b;
+                a = temp;
+            }
+            return a;
+        }
+
+        /// <summary>
+        /// Generates a list of candidate cell sizes for a given dimension.
+        /// Includes common sprite sizes, power-of-2 sizes, and all divisors >= 8.
+        /// </summary>
+        private static void GenerateCandidateCellSizes(int dimension, List<int> candidates)
+        {
+            candidates.Clear();
+
+            foreach (int size in CommonCellSizes)
+            {
+                if (size <= dimension && dimension % size == 0)
+                {
+                    AddUniqueSorted(candidates, size);
+                }
+            }
+
+            for (int power = 3; power <= 10; ++power)
+            {
+                int size = 1 << power;
+                if (dimension < size)
+                {
+                    break;
+                }
+                if (dimension % size == 0)
+                {
+                    AddUniqueSorted(candidates, size);
+                }
+            }
+
+            for (int divisor = 2; divisor * divisor <= dimension; ++divisor)
+            {
+                if (dimension % divisor == 0)
+                {
+                    if (8 <= divisor)
+                    {
+                        AddUniqueSorted(candidates, divisor);
+                    }
+                    int complement = dimension / divisor;
+                    if (8 <= complement && complement != divisor)
+                    {
+                        AddUniqueSorted(candidates, complement);
+                    }
+                }
+            }
+
+            if (8 <= dimension)
+            {
+                AddUniqueSorted(candidates, dimension);
+            }
+        }
+
+        /// <summary>
+        /// Adds a value to a sorted list if not already present, maintaining sort order.
+        /// </summary>
+        private static void AddUniqueSorted(List<int> list, int value)
+        {
+            int insertIndex = 0;
+            for (int i = 0; i < list.Count; ++i)
+            {
+                if (list[i] == value)
+                {
+                    return;
+                }
+                if (list[i] < value)
+                {
+                    insertIndex = i + 1;
+                }
+            }
+            list.Insert(insertIndex, value);
+        }
+
+        /// <summary>
+        /// Scores a candidate cell size based on how transparent the grid boundaries would be.
+        /// Returns a value between 0.0 (poor match) and 1.0+ (excellent match with bonuses).
+        /// </summary>
+        private static float ScoreCellSizeForDimension(
+            int[] transparencyCount,
+            int dimension,
+            int crossDimension,
+            int cellSize
+        )
+        {
+            if (cellSize <= 0 || dimension % cellSize != 0)
+            {
+                return 0f;
+            }
+
+            int cellCount = dimension / cellSize;
+            if (cellCount < 1)
+            {
+                return 0f;
+            }
+
+            if (cellCount == 1)
+            {
+                return 0f;
+            }
+
+            int boundaryCount = cellCount - 1;
+            float totalScore = 0f;
+
+            for (int i = 1; i < cellCount; ++i)
+            {
+                int boundaryPosition = i * cellSize;
+
+                if (dimension <= boundaryPosition)
+                {
+                    continue;
+                }
+
+                float boundaryScore = CalculateBoundaryTransparencyScore(
+                    transparencyCount,
+                    dimension,
+                    crossDimension,
+                    boundaryPosition
+                );
+
+                totalScore += boundaryScore;
+            }
+
+            return totalScore / boundaryCount;
+        }
+
+        /// <summary>
+        /// Calculates a transparency score for a specific boundary position.
+        /// Considers both the exact position and nearby positions (within 3 pixels)
+        /// to handle slight misalignment in sprite sheets and thin transparent gutters.
+        /// </summary>
+        private static float CalculateBoundaryTransparencyScore(
+            int[] transparencyCount,
+            int dimension,
+            int crossDimension,
+            int position
+        )
+        {
+            if (position < 0 || dimension <= position)
+            {
+                return 0f;
+            }
+
+            float primaryScore = transparencyCount[position] / (float)crossDimension;
+
+            float maxScore = primaryScore;
+            float sumNearby = primaryScore;
+            int nearbyCount = 1;
+
+            for (int offset = -3; offset <= 3; ++offset)
+            {
+                if (offset == 0)
+                {
+                    continue;
+                }
+
+                int adjacentPos = position + offset;
+                if (0 <= adjacentPos && adjacentPos < dimension)
+                {
+                    float adjacentScore = transparencyCount[adjacentPos] / (float)crossDimension;
+                    if (maxScore < adjacentScore)
+                    {
+                        maxScore = adjacentScore;
+                    }
+                    sumNearby += adjacentScore;
+                    ++nearbyCount;
+                }
+            }
+
+            float avgNearby = sumNearby / nearbyCount;
+
+            // Weight peak transparency for thin or offset gutters while retaining evidence from wider clear regions.
+            return maxScore * 0.6f + avgNearby * 0.25f + primaryScore * 0.15f;
+        }
+
+        /// <summary>
+        /// Fallback method that finds consistent spacing using the legacy approach.
+        /// First identifies highly transparent boundaries, then looks for consistent gaps.
+        /// </summary>
+        private static int FindConsistentSpacingFromTransparency(
+            int[] transparencyCount,
+            int dimension,
+            int crossDimension,
+            int minimumCellSize
+        )
+        {
+            // Allow partial transparency when detecting sprite-sheet boundaries.
+            float transparencyRequirement = 0.70f;
+            int minTransparentPixels = (int)(crossDimension * transparencyRequirement);
+
+            using PooledResource<List<int>> boundariesLease = Buffers<int>.List.Get(
+                out List<int> boundaries
+            );
+
+            for (int i = 0; i < dimension; ++i)
+            {
+                if (minTransparentPixels <= transparencyCount[i])
+                {
+                    boundaries.Add(i);
+                }
+            }
+
+            if (boundaries.Count < 2)
+            {
+                transparencyRequirement = 0.50f;
+                minTransparentPixels = (int)(crossDimension * transparencyRequirement);
+                boundaries.Clear();
+
+                for (int i = 0; i < dimension; ++i)
+                {
+                    if (minTransparentPixels <= transparencyCount[i])
+                    {
+                        boundaries.Add(i);
+                    }
+                }
+            }
+
+            if (boundaries.Count < 2)
+            {
+                return 0;
+            }
+
+            return FindConsistentSpacing(boundaries, dimension, minimumCellSize);
+        }
+
+        /// <summary>
+        /// Finds consistent spacing between transparent boundaries.
+        /// Returns the most common spacing if it divides the dimension evenly.
+        /// Uses a tolerance of +/- 2 pixels when searching for valid divisors.
+        /// </summary>
+        private static int FindConsistentSpacing(
+            List<int> boundaries,
+            int totalDimension,
+            int minimumCellSize
+        )
+        {
+            if (boundaries.Count < 2)
+            {
+                return 0;
+            }
+
+            using PooledResource<List<int>> gapsLease = Buffers<int>.List.Get(out List<int> gaps);
+
+            int firstBoundary = boundaries[0];
+            if (0 < firstBoundary && minimumCellSize <= firstBoundary)
+            {
+                gaps.Add(firstBoundary);
+            }
+
+            for (int i = 1; i < boundaries.Count; ++i)
+            {
+                int gap = boundaries[i] - boundaries[i - 1];
+                if (minimumCellSize <= gap)
+                {
+                    gaps.Add(gap);
+                }
+            }
+
+            int lastBoundary = boundaries[boundaries.Count - 1];
+            int trailingGap = totalDimension - lastBoundary - 1;
+            if (minimumCellSize <= trailingGap)
+            {
+                gaps.Add(trailingGap);
+            }
+
+            if (gaps.Count < 2)
+            {
+                return 0;
+            }
+
+            using PooledResource<Dictionary<int, int>> gapCountsLease = DictionaryBuffer<
+                int,
+                int
+            >.Dictionary.Get(out Dictionary<int, int> gapCounts);
+
+            foreach (int gap in gaps)
+            {
+                if (gapCounts.TryGetValue(gap, out int count))
+                {
+                    gapCounts[gap] = count + 1;
+                }
+                else
+                {
+                    gapCounts[gap] = 1;
+                }
+            }
+
+            int mostCommonGap = 0;
+            int mostCommonCount = 0;
+
+            foreach (KeyValuePair<int, int> gapCount in gapCounts)
+            {
+                if (mostCommonCount < gapCount.Value)
+                {
+                    mostCommonCount = gapCount.Value;
+                    mostCommonGap = gapCount.Key;
+                }
+            }
+
+            if (0 < mostCommonGap && totalDimension % mostCommonGap == 0)
+            {
+                int expectedColumns = totalDimension / mostCommonGap;
+                if (2 <= expectedColumns && expectedColumns - 1 <= mostCommonCount)
+                {
+                    return mostCommonGap;
+                }
+            }
+
+            for (int tolerance = 1; tolerance <= 2; ++tolerance)
+            {
+                int candidateLow = mostCommonGap - tolerance;
+                if (minimumCellSize <= candidateLow && totalDimension % candidateLow == 0)
+                {
+                    int expectedColumns = totalDimension / candidateLow;
+                    if (2 <= expectedColumns)
+                    {
+                        return candidateLow;
+                    }
+                }
+
+                int candidateHigh = mostCommonGap + tolerance;
+                if (minimumCellSize <= candidateHigh && totalDimension % candidateHigh == 0)
+                {
+                    int expectedColumns = totalDimension / candidateHigh;
+                    if (2 <= expectedColumns)
+                    {
+                        return candidateHigh;
+                    }
+                }
+            }
+
+            return 0;
+        }
+
+        /// <summary>
+        /// Draws a dashed line between two points.
+        /// </summary>
+        /// <param name="start">The starting point of the line.</param>
+        /// <param name="end">The ending point of the line.</param>
+        /// <param name="color">The color of the dashes.</param>
+        /// <param name="dashLength">The length of each dash in pixels.</param>
+        /// <param name="gapLength">The length of each gap in pixels.</param>
+        private static void DrawDashedLine(
+            Vector2 start,
+            Vector2 end,
+            Color color,
+            float dashLength,
+            float gapLength
+        )
+        {
+            Vector2 direction = end - start;
+            float totalLength = direction.magnitude;
+
+            if (totalLength < 0.001f)
+            {
+                return;
+            }
+
+            direction /= totalLength;
+
+            float segmentLength = dashLength + gapLength;
+            float currentPosition = 0f;
+            bool isHorizontal = Mathf.Abs(direction.y) < Mathf.Abs(direction.x);
+            float lineThickness = 1f;
+
+            while (currentPosition < totalLength)
+            {
+                float dashEnd = Mathf.Min(currentPosition + dashLength, totalLength);
+                Vector2 dashStart = start + direction * currentPosition;
+                Vector2 dashEndPoint = start + direction * dashEnd;
+
+                if (isHorizontal)
+                {
+                    EditorGUI.DrawRect(
+                        new Rect(
+                            dashStart.x,
+                            dashStart.y - lineThickness / 2f,
+                            dashEndPoint.x - dashStart.x,
+                            lineThickness
+                        ),
+                        color
+                    );
+                }
+                else
+                {
+                    EditorGUI.DrawRect(
+                        new Rect(
+                            dashStart.x - lineThickness / 2f,
+                            dashStart.y,
+                            lineThickness,
+                            dashEndPoint.y - dashStart.y
+                        ),
+                        color
+                    );
+                }
+
+                currentPosition += segmentLength;
+            }
+        }
+
+        internal void ApplyGlobalSettingsToAll()
+        {
+            if (_discoveredSheets == null)
+            {
+                return;
+            }
+
+            foreach (SpriteSheetEntry entry in _discoveredSheets)
+            {
+                entry._useGlobalSettings = false;
+                entry._extractionModeOverride = _extractionMode;
+                entry._gridSizeModeOverride = _gridSizeMode;
+                entry._gridColumnsOverride = _gridColumns;
+                entry._gridRowsOverride = _gridRows;
+                entry._cellWidthOverride = _cellWidth;
+                entry._cellHeightOverride = _cellHeight;
+                entry._paddingLeftOverride = _paddingLeft;
+                entry._paddingRightOverride = _paddingRight;
+                entry._paddingTopOverride = _paddingTop;
+                entry._paddingBottomOverride = _paddingBottom;
+                entry._alphaThresholdOverride = _alphaThreshold;
+                entry._showOverlayOverride = _showOverlay;
+                entry._usePivotMarkerColorOverride = false;
+                entry._pivotMarkerColorOverride = _pivotMarkerColor;
+            }
+
+            Repaint();
+        }
+
+        /// <summary>
+        /// Selects all sprites in the specified entry.
+        /// </summary>
+        internal void SelectAll(SpriteSheetEntry entry)
+        {
+            if (entry?._sprites == null)
+            {
+                return;
+            }
+
+            foreach (
+                WallstopStudios.UnityHelpers.Editor.Sprites.SpriteSheetExtractor.SpriteEntryData spritesElement in entry._sprites
+            )
+            {
+                spritesElement._isSelected = true;
+            }
+        }
+
+        /// <summary>
+        /// Deselects all sprites in the specified entry.
+        /// </summary>
+        internal void SelectNone(SpriteSheetEntry entry)
+        {
+            if (entry?._sprites == null)
+            {
+                return;
+            }
+
+            foreach (
+                WallstopStudios.UnityHelpers.Editor.Sprites.SpriteSheetExtractor.SpriteEntryData spritesElement in entry._sprites
+            )
+            {
+                spritesElement._isSelected = false;
+            }
+        }
+
+        /// <summary>
+        /// Copies all extraction settings from a source sprite sheet entry to a target entry.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This method transfers all per-entry configuration overrides including extraction mode,
+        /// grid dimensions, padding, alpha threshold, pivot settings, and auto-detection algorithm.
+        /// After copying settings, it automatically schedules preview regeneration for the target entry.
+        /// </para>
+        /// <para>
+        /// Use this method to quickly replicate configuration from one sprite sheet to another,
+        /// enabling consistent extraction settings across multiple sheets.
+        /// </para>
+        /// </remarks>
+        /// <param name="source">The sprite sheet entry to copy settings from. If null, the method returns immediately.</param>
+        /// <param name="target">The sprite sheet entry to apply settings to. If null, the method returns immediately.</param>
+        internal void CopySettingsFromEntry(SpriteSheetEntry source, SpriteSheetEntry target)
+        {
+            if (source == null || target == null)
+            {
+                return;
+            }
+
+            target._useGlobalSettings = source._useGlobalSettings;
+            target._extractionModeOverride = source._extractionModeOverride;
+            target._gridSizeModeOverride = source._gridSizeModeOverride;
+            target._gridColumnsOverride = source._gridColumnsOverride;
+            target._gridRowsOverride = source._gridRowsOverride;
+            target._cellWidthOverride = source._cellWidthOverride;
+            target._cellHeightOverride = source._cellHeightOverride;
+            target._paddingLeftOverride = source._paddingLeftOverride;
+            target._paddingRightOverride = source._paddingRightOverride;
+            target._paddingTopOverride = source._paddingTopOverride;
+            target._paddingBottomOverride = source._paddingBottomOverride;
+            target._alphaThresholdOverride = source._alphaThresholdOverride;
+            target._showOverlayOverride = source._showOverlayOverride;
+            target._pivotModeOverride = source._pivotModeOverride;
+            target._customPivotOverride = source._customPivotOverride;
+            target._autoDetectionAlgorithmOverride = source._autoDetectionAlgorithmOverride;
+            target._expectedSpriteCountOverride = source._expectedSpriteCountOverride;
+            target._snapToTextureDivisorOverride = source._snapToTextureDivisorOverride;
+            target._usePivotMarkerColorOverride = source._usePivotMarkerColorOverride;
+            target._pivotMarkerColorOverride = source._pivotMarkerColorOverride;
+
+            SchedulePreviewRegenerationForEntry(target);
+        }
+
+        /// <summary>
+        /// Clears and repopulates the sprite list for a sprite sheet entry based on its effective extraction mode.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This method is called by <see cref="RegenerateSpritesForEntry"/> to perform the actual sprite
+        /// repopulation. It first clears the existing sprite list (or creates a new one if null), then
+        /// populates it based on the entry's effective extraction mode (GridBased, PaddedGrid,
+        /// AlphaDetection, or FromMetadata).
+        /// </para>
+        /// <para>
+        /// Unlike <see cref="SchedulePreviewRegenerationForEntry"/>, this method does not preserve
+        /// preview textures during repopulation. Use this method for immediate sprite list updates
+        /// where preview continuity is not required.
+        /// </para>
+        /// </remarks>
+        /// <param name="entry">The sprite sheet entry to repopulate. If null or has no texture, the method returns immediately.</param>
+        internal void RepopulateSpritesForEntry(SpriteSheetEntry entry)
+        {
+            if (entry == null || entry._texture == null)
+            {
+                return;
+            }
+
+            if (entry._sprites != null)
+            {
+                entry._sprites.Clear();
+            }
+            else
+            {
+                entry._sprites = new List<SpriteEntryData>();
+            }
+
+            ExtractionMode effectiveMode = GetEffectiveExtractionMode(entry);
+
+            switch (effectiveMode)
+            {
+                case ExtractionMode.GridBased:
+                    PopulateSpritesFromGrid(entry, entry._texture);
+                    break;
+                case ExtractionMode.PaddedGrid:
+                    PopulateSpritesFromPaddedGrid(entry, entry._texture);
+                    break;
+                case ExtractionMode.AlphaDetection:
+                    PopulateSpritesFromAlphaDetection(entry, entry._texture);
+                    break;
+                case ExtractionMode.FromMetadata:
+                default:
+                    PopulateSpritesFromMetadata(entry, entry._assetPath, entry._importer);
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Marks a sprite sheet entry as needing regeneration.
+        /// The actual regeneration is deferred until the entry is next accessed.
+        /// </summary>
+        /// <param name="entry">The sprite sheet entry to invalidate. If null, the method returns immediately.</param>
+        internal void InvalidateEntry(SpriteSheetEntry entry)
+        {
+            if (entry == null)
+            {
+                return;
+            }
+
+            if (DiagnosticsEnabled)
+            {
+                this.Log($"InvalidateEntry: marking '{entry._assetPath}' for regeneration");
+            }
+
+            entry._needsRegeneration = true;
+            entry._cachedAlgorithmResult = null;
+            entry._lastAlgorithmDisplayText = null;
+        }
+
+        /// <summary>
+        /// Checks if an entry's cached sprite data is stale and needs regeneration.
+        /// </summary>
+        /// <param name="entry">The sprite sheet entry to check.</param>
+        /// <returns>True if the entry's cache is stale, false otherwise.</returns>
+        internal bool IsEntryStale(SpriteSheetEntry entry)
+        {
+            if (entry == null)
+            {
+                return false;
+            }
+
+            if (entry._needsRegeneration)
+            {
+                if (DiagnosticsEnabled)
+                {
+                    this.Log(
+                        $"IsEntryStale: '{entry._assetPath}' is stale because _needsRegeneration=true"
+                    );
+                }
+                return true;
+            }
+
+            int currentCacheKey = entry.GetBoundsCacheKey(this);
+            bool isStale = entry._lastCacheKey != currentCacheKey;
+            if (isStale && DiagnosticsEnabled)
+            {
+                this.Log(
+                    $"IsEntryStale: '{entry._assetPath}' is stale because cacheKey mismatch (stored={entry._lastCacheKey}, current={currentCacheKey})"
+                );
+            }
+            return isStale;
+        }
+
+        /// <summary>
+        /// Invalidates all entries that are using global settings.
+        /// Call this when global extraction settings change.
+        /// </summary>
+        internal void InvalidateEntriesUsingGlobalSettings()
+        {
+            if (_discoveredSheets == null)
+            {
+                return;
+            }
+
+            foreach (SpriteSheetEntry entry in _discoveredSheets)
+            {
+                if (entry != null && entry._useGlobalSettings)
+                {
+                    InvalidateEntry(entry);
+                }
+            }
+
+            Repaint();
+        }
+
+        /// <summary>
+        /// Invalidates all discovered entries regardless of settings mode.
+        /// Call this when texture-affecting settings change.
+        /// </summary>
+        internal void InvalidateAllEntries()
+        {
+            if (_discoveredSheets == null)
+            {
+                return;
+            }
+
+            foreach (SpriteSheetEntry entry in _discoveredSheets)
+            {
+                if (entry != null)
+                {
+                    InvalidateEntry(entry);
+                }
+            }
+
+            Repaint();
+        }
+
+        /// <summary>
+        /// Enables pivot overrides for all sprites in the given entry.
+        /// </summary>
+        /// <param name="entry">The sprite sheet entry to modify.</param>
+        internal void EnableAllPivotOverrides(SpriteSheetEntry entry)
+        {
+            if (entry == null || entry._sprites == null)
+            {
+                return;
+            }
+
+            foreach (SpriteEntryData sprite in entry._sprites)
+            {
+                if (sprite != null)
+                {
+                    sprite._usePivotOverride = true;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Disables pivot overrides for all sprites in the given entry.
+        /// </summary>
+        /// <param name="entry">The sprite sheet entry to modify.</param>
+        internal void DisableAllPivotOverrides(SpriteSheetEntry entry)
+        {
+            if (entry == null || entry._sprites == null)
+            {
+                return;
+            }
+
+            foreach (SpriteEntryData sprite in entry._sprites)
+            {
+                if (sprite != null)
+                {
+                    sprite._usePivotOverride = false;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Schedules preview regeneration for a sprite sheet entry.
+        /// This is a public wrapper around the internal regeneration method.
+        /// </summary>
+        /// <param name="entry">The sprite sheet entry to regenerate previews for.</param>
+        internal void SchedulePreviewRegeneration(SpriteSheetEntry entry)
+        {
+            SchedulePreviewRegenerationForEntry(entry);
+        }
+
+        /// <summary>
+        /// Computes a bounds cache key for an entry.
+        /// This is an instance method wrapper that delegates to the entry's cache key computation.
+        /// </summary>
+        /// <param name="entry">The sprite sheet entry to compute a cache key for. Can be null.</param>
+        /// <returns>A hash code representing the current configuration state.</returns>
+        internal int GetBoundsCacheKey(SpriteSheetEntry entry)
+        {
+            if (entry == null)
+            {
+                return GetBoundsCacheKeyStatic(this, null);
+            }
+
+            return entry.GetBoundsCacheKey(this);
+        }
+
+        /// <summary>
+        /// Checks cache size and evicts least recently used entries if limit is exceeded.
+        /// Entries are evicted by clearing their sprite lists and preview textures.
+        /// </summary>
+        internal void CheckAndEvictLRUCache()
+        {
+            if (_discoveredSheets == null || _discoveredSheets.Count <= MaxCachedEntries)
+            {
+                return;
+            }
+
+            int cachedCount = 0;
+            foreach (SpriteSheetEntry entry in _discoveredSheets)
+            {
+                if (entry != null && entry._sprites != null && 0 < entry._sprites.Count)
+                {
+                    ++cachedCount;
+                }
+            }
+
+            if (cachedCount <= MaxCachedEntries)
+            {
+                return;
+            }
+
+            int entriesToEvict = cachedCount - MaxCachedEntries;
+
+            using PooledResource<List<SpriteSheetEntry>> sortedEntriesLease =
+                Buffers<SpriteSheetEntry>.List.Get(out List<SpriteSheetEntry> sortedEntries);
+
+            foreach (SpriteSheetEntry entry in _discoveredSheets)
+            {
+                if (entry != null && entry._sprites != null && 0 < entry._sprites.Count)
+                {
+                    sortedEntries.Add(entry);
+                }
+            }
+
+            sortedEntries.Sort((a, b) => a._lastAccessTime.CompareTo(b._lastAccessTime));
+
+            for (int i = 0; i < entriesToEvict && i < sortedEntries.Count; ++i)
+            {
+                SpriteSheetEntry entry = sortedEntries[i];
+                EvictEntry(entry);
+            }
+        }
+
+        /// <summary>
+        /// Repopulates sprites for a sprite sheet entry into a provided target list.
+        /// IMPORTANT: This method does NOT modify entry._sprites at all, ensuring that old sprites
+        /// remain visible if Unity repaints during AssetDatabase operations.
+        /// </summary>
+        /// <param name="entry">The sprite sheet entry to get configuration from.</param>
+        /// <param name="targetList">The list to populate sprites into.</param>
+        internal void RepopulateSpritesForEntryIntoList(
+            SpriteSheetEntry entry,
+            List<SpriteEntryData> targetList
+        )
+        {
+            if (entry == null || entry._texture == null || targetList == null)
+            {
+                return;
+            }
+
+            ExtractionMode effectiveMode = GetEffectiveExtractionMode(entry);
+
+            switch (effectiveMode)
+            {
+                case ExtractionMode.GridBased:
+                    PopulateSpritesFromGridIntoList(entry, entry._texture, targetList);
+                    break;
+                case ExtractionMode.PaddedGrid:
+                    PopulateSpritesFromPaddedGridIntoList(entry, entry._texture, targetList);
+                    break;
+                case ExtractionMode.AlphaDetection:
+                    PopulateSpritesFromAlphaDetectionIntoList(entry, entry._texture, targetList);
+                    break;
+                case ExtractionMode.FromMetadata:
+                default:
+                    PopulateSpritesFromMetadataIntoList(
+                        entry,
+                        entry._assetPath,
+                        entry._importer,
+                        targetList
+                    );
+                    break;
+            }
+        }
+
+        internal void CalculateGridDimensions(
+            int textureWidth,
+            int textureHeight,
+            out int columns,
+            out int rows,
+            out int cellWidth,
+            out int cellHeight
+        )
+        {
+            CalculateGridDimensions(
+                textureWidth,
+                textureHeight,
+                null,
+                out columns,
+                out rows,
+                out cellWidth,
+                out cellHeight
+            );
+        }
+
+        internal void CalculateGridDimensions(
+            int textureWidth,
+            int textureHeight,
+            SpriteSheetEntry entry,
+            out int columns,
+            out int rows,
+            out int cellWidth,
+            out int cellHeight
+        )
+        {
+            CalculateGridDimensions(
+                textureWidth,
+                textureHeight,
+                entry,
+                null,
+                out columns,
+                out rows,
+                out cellWidth,
+                out cellHeight
+            );
+        }
+
+        /// <summary>
+        /// Calculates grid dimensions for sprite extraction.
+        /// In Manual mode, derives cell size from columns/rows.
+        /// In Auto mode, detects grid from transparency or uses fallback heuristics.
+        /// </summary>
+        internal void CalculateGridDimensions(
+            int textureWidth,
+            int textureHeight,
+            SpriteSheetEntry entry,
+            Color32[] pixels,
+            out int columns,
+            out int rows,
+            out int cellWidth,
+            out int cellHeight
+        )
+        {
+            GridSizeMode effectiveGridSizeMode = GetEffectiveGridSizeMode(entry);
+            int effectiveGridColumns = GetEffectiveGridColumns(entry);
+            int effectiveGridRows = GetEffectiveGridRows(entry);
+            int effectiveCellWidth = GetEffectiveCellWidth(entry);
+            int effectiveCellHeight = GetEffectiveCellHeight(entry);
+
+            if (effectiveGridSizeMode == GridSizeMode.Manual)
+            {
+                int manualColumns = Mathf.Max(1, effectiveGridColumns);
+                int manualRows = Mathf.Max(1, effectiveGridRows);
+
+                columns = manualColumns;
+                rows = manualRows;
+                cellWidth = textureWidth / manualColumns;
+                cellHeight = textureHeight / manualRows;
+                return;
+            }
+
+            float effectiveAlphaThreshold = GetEffectiveAlphaThreshold(entry);
+            AutoDetectionAlgorithm algorithm = GetEffectiveAutoDetectionAlgorithm(entry);
+            int expectedSpriteCount = GetEffectiveExpectedSpriteCount(entry);
+            bool detectedFromAlgorithm = false;
+            int detectedCellWidth = 0;
+            int detectedCellHeight = 0;
+
+            // Resolve cache hits before requiring pixels so cached queries can run without pixel data.
+            if (entry != null && entry._cachedAlgorithmResult.HasValue)
+            {
+                SpriteSheetAlgorithms.AlgorithmResult cached = entry._cachedAlgorithmResult.Value;
+                if (cached.IsValid)
+                {
+                    detectedCellWidth = cached.CellWidth;
+                    detectedCellHeight = cached.CellHeight;
+                    detectedFromAlgorithm = true;
+                    entry._lastAlgorithmDisplayText = $"{cached.Algorithm}: {cached.Confidence:P0}";
+                }
+            }
+
+            if (
+                !detectedFromAlgorithm
+                && pixels != null
+                && pixels.Length == textureWidth * textureHeight
+            )
+            {
+                bool snapToTextureDivisor = GetEffectiveSnapToTextureDivisor(entry);
+                SpriteSheetAlgorithms.AlgorithmResult result = SpriteSheetAlgorithms.DetectGrid(
+                    pixels,
+                    textureWidth,
+                    textureHeight,
+                    effectiveAlphaThreshold,
+                    algorithm,
+                    expectedSpriteCount,
+                    snapToTextureDivisor
+                );
+
+                if (DiagnosticsEnabled && entry != null)
+                {
+                    this.Log(
+                        $"Algorithm detection for '{Path.GetFileName(entry._assetPath)}': algorithm={algorithm}, expectedSpriteCount={expectedSpriteCount}, textureSize={textureWidth}x{textureHeight}, isValid={result.IsValid}, cellSize={result.CellWidth}x{result.CellHeight}, confidence={result.Confidence:P0}"
+                    );
+                }
+
+                if (result.IsValid)
+                {
+                    detectedCellWidth = result.CellWidth;
+                    detectedCellHeight = result.CellHeight;
+                    detectedFromAlgorithm = true;
+                    if (entry != null)
+                    {
+                        entry._cachedAlgorithmResult = result;
+                        entry._lastAlgorithmDisplayText =
+                            $"{result.Algorithm}: {result.Confidence:P0}";
+                    }
+
+                    // Respect an explicit sprite count; anti-aliasing and shadows can falsely fail automatic split verification.
+                    bool skipVerification = 0 < expectedSpriteCount;
+                    if (
+                        !skipVerification
+                        && !VerifyGridDoesNotCutSprites(
+                            pixels,
+                            textureWidth,
+                            textureHeight,
+                            detectedCellWidth,
+                            detectedCellHeight,
+                            effectiveAlphaThreshold
+                        )
+                    )
+                    {
+                        (int regionCellWidth, int regionCellHeight) =
+                            DetectCellSizeFromOpaqueRegions(
+                                pixels,
+                                textureWidth,
+                                textureHeight,
+                                effectiveAlphaThreshold
+                            );
+
+                        if (DiagnosticsEnabled && entry != null)
+                        {
+                            this.Log(
+                                $"VerifyGridDoesNotCutSprites FAILED for '{Path.GetFileName(entry._assetPath)}': original cellSize={detectedCellWidth}x{detectedCellHeight}, region detection returned {regionCellWidth}x{regionCellHeight}"
+                            );
+                        }
+
+                        if (0 < regionCellWidth && 0 < regionCellHeight)
+                        {
+                            detectedCellWidth = regionCellWidth;
+                            detectedCellHeight = regionCellHeight;
+                            if (entry != null)
+                            {
+                                entry._lastAlgorithmDisplayText =
+                                    $"{result.Algorithm}: {result.Confidence:P0} (adjusted)";
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!detectedFromAlgorithm)
+            {
+                (int regionWidth, int regionHeight) = DetectCellSizeFromOpaqueRegions(
+                    pixels,
+                    textureWidth,
+                    textureHeight,
+                    effectiveAlphaThreshold
+                );
+
+                if (0 < regionWidth && 0 < regionHeight)
+                {
+                    detectedCellWidth = regionWidth;
+                    detectedCellHeight = regionHeight;
+                    if (entry != null)
+                    {
+                        entry._lastAlgorithmDisplayText = "Fallback (region analysis)";
+                    }
+                }
+                else
+                {
+                    detectedCellWidth = FindSmallestReasonableDivisor(textureWidth);
+                    detectedCellHeight = FindSmallestReasonableDivisor(textureHeight);
+
+                    if (detectedCellWidth == textureWidth && detectedCellHeight == textureHeight)
+                    {
+                        int gcd = CalculateGCD(textureWidth, textureHeight);
+                        if (8 <= gcd && gcd < textureWidth && gcd < textureHeight)
+                        {
+                            detectedCellWidth = gcd;
+                            detectedCellHeight = gcd;
+                        }
+                    }
+
+                    if (entry != null)
+                    {
+                        entry._lastAlgorithmDisplayText = "Fallback (divisor heuristic)";
+                    }
+                }
+            }
+
+            // Keep detected cell dimensions when they already tile the texture.
+            int detectedColumns;
+            if (textureWidth % detectedCellWidth == 0)
+            {
+                detectedColumns = textureWidth / detectedCellWidth;
+            }
+            else
+            {
+                detectedColumns = Mathf.Max(1, textureWidth / detectedCellWidth);
+                detectedCellWidth = textureWidth / detectedColumns;
+            }
+
+            int detectedRows;
+            if (textureHeight % detectedCellHeight == 0)
+            {
+                detectedRows = textureHeight / detectedCellHeight;
+            }
+            else
+            {
+                detectedRows = Mathf.Max(1, textureHeight / detectedCellHeight);
+                detectedCellHeight = textureHeight / detectedRows;
+            }
+
+            if (DiagnosticsEnabled && entry != null)
+            {
+                this.Log(
+                    $"CalculateGridDimensions FINAL for '{Path.GetFileName(entry._assetPath)}': columns={detectedColumns}, rows={detectedRows}, cellWidth={detectedCellWidth}, cellHeight={detectedCellHeight}, detectedFromAlgorithm={detectedFromAlgorithm}"
+                );
+            }
+
+            columns = detectedColumns;
+            rows = detectedRows;
+            cellWidth = detectedCellWidth;
+            cellHeight = detectedCellHeight;
+        }
+
+        internal ExtractionMode GetEffectiveExtractionMode(SpriteSheetEntry entry)
+        {
+            ExtractionMode mode;
+            if (
+                entry == null
+                || entry._useGlobalSettings
+                || !entry._extractionModeOverride.HasValue
+            )
+            {
+                mode = _extractionMode;
+            }
+            else
+            {
+                mode = entry._extractionModeOverride.Value;
+            }
+
+#pragma warning disable CS0618 // Type or member is obsolete
+            if (mode == ExtractionMode.None)
+            {
+                return ExtractionMode.FromMetadata;
+            }
+#pragma warning restore CS0618
+
+            return mode;
+        }
+
+        internal GridSizeMode GetEffectiveGridSizeMode(SpriteSheetEntry entry)
+        {
+            GridSizeMode mode;
+            if (entry == null || entry._useGlobalSettings || !entry._gridSizeModeOverride.HasValue)
+            {
+                mode = _gridSizeMode;
+            }
+            else
+            {
+                mode = entry._gridSizeModeOverride.Value;
+            }
+
+#pragma warning disable CS0618 // Type or member is obsolete
+            if (mode == GridSizeMode.None)
+            {
+                return GridSizeMode.Auto;
+            }
+#pragma warning restore CS0618
+
+            return mode;
+        }
+
+        internal int GetEffectiveGridColumns(SpriteSheetEntry entry)
+        {
+            if (entry == null || entry._useGlobalSettings || !entry._gridColumnsOverride.HasValue)
+            {
+                return _gridColumns;
+            }
+            return entry._gridColumnsOverride.Value;
+        }
+
+        internal int GetEffectiveGridRows(SpriteSheetEntry entry)
+        {
+            if (entry == null || entry._useGlobalSettings || !entry._gridRowsOverride.HasValue)
+            {
+                return _gridRows;
+            }
+            return entry._gridRowsOverride.Value;
+        }
+
+        internal int GetEffectiveCellWidth(SpriteSheetEntry entry)
+        {
+            if (entry == null || entry._useGlobalSettings || !entry._cellWidthOverride.HasValue)
+            {
+                return _cellWidth;
+            }
+            return entry._cellWidthOverride.Value;
+        }
+
+        internal int GetEffectiveCellHeight(SpriteSheetEntry entry)
+        {
+            if (entry == null || entry._useGlobalSettings || !entry._cellHeightOverride.HasValue)
+            {
+                return _cellHeight;
+            }
+            return entry._cellHeightOverride.Value;
+        }
+
+        internal int GetEffectivePaddingLeft(SpriteSheetEntry entry)
+        {
+            if (entry == null || entry._useGlobalSettings || !entry._paddingLeftOverride.HasValue)
+            {
+                return _paddingLeft;
+            }
+            return entry._paddingLeftOverride.Value;
+        }
+
+        internal int GetEffectivePaddingRight(SpriteSheetEntry entry)
+        {
+            if (entry == null || entry._useGlobalSettings || !entry._paddingRightOverride.HasValue)
+            {
+                return _paddingRight;
+            }
+            return entry._paddingRightOverride.Value;
+        }
+
+        internal int GetEffectivePaddingTop(SpriteSheetEntry entry)
+        {
+            if (entry == null || entry._useGlobalSettings || !entry._paddingTopOverride.HasValue)
+            {
+                return _paddingTop;
+            }
+            return entry._paddingTopOverride.Value;
+        }
+
+        internal int GetEffectivePaddingBottom(SpriteSheetEntry entry)
+        {
+            if (entry == null || entry._useGlobalSettings || !entry._paddingBottomOverride.HasValue)
+            {
+                return _paddingBottom;
+            }
+            return entry._paddingBottomOverride.Value;
+        }
+
+        internal float GetEffectiveAlphaThreshold(SpriteSheetEntry entry)
+        {
+            if (
+                entry == null
+                || entry._useGlobalSettings
+                || !entry._alphaThresholdOverride.HasValue
+            )
+            {
+                return _alphaThreshold;
+            }
+            return entry._alphaThresholdOverride.Value;
+        }
+
+        /// <summary>
+        /// Returns whether the overlay should be shown for the given entry.
+        /// Uses per-sheet override if set, otherwise falls back to global setting.
+        /// </summary>
+        /// <param name="entry">The sprite sheet entry to check, or null to use global setting.</param>
+        /// <returns>True if the overlay should be displayed for this entry.</returns>
+        internal bool GetEffectiveShowOverlay(SpriteSheetEntry entry)
+        {
+            if (entry == null || entry._useGlobalSettings || !entry._showOverlayOverride.HasValue)
+            {
+                return _showOverlay;
+            }
+            return entry._showOverlayOverride.Value;
+        }
+
+        /// <summary>
+        /// Returns the effective pivot mode for the given entry.
+        /// Uses per-sheet override if set, otherwise falls back to global setting.
+        /// </summary>
+        /// <param name="entry">The sprite sheet entry to check, or null to use global setting.</param>
+        /// <returns>The pivot mode to use for this entry.</returns>
+        internal PivotMode GetEffectivePivotMode(SpriteSheetEntry entry)
+        {
+            if (entry == null || entry._useGlobalSettings || !entry._pivotModeOverride.HasValue)
+            {
+                return _pivotMode;
+            }
+            return entry._pivotModeOverride.Value;
+        }
+
+        /// <summary>
+        /// Returns the effective custom pivot for the given entry.
+        /// Uses per-sheet override if set, otherwise falls back to global setting.
+        /// </summary>
+        /// <param name="entry">The sprite sheet entry to check, or null to use global setting.</param>
+        /// <returns>The custom pivot point to use for this entry.</returns>
+        internal Vector2 GetEffectiveCustomPivot(SpriteSheetEntry entry)
+        {
+            if (entry == null || entry._useGlobalSettings || !entry._customPivotOverride.HasValue)
+            {
+                return _customPivot;
+            }
+            return entry._customPivotOverride.Value;
+        }
+
+        /// <summary>
+        /// Returns the effective auto-detection algorithm for the given entry.
+        /// Uses per-sheet override if set, otherwise falls back to global setting.
+        /// </summary>
+        /// <param name="entry">The sprite sheet entry to check, or null to use global setting.</param>
+        /// <returns>The algorithm to use for this entry.</returns>
+        internal AutoDetectionAlgorithm GetEffectiveAutoDetectionAlgorithm(SpriteSheetEntry entry)
+        {
+            if (
+                entry == null
+                || entry._useGlobalSettings
+                || !entry._autoDetectionAlgorithmOverride.HasValue
+            )
+            {
+                return _autoDetectionAlgorithm;
+            }
+            return entry._autoDetectionAlgorithmOverride.Value;
+        }
+
+        /// <summary>
+        /// Returns the effective expected sprite count for the given entry.
+        /// Uses per-sheet override if set, otherwise falls back to global setting.
+        /// </summary>
+        /// <param name="entry">The sprite sheet entry to check, or null to use global setting.</param>
+        /// <returns>The expected sprite count, or -1 if not set.</returns>
+        internal int GetEffectiveExpectedSpriteCount(SpriteSheetEntry entry)
+        {
+            if (
+                entry == null
+                || entry._useGlobalSettings
+                || !entry._expectedSpriteCountOverride.HasValue
+            )
+            {
+                return _expectedSpriteCountHint;
+            }
+            return entry._expectedSpriteCountOverride.Value;
+        }
+
+        /// <summary>
+        /// Returns the effective snap to texture divisor setting for the given entry.
+        /// Uses per-sheet override if set, otherwise falls back to global setting.
+        /// </summary>
+        /// <param name="entry">The sprite sheet entry to check, or null to use global setting.</param>
+        /// <returns>True if cell sizes should be adjusted to be exact divisors of texture dimensions.</returns>
+        internal bool GetEffectiveSnapToTextureDivisor(SpriteSheetEntry entry)
+        {
+            if (
+                entry == null
+                || entry._useGlobalSettings
+                || !entry._snapToTextureDivisorOverride.HasValue
+            )
+            {
+                return _snapToTextureDivisor;
+            }
+            return entry._snapToTextureDivisorOverride.Value;
+        }
+
+        /// <summary>
+        /// Gets the effective pivot marker color for a sprite, respecting the cascade:
+        /// per-element, per-sheet, global.
+        /// </summary>
+        /// <param name="entry">The sprite sheet entry containing the sprite.</param>
+        /// <param name="sprite">The individual sprite entry to get the color for.</param>
+        /// <returns>The effective pivot marker color for the sprite.</returns>
+        internal Color GetEffectivePivotColor(SpriteSheetEntry entry, SpriteEntryData sprite)
+        {
+            if (sprite != null && sprite._usePivotColorOverride)
+            {
+                return sprite._pivotColorOverride;
+            }
+
+            if (entry != null && entry._usePivotMarkerColorOverride)
+            {
+                return entry._pivotMarkerColorOverride;
+            }
+
+            return _pivotMarkerColor;
+        }
+
+        /// <summary>
+        /// Gets the effective pivot position for a sprite, respecting the cascade:
+        /// per-element override, per-sheet override, global settings.
+        /// </summary>
+        /// <param name="entry">The sprite sheet entry containing the sprite.</param>
+        /// <param name="sprite">The individual sprite entry to get the pivot for.</param>
+        /// <returns>
+        /// The effective pivot as a normalized Vector2 where (0,0) is bottom-left and (1,1) is top-right.
+        /// </returns>
+        internal Vector2 GetEffectivePivot(SpriteSheetEntry entry, SpriteEntryData sprite)
+        {
+            if (sprite != null && sprite._usePivotOverride)
+            {
+                return PivotModeToVector2(sprite._pivotModeOverride, sprite._customPivotOverride);
+            }
+
+            if (entry != null && !entry._useGlobalSettings && entry._pivotModeOverride.HasValue)
+            {
+                Vector2 customPivot = entry._customPivotOverride ?? _customPivot;
+                return PivotModeToVector2(entry._pivotModeOverride.Value, customPivot);
+            }
+
+            return PivotModeToVector2(_pivotMode, _customPivot);
+        }
+
+        /// <summary>
+        /// Initializes all override fields from their corresponding global values.
+        /// Called when transitioning from global settings to per-sheet settings.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This method is called AFTER <paramref name="entry"/>._useGlobalSettings has been set to false.
+        /// It copies all current effective values (which are still the global values) to the override fields,
+        /// ensuring the UI toggle states match the actual rendering behavior.
+        /// </para>
+        /// <para>
+        /// The method intentionally does NOT modify _useGlobalSettings since the caller has already changed it.
+        /// </para>
+        /// </remarks>
+        /// <param name="entry">The sprite sheet entry to initialize. If null, the method returns immediately.</param>
+        internal void InitializeOverridesFromGlobal(SpriteSheetEntry entry)
+        {
+            if (entry == null)
+            {
+                return;
+            }
+
+            // Save effective values into overrides so toggling global mode preserves customization.
+            entry._extractionModeOverride = GetEffectiveExtractionMode(entry);
+            entry._gridSizeModeOverride = GetEffectiveGridSizeMode(entry);
+            entry._gridColumnsOverride = GetEffectiveGridColumns(entry);
+            entry._gridRowsOverride = GetEffectiveGridRows(entry);
+            entry._cellWidthOverride = GetEffectiveCellWidth(entry);
+            entry._cellHeightOverride = GetEffectiveCellHeight(entry);
+            entry._paddingLeftOverride = GetEffectivePaddingLeft(entry);
+            entry._paddingRightOverride = GetEffectivePaddingRight(entry);
+            entry._paddingTopOverride = GetEffectivePaddingTop(entry);
+            entry._paddingBottomOverride = GetEffectivePaddingBottom(entry);
+            entry._alphaThresholdOverride = GetEffectiveAlphaThreshold(entry);
+            entry._showOverlayOverride = GetEffectiveShowOverlay(entry);
+            entry._pivotModeOverride = GetEffectivePivotMode(entry);
+            entry._customPivotOverride = GetEffectiveCustomPivot(entry);
+            entry._autoDetectionAlgorithmOverride = GetEffectiveAutoDetectionAlgorithm(entry);
+            entry._expectedSpriteCountOverride = GetEffectiveExpectedSpriteCount(entry);
+            entry._snapToTextureDivisorOverride = GetEffectiveSnapToTextureDivisor(entry);
+            entry._usePivotMarkerColorOverride = false;
+            entry._pivotMarkerColorOverride = _pivotMarkerColor;
+
+            entry._cachedAlgorithmResult = null;
+            entry._lastAlgorithmDisplayText = null;
+        }
+
+        /// <summary>
+        /// Saves the configuration for a sprite sheet entry to a JSON file.
+        /// </summary>
+        /// <param name="entry">The entry to save configuration for.</param>
+        /// <returns>True if the config was saved successfully, false otherwise.</returns>
+        internal bool SaveConfig(SpriteSheetEntry entry)
+        {
+            if (entry == null || string.IsNullOrEmpty(entry._assetPath))
+            {
+                return false;
+            }
+
+            try
+            {
+                string configPath = SpriteSheetConfig.GetConfigPath(entry._assetPath);
+                string fullConfigPath = Path.GetFullPath(configPath);
+
+                string textureFullPath = Path.GetFullPath(entry._assetPath);
+                string hash = ComputeFileHash(textureFullPath);
+
+                CachedAlgorithmResult cachedResult = null;
+                if (
+                    entry._cachedAlgorithmResult.HasValue
+                    && entry._cachedAlgorithmResult.Value.IsValid
+                )
+                {
+                    cachedResult = CachedAlgorithmResult.FromResult(
+                        entry._cachedAlgorithmResult.Value
+                    );
+                }
+
+                SpriteSheetConfig config = new()
+                {
+                    version = SpriteSheetConfig.CurrentVersion,
+                    pivotMode = GetEffectivePivotMode(entry),
+                    customPivot = GetEffectiveCustomPivot(entry),
+                    algorithm = (int)GetEffectiveAutoDetectionAlgorithm(entry),
+                    expectedSpriteCount = GetEffectiveExpectedSpriteCount(entry),
+                    textureContentHash = hash,
+                    cachedAlgorithmResult = cachedResult,
+                    snapToTextureDivisor = GetEffectiveSnapToTextureDivisor(entry),
+                };
+
+                string json = Serializer.JsonStringify(config, pretty: true);
+                File.WriteAllText(fullConfigPath, json, Encoding.UTF8);
+
+                entry._loadedConfig = config;
+                entry._configLoaded = true;
+                entry._configStale = false;
+
+                AssetDatabase.Refresh();
+                return true;
+            }
+            catch (Exception e)
+            {
+                this.LogError($"Failed to save config for '{entry._assetPath}'", e);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Loads the configuration for a sprite sheet entry from a JSON file.
+        /// </summary>
+        /// <param name="entry">The entry to load configuration for.</param>
+        /// <returns>True if the config was loaded successfully, false otherwise.</returns>
+        internal bool LoadConfig(SpriteSheetEntry entry)
+        {
+            if (entry == null || string.IsNullOrEmpty(entry._assetPath))
+            {
+                return false;
+            }
+
+            try
+            {
+                string configPath = SpriteSheetConfig.GetConfigPath(entry._assetPath);
+                string fullConfigPath = Path.GetFullPath(configPath);
+
+                if (!File.Exists(fullConfigPath))
+                {
+                    entry._configLoaded = false;
+                    entry._configStale = false;
+                    entry._loadedConfig = null;
+                    return false;
+                }
+
+                string json = File.ReadAllText(fullConfigPath, Encoding.UTF8);
+                SpriteSheetConfig config = Serializer.JsonDeserialize<SpriteSheetConfig>(json);
+
+                if (config == null)
+                {
+                    entry._configLoaded = false;
+                    entry._configStale = false;
+                    entry._loadedConfig = null;
+                    return false;
+                }
+
+                SpriteSheetConfig.MigrateConfig(config);
+
+                string textureFullPath = Path.GetFullPath(entry._assetPath);
+                string currentHash = ComputeFileHash(textureFullPath);
+                bool isStale =
+                    !string.IsNullOrEmpty(config.textureContentHash)
+                    && !string.Equals(
+                        config.textureContentHash,
+                        currentHash,
+                        StringComparison.OrdinalIgnoreCase
+                    );
+
+                entry._loadedConfig = config;
+                entry._configLoaded = true;
+                entry._configStale = isStale;
+
+                entry._pivotModeOverride = config.pivotMode;
+                entry._customPivotOverride = config.customPivot;
+                entry._autoDetectionAlgorithmOverride = (AutoDetectionAlgorithm)config.algorithm;
+                entry._expectedSpriteCountOverride = config.expectedSpriteCount;
+                entry._snapToTextureDivisorOverride = config.snapToTextureDivisor;
+                // Do not restore cached detections computed under potentially different configuration settings.
+                entry._cachedAlgorithmResult = null;
+                entry._useGlobalSettings = false;
+
+                return true;
+            }
+            catch (Exception e)
+            {
+                this.LogError($"Failed to load config for '{entry._assetPath}'", e);
+                entry._configLoaded = false;
+                entry._configStale = false;
+                entry._loadedConfig = null;
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Attempts to auto-load config for an entry if the config file exists.
+        /// </summary>
+        /// <param name="entry">The entry to auto-load config for.</param>
+        internal void TryAutoLoadConfig(SpriteSheetEntry entry)
+        {
+            if (entry == null || string.IsNullOrEmpty(entry._assetPath))
+            {
+                return;
+            }
+
+            string configPath = SpriteSheetConfig.GetConfigPath(entry._assetPath);
+            string fullConfigPath = Path.GetFullPath(configPath);
+
+            if (File.Exists(fullConfigPath))
+            {
+                _ = LoadConfig(entry);
+            }
+        }
+
+        /// <summary>
+        /// Calculates the actual rect where the texture is drawn within the preview area.
+        /// This accounts for ScaleMode.ScaleToFit centering behavior.
+        /// </summary>
+        internal Rect CalculateTextureRectWithinPreview(
+            Rect previewRect,
+            int textureWidth,
+            int textureHeight,
+            float scale
+        )
+        {
+            if (textureWidth <= 0 || textureHeight <= 0 || scale <= 0f)
+            {
+                return previewRect;
+            }
+
+            float scaledWidth = textureWidth * scale;
+            float scaledHeight = textureHeight * scale;
+            float offsetX = (previewRect.width - scaledWidth) * 0.5f;
+            float offsetY = (previewRect.height - scaledHeight) * 0.5f;
+            return new Rect(
+                previewRect.x + offsetX,
+                previewRect.y + offsetY,
+                scaledWidth,
+                scaledHeight
+            );
+        }
+
+        /// <summary>
+        /// Draws outline rectangles around each sprite bound in the source texture preview.
+        /// This method replaces the old grid overlay with actual sprite bounds visualization.
+        /// </summary>
+        /// <param name="previewRect">The preview area rectangle.</param>
+        /// <param name="textureWidth">Width of the source texture.</param>
+        /// <param name="textureHeight">Height of the source texture.</param>
+        /// <param name="scale">Scale factor for drawing.</param>
+        /// <param name="entry">The sprite sheet entry containing sprite bounds.</param>
+        internal void DrawSpriteBoundsOverlay(
+            Rect previewRect,
+            int textureWidth,
+            int textureHeight,
+            float scale,
+            SpriteSheetEntry entry
+        )
+        {
+            if (entry == null)
+            {
+                return;
+            }
+
+            CheckAndRegenerateIfNeeded(entry);
+
+            if (entry._sprites == null || entry._sprites.Count == 0)
+            {
+                if (DiagnosticsEnabled)
+                {
+                    this.Log(
+                        $"DrawSpriteBoundsOverlay: no sprites for '{entry._assetPath}', sprites={entry._sprites?.Count ?? 0}"
+                    );
+                }
+                return;
+            }
+
+            if (DiagnosticsEnabled && 0 < entry._sprites.Count)
+            {
+                SpriteEntryData firstSprite = entry._sprites[0];
+                this.Log(
+                    $"DrawSpriteBoundsOverlay: drawing {entry._sprites.Count} sprites for '{Path.GetFileName(entry._assetPath)}', firstRect={firstSprite._rect}, algorithm={entry._lastAlgorithmDisplayText}"
+                );
+            }
+
+            Rect textureRect = CalculateTextureRectWithinPreview(
+                previewRect,
+                textureWidth,
+                textureHeight,
+                scale
+            );
+
+            foreach (SpriteEntryData sprite in entry._sprites)
+            {
+                if (sprite == null)
+                {
+                    continue;
+                }
+
+                float rectX = textureRect.x + sprite._rect.x * scale;
+                float rectY =
+                    textureRect.y + (textureHeight - sprite._rect.y - sprite._rect.height) * scale;
+                float rectWidth = sprite._rect.width * scale;
+                float rectHeight = sprite._rect.height * scale;
+                EditorGUI.DrawRect(new Rect(rectX, rectY, rectWidth, 1), _overlayColor);
+                EditorGUI.DrawRect(
+                    new Rect(rectX, rectY + rectHeight - 1, rectWidth, 1),
+                    _overlayColor
+                );
+                EditorGUI.DrawRect(new Rect(rectX, rectY, 1, rectHeight), _overlayColor);
+                EditorGUI.DrawRect(
+                    new Rect(rectX + rectWidth - 1, rectY, 1, rectHeight),
+                    _overlayColor
+                );
+                Vector2 effectivePivot = GetEffectivePivot(entry, sprite);
+                bool isNonDefaultPivot = effectivePivot != CenterPivot || sprite._usePivotOverride;
+                if (isNonDefaultPivot)
+                {
+                    Color pivotColor = GetEffectivePivotColor(entry, sprite);
+                    Rect screenRect = new Rect(rectX, rectY, rectWidth, rectHeight);
+                    DrawPivotMarker(screenRect, effectivePivot, pivotColor);
+                }
+            }
+        }
+
+        internal int GetPreviewSize(SpriteEntryData sprite)
+        {
+            switch (_previewSizeMode)
+            {
+                case PreviewSizeMode.Size24:
+                    return 24;
+                case PreviewSizeMode.Size64:
+                    return 64;
+                case PreviewSizeMode.RealSize:
+                    if (sprite != null)
+                    {
+                        int maxDim = Mathf.Max((int)sprite._rect.width, (int)sprite._rect.height);
+                        return Mathf.Max(16, Mathf.Min(maxDim, 128));
+                    }
+                    return 32;
+                case PreviewSizeMode.Size32:
+                default:
+                    return 32;
+            }
+        }
+
+        internal void DiscoverSpriteSheets(bool generatePreviews = true)
+        {
+            CleanupPreviewTextures();
+
+            _discoveredSheets ??= new List<SpriteSheetEntry>();
+            _discoveredSheets.Clear();
+
+            _regex = null;
+            if (!string.IsNullOrWhiteSpace(_spriteNameRegex))
+            {
+                try
+                {
+                    _regex = new Regex(
+                        _spriteNameRegex,
+                        RegexOptions.Compiled | RegexOptions.CultureInvariant
+                    );
+                }
+                catch (ArgumentException e)
+                {
+                    this.LogWarn($"Invalid regex '{_spriteNameRegex}'", e);
+                    _regexError = e.Message;
+                    Repaint();
+                    return;
+                }
+            }
+
+            if (_inputDirectories == null || _inputDirectories.Count == 0)
+            {
+                this.LogWarn($"No input directories selected.");
+                Repaint();
+                return;
+            }
+
+            using PooledResource<HashSet<string>> seenLease = SetBuffers<string>
+                .GetHashSetPool(StringComparer.OrdinalIgnoreCase)
+                .Get(out HashSet<string> seen);
+
+            foreach (Object maybeDirectory in _inputDirectories)
+            {
+                if (maybeDirectory == null)
+                {
+                    continue;
+                }
+
+                string assetPath = AssetDatabase.GetAssetPath(maybeDirectory);
+                if (!AssetDatabase.IsValidFolder(assetPath))
+                {
+                    this.LogWarn($"Skipping invalid path: {assetPath}");
+                    continue;
+                }
+
+                string[] guids = AssetDatabase.FindAssets("t:Texture2D", new[] { assetPath });
+                foreach (string guidsElement in guids)
+                {
+                    string file = AssetDatabase.GUIDToAssetPath(guidsElement);
+                    if (string.IsNullOrEmpty(file))
+                    {
+                        continue;
+                    }
+
+                    bool hasValidExtension = false;
+                    foreach (string imageFileExtensionsElement in ImageFileExtensions)
+                    {
+                        if (
+                            file.EndsWith(
+                                imageFileExtensionsElement,
+                                StringComparison.OrdinalIgnoreCase
+                            )
+                        )
+                        {
+                            hasValidExtension = true;
+                            break;
+                        }
+                    }
+
+                    if (!hasValidExtension)
+                    {
+                        continue;
+                    }
+
+                    string fileName = Path.GetFileNameWithoutExtension(file);
+                    if (_regex != null && !_regex.IsMatch(fileName))
+                    {
+                        continue;
+                    }
+
+                    if (!seen.Add(file))
+                    {
+                        continue;
+                    }
+
+                    if (
+                        AssetImporter.GetAtPath(file)
+                        is not TextureImporter { textureType: TextureImporterType.Sprite } importer
+                    )
+                    {
+                        continue;
+                    }
+
+                    SpriteSheetEntry entry = CreateSpriteSheetEntry(file, importer);
+                    if (entry != null)
+                    {
+                        TryAutoLoadConfig(entry);
+                        // Loading configuration can change settings included in the cache key.
+                        entry._lastCacheKey = entry.GetBoundsCacheKey(this);
+                        _discoveredSheets.Add(entry);
+                    }
+                }
+            }
+
+            if (generatePreviews)
+            {
+                if (DiagnosticsEnabled)
+                {
+                    this.Log(
+                        $"DiscoverSpriteSheets: About to call GenerateAllPreviewTexturesInBatch with {_discoveredSheets?.Count ?? 0} entries"
+                    );
+                }
+                GenerateAllPreviewTexturesInBatch(_discoveredSheets);
+                if (DiagnosticsEnabled)
+                {
+                    this.Log($"DiscoverSpriteSheets: GenerateAllPreviewTexturesInBatch completed");
+                }
+            }
+
+            this.Log($"Discovered {_discoveredSheets.Count} sprite sheet(s).");
+            Repaint();
+        }
+
+        /// <summary>
+        /// Generates preview textures for all sprite sheet entries in a batch operation.
+        /// </summary>
+        /// <param name="entries">The list of sprite sheet entries to generate previews for.</param>
+        /// <remarks>
+        /// This method batches texture readability changes to minimize reimport operations.
+        /// It uses <see cref="AssetDatabaseBatchHelper.BeginBatch"/> to batch all import changes together,
+        /// improving performance when processing multiple textures.
+        /// </remarks>
+        internal void GenerateAllPreviewTexturesInBatch(List<SpriteSheetEntry> entries)
+        {
+            if (entries == null || entries.Count == 0)
+            {
+                if (DiagnosticsEnabled)
+                {
+                    this.Log(
+                        $"GenerateAllPreviewTexturesInBatch: entries null or empty, returning early"
+                    );
+                }
+                return;
+            }
+
+            if (DiagnosticsEnabled)
+            {
+                this.Log($"GenerateAllPreviewTexturesInBatch: START with {entries.Count} entries");
+            }
+            WallstopGenericPool<Dictionary<string, bool>> originalReadablePool = DictionaryBuffer<
+                string,
+                bool
+            >.GetDictionaryPool(StringComparer.OrdinalIgnoreCase);
+            using PooledResource<Dictionary<string, bool>> originalReadableLease =
+                originalReadablePool.Get(out Dictionary<string, bool> originalReadable);
+
+            using PooledResource<List<SpriteSheetEntry>> needsReadableLease =
+                Buffers<SpriteSheetEntry>.List.Get(out List<SpriteSheetEntry> needsReadable);
+
+            foreach (SpriteSheetEntry entry in entries)
+            {
+                if (
+                    entry == null
+                    || entry._sprites == null
+                    || entry._sprites.Count == 0
+                    || entry._texture == null
+                    || entry._importer == null
+                )
+                {
+                    continue;
+                }
+
+                originalReadable[entry._assetPath] = entry._importer.isReadable;
+                if (!entry._importer.isReadable)
+                {
+                    needsReadable.Add(entry);
+                }
+            }
+
+            if (0 < needsReadable.Count)
+            {
+                using (AssetDatabaseBatchHelper.BeginBatch())
+                {
+                    foreach (SpriteSheetEntry entry in needsReadable)
+                    {
+                        entry._importer.isReadable = true;
+                        entry._importer.SaveAndReimport();
+                    }
+                }
+
+                AssetDatabase.SaveAssets();
+
+                foreach (SpriteSheetEntry entry in needsReadable)
+                {
+                    entry._texture = AssetDatabase.LoadAssetAtPath<Texture2D>(entry._assetPath);
+                    if (entry._texture == null)
+                    {
+                        this.LogWarn(
+                            $"Failed to reload texture after making readable: {entry._assetPath}"
+                        );
+                        continue;
+                    }
+                }
+            }
+
+            foreach (SpriteSheetEntry entry in entries)
+            {
+                if (
+                    entry == null
+                    || entry._sprites == null
+                    || entry._sprites.Count == 0
+                    || entry._texture == null
+                )
+                {
+                    continue;
+                }
+
+                if (!IsTextureFormatSupportedForGetPixels(entry._texture.format))
+                {
+                    this.LogWarn(
+                        $"Texture format '{entry._texture.format}' does not support GetPixels32 for {entry._assetPath}. Preview generation skipped."
+                    );
+                    continue;
+                }
+
+                try
+                {
+                    Color32[] sourcePixels = entry._texture.GetPixels32();
+                    int sourceWidth = entry._texture.width;
+                    int sourceHeight = entry._texture.height;
+                    foreach (SpriteEntryData sprite in entry._sprites)
+                    {
+                        if (sprite == null)
+                        {
+                            continue;
+                        }
+
+                        // Keep old texture until new one is ready to avoid grey question marks
+                        Texture2D oldTexture = sprite._previewTexture;
+                        Texture2D preview = GenerateSinglePreviewTexture(
+                            sourcePixels,
+                            sourceWidth,
+                            sourceHeight,
+                            sprite
+                        );
+                        sprite._previewTexture = preview;
+                        if (DiagnosticsEnabled)
+                        {
+                            this.Log(
+                                $"GenerateAllPreviewTexturesInBatch: Generated preview for sprite '{sprite._originalName}' in '{entry._assetPath}', preview={preview != null}"
+                            );
+                        }
+
+                        if (oldTexture != null)
+                        {
+                            DestroyImmediate(oldTexture);
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    this.LogWarn($"Failed to generate preview textures for {entry._assetPath}", e);
+                }
+            }
+
+            using PooledResource<List<SpriteSheetEntry>> needsRestoreLease =
+                Buffers<SpriteSheetEntry>.List.Get(out List<SpriteSheetEntry> needsRestore);
+
+            foreach (SpriteSheetEntry entry in entries)
+            {
+                if (entry == null || entry._importer == null)
+                {
+                    continue;
+                }
+
+                if (
+                    originalReadable.TryGetValue(entry._assetPath, out bool wasReadable)
+                    && !wasReadable
+                )
+                {
+                    needsRestore.Add(entry);
+                }
+            }
+
+            if (0 < needsRestore.Count)
+            {
+                using (AssetDatabaseBatchHelper.BeginBatch())
+                {
+                    foreach (SpriteSheetEntry entry in needsRestore)
+                    {
+                        entry._importer.isReadable = false;
+                        entry._importer.SaveAndReimport();
+                    }
+                }
+
+                AssetDatabase.SaveAssets();
+
+                foreach (SpriteSheetEntry entry in needsRestore)
+                {
+                    entry._texture = AssetDatabase.LoadAssetAtPath<Texture2D>(entry._assetPath);
+                }
+
+                SpriteSheetExtractor windowRef = this;
+                EditorApplication.delayCall += () =>
+                {
+                    if (windowRef)
+                    {
+                        windowRef.Repaint();
+                    }
+                };
+            }
+            if (DiagnosticsEnabled)
+            {
+                this.Log($"GenerateAllPreviewTexturesInBatch: END");
+            }
+        }
+
+        /// <summary>
+        /// Regenerates preview textures for all discovered sprite sheets, including repopulating sprites.
+        /// </summary>
+        /// <remarks>
+        /// Called when extraction mode changes, which requires repopulating the sprite list
+        /// in addition to regenerating preview thumbnails. Uses batch processing to minimize
+        /// reimport operations. For preview size changes only, use <see cref="RegeneratePreviewTexturesOnly"/>.
+        /// </remarks>
+        internal void RegenerateAllPreviewTextures()
+        {
+            if (DiagnosticsEnabled)
+            {
+                this.Log($"RegenerateAllPreviewTextures: START");
+            }
+            _previewRegenerationScheduled = false;
+
+            if (!this || _discoveredSheets == null || _discoveredSheets.Count == 0)
+            {
+                if (DiagnosticsEnabled)
+                {
+                    this.Log(
+                        $"RegenerateAllPreviewTextures: no sheets discovered, returning early"
+                    );
+                }
+                return;
+            }
+
+            if (DiagnosticsEnabled)
+            {
+                this.Log(
+                    $"RegenerateAllPreviewTextures: setting _regenerationInProgress=true, sheetCount={_discoveredSheets.Count}"
+                );
+            }
+            _regenerationInProgress = true;
+
+            using PooledResource<List<Texture2D>> oldTexturesLease = Buffers<Texture2D>.List.Get(
+                out List<Texture2D> oldTextures
+            );
+
+            foreach (SpriteSheetEntry entry in _discoveredSheets)
+            {
+                if (entry == null)
+                {
+                    continue;
+                }
+
+                if (entry._sprites != null)
+                {
+                    foreach (SpriteEntryData sprite in entry._sprites)
+                    {
+                        if (sprite != null && sprite._previewTexture != null)
+                        {
+                            oldTextures.Add(sprite._previewTexture);
+                            sprite._previewTexture = null;
+                        }
+                    }
+                }
+
+                RepopulateSpritesForEntry(entry);
+
+                entry._needsRegeneration = false;
+                entry._lastCacheKey = entry.GetBoundsCacheKey(this);
+                entry._lastAccessTime = DateTime.UtcNow.Ticks;
+            }
+
+            GenerateAllPreviewTexturesInBatch(_discoveredSheets);
+
+            foreach (Texture2D oldTexture in oldTextures)
+            {
+                if (oldTexture != null)
+                {
+                    DestroyImmediate(oldTexture);
+                }
+            }
+
+            if (DiagnosticsEnabled)
+            {
+                this.Log(
+                    $"RegenerateAllPreviewTextures: END, setting _regenerationInProgress=false"
+                );
+            }
+            _regenerationInProgress = false;
+            Repaint();
+        }
+
+        /// <summary>
+        /// Regenerates only the preview textures without repopulating sprites.
+        /// </summary>
+        /// <remarks>
+        /// Called when only the preview size mode changes. Since sprite rects don't change,
+        /// we can skip repopulating and just regenerate the textures at the new size.
+        /// This avoids the window where sprites have null textures during repopulation.
+        /// </remarks>
+        internal void RegeneratePreviewTexturesOnly()
+        {
+            if (DiagnosticsEnabled)
+            {
+                this.Log($"RegeneratePreviewTexturesOnly: START");
+            }
+            _previewRegenerationScheduled = false;
+
+            if (!this || _discoveredSheets == null || _discoveredSheets.Count == 0)
+            {
+                if (DiagnosticsEnabled)
+                {
+                    this.Log(
+                        $"RegeneratePreviewTexturesOnly: no sheets discovered, returning early"
+                    );
+                }
+                return;
+            }
+
+            if (DiagnosticsEnabled)
+            {
+                this.Log(
+                    $"RegeneratePreviewTexturesOnly: setting _regenerationInProgress=true, sheetCount={_discoveredSheets.Count}"
+                );
+            }
+            _regenerationInProgress = true;
+
+            // Batch preview generation keeps old textures visible until their replacements are assigned.
+            GenerateAllPreviewTexturesInBatch(_discoveredSheets);
+
+            if (DiagnosticsEnabled)
+            {
+                this.Log(
+                    $"RegeneratePreviewTexturesOnly: END, setting _regenerationInProgress=false"
+                );
+            }
+            _regenerationInProgress = false;
+            Repaint();
+        }
+
+        internal void PopulateSpritesFromGrid(SpriteSheetEntry entry, Texture2D texture)
+        {
+            int columns;
+            int rows;
+            int cellWidth;
+            int cellHeight;
+
+            Color32[] pixels = null;
+            if (texture.isReadable)
+            {
+                pixels = texture.GetPixels32();
+            }
+
+            CalculateGridDimensions(
+                texture.width,
+                texture.height,
+                entry,
+                pixels,
+                out columns,
+                out rows,
+                out cellWidth,
+                out cellHeight
+            );
+
+            int spriteIndex = 0;
+            for (int row = 0; row < rows; ++row)
+            {
+                for (int col = 0; col < columns; ++col)
+                {
+                    int x = col * cellWidth;
+                    int y = (rows - 1 - row) * cellHeight;
+
+                    Rect rect = new Rect(x, y, cellWidth, cellHeight);
+
+                    SpriteEntryData spriteEntry = new()
+                    {
+                        _originalName = $"sprite_{row}_{col}",
+                        _outputName = $"sprite_{row}_{col}",
+                        _rect = rect,
+                        _pivot = new Vector2(0.5f, 0.5f),
+                        _border = Vector4.zero,
+                        _sortIndex = spriteIndex++,
+                        _isSelected = true,
+                        _previewTexture = null,
+                        _usePivotOverride = false,
+                        _pivotModeOverride = PivotMode.Center,
+                        _customPivotOverride = new Vector2(0.5f, 0.5f),
+                        _usePivotColorOverride = false,
+                        _pivotColorOverride = Color.cyan,
+                    };
+                    entry._sprites.Add(spriteEntry);
+                }
+            }
+        }
+
+        internal void PopulateSpritesFromPaddedGrid(SpriteSheetEntry entry, Texture2D texture)
+        {
+            int columns;
+            int rows;
+            int cellWidth;
+            int cellHeight;
+
+            Color32[] pixels = null;
+            if (texture.isReadable)
+            {
+                pixels = texture.GetPixels32();
+            }
+
+            CalculateGridDimensions(
+                texture.width,
+                texture.height,
+                entry,
+                pixels,
+                out columns,
+                out rows,
+                out cellWidth,
+                out cellHeight
+            );
+
+            int effectivePaddingLeft = GetEffectivePaddingLeft(entry);
+            int effectivePaddingRight = GetEffectivePaddingRight(entry);
+            int effectivePaddingTop = GetEffectivePaddingTop(entry);
+            int effectivePaddingBottom = GetEffectivePaddingBottom(entry);
+
+            int paddedWidth = cellWidth - effectivePaddingLeft - effectivePaddingRight;
+            int paddedHeight = cellHeight - effectivePaddingTop - effectivePaddingBottom;
+
+            if (paddedWidth <= 0 || paddedHeight <= 0)
+            {
+                this.LogWarn(
+                    $"Padding values result in invalid sprite size for texture {entry._assetPath}. Cell: {cellWidth}x{cellHeight}, Padding removes: {effectivePaddingLeft + effectivePaddingRight}x{effectivePaddingTop + effectivePaddingBottom}"
+                );
+                return;
+            }
+
+            int spriteIndex = 0;
+            for (int row = 0; row < rows; ++row)
+            {
+                for (int col = 0; col < columns; ++col)
+                {
+                    int baseX = col * cellWidth;
+                    int baseY = (rows - 1 - row) * cellHeight;
+
+                    int x = baseX + effectivePaddingLeft;
+                    int y = baseY + effectivePaddingBottom;
+
+                    Rect rect = new Rect(x, y, paddedWidth, paddedHeight);
+
+                    SpriteEntryData spriteEntry = new()
+                    {
+                        _originalName = $"sprite_{row}_{col}",
+                        _outputName = $"sprite_{row}_{col}",
+                        _rect = rect,
+                        _pivot = new Vector2(0.5f, 0.5f),
+                        _border = Vector4.zero,
+                        _sortIndex = spriteIndex++,
+                        _isSelected = true,
+                        _previewTexture = null,
+                        _usePivotOverride = false,
+                        _pivotModeOverride = PivotMode.Center,
+                        _customPivotOverride = new Vector2(0.5f, 0.5f),
+                        _usePivotColorOverride = false,
+                        _pivotColorOverride = Color.cyan,
+                    };
+                    entry._sprites.Add(spriteEntry);
+                }
+            }
+        }
+
+        internal void PopulateSpritesFromAlphaDetection(SpriteSheetEntry entry, Texture2D texture)
+        {
+            if (!texture.isReadable)
+            {
+                this.LogWarn(
+                    $"Texture {entry._assetPath} is not readable. Enable 'Read/Write' in import settings for alpha detection."
+                );
+                return;
+            }
+
+            int textureWidth = texture.width;
+            int textureHeight = texture.height;
+            Color32[] pixels = texture.GetPixels32();
+
+            using PooledResource<List<Rect>> rectsLease = Buffers<Rect>.List.Get(
+                out List<Rect> detectedRects
+            );
+
+            float effectiveAlphaThreshold = GetEffectiveAlphaThreshold(entry);
+            DetectSpriteBoundsByAlpha(
+                pixels,
+                textureWidth,
+                textureHeight,
+                effectiveAlphaThreshold,
+                detectedRects
+            );
+
+            int spriteIndex = 0;
+            foreach (Rect rect in detectedRects)
+            {
+                SpriteEntryData spriteEntry = new()
+                {
+                    _originalName = $"sprite_{spriteIndex}",
+                    _outputName = $"sprite_{spriteIndex}",
+                    _rect = rect,
+                    _pivot = new Vector2(0.5f, 0.5f),
+                    _border = Vector4.zero,
+                    _sortIndex = spriteIndex,
+                    _isSelected = true,
+                    _previewTexture = null,
+                    _usePivotOverride = false,
+                    _pivotModeOverride = PivotMode.Center,
+                    _customPivotOverride = new Vector2(0.5f, 0.5f),
+                    _usePivotColorOverride = false,
+                    _pivotColorOverride = Color.cyan,
+                };
+                entry._sprites.Add(spriteEntry);
+                ++spriteIndex;
+            }
+        }
+
+        internal void ExtractSelectedSprites()
+        {
+            if (_discoveredSheets == null || _discoveredSheets.Count == 0)
+            {
+                this.LogWarn($"No sprite sheets discovered.");
+                return;
+            }
+
+            string outputPath = AssetDatabase.GetAssetPath(_outputDirectory);
+            if (string.IsNullOrWhiteSpace(outputPath) || !AssetDatabase.IsValidFolder(outputPath))
+            {
+                this.LogError($"Invalid output directory.");
+                return;
+            }
+
+            _lastExtractedCount = 0;
+            _lastSkippedCount = 0;
+            _lastErrorCount = 0;
+
+            bool canceled = false;
+            int totalSprites = 0;
+            int processedSprites = 0;
+
+            foreach (SpriteSheetEntry entry in _discoveredSheets)
+            {
+                if (!entry._isSelected || entry._sprites == null)
+                {
+                    continue;
+                }
+
+                foreach (
+                    WallstopStudios.UnityHelpers.Editor.Sprites.SpriteSheetExtractor.SpriteEntryData spritesElement in entry._sprites
+                )
+                {
+                    if (spritesElement._isSelected)
+                    {
+                        ++totalSprites;
+                    }
+                }
+            }
+
+            if (totalSprites == 0)
+            {
+                this.LogWarn($"No sprites selected for extraction.");
+                return;
+            }
+
+            WallstopGenericPool<Dictionary<string, bool>> originalReadablePool = DictionaryBuffer<
+                string,
+                bool
+            >.GetDictionaryPool(StringComparer.OrdinalIgnoreCase);
+            using PooledResource<Dictionary<string, bool>> originalReadableLease =
+                originalReadablePool.Get(out Dictionary<string, bool> originalReadable);
+
+            using PooledResource<List<PendingImportSettings>> pendingImportsLease =
+                Buffers<PendingImportSettings>.List.Get(
+                    out List<PendingImportSettings> pendingImports
+                );
+
+            using PooledResource<List<string>> pendingPathsLease = Buffers<string>.List.Get(
+                out List<string> pendingPaths
+            );
+
+            try
+            {
+                using (AssetDatabaseBatchHelper.BeginBatch())
+                {
+                    for (int i = 0; i < _discoveredSheets.Count && !canceled; ++i)
+                    {
+                        SpriteSheetEntry entry = _discoveredSheets[i];
+                        if (!entry._isSelected || entry._sprites == null)
+                        {
+                            continue;
+                        }
+
+                        if (
+                            Utils.EditorUi.CancelableProgress(
+                                Name,
+                                $"Making readable: {Path.GetFileName(entry._assetPath)}",
+                                (float)i / _discoveredSheets.Count * 0.05f
+                            )
+                        )
+                        {
+                            canceled = true;
+                            break;
+                        }
+
+                        if (!entry._importer.isReadable)
+                        {
+                            originalReadable[entry._assetPath] = false;
+                            entry._importer.isReadable = true;
+                            entry._importer.SaveAndReimport();
+                        }
+                        else
+                        {
+                            originalReadable[entry._assetPath] = true;
+                        }
+                    }
+                }
+
+                AssetDatabase.SaveAssets();
+
+                if (!canceled)
+                {
+                    for (int i = 0; i < _discoveredSheets.Count && !canceled; ++i)
+                    {
+                        SpriteSheetEntry entry = _discoveredSheets[i];
+                        if (!entry._isSelected || entry._sprites == null)
+                        {
+                            continue;
+                        }
+
+                        entry._texture = AssetDatabase.LoadAssetAtPath<Texture2D>(entry._assetPath);
+                        if (entry._texture == null)
+                        {
+                            this.LogWarn($"Failed to reload texture: {entry._assetPath}");
+                            continue;
+                        }
+
+                        List<SpriteEntryData> sortedSprites = GetSortedSprites(entry._sprites);
+
+                        for (int j = 0; j < sortedSprites.Count && !canceled; ++j)
+                        {
+                            SpriteEntryData sprite = sortedSprites[j];
+                            if (!sprite._isSelected)
+                            {
+                                continue;
+                            }
+
+                            if (
+                                Utils.EditorUi.CancelableProgress(
+                                    Name,
+                                    $"Writing: {sprite._originalName}",
+                                    0.05f + (float)processedSprites / totalSprites * 0.35f
+                                )
+                            )
+                            {
+                                canceled = true;
+                                break;
+                            }
+
+                            string extractedPath = ExtractSpriteDeferred(
+                                entry,
+                                sprite,
+                                outputPath,
+                                j,
+                                pendingImports
+                            );
+                            if (extractedPath != null)
+                            {
+                                pendingPaths.Add(extractedPath);
+                                ++_lastExtractedCount;
+                            }
+                            ++processedSprites;
+                        }
+                    }
+                }
+
+                if (!canceled && 0 < pendingPaths.Count)
+                {
+                    using (AssetDatabaseBatchHelper.BeginBatch())
+                    {
+                        for (int i = 0; i < pendingPaths.Count; ++i)
+                        {
+                            if (
+                                Utils.EditorUi.CancelableProgress(
+                                    Name,
+                                    $"Importing: {Path.GetFileName(pendingPaths[i])}",
+                                    0.4f + (float)i / pendingPaths.Count * 0.3f
+                                )
+                            )
+                            {
+                                canceled = true;
+                                break;
+                            }
+
+                            AssetDatabase.ImportAsset(pendingPaths[i]);
+                        }
+                    }
+                }
+
+                if (!canceled && _preserveImportSettings && 0 < pendingImports.Count)
+                {
+                    using (AssetDatabaseBatchHelper.BeginBatch())
+                    {
+                        for (int i = 0; i < pendingImports.Count; ++i)
+                        {
+                            PendingImportSettings pending = pendingImports[i];
+
+                            if (
+                                Utils.EditorUi.CancelableProgress(
+                                    Name,
+                                    $"Applying settings: {Path.GetFileName(pending.OutputPath)}",
+                                    0.7f + (float)i / pendingImports.Count * 0.2f
+                                )
+                            )
+                            {
+                                canceled = true;
+                                break;
+                            }
+
+                            ApplyImportSettingsDeferred(
+                                pending.OutputPath,
+                                pending.SourceImporter,
+                                pending.Sprite,
+                                pending.Entry
+                            );
+                        }
+                    }
+                }
+
+                if (0 < originalReadable.Count)
+                {
+                    using PooledResource<List<string>> keysLease = Buffers<string>.List.Get(
+                        out List<string> keys
+                    );
+                    foreach (KeyValuePair<string, bool> kvp in originalReadable)
+                    {
+                        if (kvp.Value)
+                        {
+                            continue;
+                        }
+
+                        keys.Add(kvp.Key);
+                    }
+
+                    using (AssetDatabaseBatchHelper.BeginBatch())
+                    {
+                        foreach (string key in keys)
+                        {
+                            if (
+                                AssetImporter.GetAtPath(key) is TextureImporter
+                                {
+                                    textureType: TextureImporterType.Sprite
+                                } imp
+                            )
+                            {
+                                imp.isReadable = false;
+                                imp.SaveAndReimport();
+                            }
+                        }
+                    }
+                }
+
+                AssetDatabase.SaveAssets();
+
+                if (canceled)
+                {
+                    this.LogWarn($"Extraction canceled by user.");
+                }
+                else
+                {
+                    string mode = _dryRun ? "Dry run" : "Extraction";
+                    this.Log(
+                        $"{mode} complete. Extracted: {_lastExtractedCount}, Skipped: {_lastSkippedCount}, Errors: {_lastErrorCount}"
+                    );
+                }
+            }
+            catch (Exception e)
+            {
+                this.LogError($"Error during extraction", e);
+            }
+            finally
+            {
+                Utils.EditorUi.ClearProgress();
+            }
+        }
+
+        internal void ReplaceSpriteReferences()
+        {
+            if (_discoveredSheets == null || _discoveredSheets.Count == 0)
+            {
+                this.LogWarn($"No sprite sheets discovered. Run 'Find Sprite Sheets' first.");
+                return;
+            }
+
+            string outputPath = AssetDatabase.GetAssetPath(_outputDirectory);
+            if (string.IsNullOrWhiteSpace(outputPath) || !AssetDatabase.IsValidFolder(outputPath))
+            {
+                this.LogError($"Invalid output directory for reference replacement.");
+                return;
+            }
+
+            WallstopGenericPool<Dictionary<Sprite, Sprite>> mappingPool = DictionaryBuffer<
+                Sprite,
+                Sprite
+            >.Dictionary;
+            using PooledResource<Dictionary<Sprite, Sprite>> mappingLease = mappingPool.Get(
+                out Dictionary<Sprite, Sprite> mapping
+            );
+
+            try
+            {
+                foreach (SpriteSheetEntry entry in _discoveredSheets)
+                {
+                    if (!entry._isSelected || entry._sprites == null)
+                    {
+                        continue;
+                    }
+
+                    Object[] originalSprites = AssetDatabase.LoadAllAssetsAtPath(entry._assetPath);
+                    List<SpriteEntryData> sortedSprites = GetSortedSprites(entry._sprites);
+                    for (int j = 0; j < sortedSprites.Count; ++j)
+                    {
+                        SpriteEntryData spriteData = sortedSprites[j];
+                        if (!spriteData._isSelected)
+                        {
+                            continue;
+                        }
+
+                        Sprite originalSprite = null;
+                        foreach (UnityEngine.Object originalSpritesElement in originalSprites)
+                        {
+                            if (
+                                originalSpritesElement is Sprite s
+                                && s.name == spriteData._originalName
+                            )
+                            {
+                                originalSprite = s;
+                                break;
+                            }
+                        }
+
+                        if (originalSprite == null)
+                        {
+                            continue;
+                        }
+
+                        string prefix = string.IsNullOrWhiteSpace(_namingPrefix)
+                            ? Path.GetFileNameWithoutExtension(entry._assetPath)
+                            : _namingPrefix;
+                        string extractedFileName = $"{prefix}_{j:D3}.png";
+                        string extractedPath = Path.Combine(outputPath, extractedFileName);
+                        Sprite extractedSprite = AssetDatabase.LoadAssetAtPath<Sprite>(
+                            extractedPath
+                        );
+                        if (extractedSprite != null)
+                        {
+                            mapping[originalSprite] = extractedSprite;
+                        }
+                    }
+                }
+
+                if (mapping.Count == 0)
+                {
+                    this.LogWarn($"No original->extracted sprite mappings found.");
+                    return;
+                }
+
+                string[] allAssets = AssetDatabase.GetAllAssetPaths();
+                string[] candidateExts =
+                {
+                    ".prefab",
+                    ".unity",
+                    ".asset",
+                    ".mat",
+                    ".anim",
+                    ".overrideController",
+                };
+                int modifiedAssets = 0;
+
+                using (AssetDatabaseBatchHelper.BeginBatch())
+                {
+                    for (int i = 0; i < allAssets.Length; ++i)
+                    {
+                        string path = allAssets[i];
+                        if (!path.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
+                        {
+                            continue;
+                        }
+
+                        bool hasValidExt = false;
+                        foreach (string candidateExtsElement in candidateExts)
+                        {
+                            if (
+                                path.EndsWith(
+                                    candidateExtsElement,
+                                    StringComparison.OrdinalIgnoreCase
+                                )
+                            )
+                            {
+                                hasValidExt = true;
+                                break;
+                            }
+                        }
+                        if (!hasValidExt)
+                        {
+                            continue;
+                        }
+
+                        if (
+                            Utils.EditorUi.CancelableProgress(
+                                "Replacing Sprite References",
+                                $"Scanning {i + 1}/{allAssets.Length}: {Path.GetFileName(path)}",
+                                i / (float)allAssets.Length
+                            )
+                        )
+                        {
+                            this.LogWarn($"Reference replacement cancelled by user.");
+                            break;
+                        }
+
+                        bool assetModified = false;
+                        Object[] objs = AssetDatabase.LoadAllAssetsAtPath(path);
+                        foreach (Object o in objs)
+                        {
+                            if (o == null)
+                            {
+                                continue;
+                            }
+
+                            using SerializedObject so = new(o);
+                            SerializedProperty it = so.GetIterator();
+                            bool enter = true;
+                            while (it.NextVisible(enter))
+                            {
+                                enter = false;
+                                if (it.propertyType != SerializedPropertyType.ObjectReference)
+                                {
+                                    continue;
+                                }
+
+                                Sprite s = it.objectReferenceValue as Sprite;
+                                if (s != null && mapping.TryGetValue(s, out Sprite replacement))
+                                {
+                                    Undo.RecordObject(o, "Replace sprite reference");
+                                    it.objectReferenceValue = replacement;
+                                    assetModified = true;
+                                    this.Log(
+                                        $"Replaced reference in {path}: {s.name} -> {replacement.name}"
+                                    );
+                                }
+                            }
+
+                            if (assetModified)
+                            {
+                                so.ApplyModifiedPropertiesWithoutUndo();
+                                EditorUtility.SetDirty(o);
+                            }
+                        }
+                        if (assetModified)
+                        {
+                            ++modifiedAssets;
+                        }
+                    }
+                }
+
+                AssetDatabase.SaveAssets();
+
+                this.Log(
+                    $"Reference replacement complete. Modified assets: {modifiedAssets}. Mapped pairs: {mapping.Count}."
+                );
+            }
+            catch (Exception e)
+            {
+                this.LogError($"Error during reference replacement", e);
+            }
+            finally
+            {
+                Utils.EditorUi.ClearProgress();
+            }
+        }
 
         private void BindSerializedState()
         {
@@ -491,36 +4272,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         sprite._previewTexture = null;
                     }
                 }
-            }
-        }
-
-        private static bool IsTextureFormatSupportedForGetPixels(TextureFormat format)
-        {
-            switch (format)
-            {
-                case TextureFormat.Alpha8:
-                case TextureFormat.ARGB4444:
-                case TextureFormat.RGB24:
-                case TextureFormat.RGBA32:
-                case TextureFormat.ARGB32:
-                case TextureFormat.RGB565:
-                case TextureFormat.R16:
-                case TextureFormat.RGBA4444:
-                case TextureFormat.BGRA32:
-                case TextureFormat.RHalf:
-                case TextureFormat.RGHalf:
-                case TextureFormat.RGBAHalf:
-                case TextureFormat.RFloat:
-                case TextureFormat.RGFloat:
-                case TextureFormat.RGBAFloat:
-                case TextureFormat.R8:
-                case TextureFormat.RG16:
-                case TextureFormat.RG32:
-                case TextureFormat.RGB48:
-                case TextureFormat.RGBA64:
-                    return true;
-                default:
-                    return false;
             }
         }
 
@@ -1161,35 +4912,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
         }
 
-        internal void ApplyGlobalSettingsToAll()
-        {
-            if (_discoveredSheets == null)
-            {
-                return;
-            }
-
-            foreach (SpriteSheetEntry entry in _discoveredSheets)
-            {
-                entry._useGlobalSettings = false;
-                entry._extractionModeOverride = _extractionMode;
-                entry._gridSizeModeOverride = _gridSizeMode;
-                entry._gridColumnsOverride = _gridColumns;
-                entry._gridRowsOverride = _gridRows;
-                entry._cellWidthOverride = _cellWidth;
-                entry._cellHeightOverride = _cellHeight;
-                entry._paddingLeftOverride = _paddingLeft;
-                entry._paddingRightOverride = _paddingRight;
-                entry._paddingTopOverride = _paddingTop;
-                entry._paddingBottomOverride = _paddingBottom;
-                entry._alphaThresholdOverride = _alphaThreshold;
-                entry._showOverlayOverride = _showOverlay;
-                entry._usePivotMarkerColorOverride = false;
-                entry._pivotMarkerColorOverride = _pivotMarkerColor;
-            }
-
-            Repaint();
-        }
-
         private void SetAllSelection(bool selected)
         {
             if (_discoveredSheets == null)
@@ -1227,42 +4949,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 discoveredSheetsElement._isExpanded = expanded;
             }
             Repaint();
-        }
-
-        /// <summary>
-        /// Selects all sprites in the specified entry.
-        /// </summary>
-        internal void SelectAll(SpriteSheetEntry entry)
-        {
-            if (entry?._sprites == null)
-            {
-                return;
-            }
-
-            foreach (
-                WallstopStudios.UnityHelpers.Editor.Sprites.SpriteSheetExtractor.SpriteEntryData spritesElement in entry._sprites
-            )
-            {
-                spritesElement._isSelected = true;
-            }
-        }
-
-        /// <summary>
-        /// Deselects all sprites in the specified entry.
-        /// </summary>
-        internal void SelectNone(SpriteSheetEntry entry)
-        {
-            if (entry?._sprites == null)
-            {
-                return;
-            }
-
-            foreach (
-                WallstopStudios.UnityHelpers.Editor.Sprites.SpriteSheetExtractor.SpriteEntryData spritesElement in entry._sprites
-            )
-            {
-                spritesElement._isSelected = false;
-            }
         }
 
         private void DrawSpriteSheetEntry(SpriteSheetEntry entry)
@@ -1942,53 +5628,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         }
 
         /// <summary>
-        /// Copies all extraction settings from a source sprite sheet entry to a target entry.
-        /// </summary>
-        /// <remarks>
-        /// <para>
-        /// This method transfers all per-entry configuration overrides including extraction mode,
-        /// grid dimensions, padding, alpha threshold, pivot settings, and auto-detection algorithm.
-        /// After copying settings, it automatically schedules preview regeneration for the target entry.
-        /// </para>
-        /// <para>
-        /// Use this method to quickly replicate configuration from one sprite sheet to another,
-        /// enabling consistent extraction settings across multiple sheets.
-        /// </para>
-        /// </remarks>
-        /// <param name="source">The sprite sheet entry to copy settings from. If null, the method returns immediately.</param>
-        /// <param name="target">The sprite sheet entry to apply settings to. If null, the method returns immediately.</param>
-        internal void CopySettingsFromEntry(SpriteSheetEntry source, SpriteSheetEntry target)
-        {
-            if (source == null || target == null)
-            {
-                return;
-            }
-
-            target._useGlobalSettings = source._useGlobalSettings;
-            target._extractionModeOverride = source._extractionModeOverride;
-            target._gridSizeModeOverride = source._gridSizeModeOverride;
-            target._gridColumnsOverride = source._gridColumnsOverride;
-            target._gridRowsOverride = source._gridRowsOverride;
-            target._cellWidthOverride = source._cellWidthOverride;
-            target._cellHeightOverride = source._cellHeightOverride;
-            target._paddingLeftOverride = source._paddingLeftOverride;
-            target._paddingRightOverride = source._paddingRightOverride;
-            target._paddingTopOverride = source._paddingTopOverride;
-            target._paddingBottomOverride = source._paddingBottomOverride;
-            target._alphaThresholdOverride = source._alphaThresholdOverride;
-            target._showOverlayOverride = source._showOverlayOverride;
-            target._pivotModeOverride = source._pivotModeOverride;
-            target._customPivotOverride = source._customPivotOverride;
-            target._autoDetectionAlgorithmOverride = source._autoDetectionAlgorithmOverride;
-            target._expectedSpriteCountOverride = source._expectedSpriteCountOverride;
-            target._snapToTextureDivisorOverride = source._snapToTextureDivisorOverride;
-            target._usePivotMarkerColorOverride = source._usePivotMarkerColorOverride;
-            target._pivotMarkerColorOverride = source._pivotMarkerColorOverride;
-
-            SchedulePreviewRegenerationForEntry(target);
-        }
-
-        /// <summary>
         /// Schedules preview regeneration for a sprite sheet entry while preserving existing preview textures.
         /// </summary>
         /// <remarks>
@@ -2178,59 +5817,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         }
 
         /// <summary>
-        /// Clears and repopulates the sprite list for a sprite sheet entry based on its effective extraction mode.
-        /// </summary>
-        /// <remarks>
-        /// <para>
-        /// This method is called by <see cref="RegenerateSpritesForEntry"/> to perform the actual sprite
-        /// repopulation. It first clears the existing sprite list (or creates a new one if null), then
-        /// populates it based on the entry's effective extraction mode (GridBased, PaddedGrid,
-        /// AlphaDetection, or FromMetadata).
-        /// </para>
-        /// <para>
-        /// Unlike <see cref="SchedulePreviewRegenerationForEntry"/>, this method does not preserve
-        /// preview textures during repopulation. Use this method for immediate sprite list updates
-        /// where preview continuity is not required.
-        /// </para>
-        /// </remarks>
-        /// <param name="entry">The sprite sheet entry to repopulate. If null or has no texture, the method returns immediately.</param>
-        internal void RepopulateSpritesForEntry(SpriteSheetEntry entry)
-        {
-            if (entry == null || entry._texture == null)
-            {
-                return;
-            }
-
-            if (entry._sprites != null)
-            {
-                entry._sprites.Clear();
-            }
-            else
-            {
-                entry._sprites = new List<SpriteEntryData>();
-            }
-
-            ExtractionMode effectiveMode = GetEffectiveExtractionMode(entry);
-
-            switch (effectiveMode)
-            {
-                case ExtractionMode.GridBased:
-                    PopulateSpritesFromGrid(entry, entry._texture);
-                    break;
-                case ExtractionMode.PaddedGrid:
-                    PopulateSpritesFromPaddedGrid(entry, entry._texture);
-                    break;
-                case ExtractionMode.AlphaDetection:
-                    PopulateSpritesFromAlphaDetection(entry, entry._texture);
-                    break;
-                case ExtractionMode.FromMetadata:
-                default:
-                    PopulateSpritesFromMetadata(entry, entry._assetPath, entry._importer);
-                    break;
-            }
-        }
-
-        /// <summary>
         /// Regenerates sprites for a sprite sheet entry based on its effective extraction mode.
         /// Clears the existing sprite list, repopulates it, and triggers a repaint.
         /// </summary>
@@ -2275,62 +5861,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         }
 
         /// <summary>
-        /// Marks a sprite sheet entry as needing regeneration.
-        /// The actual regeneration is deferred until the entry is next accessed.
-        /// </summary>
-        /// <param name="entry">The sprite sheet entry to invalidate. If null, the method returns immediately.</param>
-        internal void InvalidateEntry(SpriteSheetEntry entry)
-        {
-            if (entry == null)
-            {
-                return;
-            }
-
-            if (DiagnosticsEnabled)
-            {
-                this.Log($"InvalidateEntry: marking '{entry._assetPath}' for regeneration");
-            }
-
-            entry._needsRegeneration = true;
-            entry._cachedAlgorithmResult = null;
-            entry._lastAlgorithmDisplayText = null;
-        }
-
-        /// <summary>
-        /// Checks if an entry's cached sprite data is stale and needs regeneration.
-        /// </summary>
-        /// <param name="entry">The sprite sheet entry to check.</param>
-        /// <returns>True if the entry's cache is stale, false otherwise.</returns>
-        internal bool IsEntryStale(SpriteSheetEntry entry)
-        {
-            if (entry == null)
-            {
-                return false;
-            }
-
-            if (entry._needsRegeneration)
-            {
-                if (DiagnosticsEnabled)
-                {
-                    this.Log(
-                        $"IsEntryStale: '{entry._assetPath}' is stale because _needsRegeneration=true"
-                    );
-                }
-                return true;
-            }
-
-            int currentCacheKey = entry.GetBoundsCacheKey(this);
-            bool isStale = entry._lastCacheKey != currentCacheKey;
-            if (isStale && DiagnosticsEnabled)
-            {
-                this.Log(
-                    $"IsEntryStale: '{entry._assetPath}' is stale because cacheKey mismatch (stored={entry._lastCacheKey}, current={currentCacheKey})"
-                );
-            }
-            return isStale;
-        }
-
-        /// <summary>
         /// Checks if an entry's cache is stale and regenerates if needed.
         /// Call this before accessing sprite data to ensure freshness.
         /// </summary>
@@ -2358,28 +5888,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 entry._lastAccessTime = DateTime.UtcNow.Ticks;
             }
-        }
-
-        /// <summary>
-        /// Invalidates all entries that are using global settings.
-        /// Call this when global extraction settings change.
-        /// </summary>
-        internal void InvalidateEntriesUsingGlobalSettings()
-        {
-            if (_discoveredSheets == null)
-            {
-                return;
-            }
-
-            foreach (SpriteSheetEntry entry in _discoveredSheets)
-            {
-                if (entry != null && entry._useGlobalSettings)
-                {
-                    InvalidateEntry(entry);
-                }
-            }
-
-            Repaint();
         }
 
         /// <summary>
@@ -2430,181 +5938,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         }
 
         /// <summary>
-        /// Invalidates all discovered entries regardless of settings mode.
-        /// Call this when texture-affecting settings change.
-        /// </summary>
-        internal void InvalidateAllEntries()
-        {
-            if (_discoveredSheets == null)
-            {
-                return;
-            }
-
-            foreach (SpriteSheetEntry entry in _discoveredSheets)
-            {
-                if (entry != null)
-                {
-                    InvalidateEntry(entry);
-                }
-            }
-
-            Repaint();
-        }
-
-        /// <summary>
-        /// Enables pivot overrides for all sprites in the given entry.
-        /// </summary>
-        /// <param name="entry">The sprite sheet entry to modify.</param>
-        internal void EnableAllPivotOverrides(SpriteSheetEntry entry)
-        {
-            if (entry == null || entry._sprites == null)
-            {
-                return;
-            }
-
-            foreach (SpriteEntryData sprite in entry._sprites)
-            {
-                if (sprite != null)
-                {
-                    sprite._usePivotOverride = true;
-                }
-            }
-        }
-
-        /// <summary>
-        /// Disables pivot overrides for all sprites in the given entry.
-        /// </summary>
-        /// <param name="entry">The sprite sheet entry to modify.</param>
-        internal void DisableAllPivotOverrides(SpriteSheetEntry entry)
-        {
-            if (entry == null || entry._sprites == null)
-            {
-                return;
-            }
-
-            foreach (SpriteEntryData sprite in entry._sprites)
-            {
-                if (sprite != null)
-                {
-                    sprite._usePivotOverride = false;
-                }
-            }
-        }
-
-        /// <summary>
-        /// Schedules preview regeneration for a sprite sheet entry.
-        /// This is a public wrapper around the internal regeneration method.
-        /// </summary>
-        /// <param name="entry">The sprite sheet entry to regenerate previews for.</param>
-        internal void SchedulePreviewRegeneration(SpriteSheetEntry entry)
-        {
-            SchedulePreviewRegenerationForEntry(entry);
-        }
-
-        /// <summary>
-        /// Computes a bounds cache key for an entry.
-        /// This is an instance method wrapper that delegates to the entry's cache key computation.
-        /// </summary>
-        /// <param name="entry">The sprite sheet entry to compute a cache key for. Can be null.</param>
-        /// <returns>A hash code representing the current configuration state.</returns>
-        internal int GetBoundsCacheKey(SpriteSheetEntry entry)
-        {
-            if (entry == null)
-            {
-                return GetBoundsCacheKeyStatic(this, null);
-            }
-
-            return entry.GetBoundsCacheKey(this);
-        }
-
-        /// <summary>
-        /// Computes a bounds cache key using static parameters.
-        /// Used for null-safe cache key computation when either extractor or entry may be null.
-        /// </summary>
-        /// <param name="extractor">The extractor to read global settings from. Can be null.</param>
-        /// <param name="entry">The sprite sheet entry to compute a cache key for. Can be null.</param>
-        /// <returns>A hash code representing the current configuration state, or 0 if extractor is null.</returns>
-        internal static int GetBoundsCacheKeyStatic(
-            SpriteSheetExtractor extractor,
-            SpriteSheetEntry entry
-        )
-        {
-            if (extractor == null)
-            {
-                return 0;
-            }
-
-            if (entry == null)
-            {
-                return Objects.HashCode(
-                    extractor._extractionMode,
-                    extractor._gridSizeMode,
-                    extractor._gridColumns,
-                    extractor._gridRows,
-                    extractor._cellWidth,
-                    extractor._cellHeight,
-                    extractor._paddingLeft,
-                    extractor._paddingRight,
-                    extractor._paddingTop,
-                    extractor._paddingBottom,
-                    extractor._alphaThreshold,
-                    extractor._autoDetectionAlgorithm,
-                    extractor._expectedSpriteCountHint,
-                    extractor._snapToTextureDivisor
-                );
-            }
-
-            return entry.GetBoundsCacheKey(extractor);
-        }
-
-        /// <summary>
-        /// Checks cache size and evicts least recently used entries if limit is exceeded.
-        /// Entries are evicted by clearing their sprite lists and preview textures.
-        /// </summary>
-        internal void CheckAndEvictLRUCache()
-        {
-            if (_discoveredSheets == null || _discoveredSheets.Count <= MaxCachedEntries)
-            {
-                return;
-            }
-
-            int cachedCount = 0;
-            foreach (SpriteSheetEntry entry in _discoveredSheets)
-            {
-                if (entry != null && entry._sprites != null && 0 < entry._sprites.Count)
-                {
-                    ++cachedCount;
-                }
-            }
-
-            if (cachedCount <= MaxCachedEntries)
-            {
-                return;
-            }
-
-            int entriesToEvict = cachedCount - MaxCachedEntries;
-
-            using PooledResource<List<SpriteSheetEntry>> sortedEntriesLease =
-                Buffers<SpriteSheetEntry>.List.Get(out List<SpriteSheetEntry> sortedEntries);
-
-            foreach (SpriteSheetEntry entry in _discoveredSheets)
-            {
-                if (entry != null && entry._sprites != null && 0 < entry._sprites.Count)
-                {
-                    sortedEntries.Add(entry);
-                }
-            }
-
-            sortedEntries.Sort((a, b) => a._lastAccessTime.CompareTo(b._lastAccessTime));
-
-            for (int i = 0; i < entriesToEvict && i < sortedEntries.Count; ++i)
-            {
-                SpriteSheetEntry entry = sortedEntries[i];
-                EvictEntry(entry);
-            }
-        }
-
-        /// <summary>
         /// Evicts a single entry by clearing its sprite list and preview textures.
         /// The entry remains in the discovered sheets list but its cache is cleared.
         /// </summary>
@@ -2632,48 +5965,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             entry._needsRegeneration = true;
             entry._cachedAlgorithmResult = null;
             entry._lastAlgorithmDisplayText = null;
-        }
-
-        /// <summary>
-        /// Repopulates sprites for a sprite sheet entry into a provided target list.
-        /// IMPORTANT: This method does NOT modify entry._sprites at all, ensuring that old sprites
-        /// remain visible if Unity repaints during AssetDatabase operations.
-        /// </summary>
-        /// <param name="entry">The sprite sheet entry to get configuration from.</param>
-        /// <param name="targetList">The list to populate sprites into.</param>
-        internal void RepopulateSpritesForEntryIntoList(
-            SpriteSheetEntry entry,
-            List<SpriteEntryData> targetList
-        )
-        {
-            if (entry == null || entry._texture == null || targetList == null)
-            {
-                return;
-            }
-
-            ExtractionMode effectiveMode = GetEffectiveExtractionMode(entry);
-
-            switch (effectiveMode)
-            {
-                case ExtractionMode.GridBased:
-                    PopulateSpritesFromGridIntoList(entry, entry._texture, targetList);
-                    break;
-                case ExtractionMode.PaddedGrid:
-                    PopulateSpritesFromPaddedGridIntoList(entry, entry._texture, targetList);
-                    break;
-                case ExtractionMode.AlphaDetection:
-                    PopulateSpritesFromAlphaDetectionIntoList(entry, entry._texture, targetList);
-                    break;
-                case ExtractionMode.FromMetadata:
-                default:
-                    PopulateSpritesFromMetadataIntoList(
-                        entry,
-                        entry._assetPath,
-                        entry._importer,
-                        targetList
-                    );
-                    break;
-            }
         }
 
         private void DrawSourceTexturePreview(SpriteSheetEntry entry)
@@ -3019,1917 +6310,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
         }
 
-        internal void CalculateGridDimensions(
-            int textureWidth,
-            int textureHeight,
-            out int columns,
-            out int rows,
-            out int cellWidth,
-            out int cellHeight
-        )
-        {
-            CalculateGridDimensions(
-                textureWidth,
-                textureHeight,
-                null,
-                out columns,
-                out rows,
-                out cellWidth,
-                out cellHeight
-            );
-        }
-
-        internal void CalculateGridDimensions(
-            int textureWidth,
-            int textureHeight,
-            SpriteSheetEntry entry,
-            out int columns,
-            out int rows,
-            out int cellWidth,
-            out int cellHeight
-        )
-        {
-            CalculateGridDimensions(
-                textureWidth,
-                textureHeight,
-                entry,
-                null,
-                out columns,
-                out rows,
-                out cellWidth,
-                out cellHeight
-            );
-        }
-
-        /// <summary>
-        /// Calculates grid dimensions for sprite extraction.
-        /// In Manual mode, derives cell size from columns/rows.
-        /// In Auto mode, detects grid from transparency or uses fallback heuristics.
-        /// </summary>
-        internal void CalculateGridDimensions(
-            int textureWidth,
-            int textureHeight,
-            SpriteSheetEntry entry,
-            Color32[] pixels,
-            out int columns,
-            out int rows,
-            out int cellWidth,
-            out int cellHeight
-        )
-        {
-            GridSizeMode effectiveGridSizeMode = GetEffectiveGridSizeMode(entry);
-            int effectiveGridColumns = GetEffectiveGridColumns(entry);
-            int effectiveGridRows = GetEffectiveGridRows(entry);
-            int effectiveCellWidth = GetEffectiveCellWidth(entry);
-            int effectiveCellHeight = GetEffectiveCellHeight(entry);
-
-            if (effectiveGridSizeMode == GridSizeMode.Manual)
-            {
-                int manualColumns = Mathf.Max(1, effectiveGridColumns);
-                int manualRows = Mathf.Max(1, effectiveGridRows);
-
-                columns = manualColumns;
-                rows = manualRows;
-                cellWidth = textureWidth / manualColumns;
-                cellHeight = textureHeight / manualRows;
-                return;
-            }
-
-            float effectiveAlphaThreshold = GetEffectiveAlphaThreshold(entry);
-            AutoDetectionAlgorithm algorithm = GetEffectiveAutoDetectionAlgorithm(entry);
-            int expectedSpriteCount = GetEffectiveExpectedSpriteCount(entry);
-            bool detectedFromAlgorithm = false;
-            int detectedCellWidth = 0;
-            int detectedCellHeight = 0;
-
-            // Resolve cache hits before requiring pixels so cached queries can run without pixel data.
-            if (entry != null && entry._cachedAlgorithmResult.HasValue)
-            {
-                SpriteSheetAlgorithms.AlgorithmResult cached = entry._cachedAlgorithmResult.Value;
-                if (cached.IsValid)
-                {
-                    detectedCellWidth = cached.CellWidth;
-                    detectedCellHeight = cached.CellHeight;
-                    detectedFromAlgorithm = true;
-                    entry._lastAlgorithmDisplayText = $"{cached.Algorithm}: {cached.Confidence:P0}";
-                }
-            }
-
-            if (
-                !detectedFromAlgorithm
-                && pixels != null
-                && pixels.Length == textureWidth * textureHeight
-            )
-            {
-                bool snapToTextureDivisor = GetEffectiveSnapToTextureDivisor(entry);
-                SpriteSheetAlgorithms.AlgorithmResult result = SpriteSheetAlgorithms.DetectGrid(
-                    pixels,
-                    textureWidth,
-                    textureHeight,
-                    effectiveAlphaThreshold,
-                    algorithm,
-                    expectedSpriteCount,
-                    snapToTextureDivisor
-                );
-
-                if (DiagnosticsEnabled && entry != null)
-                {
-                    this.Log(
-                        $"Algorithm detection for '{Path.GetFileName(entry._assetPath)}': algorithm={algorithm}, expectedSpriteCount={expectedSpriteCount}, textureSize={textureWidth}x{textureHeight}, isValid={result.IsValid}, cellSize={result.CellWidth}x{result.CellHeight}, confidence={result.Confidence:P0}"
-                    );
-                }
-
-                if (result.IsValid)
-                {
-                    detectedCellWidth = result.CellWidth;
-                    detectedCellHeight = result.CellHeight;
-                    detectedFromAlgorithm = true;
-                    if (entry != null)
-                    {
-                        entry._cachedAlgorithmResult = result;
-                        entry._lastAlgorithmDisplayText =
-                            $"{result.Algorithm}: {result.Confidence:P0}";
-                    }
-
-                    // Respect an explicit sprite count; anti-aliasing and shadows can falsely fail automatic split verification.
-                    bool skipVerification = 0 < expectedSpriteCount;
-                    if (
-                        !skipVerification
-                        && !VerifyGridDoesNotCutSprites(
-                            pixels,
-                            textureWidth,
-                            textureHeight,
-                            detectedCellWidth,
-                            detectedCellHeight,
-                            effectiveAlphaThreshold
-                        )
-                    )
-                    {
-                        (int regionCellWidth, int regionCellHeight) =
-                            DetectCellSizeFromOpaqueRegions(
-                                pixels,
-                                textureWidth,
-                                textureHeight,
-                                effectiveAlphaThreshold
-                            );
-
-                        if (DiagnosticsEnabled && entry != null)
-                        {
-                            this.Log(
-                                $"VerifyGridDoesNotCutSprites FAILED for '{Path.GetFileName(entry._assetPath)}': original cellSize={detectedCellWidth}x{detectedCellHeight}, region detection returned {regionCellWidth}x{regionCellHeight}"
-                            );
-                        }
-
-                        if (0 < regionCellWidth && 0 < regionCellHeight)
-                        {
-                            detectedCellWidth = regionCellWidth;
-                            detectedCellHeight = regionCellHeight;
-                            if (entry != null)
-                            {
-                                entry._lastAlgorithmDisplayText =
-                                    $"{result.Algorithm}: {result.Confidence:P0} (adjusted)";
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (!detectedFromAlgorithm)
-            {
-                (int regionWidth, int regionHeight) = DetectCellSizeFromOpaqueRegions(
-                    pixels,
-                    textureWidth,
-                    textureHeight,
-                    effectiveAlphaThreshold
-                );
-
-                if (0 < regionWidth && 0 < regionHeight)
-                {
-                    detectedCellWidth = regionWidth;
-                    detectedCellHeight = regionHeight;
-                    if (entry != null)
-                    {
-                        entry._lastAlgorithmDisplayText = "Fallback (region analysis)";
-                    }
-                }
-                else
-                {
-                    detectedCellWidth = FindSmallestReasonableDivisor(textureWidth);
-                    detectedCellHeight = FindSmallestReasonableDivisor(textureHeight);
-
-                    if (detectedCellWidth == textureWidth && detectedCellHeight == textureHeight)
-                    {
-                        int gcd = CalculateGCD(textureWidth, textureHeight);
-                        if (8 <= gcd && gcd < textureWidth && gcd < textureHeight)
-                        {
-                            detectedCellWidth = gcd;
-                            detectedCellHeight = gcd;
-                        }
-                    }
-
-                    if (entry != null)
-                    {
-                        entry._lastAlgorithmDisplayText = "Fallback (divisor heuristic)";
-                    }
-                }
-            }
-
-            // Keep detected cell dimensions when they already tile the texture.
-            int detectedColumns;
-            if (textureWidth % detectedCellWidth == 0)
-            {
-                detectedColumns = textureWidth / detectedCellWidth;
-            }
-            else
-            {
-                detectedColumns = Mathf.Max(1, textureWidth / detectedCellWidth);
-                detectedCellWidth = textureWidth / detectedColumns;
-            }
-
-            int detectedRows;
-            if (textureHeight % detectedCellHeight == 0)
-            {
-                detectedRows = textureHeight / detectedCellHeight;
-            }
-            else
-            {
-                detectedRows = Mathf.Max(1, textureHeight / detectedCellHeight);
-                detectedCellHeight = textureHeight / detectedRows;
-            }
-
-            if (DiagnosticsEnabled && entry != null)
-            {
-                this.Log(
-                    $"CalculateGridDimensions FINAL for '{Path.GetFileName(entry._assetPath)}': columns={detectedColumns}, rows={detectedRows}, cellWidth={detectedCellWidth}, cellHeight={detectedCellHeight}, detectedFromAlgorithm={detectedFromAlgorithm}"
-                );
-            }
-
-            columns = detectedColumns;
-            rows = detectedRows;
-            cellWidth = detectedCellWidth;
-            cellHeight = detectedCellHeight;
-        }
-
-        private static int CalculateGCD(int a, int b)
-        {
-            while (b != 0)
-            {
-                int temp = b;
-                b = a % b;
-                a = temp;
-            }
-            return a;
-        }
-
-        /// <summary>
-        /// Finds the smallest reasonable divisor for a dimension, preferring common sprite sizes.
-        /// This produces better results than GCD for typical sprite sheets.
-        /// </summary>
-        /// <param name="dimension">The texture dimension to find a divisor for.</param>
-        /// <returns>A divisor that produces at least 2 cells if possible, or the dimension itself.</returns>
-        internal static int FindSmallestReasonableDivisor(int dimension)
-        {
-            foreach (int size in CommonCellSizes)
-            {
-                if (8 <= size && size <= dimension && dimension % size == 0)
-                {
-                    int cellCount = dimension / size;
-                    if (2 <= cellCount)
-                    {
-                        return size;
-                    }
-                }
-            }
-
-            for (int divisor = 8; divisor <= dimension / 2; ++divisor)
-            {
-                if (dimension % divisor == 0)
-                {
-                    return divisor;
-                }
-            }
-
-            return dimension;
-        }
-
-        /// <summary>
-        /// Detects optimal grid dimensions by analyzing transparent boundaries in the texture.
-        /// Uses a multi-candidate scoring approach that evaluates various cell sizes and picks
-        /// the one with the highest transparency score along its grid boundaries.
-        /// </summary>
-        /// <param name="pixels">The texture pixel data in Color32 format.</param>
-        /// <param name="textureWidth">Width of the texture in pixels.</param>
-        /// <param name="textureHeight">Height of the texture in pixels.</param>
-        /// <param name="alphaThreshold">Alpha value (0-1) below which a pixel is considered transparent.
-        /// Must be in range [0.0, 1.0); NaN and values outside this range return false immediately.</param>
-        /// <param name="cellWidth">Output: Detected cell width, or 0 if no clear grid was detected.</param>
-        /// <param name="cellHeight">Output: Detected cell height, or 0 if no clear grid was detected.</param>
-        /// <returns>True if a valid grid was detected, false otherwise.</returns>
-        internal static bool DetectOptimalGridFromTransparency(
-            Color32[] pixels,
-            int textureWidth,
-            int textureHeight,
-            float alphaThreshold,
-            out int cellWidth,
-            out int cellHeight
-        )
-        {
-            if (pixels == null || pixels.Length == 0)
-            {
-                cellWidth = 0;
-                cellHeight = 0;
-                return false;
-            }
-
-            if (
-                textureWidth < SpriteSheetAlgorithms.MinimumCellSize
-                || textureHeight < SpriteSheetAlgorithms.MinimumCellSize
-            )
-            {
-                cellWidth = 0;
-                cellHeight = 0;
-                return false;
-            }
-
-            if (pixels.Length != textureWidth * textureHeight)
-            {
-                cellWidth = 0;
-                cellHeight = 0;
-                return false;
-            }
-
-            if (!(0f <= alphaThreshold && alphaThreshold < 1f))
-            {
-                cellWidth = 0;
-                cellHeight = 0;
-                return false;
-            }
-
-            byte alphaThresholdByte = ColorQuantization.ToThresholdByte(alphaThreshold);
-
-            using PooledArray<int> columnTransparencyLease = SystemArrayPool<int>.Get(
-                textureWidth,
-                out int[] columnTransparencyCount
-            );
-            using PooledArray<int> rowTransparencyLease = SystemArrayPool<int>.Get(
-                textureHeight,
-                out int[] rowTransparencyCount
-            );
-
-            Array.Clear(columnTransparencyCount, 0, textureWidth);
-            Array.Clear(rowTransparencyCount, 0, textureHeight);
-
-            int totalTransparent = 0;
-            for (int y = 0; y < textureHeight; ++y)
-            {
-                int rowOffset = y * textureWidth;
-                for (int x = 0; x < textureWidth; ++x)
-                {
-                    if (pixels[rowOffset + x].a <= alphaThresholdByte)
-                    {
-                        ++columnTransparencyCount[x];
-                        ++rowTransparencyCount[y];
-                        ++totalTransparent;
-                    }
-                }
-            }
-
-            // Fully opaque or fully transparent textures have no meaningful grid
-            int totalPixels = textureWidth * textureHeight;
-            if (totalTransparent == 0 || totalTransparent == totalPixels)
-            {
-                cellWidth = 0;
-                cellHeight = 0;
-                return false;
-            }
-
-            using PooledResource<List<int>> widthCandidatesLease = Buffers<int>.List.Get(
-                out List<int> widthCandidates
-            );
-            using PooledResource<List<int>> heightCandidatesLease = Buffers<int>.List.Get(
-                out List<int> heightCandidates
-            );
-
-            GenerateCandidateCellSizes(textureWidth, widthCandidates);
-            GenerateCandidateCellSizes(textureHeight, heightCandidates);
-
-            int bestWidth = 0;
-            int bestHeight = 0;
-            float bestScore = -1f;
-
-            foreach (int candidateWidth in widthCandidates)
-            {
-                float widthScore = ScoreCellSizeForDimension(
-                    columnTransparencyCount,
-                    textureWidth,
-                    textureHeight,
-                    candidateWidth
-                );
-                if (widthScore < MinimumBoundaryScore)
-                {
-                    continue;
-                }
-
-                foreach (int candidateHeight in heightCandidates)
-                {
-                    float heightScore = ScoreCellSizeForDimension(
-                        rowTransparencyCount,
-                        textureHeight,
-                        textureWidth,
-                        candidateHeight
-                    );
-                    if (heightScore < MinimumBoundaryScore)
-                    {
-                        continue;
-                    }
-
-                    float combinedScore = (widthScore + heightScore) * 0.5f;
-                    int columns = textureWidth / candidateWidth;
-                    int rows = textureHeight / candidateHeight;
-
-                    if (2 <= columns && 2 <= rows)
-                    {
-                        combinedScore += 0.15f;
-                    }
-                    else if (2 <= columns || 2 <= rows)
-                    {
-                        combinedScore += 0.08f;
-                    }
-
-                    if (IsPowerOfTwo(candidateWidth) && IsPowerOfTwo(candidateHeight))
-                    {
-                        combinedScore += 0.05f;
-                    }
-
-                    if (candidateWidth == candidateHeight)
-                    {
-                        combinedScore += 0.02f;
-                    }
-
-                    int cellCount = columns * rows;
-                    if (4 <= cellCount && cellCount <= 64)
-                    {
-                        combinedScore += 0.03f;
-                    }
-
-                    // Choose finer sprites when candidate scores are effectively tied.
-                    const float scoreEpsilon = 0.01f;
-                    bool significantlyBetter = bestScore + scoreEpsilon < combinedScore;
-                    bool essentiallyEqual =
-                        !significantlyBetter
-                        && bestScore - scoreEpsilon <= combinedScore
-                        && combinedScore <= bestScore + scoreEpsilon;
-                    bool smallerCellSize =
-                        candidateWidth < bestWidth || candidateHeight < bestHeight;
-                    if (significantlyBetter || (essentiallyEqual && smallerCellSize))
-                    {
-                        bestScore = combinedScore;
-                        bestWidth = candidateWidth;
-                        bestHeight = candidateHeight;
-                    }
-                }
-            }
-
-            if (MinimumBoundaryScore <= bestScore && 0 < bestWidth && 0 < bestHeight)
-            {
-                cellWidth = bestWidth;
-                cellHeight = bestHeight;
-                return true;
-            }
-
-            int detectedCellWidth = FindConsistentSpacingFromTransparency(
-                columnTransparencyCount,
-                textureWidth,
-                textureHeight,
-                minimumCellSize: 8
-            );
-            int detectedCellHeight = FindConsistentSpacingFromTransparency(
-                rowTransparencyCount,
-                textureHeight,
-                textureWidth,
-                minimumCellSize: 8
-            );
-
-            if (0 < detectedCellWidth && 0 < detectedCellHeight)
-            {
-                cellWidth = detectedCellWidth;
-                cellHeight = detectedCellHeight;
-                return true;
-            }
-
-            // A single detected spacing still provides useful square dimensions even when the other axis does not tile.
-            if (0 < detectedCellWidth)
-            {
-                cellWidth = detectedCellWidth;
-                cellHeight = detectedCellWidth;
-                return textureHeight % detectedCellWidth == 0;
-            }
-
-            if (0 < detectedCellHeight)
-            {
-                cellWidth = detectedCellHeight;
-                cellHeight = detectedCellHeight;
-                return textureWidth % detectedCellHeight == 0;
-            }
-
-            cellWidth = 0;
-            cellHeight = 0;
-            return false;
-        }
-
-        /// <summary>
-        /// Generates a list of candidate cell sizes for a given dimension.
-        /// Includes common sprite sizes, power-of-2 sizes, and all divisors >= 8.
-        /// </summary>
-        private static void GenerateCandidateCellSizes(int dimension, List<int> candidates)
-        {
-            candidates.Clear();
-
-            foreach (int size in CommonCellSizes)
-            {
-                if (size <= dimension && dimension % size == 0)
-                {
-                    AddUniqueSorted(candidates, size);
-                }
-            }
-
-            for (int power = 3; power <= 10; ++power)
-            {
-                int size = 1 << power;
-                if (dimension < size)
-                {
-                    break;
-                }
-                if (dimension % size == 0)
-                {
-                    AddUniqueSorted(candidates, size);
-                }
-            }
-
-            for (int divisor = 2; divisor * divisor <= dimension; ++divisor)
-            {
-                if (dimension % divisor == 0)
-                {
-                    if (8 <= divisor)
-                    {
-                        AddUniqueSorted(candidates, divisor);
-                    }
-                    int complement = dimension / divisor;
-                    if (8 <= complement && complement != divisor)
-                    {
-                        AddUniqueSorted(candidates, complement);
-                    }
-                }
-            }
-
-            if (8 <= dimension)
-            {
-                AddUniqueSorted(candidates, dimension);
-            }
-        }
-
-        /// <summary>
-        /// Adds a value to a sorted list if not already present, maintaining sort order.
-        /// </summary>
-        private static void AddUniqueSorted(List<int> list, int value)
-        {
-            int insertIndex = 0;
-            for (int i = 0; i < list.Count; ++i)
-            {
-                if (list[i] == value)
-                {
-                    return;
-                }
-                if (list[i] < value)
-                {
-                    insertIndex = i + 1;
-                }
-            }
-            list.Insert(insertIndex, value);
-        }
-
-        /// <summary>
-        /// Scores a candidate cell size based on how transparent the grid boundaries would be.
-        /// Returns a value between 0.0 (poor match) and 1.0+ (excellent match with bonuses).
-        /// </summary>
-        private static float ScoreCellSizeForDimension(
-            int[] transparencyCount,
-            int dimension,
-            int crossDimension,
-            int cellSize
-        )
-        {
-            if (cellSize <= 0 || dimension % cellSize != 0)
-            {
-                return 0f;
-            }
-
-            int cellCount = dimension / cellSize;
-            if (cellCount < 1)
-            {
-                return 0f;
-            }
-
-            if (cellCount == 1)
-            {
-                return 0f;
-            }
-
-            int boundaryCount = cellCount - 1;
-            float totalScore = 0f;
-
-            for (int i = 1; i < cellCount; ++i)
-            {
-                int boundaryPosition = i * cellSize;
-
-                if (dimension <= boundaryPosition)
-                {
-                    continue;
-                }
-
-                float boundaryScore = CalculateBoundaryTransparencyScore(
-                    transparencyCount,
-                    dimension,
-                    crossDimension,
-                    boundaryPosition
-                );
-
-                totalScore += boundaryScore;
-            }
-
-            return totalScore / boundaryCount;
-        }
-
-        /// <summary>
-        /// Calculates a transparency score for a specific boundary position.
-        /// Considers both the exact position and nearby positions (within 3 pixels)
-        /// to handle slight misalignment in sprite sheets and thin transparent gutters.
-        /// </summary>
-        private static float CalculateBoundaryTransparencyScore(
-            int[] transparencyCount,
-            int dimension,
-            int crossDimension,
-            int position
-        )
-        {
-            if (position < 0 || dimension <= position)
-            {
-                return 0f;
-            }
-
-            float primaryScore = transparencyCount[position] / (float)crossDimension;
-
-            float maxScore = primaryScore;
-            float sumNearby = primaryScore;
-            int nearbyCount = 1;
-
-            for (int offset = -3; offset <= 3; ++offset)
-            {
-                if (offset == 0)
-                {
-                    continue;
-                }
-
-                int adjacentPos = position + offset;
-                if (0 <= adjacentPos && adjacentPos < dimension)
-                {
-                    float adjacentScore = transparencyCount[adjacentPos] / (float)crossDimension;
-                    if (maxScore < adjacentScore)
-                    {
-                        maxScore = adjacentScore;
-                    }
-                    sumNearby += adjacentScore;
-                    ++nearbyCount;
-                }
-            }
-
-            float avgNearby = sumNearby / nearbyCount;
-
-            // Weight peak transparency for thin or offset gutters while retaining evidence from wider clear regions.
-            return maxScore * 0.6f + avgNearby * 0.25f + primaryScore * 0.15f;
-        }
-
-        /// <summary>
-        /// Checks if a value is a power of two.
-        /// </summary>
-        private static bool IsPowerOfTwo(int value)
-        {
-            return 0 < value && (value & (value - 1)) == 0;
-        }
-
-        /// <summary>
-        /// Finds the nearest divisor of a dimension to a target value that produces at least minCells cells.
-        /// </summary>
-        /// <param name="dimension">The texture dimension to find a divisor for.</param>
-        /// <param name="target">The target cell size to find the nearest divisor to.</param>
-        /// <param name="minCells">The minimum number of cells the divisor must produce.</param>
-        /// <returns>The nearest divisor that produces at least minCells cells, or target if none found.</returns>
-        internal static int FindNearestDivisorWithMinCells(int dimension, int target, int minCells)
-        {
-            if (dimension <= 0 || target <= 0 || minCells <= 0)
-            {
-                return target;
-            }
-
-            int bestDivisor = target;
-            int bestDiff = int.MaxValue;
-            bool found = false;
-
-            for (int div = 1; div <= dimension; ++div)
-            {
-                if (dimension % div != 0)
-                {
-                    continue;
-                }
-
-                int cellCount = dimension / div;
-                if (cellCount < minCells)
-                {
-                    continue;
-                }
-
-                int diff = Math.Abs(div - target);
-                if (diff < bestDiff)
-                {
-                    bestDiff = diff;
-                    bestDivisor = div;
-                    found = true;
-                }
-            }
-
-            return found ? bestDivisor : target;
-        }
-
-        /// <summary>
-        /// Detects cell size by analyzing opaque regions using flood-fill.
-        /// Identifies individual sprite regions, computes their median dimensions,
-        /// and finds the nearest divisor that produces multiple cells.
-        /// </summary>
-        /// <param name="pixels">The texture pixel data in Color32 format.</param>
-        /// <param name="textureWidth">Width of the texture in pixels.</param>
-        /// <param name="textureHeight">Height of the texture in pixels.</param>
-        /// <param name="alphaThreshold">Finite alpha value (0-1) below which a pixel is considered transparent.</param>
-        /// <returns>A tuple of (cellWidth, cellHeight), or (0, 0) if detection failed.</returns>
-        internal static (int cellWidth, int cellHeight) DetectCellSizeFromOpaqueRegions(
-            Color32[] pixels,
-            int textureWidth,
-            int textureHeight,
-            float alphaThreshold
-        )
-        {
-            if (!float.IsFinite(alphaThreshold))
-            {
-                return (0, 0);
-            }
-
-            if (pixels == null || pixels.Length == 0)
-            {
-                return (0, 0);
-            }
-
-            if (
-                textureWidth < SpriteSheetAlgorithms.MinimumCellSize
-                || textureHeight < SpriteSheetAlgorithms.MinimumCellSize
-            )
-            {
-                return (0, 0);
-            }
-
-            if (pixels.Length != textureWidth * textureHeight)
-            {
-                return (0, 0);
-            }
-
-            byte alphaThresholdByte = ColorQuantization.ToThresholdByte(alphaThreshold);
-
-            using PooledArray<bool> visitedLease = SystemArrayPool<bool>.Get(
-                pixels.Length,
-                out bool[] visited
-            );
-            Array.Clear(visited, 0, visited.Length);
-
-            using PooledResource<List<int>> widthsLease = Buffers<int>.List.Get(
-                out List<int> regionWidths
-            );
-            using PooledResource<List<int>> heightsLease = Buffers<int>.List.Get(
-                out List<int> regionHeights
-            );
-            using PooledResource<List<int>> stackLease = Buffers<int>.List.Get(out List<int> stack);
-
-            const int minimumRegionSize = SpriteSheetAlgorithms.MinimumCellSize;
-            const int maxRegionCount = 256;
-
-            for (int startY = 0; startY < textureHeight; ++startY)
-            {
-                if (maxRegionCount <= regionWidths.Count)
-                {
-                    break;
-                }
-
-                for (int startX = 0; startX < textureWidth; ++startX)
-                {
-                    int startIdx = startY * textureWidth + startX;
-                    if (visited[startIdx])
-                    {
-                        continue;
-                    }
-
-                    if (pixels[startIdx].a <= alphaThresholdByte)
-                    {
-                        visited[startIdx] = true;
-                        continue;
-                    }
-
-                    int minX = startX;
-                    int maxX = startX;
-                    int minY = startY;
-                    int maxY = startY;
-
-                    stack.Clear();
-                    stack.Add(startIdx);
-                    visited[startIdx] = true;
-
-                    while (0 < stack.Count)
-                    {
-                        int lastIndex = stack.Count - 1;
-                        int idx = stack[lastIndex];
-                        stack.RemoveAt(lastIndex);
-
-                        int px = idx % textureWidth;
-                        int py = idx / textureWidth;
-
-                        if (px < minX)
-                        {
-                            minX = px;
-                        }
-                        if (maxX < px)
-                        {
-                            maxX = px;
-                        }
-                        if (py < minY)
-                        {
-                            minY = py;
-                        }
-                        if (maxY < py)
-                        {
-                            maxY = py;
-                        }
-
-                        if (0 < px)
-                        {
-                            int left = idx - 1;
-                            if (!visited[left] && alphaThresholdByte < pixels[left].a)
-                            {
-                                visited[left] = true;
-                                stack.Add(left);
-                            }
-                        }
-                        if (px < textureWidth - 1)
-                        {
-                            int right = idx + 1;
-                            if (!visited[right] && alphaThresholdByte < pixels[right].a)
-                            {
-                                visited[right] = true;
-                                stack.Add(right);
-                            }
-                        }
-                        if (0 < py)
-                        {
-                            int down = idx - textureWidth;
-                            if (!visited[down] && alphaThresholdByte < pixels[down].a)
-                            {
-                                visited[down] = true;
-                                stack.Add(down);
-                            }
-                        }
-                        if (py < textureHeight - 1)
-                        {
-                            int up = idx + textureWidth;
-                            if (!visited[up] && alphaThresholdByte < pixels[up].a)
-                            {
-                                visited[up] = true;
-                                stack.Add(up);
-                            }
-                        }
-                    }
-
-                    int regionWidth = maxX - minX + 1;
-                    int regionHeight = maxY - minY + 1;
-
-                    if (minimumRegionSize <= regionWidth && minimumRegionSize <= regionHeight)
-                    {
-                        regionWidths.Add(regionWidth);
-                        regionHeights.Add(regionHeight);
-                    }
-                }
-            }
-
-            if (regionWidths.Count < 2)
-            {
-                return (0, 0);
-            }
-
-            regionWidths.Sort();
-            regionHeights.Sort();
-
-            int medianWidth = regionWidths[regionWidths.Count / 2];
-            int medianHeight = regionHeights[regionHeights.Count / 2];
-
-            int cellWidth = FindNearestDivisorWithMinCells(textureWidth, medianWidth, 2);
-            int cellHeight = FindNearestDivisorWithMinCells(textureHeight, medianHeight, 2);
-
-            if (cellWidth < minimumRegionSize || cellHeight < minimumRegionSize)
-            {
-                return (0, 0);
-            }
-
-            return (cellWidth, cellHeight);
-        }
-
-        /// <summary>
-        /// Verifies that grid lines do not cut through opaque sprite content.
-        /// Checks both vertical and horizontal grid boundaries for excessive opaque pixels.
-        /// </summary>
-        /// <param name="pixels">The texture pixel data in Color32 format.</param>
-        /// <param name="textureWidth">Width of the texture in pixels.</param>
-        /// <param name="textureHeight">Height of the texture in pixels.</param>
-        /// <param name="cellWidth">The cell width to verify.</param>
-        /// <param name="cellHeight">The cell height to verify.</param>
-        /// <param name="alphaThreshold">Finite alpha value (0-1) below which a pixel is considered transparent.</param>
-        /// <returns>True if the grid is valid (does not cut sprites), false if more than 30% of grid line pixels are opaque.</returns>
-        internal static bool VerifyGridDoesNotCutSprites(
-            Color32[] pixels,
-            int textureWidth,
-            int textureHeight,
-            int cellWidth,
-            int cellHeight,
-            float alphaThreshold
-        )
-        {
-            if (!float.IsFinite(alphaThreshold))
-            {
-                return false;
-            }
-
-            if (pixels == null || pixels.Length == 0)
-            {
-                return true;
-            }
-
-            if (cellWidth <= 0 || cellHeight <= 0)
-            {
-                return true;
-            }
-
-            if (pixels.Length != textureWidth * textureHeight)
-            {
-                return true;
-            }
-
-            byte alphaThresholdByte = ColorQuantization.ToThresholdByte(alphaThreshold);
-            int opaqueOnGridLines = 0;
-            int totalGridLinePixels = 0;
-
-            for (int col = 1; col < textureWidth / cellWidth; ++col)
-            {
-                int x = col * cellWidth;
-                if (textureWidth <= x)
-                {
-                    break;
-                }
-
-                for (int y = 0; y < textureHeight; ++y)
-                {
-                    int idx = y * textureWidth + x;
-                    ++totalGridLinePixels;
-                    if (alphaThresholdByte < pixels[idx].a)
-                    {
-                        ++opaqueOnGridLines;
-                    }
-                }
-            }
-
-            for (int row = 1; row < textureHeight / cellHeight; ++row)
-            {
-                int y = row * cellHeight;
-                if (textureHeight <= y)
-                {
-                    break;
-                }
-
-                for (int x = 0; x < textureWidth; ++x)
-                {
-                    int idx = y * textureWidth + x;
-                    ++totalGridLinePixels;
-                    if (alphaThresholdByte < pixels[idx].a)
-                    {
-                        ++opaqueOnGridLines;
-                    }
-                }
-            }
-
-            if (totalGridLinePixels == 0)
-            {
-                return true;
-            }
-
-            float opaqueRatio = (float)opaqueOnGridLines / totalGridLinePixels;
-
-            return opaqueRatio < 0.3f;
-        }
-
-        /// <summary>
-        /// Fallback method that finds consistent spacing using the legacy approach.
-        /// First identifies highly transparent boundaries, then looks for consistent gaps.
-        /// </summary>
-        private static int FindConsistentSpacingFromTransparency(
-            int[] transparencyCount,
-            int dimension,
-            int crossDimension,
-            int minimumCellSize
-        )
-        {
-            // Allow partial transparency when detecting sprite-sheet boundaries.
-            float transparencyRequirement = 0.70f;
-            int minTransparentPixels = (int)(crossDimension * transparencyRequirement);
-
-            using PooledResource<List<int>> boundariesLease = Buffers<int>.List.Get(
-                out List<int> boundaries
-            );
-
-            for (int i = 0; i < dimension; ++i)
-            {
-                if (minTransparentPixels <= transparencyCount[i])
-                {
-                    boundaries.Add(i);
-                }
-            }
-
-            if (boundaries.Count < 2)
-            {
-                transparencyRequirement = 0.50f;
-                minTransparentPixels = (int)(crossDimension * transparencyRequirement);
-                boundaries.Clear();
-
-                for (int i = 0; i < dimension; ++i)
-                {
-                    if (minTransparentPixels <= transparencyCount[i])
-                    {
-                        boundaries.Add(i);
-                    }
-                }
-            }
-
-            if (boundaries.Count < 2)
-            {
-                return 0;
-            }
-
-            return FindConsistentSpacing(boundaries, dimension, minimumCellSize);
-        }
-
-        /// <summary>
-        /// Finds consistent spacing between transparent boundaries.
-        /// Returns the most common spacing if it divides the dimension evenly.
-        /// Uses a tolerance of +/- 2 pixels when searching for valid divisors.
-        /// </summary>
-        private static int FindConsistentSpacing(
-            List<int> boundaries,
-            int totalDimension,
-            int minimumCellSize
-        )
-        {
-            if (boundaries.Count < 2)
-            {
-                return 0;
-            }
-
-            using PooledResource<List<int>> gapsLease = Buffers<int>.List.Get(out List<int> gaps);
-
-            int firstBoundary = boundaries[0];
-            if (0 < firstBoundary && minimumCellSize <= firstBoundary)
-            {
-                gaps.Add(firstBoundary);
-            }
-
-            for (int i = 1; i < boundaries.Count; ++i)
-            {
-                int gap = boundaries[i] - boundaries[i - 1];
-                if (minimumCellSize <= gap)
-                {
-                    gaps.Add(gap);
-                }
-            }
-
-            int lastBoundary = boundaries[boundaries.Count - 1];
-            int trailingGap = totalDimension - lastBoundary - 1;
-            if (minimumCellSize <= trailingGap)
-            {
-                gaps.Add(trailingGap);
-            }
-
-            if (gaps.Count < 2)
-            {
-                return 0;
-            }
-
-            using PooledResource<Dictionary<int, int>> gapCountsLease = DictionaryBuffer<
-                int,
-                int
-            >.Dictionary.Get(out Dictionary<int, int> gapCounts);
-
-            foreach (int gap in gaps)
-            {
-                if (gapCounts.TryGetValue(gap, out int count))
-                {
-                    gapCounts[gap] = count + 1;
-                }
-                else
-                {
-                    gapCounts[gap] = 1;
-                }
-            }
-
-            int mostCommonGap = 0;
-            int mostCommonCount = 0;
-
-            foreach (KeyValuePair<int, int> gapCount in gapCounts)
-            {
-                if (mostCommonCount < gapCount.Value)
-                {
-                    mostCommonCount = gapCount.Value;
-                    mostCommonGap = gapCount.Key;
-                }
-            }
-
-            if (0 < mostCommonGap && totalDimension % mostCommonGap == 0)
-            {
-                int expectedColumns = totalDimension / mostCommonGap;
-                if (2 <= expectedColumns && expectedColumns - 1 <= mostCommonCount)
-                {
-                    return mostCommonGap;
-                }
-            }
-
-            for (int tolerance = 1; tolerance <= 2; ++tolerance)
-            {
-                int candidateLow = mostCommonGap - tolerance;
-                if (minimumCellSize <= candidateLow && totalDimension % candidateLow == 0)
-                {
-                    int expectedColumns = totalDimension / candidateLow;
-                    if (2 <= expectedColumns)
-                    {
-                        return candidateLow;
-                    }
-                }
-
-                int candidateHigh = mostCommonGap + tolerance;
-                if (minimumCellSize <= candidateHigh && totalDimension % candidateHigh == 0)
-                {
-                    int expectedColumns = totalDimension / candidateHigh;
-                    if (2 <= expectedColumns)
-                    {
-                        return candidateHigh;
-                    }
-                }
-            }
-
-            return 0;
-        }
-
-        internal ExtractionMode GetEffectiveExtractionMode(SpriteSheetEntry entry)
-        {
-            ExtractionMode mode;
-            if (
-                entry == null
-                || entry._useGlobalSettings
-                || !entry._extractionModeOverride.HasValue
-            )
-            {
-                mode = _extractionMode;
-            }
-            else
-            {
-                mode = entry._extractionModeOverride.Value;
-            }
-
-#pragma warning disable CS0618 // Type or member is obsolete
-            if (mode == ExtractionMode.None)
-            {
-                return ExtractionMode.FromMetadata;
-            }
-#pragma warning restore CS0618
-
-            return mode;
-        }
-
-        internal GridSizeMode GetEffectiveGridSizeMode(SpriteSheetEntry entry)
-        {
-            GridSizeMode mode;
-            if (entry == null || entry._useGlobalSettings || !entry._gridSizeModeOverride.HasValue)
-            {
-                mode = _gridSizeMode;
-            }
-            else
-            {
-                mode = entry._gridSizeModeOverride.Value;
-            }
-
-#pragma warning disable CS0618 // Type or member is obsolete
-            if (mode == GridSizeMode.None)
-            {
-                return GridSizeMode.Auto;
-            }
-#pragma warning restore CS0618
-
-            return mode;
-        }
-
-        internal int GetEffectiveGridColumns(SpriteSheetEntry entry)
-        {
-            if (entry == null || entry._useGlobalSettings || !entry._gridColumnsOverride.HasValue)
-            {
-                return _gridColumns;
-            }
-            return entry._gridColumnsOverride.Value;
-        }
-
-        internal int GetEffectiveGridRows(SpriteSheetEntry entry)
-        {
-            if (entry == null || entry._useGlobalSettings || !entry._gridRowsOverride.HasValue)
-            {
-                return _gridRows;
-            }
-            return entry._gridRowsOverride.Value;
-        }
-
-        internal int GetEffectiveCellWidth(SpriteSheetEntry entry)
-        {
-            if (entry == null || entry._useGlobalSettings || !entry._cellWidthOverride.HasValue)
-            {
-                return _cellWidth;
-            }
-            return entry._cellWidthOverride.Value;
-        }
-
-        internal int GetEffectiveCellHeight(SpriteSheetEntry entry)
-        {
-            if (entry == null || entry._useGlobalSettings || !entry._cellHeightOverride.HasValue)
-            {
-                return _cellHeight;
-            }
-            return entry._cellHeightOverride.Value;
-        }
-
-        internal int GetEffectivePaddingLeft(SpriteSheetEntry entry)
-        {
-            if (entry == null || entry._useGlobalSettings || !entry._paddingLeftOverride.HasValue)
-            {
-                return _paddingLeft;
-            }
-            return entry._paddingLeftOverride.Value;
-        }
-
-        internal int GetEffectivePaddingRight(SpriteSheetEntry entry)
-        {
-            if (entry == null || entry._useGlobalSettings || !entry._paddingRightOverride.HasValue)
-            {
-                return _paddingRight;
-            }
-            return entry._paddingRightOverride.Value;
-        }
-
-        internal int GetEffectivePaddingTop(SpriteSheetEntry entry)
-        {
-            if (entry == null || entry._useGlobalSettings || !entry._paddingTopOverride.HasValue)
-            {
-                return _paddingTop;
-            }
-            return entry._paddingTopOverride.Value;
-        }
-
-        internal int GetEffectivePaddingBottom(SpriteSheetEntry entry)
-        {
-            if (entry == null || entry._useGlobalSettings || !entry._paddingBottomOverride.HasValue)
-            {
-                return _paddingBottom;
-            }
-            return entry._paddingBottomOverride.Value;
-        }
-
-        internal float GetEffectiveAlphaThreshold(SpriteSheetEntry entry)
-        {
-            if (
-                entry == null
-                || entry._useGlobalSettings
-                || !entry._alphaThresholdOverride.HasValue
-            )
-            {
-                return _alphaThreshold;
-            }
-            return entry._alphaThresholdOverride.Value;
-        }
-
-        /// <summary>
-        /// Returns whether the overlay should be shown for the given entry.
-        /// Uses per-sheet override if set, otherwise falls back to global setting.
-        /// </summary>
-        /// <param name="entry">The sprite sheet entry to check, or null to use global setting.</param>
-        /// <returns>True if the overlay should be displayed for this entry.</returns>
-        internal bool GetEffectiveShowOverlay(SpriteSheetEntry entry)
-        {
-            if (entry == null || entry._useGlobalSettings || !entry._showOverlayOverride.HasValue)
-            {
-                return _showOverlay;
-            }
-            return entry._showOverlayOverride.Value;
-        }
-
-        /// <summary>
-        /// Returns the effective pivot mode for the given entry.
-        /// Uses per-sheet override if set, otherwise falls back to global setting.
-        /// </summary>
-        /// <param name="entry">The sprite sheet entry to check, or null to use global setting.</param>
-        /// <returns>The pivot mode to use for this entry.</returns>
-        internal PivotMode GetEffectivePivotMode(SpriteSheetEntry entry)
-        {
-            if (entry == null || entry._useGlobalSettings || !entry._pivotModeOverride.HasValue)
-            {
-                return _pivotMode;
-            }
-            return entry._pivotModeOverride.Value;
-        }
-
-        /// <summary>
-        /// Returns the effective custom pivot for the given entry.
-        /// Uses per-sheet override if set, otherwise falls back to global setting.
-        /// </summary>
-        /// <param name="entry">The sprite sheet entry to check, or null to use global setting.</param>
-        /// <returns>The custom pivot point to use for this entry.</returns>
-        internal Vector2 GetEffectiveCustomPivot(SpriteSheetEntry entry)
-        {
-            if (entry == null || entry._useGlobalSettings || !entry._customPivotOverride.HasValue)
-            {
-                return _customPivot;
-            }
-            return entry._customPivotOverride.Value;
-        }
-
-        /// <summary>
-        /// Returns the effective auto-detection algorithm for the given entry.
-        /// Uses per-sheet override if set, otherwise falls back to global setting.
-        /// </summary>
-        /// <param name="entry">The sprite sheet entry to check, or null to use global setting.</param>
-        /// <returns>The algorithm to use for this entry.</returns>
-        internal AutoDetectionAlgorithm GetEffectiveAutoDetectionAlgorithm(SpriteSheetEntry entry)
-        {
-            if (
-                entry == null
-                || entry._useGlobalSettings
-                || !entry._autoDetectionAlgorithmOverride.HasValue
-            )
-            {
-                return _autoDetectionAlgorithm;
-            }
-            return entry._autoDetectionAlgorithmOverride.Value;
-        }
-
-        /// <summary>
-        /// Returns the effective expected sprite count for the given entry.
-        /// Uses per-sheet override if set, otherwise falls back to global setting.
-        /// </summary>
-        /// <param name="entry">The sprite sheet entry to check, or null to use global setting.</param>
-        /// <returns>The expected sprite count, or -1 if not set.</returns>
-        internal int GetEffectiveExpectedSpriteCount(SpriteSheetEntry entry)
-        {
-            if (
-                entry == null
-                || entry._useGlobalSettings
-                || !entry._expectedSpriteCountOverride.HasValue
-            )
-            {
-                return _expectedSpriteCountHint;
-            }
-            return entry._expectedSpriteCountOverride.Value;
-        }
-
-        /// <summary>
-        /// Returns the effective snap to texture divisor setting for the given entry.
-        /// Uses per-sheet override if set, otherwise falls back to global setting.
-        /// </summary>
-        /// <param name="entry">The sprite sheet entry to check, or null to use global setting.</param>
-        /// <returns>True if cell sizes should be adjusted to be exact divisors of texture dimensions.</returns>
-        internal bool GetEffectiveSnapToTextureDivisor(SpriteSheetEntry entry)
-        {
-            if (
-                entry == null
-                || entry._useGlobalSettings
-                || !entry._snapToTextureDivisorOverride.HasValue
-            )
-            {
-                return _snapToTextureDivisor;
-            }
-            return entry._snapToTextureDivisorOverride.Value;
-        }
-
-        /// <summary>
-        /// Gets the effective pivot marker color for a sprite, respecting the cascade:
-        /// per-element, per-sheet, global.
-        /// </summary>
-        /// <param name="entry">The sprite sheet entry containing the sprite.</param>
-        /// <param name="sprite">The individual sprite entry to get the color for.</param>
-        /// <returns>The effective pivot marker color for the sprite.</returns>
-        internal Color GetEffectivePivotColor(SpriteSheetEntry entry, SpriteEntryData sprite)
-        {
-            if (sprite != null && sprite._usePivotColorOverride)
-            {
-                return sprite._pivotColorOverride;
-            }
-
-            if (entry != null && entry._usePivotMarkerColorOverride)
-            {
-                return entry._pivotMarkerColorOverride;
-            }
-
-            return _pivotMarkerColor;
-        }
-
-        /// <summary>
-        /// Gets the effective pivot position for a sprite, respecting the cascade:
-        /// per-element override, per-sheet override, global settings.
-        /// </summary>
-        /// <param name="entry">The sprite sheet entry containing the sprite.</param>
-        /// <param name="sprite">The individual sprite entry to get the pivot for.</param>
-        /// <returns>
-        /// The effective pivot as a normalized Vector2 where (0,0) is bottom-left and (1,1) is top-right.
-        /// </returns>
-        internal Vector2 GetEffectivePivot(SpriteSheetEntry entry, SpriteEntryData sprite)
-        {
-            if (sprite != null && sprite._usePivotOverride)
-            {
-                return PivotModeToVector2(sprite._pivotModeOverride, sprite._customPivotOverride);
-            }
-
-            if (entry != null && !entry._useGlobalSettings && entry._pivotModeOverride.HasValue)
-            {
-                Vector2 customPivot = entry._customPivotOverride ?? _customPivot;
-                return PivotModeToVector2(entry._pivotModeOverride.Value, customPivot);
-            }
-
-            return PivotModeToVector2(_pivotMode, _customPivot);
-        }
-
-        /// <summary>
-        /// Initializes all override fields from their corresponding global values.
-        /// Called when transitioning from global settings to per-sheet settings.
-        /// </summary>
-        /// <remarks>
-        /// <para>
-        /// This method is called AFTER <paramref name="entry"/>._useGlobalSettings has been set to false.
-        /// It copies all current effective values (which are still the global values) to the override fields,
-        /// ensuring the UI toggle states match the actual rendering behavior.
-        /// </para>
-        /// <para>
-        /// The method intentionally does NOT modify _useGlobalSettings since the caller has already changed it.
-        /// </para>
-        /// </remarks>
-        /// <param name="entry">The sprite sheet entry to initialize. If null, the method returns immediately.</param>
-        internal void InitializeOverridesFromGlobal(SpriteSheetEntry entry)
-        {
-            if (entry == null)
-            {
-                return;
-            }
-
-            // Save effective values into overrides so toggling global mode preserves customization.
-            entry._extractionModeOverride = GetEffectiveExtractionMode(entry);
-            entry._gridSizeModeOverride = GetEffectiveGridSizeMode(entry);
-            entry._gridColumnsOverride = GetEffectiveGridColumns(entry);
-            entry._gridRowsOverride = GetEffectiveGridRows(entry);
-            entry._cellWidthOverride = GetEffectiveCellWidth(entry);
-            entry._cellHeightOverride = GetEffectiveCellHeight(entry);
-            entry._paddingLeftOverride = GetEffectivePaddingLeft(entry);
-            entry._paddingRightOverride = GetEffectivePaddingRight(entry);
-            entry._paddingTopOverride = GetEffectivePaddingTop(entry);
-            entry._paddingBottomOverride = GetEffectivePaddingBottom(entry);
-            entry._alphaThresholdOverride = GetEffectiveAlphaThreshold(entry);
-            entry._showOverlayOverride = GetEffectiveShowOverlay(entry);
-            entry._pivotModeOverride = GetEffectivePivotMode(entry);
-            entry._customPivotOverride = GetEffectiveCustomPivot(entry);
-            entry._autoDetectionAlgorithmOverride = GetEffectiveAutoDetectionAlgorithm(entry);
-            entry._expectedSpriteCountOverride = GetEffectiveExpectedSpriteCount(entry);
-            entry._snapToTextureDivisorOverride = GetEffectiveSnapToTextureDivisor(entry);
-            entry._usePivotMarkerColorOverride = false;
-            entry._pivotMarkerColorOverride = _pivotMarkerColor;
-
-            entry._cachedAlgorithmResult = null;
-            entry._lastAlgorithmDisplayText = null;
-        }
-
-        /// <summary>
-        /// Converts a PivotMode enum value to the corresponding normalized Vector2 pivot coordinates.
-        /// </summary>
-        /// <param name="pivotMode">The pivot mode to convert.</param>
-        /// <param name="customPivot">The custom pivot to use when pivotMode is Custom.</param>
-        /// <returns>Normalized pivot coordinates where (0,0) is bottom-left and (1,1) is top-right.</returns>
-        internal static Vector2 PivotModeToVector2(PivotMode pivotMode, Vector2 customPivot)
-        {
-            return pivotMode switch
-            {
-                PivotMode.Center => new Vector2(0.5f, 0.5f),
-                PivotMode.BottomLeft => new Vector2(0f, 0f),
-                PivotMode.TopLeft => new Vector2(0f, 1f),
-                PivotMode.BottomRight => new Vector2(1f, 0f),
-                PivotMode.TopRight => new Vector2(1f, 1f),
-                PivotMode.LeftCenter => new Vector2(0f, 0.5f),
-                PivotMode.RightCenter => new Vector2(1f, 0.5f),
-                PivotMode.TopCenter => new Vector2(0.5f, 1f),
-                PivotMode.BottomCenter => new Vector2(0.5f, 0f),
-                PivotMode.Custom => customPivot,
-                _ => new Vector2(0.5f, 0.5f),
-            };
-        }
-
-        /// <summary>
-        /// Converts a sprite rect (in texture coordinates) to screen coordinates within the preview rect.
-        /// </summary>
-        /// <param name="textureRect">The texture-space rect within the preview.</param>
-        /// <param name="spriteRect">The sprite rect in texture coordinates.</param>
-        /// <param name="textureHeight">The height of the source texture.</param>
-        /// <param name="scale">The scale factor from texture to screen coordinates.</param>
-        /// <returns>The screen-space rect corresponding to the sprite.</returns>
-        internal static Rect ConvertTextureRectToScreenRect(
-            Rect textureRect,
-            Rect spriteRect,
-            int textureHeight,
-            float scale
-        )
-        {
-            float screenX = textureRect.x + spriteRect.x * scale;
-            float screenY =
-                textureRect.y + (textureHeight - spriteRect.y - spriteRect.height) * scale;
-            float screenWidth = spriteRect.width * scale;
-            float screenHeight = spriteRect.height * scale;
-            return new Rect(screenX, screenY, screenWidth, screenHeight);
-        }
-
-        /// <summary>
-        /// Calculates the normalized pivot position within a sprite based on a screen position.
-        /// </summary>
-        /// <param name="screenPosition">The mouse position in screen coordinates.</param>
-        /// <param name="spriteScreenRect">The sprite rect in screen coordinates.</param>
-        /// <returns>Normalized position (0-1) where (0,0) is bottom-left and (1,1) is top-right.</returns>
-        internal static Vector2 CalculateNormalizedPositionInSprite(
-            Vector2 screenPosition,
-            Rect spriteScreenRect
-        )
-        {
-            float normalizedX = (screenPosition.x - spriteScreenRect.x) / spriteScreenRect.width;
-            float normalizedY =
-                1f - (screenPosition.y - spriteScreenRect.y) / spriteScreenRect.height;
-            return new Vector2(Mathf.Clamp01(normalizedX), Mathf.Clamp01(normalizedY));
-        }
-
-        /// <summary>
-        /// Finds which sprite (if any) contains the given screen position.
-        /// </summary>
-        /// <param name="screenPosition">The mouse position in screen coordinates.</param>
-        /// <param name="textureRect">The texture-space rect within the preview.</param>
-        /// <param name="entry">The sprite sheet entry containing the sprites.</param>
-        /// <param name="textureHeight">The height of the source texture.</param>
-        /// <param name="scale">The scale factor from texture to screen coordinates.</param>
-        /// <returns>The index of the sprite containing the position, or -1 if none.</returns>
-        internal static int FindSpriteAtScreenPosition(
-            Vector2 screenPosition,
-            Rect textureRect,
-            SpriteSheetEntry entry,
-            int textureHeight,
-            float scale
-        )
-        {
-            if (entry == null || entry._sprites == null)
-            {
-                return -1;
-            }
-
-            for (int i = 0; i < entry._sprites.Count; ++i)
-            {
-                SpriteEntryData sprite = entry._sprites[i];
-                if (sprite == null)
-                {
-                    continue;
-                }
-
-                Rect screenRect = ConvertTextureRectToScreenRect(
-                    textureRect,
-                    sprite._rect,
-                    textureHeight,
-                    scale
-                );
-
-                if (screenRect.Contains(screenPosition))
-                {
-                    return i;
-                }
-            }
-
-            return -1;
-        }
-
-        /// <summary>
-        /// Computes the SHA256 hash of a file's contents.
-        /// </summary>
-        /// <param name="filePath">The path to the file to hash.</param>
-        /// <returns>The SHA256 hash as a lowercase hex string, or null if the file cannot be read.</returns>
-        internal static string ComputeFileHash(string filePath)
-        {
-            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
-            {
-                return null;
-            }
-
-            try
-            {
-                using SHA256 sha256 = SHA256.Create();
-                using FileStream stream = File.OpenRead(filePath);
-                byte[] hashBytes = sha256.ComputeHash(stream);
-                StringBuilder builder = new(hashBytes.Length * 2);
-                for (int i = 0; i < hashBytes.Length; ++i)
-                {
-                    _ = builder.Append(hashBytes[i].ToString("x2"));
-                }
-                return builder.ToString();
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        /// <summary>
-        /// Saves the configuration for a sprite sheet entry to a JSON file.
-        /// </summary>
-        /// <param name="entry">The entry to save configuration for.</param>
-        /// <returns>True if the config was saved successfully, false otherwise.</returns>
-        internal bool SaveConfig(SpriteSheetEntry entry)
-        {
-            if (entry == null || string.IsNullOrEmpty(entry._assetPath))
-            {
-                return false;
-            }
-
-            try
-            {
-                string configPath = SpriteSheetConfig.GetConfigPath(entry._assetPath);
-                string fullConfigPath = Path.GetFullPath(configPath);
-
-                string textureFullPath = Path.GetFullPath(entry._assetPath);
-                string hash = ComputeFileHash(textureFullPath);
-
-                CachedAlgorithmResult cachedResult = null;
-                if (
-                    entry._cachedAlgorithmResult.HasValue
-                    && entry._cachedAlgorithmResult.Value.IsValid
-                )
-                {
-                    cachedResult = CachedAlgorithmResult.FromResult(
-                        entry._cachedAlgorithmResult.Value
-                    );
-                }
-
-                SpriteSheetConfig config = new()
-                {
-                    version = SpriteSheetConfig.CurrentVersion,
-                    pivotMode = GetEffectivePivotMode(entry),
-                    customPivot = GetEffectiveCustomPivot(entry),
-                    algorithm = (int)GetEffectiveAutoDetectionAlgorithm(entry),
-                    expectedSpriteCount = GetEffectiveExpectedSpriteCount(entry),
-                    textureContentHash = hash,
-                    cachedAlgorithmResult = cachedResult,
-                    snapToTextureDivisor = GetEffectiveSnapToTextureDivisor(entry),
-                };
-
-                string json = Serializer.JsonStringify(config, pretty: true);
-                File.WriteAllText(fullConfigPath, json, Encoding.UTF8);
-
-                entry._loadedConfig = config;
-                entry._configLoaded = true;
-                entry._configStale = false;
-
-                AssetDatabase.Refresh();
-                return true;
-            }
-            catch (Exception e)
-            {
-                this.LogError($"Failed to save config for '{entry._assetPath}'", e);
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Loads the configuration for a sprite sheet entry from a JSON file.
-        /// </summary>
-        /// <param name="entry">The entry to load configuration for.</param>
-        /// <returns>True if the config was loaded successfully, false otherwise.</returns>
-        internal bool LoadConfig(SpriteSheetEntry entry)
-        {
-            if (entry == null || string.IsNullOrEmpty(entry._assetPath))
-            {
-                return false;
-            }
-
-            try
-            {
-                string configPath = SpriteSheetConfig.GetConfigPath(entry._assetPath);
-                string fullConfigPath = Path.GetFullPath(configPath);
-
-                if (!File.Exists(fullConfigPath))
-                {
-                    entry._configLoaded = false;
-                    entry._configStale = false;
-                    entry._loadedConfig = null;
-                    return false;
-                }
-
-                string json = File.ReadAllText(fullConfigPath, Encoding.UTF8);
-                SpriteSheetConfig config = Serializer.JsonDeserialize<SpriteSheetConfig>(json);
-
-                if (config == null)
-                {
-                    entry._configLoaded = false;
-                    entry._configStale = false;
-                    entry._loadedConfig = null;
-                    return false;
-                }
-
-                SpriteSheetConfig.MigrateConfig(config);
-
-                string textureFullPath = Path.GetFullPath(entry._assetPath);
-                string currentHash = ComputeFileHash(textureFullPath);
-                bool isStale =
-                    !string.IsNullOrEmpty(config.textureContentHash)
-                    && !string.Equals(
-                        config.textureContentHash,
-                        currentHash,
-                        StringComparison.OrdinalIgnoreCase
-                    );
-
-                entry._loadedConfig = config;
-                entry._configLoaded = true;
-                entry._configStale = isStale;
-
-                entry._pivotModeOverride = config.pivotMode;
-                entry._customPivotOverride = config.customPivot;
-                entry._autoDetectionAlgorithmOverride = (AutoDetectionAlgorithm)config.algorithm;
-                entry._expectedSpriteCountOverride = config.expectedSpriteCount;
-                entry._snapToTextureDivisorOverride = config.snapToTextureDivisor;
-                // Do not restore cached detections computed under potentially different configuration settings.
-                entry._cachedAlgorithmResult = null;
-                entry._useGlobalSettings = false;
-
-                return true;
-            }
-            catch (Exception e)
-            {
-                this.LogError($"Failed to load config for '{entry._assetPath}'", e);
-                entry._configLoaded = false;
-                entry._configStale = false;
-                entry._loadedConfig = null;
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Attempts to auto-load config for an entry if the config file exists.
-        /// </summary>
-        /// <param name="entry">The entry to auto-load config for.</param>
-        internal void TryAutoLoadConfig(SpriteSheetEntry entry)
-        {
-            if (entry == null || string.IsNullOrEmpty(entry._assetPath))
-            {
-                return;
-            }
-
-            string configPath = SpriteSheetConfig.GetConfigPath(entry._assetPath);
-            string fullConfigPath = Path.GetFullPath(configPath);
-
-            if (File.Exists(fullConfigPath))
-            {
-                _ = LoadConfig(entry);
-            }
-        }
-
-        /// <summary>
-        /// Calculates the actual rect where the texture is drawn within the preview area.
-        /// This accounts for ScaleMode.ScaleToFit centering behavior.
-        /// </summary>
-        internal Rect CalculateTextureRectWithinPreview(
-            Rect previewRect,
-            int textureWidth,
-            int textureHeight,
-            float scale
-        )
-        {
-            if (textureWidth <= 0 || textureHeight <= 0 || scale <= 0f)
-            {
-                return previewRect;
-            }
-
-            float scaledWidth = textureWidth * scale;
-            float scaledHeight = textureHeight * scale;
-            float offsetX = (previewRect.width - scaledWidth) * 0.5f;
-            float offsetY = (previewRect.height - scaledHeight) * 0.5f;
-            return new Rect(
-                previewRect.x + offsetX,
-                previewRect.y + offsetY,
-                scaledWidth,
-                scaledHeight
-            );
-        }
-
-        /// <summary>
-        /// Draws outline rectangles around each sprite bound in the source texture preview.
-        /// This method replaces the old grid overlay with actual sprite bounds visualization.
-        /// </summary>
-        /// <param name="previewRect">The preview area rectangle.</param>
-        /// <param name="textureWidth">Width of the source texture.</param>
-        /// <param name="textureHeight">Height of the source texture.</param>
-        /// <param name="scale">Scale factor for drawing.</param>
-        /// <param name="entry">The sprite sheet entry containing sprite bounds.</param>
-        internal void DrawSpriteBoundsOverlay(
-            Rect previewRect,
-            int textureWidth,
-            int textureHeight,
-            float scale,
-            SpriteSheetEntry entry
-        )
-        {
-            if (entry == null)
-            {
-                return;
-            }
-
-            CheckAndRegenerateIfNeeded(entry);
-
-            if (entry._sprites == null || entry._sprites.Count == 0)
-            {
-                if (DiagnosticsEnabled)
-                {
-                    this.Log(
-                        $"DrawSpriteBoundsOverlay: no sprites for '{entry._assetPath}', sprites={entry._sprites?.Count ?? 0}"
-                    );
-                }
-                return;
-            }
-
-            if (DiagnosticsEnabled && 0 < entry._sprites.Count)
-            {
-                SpriteEntryData firstSprite = entry._sprites[0];
-                this.Log(
-                    $"DrawSpriteBoundsOverlay: drawing {entry._sprites.Count} sprites for '{Path.GetFileName(entry._assetPath)}', firstRect={firstSprite._rect}, algorithm={entry._lastAlgorithmDisplayText}"
-                );
-            }
-
-            Rect textureRect = CalculateTextureRectWithinPreview(
-                previewRect,
-                textureWidth,
-                textureHeight,
-                scale
-            );
-
-            foreach (SpriteEntryData sprite in entry._sprites)
-            {
-                if (sprite == null)
-                {
-                    continue;
-                }
-
-                float rectX = textureRect.x + sprite._rect.x * scale;
-                float rectY =
-                    textureRect.y + (textureHeight - sprite._rect.y - sprite._rect.height) * scale;
-                float rectWidth = sprite._rect.width * scale;
-                float rectHeight = sprite._rect.height * scale;
-                EditorGUI.DrawRect(new Rect(rectX, rectY, rectWidth, 1), _overlayColor);
-                EditorGUI.DrawRect(
-                    new Rect(rectX, rectY + rectHeight - 1, rectWidth, 1),
-                    _overlayColor
-                );
-                EditorGUI.DrawRect(new Rect(rectX, rectY, 1, rectHeight), _overlayColor);
-                EditorGUI.DrawRect(
-                    new Rect(rectX + rectWidth - 1, rectY, 1, rectHeight),
-                    _overlayColor
-                );
-                Vector2 effectivePivot = GetEffectivePivot(entry, sprite);
-                bool isNonDefaultPivot = effectivePivot != CenterPivot || sprite._usePivotOverride;
-                if (isNonDefaultPivot)
-                {
-                    Color pivotColor = GetEffectivePivotColor(entry, sprite);
-                    Rect screenRect = new Rect(rectX, rectY, rectWidth, rectHeight);
-                    DrawPivotMarker(screenRect, effectivePivot, pivotColor);
-                }
-            }
-        }
-
         /// <summary>
         /// Draws a grid overlay based on current grid settings when sprites haven't been generated yet.
         /// This provides visual feedback during regeneration or before sprites are populated.
@@ -5185,72 +6565,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             DrawPivotMarker(textureRect, pivot, SheetPivotColor, isSheetHovering, isSheetDragging);
         }
 
-        /// <summary>
-        /// Draws a dashed line between two points.
-        /// </summary>
-        /// <param name="start">The starting point of the line.</param>
-        /// <param name="end">The ending point of the line.</param>
-        /// <param name="color">The color of the dashes.</param>
-        /// <param name="dashLength">The length of each dash in pixels.</param>
-        /// <param name="gapLength">The length of each gap in pixels.</param>
-        private static void DrawDashedLine(
-            Vector2 start,
-            Vector2 end,
-            Color color,
-            float dashLength,
-            float gapLength
-        )
-        {
-            Vector2 direction = end - start;
-            float totalLength = direction.magnitude;
-
-            if (totalLength < 0.001f)
-            {
-                return;
-            }
-
-            direction /= totalLength;
-
-            float segmentLength = dashLength + gapLength;
-            float currentPosition = 0f;
-            bool isHorizontal = Mathf.Abs(direction.y) < Mathf.Abs(direction.x);
-            float lineThickness = 1f;
-
-            while (currentPosition < totalLength)
-            {
-                float dashEnd = Mathf.Min(currentPosition + dashLength, totalLength);
-                Vector2 dashStart = start + direction * currentPosition;
-                Vector2 dashEndPoint = start + direction * dashEnd;
-
-                if (isHorizontal)
-                {
-                    EditorGUI.DrawRect(
-                        new Rect(
-                            dashStart.x,
-                            dashStart.y - lineThickness / 2f,
-                            dashEndPoint.x - dashStart.x,
-                            lineThickness
-                        ),
-                        color
-                    );
-                }
-                else
-                {
-                    EditorGUI.DrawRect(
-                        new Rect(
-                            dashStart.x - lineThickness / 2f,
-                            dashStart.y,
-                            lineThickness,
-                            dashEndPoint.y - dashStart.y
-                        ),
-                        color
-                    );
-                }
-
-                currentPosition += segmentLength;
-            }
-        }
-
         private List<SpriteEntryData> GetSortedSprites(List<SpriteEntryData> sprites)
         {
             // Read pending SerializedProperty edits before ApplyModifiedProperties updates the backing field.
@@ -5269,74 +6583,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             _lastSpritesSource = sprites;
             _lastSortMode = currentSortMode;
             return _cachedSortedSprites;
-        }
-
-        /// <summary>
-        /// Applies the specified sort mode to a list of sprites, returning a new sorted list.
-        /// </summary>
-        /// <param name="sprites">The source sprites to sort.</param>
-        /// <param name="sortMode">The sort mode to apply.</param>
-        /// <param name="outputList">Optional pre-allocated list to reuse. If null, a new list is created.</param>
-        /// <returns>A sorted copy of the sprites list (does not modify the original).</returns>
-        /// <remarks>
-        /// This method is internal for testability. It creates a copy of the input list and sorts
-        /// the copy, leaving the original list unchanged.
-        /// </remarks>
-        internal static List<SpriteEntryData> ApplySortMode(
-            List<SpriteEntryData> sprites,
-            SortMode sortMode,
-            List<SpriteEntryData> outputList = null
-        )
-        {
-            outputList ??= new List<SpriteEntryData>();
-            outputList.Clear();
-
-            foreach (
-                WallstopStudios.UnityHelpers.Editor.Sprites.SpriteSheetExtractor.SpriteEntryData spritesElement in sprites
-            )
-            {
-                outputList.Add(spritesElement);
-            }
-
-            switch (sortMode)
-            {
-                case SortMode.ByName:
-                    outputList.Sort(
-                        (a, b) =>
-                            string.Compare(
-                                a._originalName,
-                                b._originalName,
-                                StringComparison.Ordinal
-                            )
-                    );
-                    break;
-                case SortMode.ByPositionTopLeft:
-                    outputList.Sort(
-                        (a, b) =>
-                        {
-                            int yCompare = b._rect.y.CompareTo(a._rect.y);
-                            return yCompare != 0 ? yCompare : a._rect.x.CompareTo(b._rect.x);
-                        }
-                    );
-                    break;
-                case SortMode.ByPositionBottomLeft:
-                    outputList.Sort(
-                        (a, b) =>
-                        {
-                            int yCompare = a._rect.y.CompareTo(b._rect.y);
-                            return yCompare != 0 ? yCompare : a._rect.x.CompareTo(b._rect.x);
-                        }
-                    );
-                    break;
-                case SortMode.Reversed:
-                    outputList.Reverse();
-                    break;
-                case SortMode.Original:
-                default:
-                    break;
-            }
-
-            return outputList;
         }
 
         private void DrawSpriteEntry(SpriteSheetEntry sheet, SpriteEntryData sprite, int index)
@@ -5522,27 +6768,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             --EditorGUI.indentLevel;
         }
 
-        internal int GetPreviewSize(SpriteEntryData sprite)
-        {
-            switch (_previewSizeMode)
-            {
-                case PreviewSizeMode.Size24:
-                    return 24;
-                case PreviewSizeMode.Size64:
-                    return 64;
-                case PreviewSizeMode.RealSize:
-                    if (sprite != null)
-                    {
-                        int maxDim = Mathf.Max((int)sprite._rect.width, (int)sprite._rect.height);
-                        return Mathf.Max(16, Mathf.Min(maxDim, 128));
-                    }
-                    return 32;
-                case PreviewSizeMode.Size32:
-                default:
-                    return 32;
-            }
-        }
-
         private void DrawExtractionSection()
         {
             if (_discoveredSheets == null || _discoveredSheets.Count == 0)
@@ -5657,135 +6882,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                 }
             }
-        }
-
-        internal void DiscoverSpriteSheets(bool generatePreviews = true)
-        {
-            CleanupPreviewTextures();
-
-            _discoveredSheets ??= new List<SpriteSheetEntry>();
-            _discoveredSheets.Clear();
-
-            _regex = null;
-            if (!string.IsNullOrWhiteSpace(_spriteNameRegex))
-            {
-                try
-                {
-                    _regex = new Regex(
-                        _spriteNameRegex,
-                        RegexOptions.Compiled | RegexOptions.CultureInvariant
-                    );
-                }
-                catch (ArgumentException e)
-                {
-                    this.LogWarn($"Invalid regex '{_spriteNameRegex}'", e);
-                    _regexError = e.Message;
-                    Repaint();
-                    return;
-                }
-            }
-
-            if (_inputDirectories == null || _inputDirectories.Count == 0)
-            {
-                this.LogWarn($"No input directories selected.");
-                Repaint();
-                return;
-            }
-
-            using PooledResource<HashSet<string>> seenLease = SetBuffers<string>
-                .GetHashSetPool(StringComparer.OrdinalIgnoreCase)
-                .Get(out HashSet<string> seen);
-
-            foreach (Object maybeDirectory in _inputDirectories)
-            {
-                if (maybeDirectory == null)
-                {
-                    continue;
-                }
-
-                string assetPath = AssetDatabase.GetAssetPath(maybeDirectory);
-                if (!AssetDatabase.IsValidFolder(assetPath))
-                {
-                    this.LogWarn($"Skipping invalid path: {assetPath}");
-                    continue;
-                }
-
-                string[] guids = AssetDatabase.FindAssets("t:Texture2D", new[] { assetPath });
-                foreach (string guidsElement in guids)
-                {
-                    string file = AssetDatabase.GUIDToAssetPath(guidsElement);
-                    if (string.IsNullOrEmpty(file))
-                    {
-                        continue;
-                    }
-
-                    bool hasValidExtension = false;
-                    foreach (string imageFileExtensionsElement in ImageFileExtensions)
-                    {
-                        if (
-                            file.EndsWith(
-                                imageFileExtensionsElement,
-                                StringComparison.OrdinalIgnoreCase
-                            )
-                        )
-                        {
-                            hasValidExtension = true;
-                            break;
-                        }
-                    }
-
-                    if (!hasValidExtension)
-                    {
-                        continue;
-                    }
-
-                    string fileName = Path.GetFileNameWithoutExtension(file);
-                    if (_regex != null && !_regex.IsMatch(fileName))
-                    {
-                        continue;
-                    }
-
-                    if (!seen.Add(file))
-                    {
-                        continue;
-                    }
-
-                    if (
-                        AssetImporter.GetAtPath(file)
-                        is not TextureImporter { textureType: TextureImporterType.Sprite } importer
-                    )
-                    {
-                        continue;
-                    }
-
-                    SpriteSheetEntry entry = CreateSpriteSheetEntry(file, importer);
-                    if (entry != null)
-                    {
-                        TryAutoLoadConfig(entry);
-                        // Loading configuration can change settings included in the cache key.
-                        entry._lastCacheKey = entry.GetBoundsCacheKey(this);
-                        _discoveredSheets.Add(entry);
-                    }
-                }
-            }
-
-            if (generatePreviews)
-            {
-                if (DiagnosticsEnabled)
-                {
-                    this.Log(
-                        $"DiscoverSpriteSheets: About to call GenerateAllPreviewTexturesInBatch with {_discoveredSheets?.Count ?? 0} entries"
-                    );
-                }
-                GenerateAllPreviewTexturesInBatch(_discoveredSheets);
-                if (DiagnosticsEnabled)
-                {
-                    this.Log($"DiscoverSpriteSheets: GenerateAllPreviewTexturesInBatch completed");
-                }
-            }
-
-            this.Log($"Discovered {_discoveredSheets.Count} sprite sheet(s).");
-            Repaint();
         }
 
         private SpriteSheetEntry CreateSpriteSheetEntry(string assetPath, TextureImporter importer)
@@ -5925,200 +7021,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         }
 
         /// <summary>
-        /// Generates preview textures for all sprite sheet entries in a batch operation.
-        /// </summary>
-        /// <param name="entries">The list of sprite sheet entries to generate previews for.</param>
-        /// <remarks>
-        /// This method batches texture readability changes to minimize reimport operations.
-        /// It uses <see cref="AssetDatabaseBatchHelper.BeginBatch"/> to batch all import changes together,
-        /// improving performance when processing multiple textures.
-        /// </remarks>
-        internal void GenerateAllPreviewTexturesInBatch(List<SpriteSheetEntry> entries)
-        {
-            if (entries == null || entries.Count == 0)
-            {
-                if (DiagnosticsEnabled)
-                {
-                    this.Log(
-                        $"GenerateAllPreviewTexturesInBatch: entries null or empty, returning early"
-                    );
-                }
-                return;
-            }
-
-            if (DiagnosticsEnabled)
-            {
-                this.Log($"GenerateAllPreviewTexturesInBatch: START with {entries.Count} entries");
-            }
-            WallstopGenericPool<Dictionary<string, bool>> originalReadablePool = DictionaryBuffer<
-                string,
-                bool
-            >.GetDictionaryPool(StringComparer.OrdinalIgnoreCase);
-            using PooledResource<Dictionary<string, bool>> originalReadableLease =
-                originalReadablePool.Get(out Dictionary<string, bool> originalReadable);
-
-            using PooledResource<List<SpriteSheetEntry>> needsReadableLease =
-                Buffers<SpriteSheetEntry>.List.Get(out List<SpriteSheetEntry> needsReadable);
-
-            foreach (SpriteSheetEntry entry in entries)
-            {
-                if (
-                    entry == null
-                    || entry._sprites == null
-                    || entry._sprites.Count == 0
-                    || entry._texture == null
-                    || entry._importer == null
-                )
-                {
-                    continue;
-                }
-
-                originalReadable[entry._assetPath] = entry._importer.isReadable;
-                if (!entry._importer.isReadable)
-                {
-                    needsReadable.Add(entry);
-                }
-            }
-
-            if (0 < needsReadable.Count)
-            {
-                using (AssetDatabaseBatchHelper.BeginBatch())
-                {
-                    foreach (SpriteSheetEntry entry in needsReadable)
-                    {
-                        entry._importer.isReadable = true;
-                        entry._importer.SaveAndReimport();
-                    }
-                }
-
-                AssetDatabase.SaveAssets();
-
-                foreach (SpriteSheetEntry entry in needsReadable)
-                {
-                    entry._texture = AssetDatabase.LoadAssetAtPath<Texture2D>(entry._assetPath);
-                    if (entry._texture == null)
-                    {
-                        this.LogWarn(
-                            $"Failed to reload texture after making readable: {entry._assetPath}"
-                        );
-                        continue;
-                    }
-                }
-            }
-
-            foreach (SpriteSheetEntry entry in entries)
-            {
-                if (
-                    entry == null
-                    || entry._sprites == null
-                    || entry._sprites.Count == 0
-                    || entry._texture == null
-                )
-                {
-                    continue;
-                }
-
-                if (!IsTextureFormatSupportedForGetPixels(entry._texture.format))
-                {
-                    this.LogWarn(
-                        $"Texture format '{entry._texture.format}' does not support GetPixels32 for {entry._assetPath}. Preview generation skipped."
-                    );
-                    continue;
-                }
-
-                try
-                {
-                    Color32[] sourcePixels = entry._texture.GetPixels32();
-                    int sourceWidth = entry._texture.width;
-                    int sourceHeight = entry._texture.height;
-                    foreach (SpriteEntryData sprite in entry._sprites)
-                    {
-                        if (sprite == null)
-                        {
-                            continue;
-                        }
-
-                        // Keep old texture until new one is ready to avoid grey question marks
-                        Texture2D oldTexture = sprite._previewTexture;
-                        Texture2D preview = GenerateSinglePreviewTexture(
-                            sourcePixels,
-                            sourceWidth,
-                            sourceHeight,
-                            sprite
-                        );
-                        sprite._previewTexture = preview;
-                        if (DiagnosticsEnabled)
-                        {
-                            this.Log(
-                                $"GenerateAllPreviewTexturesInBatch: Generated preview for sprite '{sprite._originalName}' in '{entry._assetPath}', preview={preview != null}"
-                            );
-                        }
-
-                        if (oldTexture != null)
-                        {
-                            DestroyImmediate(oldTexture);
-                        }
-                    }
-                }
-                catch (Exception e)
-                {
-                    this.LogWarn($"Failed to generate preview textures for {entry._assetPath}", e);
-                }
-            }
-
-            using PooledResource<List<SpriteSheetEntry>> needsRestoreLease =
-                Buffers<SpriteSheetEntry>.List.Get(out List<SpriteSheetEntry> needsRestore);
-
-            foreach (SpriteSheetEntry entry in entries)
-            {
-                if (entry == null || entry._importer == null)
-                {
-                    continue;
-                }
-
-                if (
-                    originalReadable.TryGetValue(entry._assetPath, out bool wasReadable)
-                    && !wasReadable
-                )
-                {
-                    needsRestore.Add(entry);
-                }
-            }
-
-            if (0 < needsRestore.Count)
-            {
-                using (AssetDatabaseBatchHelper.BeginBatch())
-                {
-                    foreach (SpriteSheetEntry entry in needsRestore)
-                    {
-                        entry._importer.isReadable = false;
-                        entry._importer.SaveAndReimport();
-                    }
-                }
-
-                AssetDatabase.SaveAssets();
-
-                foreach (SpriteSheetEntry entry in needsRestore)
-                {
-                    entry._texture = AssetDatabase.LoadAssetAtPath<Texture2D>(entry._assetPath);
-                }
-
-                SpriteSheetExtractor windowRef = this;
-                EditorApplication.delayCall += () =>
-                {
-                    if (windowRef)
-                    {
-                        windowRef.Repaint();
-                    }
-                };
-            }
-            if (DiagnosticsEnabled)
-            {
-                this.Log($"GenerateAllPreviewTexturesInBatch: END");
-            }
-        }
-
-        /// <summary>
         /// Creates a single preview texture for a sprite by extracting and scaling pixels from the source texture.
         /// </summary>
         /// <param name="sourcePixels">The pixel data from the source texture.</param>
@@ -6241,139 +7143,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
         }
 
-        /// <summary>
-        /// Regenerates preview textures for all discovered sprite sheets, including repopulating sprites.
-        /// </summary>
-        /// <remarks>
-        /// Called when extraction mode changes, which requires repopulating the sprite list
-        /// in addition to regenerating preview thumbnails. Uses batch processing to minimize
-        /// reimport operations. For preview size changes only, use <see cref="RegeneratePreviewTexturesOnly"/>.
-        /// </remarks>
-        internal void RegenerateAllPreviewTextures()
-        {
-            if (DiagnosticsEnabled)
-            {
-                this.Log($"RegenerateAllPreviewTextures: START");
-            }
-            _previewRegenerationScheduled = false;
-
-            if (!this || _discoveredSheets == null || _discoveredSheets.Count == 0)
-            {
-                if (DiagnosticsEnabled)
-                {
-                    this.Log(
-                        $"RegenerateAllPreviewTextures: no sheets discovered, returning early"
-                    );
-                }
-                return;
-            }
-
-            if (DiagnosticsEnabled)
-            {
-                this.Log(
-                    $"RegenerateAllPreviewTextures: setting _regenerationInProgress=true, sheetCount={_discoveredSheets.Count}"
-                );
-            }
-            _regenerationInProgress = true;
-
-            using PooledResource<List<Texture2D>> oldTexturesLease = Buffers<Texture2D>.List.Get(
-                out List<Texture2D> oldTextures
-            );
-
-            foreach (SpriteSheetEntry entry in _discoveredSheets)
-            {
-                if (entry == null)
-                {
-                    continue;
-                }
-
-                if (entry._sprites != null)
-                {
-                    foreach (SpriteEntryData sprite in entry._sprites)
-                    {
-                        if (sprite != null && sprite._previewTexture != null)
-                        {
-                            oldTextures.Add(sprite._previewTexture);
-                            sprite._previewTexture = null;
-                        }
-                    }
-                }
-
-                RepopulateSpritesForEntry(entry);
-
-                entry._needsRegeneration = false;
-                entry._lastCacheKey = entry.GetBoundsCacheKey(this);
-                entry._lastAccessTime = DateTime.UtcNow.Ticks;
-            }
-
-            GenerateAllPreviewTexturesInBatch(_discoveredSheets);
-
-            foreach (Texture2D oldTexture in oldTextures)
-            {
-                if (oldTexture != null)
-                {
-                    DestroyImmediate(oldTexture);
-                }
-            }
-
-            if (DiagnosticsEnabled)
-            {
-                this.Log(
-                    $"RegenerateAllPreviewTextures: END, setting _regenerationInProgress=false"
-                );
-            }
-            _regenerationInProgress = false;
-            Repaint();
-        }
-
-        /// <summary>
-        /// Regenerates only the preview textures without repopulating sprites.
-        /// </summary>
-        /// <remarks>
-        /// Called when only the preview size mode changes. Since sprite rects don't change,
-        /// we can skip repopulating and just regenerate the textures at the new size.
-        /// This avoids the window where sprites have null textures during repopulation.
-        /// </remarks>
-        internal void RegeneratePreviewTexturesOnly()
-        {
-            if (DiagnosticsEnabled)
-            {
-                this.Log($"RegeneratePreviewTexturesOnly: START");
-            }
-            _previewRegenerationScheduled = false;
-
-            if (!this || _discoveredSheets == null || _discoveredSheets.Count == 0)
-            {
-                if (DiagnosticsEnabled)
-                {
-                    this.Log(
-                        $"RegeneratePreviewTexturesOnly: no sheets discovered, returning early"
-                    );
-                }
-                return;
-            }
-
-            if (DiagnosticsEnabled)
-            {
-                this.Log(
-                    $"RegeneratePreviewTexturesOnly: setting _regenerationInProgress=true, sheetCount={_discoveredSheets.Count}"
-                );
-            }
-            _regenerationInProgress = true;
-
-            // Batch preview generation keeps old textures visible until their replacements are assigned.
-            GenerateAllPreviewTexturesInBatch(_discoveredSheets);
-
-            if (DiagnosticsEnabled)
-            {
-                this.Log(
-                    $"RegeneratePreviewTexturesOnly: END, setting _regenerationInProgress=false"
-                );
-            }
-            _regenerationInProgress = false;
-            Repaint();
-        }
-
         private void PopulateSpritesFromMetadata(
             SpriteSheetEntry entry,
             string assetPath,
@@ -6433,186 +7202,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     };
                     entry._sprites.Add(spriteEntry);
                 }
-            }
-        }
-
-        internal void PopulateSpritesFromGrid(SpriteSheetEntry entry, Texture2D texture)
-        {
-            int columns;
-            int rows;
-            int cellWidth;
-            int cellHeight;
-
-            Color32[] pixels = null;
-            if (texture.isReadable)
-            {
-                pixels = texture.GetPixels32();
-            }
-
-            CalculateGridDimensions(
-                texture.width,
-                texture.height,
-                entry,
-                pixels,
-                out columns,
-                out rows,
-                out cellWidth,
-                out cellHeight
-            );
-
-            int spriteIndex = 0;
-            for (int row = 0; row < rows; ++row)
-            {
-                for (int col = 0; col < columns; ++col)
-                {
-                    int x = col * cellWidth;
-                    int y = (rows - 1 - row) * cellHeight;
-
-                    Rect rect = new Rect(x, y, cellWidth, cellHeight);
-
-                    SpriteEntryData spriteEntry = new()
-                    {
-                        _originalName = $"sprite_{row}_{col}",
-                        _outputName = $"sprite_{row}_{col}",
-                        _rect = rect,
-                        _pivot = new Vector2(0.5f, 0.5f),
-                        _border = Vector4.zero,
-                        _sortIndex = spriteIndex++,
-                        _isSelected = true,
-                        _previewTexture = null,
-                        _usePivotOverride = false,
-                        _pivotModeOverride = PivotMode.Center,
-                        _customPivotOverride = new Vector2(0.5f, 0.5f),
-                        _usePivotColorOverride = false,
-                        _pivotColorOverride = Color.cyan,
-                    };
-                    entry._sprites.Add(spriteEntry);
-                }
-            }
-        }
-
-        internal void PopulateSpritesFromPaddedGrid(SpriteSheetEntry entry, Texture2D texture)
-        {
-            int columns;
-            int rows;
-            int cellWidth;
-            int cellHeight;
-
-            Color32[] pixels = null;
-            if (texture.isReadable)
-            {
-                pixels = texture.GetPixels32();
-            }
-
-            CalculateGridDimensions(
-                texture.width,
-                texture.height,
-                entry,
-                pixels,
-                out columns,
-                out rows,
-                out cellWidth,
-                out cellHeight
-            );
-
-            int effectivePaddingLeft = GetEffectivePaddingLeft(entry);
-            int effectivePaddingRight = GetEffectivePaddingRight(entry);
-            int effectivePaddingTop = GetEffectivePaddingTop(entry);
-            int effectivePaddingBottom = GetEffectivePaddingBottom(entry);
-
-            int paddedWidth = cellWidth - effectivePaddingLeft - effectivePaddingRight;
-            int paddedHeight = cellHeight - effectivePaddingTop - effectivePaddingBottom;
-
-            if (paddedWidth <= 0 || paddedHeight <= 0)
-            {
-                this.LogWarn(
-                    $"Padding values result in invalid sprite size for texture {entry._assetPath}. Cell: {cellWidth}x{cellHeight}, Padding removes: {effectivePaddingLeft + effectivePaddingRight}x{effectivePaddingTop + effectivePaddingBottom}"
-                );
-                return;
-            }
-
-            int spriteIndex = 0;
-            for (int row = 0; row < rows; ++row)
-            {
-                for (int col = 0; col < columns; ++col)
-                {
-                    int baseX = col * cellWidth;
-                    int baseY = (rows - 1 - row) * cellHeight;
-
-                    int x = baseX + effectivePaddingLeft;
-                    int y = baseY + effectivePaddingBottom;
-
-                    Rect rect = new Rect(x, y, paddedWidth, paddedHeight);
-
-                    SpriteEntryData spriteEntry = new()
-                    {
-                        _originalName = $"sprite_{row}_{col}",
-                        _outputName = $"sprite_{row}_{col}",
-                        _rect = rect,
-                        _pivot = new Vector2(0.5f, 0.5f),
-                        _border = Vector4.zero,
-                        _sortIndex = spriteIndex++,
-                        _isSelected = true,
-                        _previewTexture = null,
-                        _usePivotOverride = false,
-                        _pivotModeOverride = PivotMode.Center,
-                        _customPivotOverride = new Vector2(0.5f, 0.5f),
-                        _usePivotColorOverride = false,
-                        _pivotColorOverride = Color.cyan,
-                    };
-                    entry._sprites.Add(spriteEntry);
-                }
-            }
-        }
-
-        internal void PopulateSpritesFromAlphaDetection(SpriteSheetEntry entry, Texture2D texture)
-        {
-            if (!texture.isReadable)
-            {
-                this.LogWarn(
-                    $"Texture {entry._assetPath} is not readable. Enable 'Read/Write' in import settings for alpha detection."
-                );
-                return;
-            }
-
-            int textureWidth = texture.width;
-            int textureHeight = texture.height;
-            Color32[] pixels = texture.GetPixels32();
-
-            using PooledResource<List<Rect>> rectsLease = Buffers<Rect>.List.Get(
-                out List<Rect> detectedRects
-            );
-
-            float effectiveAlphaThreshold = GetEffectiveAlphaThreshold(entry);
-            DetectSpriteBoundsByAlpha(
-                pixels,
-                textureWidth,
-                textureHeight,
-                effectiveAlphaThreshold,
-                detectedRects
-            );
-
-            int spriteIndex = 0;
-            foreach (Rect rect in detectedRects)
-            {
-                SpriteEntryData spriteEntry = new()
-                {
-                    _originalName = $"sprite_{spriteIndex}",
-                    _outputName = $"sprite_{spriteIndex}",
-                    _rect = rect,
-                    _pivot = new Vector2(0.5f, 0.5f),
-                    _border = Vector4.zero,
-                    _sortIndex = spriteIndex,
-                    _isSelected = true,
-                    _previewTexture = null,
-                    _usePivotOverride = false,
-                    _pivotModeOverride = PivotMode.Center,
-                    _customPivotOverride = new Vector2(0.5f, 0.5f),
-                    _usePivotColorOverride = false,
-                    _pivotColorOverride = Color.cyan,
-                };
-                entry._sprites.Add(spriteEntry);
-                ++spriteIndex;
             }
         }
 
@@ -6925,408 +7514,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 };
                 targetList.Add(spriteEntry);
                 ++spriteIndex;
-            }
-        }
-
-        internal static void DetectSpriteBoundsByAlpha(
-            Color32[] pixels,
-            int textureWidth,
-            int textureHeight,
-            float alphaThreshold,
-            List<Rect> result
-        )
-        {
-            result.Clear();
-            if (!float.IsFinite(alphaThreshold))
-            {
-                return;
-            }
-
-            byte alphaThresholdByte = ColorQuantization.ToThresholdByte(alphaThreshold);
-            using PooledArray<bool> visitedLease = SystemArrayPool<bool>.Get(
-                pixels.Length,
-                out bool[] visited
-            );
-            Array.Clear(visited, 0, visited.Length);
-
-            for (int y = 0; y < textureHeight; ++y)
-            {
-                for (int x = 0; x < textureWidth; ++x)
-                {
-                    int index = y * textureWidth + x;
-                    if (visited[index])
-                    {
-                        continue;
-                    }
-
-                    if (pixels[index].a <= alphaThresholdByte)
-                    {
-                        visited[index] = true;
-                        continue;
-                    }
-
-                    int minX = x;
-                    int maxX = x;
-                    int minY = y;
-                    int maxY = y;
-
-                    using PooledResource<List<int>> stackLease = Buffers<int>.List.Get(
-                        out List<int> stack
-                    );
-                    stack.Add(index);
-                    visited[index] = true;
-
-                    while (0 < stack.Count)
-                    {
-                        int lastIndex = stack.Count - 1;
-                        int current = stack[lastIndex];
-                        stack.RemoveAt(lastIndex);
-
-                        int currentX = current % textureWidth;
-                        int currentY = current / textureWidth;
-
-                        if (currentX < minX)
-                        {
-                            minX = currentX;
-                        }
-                        if (maxX < currentX)
-                        {
-                            maxX = currentX;
-                        }
-                        if (currentY < minY)
-                        {
-                            minY = currentY;
-                        }
-                        if (maxY < currentY)
-                        {
-                            maxY = currentY;
-                        }
-
-                        if (0 < currentX)
-                        {
-                            int leftIndex = current - 1;
-                            if (!visited[leftIndex] && alphaThresholdByte < pixels[leftIndex].a)
-                            {
-                                visited[leftIndex] = true;
-                                stack.Add(leftIndex);
-                            }
-                        }
-                        if (currentX < textureWidth - 1)
-                        {
-                            int rightIndex = current + 1;
-                            if (!visited[rightIndex] && alphaThresholdByte < pixels[rightIndex].a)
-                            {
-                                visited[rightIndex] = true;
-                                stack.Add(rightIndex);
-                            }
-                        }
-                        if (0 < currentY)
-                        {
-                            int bottomIndex = current - textureWidth;
-                            if (!visited[bottomIndex] && alphaThresholdByte < pixels[bottomIndex].a)
-                            {
-                                visited[bottomIndex] = true;
-                                stack.Add(bottomIndex);
-                            }
-                        }
-                        if (currentY < textureHeight - 1)
-                        {
-                            int topIndex = current + textureWidth;
-                            if (!visited[topIndex] && alphaThresholdByte < pixels[topIndex].a)
-                            {
-                                visited[topIndex] = true;
-                                stack.Add(topIndex);
-                            }
-                        }
-                    }
-
-                    int width = maxX - minX + 1;
-                    int height = maxY - minY + 1;
-
-                    if (2 <= width && 2 <= height)
-                    {
-                        result.Add(new Rect(minX, minY, width, height));
-                    }
-                }
-            }
-
-            if (1 < result.Count)
-            {
-                result.Sort(
-                    (a, b) =>
-                    {
-                        int yCompare = b.y.CompareTo(a.y);
-                        return yCompare != 0 ? yCompare : a.x.CompareTo(b.x);
-                    }
-                );
-            }
-        }
-
-        internal void ExtractSelectedSprites()
-        {
-            if (_discoveredSheets == null || _discoveredSheets.Count == 0)
-            {
-                this.LogWarn($"No sprite sheets discovered.");
-                return;
-            }
-
-            string outputPath = AssetDatabase.GetAssetPath(_outputDirectory);
-            if (string.IsNullOrWhiteSpace(outputPath) || !AssetDatabase.IsValidFolder(outputPath))
-            {
-                this.LogError($"Invalid output directory.");
-                return;
-            }
-
-            _lastExtractedCount = 0;
-            _lastSkippedCount = 0;
-            _lastErrorCount = 0;
-
-            bool canceled = false;
-            int totalSprites = 0;
-            int processedSprites = 0;
-
-            foreach (SpriteSheetEntry entry in _discoveredSheets)
-            {
-                if (!entry._isSelected || entry._sprites == null)
-                {
-                    continue;
-                }
-
-                foreach (
-                    WallstopStudios.UnityHelpers.Editor.Sprites.SpriteSheetExtractor.SpriteEntryData spritesElement in entry._sprites
-                )
-                {
-                    if (spritesElement._isSelected)
-                    {
-                        ++totalSprites;
-                    }
-                }
-            }
-
-            if (totalSprites == 0)
-            {
-                this.LogWarn($"No sprites selected for extraction.");
-                return;
-            }
-
-            WallstopGenericPool<Dictionary<string, bool>> originalReadablePool = DictionaryBuffer<
-                string,
-                bool
-            >.GetDictionaryPool(StringComparer.OrdinalIgnoreCase);
-            using PooledResource<Dictionary<string, bool>> originalReadableLease =
-                originalReadablePool.Get(out Dictionary<string, bool> originalReadable);
-
-            using PooledResource<List<PendingImportSettings>> pendingImportsLease =
-                Buffers<PendingImportSettings>.List.Get(
-                    out List<PendingImportSettings> pendingImports
-                );
-
-            using PooledResource<List<string>> pendingPathsLease = Buffers<string>.List.Get(
-                out List<string> pendingPaths
-            );
-
-            try
-            {
-                using (AssetDatabaseBatchHelper.BeginBatch())
-                {
-                    for (int i = 0; i < _discoveredSheets.Count && !canceled; ++i)
-                    {
-                        SpriteSheetEntry entry = _discoveredSheets[i];
-                        if (!entry._isSelected || entry._sprites == null)
-                        {
-                            continue;
-                        }
-
-                        if (
-                            Utils.EditorUi.CancelableProgress(
-                                Name,
-                                $"Making readable: {Path.GetFileName(entry._assetPath)}",
-                                (float)i / _discoveredSheets.Count * 0.05f
-                            )
-                        )
-                        {
-                            canceled = true;
-                            break;
-                        }
-
-                        if (!entry._importer.isReadable)
-                        {
-                            originalReadable[entry._assetPath] = false;
-                            entry._importer.isReadable = true;
-                            entry._importer.SaveAndReimport();
-                        }
-                        else
-                        {
-                            originalReadable[entry._assetPath] = true;
-                        }
-                    }
-                }
-
-                AssetDatabase.SaveAssets();
-
-                if (!canceled)
-                {
-                    for (int i = 0; i < _discoveredSheets.Count && !canceled; ++i)
-                    {
-                        SpriteSheetEntry entry = _discoveredSheets[i];
-                        if (!entry._isSelected || entry._sprites == null)
-                        {
-                            continue;
-                        }
-
-                        entry._texture = AssetDatabase.LoadAssetAtPath<Texture2D>(entry._assetPath);
-                        if (entry._texture == null)
-                        {
-                            this.LogWarn($"Failed to reload texture: {entry._assetPath}");
-                            continue;
-                        }
-
-                        List<SpriteEntryData> sortedSprites = GetSortedSprites(entry._sprites);
-
-                        for (int j = 0; j < sortedSprites.Count && !canceled; ++j)
-                        {
-                            SpriteEntryData sprite = sortedSprites[j];
-                            if (!sprite._isSelected)
-                            {
-                                continue;
-                            }
-
-                            if (
-                                Utils.EditorUi.CancelableProgress(
-                                    Name,
-                                    $"Writing: {sprite._originalName}",
-                                    0.05f + (float)processedSprites / totalSprites * 0.35f
-                                )
-                            )
-                            {
-                                canceled = true;
-                                break;
-                            }
-
-                            string extractedPath = ExtractSpriteDeferred(
-                                entry,
-                                sprite,
-                                outputPath,
-                                j,
-                                pendingImports
-                            );
-                            if (extractedPath != null)
-                            {
-                                pendingPaths.Add(extractedPath);
-                                ++_lastExtractedCount;
-                            }
-                            ++processedSprites;
-                        }
-                    }
-                }
-
-                if (!canceled && 0 < pendingPaths.Count)
-                {
-                    using (AssetDatabaseBatchHelper.BeginBatch())
-                    {
-                        for (int i = 0; i < pendingPaths.Count; ++i)
-                        {
-                            if (
-                                Utils.EditorUi.CancelableProgress(
-                                    Name,
-                                    $"Importing: {Path.GetFileName(pendingPaths[i])}",
-                                    0.4f + (float)i / pendingPaths.Count * 0.3f
-                                )
-                            )
-                            {
-                                canceled = true;
-                                break;
-                            }
-
-                            AssetDatabase.ImportAsset(pendingPaths[i]);
-                        }
-                    }
-                }
-
-                if (!canceled && _preserveImportSettings && 0 < pendingImports.Count)
-                {
-                    using (AssetDatabaseBatchHelper.BeginBatch())
-                    {
-                        for (int i = 0; i < pendingImports.Count; ++i)
-                        {
-                            PendingImportSettings pending = pendingImports[i];
-
-                            if (
-                                Utils.EditorUi.CancelableProgress(
-                                    Name,
-                                    $"Applying settings: {Path.GetFileName(pending.OutputPath)}",
-                                    0.7f + (float)i / pendingImports.Count * 0.2f
-                                )
-                            )
-                            {
-                                canceled = true;
-                                break;
-                            }
-
-                            ApplyImportSettingsDeferred(
-                                pending.OutputPath,
-                                pending.SourceImporter,
-                                pending.Sprite,
-                                pending.Entry
-                            );
-                        }
-                    }
-                }
-
-                if (0 < originalReadable.Count)
-                {
-                    using PooledResource<List<string>> keysLease = Buffers<string>.List.Get(
-                        out List<string> keys
-                    );
-                    foreach (KeyValuePair<string, bool> kvp in originalReadable)
-                    {
-                        if (kvp.Value)
-                        {
-                            continue;
-                        }
-
-                        keys.Add(kvp.Key);
-                    }
-
-                    using (AssetDatabaseBatchHelper.BeginBatch())
-                    {
-                        foreach (string key in keys)
-                        {
-                            if (
-                                AssetImporter.GetAtPath(key) is TextureImporter
-                                {
-                                    textureType: TextureImporterType.Sprite
-                                } imp
-                            )
-                            {
-                                imp.isReadable = false;
-                                imp.SaveAndReimport();
-                            }
-                        }
-                    }
-                }
-
-                AssetDatabase.SaveAssets();
-
-                if (canceled)
-                {
-                    this.LogWarn($"Extraction canceled by user.");
-                }
-                else
-                {
-                    string mode = _dryRun ? "Dry run" : "Extraction";
-                    this.Log(
-                        $"{mode} complete. Extracted: {_lastExtractedCount}, Skipped: {_lastSkippedCount}, Errors: {_lastErrorCount}"
-                    );
-                }
-            }
-            catch (Exception e)
-            {
-                this.LogError($"Error during extraction", e);
-            }
-            finally
-            {
-                Utils.EditorUi.ClearProgress();
             }
         }
 
@@ -7696,201 +7883,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             // SetDirty does not apply importer settings; SaveAndReimport is required even inside a batch.
             newImporter.SaveAndReimport();
-        }
-
-        internal void ReplaceSpriteReferences()
-        {
-            if (_discoveredSheets == null || _discoveredSheets.Count == 0)
-            {
-                this.LogWarn($"No sprite sheets discovered. Run 'Find Sprite Sheets' first.");
-                return;
-            }
-
-            string outputPath = AssetDatabase.GetAssetPath(_outputDirectory);
-            if (string.IsNullOrWhiteSpace(outputPath) || !AssetDatabase.IsValidFolder(outputPath))
-            {
-                this.LogError($"Invalid output directory for reference replacement.");
-                return;
-            }
-
-            WallstopGenericPool<Dictionary<Sprite, Sprite>> mappingPool = DictionaryBuffer<
-                Sprite,
-                Sprite
-            >.Dictionary;
-            using PooledResource<Dictionary<Sprite, Sprite>> mappingLease = mappingPool.Get(
-                out Dictionary<Sprite, Sprite> mapping
-            );
-
-            try
-            {
-                foreach (SpriteSheetEntry entry in _discoveredSheets)
-                {
-                    if (!entry._isSelected || entry._sprites == null)
-                    {
-                        continue;
-                    }
-
-                    Object[] originalSprites = AssetDatabase.LoadAllAssetsAtPath(entry._assetPath);
-                    List<SpriteEntryData> sortedSprites = GetSortedSprites(entry._sprites);
-                    for (int j = 0; j < sortedSprites.Count; ++j)
-                    {
-                        SpriteEntryData spriteData = sortedSprites[j];
-                        if (!spriteData._isSelected)
-                        {
-                            continue;
-                        }
-
-                        Sprite originalSprite = null;
-                        foreach (UnityEngine.Object originalSpritesElement in originalSprites)
-                        {
-                            if (
-                                originalSpritesElement is Sprite s
-                                && s.name == spriteData._originalName
-                            )
-                            {
-                                originalSprite = s;
-                                break;
-                            }
-                        }
-
-                        if (originalSprite == null)
-                        {
-                            continue;
-                        }
-
-                        string prefix = string.IsNullOrWhiteSpace(_namingPrefix)
-                            ? Path.GetFileNameWithoutExtension(entry._assetPath)
-                            : _namingPrefix;
-                        string extractedFileName = $"{prefix}_{j:D3}.png";
-                        string extractedPath = Path.Combine(outputPath, extractedFileName);
-                        Sprite extractedSprite = AssetDatabase.LoadAssetAtPath<Sprite>(
-                            extractedPath
-                        );
-                        if (extractedSprite != null)
-                        {
-                            mapping[originalSprite] = extractedSprite;
-                        }
-                    }
-                }
-
-                if (mapping.Count == 0)
-                {
-                    this.LogWarn($"No original->extracted sprite mappings found.");
-                    return;
-                }
-
-                string[] allAssets = AssetDatabase.GetAllAssetPaths();
-                string[] candidateExts =
-                {
-                    ".prefab",
-                    ".unity",
-                    ".asset",
-                    ".mat",
-                    ".anim",
-                    ".overrideController",
-                };
-                int modifiedAssets = 0;
-
-                using (AssetDatabaseBatchHelper.BeginBatch())
-                {
-                    for (int i = 0; i < allAssets.Length; ++i)
-                    {
-                        string path = allAssets[i];
-                        if (!path.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
-                        {
-                            continue;
-                        }
-
-                        bool hasValidExt = false;
-                        foreach (string candidateExtsElement in candidateExts)
-                        {
-                            if (
-                                path.EndsWith(
-                                    candidateExtsElement,
-                                    StringComparison.OrdinalIgnoreCase
-                                )
-                            )
-                            {
-                                hasValidExt = true;
-                                break;
-                            }
-                        }
-                        if (!hasValidExt)
-                        {
-                            continue;
-                        }
-
-                        if (
-                            Utils.EditorUi.CancelableProgress(
-                                "Replacing Sprite References",
-                                $"Scanning {i + 1}/{allAssets.Length}: {Path.GetFileName(path)}",
-                                i / (float)allAssets.Length
-                            )
-                        )
-                        {
-                            this.LogWarn($"Reference replacement cancelled by user.");
-                            break;
-                        }
-
-                        bool assetModified = false;
-                        Object[] objs = AssetDatabase.LoadAllAssetsAtPath(path);
-                        foreach (Object o in objs)
-                        {
-                            if (o == null)
-                            {
-                                continue;
-                            }
-
-                            using SerializedObject so = new(o);
-                            SerializedProperty it = so.GetIterator();
-                            bool enter = true;
-                            while (it.NextVisible(enter))
-                            {
-                                enter = false;
-                                if (it.propertyType != SerializedPropertyType.ObjectReference)
-                                {
-                                    continue;
-                                }
-
-                                Sprite s = it.objectReferenceValue as Sprite;
-                                if (s != null && mapping.TryGetValue(s, out Sprite replacement))
-                                {
-                                    Undo.RecordObject(o, "Replace sprite reference");
-                                    it.objectReferenceValue = replacement;
-                                    assetModified = true;
-                                    this.Log(
-                                        $"Replaced reference in {path}: {s.name} -> {replacement.name}"
-                                    );
-                                }
-                            }
-
-                            if (assetModified)
-                            {
-                                so.ApplyModifiedPropertiesWithoutUndo();
-                                EditorUtility.SetDirty(o);
-                            }
-                        }
-                        if (assetModified)
-                        {
-                            ++modifiedAssets;
-                        }
-                    }
-                }
-
-                AssetDatabase.SaveAssets();
-
-                this.Log(
-                    $"Reference replacement complete. Modified assets: {modifiedAssets}. Mapped pairs: {mapping.Count}."
-                );
-            }
-            catch (Exception e)
-            {
-                this.LogError($"Error during reference replacement", e);
-            }
-            finally
-            {
-                Utils.EditorUi.ClearProgress();
-            }
         }
 
         /// <summary>

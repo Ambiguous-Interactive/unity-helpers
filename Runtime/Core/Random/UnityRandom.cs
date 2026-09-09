@@ -83,6 +83,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public static readonly UnityRandom Instance = new();
 
+        // Derive the zero-state representation without assuming Unity field count.
+        private static readonly string ZeroedEngineState = UnityEngine.JsonUtility.ToJson(
+            default(UnityEngine.Random.State)
+        );
+
         /// <summary>
         /// Captures the shared engine position and this object's cached samples.
         /// </summary>
@@ -106,14 +111,14 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
         }
 
-        [ProtoMember(6)]
-        [WProtoMember(6)]
-        private readonly int? _seed;
-
         // Capture engine state at serialization time because other callers can advance the shared generator.
         [ProtoMember(7)]
         [WProtoMember(7)]
         internal string _engineState;
+
+        [ProtoMember(6)]
+        [WProtoMember(6)]
+        private readonly int? _seed;
 
         public UnityRandom()
             : this(null) { }
@@ -148,6 +153,24 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
         }
 
+        private static string CaptureEngineState()
+        {
+            // JsonUtility preserves the public Random.State contract without depending on its private field layout.
+            return UnityEngine.JsonUtility.ToJson(UnityEngine.Random.state);
+        }
+
+        private static byte[] EncodeEngineState(string engineState)
+        {
+            return string.IsNullOrEmpty(engineState) ? null : Encoding.UTF8.GetBytes(engineState);
+        }
+
+        private static string DecodeEngineState(RandomState internalState)
+        {
+            byte[] payload = internalState._payload;
+            // The JSON state validator rejects decoded text that this encoder could not have produced.
+            return payload == null || payload.Length == 0 ? null : Encoding.UTF8.GetString(payload);
+        }
+
         public override uint NextUint()
         {
             return unchecked((uint)UnityEngine.Random.Range(int.MinValue, int.MaxValue));
@@ -170,24 +193,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         {
             // Protobuf bypasses constructors, so apply its restored engine position here.
             ApplyEngineState();
-        }
-
-        private static string CaptureEngineState()
-        {
-            // JsonUtility preserves the public Random.State contract without depending on its private field layout.
-            return UnityEngine.JsonUtility.ToJson(UnityEngine.Random.state);
-        }
-
-        private static byte[] EncodeEngineState(string engineState)
-        {
-            return string.IsNullOrEmpty(engineState) ? null : Encoding.UTF8.GetBytes(engineState);
-        }
-
-        private static string DecodeEngineState(RandomState internalState)
-        {
-            byte[] payload = internalState._payload;
-            // The JSON state validator rejects decoded text that this encoder could not have produced.
-            return payload == null || payload.Length == 0 ? null : Encoding.UTF8.GetString(payload);
         }
 
         private void ApplyEngineState()
@@ -220,10 +225,5 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
             UnityEngine.Random.state = parsed;
         }
-
-        // Derive the zero-state representation without assuming Unity field count.
-        private static readonly string ZeroedEngineState = UnityEngine.JsonUtility.ToJson(
-            default(UnityEngine.Random.State)
-        );
     }
 }

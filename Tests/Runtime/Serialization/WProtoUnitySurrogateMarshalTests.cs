@@ -63,112 +63,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             typeof(FastVector3Int),
         };
 
-        [TestCaseSource(nameof(SurrogatedRootCases))]
-        public void EverySurrogatedStructRoundTripsAtTheRoot(Action roundTrip)
-        {
-            roundTrip();
-        }
-
-        /// <summary>
-        /// A future surrogate cannot be added without a root path.
-        /// </summary>
-        /// <remarks>
-        /// <para>
-        /// The two lists live in different files and nothing but this connects them. A surrogate
-        /// added to <c>ProtobufUnityModel</c> without a root marshal has no visible symptom in the
-        /// editor -- protobuf-net answers, exactly as before -- and becomes issue #696 again in a
-        /// shipped IL2CPP player, where that path cannot run.
-        /// </para>
-        /// <para>
-        /// Read from <c>ProtobufUnityModel.Surrogated</c>, which <c>Register</c> itself fills in, and
-        /// from the <c>[assembly: WProtoRootMarshal]</c> attributes, which ARE the registrations.
-        /// Neither is reflection into our own implementation: the first is an internal member this
-        /// assembly is granted, and the second is attribute metadata.
-        /// </para>
-        /// </remarks>
-        [Test]
-        public void EverySurrogatedStructHasAWallstopProtoRootPath()
-        {
-            ProtobufUnityModel.EnsureInitialized();
-
-            HashSet<Type> rootServed = new HashSet<Type>();
-            foreach (
-                Attribute declared in Attribute.GetCustomAttributes(
-                    typeof(WProtoFacade).Assembly,
-                    typeof(WProtoRootMarshalAttribute)
-                )
-            )
-            {
-                rootServed.Add(((WProtoRootMarshalAttribute)declared).RealType);
-            }
-
-            Assert.IsNotEmpty(
-                rootServed,
-                "No root marshal registrations were found at all, so this gate had no subjects."
-            );
-            Assert.IsNotEmpty(
-                ProtobufUnityModel.Surrogated,
-                "ProtobufUnityModel recorded no surrogate at all, so this gate had no subjects."
-            );
-
-            Assert.IsTrue(
-                WProtoFormatterProvider.IsRegistered<FastVector2Int>(),
-                "FastVector2Int is excused from needing a marshal because a hand-written formatter "
-                    + "serves it, and that formatter is not registered."
-            );
-            Assert.IsTrue(
-                WProtoFormatterProvider.IsRegistered<FastVector3Int>(),
-                "FastVector3Int is excused from needing a marshal because a hand-written formatter "
-                    + "serves it, and that formatter is not registered."
-            );
-
-            foreach (Type handWritten in ServedByAHandWrittenFormatter)
-            {
-                rootServed.Add(handWritten);
-            }
-
-            List<string> unserved = new List<string>();
-            foreach (Type surrogated in ProtobufUnityModel.Surrogated)
-            {
-                if (!rootServed.Contains(surrogated))
-                {
-                    unserved.Add(surrogated.Name);
-                }
-            }
-
-            Assert.IsEmpty(
-                unserved,
-                "ProtobufUnityModel routes these through a protobuf-net surrogate and nothing serves "
-                    + "them at the WallstopProto root, so a root serialization falls through to "
-                    + "protobuf-net -- which under IL2CPP either throws or silently returns a default "
-                    + "value (issue #696): "
-                    + string.Join(", ", unserved)
-            );
-        }
-
-        /// <summary>
-        /// A root marshal must stay invisible to the member path.
-        /// </summary>
-        /// <remarks>
-        /// <see cref="WProtoGeneric{T}"/> resolves a member whose type a closure decides through
-        /// <see cref="WProtoFormatterProvider"/>. A marshal registered there would rewrite the
-        /// encoding of every such member, where the shipped bytes are the surrogate's. The surrogate
-        /// itself is what belongs in that provider, and it is still there.
-        /// </remarks>
-        [Test]
-        public void AMarshalledStructIsNotVisibleToTheContractFormatterProvider()
-        {
-            Assert.IsFalse(WProtoFormatterProvider.IsRegistered<Vector2>());
-            Assert.IsFalse(WProtoFormatterProvider.IsRegistered<Bounds>());
-            Assert.IsFalse(WProtoFormatterProvider.IsRegistered<Resolution>());
-            Assert.IsFalse(WProtoFormatterProvider.IsRegistered<ImmutableBitSet>());
-
-            Assert.IsTrue(WProtoRootMarshalProvider.IsRegistered<Vector2>());
-            Assert.IsTrue(WProtoRootMarshalProvider.IsRegistered<Bounds>());
-            Assert.IsTrue(WProtoRootMarshalProvider.IsRegistered<Resolution>());
-            Assert.IsTrue(WProtoRootMarshalProvider.IsRegistered<ImmutableBitSet>());
-        }
-
         private static IEnumerable<TestCaseData> SurrogatedRootCases()
         {
             yield return Case(
@@ -344,6 +238,112 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             }
 
             return builder.ToImmutable();
+        }
+
+        [TestCaseSource(nameof(SurrogatedRootCases))]
+        public void EverySurrogatedStructRoundTripsAtTheRoot(Action roundTrip)
+        {
+            roundTrip();
+        }
+
+        /// <summary>
+        /// A future surrogate cannot be added without a root path.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The two lists live in different files and nothing but this connects them. A surrogate
+        /// added to <c>ProtobufUnityModel</c> without a root marshal has no visible symptom in the
+        /// editor -- protobuf-net answers, exactly as before -- and becomes issue #696 again in a
+        /// shipped IL2CPP player, where that path cannot run.
+        /// </para>
+        /// <para>
+        /// Read from <c>ProtobufUnityModel.Surrogated</c>, which <c>Register</c> itself fills in, and
+        /// from the <c>[assembly: WProtoRootMarshal]</c> attributes, which ARE the registrations.
+        /// Neither is reflection into our own implementation: the first is an internal member this
+        /// assembly is granted, and the second is attribute metadata.
+        /// </para>
+        /// </remarks>
+        [Test]
+        public void EverySurrogatedStructHasAWallstopProtoRootPath()
+        {
+            ProtobufUnityModel.EnsureInitialized();
+
+            HashSet<Type> rootServed = new HashSet<Type>();
+            foreach (
+                Attribute declared in Attribute.GetCustomAttributes(
+                    typeof(WProtoFacade).Assembly,
+                    typeof(WProtoRootMarshalAttribute)
+                )
+            )
+            {
+                rootServed.Add(((WProtoRootMarshalAttribute)declared).RealType);
+            }
+
+            Assert.IsNotEmpty(
+                rootServed,
+                "No root marshal registrations were found at all, so this gate had no subjects."
+            );
+            Assert.IsNotEmpty(
+                ProtobufUnityModel.Surrogated,
+                "ProtobufUnityModel recorded no surrogate at all, so this gate had no subjects."
+            );
+
+            Assert.IsTrue(
+                WProtoFormatterProvider.IsRegistered<FastVector2Int>(),
+                "FastVector2Int is excused from needing a marshal because a hand-written formatter "
+                    + "serves it, and that formatter is not registered."
+            );
+            Assert.IsTrue(
+                WProtoFormatterProvider.IsRegistered<FastVector3Int>(),
+                "FastVector3Int is excused from needing a marshal because a hand-written formatter "
+                    + "serves it, and that formatter is not registered."
+            );
+
+            foreach (Type handWritten in ServedByAHandWrittenFormatter)
+            {
+                rootServed.Add(handWritten);
+            }
+
+            List<string> unserved = new List<string>();
+            foreach (Type surrogated in ProtobufUnityModel.Surrogated)
+            {
+                if (!rootServed.Contains(surrogated))
+                {
+                    unserved.Add(surrogated.Name);
+                }
+            }
+
+            Assert.IsEmpty(
+                unserved,
+                "ProtobufUnityModel routes these through a protobuf-net surrogate and nothing serves "
+                    + "them at the WallstopProto root, so a root serialization falls through to "
+                    + "protobuf-net -- which under IL2CPP either throws or silently returns a default "
+                    + "value (issue #696): "
+                    + string.Join(", ", unserved)
+            );
+        }
+
+        /// <summary>
+        /// A root marshal must stay invisible to the member path.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="WProtoGeneric{T}"/> resolves a member whose type a closure decides through
+        /// <see cref="WProtoFormatterProvider"/>. A marshal registered there would rewrite the
+        /// encoding of every such member, where the shipped bytes are the surrogate's. The surrogate
+        /// itself is what belongs in that provider, and it is still there.
+        /// </remarks>
+        [Test]
+        public void AMarshalledStructIsNotVisibleToTheContractFormatterProvider()
+        {
+            Assert.IsFalse(WProtoFormatterProvider.IsRegistered<Vector2>());
+            Assert.IsFalse(WProtoFormatterProvider.IsRegistered<Bounds>());
+            Assert.IsFalse(WProtoFormatterProvider.IsRegistered<Resolution>());
+            Assert.IsFalse(WProtoFormatterProvider.IsRegistered<ImmutableBitSet>());
+
+            Assert.IsTrue(WProtoRootMarshalProvider.IsRegistered<Vector2>());
+            Assert.IsTrue(WProtoRootMarshalProvider.IsRegistered<Bounds>());
+            Assert.IsTrue(WProtoRootMarshalProvider.IsRegistered<Resolution>());
+            Assert.IsTrue(WProtoRootMarshalProvider.IsRegistered<ImmutableBitSet>());
         }
     }
 }

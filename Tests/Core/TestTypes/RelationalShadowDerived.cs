@@ -11,10 +11,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
     /// </summary>
     public sealed class RelationalShadowDerived : RelationalShadowBase
     {
-        [SiblingComponent(Optional = true)]
-        private new BoxCollider _collider;
-
         /// <summary>The field this subclass declared.</summary>
         public BoxCollider DerivedCollider => _collider;
+
+        [SiblingComponent(Optional = true)]
+        private new BoxCollider _collider;
     }
 }

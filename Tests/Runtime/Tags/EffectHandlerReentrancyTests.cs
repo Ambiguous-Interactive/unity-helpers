@@ -28,6 +28,100 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             "made no progress because a removal callback re-applied it"
         );
 
+        private (
+            GameObject entity,
+            EffectHandler handler,
+            TestAttributesComponent attributes,
+            TagHandler tags
+        ) CreateEntity()
+        {
+            GameObject entity = CreateTrackedGameObject(
+                "ReentrancyEntity",
+                typeof(TestAttributesComponent)
+            );
+            return (
+                entity,
+                entity.GetComponent<EffectHandler>(),
+                entity.GetComponent<TestAttributesComponent>(),
+                entity.GetComponent<TagHandler>()
+            );
+        }
+
+        private static IEnumerable<TestCaseData> DestroyedCosmeticSiblingCases()
+        {
+            yield return new TestCaseData(ModifierDurationType.Instant, false, false)
+                .Returns(null)
+                .SetName("DestroyedSibling.Instant.Shared.DuringApply");
+            yield return new TestCaseData(ModifierDurationType.Infinite, false, false)
+                .Returns(null)
+                .SetName("DestroyedSibling.Infinite.Shared.DuringApply");
+            yield return new TestCaseData(ModifierDurationType.Infinite, false, true)
+                .Returns(null)
+                .SetName("DestroyedSibling.Infinite.Shared.DuringRemoval");
+            yield return new TestCaseData(ModifierDurationType.Infinite, true, true)
+                .Returns(null)
+                .SetName("DestroyedSibling.Infinite.Instanced.DuringRemoval");
+        }
+
+        private static void AssertHandlerIsIdle(EffectHandler handler)
+        {
+            Assert.AreEqual(
+                0,
+                handler.TraversalDepthForTesting,
+                "The traversal counter must return to zero once every callback has unwound."
+            );
+            Assert.AreEqual(
+                0,
+                handler.DeferredLeaseCountForTesting,
+                "Every deferred pooled lease must be released once the outermost traversal exits."
+            );
+        }
+
+        private static IEnumerable<TestCaseData> CosmeticInstancingCases()
+        {
+            yield return new TestCaseData(false).Returns(null);
+            yield return new TestCaseData(true).Returns(null);
+        }
+
+        private static IEnumerable<TestCaseData> TeardownFailureCases()
+        {
+            yield return new TestCaseData(EffectTeardownPhase.AttributeModification)
+                .Returns(null)
+                .SetName("Teardown.AttributeModification.Throws");
+            yield return new TestCaseData(EffectTeardownPhase.Tag)
+                .Returns(null)
+                .SetName("Teardown.Tag.Throws");
+            yield return new TestCaseData(EffectTeardownPhase.Cosmetic)
+                .Returns(null)
+                .SetName("Teardown.Cosmetic.Throws");
+            yield return new TestCaseData(EffectTeardownPhase.EffectRemovedEvent)
+                .Returns(null)
+                .SetName("Teardown.EffectRemovedEvent.Throws");
+            yield return new TestCaseData(EffectTeardownPhase.BehaviorRemove)
+                .Returns(null)
+                .SetName("Teardown.BehaviorRemove.Throws");
+        }
+
+        // Rent the same pooled type to expose early return of the handler's active traversal list.
+        private static void RentAndMutateBehaviorBuffer()
+        {
+            using PooledResource<List<EffectBehavior>> lease = Buffers<EffectBehavior>.List.Get(
+                out List<EffectBehavior> stolen
+            );
+            stolen.Add(null);
+            stolen.Add(null);
+        }
+
+        private static void RentAndMutatePeriodicBuffer()
+        {
+            using PooledResource<List<PeriodicEffectRuntimeState>> lease =
+                Buffers<PeriodicEffectRuntimeState>.List.Get(
+                    out List<PeriodicEffectRuntimeState> stolen
+                );
+            stolen.Add(null);
+            stolen.Add(null);
+        }
+
         [SetUp]
         public void SetUp()
         {
@@ -1057,81 +1151,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             AssertHandlerIsIdle(handler);
         }
 
-        private static IEnumerable<TestCaseData> DestroyedCosmeticSiblingCases()
-        {
-            yield return new TestCaseData(ModifierDurationType.Instant, false, false)
-                .Returns(null)
-                .SetName("DestroyedSibling.Instant.Shared.DuringApply");
-            yield return new TestCaseData(ModifierDurationType.Infinite, false, false)
-                .Returns(null)
-                .SetName("DestroyedSibling.Infinite.Shared.DuringApply");
-            yield return new TestCaseData(ModifierDurationType.Infinite, false, true)
-                .Returns(null)
-                .SetName("DestroyedSibling.Infinite.Shared.DuringRemoval");
-            yield return new TestCaseData(ModifierDurationType.Infinite, true, true)
-                .Returns(null)
-                .SetName("DestroyedSibling.Infinite.Instanced.DuringRemoval");
-        }
-
-        private static void AssertHandlerIsIdle(EffectHandler handler)
-        {
-            Assert.AreEqual(
-                0,
-                handler.TraversalDepthForTesting,
-                "The traversal counter must return to zero once every callback has unwound."
-            );
-            Assert.AreEqual(
-                0,
-                handler.DeferredLeaseCountForTesting,
-                "Every deferred pooled lease must be released once the outermost traversal exits."
-            );
-        }
-
-        private static IEnumerable<TestCaseData> CosmeticInstancingCases()
-        {
-            yield return new TestCaseData(false).Returns(null);
-            yield return new TestCaseData(true).Returns(null);
-        }
-
-        private static IEnumerable<TestCaseData> TeardownFailureCases()
-        {
-            yield return new TestCaseData(EffectTeardownPhase.AttributeModification)
-                .Returns(null)
-                .SetName("Teardown.AttributeModification.Throws");
-            yield return new TestCaseData(EffectTeardownPhase.Tag)
-                .Returns(null)
-                .SetName("Teardown.Tag.Throws");
-            yield return new TestCaseData(EffectTeardownPhase.Cosmetic)
-                .Returns(null)
-                .SetName("Teardown.Cosmetic.Throws");
-            yield return new TestCaseData(EffectTeardownPhase.EffectRemovedEvent)
-                .Returns(null)
-                .SetName("Teardown.EffectRemovedEvent.Throws");
-            yield return new TestCaseData(EffectTeardownPhase.BehaviorRemove)
-                .Returns(null)
-                .SetName("Teardown.BehaviorRemove.Throws");
-        }
-
-        // Rent the same pooled type to expose early return of the handler's active traversal list.
-        private static void RentAndMutateBehaviorBuffer()
-        {
-            using PooledResource<List<EffectBehavior>> lease = Buffers<EffectBehavior>.List.Get(
-                out List<EffectBehavior> stolen
-            );
-            stolen.Add(null);
-            stolen.Add(null);
-        }
-
-        private static void RentAndMutatePeriodicBuffer()
-        {
-            using PooledResource<List<PeriodicEffectRuntimeState>> lease =
-                Buffers<PeriodicEffectRuntimeState>.List.Get(
-                    out List<PeriodicEffectRuntimeState> stolen
-                );
-            stolen.Add(null);
-            stolen.Add(null);
-        }
-
         /// <summary>
         /// An OnAttributeModified subscriber that removes the effect leaves the handle detached
         /// from every index. A modifier applied after that point has no handle to remove it, so the
@@ -1434,25 +1453,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                 template.AddComponent<ReentrantCosmeticComponent>();
             component.requireInstance = requiresInstance;
             return template.GetComponent<CosmeticEffectData>();
-        }
-
-        private (
-            GameObject entity,
-            EffectHandler handler,
-            TestAttributesComponent attributes,
-            TagHandler tags
-        ) CreateEntity()
-        {
-            GameObject entity = CreateTrackedGameObject(
-                "ReentrancyEntity",
-                typeof(TestAttributesComponent)
-            );
-            return (
-                entity,
-                entity.GetComponent<EffectHandler>(),
-                entity.GetComponent<TestAttributesComponent>(),
-                entity.GetComponent<TagHandler>()
-            );
         }
     }
 }

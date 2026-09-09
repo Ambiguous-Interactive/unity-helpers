@@ -12,23 +12,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
     /// </summary>
     internal readonly struct DocumentationImage
     {
-        internal DocumentationImage(
-            string relativePath,
-            Type[] targetTypes,
-            float columnWidth,
-            float labelWidth,
-            int canvasWidth,
-            int canvasHeight
-        )
-        {
-            RelativePath = relativePath;
-            TargetTypes = targetTypes;
-            ColumnWidth = columnWidth;
-            LabelWidth = labelWidth;
-            CanvasWidth = canvasWidth;
-            CanvasHeight = canvasHeight;
-        }
-
         /// <summary>
         /// Path under <c>docs/images/</c>, forward-slashed, for example
         /// <c>inspector/buttons/player-debug.png</c>.
@@ -62,6 +45,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
                 int separator = RelativePath.LastIndexOf('/');
                 return separator < 0 ? RelativePath : RelativePath.Substring(separator + 1);
             }
+        }
+
+        internal DocumentationImage(
+            string relativePath,
+            Type[] targetTypes,
+            float columnWidth,
+            float labelWidth,
+            int canvasWidth,
+            int canvasHeight
+        )
+        {
+            RelativePath = relativePath;
+            TargetTypes = targetTypes;
+            ColumnWidth = columnWidth;
+            LabelWidth = labelWidth;
+            CanvasWidth = canvasWidth;
+            CanvasHeight = canvasHeight;
         }
 
         public override string ToString()

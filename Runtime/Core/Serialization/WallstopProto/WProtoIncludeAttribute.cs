@@ -30,6 +30,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     )]
     public sealed class WProtoIncludeAttribute : Attribute
     {
+        /// <summary>The field number carrying the subtype on the base message.</summary>
+        public int Tag { get; }
+
+        /// <summary>The subtype this tag identifies.</summary>
+        public Type KnownType { get; }
+
         /// <summary>
         /// Initializes the attribute with the subtype's field number on the base message.
         /// </summary>
@@ -40,11 +46,5 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             Tag = tag;
             KnownType = knownType;
         }
-
-        /// <summary>The field number carrying the subtype on the base message.</summary>
-        public int Tag { get; }
-
-        /// <summary>The subtype this tag identifies.</summary>
-        public Type KnownType { get; }
     }
 }

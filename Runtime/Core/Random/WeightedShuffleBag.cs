@@ -23,9 +23,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// </summary>
         public const int MaxTickets = 1_000_000;
 
-        private readonly List<T> _entries = new();
-        private readonly List<T> _remaining = new();
-
         /// <summary>
         /// Gets the total configured ticket count.
         /// </summary>
@@ -35,6 +32,65 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// Gets the ticket count remaining in the current cycle.
         /// </summary>
         public int RemainingCount => _remaining.Count;
+
+        private readonly List<T> _entries = new();
+        private readonly List<T> _remaining = new();
+
+        private static bool TryCopyTicketsTo(IReadOnlyList<T> source, ICollection<T> destination)
+        {
+            if (destination == null || destination.IsReadOnly)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < source.Count; ++i)
+            {
+                destination.Add(source[i]);
+            }
+
+            return true;
+        }
+
+        private static void AddCount(Dictionary<T, int> counts, T item, ref int nullCount)
+        {
+            if (item is null)
+            {
+                ++nullCount;
+                return;
+            }
+
+            counts[item] = counts.TryGetValue(item, out int count) ? count + 1 : 1;
+        }
+
+        private static bool RemoveCount(Dictionary<T, int> counts, T item, ref int nullCount)
+        {
+            if (item is null)
+            {
+                if (nullCount <= 0)
+                {
+                    return false;
+                }
+
+                --nullCount;
+                return true;
+            }
+
+            if (!counts.TryGetValue(item, out int count) || count <= 0)
+            {
+                return false;
+            }
+
+            if (count == 1)
+            {
+                counts.Remove(item);
+            }
+            else
+            {
+                counts[item] = count - 1;
+            }
+
+            return true;
+        }
 
         /// <summary>
         /// Adds an item with the specified number of tickets.
@@ -190,21 +246,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             _remaining.Clear();
         }
 
-        private static bool TryCopyTicketsTo(IReadOnlyList<T> source, ICollection<T> destination)
-        {
-            if (destination == null || destination.IsReadOnly)
-            {
-                return false;
-            }
-
-            for (int i = 0; i < source.Count; ++i)
-            {
-                destination.Add(source[i]);
-            }
-
-            return true;
-        }
-
         private bool RemainingTicketsFitConfiguredCounts(IReadOnlyList<T> remainingTickets)
         {
             Dictionary<T, int> counts = new();
@@ -220,47 +261,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 {
                     return false;
                 }
-            }
-
-            return true;
-        }
-
-        private static void AddCount(Dictionary<T, int> counts, T item, ref int nullCount)
-        {
-            if (item is null)
-            {
-                ++nullCount;
-                return;
-            }
-
-            counts[item] = counts.TryGetValue(item, out int count) ? count + 1 : 1;
-        }
-
-        private static bool RemoveCount(Dictionary<T, int> counts, T item, ref int nullCount)
-        {
-            if (item is null)
-            {
-                if (nullCount <= 0)
-                {
-                    return false;
-                }
-
-                --nullCount;
-                return true;
-            }
-
-            if (!counts.TryGetValue(item, out int count) || count <= 0)
-            {
-                return false;
-            }
-
-            if (count == 1)
-            {
-                counts.Remove(item);
-            }
-            else
-            {
-                counts[item] = count - 1;
             }
 
             return true;

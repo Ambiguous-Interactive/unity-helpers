@@ -33,17 +33,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         private const int ReservedRangeStart = 19000;
         private const int ReservedRangeEnd = 19999;
 
-        private WProtoSubtypeTagPlan(
-            IReadOnlyList<Entry> assigned,
-            IReadOnlyList<Entry> retired,
-            IReadOnlyList<Entry> freshlyAssigned
-        )
-        {
-            Assigned = assigned;
-            Retired = retired;
-            FreshlyAssigned = freshlyAssigned;
-        }
-
         /// <summary>The field number every tag-less subtype should be written under.</summary>
         public IReadOnlyList<Entry> Assigned { get; }
 
@@ -64,6 +53,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
         /// <summary>Whether the plan would write no entry of either kind.</summary>
         public bool IsEmpty => Assigned.Count == 0 && Retired.Count == 0;
+
+        private WProtoSubtypeTagPlan(
+            IReadOnlyList<Entry> assigned,
+            IReadOnlyList<Entry> retired,
+            IReadOnlyList<Entry> freshlyAssigned
+        )
+        {
+            Assigned = assigned;
+            Retired = retired;
+            FreshlyAssigned = freshlyAssigned;
+        }
 
         /// <summary>
         /// Computes the manifest an assembly should carry.
@@ -337,6 +337,84 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             return new WProtoSubtypeTagPlan(assignments, retiredOut, fresh);
         }
 
+        private static IEnumerable<T> Safe<T>(IReadOnlyList<T> values)
+        {
+            return values ?? (IReadOnlyList<T>)Array.Empty<T>();
+        }
+
+        private static void Claim(Dictionary<string, HashSet<int>> taken, string baseName, int tag)
+        {
+            if (!taken.TryGetValue(baseName, out HashSet<int> claimed))
+            {
+                claimed = new HashSet<int>();
+                taken[baseName] = claimed;
+            }
+
+            claimed.Add(tag);
+        }
+
+        private static bool TryNextFree(
+            Dictionary<string, HashSet<int>> taken,
+            string baseName,
+            out int next
+        )
+        {
+            if (!taken.TryGetValue(baseName, out HashSet<int> claimed))
+            {
+                claimed = new HashSet<int>();
+                taken[baseName] = claimed;
+            }
+
+            // Choose the smallest free number to keep ordinary discriminator varints compact.
+            for (int candidate = 1; candidate <= MaxFieldNumber; candidate++)
+            {
+                if (ReservedRangeStart <= candidate && candidate <= ReservedRangeEnd)
+                {
+                    candidate = ReservedRangeEnd;
+                    continue;
+                }
+
+                if (claimed.Add(candidate))
+                {
+                    next = candidate;
+                    return true;
+                }
+            }
+
+            next = 0;
+            return false;
+        }
+
+        private static string PairKey(string subTypeName, string baseTypeName)
+        {
+            return subTypeName + "|" + baseTypeName;
+        }
+
+        private static string RetirementKey(Entry entry)
+        {
+            return entry.SubTypeName + "|" + entry.BaseTypeName + "|" + entry.Tag;
+        }
+
+        private static int CompareEntries(Entry left, Entry right)
+        {
+            int byBase = string.CompareOrdinal(left.BaseTypeName, right.BaseTypeName);
+            if (byBase != 0)
+            {
+                return byBase;
+            }
+
+            int byTag = left.Tag.CompareTo(right.Tag);
+            return byTag != 0 ? byTag : string.CompareOrdinal(left.SubTypeName, right.SubTypeName);
+        }
+
+        private static int CompareDeclarations(Declaration left, Declaration right)
+        {
+            int byBase = string.CompareOrdinal(left.BaseTypeName, right.BaseTypeName);
+            return byBase != 0
+                ? byBase
+                : string.CompareOrdinal(left.SubTypeName, right.SubTypeName);
+        }
+
         /// <summary>
         /// Renders the plan as the committed C# manifest file.
         /// </summary>
@@ -430,104 +508,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             return builder.ToString();
         }
 
-        private static IEnumerable<T> Safe<T>(IReadOnlyList<T> values)
-        {
-            return values ?? (IReadOnlyList<T>)Array.Empty<T>();
-        }
-
-        private static void Claim(Dictionary<string, HashSet<int>> taken, string baseName, int tag)
-        {
-            if (!taken.TryGetValue(baseName, out HashSet<int> claimed))
-            {
-                claimed = new HashSet<int>();
-                taken[baseName] = claimed;
-            }
-
-            claimed.Add(tag);
-        }
-
-        private static bool TryNextFree(
-            Dictionary<string, HashSet<int>> taken,
-            string baseName,
-            out int next
-        )
-        {
-            if (!taken.TryGetValue(baseName, out HashSet<int> claimed))
-            {
-                claimed = new HashSet<int>();
-                taken[baseName] = claimed;
-            }
-
-            // Choose the smallest free number to keep ordinary discriminator varints compact.
-            for (int candidate = 1; candidate <= MaxFieldNumber; candidate++)
-            {
-                if (ReservedRangeStart <= candidate && candidate <= ReservedRangeEnd)
-                {
-                    candidate = ReservedRangeEnd;
-                    continue;
-                }
-
-                if (claimed.Add(candidate))
-                {
-                    next = candidate;
-                    return true;
-                }
-            }
-
-            next = 0;
-            return false;
-        }
-
-        private static string PairKey(string subTypeName, string baseTypeName)
-        {
-            return subTypeName + "|" + baseTypeName;
-        }
-
-        private static string RetirementKey(Entry entry)
-        {
-            return entry.SubTypeName + "|" + entry.BaseTypeName + "|" + entry.Tag;
-        }
-
-        private static int CompareEntries(Entry left, Entry right)
-        {
-            int byBase = string.CompareOrdinal(left.BaseTypeName, right.BaseTypeName);
-            if (byBase != 0)
-            {
-                return byBase;
-            }
-
-            int byTag = left.Tag.CompareTo(right.Tag);
-            return byTag != 0 ? byTag : string.CompareOrdinal(left.SubTypeName, right.SubTypeName);
-        }
-
-        private static int CompareDeclarations(Declaration left, Declaration right)
-        {
-            int byBase = string.CompareOrdinal(left.BaseTypeName, right.BaseTypeName);
-            return byBase != 0
-                ? byBase
-                : string.CompareOrdinal(left.SubTypeName, right.SubTypeName);
-        }
-
         /// <summary>
         /// One <c>[WProtoSubtype]</c> as written, whether or not it stated a field number.
         /// </summary>
         public readonly struct Declaration
         {
-            /// <summary>
-            /// Initializes the declaration.
-            /// </summary>
-            /// <param name="subTypeName">The fully qualified subtype name.</param>
-            /// <param name="baseTypeName">The fully qualified base type name.</param>
-            /// <param name="hasTag">Whether the declaration stated its own field number.</param>
-            /// <param name="tag">The stated field number, ignored when <paramref name="hasTag"/> is <c>false</c>.</param>
-            public Declaration(string subTypeName, string baseTypeName, bool hasTag, int tag)
-            {
-                SubTypeName = subTypeName;
-                BaseTypeName = baseTypeName;
-                HasTag = hasTag;
-                Tag = tag;
-            }
-
             /// <summary>The fully qualified subtype name.</summary>
             public string SubTypeName { get; }
 
@@ -545,6 +530,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 !string.IsNullOrEmpty(SubTypeName)
                 && !string.IsNullOrEmpty(BaseTypeName)
                 && (!HasTag || (1 <= Tag && Tag <= MaxFieldNumber));
+
+            /// <summary>
+            /// Initializes the declaration.
+            /// </summary>
+            /// <param name="subTypeName">The fully qualified subtype name.</param>
+            /// <param name="baseTypeName">The fully qualified base type name.</param>
+            /// <param name="hasTag">Whether the declaration stated its own field number.</param>
+            /// <param name="tag">The stated field number, ignored when <paramref name="hasTag"/> is <c>false</c>.</param>
+            public Declaration(string subTypeName, string baseTypeName, bool hasTag, int tag)
+            {
+                SubTypeName = subTypeName;
+                BaseTypeName = baseTypeName;
+                HasTag = hasTag;
+                Tag = tag;
+            }
         }
 
         /// <summary>
@@ -552,19 +552,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// </summary>
         public readonly struct Entry
         {
-            /// <summary>
-            /// Initializes the entry.
-            /// </summary>
-            /// <param name="subTypeName">The fully qualified subtype name.</param>
-            /// <param name="baseTypeName">The fully qualified base type name.</param>
-            /// <param name="tag">The field number.</param>
-            public Entry(string subTypeName, string baseTypeName, int tag)
-            {
-                SubTypeName = subTypeName;
-                BaseTypeName = baseTypeName;
-                Tag = tag;
-            }
-
             /// <summary>The fully qualified subtype name.</summary>
             public string SubTypeName { get; }
 
@@ -580,6 +567,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 && !string.IsNullOrEmpty(BaseTypeName)
                 && 1 <= Tag
                 && Tag <= MaxFieldNumber;
+
+            /// <summary>
+            /// Initializes the entry.
+            /// </summary>
+            /// <param name="subTypeName">The fully qualified subtype name.</param>
+            /// <param name="baseTypeName">The fully qualified base type name.</param>
+            /// <param name="tag">The field number.</param>
+            public Entry(string subTypeName, string baseTypeName, int tag)
+            {
+                SubTypeName = subTypeName;
+                BaseTypeName = baseTypeName;
+                Tag = tag;
+            }
         }
     }
 }

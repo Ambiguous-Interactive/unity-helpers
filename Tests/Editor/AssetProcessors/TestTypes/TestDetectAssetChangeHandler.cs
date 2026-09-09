@@ -13,9 +13,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     /// </summary>
     internal sealed class TestDetectAssetChangeHandler : ScriptableObject
     {
-        private static readonly List<AssetChangeContext> Recorded = new();
-
         public static IReadOnlyList<AssetChangeContext> RecordedContexts => Recorded;
+
+        private static readonly List<AssetChangeContext> Recorded = new();
 
         public static void Clear()
         {

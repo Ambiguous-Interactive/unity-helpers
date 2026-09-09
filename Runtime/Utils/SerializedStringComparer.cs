@@ -22,6 +22,9 @@ namespace WallstopStudios.UnityHelpers.Utils
     [Serializable]
     public sealed class SerializedStringComparer : IEqualityComparer<string>
     {
+        /// <summary>Whether <see cref="Freeze"/> has pinned this comparer's rule.</summary>
+        public bool IsFrozen => _frozen;
+
         /// <summary>The comparison rule this instance applies.</summary>
         /// <remarks>
         /// <para><b>Changing this after a dictionary has been built with this comparer breaks that
@@ -51,6 +54,22 @@ namespace WallstopStudios.UnityHelpers.Utils
         public SerializedStringComparer(StringCompareMode compareMode)
         {
             this.compareMode = compareMode;
+        }
+
+        // Unknown serialized modes use the field default instead of throwing during dictionary lookup.
+        private static StringComparer ResolveMode(StringCompareMode compareMode)
+        {
+            return compareMode switch
+            {
+                StringCompareMode.OrdinalIgnoreCase => StringComparer.OrdinalIgnoreCase,
+                StringCompareMode.CurrentCulture => StringComparer.CurrentCulture,
+                StringCompareMode.CurrentCultureIgnoreCase =>
+                    StringComparer.CurrentCultureIgnoreCase,
+                StringCompareMode.InvariantCulture => StringComparer.InvariantCulture,
+                StringCompareMode.InvariantCultureIgnoreCase =>
+                    StringComparer.InvariantCultureIgnoreCase,
+                _ => StringComparer.Ordinal,
+            };
         }
 
         /// <summary>Determines whether two strings are equal under <see cref="compareMode"/>.</summary>
@@ -100,9 +119,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             return this;
         }
 
-        /// <summary>Whether <see cref="Freeze"/> has pinned this comparer's rule.</summary>
-        public bool IsFrozen => _frozen;
-
         private StringComparer Resolve()
         {
             if (_frozen)
@@ -118,22 +134,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             _resolved = ResolveMode(compareMode);
             _resolvedMode = compareMode;
             return _resolved;
-        }
-
-        // Unknown serialized modes use the field default instead of throwing during dictionary lookup.
-        private static StringComparer ResolveMode(StringCompareMode compareMode)
-        {
-            return compareMode switch
-            {
-                StringCompareMode.OrdinalIgnoreCase => StringComparer.OrdinalIgnoreCase,
-                StringCompareMode.CurrentCulture => StringComparer.CurrentCulture,
-                StringCompareMode.CurrentCultureIgnoreCase =>
-                    StringComparer.CurrentCultureIgnoreCase,
-                StringCompareMode.InvariantCulture => StringComparer.InvariantCulture,
-                StringCompareMode.InvariantCultureIgnoreCase =>
-                    StringComparer.InvariantCultureIgnoreCase,
-                _ => StringComparer.Ordinal,
-            };
         }
 
         /// <summary>The comparison rule a <see cref="SerializedStringComparer"/> applies.</summary>

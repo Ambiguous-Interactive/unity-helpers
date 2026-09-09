@@ -34,6 +34,89 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         private const string FilledRequirementsAsset = "FilledRequirements.asset";
         private const string SpritePropertyName = "m_Sprite";
 
+        private string _root;
+        private string _scriptPath;
+        private string _emptyRequirements;
+        private string _filledRequirements;
+
+        private static List<ValidationFinding> Judge(
+            IValidationRule rule,
+            ValidationTarget target,
+            Object asset
+        )
+        {
+            List<ValidationFinding> findings = new List<ValidationFinding>();
+            rule.Validate(in target, asset, findings);
+            return findings;
+        }
+
+        private static List<IValidationRule> ShippedRules()
+        {
+            return new List<IValidationRule>
+            {
+                new AuthoredRequirementRule(),
+                new SerializableDictionaryPairingRule(),
+                new AnimationKeyframeRule(),
+                new ScriptFileNameRule(),
+            };
+        }
+
+        private static ValidationFinding UnderRule(ValidationFinding finding, string ruleId)
+        {
+            return new ValidationFinding(
+                ruleId,
+                finding.Severity,
+                null,
+                finding.AssetGuid,
+                finding.AssetPath,
+                finding.Discriminator,
+                finding.Message
+            );
+        }
+
+        private static ValidationTarget Target(string assetPath, Type mainAssetType)
+        {
+            return new ValidationTarget(GuidOf(assetPath), assetPath, mainAssetType);
+        }
+
+        private static ValidationTarget AssetTarget(string assetPath)
+        {
+            string guid = AssetDatabase.AssetPathToGUID(assetPath);
+            Assert.IsFalse(
+                string.IsNullOrEmpty(guid),
+                assetPath
+                    + " is not in the asset database, so the fixture is looking in the wrong "
+                    + "place rather than at a clean project"
+            );
+
+            return new ValidationTarget(
+                guid,
+                assetPath,
+                AssetDatabase.GetMainAssetTypeAtPath(assetPath)
+            );
+        }
+
+        private static Object LoadMainAsset(string assetPath)
+        {
+            return AssetDatabase.LoadMainAssetAtPath(assetPath);
+        }
+
+        private static string GuidOf(string assetPath)
+        {
+            return ((uint)StringComparer.Ordinal.GetHashCode(assetPath)).ToString("x32");
+        }
+
+        private static string Describe(List<ValidationFinding> findings)
+        {
+            List<string> rendered = new List<string>(findings.Count);
+            foreach (ValidationFinding finding in findings)
+            {
+                rendered.Add(finding.ToString());
+            }
+
+            return string.Join(Environment.NewLine, rendered);
+        }
+
         [SetUp]
         public void CreateRuleFixture()
         {
@@ -518,84 +601,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
         }
 
-        private static List<ValidationFinding> Judge(
-            IValidationRule rule,
-            ValidationTarget target,
-            Object asset
-        )
-        {
-            List<ValidationFinding> findings = new List<ValidationFinding>();
-            rule.Validate(in target, asset, findings);
-            return findings;
-        }
-
-        private static List<IValidationRule> ShippedRules()
-        {
-            return new List<IValidationRule>
-            {
-                new AuthoredRequirementRule(),
-                new SerializableDictionaryPairingRule(),
-                new AnimationKeyframeRule(),
-                new ScriptFileNameRule(),
-            };
-        }
-
-        private static ValidationFinding UnderRule(ValidationFinding finding, string ruleId)
-        {
-            return new ValidationFinding(
-                ruleId,
-                finding.Severity,
-                null,
-                finding.AssetGuid,
-                finding.AssetPath,
-                finding.Discriminator,
-                finding.Message
-            );
-        }
-
-        private static ValidationTarget Target(string assetPath, Type mainAssetType)
-        {
-            return new ValidationTarget(GuidOf(assetPath), assetPath, mainAssetType);
-        }
-
-        private static ValidationTarget AssetTarget(string assetPath)
-        {
-            string guid = AssetDatabase.AssetPathToGUID(assetPath);
-            Assert.IsFalse(
-                string.IsNullOrEmpty(guid),
-                assetPath
-                    + " is not in the asset database, so the fixture is looking in the wrong "
-                    + "place rather than at a clean project"
-            );
-
-            return new ValidationTarget(
-                guid,
-                assetPath,
-                AssetDatabase.GetMainAssetTypeAtPath(assetPath)
-            );
-        }
-
-        private static Object LoadMainAsset(string assetPath)
-        {
-            return AssetDatabase.LoadMainAssetAtPath(assetPath);
-        }
-
-        private static string GuidOf(string assetPath)
-        {
-            return ((uint)StringComparer.Ordinal.GetHashCode(assetPath)).ToString("x32");
-        }
-
-        private static string Describe(List<ValidationFinding> findings)
-        {
-            List<string> rendered = new List<string>(findings.Count);
-            foreach (ValidationFinding finding in findings)
-            {
-                rendered.Add(finding.ToString());
-            }
-
-            return string.Join(Environment.NewLine, rendered);
-        }
-
         private Sprite FilledSprite()
         {
             Texture2D texture = Track(new Texture2D(4, 4));
@@ -640,10 +645,5 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             File.WriteAllLines(assetPath, lines);
             return assetPath;
         }
-
-        private string _root;
-        private string _scriptPath;
-        private string _emptyRequirements;
-        private string _filledRequirements;
     }
 }

@@ -16,6 +16,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [TestFixture]
     public sealed class FacadeTests
     {
+        private static void AssertServedAndIdentical<T>(T value)
+        {
+            Assert.IsTrue(WProtoFacade.TrySerialize(value, out byte[] mine), typeof(T).Name);
+
+            using MemoryStream stream = new();
+            ProtoBuf.Serializer.Serialize(stream, value);
+
+            CollectionAssert.AreEqual(stream.ToArray(), mine, typeof(T).Name);
+        }
+
         [Test]
         public void SerializingNullReturnsTheEmptyPayloadRatherThanThrowing()
         {
@@ -301,16 +311,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             Assert.IsTrue(root.CanWrite(typeof(IncludeGamma)));
             Assert.IsFalse(root.CanWrite(typeof(UndeclaredAlpha)));
-        }
-
-        private static void AssertServedAndIdentical<T>(T value)
-        {
-            Assert.IsTrue(WProtoFacade.TrySerialize(value, out byte[] mine), typeof(T).Name);
-
-            using MemoryStream stream = new();
-            ProtoBuf.Serializer.Serialize(stream, value);
-
-            CollectionAssert.AreEqual(stream.ToArray(), mine, typeof(T).Name);
         }
 
         private sealed class FacadeBrokenContract { }

@@ -28,6 +28,16 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     [WProtoContract]
     public sealed partial class DisjointSet
     {
+        /// <summary>
+        /// Gets the number of elements in the disjoint set.
+        /// </summary>
+        public int Count => _parent.Length;
+
+        /// <summary>
+        /// Gets the number of distinct sets.
+        /// </summary>
+        public int SetCount => _setCount;
+
         [SerializeField]
         [ProtoMember(1)]
         [WProtoMember(1)]
@@ -42,18 +52,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         [ProtoMember(3)]
         [WProtoMember(3)]
         private int _setCount;
-
-        /// <summary>
-        /// Gets the number of elements in the disjoint set.
-        /// </summary>
-        public int Count => _parent.Length;
-
-        /// <summary>
-        /// Gets the number of distinct sets.
-        /// </summary>
-        public int SetCount => _setCount;
-
-        private DisjointSet() { }
 
         /// <summary>
         /// Constructs a disjoint set with n elements, each in its own set.
@@ -77,6 +75,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
         }
 
+        private DisjointSet() { }
+
         /// <summary>
         /// Attempts to find the representative (root) of the set containing element x.
         /// Uses path compression for optimization.
@@ -99,15 +99,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
             representative = _parent[x];
             return true;
-        }
-
-        private int TryFindInternal(int x)
-        {
-            if (_parent[x] != x)
-            {
-                _parent[x] = TryFindInternal(_parent[x]);
-            }
-            return _parent[x];
         }
 
         /// <summary>
@@ -303,6 +294,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
             _setCount = _parent.Length;
         }
+
+        private int TryFindInternal(int x)
+        {
+            if (_parent[x] != x)
+            {
+                _parent[x] = TryFindInternal(_parent[x]);
+            }
+            return _parent[x];
+        }
     }
 
     /// <summary>
@@ -320,11 +320,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     [Serializable]
     public sealed class DisjointSet<T>
     {
-        private readonly DisjointSet _disjointSet;
-        private readonly Dictionary<T, int> _elementToIndex;
-        private readonly List<T> _indexToElement;
-        private readonly IEqualityComparer<T> _comparer;
-
         /// <summary>
         /// Gets the number of elements in the disjoint set.
         /// </summary>
@@ -334,6 +329,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// Gets the number of distinct sets.
         /// </summary>
         public int SetCount => _disjointSet.SetCount;
+
+        private readonly DisjointSet _disjointSet;
+        private readonly Dictionary<T, int> _elementToIndex;
+        private readonly List<T> _indexToElement;
+        private readonly IEqualityComparer<T> _comparer;
 
         /// <summary>
         /// Constructs a disjoint set from a collection of elements.

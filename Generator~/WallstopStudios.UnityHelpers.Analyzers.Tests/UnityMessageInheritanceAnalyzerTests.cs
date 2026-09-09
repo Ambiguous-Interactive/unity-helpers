@@ -27,6 +27,42 @@ namespace WallstopStudios.UnityHelpers.Tests.Core {
 public sealed class SuppressAnalyzerAttribute : System.Attribute {} }
 ";
 
+        private static CSharpCompilation CreateCompilation(string name, params string[] sources)
+        {
+            List<MetadataReference> references = new();
+            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
+                {
+                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
+                }
+            }
+            return CSharpCompilation.Create(
+                name,
+                sources.Select(source => CSharpSyntaxTree.ParseText(source)),
+                references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+            );
+        }
+
+        private static Diagnostic[] Analyze(CSharpCompilation compilation)
+        {
+            Assert.That(
+                compilation
+                    .GetDiagnostics()
+                    .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error),
+                Is.Empty
+            );
+            return compilation
+                .WithAnalyzers(
+                    ImmutableArray.Create<DiagnosticAnalyzer>(new UnityMessageInheritanceAnalyzer())
+                )
+                .GetAnalyzerDiagnosticsAsync()
+                .GetAwaiter()
+                .GetResult()
+                .ToArray();
+        }
+
         [TestCase(
             "class Base : UnityEngine.MonoBehaviour { private void Awake() {} } class Subject : Base { private void Awake() {} }",
             1
@@ -161,42 +197,6 @@ public sealed class SuppressAnalyzerAttribute : System.Attribute {} }
                 compilation.GetDiagnostics().Select(diagnostic => diagnostic.Id),
                 Does.Contain(expected)
             );
-        }
-
-        private static CSharpCompilation CreateCompilation(string name, params string[] sources)
-        {
-            List<MetadataReference> references = new();
-            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
-                {
-                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
-                }
-            }
-            return CSharpCompilation.Create(
-                name,
-                sources.Select(source => CSharpSyntaxTree.ParseText(source)),
-                references,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-            );
-        }
-
-        private static Diagnostic[] Analyze(CSharpCompilation compilation)
-        {
-            Assert.That(
-                compilation
-                    .GetDiagnostics()
-                    .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error),
-                Is.Empty
-            );
-            return compilation
-                .WithAnalyzers(
-                    ImmutableArray.Create<DiagnosticAnalyzer>(new UnityMessageInheritanceAnalyzer())
-                )
-                .GetAnalyzerDiagnosticsAsync()
-                .GetAwaiter()
-                .GetResult()
-                .ToArray();
         }
     }
 }

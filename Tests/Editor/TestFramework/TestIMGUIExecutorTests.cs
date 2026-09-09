@@ -12,6 +12,11 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
     [TestFixture]
     public sealed class TestIMGUIExecutorTests
     {
+        private static void DrainEnumerator(IEnumerator enumerator)
+        {
+            while (enumerator.MoveNext()) { }
+        }
+
         [UnityTest]
         public IEnumerator RunInvokesActionAndCompletesWithinBudget()
         {
@@ -83,11 +88,6 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
             Assert.IsTrue(sawLayout, "Expected the offscreen pump to run Layout first.");
             Assert.IsTrue(sawMouseDown, "Expected the offscreen pump to run MouseDown.");
             Assert.IsTrue(sawRepaint, "Expected the offscreen pump to run Repaint last.");
-        }
-
-        private static void DrainEnumerator(IEnumerator enumerator)
-        {
-            while (enumerator.MoveNext()) { }
         }
     }
 #endif

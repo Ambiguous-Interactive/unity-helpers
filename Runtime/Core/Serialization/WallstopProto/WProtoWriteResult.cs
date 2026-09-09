@@ -25,6 +25,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// </remarks>
     public readonly struct WProtoWriteResult
     {
+        /// <summary>Whether WallstopProto handled the request.</summary>
+        public bool Served => BytesWritten.HasValue;
+
+        /// <summary>The payload length, or 0 when the request was not served.</summary>
+        /// <remarks>
+        /// For a caller that has already checked <see cref="Served"/> and wants the number without
+        /// unwrapping it a second time.
+        /// </remarks>
+        public int Length => BytesWritten ?? 0;
+
         /// <summary>
         /// The number of bytes written, or <c>null</c> when WallstopProto does not serve the type.
         /// </summary>
@@ -48,15 +58,5 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             BytesWritten = bytesWritten;
             Resized = resized;
         }
-
-        /// <summary>Whether WallstopProto handled the request.</summary>
-        public bool Served => BytesWritten.HasValue;
-
-        /// <summary>The payload length, or 0 when the request was not served.</summary>
-        /// <remarks>
-        /// For a caller that has already checked <see cref="Served"/> and wants the number without
-        /// unwrapping it a second time.
-        /// </remarks>
-        public int Length => BytesWritten ?? 0;
     }
 }

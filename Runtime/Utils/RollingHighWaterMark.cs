@@ -45,16 +45,6 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </summary>
         private const int RingLength = WindowBucketCount + 2;
 
-        private readonly Bucket[] _buckets = new Bucket[RingLength];
-        private readonly object _lock = new object();
-        private float _windowSeconds;
-        private float _bucketSeconds;
-        private long _newestEpoch;
-        private bool _hasEpoch;
-        private int _cachedPeak;
-        private long _runningSum;
-        private long _sampleCount;
-
         /// <summary>
         /// Gets or sets the rolling window duration in seconds. Changing it discards the samples
         /// recorded against the previous bucket duration.
@@ -114,6 +104,16 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
         }
 
+        private readonly Bucket[] _buckets = new Bucket[RingLength];
+        private readonly object _lock = new object();
+        private float _windowSeconds;
+        private float _bucketSeconds;
+        private long _newestEpoch;
+        private bool _hasEpoch;
+        private int _cachedPeak;
+        private long _runningSum;
+        private long _sampleCount;
+
         /// <summary>
         /// Creates a new rolling high-water mark tracker.
         /// </summary>
@@ -124,6 +124,13 @@ namespace WallstopStudios.UnityHelpers.Utils
                 0f < windowSeconds ? windowSeconds : PoolPurgeSettings.DefaultRollingWindowSeconds;
             _bucketSeconds = _windowSeconds / WindowBucketCount;
             _cachedPeak = 0;
+        }
+
+        private static long OldestLiveEpoch(long newestEpoch)
+        {
+            return newestEpoch < long.MinValue + (RingLength - 1)
+                ? long.MinValue
+                : newestEpoch - (RingLength - 1);
         }
 
         /// <summary>
@@ -294,13 +301,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
         }
 
-        private static long OldestLiveEpoch(long newestEpoch)
-        {
-            return newestEpoch < long.MinValue + (RingLength - 1)
-                ? long.MinValue
-                : newestEpoch - (RingLength - 1);
-        }
-
         private long EpochFor(float currentTime)
         {
             // A denormal window can yield zero bucket duration; use the newest epoch to avoid undefined NaN conversion.
@@ -422,26 +422,6 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// Pools with no access for 5+ minutes are candidates for aggressive purge.
         /// </summary>
         private const float UnusedPoolThresholdMinutes = 5f;
-
-        private readonly RollingHighWaterMark _rollingHighWaterMark;
-        private readonly object _lock = new object();
-
-        private int _currentlyRented;
-        private int _peakConcurrentRentals;
-        private float _lastRentalTime;
-        private float _lastReturnTime;
-        private float _lastSpikeTime;
-        private float _hysteresisSeconds;
-        private float _spikeThresholdMultiplier;
-        private float _bufferMultiplier;
-
-        private int _rentalCountThisWindow;
-        private float _windowStartTime;
-        private float _cachedRentalsPerMinute;
-        private long _totalRentalCount;
-        private double _totalInterRentalTimeSeconds;
-        private int _interRentalCount;
-        private float _previousRentalTime;
 
         /// <summary>
         /// Gets the current number of items rented from the pool.
@@ -642,6 +622,26 @@ namespace WallstopStudios.UnityHelpers.Utils
             get => _rollingHighWaterMark.WindowSeconds;
             set => _rollingHighWaterMark.WindowSeconds = value;
         }
+
+        private readonly RollingHighWaterMark _rollingHighWaterMark;
+        private readonly object _lock = new object();
+
+        private int _currentlyRented;
+        private int _peakConcurrentRentals;
+        private float _lastRentalTime;
+        private float _lastReturnTime;
+        private float _lastSpikeTime;
+        private float _hysteresisSeconds;
+        private float _spikeThresholdMultiplier;
+        private float _bufferMultiplier;
+
+        private int _rentalCountThisWindow;
+        private float _windowStartTime;
+        private float _cachedRentalsPerMinute;
+        private long _totalRentalCount;
+        private double _totalInterRentalTimeSeconds;
+        private int _interRentalCount;
+        private float _previousRentalTime;
 
         /// <summary>
         /// Creates a new pool usage tracker.
@@ -1225,6 +1225,22 @@ namespace WallstopStudios.UnityHelpers.Utils
     public readonly struct PoolFrequencyStatistics : IEquatable<PoolFrequencyStatistics>
     {
         /// <summary>
+        /// Determines whether two <see cref="PoolFrequencyStatistics"/> instances are equal.
+        /// </summary>
+        public static bool operator ==(PoolFrequencyStatistics left, PoolFrequencyStatistics right)
+        {
+            return left.Equals(right);
+        }
+
+        /// <summary>
+        /// Determines whether two <see cref="PoolFrequencyStatistics"/> instances are not equal.
+        /// </summary>
+        public static bool operator !=(PoolFrequencyStatistics left, PoolFrequencyStatistics right)
+        {
+            return !left.Equals(right);
+        }
+
+        /// <summary>
         /// Gets the current rentals-per-minute rate.
         /// </summary>
         public float RentalsPerMinute { get; }
@@ -1360,22 +1376,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 IsLowFrequency,
                 IsUnused
             );
-        }
-
-        /// <summary>
-        /// Determines whether two <see cref="PoolFrequencyStatistics"/> instances are equal.
-        /// </summary>
-        public static bool operator ==(PoolFrequencyStatistics left, PoolFrequencyStatistics right)
-        {
-            return left.Equals(right);
-        }
-
-        /// <summary>
-        /// Determines whether two <see cref="PoolFrequencyStatistics"/> instances are not equal.
-        /// </summary>
-        public static bool operator !=(PoolFrequencyStatistics left, PoolFrequencyStatistics right)
-        {
-            return !left.Equals(right);
         }
 
         /// <inheritdoc />

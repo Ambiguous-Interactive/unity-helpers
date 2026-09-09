@@ -48,10 +48,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// </remarks>
         public const double InteractiveBudgetMilliseconds = 33.0;
 
-        private static ValidationRun _active;
-        private static double _budgetMilliseconds = DefaultBudgetMilliseconds;
-        private static Action<ValidationRun> _onComplete;
-
         /// <summary>The run currently being driven, or <c>null</c>.</summary>
         public static ValidationRun Active => _active;
 
@@ -63,6 +59,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// <see cref="DefaultBudgetMilliseconds"/> when nothing is running.
         /// </summary>
         public static double BudgetMilliseconds => _budgetMilliseconds;
+
+        private static ValidationRun _active;
+        private static double _budgetMilliseconds = DefaultBudgetMilliseconds;
+        private static Action<ValidationRun> _onComplete;
 
         /// <summary>
         /// Begins driving <paramref name="run"/> from the editor's update loop.

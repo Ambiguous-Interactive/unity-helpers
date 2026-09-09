@@ -35,19 +35,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous.Rules
     /// </remarks>
     public sealed class AuthoredRequirementRule : IValidationRule
     {
-        private readonly List<AuthoredRequirementFinding> _found =
-            new List<AuthoredRequirementFinding>();
-
-        private readonly List<AuthoredRequirementExemption> _exemptions =
-            new List<AuthoredRequirementExemption>();
-
-        private readonly Dictionary<string, int> _occurrences = new Dictionary<string, int>(
-            StringComparer.Ordinal
-        );
-
-        private Dictionary<string, List<AuthoredRequirementField>> _fieldsByScriptGuid;
-        private bool _indexBuilt;
-
         /// <inheritdoc />
         public string RuleId => ValidationRuleIds.RequiredFieldEmpty;
 
@@ -66,6 +53,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous.Rules
                 return _fieldsByScriptGuid;
             }
         }
+
+        private readonly List<AuthoredRequirementFinding> _found =
+            new List<AuthoredRequirementFinding>();
+
+        private readonly List<AuthoredRequirementExemption> _exemptions =
+            new List<AuthoredRequirementExemption>();
+
+        private readonly Dictionary<string, int> _occurrences = new Dictionary<string, int>(
+            StringComparer.Ordinal
+        );
+
+        private Dictionary<string, List<AuthoredRequirementField>> _fieldsByScriptGuid;
+        private bool _indexBuilt;
 
         /// <inheritdoc />
         public bool AppliesTo(in ValidationTarget target)

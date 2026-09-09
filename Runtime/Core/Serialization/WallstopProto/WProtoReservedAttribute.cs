@@ -65,6 +65,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         private static readonly int[] NoNumbers = Array.Empty<int>();
         private static readonly string[] NoNames = Array.Empty<string>();
 
+        /// <summary>The field numbers this declaration holds; empty when it reserves names.</summary>
+        public IReadOnlyList<int> FieldNumbers { get; }
+
+        /// <summary>The member names this declaration holds; empty when it reserves numbers.</summary>
+        public IReadOnlyList<string> MemberNames { get; }
+
         /// <summary>
         /// Reserves one or more field numbers.
         /// </summary>
@@ -105,11 +111,5 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             MemberNames = names;
             FieldNumbers = NoNumbers;
         }
-
-        /// <summary>The field numbers this declaration holds; empty when it reserves names.</summary>
-        public IReadOnlyList<int> FieldNumbers { get; }
-
-        /// <summary>The member names this declaration holds; empty when it reserves numbers.</summary>
-        public IReadOnlyList<string> MemberNames { get; }
     }
 }

@@ -60,6 +60,194 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
         private static readonly ulong DeterministicSeed = 0x6C8E9CF5709321D5UL;
 
+        private static List<string> BuildMarkdownReport(
+            List<BaselineTestResult> results,
+            DateTime timestamp
+        )
+        {
+            List<string> lines = new();
+
+            lines.Add("");
+            lines.Add("## Performance Baseline Report");
+            lines.Add("");
+            lines.Add($"Generated: {timestamp:yyyy-MM-dd HH:mm:ss} UTC");
+            lines.Add("");
+
+            string currentCategory = null;
+            foreach (BaselineTestResult result in results)
+            {
+                if (result.Category != currentCategory)
+                {
+                    if (currentCategory != null)
+                    {
+                        lines.Add("  </tbody>");
+                        lines.Add("</table>");
+                        lines.Add("");
+                    }
+
+                    currentCategory = result.Category;
+                    lines.Add($"### {currentCategory}");
+                    lines.Add("");
+                    lines.Add("<table data-sortable>");
+                    lines.Add("  <thead>");
+                    lines.Add("    <tr>");
+                    lines.Add("      <th align=\"left\">Test</th>");
+                    lines.Add("      <th align=\"right\">Iterations</th>");
+                    lines.Add("      <th align=\"right\">Time (ms)</th>");
+                    lines.Add("      <th align=\"right\">Baseline (ms)</th>");
+                    lines.Add("      <th align=\"right\">% of Baseline</th>");
+                    lines.Add("      <th align=\"left\">Status</th>");
+                    lines.Add("    </tr>");
+                    lines.Add("  </thead>");
+                    lines.Add("  <tbody>");
+                }
+
+                double percent =
+                    0 < result.BaselineMs
+                        ? (result.TimeMs / (double)result.BaselineMs) * 100.0
+                        : 0.0;
+                string status = result.Passed ? "Pass" : "FAIL";
+                string iterationsFormatted = FormatNumber(result.Iterations);
+                lines.Add(
+                    $"    <tr><td align=\"left\">{result.TestName}</td><td align=\"right\">{iterationsFormatted}</td><td align=\"right\">{result.TimeMs}</td><td align=\"right\">{result.BaselineMs}</td><td align=\"right\">{percent:F1}%</td><td align=\"left\">{status}</td></tr>"
+                );
+            }
+
+            if (currentCategory != null)
+            {
+                lines.Add("  </tbody>");
+                lines.Add("</table>");
+            }
+
+            lines.Add("");
+
+            int passedCount = 0;
+            int failedCount = 0;
+            foreach (
+                WallstopStudios.UnityHelpers.Tests.Runtime.Performance.PerformanceBaselineTests.BaselineTestResult resultsElement in results
+            )
+            {
+                if (resultsElement.Passed)
+                {
+                    passedCount = passedCount + 1;
+                }
+                else
+                {
+                    failedCount = failedCount + 1;
+                }
+            }
+
+            lines.Add("### Summary");
+            lines.Add("");
+            if (failedCount == 0)
+            {
+                lines.Add($"All {results.Count} tests passed within baseline thresholds.");
+            }
+            else
+            {
+                lines.Add(
+                    $"{passedCount} passed, {failedCount} failed out of {results.Count} tests."
+                );
+            }
+            lines.Add("");
+
+            return lines;
+        }
+
+        private static string FormatNumber(int number)
+        {
+            if (1000000 <= number)
+            {
+                return $"{number / 1000000.0:F0}M".Replace(".0M", "M");
+            }
+            if (1000 <= number)
+            {
+                return $"{number / 1000.0:F0}K".Replace(".0K", "K");
+            }
+            return number.ToString();
+        }
+
+        private static byte[] CreateSeedBytes(int index)
+        {
+            byte[] bytes = new byte[16];
+            ulong first = DeterministicSeed + (ulong)index;
+            ulong second = DeterministicSeed ^ ((ulong)index * 0x9E3779B97F4A7C15UL);
+            WriteUInt64LittleEndian(bytes, 0, first);
+            WriteUInt64LittleEndian(bytes, 8, second);
+            return bytes;
+        }
+
+        private static void WriteUInt64LittleEndian(byte[] buffer, int offset, ulong value)
+        {
+            buffer[offset + 0] = (byte)value;
+            buffer[offset + 1] = (byte)(value >> 8);
+            buffer[offset + 2] = (byte)(value >> 16);
+            buffer[offset + 3] = (byte)(value >> 24);
+            buffer[offset + 4] = (byte)(value >> 32);
+            buffer[offset + 5] = (byte)(value >> 40);
+            buffer[offset + 6] = (byte)(value >> 48);
+            buffer[offset + 7] = (byte)(value >> 56);
+        }
+
+        private static Vector2[] CreateRandomPoints2D(PcgRandom random, int count)
+        {
+            Vector2[] points = new Vector2[count];
+            for (int i = 0; i < count; ++i)
+            {
+                points[i] = new Vector2(random.NextFloat() * 1000f, random.NextFloat() * 1000f);
+            }
+            return points;
+        }
+
+        private static Vector3[] CreateRandomPoints3D(PcgRandom random, int count)
+        {
+            Vector3[] points = new Vector3[count];
+            for (int i = 0; i < count; ++i)
+            {
+                points[i] = new Vector3(
+                    random.NextFloat() * 1000f,
+                    random.NextFloat() * 1000f,
+                    random.NextFloat() * 1000f
+                );
+            }
+            return points;
+        }
+
+        private static QuadTree2D<Vector2> CreateQuadTree2D(PcgRandom random)
+        {
+            Vector2[] points = CreateRandomPoints2D(random, SpatialTreeElementCount);
+            return new QuadTree2D<Vector2>(points, p => p);
+        }
+
+        private static KdTree2D<Vector2> CreateKdTree2D(PcgRandom random)
+        {
+            Vector2[] points = CreateRandomPoints2D(random, SpatialTreeElementCount);
+            return new KdTree2D<Vector2>(points, p => p);
+        }
+
+        private static RTree2D<Vector2> CreateRTree2D(PcgRandom random)
+        {
+            Vector2[] points = CreateRandomPoints2D(random, SpatialTreeElementCount);
+            return new RTree2D<Vector2>(points, CreatePointBounds);
+        }
+
+        private static OctTree3D<Vector3> CreateOctTree3D(PcgRandom random)
+        {
+            Vector3[] points = CreateRandomPoints3D(random, SpatialTreeElementCount);
+            return new OctTree3D<Vector3>(points, p => p);
+        }
+
+        private static KdTree3D<Vector3> CreateKdTree3D(PcgRandom random)
+        {
+            Vector3[] points = CreateRandomPoints3D(random, SpatialTreeElementCount);
+            return new KdTree3D<Vector3>(points, p => p);
+        }
+
+        private static Bounds CreatePointBounds(Vector2 point)
+        {
+            return new Bounds(new Vector3(point.x, point.y, 0f), new Vector3(0.01f, 0.01f, 1f));
+        }
+
         /// <summary>
         /// Verifies QuadTree2D range query performance meets baseline requirements.
         /// Baseline: 1000 range queries on 10K elements in less than 200ms.
@@ -1023,6 +1211,60 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             );
         }
 
+        /// <summary>
+        /// Verifies Protobuf is faster than JSON for serialization.
+        /// This test ensures Protobuf maintains its expected performance advantage over JSON.
+        /// </summary>
+        [Test]
+        public void ProtobufFasterThanJsonForSerialization()
+        {
+            ProtoTestData protoData = new()
+            {
+                Id = 12345,
+                Name = "Performance Test Object",
+                Score = 98.765f,
+                IsActive = true,
+                Values = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 },
+            };
+
+            JsonTestData jsonData = new()
+            {
+                Id = 12345,
+                Name = "Performance Test Object",
+                Score = 98.765f,
+                IsActive = true,
+                Values = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 },
+            };
+
+            const int iterations = 5000;
+
+            for (int i = 0; i < WarmupIterations * 100; ++i)
+            {
+                _ = Serializer.ProtoSerialize(protoData);
+                _ = Serializer.JsonStringify(jsonData);
+            }
+
+            Stopwatch protoWatch = Stopwatch.StartNew();
+            for (int i = 0; i < iterations; ++i)
+            {
+                _ = Serializer.ProtoSerialize(protoData);
+            }
+            protoWatch.Stop();
+
+            Stopwatch jsonWatch = Stopwatch.StartNew();
+            for (int i = 0; i < iterations; ++i)
+            {
+                _ = Serializer.JsonStringify(jsonData);
+            }
+            jsonWatch.Stop();
+
+            Assert.Less(
+                protoWatch.ElapsedMilliseconds,
+                jsonWatch.ElapsedMilliseconds * 3,
+                $"Protobuf should be comparable to or faster than JSON. Protobuf: {protoWatch.ElapsedMilliseconds}ms, JSON: {jsonWatch.ElapsedMilliseconds}ms"
+            );
+        }
+
         private List<BaselineTestResult> RunSpatialTreeBaselines()
         {
             List<BaselineTestResult> results = new();
@@ -1704,248 +1946,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             );
 
             return results;
-        }
-
-        private static List<string> BuildMarkdownReport(
-            List<BaselineTestResult> results,
-            DateTime timestamp
-        )
-        {
-            List<string> lines = new();
-
-            lines.Add("");
-            lines.Add("## Performance Baseline Report");
-            lines.Add("");
-            lines.Add($"Generated: {timestamp:yyyy-MM-dd HH:mm:ss} UTC");
-            lines.Add("");
-
-            string currentCategory = null;
-            foreach (BaselineTestResult result in results)
-            {
-                if (result.Category != currentCategory)
-                {
-                    if (currentCategory != null)
-                    {
-                        lines.Add("  </tbody>");
-                        lines.Add("</table>");
-                        lines.Add("");
-                    }
-
-                    currentCategory = result.Category;
-                    lines.Add($"### {currentCategory}");
-                    lines.Add("");
-                    lines.Add("<table data-sortable>");
-                    lines.Add("  <thead>");
-                    lines.Add("    <tr>");
-                    lines.Add("      <th align=\"left\">Test</th>");
-                    lines.Add("      <th align=\"right\">Iterations</th>");
-                    lines.Add("      <th align=\"right\">Time (ms)</th>");
-                    lines.Add("      <th align=\"right\">Baseline (ms)</th>");
-                    lines.Add("      <th align=\"right\">% of Baseline</th>");
-                    lines.Add("      <th align=\"left\">Status</th>");
-                    lines.Add("    </tr>");
-                    lines.Add("  </thead>");
-                    lines.Add("  <tbody>");
-                }
-
-                double percent =
-                    0 < result.BaselineMs
-                        ? (result.TimeMs / (double)result.BaselineMs) * 100.0
-                        : 0.0;
-                string status = result.Passed ? "Pass" : "FAIL";
-                string iterationsFormatted = FormatNumber(result.Iterations);
-                lines.Add(
-                    $"    <tr><td align=\"left\">{result.TestName}</td><td align=\"right\">{iterationsFormatted}</td><td align=\"right\">{result.TimeMs}</td><td align=\"right\">{result.BaselineMs}</td><td align=\"right\">{percent:F1}%</td><td align=\"left\">{status}</td></tr>"
-                );
-            }
-
-            if (currentCategory != null)
-            {
-                lines.Add("  </tbody>");
-                lines.Add("</table>");
-            }
-
-            lines.Add("");
-
-            int passedCount = 0;
-            int failedCount = 0;
-            foreach (
-                WallstopStudios.UnityHelpers.Tests.Runtime.Performance.PerformanceBaselineTests.BaselineTestResult resultsElement in results
-            )
-            {
-                if (resultsElement.Passed)
-                {
-                    passedCount = passedCount + 1;
-                }
-                else
-                {
-                    failedCount = failedCount + 1;
-                }
-            }
-
-            lines.Add("### Summary");
-            lines.Add("");
-            if (failedCount == 0)
-            {
-                lines.Add($"All {results.Count} tests passed within baseline thresholds.");
-            }
-            else
-            {
-                lines.Add(
-                    $"{passedCount} passed, {failedCount} failed out of {results.Count} tests."
-                );
-            }
-            lines.Add("");
-
-            return lines;
-        }
-
-        private static string FormatNumber(int number)
-        {
-            if (1000000 <= number)
-            {
-                return $"{number / 1000000.0:F0}M".Replace(".0M", "M");
-            }
-            if (1000 <= number)
-            {
-                return $"{number / 1000.0:F0}K".Replace(".0K", "K");
-            }
-            return number.ToString();
-        }
-
-        /// <summary>
-        /// Verifies Protobuf is faster than JSON for serialization.
-        /// This test ensures Protobuf maintains its expected performance advantage over JSON.
-        /// </summary>
-        [Test]
-        public void ProtobufFasterThanJsonForSerialization()
-        {
-            ProtoTestData protoData = new()
-            {
-                Id = 12345,
-                Name = "Performance Test Object",
-                Score = 98.765f,
-                IsActive = true,
-                Values = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 },
-            };
-
-            JsonTestData jsonData = new()
-            {
-                Id = 12345,
-                Name = "Performance Test Object",
-                Score = 98.765f,
-                IsActive = true,
-                Values = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 },
-            };
-
-            const int iterations = 5000;
-
-            for (int i = 0; i < WarmupIterations * 100; ++i)
-            {
-                _ = Serializer.ProtoSerialize(protoData);
-                _ = Serializer.JsonStringify(jsonData);
-            }
-
-            Stopwatch protoWatch = Stopwatch.StartNew();
-            for (int i = 0; i < iterations; ++i)
-            {
-                _ = Serializer.ProtoSerialize(protoData);
-            }
-            protoWatch.Stop();
-
-            Stopwatch jsonWatch = Stopwatch.StartNew();
-            for (int i = 0; i < iterations; ++i)
-            {
-                _ = Serializer.JsonStringify(jsonData);
-            }
-            jsonWatch.Stop();
-
-            Assert.Less(
-                protoWatch.ElapsedMilliseconds,
-                jsonWatch.ElapsedMilliseconds * 3,
-                $"Protobuf should be comparable to or faster than JSON. Protobuf: {protoWatch.ElapsedMilliseconds}ms, JSON: {jsonWatch.ElapsedMilliseconds}ms"
-            );
-        }
-
-        private static byte[] CreateSeedBytes(int index)
-        {
-            byte[] bytes = new byte[16];
-            ulong first = DeterministicSeed + (ulong)index;
-            ulong second = DeterministicSeed ^ ((ulong)index * 0x9E3779B97F4A7C15UL);
-            WriteUInt64LittleEndian(bytes, 0, first);
-            WriteUInt64LittleEndian(bytes, 8, second);
-            return bytes;
-        }
-
-        private static void WriteUInt64LittleEndian(byte[] buffer, int offset, ulong value)
-        {
-            buffer[offset + 0] = (byte)value;
-            buffer[offset + 1] = (byte)(value >> 8);
-            buffer[offset + 2] = (byte)(value >> 16);
-            buffer[offset + 3] = (byte)(value >> 24);
-            buffer[offset + 4] = (byte)(value >> 32);
-            buffer[offset + 5] = (byte)(value >> 40);
-            buffer[offset + 6] = (byte)(value >> 48);
-            buffer[offset + 7] = (byte)(value >> 56);
-        }
-
-        private static Vector2[] CreateRandomPoints2D(PcgRandom random, int count)
-        {
-            Vector2[] points = new Vector2[count];
-            for (int i = 0; i < count; ++i)
-            {
-                points[i] = new Vector2(random.NextFloat() * 1000f, random.NextFloat() * 1000f);
-            }
-            return points;
-        }
-
-        private static Vector3[] CreateRandomPoints3D(PcgRandom random, int count)
-        {
-            Vector3[] points = new Vector3[count];
-            for (int i = 0; i < count; ++i)
-            {
-                points[i] = new Vector3(
-                    random.NextFloat() * 1000f,
-                    random.NextFloat() * 1000f,
-                    random.NextFloat() * 1000f
-                );
-            }
-            return points;
-        }
-
-        private static QuadTree2D<Vector2> CreateQuadTree2D(PcgRandom random)
-        {
-            Vector2[] points = CreateRandomPoints2D(random, SpatialTreeElementCount);
-            return new QuadTree2D<Vector2>(points, p => p);
-        }
-
-        private static KdTree2D<Vector2> CreateKdTree2D(PcgRandom random)
-        {
-            Vector2[] points = CreateRandomPoints2D(random, SpatialTreeElementCount);
-            return new KdTree2D<Vector2>(points, p => p);
-        }
-
-        private static RTree2D<Vector2> CreateRTree2D(PcgRandom random)
-        {
-            Vector2[] points = CreateRandomPoints2D(random, SpatialTreeElementCount);
-            return new RTree2D<Vector2>(points, CreatePointBounds);
-        }
-
-        private static OctTree3D<Vector3> CreateOctTree3D(PcgRandom random)
-        {
-            Vector3[] points = CreateRandomPoints3D(random, SpatialTreeElementCount);
-            return new OctTree3D<Vector3>(points, p => p);
-        }
-
-        private static KdTree3D<Vector3> CreateKdTree3D(PcgRandom random)
-        {
-            Vector3[] points = CreateRandomPoints3D(random, SpatialTreeElementCount);
-            return new KdTree3D<Vector3>(points, p => p);
-        }
-
-        private static Bounds CreatePointBounds(Vector2 point)
-        {
-            return new Bounds(new Vector3(point.x, point.y, 0f), new Vector3(0.01f, 0.01f, 1f));
         }
 
         /// <summary>

@@ -49,50 +49,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         */
         private static int _sink;
 
-        [Test]
-        [Timeout(0)]
-        public void IntMapLookupsComparedAgainstDictionary()
-        {
-            UnityEngine.Debug.Log("| Workload | Ratio | Reference Spread | Subject Spread |");
-            UnityEngine.Debug.Log("| -------- | -----:| ----------------:| --------------:|");
-
-            List<string> unstable = new List<string>();
-            int stableWorkloads = 0;
-            foreach (int entries in EntryCounts)
-            {
-                foreach (int missPercent in MissPercents)
-                {
-                    string workload = $"{entries} entries / {missPercent}% miss";
-                    PairedMeasurement measurement = MeasureWorkload(entries, missPercent);
-                    if (!measurement.IsStable(BenchmarkProtocol.DefaultSpreadLimit))
-                    {
-                        unstable.Add($"{workload} ({measurement})");
-                        continue;
-                    }
-
-                    stableWorkloads++;
-                    UnityEngine.Debug.Log(
-                        $"| {workload} | {measurement.Ratio:F2} | "
-                            + $"{measurement.ReferenceSpread:F4} | {measurement.SubjectSpread:F4} |"
-                    );
-                }
-            }
-
-            foreach (string workload in unstable)
-            {
-                UnityEngine.Debug.Log($"unstable, not published: {workload}");
-            }
-
-            if (stableWorkloads == 0)
-            {
-                Assert.Ignore(
-                    "Every workload read the machine rather than the code: none came inside the "
-                        + $"{BenchmarkProtocol.DefaultSpreadLimit:P0} spread limit on "
-                        + $"{Application.platform}."
-                );
-            }
-        }
-
         private static PairedMeasurement MeasureWorkload(int entries, int missPercent)
         {
             int[] keys = BuildKeys(entries);
@@ -290,6 +246,50 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         {
             state = (state * Multiplier) + Increment;
             return state;
+        }
+
+        [Test]
+        [Timeout(0)]
+        public void IntMapLookupsComparedAgainstDictionary()
+        {
+            UnityEngine.Debug.Log("| Workload | Ratio | Reference Spread | Subject Spread |");
+            UnityEngine.Debug.Log("| -------- | -----:| ----------------:| --------------:|");
+
+            List<string> unstable = new List<string>();
+            int stableWorkloads = 0;
+            foreach (int entries in EntryCounts)
+            {
+                foreach (int missPercent in MissPercents)
+                {
+                    string workload = $"{entries} entries / {missPercent}% miss";
+                    PairedMeasurement measurement = MeasureWorkload(entries, missPercent);
+                    if (!measurement.IsStable(BenchmarkProtocol.DefaultSpreadLimit))
+                    {
+                        unstable.Add($"{workload} ({measurement})");
+                        continue;
+                    }
+
+                    stableWorkloads++;
+                    UnityEngine.Debug.Log(
+                        $"| {workload} | {measurement.Ratio:F2} | "
+                            + $"{measurement.ReferenceSpread:F4} | {measurement.SubjectSpread:F4} |"
+                    );
+                }
+            }
+
+            foreach (string workload in unstable)
+            {
+                UnityEngine.Debug.Log($"unstable, not published: {workload}");
+            }
+
+            if (stableWorkloads == 0)
+            {
+                Assert.Ignore(
+                    "Every workload read the machine rather than the code: none came inside the "
+                        + $"{BenchmarkProtocol.DefaultSpreadLimit:P0} spread limit on "
+                        + $"{Application.platform}."
+                );
+            }
         }
     }
 }

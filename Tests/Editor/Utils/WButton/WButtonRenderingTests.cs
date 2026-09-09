@@ -23,6 +23,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
     [NUnit.Framework.Category("Integration")]
     public sealed class WButtonRenderingTests : BatchedEditorTestBase
     {
+        private static void ClearWButtonCaches()
+        {
+            WButtonGUI.ClearGroupDataForTesting();
+            WButtonGUI.ClearConflictingDrawOrderWarningsForTesting();
+            WButtonGUI.ClearConflictingGroupPriorityWarningsForTesting();
+            WButtonGUI.ClearConflictingGroupPlacementWarningsForTesting();
+            WButtonGUI.ClearConflictWarningContentCacheForTesting();
+            WButtonGUI.ClearContextCache();
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -35,16 +45,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
         {
             ClearWButtonCaches();
             base.TearDown();
-        }
-
-        private static void ClearWButtonCaches()
-        {
-            WButtonGUI.ClearGroupDataForTesting();
-            WButtonGUI.ClearConflictingDrawOrderWarningsForTesting();
-            WButtonGUI.ClearConflictingGroupPriorityWarningsForTesting();
-            WButtonGUI.ClearConflictingGroupPlacementWarningsForTesting();
-            WButtonGUI.ClearConflictWarningContentCacheForTesting();
-            WButtonGUI.ClearContextCache();
         }
 
         [Test]

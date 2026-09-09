@@ -14,6 +14,12 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     public sealed class AutoLoadSingletonAttribute : Attribute
     {
         /// <summary>
+        /// Gets the Unity load phase that should trigger instantiation. The editor serializes this into <see cref="Tags.AttributeMetadataCache"/>
+        /// so <see cref="Core.Helper.SingletonAutoLoader"/> can reflectively touch the singleton at runtime.
+        /// </summary>
+        public RuntimeInitializeLoadType LoadType { get; }
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="AutoLoadSingletonAttribute"/> class.
         /// </summary>
         /// <param name="loadType">
@@ -25,11 +31,5 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         {
             LoadType = loadType;
         }
-
-        /// <summary>
-        /// Gets the Unity load phase that should trigger instantiation. The editor serializes this into <see cref="Tags.AttributeMetadataCache"/>
-        /// so <see cref="Core.Helper.SingletonAutoLoader"/> can reflectively touch the singleton at runtime.
-        /// </summary>
-        public RuntimeInitializeLoadType LoadType { get; }
     }
 }

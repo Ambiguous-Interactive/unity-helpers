@@ -12,6 +12,62 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     [TestFixture]
     public sealed class SpriteLabelProcessorTests
     {
+        private static IEnumerable<TestCaseData> EnqueuePathFilteringCases()
+        {
+            yield return new TestCaseData(
+                new[]
+                {
+                    "Assets/Sprites/Hero.png",
+                    "Assets/Sprites/Hero.png",
+                    "Assets/Sprites/hero.PNG",
+                    "Assets/Sprites/Villain.jpg",
+                    "Assets/Sprites/Notes.txt",
+                    "Packages/com.wallstop-studios.unity-helpers/Icons/Icon.png",
+                },
+                new[] { "assets/sprites/hero.png", "assets/sprites/villain.jpg" }
+            ).SetName("FiltersByAssetsPrefixAndSpriteExtensions");
+
+            yield return new TestCaseData(
+                new[]
+                {
+                    "assets/characters/NPC.JPEG",
+                    "ASSETS/characters/npc.jpeg",
+                    "Assets/Characters/Boss.JPG",
+                    "Assets/Characters/Boss.jpg",
+                    "Assets/Characters/Notes.md",
+                },
+                new[] { "assets/characters/npc.jpeg", "assets/characters/boss.jpg" }
+            ).SetName("DeduplicatesCaseInsensitivelyAcrossJpgAndJpegCandidates");
+
+            yield return new TestCaseData(
+                new[]
+                {
+                    null,
+                    string.Empty,
+                    "Packages/com.wallstop-studios.unity-helpers/Icons/Icon.jpg",
+                    "ProjectSettings/Icon.png",
+                    "Assets/Readme.txt",
+                },
+                Array.Empty<string>()
+            ).SetName("RejectsNullEmptyAndNonAssetsCandidateInputs");
+        }
+
+        private static string[] SnapshotNormalizedPendingPaths()
+        {
+            return SpriteLabelProcessor
+                .SnapshotPendingImportedPathsForTesting()
+                .Select(path => path.ToLowerInvariant())
+                .OrderBy(path => path, StringComparer.Ordinal)
+                .ToArray();
+        }
+
+        private static string DescribePendingState()
+        {
+            string[] normalized = SnapshotNormalizedPendingPaths();
+            return $"PendingImportedPaths.Count={SpriteLabelProcessor.PendingImportedPathCountForTesting}; "
+                + $"Normalized=[{string.Join(", ", normalized)}]";
+        }
+
         [SetUp]
         public void SetUp()
         {
@@ -112,62 +168,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 "Expected exactly three unique candidate paths after two enqueue batches. "
                     + DescribePendingState()
             );
-        }
-
-        private static IEnumerable<TestCaseData> EnqueuePathFilteringCases()
-        {
-            yield return new TestCaseData(
-                new[]
-                {
-                    "Assets/Sprites/Hero.png",
-                    "Assets/Sprites/Hero.png",
-                    "Assets/Sprites/hero.PNG",
-                    "Assets/Sprites/Villain.jpg",
-                    "Assets/Sprites/Notes.txt",
-                    "Packages/com.wallstop-studios.unity-helpers/Icons/Icon.png",
-                },
-                new[] { "assets/sprites/hero.png", "assets/sprites/villain.jpg" }
-            ).SetName("FiltersByAssetsPrefixAndSpriteExtensions");
-
-            yield return new TestCaseData(
-                new[]
-                {
-                    "assets/characters/NPC.JPEG",
-                    "ASSETS/characters/npc.jpeg",
-                    "Assets/Characters/Boss.JPG",
-                    "Assets/Characters/Boss.jpg",
-                    "Assets/Characters/Notes.md",
-                },
-                new[] { "assets/characters/npc.jpeg", "assets/characters/boss.jpg" }
-            ).SetName("DeduplicatesCaseInsensitivelyAcrossJpgAndJpegCandidates");
-
-            yield return new TestCaseData(
-                new[]
-                {
-                    null,
-                    string.Empty,
-                    "Packages/com.wallstop-studios.unity-helpers/Icons/Icon.jpg",
-                    "ProjectSettings/Icon.png",
-                    "Assets/Readme.txt",
-                },
-                Array.Empty<string>()
-            ).SetName("RejectsNullEmptyAndNonAssetsCandidateInputs");
-        }
-
-        private static string[] SnapshotNormalizedPendingPaths()
-        {
-            return SpriteLabelProcessor
-                .SnapshotPendingImportedPathsForTesting()
-                .Select(path => path.ToLowerInvariant())
-                .OrderBy(path => path, StringComparer.Ordinal)
-                .ToArray();
-        }
-
-        private static string DescribePendingState()
-        {
-            string[] normalized = SnapshotNormalizedPendingPaths();
-            return $"PendingImportedPaths.Count={SpriteLabelProcessor.PendingImportedPathCountForTesting}; "
-                + $"Normalized=[{string.Join(", ", normalized)}]";
         }
     }
 }

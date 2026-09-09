@@ -25,18 +25,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous.Rules
     /// </remarks>
     public sealed class SerializableDictionaryPairingRule : IValidationRule
     {
+        /// <inheritdoc />
+        public string RuleId => ValidationRuleIds.DictionaryPairing;
+
+        /// <inheritdoc />
+        public string DisplayName => "Serializable dictionaries keep their pairing";
+
         private readonly List<SerializableDictionaryAssetFinding> _found =
             new List<SerializableDictionaryAssetFinding>();
 
         private readonly Dictionary<string, int> _occurrences = new Dictionary<string, int>(
             StringComparer.Ordinal
         );
-
-        /// <inheritdoc />
-        public string RuleId => ValidationRuleIds.DictionaryPairing;
-
-        /// <inheritdoc />
-        public string DisplayName => "Serializable dictionaries keep their pairing";
 
         /// <summary>
         /// How much each authored dictionary state should interrupt a reader.

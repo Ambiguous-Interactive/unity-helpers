@@ -48,6 +48,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             return true;
         }
 
+        private static string ResolveScenePath()
+        {
+            string relativePath = DirectoryHelper.FindAbsolutePathToDirectory(
+                "Tests/Runtime/Scenes/Test1.unity"
+            );
+            if (string.IsNullOrWhiteSpace(relativePath))
+            {
+                Assert.Fail("Unable to resolve test scene path.");
+            }
+
+            return relativePath;
+        }
+
         [Test]
         public void GetScenesInBuild()
         {
@@ -274,19 +287,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(task.IsCompletedSuccessfully);
             TrackAsyncDisposal(task.Result.DisposeAsync);
             Assert.IsEmpty(task.Result.result);
-        }
-
-        private static string ResolveScenePath()
-        {
-            string relativePath = DirectoryHelper.FindAbsolutePathToDirectory(
-                "Tests/Runtime/Scenes/Test1.unity"
-            );
-            if (string.IsNullOrWhiteSpace(relativePath))
-            {
-                Assert.Fail("Unable to resolve test scene path.");
-            }
-
-            return relativePath;
         }
 
         private static class SceneHelperTestsUtilities

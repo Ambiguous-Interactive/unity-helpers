@@ -40,168 +40,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     /// </remarks>
     public sealed class SpriteSettingsApplierWindow : EditorWindow
     {
-        public List<Sprite> sprites = new();
-        public List<string> spriteFileExtensions = new() { ".png" };
-        public List<SpriteSettings> spriteSettings = new() { new SpriteSettings() };
-        public List<Object> directories = new();
-
-        private SerializedObject _serializedObject;
-        private SerializedProperty _spritesProp;
-        private SerializedProperty _spriteFileExtensionsProp;
-        private SerializedProperty _spriteSettingsProp;
-        private SerializedProperty _directoriesProp;
-
-        private Vector2 _scrollPosition;
-        private int _totalSpritesToProcess = -1;
-        private int _spritesThatWillChange = -1;
-        private bool _showPreviewOfChanges;
-        private readonly List<string> _assetsThatWillChange = new();
-        private bool _applyCanceled;
-        private readonly TextureImporterSettings _settingsBuffer = new();
-        private readonly List<(string fullFilePath, string relativePath)> _targetSpriteBuffer =
-            new();
-
-        [MenuItem("Tools/Wallstop Studios/Unity Helpers/Sprite Settings Applier", priority = -2)]
-        public static void ShowWindow()
-        {
-            SpriteSettingsApplierWindow window = GetWindow<SpriteSettingsApplierWindow>(
-                "Sprite Settings Applier"
-            );
-            window.minSize = new Vector2(400, 300);
-            window.Show();
-        }
-
         internal SerializedObject SerializedStateForTesting => _serializedObject;
-
-        private void BindSerializedState()
-        {
-            ReleaseSerializedState();
-            _serializedObject = new SerializedObject(this);
-            _spritesProp = _serializedObject.FindProperty(nameof(sprites));
-            _spriteFileExtensionsProp = _serializedObject.FindProperty(
-                nameof(spriteFileExtensions)
-            );
-            _spriteSettingsProp = _serializedObject.FindProperty(nameof(spriteSettings));
-            _directoriesProp = _serializedObject.FindProperty(nameof(directories));
-        }
-
-        private void ReleaseSerializedState()
-        {
-            _spritesProp = null;
-            _spriteFileExtensionsProp = null;
-            _spriteSettingsProp = null;
-            _directoriesProp = null;
-            _serializedObject?.Dispose();
-            _serializedObject = null;
-        }
-
-        private void OnDisable()
-        {
-            ReleaseSerializedState();
-        }
-
-        private void OnEnable()
-        {
-            BindSerializedState();
-        }
-
-        private void OnGUI()
-        {
-            if (_serializedObject == null)
-            {
-                BindSerializedState();
-            }
-
-            _serializedObject.Update();
-            _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
-
-            EditorGUILayout.LabelField("Sprite Sources", EditorStyles.boldLabel);
-            EditorGUILayout.PropertyField(_spritesProp, new GUIContent("Specific Sprites"), true);
-            EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Directory Sources", EditorStyles.boldLabel);
-            PersistentDirectoryGUI.PathSelectorObjectArray(
-                _directoriesProp,
-                nameof(SpriteSettingsApplierWindow)
-            );
-            EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Settings", EditorStyles.boldLabel);
-            EditorGUILayout.PropertyField(
-                _spriteFileExtensionsProp,
-                new GUIContent("Sprite File Extensions"),
-                true
-            );
-            EditorGUILayout.PropertyField(
-                _spriteSettingsProp,
-                new GUIContent("Sprite Settings Profiles"),
-                true
-            );
-            EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Actions", EditorStyles.boldLabel);
-
-            if (GUILayout.Button("Calculate Stats"))
-            {
-                CalculateStats();
-            }
-
-            if (0 <= _totalSpritesToProcess && 0 <= _spritesThatWillChange)
-            {
-                EditorGUILayout.LabelField($"Sprites to process: {_totalSpritesToProcess}");
-                EditorGUILayout.LabelField($"Sprites that will change: {_spritesThatWillChange}");
-                _showPreviewOfChanges = EditorGUILayout.Foldout(
-                    _showPreviewOfChanges,
-                    $"Preview ({_assetsThatWillChange.Count})"
-                );
-                if (_showPreviewOfChanges)
-                {
-                    int toShow = Mathf.Min(_assetsThatWillChange.Count, 200);
-                    for (int i = 0; i < toShow; i++)
-                    {
-                        EditorGUILayout.LabelField(_assetsThatWillChange[i]);
-                    }
-                    if (200 < _assetsThatWillChange.Count)
-                    {
-                        EditorGUILayout.LabelField(
-                            $"...and {_assetsThatWillChange.Count - 200} more"
-                        );
-                    }
-                    if (GUILayout.Button("Copy List"))
-                    {
-                        EditorGUIUtility.systemCopyBuffer = string.Join(
-                            "\n",
-                            _assetsThatWillChange
-                        );
-                    }
-                }
-            }
-            else
-            {
-                EditorGUILayout.LabelField("Press 'Calculate Stats' to see processing details.");
-            }
-
-            EditorGUILayout.Space();
-
-            if (GUILayout.Button("Apply Settings to Sprites"))
-            {
-                ApplySettings();
-            }
-
-            EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Profiles", EditorStyles.boldLabel);
-            EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("Save Profiles Asset"))
-            {
-                SaveProfilesAsset();
-            }
-            if (GUILayout.Button("Load Profiles Asset"))
-            {
-                LoadProfilesAsset();
-            }
-            EditorGUILayout.EndHorizontal();
-
-            EditorGUILayout.EndScrollView();
-
-            _serializedObject.ApplyModifiedProperties();
-        }
 
         private List<(string fullFilePath, string relativePath)> GetTargetSpritePaths()
         {
@@ -307,6 +146,37 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
             return filePaths;
+        }
+
+        public List<Sprite> sprites = new();
+        public List<string> spriteFileExtensions = new() { ".png" };
+        public List<SpriteSettings> spriteSettings = new() { new SpriteSettings() };
+        public List<Object> directories = new();
+
+        private SerializedObject _serializedObject;
+        private SerializedProperty _spritesProp;
+        private SerializedProperty _spriteFileExtensionsProp;
+        private SerializedProperty _spriteSettingsProp;
+        private SerializedProperty _directoriesProp;
+
+        private Vector2 _scrollPosition;
+        private int _totalSpritesToProcess = -1;
+        private int _spritesThatWillChange = -1;
+        private bool _showPreviewOfChanges;
+        private readonly List<string> _assetsThatWillChange = new();
+        private bool _applyCanceled;
+        private readonly TextureImporterSettings _settingsBuffer = new();
+        private readonly List<(string fullFilePath, string relativePath)> _targetSpriteBuffer =
+            new();
+
+        [MenuItem("Tools/Wallstop Studios/Unity Helpers/Sprite Settings Applier", priority = -2)]
+        public static void ShowWindow()
+        {
+            SpriteSettingsApplierWindow window = GetWindow<SpriteSettingsApplierWindow>(
+                "Sprite Settings Applier"
+            );
+            window.minSize = new Vector2(400, 300);
+            window.Show();
         }
 
         internal void CalculateStats()
@@ -492,6 +362,136 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             _totalSpritesToProcess = -1;
             _spritesThatWillChange = -1;
+        }
+
+        private void BindSerializedState()
+        {
+            ReleaseSerializedState();
+            _serializedObject = new SerializedObject(this);
+            _spritesProp = _serializedObject.FindProperty(nameof(sprites));
+            _spriteFileExtensionsProp = _serializedObject.FindProperty(
+                nameof(spriteFileExtensions)
+            );
+            _spriteSettingsProp = _serializedObject.FindProperty(nameof(spriteSettings));
+            _directoriesProp = _serializedObject.FindProperty(nameof(directories));
+        }
+
+        private void ReleaseSerializedState()
+        {
+            _spritesProp = null;
+            _spriteFileExtensionsProp = null;
+            _spriteSettingsProp = null;
+            _directoriesProp = null;
+            _serializedObject?.Dispose();
+            _serializedObject = null;
+        }
+
+        private void OnDisable()
+        {
+            ReleaseSerializedState();
+        }
+
+        private void OnEnable()
+        {
+            BindSerializedState();
+        }
+
+        private void OnGUI()
+        {
+            if (_serializedObject == null)
+            {
+                BindSerializedState();
+            }
+
+            _serializedObject.Update();
+            _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
+
+            EditorGUILayout.LabelField("Sprite Sources", EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(_spritesProp, new GUIContent("Specific Sprites"), true);
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Directory Sources", EditorStyles.boldLabel);
+            PersistentDirectoryGUI.PathSelectorObjectArray(
+                _directoriesProp,
+                nameof(SpriteSettingsApplierWindow)
+            );
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Settings", EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(
+                _spriteFileExtensionsProp,
+                new GUIContent("Sprite File Extensions"),
+                true
+            );
+            EditorGUILayout.PropertyField(
+                _spriteSettingsProp,
+                new GUIContent("Sprite Settings Profiles"),
+                true
+            );
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Actions", EditorStyles.boldLabel);
+
+            if (GUILayout.Button("Calculate Stats"))
+            {
+                CalculateStats();
+            }
+
+            if (0 <= _totalSpritesToProcess && 0 <= _spritesThatWillChange)
+            {
+                EditorGUILayout.LabelField($"Sprites to process: {_totalSpritesToProcess}");
+                EditorGUILayout.LabelField($"Sprites that will change: {_spritesThatWillChange}");
+                _showPreviewOfChanges = EditorGUILayout.Foldout(
+                    _showPreviewOfChanges,
+                    $"Preview ({_assetsThatWillChange.Count})"
+                );
+                if (_showPreviewOfChanges)
+                {
+                    int toShow = Mathf.Min(_assetsThatWillChange.Count, 200);
+                    for (int i = 0; i < toShow; i++)
+                    {
+                        EditorGUILayout.LabelField(_assetsThatWillChange[i]);
+                    }
+                    if (200 < _assetsThatWillChange.Count)
+                    {
+                        EditorGUILayout.LabelField(
+                            $"...and {_assetsThatWillChange.Count - 200} more"
+                        );
+                    }
+                    if (GUILayout.Button("Copy List"))
+                    {
+                        EditorGUIUtility.systemCopyBuffer = string.Join(
+                            "\n",
+                            _assetsThatWillChange
+                        );
+                    }
+                }
+            }
+            else
+            {
+                EditorGUILayout.LabelField("Press 'Calculate Stats' to see processing details.");
+            }
+
+            EditorGUILayout.Space();
+
+            if (GUILayout.Button("Apply Settings to Sprites"))
+            {
+                ApplySettings();
+            }
+
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Profiles", EditorStyles.boldLabel);
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Save Profiles Asset"))
+            {
+                SaveProfilesAsset();
+            }
+            if (GUILayout.Button("Load Profiles Asset"))
+            {
+                LoadProfilesAsset();
+            }
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.EndScrollView();
+
+            _serializedObject.ApplyModifiedProperties();
         }
 
         private void SaveProfilesAsset()

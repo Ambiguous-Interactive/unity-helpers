@@ -17,56 +17,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
 
         private BoundsIntConverter() { }
 
-        public override BoundsInt Read(
-            ref Utf8JsonReader reader,
-            Type typeToConvert,
-            JsonSerializerOptions options
-        )
-        {
-            if (reader.TokenType != JsonTokenType.StartObject)
-            {
-                throw new JsonException($"Invalid token type {reader.TokenType}");
-            }
-
-            Vector3Int position = default;
-            Vector3Int size = default;
-            bool havePosition = false;
-            bool haveSize = false;
-
-            while (reader.Read())
-            {
-                if (reader.TokenType == JsonTokenType.EndObject)
-                {
-                    return new BoundsInt(
-                        havePosition ? position : default,
-                        haveSize ? size : default
-                    );
-                }
-
-                if (reader.TokenType == JsonTokenType.PropertyName)
-                {
-                    if (reader.ValueTextEquals("position"))
-                    {
-                        reader.Read();
-                        position = ReadVector3IntStrict(ref reader);
-                        havePosition = true;
-                    }
-                    else if (reader.ValueTextEquals("size"))
-                    {
-                        reader.Read();
-                        size = ReadVector3IntStrict(ref reader);
-                        haveSize = true;
-                    }
-                    else
-                    {
-                        throw new JsonException("Unknown property for BoundsInt");
-                    }
-                }
-            }
-
-            throw new JsonException("Incomplete JSON for BoundsInt");
-        }
-
         private static Vector3Int ReadVector3IntStrict(ref Utf8JsonReader reader)
         {
             if (reader.TokenType != JsonTokenType.StartObject)
@@ -119,6 +69,56 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             }
 
             throw new JsonException("Incomplete JSON for Vector3Int");
+        }
+
+        public override BoundsInt Read(
+            ref Utf8JsonReader reader,
+            Type typeToConvert,
+            JsonSerializerOptions options
+        )
+        {
+            if (reader.TokenType != JsonTokenType.StartObject)
+            {
+                throw new JsonException($"Invalid token type {reader.TokenType}");
+            }
+
+            Vector3Int position = default;
+            Vector3Int size = default;
+            bool havePosition = false;
+            bool haveSize = false;
+
+            while (reader.Read())
+            {
+                if (reader.TokenType == JsonTokenType.EndObject)
+                {
+                    return new BoundsInt(
+                        havePosition ? position : default,
+                        haveSize ? size : default
+                    );
+                }
+
+                if (reader.TokenType == JsonTokenType.PropertyName)
+                {
+                    if (reader.ValueTextEquals("position"))
+                    {
+                        reader.Read();
+                        position = ReadVector3IntStrict(ref reader);
+                        havePosition = true;
+                    }
+                    else if (reader.ValueTextEquals("size"))
+                    {
+                        reader.Read();
+                        size = ReadVector3IntStrict(ref reader);
+                        haveSize = true;
+                    }
+                    else
+                    {
+                        throw new JsonException("Unknown property for BoundsInt");
+                    }
+                }
+            }
+
+            throw new JsonException("Incomplete JSON for BoundsInt");
         }
 
         public override void Write(

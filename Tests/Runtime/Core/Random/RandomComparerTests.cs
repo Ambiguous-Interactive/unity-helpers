@@ -41,6 +41,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.Random
 
         private sealed class CountingRandom : IRandom
         {
+            public int NextCallCount { get; private set; }
+
+            public RandomState InternalState => default;
+
             private readonly Queue<int> _values;
 
             public CountingRandom(params int[] values)
@@ -48,9 +52,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.Random
                 _values = new Queue<int>(values);
             }
 
-            public int NextCallCount { get; private set; }
-
-            public RandomState InternalState => default;
+            private static T NotSupported<T>() => throw new NotSupportedException();
 
             public int Next()
             {
@@ -62,8 +64,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.Random
 
                 return _values.Dequeue();
             }
-
-            private static T NotSupported<T>() => throw new NotSupportedException();
 
             public int Next(int max) => NotSupported<int>();
 

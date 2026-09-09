@@ -28,6 +28,58 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
     [NUnit.Framework.Category("Integration")]
     public sealed class WEnumToggleButtonsOdinDrawerTests : CommonTestBase
     {
+        private static (bool shouldPaginate, int pageSize) ShouldPaginate(
+            WEnumToggleButtonsAttribute attribute,
+            int optionCount
+        )
+        {
+            int pageSize = 0;
+            bool result = WEnumToggleButtonsOdinDrawer.ShouldPaginate(
+                attribute,
+                optionCount,
+                out pageSize
+            );
+            return (result, pageSize);
+        }
+
+        private static EnumToggleButtonsShared.ToggleOption[] GetCachedEnumOptions(Type enumType)
+        {
+            return WEnumToggleButtonsOdinDrawer.GetCachedEnumOptions(enumType);
+        }
+
+        private static EnumToggleButtonsShared.ToggleOption[] BuildEnumOptions(
+            Type enumType,
+            bool isFlags
+        )
+        {
+            return WEnumToggleButtonsOdinDrawer.BuildEnumOptions(enumType, isFlags);
+        }
+
+        private static ulong CalculateAllFlagsMask(EnumToggleButtonsShared.ToggleOption[] options)
+        {
+            return WEnumToggleButtonsOdinDrawer.CalculateAllFlagsMask(options);
+        }
+
+        private static int ResolvePageSize(WEnumToggleButtonsAttribute attribute)
+        {
+            return WEnumToggleButtonsOdinDrawer.ResolvePageSize(attribute);
+        }
+
+        private static ulong ConvertToUInt64(object value)
+        {
+            return EnumToggleButtonsShared.ConvertToUInt64(value);
+        }
+
+        private static bool IsPowerOfTwo(ulong value)
+        {
+            return EnumToggleButtonsShared.IsPowerOfTwo(value);
+        }
+
+        private static int ResolveButtonSegment(int index, int total, int columns)
+        {
+            return (int)EnumToggleButtonsShared.ResolveButtonSegment(index, total, columns);
+        }
+
         [Test]
         public void DrawerRegistrationForRegularEnumIsCorrect()
         {
@@ -881,58 +933,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             ulong mask = ConvertToUInt64(target.enumValue);
 
             Assert.That(mask, Is.EqualTo(1UL), "Regular enum should have single value");
-        }
-
-        private static EnumToggleButtonsShared.ToggleOption[] GetCachedEnumOptions(Type enumType)
-        {
-            return WEnumToggleButtonsOdinDrawer.GetCachedEnumOptions(enumType);
-        }
-
-        private static EnumToggleButtonsShared.ToggleOption[] BuildEnumOptions(
-            Type enumType,
-            bool isFlags
-        )
-        {
-            return WEnumToggleButtonsOdinDrawer.BuildEnumOptions(enumType, isFlags);
-        }
-
-        private static ulong CalculateAllFlagsMask(EnumToggleButtonsShared.ToggleOption[] options)
-        {
-            return WEnumToggleButtonsOdinDrawer.CalculateAllFlagsMask(options);
-        }
-
-        private static (bool shouldPaginate, int pageSize) ShouldPaginate(
-            WEnumToggleButtonsAttribute attribute,
-            int optionCount
-        )
-        {
-            int pageSize = 0;
-            bool result = WEnumToggleButtonsOdinDrawer.ShouldPaginate(
-                attribute,
-                optionCount,
-                out pageSize
-            );
-            return (result, pageSize);
-        }
-
-        private static int ResolvePageSize(WEnumToggleButtonsAttribute attribute)
-        {
-            return WEnumToggleButtonsOdinDrawer.ResolvePageSize(attribute);
-        }
-
-        private static ulong ConvertToUInt64(object value)
-        {
-            return EnumToggleButtonsShared.ConvertToUInt64(value);
-        }
-
-        private static bool IsPowerOfTwo(ulong value)
-        {
-            return EnumToggleButtonsShared.IsPowerOfTwo(value);
-        }
-
-        private static int ResolveButtonSegment(int index, int total, int columns)
-        {
-            return (int)EnumToggleButtonsShared.ResolveButtonSegment(index, total, columns);
         }
     }
 #endif

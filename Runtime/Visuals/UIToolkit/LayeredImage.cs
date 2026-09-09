@@ -15,34 +15,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
 
     public sealed class LayeredImage : VisualElement
     {
-        /// <remarks>
-        /// The tolerance covers float drift only. A half-8-bit-step of slack used to be added on top,
-        /// which discarded an extra alpha level at some cutoffs and none at others - so the same cutoff
-        /// selected different pixels here than <see cref="ColorQuantization.ToThresholdByte"/> selects
-        /// everywhere else in the package, and a pixel the caller asked to keep was dropped. Composited
-        /// alpha does not land on the 8-bit grid, so the plain comparison is the rule; drift is the only
-        /// thing needing slack.
-        /// </remarks>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool IsAlphaEffectivelyInvisible(float alpha, float cutoff)
-        {
-            float maxMagnitude = Mathf.Max(Mathf.Abs(alpha), Mathf.Abs(cutoff));
-            float fudge = Mathf.Max(1e-6f * maxMagnitude, Mathf.Epsilon * 8f);
-            return alpha <= cutoff + fudge;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool CanPlayTimed(float fps)
-        {
-            if (fps <= 0 || float.IsNaN(fps) || float.IsInfinity(fps))
-            {
-                return false;
-            }
-
-            double frameMilliseconds = 1000d / fps;
-            return 0 < frameMilliseconds
-                && frameMilliseconds <= TimeSpan.MaxValue.TotalMilliseconds;
-        }
+        private const int ParallelBlendThreshold = 2048;
 
         public float Fps
         {
@@ -73,73 +46,11 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                 StartSelfUpdate();
             }
         }
-
-        private static long GetFrameIntervalMilliseconds(float fps)
-        {
-            return Math.Max(1L, (long)Math.Round(1000d / fps));
-        }
-
-        private static TimeSpan GetFrameInterval(float fps)
-        {
-            return TimeSpan.FromMilliseconds(GetFrameIntervalMilliseconds(fps));
-        }
-
-        private bool CanSelfUpdate()
-        {
-            return _updatesSelf && 1 < _computed.Length && CanPlayTimed(_fps);
-        }
-
-        private void StartSelfUpdate()
-        {
-            if (!CanSelfUpdate() || panel == null || _selfUpdateItem != null)
-            {
-                return;
-            }
-
-            _selfUpdateItem = schedule
-                .Execute(HandleSelfUpdate)
-                .Every(GetFrameIntervalMilliseconds(_fps));
-        }
-
-        private void StopSelfUpdate()
-        {
-            _selfUpdateItem?.Pause();
-            _selfUpdateItem = null;
-        }
-
-        private void HandleSelfUpdate(TimerState _)
-        {
-            if (panel == null || !CanSelfUpdate())
-            {
-                StopSelfUpdate();
-                return;
-            }
-
-            Update(force: true);
-        }
-
-        private void HandleAttachToPanel(AttachToPanelEvent _)
-        {
-            StartSelfUpdate();
-        }
-
-        private void HandleDetachFromPanel(DetachFromPanelEvent _)
-        {
-            StopSelfUpdate();
-        }
-
-        private const int ParallelBlendThreshold = 2048;
-
-        private readonly AnimatedSpriteLayer[] _layers;
-        private readonly Texture2D[] _computed;
         internal Texture2D[] ComputedTexturesForTests => _computed;
         internal bool SelfUpdateActiveForTests => _selfUpdateItem != null;
 
-        internal void SetElapsedSinceLastFrameForTests(TimeSpan elapsedSinceLastFrame)
-        {
-            _timer.Stop();
-            _lastTick = _timer.Elapsed - elapsedSinceLastFrame;
-        }
+        private readonly AnimatedSpriteLayer[] _layers;
+        private readonly Texture2D[] _computed;
 
         private readonly Color _backgroundColor;
         private readonly Rect? _largestArea;
@@ -204,123 +115,43 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             Fps = fps;
         }
 
-        public void Update(bool force = false)
+        /// <remarks>
+        /// The tolerance covers float drift only. A half-8-bit-step of slack used to be added on top,
+        /// which discarded an extra alpha level at some cutoffs and none at others - so the same cutoff
+        /// selected different pixels here than <see cref="ColorQuantization.ToThresholdByte"/> selects
+        /// everywhere else in the package, and a pixel the caller asked to keep was dropped. Composited
+        /// alpha does not land on the 8-bit grid, so the plain comparison is the rule; drift is the only
+        /// thing needing slack.
+        /// </remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool IsAlphaEffectivelyInvisible(float alpha, float cutoff)
         {
-            if (panel == null)
-            {
-                return;
-            }
-
-            if (_computed.Length == 0)
-            {
-                return;
-            }
-
-            if (!CanPlayTimed(_fps))
-            {
-                return;
-            }
-
-            TimeSpan elapsed = _timer.Elapsed;
-            TimeSpan deltaTime = GetFrameInterval(_fps);
-
-            // Clamp stale ticks before advancing to prevent rapid catch-up animation after a pause.
-            if (deltaTime + deltaTime < elapsed - _lastTick)
-            {
-                _lastTick = elapsed - deltaTime;
-            }
-
-            if (!force && elapsed < _lastTick + deltaTime)
-            {
-                return;
-            }
-
-            _index = _index.WrappedIncrement(_computed.Length);
-            _lastTick += deltaTime;
-
-            Render(_index);
+            float maxMagnitude = Mathf.Max(Mathf.Abs(alpha), Mathf.Abs(cutoff));
+            float fudge = Mathf.Max(1e-6f * maxMagnitude, Mathf.Epsilon * 8f);
+            return alpha <= cutoff + fudge;
         }
 
-        private void Render(int index)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool CanPlayTimed(float fps)
         {
-            if (index < 0 || _computed.Length <= index)
+            if (fps <= 0 || float.IsNaN(fps) || float.IsInfinity(fps))
             {
-                return;
+                return false;
             }
 
-            Texture2D computed = _computed[index];
-            if (computed != null)
-            {
-                style.backgroundImage = computed;
-                style.width = computed.width;
-                style.height = computed.height;
-            }
-            else
-            {
-                style.backgroundImage = null;
-                style.width = _largestArea?.width ?? 0;
-                style.height = _largestArea?.height ?? 0;
-            }
-
-            style.marginRight = 0;
-            style.marginBottom = 0;
-            if (_largestArea == null)
-            {
-                return;
-            }
-
-            Rect largestAreaRect = _largestArea.Value;
-            float currentWidth = computed != null ? computed.width : _largestArea?.width ?? 0;
-            float currentHeight = computed != null ? computed.height : _largestArea?.height ?? 0;
-
-            if (currentWidth < largestAreaRect.width)
-            {
-                style.marginRight = largestAreaRect.width - currentWidth;
-            }
-            if (currentHeight < largestAreaRect.height)
-            {
-                style.marginBottom = largestAreaRect.height - currentHeight;
-            }
+            double frameMilliseconds = 1000d / fps;
+            return 0 < frameMilliseconds
+                && frameMilliseconds <= TimeSpan.MaxValue.TotalMilliseconds;
         }
 
-        private Texture2D[] ComputeTextures()
+        private static long GetFrameIntervalMilliseconds(float fps)
         {
-            AnimatedSpriteLayer[] layers = _layers;
-            if (layers == null || layers.Length == 0)
-            {
-                return Array.Empty<Texture2D>();
-            }
+            return Math.Max(1L, (long)Math.Round(1000d / fps));
+        }
 
-            int frameCount = 0;
-            foreach (AnimatedSpriteLayer layer in layers)
-            {
-                Sprite[] layerFrames = layer.frames;
-                if (layerFrames == null)
-                {
-                    continue;
-                }
-
-                int layerFrameCount = layerFrames.Length;
-                if (frameCount < layerFrameCount)
-                {
-                    frameCount = layerFrameCount;
-                }
-            }
-
-            if (frameCount == 0)
-            {
-                return Array.Empty<Texture2D>();
-            }
-
-            FrameCompositor compositor = new(layers, _backgroundColor, _pixelCutoff);
-            Texture2D[] computed = new Texture2D[frameCount];
-
-            for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex)
-            {
-                computed[frameIndex] = compositor.ComposeFrame(frameIndex);
-            }
-
-            return computed;
+        private static TimeSpan GetFrameInterval(float fps)
+        {
+            return TimeSpan.FromMilliseconds(GetFrameIntervalMilliseconds(fps));
         }
 
         private static void ComposeSpriteOntoBuffer(
@@ -475,6 +306,175 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             }
 
             return offsets[frameIndex];
+        }
+
+        public void Update(bool force = false)
+        {
+            if (panel == null)
+            {
+                return;
+            }
+
+            if (_computed.Length == 0)
+            {
+                return;
+            }
+
+            if (!CanPlayTimed(_fps))
+            {
+                return;
+            }
+
+            TimeSpan elapsed = _timer.Elapsed;
+            TimeSpan deltaTime = GetFrameInterval(_fps);
+
+            // Clamp stale ticks before advancing to prevent rapid catch-up animation after a pause.
+            if (deltaTime + deltaTime < elapsed - _lastTick)
+            {
+                _lastTick = elapsed - deltaTime;
+            }
+
+            if (!force && elapsed < _lastTick + deltaTime)
+            {
+                return;
+            }
+
+            _index = _index.WrappedIncrement(_computed.Length);
+            _lastTick += deltaTime;
+
+            Render(_index);
+        }
+
+        internal void SetElapsedSinceLastFrameForTests(TimeSpan elapsedSinceLastFrame)
+        {
+            _timer.Stop();
+            _lastTick = _timer.Elapsed - elapsedSinceLastFrame;
+        }
+
+        private bool CanSelfUpdate()
+        {
+            return _updatesSelf && 1 < _computed.Length && CanPlayTimed(_fps);
+        }
+
+        private void StartSelfUpdate()
+        {
+            if (!CanSelfUpdate() || panel == null || _selfUpdateItem != null)
+            {
+                return;
+            }
+
+            _selfUpdateItem = schedule
+                .Execute(HandleSelfUpdate)
+                .Every(GetFrameIntervalMilliseconds(_fps));
+        }
+
+        private void StopSelfUpdate()
+        {
+            _selfUpdateItem?.Pause();
+            _selfUpdateItem = null;
+        }
+
+        private void HandleSelfUpdate(TimerState _)
+        {
+            if (panel == null || !CanSelfUpdate())
+            {
+                StopSelfUpdate();
+                return;
+            }
+
+            Update(force: true);
+        }
+
+        private void HandleAttachToPanel(AttachToPanelEvent _)
+        {
+            StartSelfUpdate();
+        }
+
+        private void HandleDetachFromPanel(DetachFromPanelEvent _)
+        {
+            StopSelfUpdate();
+        }
+
+        private void Render(int index)
+        {
+            if (index < 0 || _computed.Length <= index)
+            {
+                return;
+            }
+
+            Texture2D computed = _computed[index];
+            if (computed != null)
+            {
+                style.backgroundImage = computed;
+                style.width = computed.width;
+                style.height = computed.height;
+            }
+            else
+            {
+                style.backgroundImage = null;
+                style.width = _largestArea?.width ?? 0;
+                style.height = _largestArea?.height ?? 0;
+            }
+
+            style.marginRight = 0;
+            style.marginBottom = 0;
+            if (_largestArea == null)
+            {
+                return;
+            }
+
+            Rect largestAreaRect = _largestArea.Value;
+            float currentWidth = computed != null ? computed.width : _largestArea?.width ?? 0;
+            float currentHeight = computed != null ? computed.height : _largestArea?.height ?? 0;
+
+            if (currentWidth < largestAreaRect.width)
+            {
+                style.marginRight = largestAreaRect.width - currentWidth;
+            }
+            if (currentHeight < largestAreaRect.height)
+            {
+                style.marginBottom = largestAreaRect.height - currentHeight;
+            }
+        }
+
+        private Texture2D[] ComputeTextures()
+        {
+            AnimatedSpriteLayer[] layers = _layers;
+            if (layers == null || layers.Length == 0)
+            {
+                return Array.Empty<Texture2D>();
+            }
+
+            int frameCount = 0;
+            foreach (AnimatedSpriteLayer layer in layers)
+            {
+                Sprite[] layerFrames = layer.frames;
+                if (layerFrames == null)
+                {
+                    continue;
+                }
+
+                int layerFrameCount = layerFrames.Length;
+                if (frameCount < layerFrameCount)
+                {
+                    frameCount = layerFrameCount;
+                }
+            }
+
+            if (frameCount == 0)
+            {
+                return Array.Empty<Texture2D>();
+            }
+
+            FrameCompositor compositor = new(layers, _backgroundColor, _pixelCutoff);
+            Texture2D[] computed = new Texture2D[frameCount];
+
+            for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex)
+            {
+                computed[frameIndex] = compositor.ComposeFrame(frameIndex);
+            }
+
+            return computed;
         }
 
         private readonly struct FrameCompositor

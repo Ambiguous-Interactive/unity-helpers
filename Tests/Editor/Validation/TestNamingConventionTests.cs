@@ -46,6 +46,240 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         );
 
         /// <summary>
+        /// Iterates every public/non-public/instance/static method on every type of
+        /// every loaded assembly whose name starts with a test-assembly prefix, and
+        /// invokes <paramref name="visitor"/> for each method that is annotated with
+        /// <c>[Test]</c>, <c>[TestCase]</c>, <c>[TestCaseSource]</c>, or
+        /// <c>[UnityTest]</c>. Returns the list of assembly names that were scanned
+        /// so callers can include that context in failure messages.
+        /// </summary>
+        private static List<string> ScanTestMethods(Action<string, Type, MethodInfo> visitor)
+        {
+            List<string> scannedAssemblies = new();
+            foreach (Assembly assembly in GetTestAssemblies())
+            {
+                string assemblyName = assembly.GetName().Name;
+                scannedAssemblies.Add(assemblyName);
+
+                Type[] types;
+                try
+                {
+                    types = assembly.GetTypes();
+                }
+                catch (ReflectionTypeLoadException ex)
+                {
+                    types = ex.Types;
+                }
+
+                foreach (Type type in types)
+                {
+                    if (type == null)
+                    {
+                        continue;
+                    }
+
+                    MethodInfo[] methods;
+                    try
+                    {
+                        methods = type.GetMethods(
+                            BindingFlags.Public
+                                | BindingFlags.NonPublic
+                                | BindingFlags.Instance
+                                | BindingFlags.Static
+                        );
+                    }
+                    catch
+                    {
+                        continue;
+                    }
+
+                    foreach (MethodInfo method in methods)
+                    {
+                        if (!IsTestMethod(method))
+                        {
+                            continue;
+                        }
+
+                        visitor(assemblyName, type, method);
+                    }
+                }
+            }
+
+            return scannedAssemblies;
+        }
+
+        /// <summary>
+        /// Iterates every <c>.cs</c> file under <c>&lt;packagePath&gt;/Tests</c>
+        /// and invokes <paramref name="visitor"/> with the relative file path,
+        /// 1-based line number, and line text. Returns the absolute path of the
+        /// tests directory that was scanned, or <see langword="null"/> if no
+        /// tests directory was found beneath <paramref name="packagePath"/>.
+        /// </summary>
+        private static string ScanTestFiles(string packagePath, Action<string, int, string> visitor)
+        {
+            string testsPath = Path.Combine(packagePath, "Tests");
+            if (!Directory.Exists(testsPath))
+            {
+                return null;
+            }
+
+            string[] testFiles = Directory.GetFiles(testsPath, "*.cs", SearchOption.AllDirectories);
+            foreach (string filePath in testFiles)
+            {
+                if (filePath.EndsWith(".meta"))
+                {
+                    continue;
+                }
+
+                string[] lines;
+                try
+                {
+                    lines = File.ReadAllLines(filePath);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                string relativePath = GetRelativePath(filePath, packagePath);
+                for (int lineIndex = 0; lineIndex < lines.Length; lineIndex++)
+                {
+                    visitor(relativePath, lineIndex + 1, lines[lineIndex]);
+                }
+            }
+
+            return testsPath;
+        }
+
+        private static List<Assembly> GetTestAssemblies()
+        {
+            List<Assembly> testAssemblies = new();
+            Assembly[] loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
+
+            foreach (Assembly assembly in loadedAssemblies)
+            {
+                string assemblyName = assembly.GetName().Name;
+                foreach (string prefix in TestAssemblyPrefixes)
+                {
+                    if (assemblyName.StartsWith(prefix))
+                    {
+                        testAssemblies.Add(assembly);
+                        break;
+                    }
+                }
+            }
+
+            return testAssemblies;
+        }
+
+        private static bool IsTestMethod(MethodInfo method)
+        {
+            object[] attributes;
+            try
+            {
+                attributes = method.GetCustomAttributes(true);
+            }
+            catch
+            {
+                return false;
+            }
+
+            foreach (object attribute in attributes)
+            {
+                string attributeName = attribute.GetType().Name;
+                if (
+                    attributeName == "TestAttribute"
+                    || attributeName == "TestCaseAttribute"
+                    || attributeName == "TestCaseSourceAttribute"
+                    || attributeName == "UnityTestAttribute"
+                )
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static string GetPackagePath()
+        {
+            string[] guids = AssetDatabase.FindAssets("package t:TextAsset");
+            foreach (string guid in guids)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                if (
+                    path.EndsWith("package.json")
+                    && path.Contains("com.wallstop-studios.unity-helpers")
+                )
+                {
+                    return Path.GetDirectoryName(path);
+                }
+            }
+
+            Assembly thisAssembly = typeof(TestNamingConventionTests).Assembly;
+            string assemblyLocation = thisAssembly.Location;
+            if (!string.IsNullOrEmpty(assemblyLocation))
+            {
+                string current = Path.GetDirectoryName(assemblyLocation);
+                for (int i = 0; i < 10 && !string.IsNullOrEmpty(current); i++)
+                {
+                    if (File.Exists(Path.Combine(current, "package.json")))
+                    {
+                        return current;
+                    }
+
+                    current = Path.GetDirectoryName(current);
+                }
+            }
+
+            string dataPath = Application.dataPath;
+            string projectRoot = Path.GetDirectoryName(dataPath);
+
+            string[] possiblePaths =
+            {
+                Path.Combine(projectRoot, "Packages", "com.wallstop-studios.unity-helpers"),
+                Path.Combine(dataPath, "..", "Packages", "com.wallstop-studios.unity-helpers"),
+            };
+
+            foreach (string possiblePath in possiblePaths)
+            {
+                string normalized = Path.GetFullPath(possiblePath);
+                if (
+                    Directory.Exists(normalized)
+                    && File.Exists(Path.Combine(normalized, "package.json"))
+                )
+                {
+                    return normalized;
+                }
+            }
+
+            return null;
+        }
+
+        private static string GetRelativePath(string fullPath, string basePath)
+        {
+            if (string.IsNullOrEmpty(basePath))
+            {
+                return fullPath;
+            }
+
+            string normalizedFull = Path.GetFullPath(fullPath).Replace('\\', '/');
+            string normalizedBase = Path.GetFullPath(basePath).Replace('\\', '/');
+
+            if (!normalizedBase.EndsWith("/"))
+            {
+                normalizedBase += "/";
+            }
+
+            if (normalizedFull.StartsWith(normalizedBase))
+            {
+                return normalizedFull.Substring(normalizedBase.Length);
+            }
+
+            return fullPath;
+        }
+
+        /// <summary>
         /// Verifies that test method names do not contain underscores.
         /// </summary>
         [Test]
@@ -334,240 +568,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                     + $"({string.Join(", ", scannedAssemblies)}) and source tree at {scannedRoot}:\n"
                     + violations
             );
-        }
-
-        /// <summary>
-        /// Iterates every public/non-public/instance/static method on every type of
-        /// every loaded assembly whose name starts with a test-assembly prefix, and
-        /// invokes <paramref name="visitor"/> for each method that is annotated with
-        /// <c>[Test]</c>, <c>[TestCase]</c>, <c>[TestCaseSource]</c>, or
-        /// <c>[UnityTest]</c>. Returns the list of assembly names that were scanned
-        /// so callers can include that context in failure messages.
-        /// </summary>
-        private static List<string> ScanTestMethods(Action<string, Type, MethodInfo> visitor)
-        {
-            List<string> scannedAssemblies = new();
-            foreach (Assembly assembly in GetTestAssemblies())
-            {
-                string assemblyName = assembly.GetName().Name;
-                scannedAssemblies.Add(assemblyName);
-
-                Type[] types;
-                try
-                {
-                    types = assembly.GetTypes();
-                }
-                catch (ReflectionTypeLoadException ex)
-                {
-                    types = ex.Types;
-                }
-
-                foreach (Type type in types)
-                {
-                    if (type == null)
-                    {
-                        continue;
-                    }
-
-                    MethodInfo[] methods;
-                    try
-                    {
-                        methods = type.GetMethods(
-                            BindingFlags.Public
-                                | BindingFlags.NonPublic
-                                | BindingFlags.Instance
-                                | BindingFlags.Static
-                        );
-                    }
-                    catch
-                    {
-                        continue;
-                    }
-
-                    foreach (MethodInfo method in methods)
-                    {
-                        if (!IsTestMethod(method))
-                        {
-                            continue;
-                        }
-
-                        visitor(assemblyName, type, method);
-                    }
-                }
-            }
-
-            return scannedAssemblies;
-        }
-
-        /// <summary>
-        /// Iterates every <c>.cs</c> file under <c>&lt;packagePath&gt;/Tests</c>
-        /// and invokes <paramref name="visitor"/> with the relative file path,
-        /// 1-based line number, and line text. Returns the absolute path of the
-        /// tests directory that was scanned, or <see langword="null"/> if no
-        /// tests directory was found beneath <paramref name="packagePath"/>.
-        /// </summary>
-        private static string ScanTestFiles(string packagePath, Action<string, int, string> visitor)
-        {
-            string testsPath = Path.Combine(packagePath, "Tests");
-            if (!Directory.Exists(testsPath))
-            {
-                return null;
-            }
-
-            string[] testFiles = Directory.GetFiles(testsPath, "*.cs", SearchOption.AllDirectories);
-            foreach (string filePath in testFiles)
-            {
-                if (filePath.EndsWith(".meta"))
-                {
-                    continue;
-                }
-
-                string[] lines;
-                try
-                {
-                    lines = File.ReadAllLines(filePath);
-                }
-                catch
-                {
-                    continue;
-                }
-
-                string relativePath = GetRelativePath(filePath, packagePath);
-                for (int lineIndex = 0; lineIndex < lines.Length; lineIndex++)
-                {
-                    visitor(relativePath, lineIndex + 1, lines[lineIndex]);
-                }
-            }
-
-            return testsPath;
-        }
-
-        private static List<Assembly> GetTestAssemblies()
-        {
-            List<Assembly> testAssemblies = new();
-            Assembly[] loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
-
-            foreach (Assembly assembly in loadedAssemblies)
-            {
-                string assemblyName = assembly.GetName().Name;
-                foreach (string prefix in TestAssemblyPrefixes)
-                {
-                    if (assemblyName.StartsWith(prefix))
-                    {
-                        testAssemblies.Add(assembly);
-                        break;
-                    }
-                }
-            }
-
-            return testAssemblies;
-        }
-
-        private static bool IsTestMethod(MethodInfo method)
-        {
-            object[] attributes;
-            try
-            {
-                attributes = method.GetCustomAttributes(true);
-            }
-            catch
-            {
-                return false;
-            }
-
-            foreach (object attribute in attributes)
-            {
-                string attributeName = attribute.GetType().Name;
-                if (
-                    attributeName == "TestAttribute"
-                    || attributeName == "TestCaseAttribute"
-                    || attributeName == "TestCaseSourceAttribute"
-                    || attributeName == "UnityTestAttribute"
-                )
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static string GetPackagePath()
-        {
-            string[] guids = AssetDatabase.FindAssets("package t:TextAsset");
-            foreach (string guid in guids)
-            {
-                string path = AssetDatabase.GUIDToAssetPath(guid);
-                if (
-                    path.EndsWith("package.json")
-                    && path.Contains("com.wallstop-studios.unity-helpers")
-                )
-                {
-                    return Path.GetDirectoryName(path);
-                }
-            }
-
-            Assembly thisAssembly = typeof(TestNamingConventionTests).Assembly;
-            string assemblyLocation = thisAssembly.Location;
-            if (!string.IsNullOrEmpty(assemblyLocation))
-            {
-                string current = Path.GetDirectoryName(assemblyLocation);
-                for (int i = 0; i < 10 && !string.IsNullOrEmpty(current); i++)
-                {
-                    if (File.Exists(Path.Combine(current, "package.json")))
-                    {
-                        return current;
-                    }
-
-                    current = Path.GetDirectoryName(current);
-                }
-            }
-
-            string dataPath = Application.dataPath;
-            string projectRoot = Path.GetDirectoryName(dataPath);
-
-            string[] possiblePaths =
-            {
-                Path.Combine(projectRoot, "Packages", "com.wallstop-studios.unity-helpers"),
-                Path.Combine(dataPath, "..", "Packages", "com.wallstop-studios.unity-helpers"),
-            };
-
-            foreach (string possiblePath in possiblePaths)
-            {
-                string normalized = Path.GetFullPath(possiblePath);
-                if (
-                    Directory.Exists(normalized)
-                    && File.Exists(Path.Combine(normalized, "package.json"))
-                )
-                {
-                    return normalized;
-                }
-            }
-
-            return null;
-        }
-
-        private static string GetRelativePath(string fullPath, string basePath)
-        {
-            if (string.IsNullOrEmpty(basePath))
-            {
-                return fullPath;
-            }
-
-            string normalizedFull = Path.GetFullPath(fullPath).Replace('\\', '/');
-            string normalizedBase = Path.GetFullPath(basePath).Replace('\\', '/');
-
-            if (!normalizedBase.EndsWith("/"))
-            {
-                normalizedBase += "/";
-            }
-
-            if (normalizedFull.StartsWith(normalizedBase))
-            {
-                return normalizedFull.Substring(normalizedBase.Length);
-            }
-
-            return fullPath;
         }
     }
 }

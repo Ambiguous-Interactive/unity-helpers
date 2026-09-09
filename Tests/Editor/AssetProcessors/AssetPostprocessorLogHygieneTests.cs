@@ -28,6 +28,58 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
         private AssetChangeDetectionEnabledScope _watcherScope;
 
+        private static void SkipIfDeferralDisabled()
+        {
+            if (!UnityHelpersSettings.GetDeferAssetPostprocessorCallbacks())
+            {
+                Assert.Inconclusive(
+                    "Skipping: UnityHelpersSettings.GetDeferAssetPostprocessorCallbacks() is false. "
+                        + "This test only exercises the deferred path; re-enable the setting to run it."
+                );
+            }
+        }
+
+        private static void EnsureTestFolder()
+        {
+            /*
+                The batch-safe helper synchronizes folder creation with AssetDatabase, avoiding unregistered or
+                numbered duplicate folders.
+            */
+            if (!AssetDatabaseBatchHelper.EnsureAssetFolder(TestRoot))
+            {
+                Debug.LogWarning(
+                    $"EnsureTestFolder: Failed to register folder '{TestRoot}' in the AssetDatabase."
+                );
+            }
+        }
+
+        private static void WriteSolidColorTexture(string path, int width, int height, Color color)
+        {
+            Texture2D texture = new(width, height, TextureFormat.RGBA32, mipChain: false);
+            try
+            {
+                Color[] pixels = new Color[width * height];
+                for (int i = 0; i < pixels.Length; i++)
+                {
+                    pixels[i] = color;
+                }
+
+                texture.SetPixels(pixels);
+                texture.Apply();
+
+                byte[] encoded = texture.EncodeToPNG();
+                string absolutePath = Path.Combine(
+                    Path.GetDirectoryName(Application.dataPath) ?? string.Empty,
+                    path
+                );
+                File.WriteAllBytes(absolutePath, encoded);
+            }
+            finally
+            {
+                Object.DestroyImmediate(texture); // UNH-SUPPRESS: Test cleanup
+            }
+        }
+
         [OneTimeSetUp]
         public override void CommonOneTimeSetUp()
         {
@@ -195,58 +247,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             AssetPostprocessorDeferral.FlushForTesting();
 
             logScope.AssertNoSendMessageWarnings();
-        }
-
-        private static void SkipIfDeferralDisabled()
-        {
-            if (!UnityHelpersSettings.GetDeferAssetPostprocessorCallbacks())
-            {
-                Assert.Inconclusive(
-                    "Skipping: UnityHelpersSettings.GetDeferAssetPostprocessorCallbacks() is false. "
-                        + "This test only exercises the deferred path; re-enable the setting to run it."
-                );
-            }
-        }
-
-        private static void EnsureTestFolder()
-        {
-            /*
-                The batch-safe helper synchronizes folder creation with AssetDatabase, avoiding unregistered or
-                numbered duplicate folders.
-            */
-            if (!AssetDatabaseBatchHelper.EnsureAssetFolder(TestRoot))
-            {
-                Debug.LogWarning(
-                    $"EnsureTestFolder: Failed to register folder '{TestRoot}' in the AssetDatabase."
-                );
-            }
-        }
-
-        private static void WriteSolidColorTexture(string path, int width, int height, Color color)
-        {
-            Texture2D texture = new(width, height, TextureFormat.RGBA32, mipChain: false);
-            try
-            {
-                Color[] pixels = new Color[width * height];
-                for (int i = 0; i < pixels.Length; i++)
-                {
-                    pixels[i] = color;
-                }
-
-                texture.SetPixels(pixels);
-                texture.Apply();
-
-                byte[] encoded = texture.EncodeToPNG();
-                string absolutePath = Path.Combine(
-                    Path.GetDirectoryName(Application.dataPath) ?? string.Empty,
-                    path
-                );
-                File.WriteAllBytes(absolutePath, encoded);
-            }
-            finally
-            {
-                Object.DestroyImmediate(texture); // UNH-SUPPRESS: Test cleanup
-            }
         }
     }
 }

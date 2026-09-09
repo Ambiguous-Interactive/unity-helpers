@@ -38,17 +38,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private const string Proto =
             "global::WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto";
 
-        internal Include(int tag, INamedTypeSymbol subType)
-            : this(tag, subType, false) { }
-
-        internal Include(int tag, INamedTypeSymbol subType, bool tagFromManifest)
-        {
-            Tag = tag;
-            SubType = subType;
-            TagFromManifest = tagFromManifest;
-            Qualified = subType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-        }
-
         internal int Tag { get; }
 
         /// <summary>
@@ -80,5 +69,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// type is also one static call instead of a registry read.
         /// </remarks>
         internal string Formatter => Qualified + "." + WProtoGeneratedNames.Formatter + ".Instance";
+
+        internal Include(int tag, INamedTypeSymbol subType)
+            : this(tag, subType, false) { }
+
+        internal Include(int tag, INamedTypeSymbol subType, bool tagFromManifest)
+        {
+            Tag = tag;
+            SubType = subType;
+            TagFromManifest = tagFromManifest;
+            Qualified = subType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        }
     }
 }

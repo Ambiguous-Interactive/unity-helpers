@@ -15,14 +15,14 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [WGroup("Infinite Group")]
         public int groupAnchor;
 
+        public int visibleField1;
+        public int visibleField2;
+
         [HideInInspector]
         [SerializeField]
 #pragma warning disable CS0649 // Field is never assigned to
         internal int _hiddenField;
 #pragma warning restore CS0649 // Field is never assigned to
-
-        public int visibleField1;
-        public int visibleField2;
     }
 }
 #endif

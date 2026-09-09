@@ -67,20 +67,6 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </summary>
         public const long DefaultMemoryGrowthRateThreshold = 50L * 1024 * 1024; // 50MB/s
 
-        private static int _enabled = 1;
-        private static long _memoryPressureThresholdBytes = DefaultMemoryPressureThresholdBytes;
-        private static float _checkIntervalSeconds = DefaultCheckIntervalSeconds;
-        private static float _gcCollectionRateThreshold = DefaultGCCollectionRateThreshold;
-        private static long _memoryGrowthRateThreshold = DefaultMemoryGrowthRateThreshold;
-
-        private static long _lastTotalMemory;
-        private static int _lastGCCount;
-        private static float _lastCheckTime;
-        private static int _currentPressure;
-
-        private static readonly Stopwatch MonitorStopwatch = Stopwatch.StartNew();
-        private static readonly object UpdateLock = new();
-
         private const float CriticalMemoryRatio = 1.25f;
         private const float HighMemoryRatio = 1.0f;
         private const float MediumMemoryRatio = 0.9f;
@@ -103,80 +89,6 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private const float HighGCRateMultiplier = 3f;
         private const float HighGrowthRateMultiplier = 2f;
-
-        /// <summary>
-        /// Calculates the pressure level from provided metrics without querying the GC.
-        /// Used for testing pressure calculation logic with controlled inputs.
-        /// </summary>
-        /// <param name="memoryRatio">Current memory as ratio of threshold (e.g., 0.9 = 90% of threshold).</param>
-        /// <param name="gcRateMultiplier">GC rate as multiple of threshold (e.g., 2.0 = 2x the threshold rate).</param>
-        /// <param name="growthRateMultiplier">Growth rate as multiple of threshold (e.g., 1.5 = 1.5x the threshold rate).</param>
-        /// <returns>The calculated pressure level.</returns>
-        internal static MemoryPressureLevel CalculatePressureFromMetrics(
-            float memoryRatio,
-            float gcRateMultiplier,
-            float growthRateMultiplier
-        )
-        {
-            int pressureScore = 0;
-
-            if (CriticalMemoryRatio <= memoryRatio)
-            {
-                pressureScore += CriticalMemoryScoreContribution;
-            }
-            else if (HighMemoryRatio <= memoryRatio)
-            {
-                pressureScore += HighMemoryScoreContribution;
-            }
-            else if (MediumMemoryRatio <= memoryRatio)
-            {
-                pressureScore += MediumMemoryScoreContribution;
-            }
-            else if (LowMemoryRatio <= memoryRatio)
-            {
-                pressureScore += LowMemoryScoreContribution;
-            }
-
-            if (HighGCRateMultiplier <= gcRateMultiplier)
-            {
-                pressureScore += HighGCRateScoreContribution;
-            }
-            else if (1f <= gcRateMultiplier)
-            {
-                pressureScore += MediumGCRateScoreContribution;
-            }
-
-            if (HighGrowthRateMultiplier <= growthRateMultiplier)
-            {
-                pressureScore += HighGrowthRateScoreContribution;
-            }
-            else if (1f <= growthRateMultiplier)
-            {
-                pressureScore += MediumGrowthRateScoreContribution;
-            }
-
-            if (CriticalScoreThreshold <= pressureScore)
-            {
-                return MemoryPressureLevel.Critical;
-            }
-
-            if (HighScoreThreshold <= pressureScore)
-            {
-                return MemoryPressureLevel.High;
-            }
-
-            if (MediumScoreThreshold <= pressureScore)
-            {
-                return MemoryPressureLevel.Medium;
-            }
-
-            if (LowScoreThreshold <= pressureScore)
-            {
-                return MemoryPressureLevel.Low;
-            }
-
-            return MemoryPressureLevel.None;
-        }
 
         /// <summary>
         /// Gets or sets whether memory pressure monitoring is enabled.
@@ -303,6 +215,20 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </summary>
         public static int LastGCCount => Volatile.Read(ref _lastGCCount);
 
+        private static int _enabled = 1;
+        private static long _memoryPressureThresholdBytes = DefaultMemoryPressureThresholdBytes;
+        private static float _checkIntervalSeconds = DefaultCheckIntervalSeconds;
+        private static float _gcCollectionRateThreshold = DefaultGCCollectionRateThreshold;
+        private static long _memoryGrowthRateThreshold = DefaultMemoryGrowthRateThreshold;
+
+        private static long _lastTotalMemory;
+        private static int _lastGCCount;
+        private static float _lastCheckTime;
+        private static int _currentPressure;
+
+        private static readonly Stopwatch MonitorStopwatch = Stopwatch.StartNew();
+        private static readonly object UpdateLock = new();
+
         /// <summary>
         /// Updates the memory pressure calculation if the check interval has elapsed.
         /// </summary>
@@ -394,6 +320,80 @@ namespace WallstopStudios.UnityHelpers.Utils
                 _lastCheckTime = 0f;
                 _currentPressure = 0;
             }
+        }
+
+        /// <summary>
+        /// Calculates the pressure level from provided metrics without querying the GC.
+        /// Used for testing pressure calculation logic with controlled inputs.
+        /// </summary>
+        /// <param name="memoryRatio">Current memory as ratio of threshold (e.g., 0.9 = 90% of threshold).</param>
+        /// <param name="gcRateMultiplier">GC rate as multiple of threshold (e.g., 2.0 = 2x the threshold rate).</param>
+        /// <param name="growthRateMultiplier">Growth rate as multiple of threshold (e.g., 1.5 = 1.5x the threshold rate).</param>
+        /// <returns>The calculated pressure level.</returns>
+        internal static MemoryPressureLevel CalculatePressureFromMetrics(
+            float memoryRatio,
+            float gcRateMultiplier,
+            float growthRateMultiplier
+        )
+        {
+            int pressureScore = 0;
+
+            if (CriticalMemoryRatio <= memoryRatio)
+            {
+                pressureScore += CriticalMemoryScoreContribution;
+            }
+            else if (HighMemoryRatio <= memoryRatio)
+            {
+                pressureScore += HighMemoryScoreContribution;
+            }
+            else if (MediumMemoryRatio <= memoryRatio)
+            {
+                pressureScore += MediumMemoryScoreContribution;
+            }
+            else if (LowMemoryRatio <= memoryRatio)
+            {
+                pressureScore += LowMemoryScoreContribution;
+            }
+
+            if (HighGCRateMultiplier <= gcRateMultiplier)
+            {
+                pressureScore += HighGCRateScoreContribution;
+            }
+            else if (1f <= gcRateMultiplier)
+            {
+                pressureScore += MediumGCRateScoreContribution;
+            }
+
+            if (HighGrowthRateMultiplier <= growthRateMultiplier)
+            {
+                pressureScore += HighGrowthRateScoreContribution;
+            }
+            else if (1f <= growthRateMultiplier)
+            {
+                pressureScore += MediumGrowthRateScoreContribution;
+            }
+
+            if (CriticalScoreThreshold <= pressureScore)
+            {
+                return MemoryPressureLevel.Critical;
+            }
+
+            if (HighScoreThreshold <= pressureScore)
+            {
+                return MemoryPressureLevel.High;
+            }
+
+            if (MediumScoreThreshold <= pressureScore)
+            {
+                return MemoryPressureLevel.Medium;
+            }
+
+            if (LowScoreThreshold <= pressureScore)
+            {
+                return MemoryPressureLevel.Low;
+            }
+
+            return MemoryPressureLevel.None;
         }
 
         private static void CalculatePressure(float currentTime, float lastCheckTime)

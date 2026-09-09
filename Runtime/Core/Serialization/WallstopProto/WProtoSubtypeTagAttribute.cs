@@ -44,6 +44,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true, Inherited = false)]
     public sealed class WProtoSubtypeTagAttribute : Attribute
     {
+        /// <summary>The fully qualified name of the subtype this field number identifies.</summary>
+        public string SubTypeName { get; }
+
+        /// <summary>The immediate base contract the subtype is written as.</summary>
+        public Type BaseType { get; }
+
+        /// <summary>The field number carrying the subtype on the base message.</summary>
+        public int Tag { get; }
+
         /// <summary>
         /// Initializes the entry with the pair it numbers and the number assigned to it.
         /// </summary>
@@ -56,14 +65,5 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             BaseType = baseType;
             Tag = tag;
         }
-
-        /// <summary>The fully qualified name of the subtype this field number identifies.</summary>
-        public string SubTypeName { get; }
-
-        /// <summary>The immediate base contract the subtype is written as.</summary>
-        public Type BaseType { get; }
-
-        /// <summary>The field number carrying the subtype on the base message.</summary>
-        public int Tag { get; }
     }
 }

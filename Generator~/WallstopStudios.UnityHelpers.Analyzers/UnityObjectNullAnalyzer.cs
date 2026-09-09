@@ -82,14 +82,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 UnityHelpersDiagnostics.NullAssertionOnUnityObject
             );
 
-        /// <inheritdoc />
-        public override void Initialize(AnalysisContext context)
-        {
-            context.EnableConcurrentExecution();
-            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
-            context.RegisterCompilationStartAction(OnCompilationStart);
-        }
-
         private static void OnCompilationStart(CompilationStartAnalysisContext context)
         {
             INamedTypeSymbol unityObject = context.Compilation.GetTypeByMetadataName(
@@ -407,6 +399,14 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 && syntax.WhenNotNull.GetFirstToken().IsKind(SyntaxKind.OpenBracketToken)
                 ? NullConditionalIndexOperator
                 : NullConditionalOperator;
+        }
+
+        /// <inheritdoc />
+        public override void Initialize(AnalysisContext context)
+        {
+            context.EnableConcurrentExecution();
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+            context.RegisterCompilationStartAction(OnCompilationStart);
         }
     }
 }

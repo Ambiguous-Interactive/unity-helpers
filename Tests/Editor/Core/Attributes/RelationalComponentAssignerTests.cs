@@ -18,33 +18,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.Attributes
     [NUnit.Framework.Category("Integration")]
     public sealed class RelationalComponentAssignerTests : CommonTestBase
     {
-        private AttributeMetadataCache CreateCacheWithSiblingSelfInclusionMetadata()
-        {
-            AttributeMetadataCache cache = CreateScriptableObject<AttributeMetadataCache>();
-            AttributeMetadataCache.RelationalTypeMetadata relationalMetadata = new(
-                typeof(SiblingSelfInclusionTester).AssemblyQualifiedName,
-                new[]
-                {
-                    new AttributeMetadataCache.RelationalFieldMetadata(
-                        "siblingRenderer",
-                        AttributeMetadataCache.RelationalAttributeKind.Sibling,
-                        AttributeMetadataCache.FieldKind.Single,
-                        typeof(SpriteRenderer).AssemblyQualifiedName,
-                        false
-                    ),
-                }
-            );
-
-            cache.SetMetadata(
-                Array.Empty<string>(),
-                Array.Empty<AttributeMetadataCache.TypeFieldMetadata>(),
-                new[] { relationalMetadata },
-                Array.Empty<AttributeMetadataCache.AutoLoadSingletonEntry>()
-            );
-            cache.ForceRebuildForTests();
-            return cache;
-        }
-
         [Test]
         public void HasRelationalAssignmentsRespectsMetadata()
         {
@@ -261,6 +234,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.Attributes
                 () => assigner.AssignHierarchy(null),
                 "AssignHierarchy(null) should not throw"
             );
+        }
+
+        private AttributeMetadataCache CreateCacheWithSiblingSelfInclusionMetadata()
+        {
+            AttributeMetadataCache cache = CreateScriptableObject<AttributeMetadataCache>();
+            AttributeMetadataCache.RelationalTypeMetadata relationalMetadata = new(
+                typeof(SiblingSelfInclusionTester).AssemblyQualifiedName,
+                new[]
+                {
+                    new AttributeMetadataCache.RelationalFieldMetadata(
+                        "siblingRenderer",
+                        AttributeMetadataCache.RelationalAttributeKind.Sibling,
+                        AttributeMetadataCache.FieldKind.Single,
+                        typeof(SpriteRenderer).AssemblyQualifiedName,
+                        false
+                    ),
+                }
+            );
+
+            cache.SetMetadata(
+                Array.Empty<string>(),
+                Array.Empty<AttributeMetadataCache.TypeFieldMetadata>(),
+                new[] { relationalMetadata },
+                Array.Empty<AttributeMetadataCache.AutoLoadSingletonEntry>()
+            );
+            cache.ForceRebuildForTests();
+            return cache;
         }
     }
 }

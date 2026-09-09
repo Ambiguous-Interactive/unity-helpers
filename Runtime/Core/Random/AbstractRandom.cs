@@ -103,55 +103,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         private const int GuidByteCount = 16;
         private const int MaxDoubleBitAttempts = 1 << 20;
 
+        public abstract RandomState InternalState { get; }
+
         [ProtoMember(1)]
         [WProtoMember(1)]
         protected double? _cachedGaussian;
-
-        public abstract RandomState InternalState { get; }
-
-        /// <summary>
-        /// Runs once on the instance a payload was read into, whichever generator it turned out to
-        /// be.
-        /// </summary>
-        /// <remarks>
-        /// Declared here rather than on the subtype that needs it, and this is the only placement
-        /// every reader agrees on. A reader invokes the callbacks of the type that owns the wire
-        /// shape, which is this one: protobuf-net 3.2.56 runs the root's and none of a subtype's,
-        /// 2.4.9 runs every level outermost-first, and WallstopProto runs every level
-        /// innermost-first. A hook declared on <c>DotNetRandom</c> therefore ran under two readers
-        /// out of three -- see WPROTO034, which now says so at the declaration.
-        /// </remarks>
-        protected virtual void OnAfterDeserialization() { }
-
-        [ProtoAfterDeserialization]
-        [WProtoAfterDeserialization]
-        private void OnProtoDeserialize()
-        {
-            RepairCommonState();
-            OnAfterDeserialization();
-        }
-
-        /// <summary>
-        /// Runs on the instance being written, whichever generator it turned out to be.
-        /// </summary>
-        /// <remarks>
-        /// The mirror of <see cref="OnAfterDeserialization"/>, and declared here for the same
-        /// reason: the root owns the wire shape, so a hook on a subtype runs under some readers and
-        /// writers and not others (WPROTO034). A generator whose state is not entirely in its own
-        /// fields -- <see cref="UnityRandom"/>, whose position belongs to the engine -- uses this to
-        /// put that state into a member before the member is read.
-        /// </remarks>
-        protected virtual void OnBeforeSerialization() { }
-
-        [ProtoBeforeSerialization]
-        [WProtoBeforeSerialization]
-        private void OnProtoSerialize()
-        {
-            OnBeforeSerialization();
-        }
-
-        // SkipConstructor bypasses buffer initialization; the root callback must repair it.
-        private byte[] _guidBytes;
 
         // Serialize bit and byte reservoirs to preserve exact stream continuation.
         [ProtoMember(2)]
@@ -170,81 +126,302 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         [WProtoMember(5)]
         protected int _byteCount;
 
+        // SkipConstructor bypasses buffer initialization; the root callback must repair it.
+        private byte[] _guidBytes;
+
         protected AbstractRandom()
         {
             _guidBytes = new byte[GuidByteCount];
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        protected RandomState BuildState(
-            ulong state1,
-            ulong state2 = 0,
-            IReadOnlyList<byte> payload = null,
-            uint? auxiliaryUintA = null,
-            uint? auxiliaryUintB = null
-        )
+        public static void SetUuidV4Bits(byte[] bytes)
         {
-            byte[] payloadCopy = null;
-            if (payload != null)
+            if (bytes == null || bytes.Length < GuidByteCount)
             {
-                if (payload is byte[] payloadArray)
+                throw new ArgumentException(
+                    "UUID buffer must contain at least 16 bytes.",
+                    nameof(bytes)
+                );
+            }
+
+            // Version bits live in byte 7 (second byte of the time_hi_and_version field).
+            byte versionByte = bytes[7];
+            versionByte &= 0x0F;
+            versionByte |= 0x40;
+            bytes[7] = versionByte;
+
+            // Variant bits live in byte 8 (clock_seq_hi_and_reserved).
+            byte variantByte = bytes[8];
+            variantByte &= 0x3F;
+            variantByte |= 0x80;
+            bytes[8] = variantByte;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected internal static uint RotateLeft(uint value, int count)
+        {
+            return (value << count) | (value >> (32 - count));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected internal static uint Mix32(ref ulong state)
+        {
+            unchecked
+            {
+                state += 0x9E3779B97F4A7C15UL;
+                ulong z = state;
+                z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL;
+                z = (z ^ (z >> 27)) * 0x94D049BB133111EBUL;
+                z ^= z >> 31;
+                return (uint)z;
+            }
+        }
+
+        private static uint ToOrderedFloat(float value)
+        {
+            uint bits = unchecked((uint)BitConverter.SingleToInt32Bits(value));
+            const uint signBit = 1u << 31;
+            return (bits & signBit) != 0 ? ~bits : bits | signBit;
+        }
+
+        private static T[] GetEnumValues<T>()
+            where T : unmanaged, Enum
+        {
+            return EnumValues<T>.Values;
+        }
+
+        private static void EnsureEnumHasAvailableValues<T>(
+            T[] enumValues,
+            ReadOnlySpan<T> exclusions
+        )
+            where T : unmanaged, Enum
+        {
+            if (enumValues.Length == 0)
+            {
+                throw new InvalidOperationException(
+                    $"Enum {typeof(T).Name} does not define any values."
+                );
+            }
+
+            if (exclusions.IsEmpty)
+            {
+                return;
+            }
+
+            int enumCount = enumValues.Length;
+            const int StackThreshold = 8;
+
+            if (exclusions.Length <= StackThreshold)
+            {
+                Span<T> unique = stackalloc T[StackThreshold];
+                int uniqueCount = 0;
+
+                foreach (T exclusion in exclusions)
                 {
-                    int length = payloadArray.Length;
-                    payloadCopy = new byte[length];
-                    Buffer.BlockCopy(payloadArray, 0, payloadCopy, 0, length);
-                }
-                else
-                {
-                    int count = payload.Count;
-                    payloadCopy = new byte[count];
-                    for (int i = 0; i < count; ++i)
+                    if (Array.IndexOf(enumValues, exclusion) < 0)
                     {
-                        payloadCopy[i] = payload[i];
+                        continue;
                     }
+
+                    bool seen = false;
+                    for (int i = 0; i < uniqueCount; ++i)
+                    {
+                        if (EqualityComparer<T>.Default.Equals(unique[i], exclusion))
+                        {
+                            seen = true;
+                            break;
+                        }
+                    }
+
+                    if (seen)
+                    {
+                        continue;
+                    }
+
+                    unique[uniqueCount++] = exclusion;
+                    if (enumCount <= uniqueCount)
+                    {
+                        ThrowAllEnumValuesExcluded<T>(enumCount);
+                    }
+                }
+
+                return;
+            }
+
+            using PooledResource<HashSet<T>> pooledSet = Buffers<T>.HashSet.Get(out HashSet<T> set);
+            foreach (T exclusion in exclusions)
+            {
+                if (Array.IndexOf(enumValues, exclusion) < 0)
+                {
+                    continue;
+                }
+
+                set.Add(exclusion);
+                if (enumCount <= set.Count)
+                {
+                    ThrowAllEnumValuesExcluded<T>(enumCount);
+                }
+            }
+        }
+
+        private static void EnsureEnumHasAvailableValues<T>(T[] enumValues, HashSet<T> exclusions)
+            where T : struct, Enum
+        {
+            if (enumValues.Length == 0)
+            {
+                exclusions.Clear();
+                throw new InvalidOperationException(
+                    $"Enum {typeof(T).Name} does not define any values."
+                );
+            }
+
+            if (exclusions.Count == 0)
+            {
+                return;
+            }
+
+            int excludedCount = 0;
+            foreach (T value in enumValues)
+            {
+                if (exclusions.Contains(value))
+                {
+                    excludedCount++;
                 }
             }
 
-            return new RandomState(
-                state1,
-                state2,
-                _cachedGaussian,
-                payload: payloadCopy,
-                bitBuffer: _bitBuffer,
-                bitCount: _bitCount,
-                byteBuffer: _byteBuffer,
-                byteCount: _byteCount
+            if (enumValues.Length <= excludedCount)
+            {
+                exclusions.Clear();
+                ThrowAllEnumValuesExcluded<T>(enumValues.Length);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool SpanContains<T>(ReadOnlySpan<T> span, T value)
+        {
+            for (int i = 0; i < span.Length; ++i)
+            {
+                if (EqualityComparer<T>.Default.Equals(span[i], value))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int PopulateAllowedValues<T>(
+            T[] enumValues,
+            ReadOnlySpan<T> exclusions,
+            Span<T> destination
+        )
+            where T : unmanaged, Enum
+        {
+            int count = 0;
+            foreach (T value in enumValues)
+            {
+                if (!SpanContains(exclusions, value))
+                {
+                    destination[count++] = value;
+                }
+            }
+
+            return count;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int PopulateAllowedValues<T>(
+            T[] enumValues,
+            HashSet<T> exclusions,
+            Span<T> destination
+        )
+            where T : unmanaged, Enum
+        {
+            int count = 0;
+            foreach (T value in enumValues)
+            {
+                if (!exclusions.Contains(value))
+                {
+                    destination[count++] = value;
+                }
+            }
+
+            return count;
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ThrowAllEnumValuesExcluded<T>(int enumCount)
+            where T : struct, Enum
+        {
+            throw new InvalidOperationException(
+                $"Cannot select a value from enum {typeof(T).Name} because all {enumCount} defined values are excluded."
             );
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        protected void RestoreCommonState(RandomState state)
+        private static ulong BiasLong(long value)
         {
-            _cachedGaussian = state.Gaussian;
-            _bitBuffer = state.BitBuffer;
-            _bitCount = state.BitCount;
-            _byteBuffer = state.ByteBuffer;
-            _byteCount = state.ByteCount;
-            RepairCommonState();
+            return unchecked((ulong)value + LongBias);
         }
 
-        private void RepairCommonState()
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static long UnbiasLong(ulong value)
         {
-            if (_guidBytes == null)
+            return unchecked((long)(value - LongBias));
+        }
+
+        /// <summary>
+        /// The high 64 bits of the 128-bit product, by schoolbook decomposition.
+        /// </summary>
+        /// <param name="x">First factor.</param>
+        /// <param name="y">Second factor.</param>
+        /// <returns>The product's high half.</returns>
+        /// <remarks>
+        /// A BMI2 wide-multiply branch lived here behind <c>NET7_0_OR_GREATER</c>, which no Unity player
+        /// defines, so it never ran
+        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/637">#637</see>).
+        /// </remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static ulong MulHi64(ulong x, ulong y)
+        {
+            ulong x0 = (uint)x;
+            ulong x1 = x >> 32;
+            ulong y0 = (uint)y;
+            ulong y1 = y >> 32;
+
+            ulong p11 = x1 * y1;
+            ulong p01 = x0 * y1;
+            ulong p10 = x1 * y0;
+            ulong p00 = x0 * y0;
+
+            ulong middle = p10 + (p00 >> 32) + (uint)p01;
+            ulong hi = p11 + (middle >> 32) + (p01 >> 32);
+            return hi;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static ulong ToOrderedDouble(double value)
+        {
+            if (double.IsNaN(value))
             {
-                _guidBytes = new byte[GuidByteCount];
+                throw new ArgumentException(
+                    "NaN is not a valid bound for random sampling.",
+                    nameof(value)
+                );
             }
 
-            if (_bitCount < 0 || 32 < _bitCount)
-            {
-                _bitBuffer = 0;
-                _bitCount = 0;
-            }
+            ulong bits = unchecked((ulong)BitConverter.DoubleToInt64Bits(value));
+            const ulong signBit = 1UL << 63;
+            return (bits & signBit) != 0 ? ~bits : bits | signBit;
+        }
 
-            if (_byteCount < 0 || 4 < _byteCount)
-            {
-                _byteBuffer = 0;
-                _byteCount = 0;
-            }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static double FromOrderedDouble(ulong value)
+        {
+            const ulong signBit = 1UL << 63;
+            ulong bits = (value & signBit) != 0 ? value & ~signBit : ~value;
+            return BitConverter.Int64BitsToDouble(unchecked((long)bits));
         }
 
         public virtual int Next()
@@ -312,48 +489,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             TrySampleUintBelow(max, out uint value);
             return value;
 #pragma warning restore WUH008
-        }
-
-        /// <summary>
-        /// Lemire multiply-shift rejection over <c>[0, max)</c>, shared by
-        /// <see cref="NextUint(uint)"/> and <see cref="TryNextUint(uint, out uint)"/> so the
-        /// arithmetic exists once.
-        /// </summary>
-        /// <param name="max">Exclusive upper bound; must not be zero.</param>
-        /// <param name="value">The exact sample, or the legacy modulo fallback on failure.</param>
-        /// <returns>Whether rejection sampling produced an unbiased value.</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool TrySampleUintBelow(uint max, out uint value)
-        {
-            if ((max & (max - 1)) == 0)
-            {
-                value = NextUint() & (max - 1);
-                return true;
-            }
-
-            // Lemire's method (32-bit): take high 32 bits of r*max
-            uint r = NextUint();
-            ulong m = (ulong)r * max;
-            uint lo = (uint)m;
-            if (lo < max)
-            {
-                uint t = unchecked((0u - max) % max);
-                int attempts = 0;
-                while (lo < t)
-                {
-                    if (MaxRejectionAttempts32 < ++attempts)
-                    {
-                        value = r % max;
-                        return false;
-                    }
-                    r = NextUint();
-                    m = (ulong)r * max;
-                    lo = (uint)m;
-                }
-            }
-
-            value = (uint)(m >> 32);
-            return true;
         }
 
         public uint NextUint(uint min, uint max)
@@ -528,51 +663,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             TrySampleUlongBelow(max, out ulong value);
             return value;
 #pragma warning restore WUH008
-        }
-
-        /// <summary>
-        /// Lemire multiply-shift rejection over <c>[0, max)</c>, shared by
-        /// <see cref="NextUlong(ulong)"/> and <see cref="TryNextUlong(ulong, out ulong)"/> so the
-        /// arithmetic exists once.
-        /// </summary>
-        /// <param name="max">Exclusive upper bound; must not be zero.</param>
-        /// <param name="value">The exact sample, or the legacy modulo fallback on failure.</param>
-        /// <returns>Whether rejection sampling produced an unbiased value.</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool TrySampleUlongBelow(ulong max, out ulong value)
-        {
-            if ((max & (max - 1)) == 0)
-            {
-                value = NextUlong() & (max - 1);
-                return true;
-            }
-
-            /*
-                Lemire's method with rejection: use high 64 bits of the 128-bit product,
-                retrying when the low bits fall within the threshold region to avoid bias.
-            */
-            ulong sample = NextUlong();
-            ulong productLow = unchecked(sample * max);
-            if (productLow < max)
-            {
-                // A low half above max already exceeds the threshold, so it needs no division.
-                ulong threshold = unchecked(0UL - max) % max;
-                int attempts = 0;
-                while (productLow < threshold)
-                {
-                    if (MaxRejectionAttempts64 < ++attempts)
-                    {
-                        value = sample % max;
-                        return false;
-                    }
-
-                    sample = NextUlong();
-                    productLow = unchecked(sample * max);
-                }
-            }
-
-            value = MulHi64(sample, max);
-            return true;
         }
 
         public ulong NextUlong(ulong min, ulong max)
@@ -767,101 +857,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             return min + NextDouble() * range;
         }
 
-        protected double NextDoubleWithInfiniteRange(double min, double max)
-        {
-            if (ToOrderedDouble(max) <= ToOrderedDouble(min))
-            {
-                throw new ArgumentException(
-                    $"Invalid range [{min}, {max}) for infinite-range sampling."
-                );
-            }
-
-#pragma warning disable WUH008 // The legacy API returns the core's documented fallback when exact sampling fails.
-            TrySampleDoubleWithInfiniteRange(min, max, false, out double value);
-            return value;
-#pragma warning restore WUH008
-        }
-
-        /// <summary>
-        /// Samples an ordered-bit-pattern range whose width overflows a <see cref="double"/>
-        /// subtraction, and reports whether the result came from the rejection loop.
-        /// </summary>
-        /// <param name="min">Inclusive lower bound.</param>
-        /// <param name="max">Exclusive upper bound.</param>
-        /// <param name="requireExact">Stops immediately when bounded integer sampling fails.</param>
-        /// <param name="value">The exact sample, or the legacy fallback on failure.</param>
-        /// <returns>Whether both rejection layers produced an exact draw.</returns>
-        private bool TrySampleDoubleWithInfiniteRange(
-            double min,
-            double max,
-            bool requireExact,
-            out double value
-        )
-        {
-            const ulong orderedNegativeZero = long.MaxValue;
-            ulong orderedMin = ToOrderedDouble(min);
-            ulong orderedMax = max == 0d ? orderedNegativeZero : ToOrderedDouble(max);
-
-            if (orderedMax <= orderedMin)
-            {
-                value = default;
-                return false;
-            }
-
-            ulong range = orderedMax - orderedMin;
-            if (double.IsNegativeInfinity(min) && range == 1)
-            {
-                value = min;
-                return false;
-            }
-
-            int attempts = 0;
-            bool allDrawsUnbiased = true;
-            while (true)
-            {
-                bool unbiased = TrySampleUlongBelow(range, out ulong offset);
-                if (requireExact && !unbiased)
-                {
-                    value = default;
-                    return false;
-                }
-                allDrawsUnbiased &= unbiased;
-                ulong sample = orderedMin + offset;
-                double candidate = FromOrderedDouble(sample);
-
-                if (!double.IsNaN(candidate) && !double.IsInfinity(candidate))
-                {
-                    value = candidate;
-                    return allDrawsUnbiased;
-                }
-                if (!unbiased || MaxRejectionAttempts64 < ++attempts)
-                {
-                    // This degraded fixed result is reported as failure by TryNextDouble.
-                    if (double.IsPositiveInfinity(max))
-                    {
-                        value = FromOrderedDouble(orderedMax - 1);
-                        return false;
-                    }
-                    if (double.IsNegativeInfinity(min))
-                    {
-                        value = FromOrderedDouble(orderedMin + 1);
-                        return false;
-                    }
-
-                    ulong midpoint = orderedMin + (range >> 1);
-                    double midValue = FromOrderedDouble(midpoint);
-                    if (!double.IsNaN(midValue) && !double.IsInfinity(midValue))
-                    {
-                        value = midValue;
-                        return false;
-                    }
-
-                    value = FromOrderedDouble(orderedMin + 1);
-                    return false;
-                }
-            }
-        }
-
         /// <summary>
         /// Samples <c>[min, max)</c> and reports whether the result is a genuine draw.
         /// </summary>
@@ -904,24 +899,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
             value = candidate;
             return true;
-        }
-
-        protected double NextDoubleFullRange()
-        {
-            const ulong exponentMask = 0x7FF0000000000000;
-            ulong randomBits;
-            int attempts = 0;
-            do
-            {
-                randomBits = NextUlong();
-                if (MaxDoubleBitAttempts < ++attempts)
-                {
-                    randomBits &= ~exponentMask;
-                    break;
-                }
-            } while ((randomBits & exponentMask) == exponentMask);
-
-            return BitConverter.Int64BitsToDouble(unchecked((long)randomBits));
         }
 
         public double NextGaussian(double mean = 0, double stdDev = 1)
@@ -967,61 +944,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
 
             value = candidate;
-            return true;
-        }
-
-        private double NextGaussianInternal()
-        {
-#pragma warning disable WUH008 // The legacy API returns the core's documented fallback when exact sampling fails.
-            TrySampleGaussian(out double value);
-            return value;
-#pragma warning restore WUH008
-        }
-
-        /// <summary>
-        /// Marsaglia polar sampling of the standard normal, reporting whether the result came from
-        /// the rejection loop.
-        /// </summary>
-        /// <param name="value">The exact deviate, or the legacy Box-Muller fallback on failure.</param>
-        /// <returns>Whether polar rejection sampling produced the deviate.</returns>
-        private bool TrySampleGaussian(out double value)
-        {
-            if (_cachedGaussian != null)
-            {
-                double cached = _cachedGaussian.Value;
-                _cachedGaussian = null;
-                value = cached;
-                return true;
-            }
-
-            // https://stackoverflow.com/q/7183229/1917135
-            double x;
-            double y;
-            double square;
-            int attempts = 0;
-            do
-            {
-                x = 2 * NextDouble() - 1;
-                y = 2 * NextDouble() - 1;
-                square = x * x + y * y;
-                if (MaxGaussianAttempts < ++attempts)
-                {
-                    // Do not cache a partner from degraded sampling; a later exact request must not receive it.
-                    double u1 = NextDouble();
-                    if (u1 <= double.Epsilon)
-                    {
-                        u1 = double.Epsilon;
-                    }
-                    double u2 = NextDouble();
-                    double mag = Math.Sqrt(-2.0 * Math.Log(u1));
-                    value = mag * Math.Cos(2.0 * Math.PI * u2);
-                    return false;
-                }
-            } while (square is 0 or > 1);
-
-            double fac = Math.Sqrt(-2 * Math.Log(square) / square);
-            _cachedGaussian = x * fac;
-            value = y * fac;
             return true;
         }
 
@@ -1076,29 +998,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
 
             return min + NextFloat(range);
-        }
-
-        private float NextFloatWithInfiniteBound(float min, float max)
-        {
-            const uint orderedNegativeZero = int.MaxValue;
-            uint minimum = ToOrderedFloat(float.IsNegativeInfinity(min) ? float.MinValue : min);
-            uint maximum = max == 0f ? orderedNegativeZero : ToOrderedFloat(max);
-            if (minimum == maximum)
-            {
-                return min;
-            }
-
-            uint ordered = minimum + NextUint(maximum - minimum);
-            const uint signBit = 1u << 31;
-            uint bits = (ordered & signBit) != 0 ? ordered & ~signBit : ~ordered;
-            return BitConverter.Int32BitsToSingle(unchecked((int)bits));
-        }
-
-        private static uint ToOrderedFloat(float value)
-        {
-            uint bits = unchecked((uint)BitConverter.SingleToInt32Bits(value));
-            const uint signBit = 1u << 31;
-            return (bits & signBit) != 0 ? ~bits : bits | signBit;
         }
 
         public T NextOf<T>(IEnumerable<T> enumerable)
@@ -1231,345 +1130,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             return RandomOf(elements);
         }
 
-        private T NextFromEnumerable<T>(IEnumerable<T> enumerable)
-        {
-            using IEnumerator<T> enumerator = enumerable.GetEnumerator();
-            if (!enumerator.MoveNext())
-            {
-                throw new ArgumentException("Collection cannot be empty", nameof(enumerable));
-            }
-
-            T selection = enumerator.Current;
-            ulong seen = 1;
-
-            while (enumerator.MoveNext())
-            {
-                seen++;
-                if (NextUlong(seen) == 0)
-                {
-                    selection = enumerator.Current;
-                }
-            }
-
-            return selection;
-        }
-
-        private static T[] GetEnumValues<T>()
-            where T : unmanaged, Enum
-        {
-            return EnumValues<T>.Values;
-        }
-
-        private static void EnsureEnumHasAvailableValues<T>(
-            T[] enumValues,
-            ReadOnlySpan<T> exclusions
-        )
-            where T : unmanaged, Enum
-        {
-            if (enumValues.Length == 0)
-            {
-                throw new InvalidOperationException(
-                    $"Enum {typeof(T).Name} does not define any values."
-                );
-            }
-
-            if (exclusions.IsEmpty)
-            {
-                return;
-            }
-
-            int enumCount = enumValues.Length;
-            const int StackThreshold = 8;
-
-            if (exclusions.Length <= StackThreshold)
-            {
-                Span<T> unique = stackalloc T[StackThreshold];
-                int uniqueCount = 0;
-
-                foreach (T exclusion in exclusions)
-                {
-                    if (Array.IndexOf(enumValues, exclusion) < 0)
-                    {
-                        continue;
-                    }
-
-                    bool seen = false;
-                    for (int i = 0; i < uniqueCount; ++i)
-                    {
-                        if (EqualityComparer<T>.Default.Equals(unique[i], exclusion))
-                        {
-                            seen = true;
-                            break;
-                        }
-                    }
-
-                    if (seen)
-                    {
-                        continue;
-                    }
-
-                    unique[uniqueCount++] = exclusion;
-                    if (enumCount <= uniqueCount)
-                    {
-                        ThrowAllEnumValuesExcluded<T>(enumCount);
-                    }
-                }
-
-                return;
-            }
-
-            using PooledResource<HashSet<T>> pooledSet = Buffers<T>.HashSet.Get(out HashSet<T> set);
-            foreach (T exclusion in exclusions)
-            {
-                if (Array.IndexOf(enumValues, exclusion) < 0)
-                {
-                    continue;
-                }
-
-                set.Add(exclusion);
-                if (enumCount <= set.Count)
-                {
-                    ThrowAllEnumValuesExcluded<T>(enumCount);
-                }
-            }
-        }
-
-        private T NextEnumExceptInternal<T>(ReadOnlySpan<T> exclusions)
-            where T : unmanaged, Enum
-        {
-            T[] enumValues = GetEnumValues<T>();
-            EnsureEnumHasAvailableValues(enumValues, exclusions);
-            return SelectEnumValue(enumValues, exclusions);
-        }
-
-        private T SelectEnumValue<T>(T[] enumValues, ReadOnlySpan<T> exclusions)
-            where T : unmanaged, Enum
-        {
-            if (exclusions.IsEmpty)
-            {
-                return RandomOf(enumValues);
-            }
-
-            const int StackThreshold = 128;
-            int enumCount = enumValues.Length;
-            Span<T> buffer = enumCount <= StackThreshold ? stackalloc T[enumCount] : default;
-
-            if (!buffer.IsEmpty)
-            {
-                int count = PopulateAllowedValues(enumValues, exclusions, buffer);
-                if (count == 0)
-                {
-                    ThrowAllEnumValuesExcluded<T>(enumCount);
-                }
-
-                return count == 1 ? buffer[0] : buffer[Next(count)];
-            }
-
-            using PooledArray<T> pooled = SystemArrayPool<T>.Get(enumCount, out T[] temp);
-            Span<T> tempSpan = temp.AsSpan(0, enumCount);
-            int index = PopulateAllowedValues(enumValues, exclusions, tempSpan);
-            if (index == 0)
-            {
-                ThrowAllEnumValuesExcluded<T>(enumCount);
-            }
-
-            return index == 1 ? temp[0] : temp[Next(index)];
-        }
-
-        private T SelectEnumValue<T>(T[] enumValues, HashSet<T> exclusions)
-            where T : unmanaged, Enum
-        {
-            if (exclusions == null || exclusions.Count == 0)
-            {
-                return RandomOf(enumValues);
-            }
-
-            const int StackThreshold = 128;
-            int enumCount = enumValues.Length;
-            Span<T> buffer = enumCount <= StackThreshold ? stackalloc T[enumCount] : default;
-
-            if (!buffer.IsEmpty)
-            {
-                int count = PopulateAllowedValues(enumValues, exclusions, buffer);
-                if (count == 0)
-                {
-                    ThrowAllEnumValuesExcluded<T>(enumCount);
-                }
-
-                return count == 1 ? buffer[0] : buffer[Next(count)];
-            }
-
-            using PooledArray<T> pooled = SystemArrayPool<T>.Get(enumCount, out T[] temp);
-            Span<T> tempSpan = temp.AsSpan(0, enumCount);
-            int index = PopulateAllowedValues(enumValues, exclusions, tempSpan);
-            if (index == 0)
-            {
-                ThrowAllEnumValuesExcluded<T>(enumCount);
-            }
-
-            return index == 1 ? temp[0] : temp[Next(index)];
-        }
-
-        private static void EnsureEnumHasAvailableValues<T>(T[] enumValues, HashSet<T> exclusions)
-            where T : struct, Enum
-        {
-            if (enumValues.Length == 0)
-            {
-                exclusions.Clear();
-                throw new InvalidOperationException(
-                    $"Enum {typeof(T).Name} does not define any values."
-                );
-            }
-
-            if (exclusions.Count == 0)
-            {
-                return;
-            }
-
-            int excludedCount = 0;
-            foreach (T value in enumValues)
-            {
-                if (exclusions.Contains(value))
-                {
-                    excludedCount++;
-                }
-            }
-
-            if (enumValues.Length <= excludedCount)
-            {
-                exclusions.Clear();
-                ThrowAllEnumValuesExcluded<T>(enumValues.Length);
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool SpanContains<T>(ReadOnlySpan<T> span, T value)
-        {
-            for (int i = 0; i < span.Length; ++i)
-            {
-                if (EqualityComparer<T>.Default.Equals(span[i], value))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static int PopulateAllowedValues<T>(
-            T[] enumValues,
-            ReadOnlySpan<T> exclusions,
-            Span<T> destination
-        )
-            where T : unmanaged, Enum
-        {
-            int count = 0;
-            foreach (T value in enumValues)
-            {
-                if (!SpanContains(exclusions, value))
-                {
-                    destination[count++] = value;
-                }
-            }
-
-            return count;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static int PopulateAllowedValues<T>(
-            T[] enumValues,
-            HashSet<T> exclusions,
-            Span<T> destination
-        )
-            where T : unmanaged, Enum
-        {
-            int count = 0;
-            foreach (T value in enumValues)
-            {
-                if (!exclusions.Contains(value))
-                {
-                    destination[count++] = value;
-                }
-            }
-
-            return count;
-        }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowAllEnumValuesExcluded<T>(int enumCount)
-            where T : struct, Enum
-        {
-            throw new InvalidOperationException(
-                $"Cannot select a value from enum {typeof(T).Name} because all {enumCount} defined values are excluded."
-            );
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong BiasLong(long value)
-        {
-            return unchecked((ulong)value + LongBias);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static long UnbiasLong(ulong value)
-        {
-            return unchecked((long)(value - LongBias));
-        }
-
-        /// <summary>
-        /// The high 64 bits of the 128-bit product, by schoolbook decomposition.
-        /// </summary>
-        /// <param name="x">First factor.</param>
-        /// <param name="y">Second factor.</param>
-        /// <returns>The product's high half.</returns>
-        /// <remarks>
-        /// A BMI2 wide-multiply branch lived here behind <c>NET7_0_OR_GREATER</c>, which no Unity player
-        /// defines, so it never ran
-        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/637">#637</see>).
-        /// </remarks>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong MulHi64(ulong x, ulong y)
-        {
-            ulong x0 = (uint)x;
-            ulong x1 = x >> 32;
-            ulong y0 = (uint)y;
-            ulong y1 = y >> 32;
-
-            ulong p11 = x1 * y1;
-            ulong p01 = x0 * y1;
-            ulong p10 = x1 * y0;
-            ulong p00 = x0 * y0;
-
-            ulong middle = p10 + (p00 >> 32) + (uint)p01;
-            ulong hi = p11 + (middle >> 32) + (p01 >> 32);
-            return hi;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong ToOrderedDouble(double value)
-        {
-            if (double.IsNaN(value))
-            {
-                throw new ArgumentException(
-                    "NaN is not a valid bound for random sampling.",
-                    nameof(value)
-                );
-            }
-
-            ulong bits = unchecked((ulong)BitConverter.DoubleToInt64Bits(value));
-            const ulong signBit = 1UL << 63;
-            return (bits & signBit) != 0 ? ~bits : bits | signBit;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static double FromOrderedDouble(ulong value)
-        {
-            const ulong signBit = 1UL << 63;
-            ulong bits = (value & signBit) != 0 ? value & ~signBit : ~value;
-            return BitConverter.Int64BitsToDouble(unchecked((long)bits));
-        }
-
         public T NextEnum<T>()
             where T : unmanaged, Enum
         {
@@ -1658,37 +1218,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         public WGuid NextWGuid()
         {
             return new WGuid(GenerateGuidBytes());
-        }
-
-        private byte[] GenerateGuidBytes()
-        {
-            byte[] guidBytes = _guidBytes;
-            NextBytes(guidBytes);
-            SetUuidV4Bits(guidBytes);
-            return guidBytes;
-        }
-
-        public static void SetUuidV4Bits(byte[] bytes)
-        {
-            if (bytes == null || bytes.Length < GuidByteCount)
-            {
-                throw new ArgumentException(
-                    "UUID buffer must contain at least 16 bytes.",
-                    nameof(bytes)
-                );
-            }
-
-            // Version bits live in byte 7 (second byte of the time_hi_and_version field).
-            byte versionByte = bytes[7];
-            versionByte &= 0x0F;
-            versionByte |= 0x40;
-            bytes[7] = versionByte;
-
-            // Variant bits live in byte 8 (clock_seq_hi_and_reserved).
-            byte variantByte = bytes[8];
-            variantByte &= 0x3F;
-            variantByte |= 0x80;
-            bytes[8] = variantByte;
         }
 
         /// <summary>
@@ -1814,6 +1343,119 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             return noiseMap;
         }
 
+        public abstract IRandom Copy();
+
+        /// <summary>
+        /// Runs once on the instance a payload was read into, whichever generator it turned out to
+        /// be.
+        /// </summary>
+        /// <remarks>
+        /// Declared here rather than on the subtype that needs it, and this is the only placement
+        /// every reader agrees on. A reader invokes the callbacks of the type that owns the wire
+        /// shape, which is this one: protobuf-net 3.2.56 runs the root's and none of a subtype's,
+        /// 2.4.9 runs every level outermost-first, and WallstopProto runs every level
+        /// innermost-first. A hook declared on <c>DotNetRandom</c> therefore ran under two readers
+        /// out of three -- see WPROTO034, which now says so at the declaration.
+        /// </remarks>
+        protected virtual void OnAfterDeserialization() { }
+
+        /// <summary>
+        /// Runs on the instance being written, whichever generator it turned out to be.
+        /// </summary>
+        /// <remarks>
+        /// The mirror of <see cref="OnAfterDeserialization"/>, and declared here for the same
+        /// reason: the root owns the wire shape, so a hook on a subtype runs under some readers and
+        /// writers and not others (WPROTO034). A generator whose state is not entirely in its own
+        /// fields -- <see cref="UnityRandom"/>, whose position belongs to the engine -- uses this to
+        /// put that state into a member before the member is read.
+        /// </remarks>
+        protected virtual void OnBeforeSerialization() { }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected RandomState BuildState(
+            ulong state1,
+            ulong state2 = 0,
+            IReadOnlyList<byte> payload = null,
+            uint? auxiliaryUintA = null,
+            uint? auxiliaryUintB = null
+        )
+        {
+            byte[] payloadCopy = null;
+            if (payload != null)
+            {
+                if (payload is byte[] payloadArray)
+                {
+                    int length = payloadArray.Length;
+                    payloadCopy = new byte[length];
+                    Buffer.BlockCopy(payloadArray, 0, payloadCopy, 0, length);
+                }
+                else
+                {
+                    int count = payload.Count;
+                    payloadCopy = new byte[count];
+                    for (int i = 0; i < count; ++i)
+                    {
+                        payloadCopy[i] = payload[i];
+                    }
+                }
+            }
+
+            return new RandomState(
+                state1,
+                state2,
+                _cachedGaussian,
+                payload: payloadCopy,
+                bitBuffer: _bitBuffer,
+                bitCount: _bitCount,
+                byteBuffer: _byteBuffer,
+                byteCount: _byteCount
+            );
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected void RestoreCommonState(RandomState state)
+        {
+            _cachedGaussian = state.Gaussian;
+            _bitBuffer = state.BitBuffer;
+            _bitCount = state.BitCount;
+            _byteBuffer = state.ByteBuffer;
+            _byteCount = state.ByteCount;
+            RepairCommonState();
+        }
+
+        protected double NextDoubleWithInfiniteRange(double min, double max)
+        {
+            if (ToOrderedDouble(max) <= ToOrderedDouble(min))
+            {
+                throw new ArgumentException(
+                    $"Invalid range [{min}, {max}) for infinite-range sampling."
+                );
+            }
+
+#pragma warning disable WUH008 // The legacy API returns the core's documented fallback when exact sampling fails.
+            TrySampleDoubleWithInfiniteRange(min, max, false, out double value);
+            return value;
+#pragma warning restore WUH008
+        }
+
+        protected double NextDoubleFullRange()
+        {
+            const ulong exponentMask = 0x7FF0000000000000;
+            ulong randomBits;
+            int attempts = 0;
+            do
+            {
+                randomBits = NextUlong();
+                if (MaxDoubleBitAttempts < ++attempts)
+                {
+                    randomBits &= ~exponentMask;
+                    break;
+                }
+            } while ((randomBits & exponentMask) == exponentMask);
+
+            return BitConverter.Int64BitsToDouble(unchecked((long)randomBits));
+        }
+
         protected T RandomOf<T>(IReadOnlyList<T> values)
         {
             int count = values.Count;
@@ -1826,26 +1468,384 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             };
         }
 
-        public abstract IRandom Copy();
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        protected internal static uint RotateLeft(uint value, int count)
+        [ProtoAfterDeserialization]
+        [WProtoAfterDeserialization]
+        private void OnProtoDeserialize()
         {
-            return (value << count) | (value >> (32 - count));
+            RepairCommonState();
+            OnAfterDeserialization();
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        protected internal static uint Mix32(ref ulong state)
+        [ProtoBeforeSerialization]
+        [WProtoBeforeSerialization]
+        private void OnProtoSerialize()
         {
-            unchecked
+            OnBeforeSerialization();
+        }
+
+        private void RepairCommonState()
+        {
+            if (_guidBytes == null)
             {
-                state += 0x9E3779B97F4A7C15UL;
-                ulong z = state;
-                z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL;
-                z = (z ^ (z >> 27)) * 0x94D049BB133111EBUL;
-                z ^= z >> 31;
-                return (uint)z;
+                _guidBytes = new byte[GuidByteCount];
             }
+
+            if (_bitCount < 0 || 32 < _bitCount)
+            {
+                _bitBuffer = 0;
+                _bitCount = 0;
+            }
+
+            if (_byteCount < 0 || 4 < _byteCount)
+            {
+                _byteBuffer = 0;
+                _byteCount = 0;
+            }
+        }
+
+        /// <summary>
+        /// Lemire multiply-shift rejection over <c>[0, max)</c>, shared by
+        /// <see cref="NextUint(uint)"/> and <see cref="TryNextUint(uint, out uint)"/> so the
+        /// arithmetic exists once.
+        /// </summary>
+        /// <param name="max">Exclusive upper bound; must not be zero.</param>
+        /// <param name="value">The exact sample, or the legacy modulo fallback on failure.</param>
+        /// <returns>Whether rejection sampling produced an unbiased value.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool TrySampleUintBelow(uint max, out uint value)
+        {
+            if ((max & (max - 1)) == 0)
+            {
+                value = NextUint() & (max - 1);
+                return true;
+            }
+
+            // Lemire's method (32-bit): take high 32 bits of r*max
+            uint r = NextUint();
+            ulong m = (ulong)r * max;
+            uint lo = (uint)m;
+            if (lo < max)
+            {
+                uint t = unchecked((0u - max) % max);
+                int attempts = 0;
+                while (lo < t)
+                {
+                    if (MaxRejectionAttempts32 < ++attempts)
+                    {
+                        value = r % max;
+                        return false;
+                    }
+                    r = NextUint();
+                    m = (ulong)r * max;
+                    lo = (uint)m;
+                }
+            }
+
+            value = (uint)(m >> 32);
+            return true;
+        }
+
+        /// <summary>
+        /// Lemire multiply-shift rejection over <c>[0, max)</c>, shared by
+        /// <see cref="NextUlong(ulong)"/> and <see cref="TryNextUlong(ulong, out ulong)"/> so the
+        /// arithmetic exists once.
+        /// </summary>
+        /// <param name="max">Exclusive upper bound; must not be zero.</param>
+        /// <param name="value">The exact sample, or the legacy modulo fallback on failure.</param>
+        /// <returns>Whether rejection sampling produced an unbiased value.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private bool TrySampleUlongBelow(ulong max, out ulong value)
+        {
+            if ((max & (max - 1)) == 0)
+            {
+                value = NextUlong() & (max - 1);
+                return true;
+            }
+
+            /*
+                Lemire's method with rejection: use high 64 bits of the 128-bit product,
+                retrying when the low bits fall within the threshold region to avoid bias.
+            */
+            ulong sample = NextUlong();
+            ulong productLow = unchecked(sample * max);
+            if (productLow < max)
+            {
+                // A low half above max already exceeds the threshold, so it needs no division.
+                ulong threshold = unchecked(0UL - max) % max;
+                int attempts = 0;
+                while (productLow < threshold)
+                {
+                    if (MaxRejectionAttempts64 < ++attempts)
+                    {
+                        value = sample % max;
+                        return false;
+                    }
+
+                    sample = NextUlong();
+                    productLow = unchecked(sample * max);
+                }
+            }
+
+            value = MulHi64(sample, max);
+            return true;
+        }
+
+        /// <summary>
+        /// Samples an ordered-bit-pattern range whose width overflows a <see cref="double"/>
+        /// subtraction, and reports whether the result came from the rejection loop.
+        /// </summary>
+        /// <param name="min">Inclusive lower bound.</param>
+        /// <param name="max">Exclusive upper bound.</param>
+        /// <param name="requireExact">Stops immediately when bounded integer sampling fails.</param>
+        /// <param name="value">The exact sample, or the legacy fallback on failure.</param>
+        /// <returns>Whether both rejection layers produced an exact draw.</returns>
+        private bool TrySampleDoubleWithInfiniteRange(
+            double min,
+            double max,
+            bool requireExact,
+            out double value
+        )
+        {
+            const ulong orderedNegativeZero = long.MaxValue;
+            ulong orderedMin = ToOrderedDouble(min);
+            ulong orderedMax = max == 0d ? orderedNegativeZero : ToOrderedDouble(max);
+
+            if (orderedMax <= orderedMin)
+            {
+                value = default;
+                return false;
+            }
+
+            ulong range = orderedMax - orderedMin;
+            if (double.IsNegativeInfinity(min) && range == 1)
+            {
+                value = min;
+                return false;
+            }
+
+            int attempts = 0;
+            bool allDrawsUnbiased = true;
+            while (true)
+            {
+                bool unbiased = TrySampleUlongBelow(range, out ulong offset);
+                if (requireExact && !unbiased)
+                {
+                    value = default;
+                    return false;
+                }
+                allDrawsUnbiased &= unbiased;
+                ulong sample = orderedMin + offset;
+                double candidate = FromOrderedDouble(sample);
+
+                if (!double.IsNaN(candidate) && !double.IsInfinity(candidate))
+                {
+                    value = candidate;
+                    return allDrawsUnbiased;
+                }
+                if (!unbiased || MaxRejectionAttempts64 < ++attempts)
+                {
+                    // This degraded fixed result is reported as failure by TryNextDouble.
+                    if (double.IsPositiveInfinity(max))
+                    {
+                        value = FromOrderedDouble(orderedMax - 1);
+                        return false;
+                    }
+                    if (double.IsNegativeInfinity(min))
+                    {
+                        value = FromOrderedDouble(orderedMin + 1);
+                        return false;
+                    }
+
+                    ulong midpoint = orderedMin + (range >> 1);
+                    double midValue = FromOrderedDouble(midpoint);
+                    if (!double.IsNaN(midValue) && !double.IsInfinity(midValue))
+                    {
+                        value = midValue;
+                        return false;
+                    }
+
+                    value = FromOrderedDouble(orderedMin + 1);
+                    return false;
+                }
+            }
+        }
+
+        private double NextGaussianInternal()
+        {
+#pragma warning disable WUH008 // The legacy API returns the core's documented fallback when exact sampling fails.
+            TrySampleGaussian(out double value);
+            return value;
+#pragma warning restore WUH008
+        }
+
+        /// <summary>
+        /// Marsaglia polar sampling of the standard normal, reporting whether the result came from
+        /// the rejection loop.
+        /// </summary>
+        /// <param name="value">The exact deviate, or the legacy Box-Muller fallback on failure.</param>
+        /// <returns>Whether polar rejection sampling produced the deviate.</returns>
+        private bool TrySampleGaussian(out double value)
+        {
+            if (_cachedGaussian != null)
+            {
+                double cached = _cachedGaussian.Value;
+                _cachedGaussian = null;
+                value = cached;
+                return true;
+            }
+
+            // https://stackoverflow.com/q/7183229/1917135
+            double x;
+            double y;
+            double square;
+            int attempts = 0;
+            do
+            {
+                x = 2 * NextDouble() - 1;
+                y = 2 * NextDouble() - 1;
+                square = x * x + y * y;
+                if (MaxGaussianAttempts < ++attempts)
+                {
+                    // Do not cache a partner from degraded sampling; a later exact request must not receive it.
+                    double u1 = NextDouble();
+                    if (u1 <= double.Epsilon)
+                    {
+                        u1 = double.Epsilon;
+                    }
+                    double u2 = NextDouble();
+                    double mag = Math.Sqrt(-2.0 * Math.Log(u1));
+                    value = mag * Math.Cos(2.0 * Math.PI * u2);
+                    return false;
+                }
+            } while (square is 0 or > 1);
+
+            double fac = Math.Sqrt(-2 * Math.Log(square) / square);
+            _cachedGaussian = x * fac;
+            value = y * fac;
+            return true;
+        }
+
+        private float NextFloatWithInfiniteBound(float min, float max)
+        {
+            const uint orderedNegativeZero = int.MaxValue;
+            uint minimum = ToOrderedFloat(float.IsNegativeInfinity(min) ? float.MinValue : min);
+            uint maximum = max == 0f ? orderedNegativeZero : ToOrderedFloat(max);
+            if (minimum == maximum)
+            {
+                return min;
+            }
+
+            uint ordered = minimum + NextUint(maximum - minimum);
+            const uint signBit = 1u << 31;
+            uint bits = (ordered & signBit) != 0 ? ordered & ~signBit : ~ordered;
+            return BitConverter.Int32BitsToSingle(unchecked((int)bits));
+        }
+
+        private T NextFromEnumerable<T>(IEnumerable<T> enumerable)
+        {
+            using IEnumerator<T> enumerator = enumerable.GetEnumerator();
+            if (!enumerator.MoveNext())
+            {
+                throw new ArgumentException("Collection cannot be empty", nameof(enumerable));
+            }
+
+            T selection = enumerator.Current;
+            ulong seen = 1;
+
+            while (enumerator.MoveNext())
+            {
+                seen++;
+                if (NextUlong(seen) == 0)
+                {
+                    selection = enumerator.Current;
+                }
+            }
+
+            return selection;
+        }
+
+        private T NextEnumExceptInternal<T>(ReadOnlySpan<T> exclusions)
+            where T : unmanaged, Enum
+        {
+            T[] enumValues = GetEnumValues<T>();
+            EnsureEnumHasAvailableValues(enumValues, exclusions);
+            return SelectEnumValue(enumValues, exclusions);
+        }
+
+        private T SelectEnumValue<T>(T[] enumValues, ReadOnlySpan<T> exclusions)
+            where T : unmanaged, Enum
+        {
+            if (exclusions.IsEmpty)
+            {
+                return RandomOf(enumValues);
+            }
+
+            const int StackThreshold = 128;
+            int enumCount = enumValues.Length;
+            Span<T> buffer = enumCount <= StackThreshold ? stackalloc T[enumCount] : default;
+
+            if (!buffer.IsEmpty)
+            {
+                int count = PopulateAllowedValues(enumValues, exclusions, buffer);
+                if (count == 0)
+                {
+                    ThrowAllEnumValuesExcluded<T>(enumCount);
+                }
+
+                return count == 1 ? buffer[0] : buffer[Next(count)];
+            }
+
+            using PooledArray<T> pooled = SystemArrayPool<T>.Get(enumCount, out T[] temp);
+            Span<T> tempSpan = temp.AsSpan(0, enumCount);
+            int index = PopulateAllowedValues(enumValues, exclusions, tempSpan);
+            if (index == 0)
+            {
+                ThrowAllEnumValuesExcluded<T>(enumCount);
+            }
+
+            return index == 1 ? temp[0] : temp[Next(index)];
+        }
+
+        private T SelectEnumValue<T>(T[] enumValues, HashSet<T> exclusions)
+            where T : unmanaged, Enum
+        {
+            if (exclusions == null || exclusions.Count == 0)
+            {
+                return RandomOf(enumValues);
+            }
+
+            const int StackThreshold = 128;
+            int enumCount = enumValues.Length;
+            Span<T> buffer = enumCount <= StackThreshold ? stackalloc T[enumCount] : default;
+
+            if (!buffer.IsEmpty)
+            {
+                int count = PopulateAllowedValues(enumValues, exclusions, buffer);
+                if (count == 0)
+                {
+                    ThrowAllEnumValuesExcluded<T>(enumCount);
+                }
+
+                return count == 1 ? buffer[0] : buffer[Next(count)];
+            }
+
+            using PooledArray<T> pooled = SystemArrayPool<T>.Get(enumCount, out T[] temp);
+            Span<T> tempSpan = temp.AsSpan(0, enumCount);
+            int index = PopulateAllowedValues(enumValues, exclusions, tempSpan);
+            if (index == 0)
+            {
+                ThrowAllEnumValuesExcluded<T>(enumCount);
+            }
+
+            return index == 1 ? temp[0] : temp[Next(index)];
+        }
+
+        private byte[] GenerateGuidBytes()
+        {
+            byte[] guidBytes = _guidBytes;
+            NextBytes(guidBytes);
+            SetUuidV4Bits(guidBytes);
+            return guidBytes;
         }
 
         /// <summary>

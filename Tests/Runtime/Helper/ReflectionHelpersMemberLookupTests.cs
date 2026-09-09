@@ -25,10 +25,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     public sealed class RuntimeMarkerTarget
     {
         [RuntimeMarker]
-        public int markedField;
+        public int MarkedProperty { get; set; }
 
         [RuntimeMarker]
-        public int MarkedProperty { get; set; }
+        public int markedField;
 
         [RuntimeMarker]
         public void MarkedMethod() { }

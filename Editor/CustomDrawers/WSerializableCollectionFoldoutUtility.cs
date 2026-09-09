@@ -102,15 +102,15 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private readonly struct FoldoutInitializationKey : IEquatable<FoldoutInitializationKey>
         {
+            private long TargetId { get; }
+
+            private string PropertyPath { get; }
+
             public FoldoutInitializationKey(UnityEngine.Object target, string propertyPath)
             {
                 TargetId = target != null ? target.GetUnityObjectId() : 0;
                 PropertyPath = propertyPath ?? string.Empty;
             }
-
-            private long TargetId { get; }
-
-            private string PropertyPath { get; }
 
             public bool Equals(FoldoutInitializationKey other)
             {

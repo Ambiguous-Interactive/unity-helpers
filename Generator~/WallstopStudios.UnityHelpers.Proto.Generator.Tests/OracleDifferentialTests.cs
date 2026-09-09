@@ -30,6 +30,33 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [TestFixture]
     public sealed class OracleDifferentialTests
     {
+        private static void AssertSameShape(
+            StdlibCollectionContract expected,
+            StdlibCollectionContract actual,
+            string context
+        )
+        {
+            CollectionAssert.AreEqual(expected.Linked, actual.Linked, context + " Linked");
+            CollectionAssert.AreEqual(expected.Listed, actual.Listed, context + " Listed");
+            CollectionAssert.AreEqual(expected.Collected, actual.Collected, context + " Collected");
+            CollectionAssert.AreEqual(
+                expected.Enumerated,
+                actual.Enumerated,
+                context + " Enumerated"
+            );
+            CollectionAssert.AreEqual(
+                expected.ReadOnlyListed,
+                actual.ReadOnlyListed,
+                context + " ReadOnlyListed"
+            );
+            CollectionAssert.AreEqual(
+                expected.ReadOnlyCollected,
+                actual.ReadOnlyCollected,
+                context + " ReadOnlyCollected"
+            );
+            CollectionAssert.AreEquivalent(expected.Mapped, actual.Mapped, context + " Mapped");
+        }
+
         [Test]
         public void EveryRepeatedShapeEncodesExactlyAsProtobufNetDoes()
         {
@@ -393,33 +420,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             AssertSameShape(value, mineFromTheirs, "WallstopProto reading protobuf-net");
         }
 
-        private static void AssertSameShape(
-            StdlibCollectionContract expected,
-            StdlibCollectionContract actual,
-            string context
-        )
-        {
-            CollectionAssert.AreEqual(expected.Linked, actual.Linked, context + " Linked");
-            CollectionAssert.AreEqual(expected.Listed, actual.Listed, context + " Listed");
-            CollectionAssert.AreEqual(expected.Collected, actual.Collected, context + " Collected");
-            CollectionAssert.AreEqual(
-                expected.Enumerated,
-                actual.Enumerated,
-                context + " Enumerated"
-            );
-            CollectionAssert.AreEqual(
-                expected.ReadOnlyListed,
-                actual.ReadOnlyListed,
-                context + " ReadOnlyListed"
-            );
-            CollectionAssert.AreEqual(
-                expected.ReadOnlyCollected,
-                actual.ReadOnlyCollected,
-                context + " ReadOnlyCollected"
-            );
-            CollectionAssert.AreEquivalent(expected.Mapped, actual.Mapped, context + " Mapped");
-        }
-
         [Test]
         public void TheStackAndSetShapesRoundTripThroughWallstopProto()
         {
@@ -589,137 +589,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 #endif
 
-        [Test]
-        public void TheNewCollectionShapesAppendAndOverwriteAsMeasured()
-        {
-            // Generate input locally because version 2 cannot serialize every member shape.
-            string payload = MineHex(
-                new SeededStdlibContract
-                {
-                    Linked = new LinkedList<int>(new[] { 1 }),
-                    Queued = new Queue<int>(new[] { 1 }),
-                    Stacked = new Stack<int>(new[] { 1 }),
-                    OverwrittenStack = new Stack<int>(new[] { 1 }),
-                    Listed = new List<int> { 1 },
-                    OverwrittenList = new List<int> { 1 },
-                    SetOf = new HashSet<int> { 1 },
-                    Mapped = new Dictionary<string, int> { { "k", 1 } },
-                }
-            );
-
-            WProtoReader reader = new WProtoReader(Parse(payload));
-            Assert.IsTrue(
-                WProtoFormatterProvider
-                    .Get<SeededStdlibContract>()
-                    .TryRead(ref reader, out SeededStdlibContract mine)
-            );
-
-            CollectionAssert.AreEqual(new[] { 7, 8, 1 }, mine.Linked, "Linked");
-            CollectionAssert.AreEqual(new[] { 7, 8, 1 }, mine.Queued, "Queued");
-            CollectionAssert.AreEqual(new[] { 1, 8, 7 }, mine.Stacked, "Stacked");
-            CollectionAssert.AreEqual(new[] { 1 }, mine.OverwrittenStack, "OverwrittenStack");
-            CollectionAssert.AreEqual(new[] { 7, 8, 1 }, mine.Listed, "Listed");
-            CollectionAssert.AreEqual(new[] { 1 }, mine.OverwrittenList, "OverwrittenList");
-            CollectionAssert.AreEquivalent(new[] { 7, 8, 1 }, mine.SetOf, "SetOf");
-            Assert.AreEqual(9, mine.Mapped["seed"], "Mapped keeps the seed");
-            Assert.AreEqual(1, mine.Mapped["k"], "Mapped takes the payload");
-        }
-
-        [Test]
-        public void AnAbsentFieldLeavesEveryNewCollectionShapeAlone()
-        {
-            // Empty and absent share a wire form, so an absent member must retain its constructor value.
-            WProtoReader reader = new WProtoReader(System.Array.Empty<byte>());
-            Assert.IsTrue(
-                WProtoFormatterProvider
-                    .Get<SeededStdlibContract>()
-                    .TryRead(ref reader, out SeededStdlibContract mine)
-            );
-
-            CollectionAssert.AreEqual(new[] { 7, 8 }, mine.Linked);
-            CollectionAssert.AreEqual(new[] { 7, 8 }, mine.Queued);
-            CollectionAssert.AreEqual(new[] { 8, 7 }, mine.Stacked);
-            CollectionAssert.AreEqual(new[] { 8, 7 }, mine.OverwrittenStack);
-            CollectionAssert.AreEqual(new[] { 7, 8 }, mine.Listed);
-            CollectionAssert.AreEqual(new[] { 7, 8 }, mine.OverwrittenList);
-            CollectionAssert.AreEquivalent(new[] { 7, 8 }, mine.SetOf);
-            Assert.AreEqual(9, mine.Mapped["seed"]);
-        }
-
-        [Test]
-        public void TheNewShapesCommitCorrectlyOnAPolymorphicContract()
-        {
-            /*
-             * Different subtype seeds distinguish committing to the final instance from committing to a
-             * provisional base.
-             */
-            PolyStackBase decoded = Read<PolyStackBase>(
-                "A20600" + "0A03030201" + "12020102" + "1A020102"
-            );
-
-            Assert.IsInstanceOf<PolyStackSub>(decoded);
-            CollectionAssert.AreEqual(new[] { 3, 2, 1, 5 }, decoded.Stacked, "Stacked");
-            CollectionAssert.AreEqual(new[] { 1, 2 }, decoded.Frozen, "Frozen");
-            CollectionAssert.AreEqual(new[] { 5, 1, 2 }, decoded.Listed, "Listed");
-        }
-
-        [Test]
-        public void TheNewShapesCommitCorrectlyOnAnImmutableContract()
-        {
-            // Immutable construction has no instance to seed from before decoded members are committed.
-            ImmutableCollectionRecord decoded = Read<ImmutableCollectionRecord>(
-                "0A03030201" + "12020102" + "1A020102" + "22050A016B1001"
-            );
-
-            CollectionAssert.AreEqual(new[] { 3, 2, 1 }, decoded.Stacked, "Stacked");
-            CollectionAssert.AreEqual(new[] { 1, 2 }, decoded.Frozen, "Frozen");
-            CollectionAssert.AreEqual(new[] { 1, 2 }, decoded.Listed, "Listed");
-            Assert.AreEqual(1, decoded.Mapped["k"], "Mapped");
-        }
-
         private static T Read<T>(string hex)
         {
             WProtoReader reader = new WProtoReader(Parse(hex));
             Assert.IsTrue(WProtoFormatterProvider.Get<T>().TryRead(ref reader, out T value), hex);
             return value;
-        }
-
-        [Test]
-        public void AnEmptyOrNullNewCollectionShapeWritesNothing()
-        {
-            Assert.AreEqual(string.Empty, MineHex(new StdlibCollectionContract()));
-            Assert.AreEqual(
-                string.Empty,
-                MineHex(
-                    new StdlibCollectionContract
-                    {
-                        Linked = new LinkedList<int>(),
-                        Listed = new List<string>(),
-                        Collected = new List<int>(),
-                        Enumerated = new List<int>(),
-                        ReadOnlyListed = new List<int>(),
-                        ReadOnlyCollected = new List<int>(),
-                        Mapped = new Dictionary<string, int>(),
-                    }
-                )
-            );
-
-            Assert.AreEqual(string.Empty, MineHex(new V3CollectionContract()));
-            Assert.AreEqual(
-                string.Empty,
-                MineHex(
-                    new V3CollectionContract
-                    {
-                        Queued = new Queue<int>(),
-                        Stacked = new Stack<int>(),
-                        SetOf = new HashSet<int>(),
-                        ReadOnlyMapped = new Dictionary<string, int>(),
-                        StackedPoints = new Stack<Outer.Point>(),
-                    }
-                )
-            );
-
-            Assert.AreEqual(string.Empty, MineHex(new ConstructedCollectionContract()));
         }
 
         private static string Describe(Dictionary<int, int> entries)
@@ -743,37 +617,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 hex
             );
             return value;
-        }
-
-        [Test]
-        public void NullElementBehaviorIsPinnedToTheSelectedOracle()
-        {
-            /*
-             * Version 2 silently drops null elements; this reader follows version 3 rejection to prevent data
-             * loss.
-             */
-            RepeatedContract value = new RepeatedContract { Texts = new[] { "a", null } };
-
-            using (MemoryStream stream = new MemoryStream())
-            {
-#if PROTOBUF_NET_ORACLE_V2
-                ProtoBuf.Serializer.Serialize(stream, value);
-                Assert.AreEqual(
-                    "1A0161",
-                    ToHex(stream.ToArray()),
-                    "v2 silently omits the null element; v3 rejects it"
-                );
-#else
-                Assert.Throws<NullReferenceException>(() =>
-                    ProtoBuf.Serializer.Serialize(stream, value)
-                );
-#endif
-            }
-
-            InvalidOperationException mine = Assert.Throws<InvalidOperationException>(() =>
-                WProtoFormatterProvider.Get<RepeatedContract>().Measure(value)
-            );
-            StringAssert.Contains("RepeatedContract.Texts", mine.Message);
         }
 
         private static IEnumerable<RepeatedContract> Corpus()
@@ -1115,6 +958,163 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
 
             return bytes;
+        }
+
+        [Test]
+        public void TheNewCollectionShapesAppendAndOverwriteAsMeasured()
+        {
+            // Generate input locally because version 2 cannot serialize every member shape.
+            string payload = MineHex(
+                new SeededStdlibContract
+                {
+                    Linked = new LinkedList<int>(new[] { 1 }),
+                    Queued = new Queue<int>(new[] { 1 }),
+                    Stacked = new Stack<int>(new[] { 1 }),
+                    OverwrittenStack = new Stack<int>(new[] { 1 }),
+                    Listed = new List<int> { 1 },
+                    OverwrittenList = new List<int> { 1 },
+                    SetOf = new HashSet<int> { 1 },
+                    Mapped = new Dictionary<string, int> { { "k", 1 } },
+                }
+            );
+
+            WProtoReader reader = new WProtoReader(Parse(payload));
+            Assert.IsTrue(
+                WProtoFormatterProvider
+                    .Get<SeededStdlibContract>()
+                    .TryRead(ref reader, out SeededStdlibContract mine)
+            );
+
+            CollectionAssert.AreEqual(new[] { 7, 8, 1 }, mine.Linked, "Linked");
+            CollectionAssert.AreEqual(new[] { 7, 8, 1 }, mine.Queued, "Queued");
+            CollectionAssert.AreEqual(new[] { 1, 8, 7 }, mine.Stacked, "Stacked");
+            CollectionAssert.AreEqual(new[] { 1 }, mine.OverwrittenStack, "OverwrittenStack");
+            CollectionAssert.AreEqual(new[] { 7, 8, 1 }, mine.Listed, "Listed");
+            CollectionAssert.AreEqual(new[] { 1 }, mine.OverwrittenList, "OverwrittenList");
+            CollectionAssert.AreEquivalent(new[] { 7, 8, 1 }, mine.SetOf, "SetOf");
+            Assert.AreEqual(9, mine.Mapped["seed"], "Mapped keeps the seed");
+            Assert.AreEqual(1, mine.Mapped["k"], "Mapped takes the payload");
+        }
+
+        [Test]
+        public void AnAbsentFieldLeavesEveryNewCollectionShapeAlone()
+        {
+            // Empty and absent share a wire form, so an absent member must retain its constructor value.
+            WProtoReader reader = new WProtoReader(System.Array.Empty<byte>());
+            Assert.IsTrue(
+                WProtoFormatterProvider
+                    .Get<SeededStdlibContract>()
+                    .TryRead(ref reader, out SeededStdlibContract mine)
+            );
+
+            CollectionAssert.AreEqual(new[] { 7, 8 }, mine.Linked);
+            CollectionAssert.AreEqual(new[] { 7, 8 }, mine.Queued);
+            CollectionAssert.AreEqual(new[] { 8, 7 }, mine.Stacked);
+            CollectionAssert.AreEqual(new[] { 8, 7 }, mine.OverwrittenStack);
+            CollectionAssert.AreEqual(new[] { 7, 8 }, mine.Listed);
+            CollectionAssert.AreEqual(new[] { 7, 8 }, mine.OverwrittenList);
+            CollectionAssert.AreEquivalent(new[] { 7, 8 }, mine.SetOf);
+            Assert.AreEqual(9, mine.Mapped["seed"]);
+        }
+
+        [Test]
+        public void TheNewShapesCommitCorrectlyOnAPolymorphicContract()
+        {
+            /*
+             * Different subtype seeds distinguish committing to the final instance from committing to a
+             * provisional base.
+             */
+            PolyStackBase decoded = Read<PolyStackBase>(
+                "A20600" + "0A03030201" + "12020102" + "1A020102"
+            );
+
+            Assert.IsInstanceOf<PolyStackSub>(decoded);
+            CollectionAssert.AreEqual(new[] { 3, 2, 1, 5 }, decoded.Stacked, "Stacked");
+            CollectionAssert.AreEqual(new[] { 1, 2 }, decoded.Frozen, "Frozen");
+            CollectionAssert.AreEqual(new[] { 5, 1, 2 }, decoded.Listed, "Listed");
+        }
+
+        [Test]
+        public void TheNewShapesCommitCorrectlyOnAnImmutableContract()
+        {
+            // Immutable construction has no instance to seed from before decoded members are committed.
+            ImmutableCollectionRecord decoded = Read<ImmutableCollectionRecord>(
+                "0A03030201" + "12020102" + "1A020102" + "22050A016B1001"
+            );
+
+            CollectionAssert.AreEqual(new[] { 3, 2, 1 }, decoded.Stacked, "Stacked");
+            CollectionAssert.AreEqual(new[] { 1, 2 }, decoded.Frozen, "Frozen");
+            CollectionAssert.AreEqual(new[] { 1, 2 }, decoded.Listed, "Listed");
+            Assert.AreEqual(1, decoded.Mapped["k"], "Mapped");
+        }
+
+        [Test]
+        public void AnEmptyOrNullNewCollectionShapeWritesNothing()
+        {
+            Assert.AreEqual(string.Empty, MineHex(new StdlibCollectionContract()));
+            Assert.AreEqual(
+                string.Empty,
+                MineHex(
+                    new StdlibCollectionContract
+                    {
+                        Linked = new LinkedList<int>(),
+                        Listed = new List<string>(),
+                        Collected = new List<int>(),
+                        Enumerated = new List<int>(),
+                        ReadOnlyListed = new List<int>(),
+                        ReadOnlyCollected = new List<int>(),
+                        Mapped = new Dictionary<string, int>(),
+                    }
+                )
+            );
+
+            Assert.AreEqual(string.Empty, MineHex(new V3CollectionContract()));
+            Assert.AreEqual(
+                string.Empty,
+                MineHex(
+                    new V3CollectionContract
+                    {
+                        Queued = new Queue<int>(),
+                        Stacked = new Stack<int>(),
+                        SetOf = new HashSet<int>(),
+                        ReadOnlyMapped = new Dictionary<string, int>(),
+                        StackedPoints = new Stack<Outer.Point>(),
+                    }
+                )
+            );
+
+            Assert.AreEqual(string.Empty, MineHex(new ConstructedCollectionContract()));
+        }
+
+        [Test]
+        public void NullElementBehaviorIsPinnedToTheSelectedOracle()
+        {
+            /*
+             * Version 2 silently drops null elements; this reader follows version 3 rejection to prevent data
+             * loss.
+             */
+            RepeatedContract value = new RepeatedContract { Texts = new[] { "a", null } };
+
+            using (MemoryStream stream = new MemoryStream())
+            {
+#if PROTOBUF_NET_ORACLE_V2
+                ProtoBuf.Serializer.Serialize(stream, value);
+                Assert.AreEqual(
+                    "1A0161",
+                    ToHex(stream.ToArray()),
+                    "v2 silently omits the null element; v3 rejects it"
+                );
+#else
+                Assert.Throws<NullReferenceException>(() =>
+                    ProtoBuf.Serializer.Serialize(stream, value)
+                );
+#endif
+            }
+
+            InvalidOperationException mine = Assert.Throws<InvalidOperationException>(() =>
+                WProtoFormatterProvider.Get<RepeatedContract>().Measure(value)
+            );
+            StringAssert.Contains("RepeatedContract.Texts", mine.Message);
         }
     }
 }

@@ -8,9 +8,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.VContainer
 
     public class BaseWithSibling : MonoBehaviour
     {
+        public SpriteRenderer SR => _spriteRenderer;
+
         [SiblingComponent]
         public SpriteRenderer _spriteRenderer;
-
-        public SpriteRenderer SR => _spriteRenderer;
     }
 }

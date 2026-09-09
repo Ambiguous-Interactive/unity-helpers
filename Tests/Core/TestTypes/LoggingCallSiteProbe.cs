@@ -23,19 +23,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
         /// </summary>
         public static int ArgumentEvaluations { get; private set; }
 
-        private static Object Target;
-
-        /// <summary>
-        /// Points the probe at <paramref name="target"/> and zeroes both counters.
-        /// </summary>
-        /// <param name="target">The Unity Object <see cref="Receiver"/> yields.</param>
-        public static void Reset(Object target)
-        {
-            Target = target;
-            ReceiverEvaluations = 0;
-            ArgumentEvaluations = 0;
-        }
-
         /// <summary>
         /// A logging receiver whose evaluation is observable. Reading it is the side effect that a
         /// stripped call site must never perform.
@@ -60,6 +47,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
                 ArgumentEvaluations++;
                 return ArgumentEvaluations;
             }
+        }
+
+        private static Object Target;
+
+        /// <summary>
+        /// Points the probe at <paramref name="target"/> and zeroes both counters.
+        /// </summary>
+        /// <param name="target">The Unity Object <see cref="Receiver"/> yields.</param>
+        public static void Reset(Object target)
+        {
+            Target = target;
+            ReceiverEvaluations = 0;
+            ArgumentEvaluations = 0;
         }
     }
 }

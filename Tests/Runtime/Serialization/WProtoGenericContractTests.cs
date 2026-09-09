@@ -21,6 +21,44 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [NUnit.Framework.Category("Serialization")]
     public sealed class WProtoGenericContractTests
     {
+        private static void AssertExact<T>(WProtoBox<T> value)
+        {
+            IWProtoFormatter<WProtoBox<T>> formatter = WProtoFormatterProvider.Get<WProtoBox<T>>();
+            int predicted = formatter.Measure(value);
+            byte[] buffer = new byte[predicted];
+            WProtoWriter writer = new(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value), typeof(T).Name);
+            Assert.AreEqual(predicted, writer.Position, typeof(T).Name);
+        }
+
+        private static string Encode<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+
+            StringBuilder builder = new(writer.Position * 2);
+            foreach (byte current in writer.Written)
+            {
+                builder.Append(current.ToString("X2"));
+            }
+
+            return builder.ToString();
+        }
+
+        private static T RoundTrip<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+
+            WProtoReader reader = new(buffer);
+            Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
+            return restored;
+        }
+
         [Test]
         public void TheFieldKeyChangesWithTheClosure()
         {
@@ -112,44 +150,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     },
                 }
             );
-        }
-
-        private static void AssertExact<T>(WProtoBox<T> value)
-        {
-            IWProtoFormatter<WProtoBox<T>> formatter = WProtoFormatterProvider.Get<WProtoBox<T>>();
-            int predicted = formatter.Measure(value);
-            byte[] buffer = new byte[predicted];
-            WProtoWriter writer = new(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value), typeof(T).Name);
-            Assert.AreEqual(predicted, writer.Position, typeof(T).Name);
-        }
-
-        private static string Encode<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-
-            StringBuilder builder = new(writer.Position * 2);
-            foreach (byte current in writer.Written)
-            {
-                builder.Append(current.ToString("X2"));
-            }
-
-            return builder.ToString();
-        }
-
-        private static T RoundTrip<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-
-            WProtoReader reader = new(buffer);
-            Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
-            return restored;
         }
     }
 }

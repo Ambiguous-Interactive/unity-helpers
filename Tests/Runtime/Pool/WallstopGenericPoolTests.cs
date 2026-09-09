@@ -19,24 +19,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         private float _currentTime;
         private bool _wasMemoryPressureEnabled;
 
-        private float TestTimeProvider()
-        {
-            return _currentTime;
-        }
-
-        private void LogPoolDiagnostics(WallstopGenericPool<TestPoolItem> pool, string context)
-        {
-            PoolStatistics stats = pool.GetStatistics();
-            TestContext.WriteLine($"[{context}] Pool Diagnostics:");
-            TestContext.WriteLine($"  Time: {_currentTime}");
-            TestContext.WriteLine($"  Pool.Count: {pool.Count}");
-            TestContext.WriteLine($"  RentCount: {stats.RentCount}");
-            TestContext.WriteLine($"  PurgeCount: {stats.PurgeCount}");
-            TestContext.WriteLine($"  IdleTimeoutPurges: {stats.IdleTimeoutPurges}");
-            TestContext.WriteLine($"  IsLowFrequency: {stats.IsLowFrequency}");
-            TestContext.WriteLine($"  RentalsPerMinute: {stats.RentalsPerMinute}");
-        }
-
         [SetUp]
         public void SetUp()
         {
@@ -1283,6 +1265,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Assert.AreEqual(2, disposeCount);
         }
 
+        private float TestTimeProvider()
+        {
+            return _currentTime;
+        }
+
+        private void LogPoolDiagnostics(WallstopGenericPool<TestPoolItem> pool, string context)
+        {
+            PoolStatistics stats = pool.GetStatistics();
+            TestContext.WriteLine($"[{context}] Pool Diagnostics:");
+            TestContext.WriteLine($"  Time: {_currentTime}");
+            TestContext.WriteLine($"  Pool.Count: {pool.Count}");
+            TestContext.WriteLine($"  RentCount: {stats.RentCount}");
+            TestContext.WriteLine($"  PurgeCount: {stats.PurgeCount}");
+            TestContext.WriteLine($"  IdleTimeoutPurges: {stats.IdleTimeoutPurges}");
+            TestContext.WriteLine($"  IsLowFrequency: {stats.IsLowFrequency}");
+            TestContext.WriteLine($"  RentalsPerMinute: {stats.RentalsPerMinute}");
+        }
+
 #if !SINGLE_THREADED
         [Test]
         public void ReturnRacingDisposeRetiresItemExactlyOnce()
@@ -1987,54 +1987,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         }
 #endif
 
-        [Test]
-        public void LoweringPoolTypeResolverBoundEvictsExistingNamesImmediately()
-        {
-            int originalBound = PoolTypeResolver.MaxCachedTypeNames;
-            try
-            {
-                PoolTypeResolver.ClearCache();
-                PoolTypeResolver.MaxCachedTypeNames = 0;
-                _ = PoolTypeResolver.ResolveType("System.Int32");
-                _ = PoolTypeResolver.ResolveType("System.String");
-                _ = PoolTypeResolver.ResolveType("System.Single");
-                _ = PoolTypeResolver.ResolveType("System.Double");
-
-                PoolTypeResolver.MaxCachedTypeNames = 2;
-
-                Assert.AreEqual(2, PoolTypeResolver.CachedTypeNameCountForTesting);
-            }
-            finally
-            {
-                PoolTypeResolver.MaxCachedTypeNames = originalBound;
-                PoolTypeResolver.ClearCache();
-            }
-        }
-
-        [Test]
-        [TestCaseSource(nameof(TypeMatchingTestCases))]
-        public void GenericMatchingTypeMatchesPattern(
-            Type concreteType,
-            Type patternType,
-            bool expectedMatch,
-            int expectedPriority
-        )
-        {
-            bool matchResult = PoolTypeResolver.TypeMatchesPattern(concreteType, patternType);
-            int priorityResult = PoolTypeResolver.GetMatchPriority(concreteType, patternType);
-
-            Assert.AreEqual(
-                expectedMatch,
-                matchResult,
-                $"TypeMatchesPattern({concreteType}, {patternType}) should return {expectedMatch}"
-            );
-            Assert.AreEqual(
-                expectedPriority,
-                priorityResult,
-                $"GetMatchPriority({concreteType}, {patternType}) should return {expectedPriority}"
-            );
-        }
-
         private static IEnumerable<TestCaseData> TypeMatchingTestCases()
         {
             yield return new TestCaseData(typeof(List<int>), typeof(List<int>), true, 0).SetName(
@@ -2088,6 +2040,78 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 false,
                 int.MaxValue
             ).SetName("NoMatch.DifferentTypeArgs");
+        }
+
+        private static IEnumerable<TestCaseData> GetDisplayNameTestCases()
+        {
+            yield return new TestCaseData(typeof(List<int>), "List<int>").SetName(
+                "DisplayName.ListOfInt"
+            );
+            yield return new TestCaseData(typeof(List<>), "List<>").SetName("DisplayName.ListOpen");
+            yield return new TestCaseData(
+                typeof(Dictionary<string, int>),
+                "Dictionary<string, int>"
+            ).SetName("DisplayName.DictionaryStringInt");
+            yield return new TestCaseData(typeof(Dictionary<,>), "Dictionary<,>").SetName(
+                "DisplayName.DictionaryOpen"
+            );
+            yield return new TestCaseData(typeof(List<List<int>>), "List<List<int>>").SetName(
+                "DisplayName.NestedList"
+            );
+            yield return new TestCaseData(typeof(HashSet<string>), "HashSet<string>").SetName(
+                "DisplayName.HashSetString"
+            );
+            yield return new TestCaseData(typeof(HashSet<>), "HashSet<>").SetName(
+                "DisplayName.HashSetOpen"
+            );
+        }
+
+        [Test]
+        public void LoweringPoolTypeResolverBoundEvictsExistingNamesImmediately()
+        {
+            int originalBound = PoolTypeResolver.MaxCachedTypeNames;
+            try
+            {
+                PoolTypeResolver.ClearCache();
+                PoolTypeResolver.MaxCachedTypeNames = 0;
+                _ = PoolTypeResolver.ResolveType("System.Int32");
+                _ = PoolTypeResolver.ResolveType("System.String");
+                _ = PoolTypeResolver.ResolveType("System.Single");
+                _ = PoolTypeResolver.ResolveType("System.Double");
+
+                PoolTypeResolver.MaxCachedTypeNames = 2;
+
+                Assert.AreEqual(2, PoolTypeResolver.CachedTypeNameCountForTesting);
+            }
+            finally
+            {
+                PoolTypeResolver.MaxCachedTypeNames = originalBound;
+                PoolTypeResolver.ClearCache();
+            }
+        }
+
+        [Test]
+        [TestCaseSource(nameof(TypeMatchingTestCases))]
+        public void GenericMatchingTypeMatchesPattern(
+            Type concreteType,
+            Type patternType,
+            bool expectedMatch,
+            int expectedPriority
+        )
+        {
+            bool matchResult = PoolTypeResolver.TypeMatchesPattern(concreteType, patternType);
+            int priorityResult = PoolTypeResolver.GetMatchPriority(concreteType, patternType);
+
+            Assert.AreEqual(
+                expectedMatch,
+                matchResult,
+                $"TypeMatchesPattern({concreteType}, {patternType}) should return {expectedMatch}"
+            );
+            Assert.AreEqual(
+                expectedPriority,
+                priorityResult,
+                $"GetMatchPriority({concreteType}, {patternType}) should return {expectedPriority}"
+            );
         }
 
         [Test]
@@ -2182,30 +2206,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         )
         {
             Assert.AreEqual(expectedDisplayName, PoolTypeResolver.GetDisplayName(inputType));
-        }
-
-        private static IEnumerable<TestCaseData> GetDisplayNameTestCases()
-        {
-            yield return new TestCaseData(typeof(List<int>), "List<int>").SetName(
-                "DisplayName.ListOfInt"
-            );
-            yield return new TestCaseData(typeof(List<>), "List<>").SetName("DisplayName.ListOpen");
-            yield return new TestCaseData(
-                typeof(Dictionary<string, int>),
-                "Dictionary<string, int>"
-            ).SetName("DisplayName.DictionaryStringInt");
-            yield return new TestCaseData(typeof(Dictionary<,>), "Dictionary<,>").SetName(
-                "DisplayName.DictionaryOpen"
-            );
-            yield return new TestCaseData(typeof(List<List<int>>), "List<List<int>>").SetName(
-                "DisplayName.NestedList"
-            );
-            yield return new TestCaseData(typeof(HashSet<string>), "HashSet<string>").SetName(
-                "DisplayName.HashSetString"
-            );
-            yield return new TestCaseData(typeof(HashSet<>), "HashSet<>").SetName(
-                "DisplayName.HashSetOpen"
-            );
         }
 
         [Test]
@@ -2511,11 +2511,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
         private sealed class TestPoolItem
         {
+            private static int _nextId;
+
             public int Id { get; }
             public bool WasReset { get; set; }
             public bool WasDisposed { get; set; }
-
-            private static int _nextId;
 
             public TestPoolItem()
             {
@@ -2540,11 +2540,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
     {
         private float _currentTime;
         private bool _wasMemoryPressureEnabled;
-
-        private float TestTimeProvider()
-        {
-            return _currentTime;
-        }
 
         [SetUp]
         public void SetUp()
@@ -2672,11 +2667,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
         }
 
+        private float TestTimeProvider()
+        {
+            return _currentTime;
+        }
+
         private sealed class TestPoolItem
         {
-            public int Id { get; }
-
             private static int _nextId;
+
+            public int Id { get; }
 
             public TestPoolItem()
             {
@@ -2699,11 +2699,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
     {
         private float _currentTime;
         private bool _wasMemoryPressureEnabled;
-
-        private float TestTimeProvider()
-        {
-            return _currentTime;
-        }
 
         [SetUp]
         public void SetUp()
@@ -2846,11 +2841,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
         }
 
+        private float TestTimeProvider()
+        {
+            return _currentTime;
+        }
+
         private sealed class TestPoolItem
         {
-            public int Id { get; }
-
             private static int _nextId;
+
+            public int Id { get; }
 
             public TestPoolItem()
             {
@@ -2873,11 +2873,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
     {
         private float _currentTime;
         private bool _wasMemoryPressureEnabled;
-
-        private float TestTimeProvider()
-        {
-            return _currentTime;
-        }
 
         [SetUp]
         public void SetUp()
@@ -3246,11 +3241,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
         }
 
+        private float TestTimeProvider()
+        {
+            return _currentTime;
+        }
+
         private sealed class TestPoolItem
         {
-            public int Id { get; }
-
             private static int _nextId;
+
+            public int Id { get; }
 
             public TestPoolItem()
             {
@@ -3287,11 +3287,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
     {
         private float _currentTime;
         private bool _wasMemoryPressureEnabled;
-
-        private float TestTimeProvider()
-        {
-            return _currentTime;
-        }
 
         [SetUp]
         public void SetUp()
@@ -3641,11 +3636,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
         }
 
+        private float TestTimeProvider()
+        {
+            return _currentTime;
+        }
+
         private sealed class TestPoolItem
         {
-            public int Id { get; }
-
             private static int _nextId;
+
+            public int Id { get; }
 
             public TestPoolItem()
             {

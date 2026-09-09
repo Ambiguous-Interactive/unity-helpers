@@ -24,6 +24,128 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     )]
     public sealed class ValidationWorkspaceInteractionTests
     {
+        private static void VerifyStatusPreferences(ValidationWorkspaceSettings settings)
+        {
+            Assert.IsFalse(ValidationResults.HasRun);
+            const string ruleId = "project.status.probe";
+            const string assetGuid = "00000000000000000000000000000001";
+            ValidationFinding finding = new ValidationFinding(
+                ruleId,
+                ValidationSeverity.Error,
+                null,
+                assetGuid,
+                "Assets/StatusProbe.asset",
+                "field",
+                "Status probe"
+            );
+            ValidationStatusSurfaces.SuppressionsChanged(ValidationSuppressions.Empty);
+            try
+            {
+                ValidationResults.Replace(assetGuid, new[] { finding });
+                Assert.AreEqual("Sentinel · 1 ! · 0 ⚠", ValidationStatusSurfaces.Badge);
+                foreach (
+                    (
+                        bool enabled,
+                        bool overridden,
+                        ValidationSeverity severity,
+                        string badge
+                    ) in new[]
+                    {
+                        (false, false, ValidationSeverity.Error, "Sentinel · 0 ! · 0 ⚠"),
+                        (true, true, ValidationSeverity.Warning, "Sentinel · 0 ! · 1 ⚠"),
+                        (true, true, ValidationSeverity.Info, "Sentinel · 0 ! · 0 ⚠"),
+                        (true, false, ValidationSeverity.Info, "Sentinel · 1 ! · 0 ⚠"),
+                        (false, true, ValidationSeverity.Warning, "Sentinel · 0 ! · 0 ⚠"),
+                        (true, true, ValidationSeverity.Error, "Sentinel · 1 ! · 0 ⚠"),
+                    }
+                )
+                {
+                    settings.SetRulePreference(ruleId, enabled, overridden, severity);
+                    Assert.AreEqual(badge, ValidationStatusSurfaces.Badge);
+                    Assert.AreEqual(
+                        ValidationSeverity.Error,
+                        ValidationResults.Snapshot()[0].Severity
+                    );
+                }
+                ValidationStatusSurfaces.SuppressionsChanged(
+                    ValidationSuppressions.Parse(finding.Id)
+                );
+                Assert.AreEqual("Sentinel · 0 ! · 0 ⚠", ValidationStatusSurfaces.Badge);
+                settings.SetRulePreference(ruleId, true, true, ValidationSeverity.Warning);
+                Assert.AreEqual("Sentinel · 0 ! · 0 ⚠", ValidationStatusSurfaces.Badge);
+                ValidationStatusSurfaces.SuppressionsChanged(ValidationSuppressions.Empty);
+                Assert.AreEqual("Sentinel · 0 ! · 1 ⚠", ValidationStatusSurfaces.Badge);
+                ValidationWorkspaceSettings.RulePreference preference = settings.PreferenceFor(
+                    ruleId
+                );
+                preference.overrideSeverity = false;
+                settings.SaveAfterUndo();
+                Assert.AreEqual("Sentinel · 1 ! · 0 ⚠", ValidationStatusSurfaces.Badge);
+            }
+            finally
+            {
+                ValidationStatusSurfaces.SuppressionsChanged(ValidationSuppressions.Empty);
+                ValidationResults.Clear();
+            }
+        }
+
+        private static T Field<T>(VisualElement root, string label)
+            where T : VisualElement
+        {
+            return root.Query<T>()
+                .ToList()
+                .Single(element =>
+                    element is TextField text && text.label == label
+                    || element is DropdownField choice && choice.label == label
+                    || element is IntegerField integer && integer.label == label
+                    || element is Toggle toggle && toggle.label == label
+                );
+        }
+
+        private static Button ButtonWithText(VisualElement root, string label)
+        {
+            return root.Query<Button>().ToList().Single(button => button.text == label);
+        }
+
+        private static void Submit(Button button)
+        {
+            Assert.IsTrue(button.panel != null);
+            using (NavigationSubmitEvent submit = NavigationSubmitEvent.GetPooled())
+            {
+                submit.target = button;
+                button.SendEvent(submit);
+            }
+        }
+
+        private static void RequireDisposableProject()
+        {
+            Assert.IsTrue(Application.isBatchMode, "Interactive Unity projects are forbidden.");
+            string project = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            string token = Environment.GetEnvironmentVariable(
+                "WALLSTOP_SENTINEL_INTERACTION_TOKEN"
+            );
+            string expected = Environment.GetEnvironmentVariable(
+                "WALLSTOP_SENTINEL_INTERACTION_PROJECT"
+            );
+            Assert.IsTrue(
+                Guid.TryParseExact(token, "N", out _),
+                "Missing disposable-project token."
+            );
+            Assert.AreEqual(
+                project,
+                expected,
+                "This probe is forbidden outside its explicitly provisioned disposable project."
+            );
+            Assert.IsTrue(
+                Path.GetFileName(project)
+                    .StartsWith("sentinel-interaction-", StringComparison.Ordinal)
+            );
+            Assert.AreEqual(
+                token,
+                File.ReadAllText(Path.Combine(project, ".sentinel-interaction-disposable")).Trim()
+            );
+        }
+
         /// <summary>Retains the builder draft across modes and persists settings through native callbacks.</summary>
         [Test]
         public void NativePanelCallbacksRetainDraftAndPersistSettings()
@@ -240,128 +362,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                     }
                 }
             }
-        }
-
-        private static void VerifyStatusPreferences(ValidationWorkspaceSettings settings)
-        {
-            Assert.IsFalse(ValidationResults.HasRun);
-            const string ruleId = "project.status.probe";
-            const string assetGuid = "00000000000000000000000000000001";
-            ValidationFinding finding = new ValidationFinding(
-                ruleId,
-                ValidationSeverity.Error,
-                null,
-                assetGuid,
-                "Assets/StatusProbe.asset",
-                "field",
-                "Status probe"
-            );
-            ValidationStatusSurfaces.SuppressionsChanged(ValidationSuppressions.Empty);
-            try
-            {
-                ValidationResults.Replace(assetGuid, new[] { finding });
-                Assert.AreEqual("Sentinel · 1 ! · 0 ⚠", ValidationStatusSurfaces.Badge);
-                foreach (
-                    (
-                        bool enabled,
-                        bool overridden,
-                        ValidationSeverity severity,
-                        string badge
-                    ) in new[]
-                    {
-                        (false, false, ValidationSeverity.Error, "Sentinel · 0 ! · 0 ⚠"),
-                        (true, true, ValidationSeverity.Warning, "Sentinel · 0 ! · 1 ⚠"),
-                        (true, true, ValidationSeverity.Info, "Sentinel · 0 ! · 0 ⚠"),
-                        (true, false, ValidationSeverity.Info, "Sentinel · 1 ! · 0 ⚠"),
-                        (false, true, ValidationSeverity.Warning, "Sentinel · 0 ! · 0 ⚠"),
-                        (true, true, ValidationSeverity.Error, "Sentinel · 1 ! · 0 ⚠"),
-                    }
-                )
-                {
-                    settings.SetRulePreference(ruleId, enabled, overridden, severity);
-                    Assert.AreEqual(badge, ValidationStatusSurfaces.Badge);
-                    Assert.AreEqual(
-                        ValidationSeverity.Error,
-                        ValidationResults.Snapshot()[0].Severity
-                    );
-                }
-                ValidationStatusSurfaces.SuppressionsChanged(
-                    ValidationSuppressions.Parse(finding.Id)
-                );
-                Assert.AreEqual("Sentinel · 0 ! · 0 ⚠", ValidationStatusSurfaces.Badge);
-                settings.SetRulePreference(ruleId, true, true, ValidationSeverity.Warning);
-                Assert.AreEqual("Sentinel · 0 ! · 0 ⚠", ValidationStatusSurfaces.Badge);
-                ValidationStatusSurfaces.SuppressionsChanged(ValidationSuppressions.Empty);
-                Assert.AreEqual("Sentinel · 0 ! · 1 ⚠", ValidationStatusSurfaces.Badge);
-                ValidationWorkspaceSettings.RulePreference preference = settings.PreferenceFor(
-                    ruleId
-                );
-                preference.overrideSeverity = false;
-                settings.SaveAfterUndo();
-                Assert.AreEqual("Sentinel · 1 ! · 0 ⚠", ValidationStatusSurfaces.Badge);
-            }
-            finally
-            {
-                ValidationStatusSurfaces.SuppressionsChanged(ValidationSuppressions.Empty);
-                ValidationResults.Clear();
-            }
-        }
-
-        private static T Field<T>(VisualElement root, string label)
-            where T : VisualElement
-        {
-            return root.Query<T>()
-                .ToList()
-                .Single(element =>
-                    element is TextField text && text.label == label
-                    || element is DropdownField choice && choice.label == label
-                    || element is IntegerField integer && integer.label == label
-                    || element is Toggle toggle && toggle.label == label
-                );
-        }
-
-        private static Button ButtonWithText(VisualElement root, string label)
-        {
-            return root.Query<Button>().ToList().Single(button => button.text == label);
-        }
-
-        private static void Submit(Button button)
-        {
-            Assert.IsTrue(button.panel != null);
-            using (NavigationSubmitEvent submit = NavigationSubmitEvent.GetPooled())
-            {
-                submit.target = button;
-                button.SendEvent(submit);
-            }
-        }
-
-        private static void RequireDisposableProject()
-        {
-            Assert.IsTrue(Application.isBatchMode, "Interactive Unity projects are forbidden.");
-            string project = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-            string token = Environment.GetEnvironmentVariable(
-                "WALLSTOP_SENTINEL_INTERACTION_TOKEN"
-            );
-            string expected = Environment.GetEnvironmentVariable(
-                "WALLSTOP_SENTINEL_INTERACTION_PROJECT"
-            );
-            Assert.IsTrue(
-                Guid.TryParseExact(token, "N", out _),
-                "Missing disposable-project token."
-            );
-            Assert.AreEqual(
-                project,
-                expected,
-                "This probe is forbidden outside its explicitly provisioned disposable project."
-            );
-            Assert.IsTrue(
-                Path.GetFileName(project)
-                    .StartsWith("sentinel-interaction-", StringComparison.Ordinal)
-            );
-            Assert.AreEqual(
-                token,
-                File.ReadAllText(Path.Combine(project, ".sentinel-interaction-disposable")).Trim()
-            );
         }
     }
 }

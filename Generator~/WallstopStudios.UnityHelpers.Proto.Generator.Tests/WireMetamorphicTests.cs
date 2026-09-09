@@ -33,137 +33,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [TestFixture]
     public sealed class WireMetamorphicTests
     {
-        [Test]
-        public void ReorderingFieldsDoesNotChangeWhatAPayloadMeans()
-        {
-            int transformed = 0;
-            foreach (object value in Corpus())
-            {
-                byte[] original = Encode(value);
-                byte[] reordered = WireMetamorphic.ReverseFieldOrder(original);
-                if (reordered == null)
-                {
-                    continue;
-                }
-
-                transformed++;
-                Assert.AreNotEqual(
-                    ToHex(original),
-                    ToHex(reordered),
-                    "the transform reported a rewrite it did not make"
-                );
-                AssertDecodesTheSame(value, reordered, "reordered");
-            }
-
-            // The low floor catches a no-op transform without coupling the test to the corpus size.
-            Assert.Greater(transformed, 5, "the reordering transform stopped firing");
-        }
-
-        [Test]
-        public void AFieldTheContractDoesNotDeclareIsSkippedWhereverItSits()
-        {
-            int transformed = 0;
-            foreach (object value in Corpus())
-            {
-                byte[] original = Encode(value);
-                foreach (
-                    byte[] injected in WireMetamorphic.InjectUnknownField(
-                        original,
-                        DeclaredTags(value.GetType())
-                    )
-                )
-                {
-                    transformed++;
-                    Assert.Greater(
-                        injected.Length,
-                        original.Length,
-                        "the injected field added no bytes"
-                    );
-                    AssertDecodesTheSame(value, injected, "unknown field injected");
-                }
-            }
-
-            Assert.Greater(transformed, 20, "the injection transform stopped firing");
-        }
-
-        /// <summary>
-        /// Two occurrences of a sub-message field decode as their merge, not as the second one.
-        /// </summary>
-        /// <remarks>
-        /// The package already relies on this and has been wrong about it once: decoding each
-        /// occurrence in turn made the second REPLACE the first, silently dropping the members only
-        /// the first carried. That bug is invisible to a round trip, because this encoder never
-        /// writes a field twice.
-        /// </remarks>
-        [Test]
-        public void ASubMessageSplitInTwoDecodesAsTheMergeOfItsHalves()
-        {
-            int transformed = 0;
-            foreach (object value in Corpus())
-            {
-                byte[] original = Encode(value);
-                foreach (
-                    byte[] split in WireMetamorphic.SplitSubMessages(
-                        original,
-                        MessageTags(value.GetType())
-                    )
-                )
-                {
-                    transformed++;
-                    AssertDecodesTheSame(value, split, "sub-message split");
-                }
-            }
-
-            Assert.Greater(transformed, 0, "the sub-message split transform stopped firing");
-        }
-
-        /// <summary>
-        /// The transforms are legal, and protobuf-net agrees they are.
-        /// </summary>
-        /// <remarks>
-        /// Without this the battery would only prove this package is self-consistent under its own
-        /// idea of what a legal rewrite is. Running the same rewritten bytes through the oracle is
-        /// what makes "legal" mean protobuf rather than "whatever WallstopProto accepts".
-        /// </remarks>
-        [Test]
-        public void TheOracleReadsEveryRewrittenPayloadTheSameWay()
-        {
-            int checks = 0;
-            foreach (RepeatedContract value in RepeatedCorpus())
-            {
-                byte[] original = Encode(value);
-                List<byte[]> rewritten = new List<byte[]>();
-                byte[] reordered = WireMetamorphic.ReverseFieldOrder(original);
-                if (reordered != null)
-                {
-                    rewritten.Add(reordered);
-                }
-
-                rewritten.AddRange(
-                    WireMetamorphic.InjectUnknownField(
-                        original,
-                        DeclaredTags(typeof(RepeatedContract))
-                    )
-                );
-
-                foreach (byte[] payload in rewritten)
-                {
-                    checks++;
-                    using System.IO.MemoryStream stream = new System.IO.MemoryStream(payload);
-                    RepeatedContract theirs = ProtoBuf.Serializer.Deserialize<RepeatedContract>(
-                        stream
-                    );
-                    Assert.AreEqual(
-                        ToHex(Encode(value)),
-                        ToHex(Encode(theirs)),
-                        "protobuf-net read a rewritten payload differently"
-                    );
-                }
-            }
-
-            Assert.Greater(checks, 10, "the oracle cross-check stopped firing");
-        }
-
         private static void AssertDecodesTheSame(object value, byte[] payload, string context)
         {
             /*
@@ -397,6 +266,137 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
 
             return builder.ToString();
+        }
+
+        [Test]
+        public void ReorderingFieldsDoesNotChangeWhatAPayloadMeans()
+        {
+            int transformed = 0;
+            foreach (object value in Corpus())
+            {
+                byte[] original = Encode(value);
+                byte[] reordered = WireMetamorphic.ReverseFieldOrder(original);
+                if (reordered == null)
+                {
+                    continue;
+                }
+
+                transformed++;
+                Assert.AreNotEqual(
+                    ToHex(original),
+                    ToHex(reordered),
+                    "the transform reported a rewrite it did not make"
+                );
+                AssertDecodesTheSame(value, reordered, "reordered");
+            }
+
+            // The low floor catches a no-op transform without coupling the test to the corpus size.
+            Assert.Greater(transformed, 5, "the reordering transform stopped firing");
+        }
+
+        [Test]
+        public void AFieldTheContractDoesNotDeclareIsSkippedWhereverItSits()
+        {
+            int transformed = 0;
+            foreach (object value in Corpus())
+            {
+                byte[] original = Encode(value);
+                foreach (
+                    byte[] injected in WireMetamorphic.InjectUnknownField(
+                        original,
+                        DeclaredTags(value.GetType())
+                    )
+                )
+                {
+                    transformed++;
+                    Assert.Greater(
+                        injected.Length,
+                        original.Length,
+                        "the injected field added no bytes"
+                    );
+                    AssertDecodesTheSame(value, injected, "unknown field injected");
+                }
+            }
+
+            Assert.Greater(transformed, 20, "the injection transform stopped firing");
+        }
+
+        /// <summary>
+        /// Two occurrences of a sub-message field decode as their merge, not as the second one.
+        /// </summary>
+        /// <remarks>
+        /// The package already relies on this and has been wrong about it once: decoding each
+        /// occurrence in turn made the second REPLACE the first, silently dropping the members only
+        /// the first carried. That bug is invisible to a round trip, because this encoder never
+        /// writes a field twice.
+        /// </remarks>
+        [Test]
+        public void ASubMessageSplitInTwoDecodesAsTheMergeOfItsHalves()
+        {
+            int transformed = 0;
+            foreach (object value in Corpus())
+            {
+                byte[] original = Encode(value);
+                foreach (
+                    byte[] split in WireMetamorphic.SplitSubMessages(
+                        original,
+                        MessageTags(value.GetType())
+                    )
+                )
+                {
+                    transformed++;
+                    AssertDecodesTheSame(value, split, "sub-message split");
+                }
+            }
+
+            Assert.Greater(transformed, 0, "the sub-message split transform stopped firing");
+        }
+
+        /// <summary>
+        /// The transforms are legal, and protobuf-net agrees they are.
+        /// </summary>
+        /// <remarks>
+        /// Without this the battery would only prove this package is self-consistent under its own
+        /// idea of what a legal rewrite is. Running the same rewritten bytes through the oracle is
+        /// what makes "legal" mean protobuf rather than "whatever WallstopProto accepts".
+        /// </remarks>
+        [Test]
+        public void TheOracleReadsEveryRewrittenPayloadTheSameWay()
+        {
+            int checks = 0;
+            foreach (RepeatedContract value in RepeatedCorpus())
+            {
+                byte[] original = Encode(value);
+                List<byte[]> rewritten = new List<byte[]>();
+                byte[] reordered = WireMetamorphic.ReverseFieldOrder(original);
+                if (reordered != null)
+                {
+                    rewritten.Add(reordered);
+                }
+
+                rewritten.AddRange(
+                    WireMetamorphic.InjectUnknownField(
+                        original,
+                        DeclaredTags(typeof(RepeatedContract))
+                    )
+                );
+
+                foreach (byte[] payload in rewritten)
+                {
+                    checks++;
+                    using System.IO.MemoryStream stream = new System.IO.MemoryStream(payload);
+                    RepeatedContract theirs = ProtoBuf.Serializer.Deserialize<RepeatedContract>(
+                        stream
+                    );
+                    Assert.AreEqual(
+                        ToHex(Encode(value)),
+                        ToHex(Encode(theirs)),
+                        "protobuf-net read a rewritten payload differently"
+                    );
+                }
+            }
+
+            Assert.Greater(checks, 10, "the oracle cross-check stopped firing");
         }
     }
 }

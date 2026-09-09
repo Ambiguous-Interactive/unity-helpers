@@ -35,6 +35,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         where TDeclared : class
         where TRoot : TDeclared
     {
+        // Concrete declared types would bypass this formatter through the facade exact-match path.
+        private static readonly bool NeverARuntimeType =
+            typeof(TDeclared).IsInterface || typeof(TDeclared).IsAbstract;
+
         /// <summary>
         /// Reports whether this adapter is the one currently designated for
         /// <typeparamref name="TDeclared"/>.
@@ -161,10 +165,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             value = read;
             return true;
         }
-
-        // Concrete declared types would bypass this formatter through the facade exact-match path.
-        private static readonly bool NeverARuntimeType =
-            typeof(TDeclared).IsInterface || typeof(TDeclared).IsAbstract;
 
         private IWProtoFormatter<TRoot> Root()
         {

@@ -21,6 +21,27 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
     [NUnit.Framework.Category("Integration")]
     public sealed class WButtonDeclarationOrderTests : CommonTestBase
     {
+        private static string FormatMetadataDiagnostics(
+            IReadOnlyList<WButtonMethodMetadata> metadata
+        )
+        {
+            if (metadata == null || metadata.Count == 0)
+            {
+                return "Metadata: <empty>";
+            }
+
+            System.Text.StringBuilder builder = new System.Text.StringBuilder();
+            builder.AppendLine($"Metadata ({metadata.Count} items):");
+            for (int i = 0; i < metadata.Count; i++)
+            {
+                WButtonMethodMetadata m = metadata[i];
+                builder.AppendLine(
+                    $"  [{i}] Method={m.Method.Name}, Display=\"{m.DisplayName}\", DrawOrder={m.DrawOrder}, DeclOrder={m.DeclarationOrder}, Group=\"{m.GroupName ?? "<null>"}\""
+                );
+            }
+            return builder.ToString();
+        }
+
         [Test]
         public void AlphabeticalTrapPreservesDeclarationOrderNotAlphabetical()
         {
@@ -790,27 +811,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                     previousDrawOrder = metadata[i].DrawOrder;
                 }
             }
-        }
-
-        private static string FormatMetadataDiagnostics(
-            IReadOnlyList<WButtonMethodMetadata> metadata
-        )
-        {
-            if (metadata == null || metadata.Count == 0)
-            {
-                return "Metadata: <empty>";
-            }
-
-            System.Text.StringBuilder builder = new System.Text.StringBuilder();
-            builder.AppendLine($"Metadata ({metadata.Count} items):");
-            for (int i = 0; i < metadata.Count; i++)
-            {
-                WButtonMethodMetadata m = metadata[i];
-                builder.AppendLine(
-                    $"  [{i}] Method={m.Method.Name}, Display=\"{m.DisplayName}\", DrawOrder={m.DrawOrder}, DeclOrder={m.DeclarationOrder}, Group=\"{m.GroupName ?? "<null>"}\""
-                );
-            }
-            return builder.ToString();
         }
     }
 }

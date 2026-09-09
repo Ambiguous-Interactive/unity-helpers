@@ -59,18 +59,18 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         > Collectors = new();
 #endif
 
-        private static readonly MethodInfo CreateGenericMethod =
-            typeof(RelationalComponentCollector).GetMethod(
-                nameof(CreateGeneric),
-                BindingFlags.NonPublic | BindingFlags.Static
-            );
-
         /// <summary>
         /// Forces every caller onto the non-generic fallback, as an AOT runtime that refuses the
         /// closed generic would. Exists so the two paths can be asserted equal on the same
         /// hierarchies rather than only the fast one being tested.
         /// </summary>
         internal static bool FallbackOnly;
+
+        private static readonly MethodInfo CreateGenericMethod =
+            typeof(RelationalComponentCollector).GetMethod(
+                nameof(CreateGeneric),
+                BindingFlags.NonPublic | BindingFlags.Static
+            );
 
         /// <summary>
         /// Gets the collector for <paramref name="elementType"/>, building and proving it on first
@@ -114,26 +114,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 #endif
         }
 
-        /// <summary>
-        /// Appends every matching component on <paramref name="source"/> and its descendants to
-        /// <paramref name="destination"/>.
-        /// </summary>
-        internal abstract int CollectChildrenInto(
-            Component source,
-            bool includeInactive,
-            List<Component> destination
-        );
-
-        /// <summary>
-        /// Appends every matching component on <paramref name="source"/> and its ancestors to
-        /// <paramref name="destination"/>.
-        /// </summary>
-        internal abstract int CollectParentsInto(
-            Component source,
-            bool includeInactive,
-            List<Component> destination
-        );
-
         private static RelationalComponentCollector Create(Type elementType, Component probe)
         {
             if (
@@ -172,9 +152,40 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             return new TypedCollector<TElement>();
         }
 
+        /// <summary>
+        /// Appends every matching component on <paramref name="source"/> and its descendants to
+        /// <paramref name="destination"/>.
+        /// </summary>
+        internal abstract int CollectChildrenInto(
+            Component source,
+            bool includeInactive,
+            List<Component> destination
+        );
+
+        /// <summary>
+        /// Appends every matching component on <paramref name="source"/> and its ancestors to
+        /// <paramref name="destination"/>.
+        /// </summary>
+        internal abstract int CollectParentsInto(
+            Component source,
+            bool includeInactive,
+            List<Component> destination
+        );
+
         private sealed class TypedCollector<TElement> : RelationalComponentCollector
             where TElement : Component
         {
+            private static int Drain(List<TElement> buffer, List<Component> destination)
+            {
+                int count = buffer.Count;
+                for (int i = 0; i < count; ++i)
+                {
+                    destination.Add(buffer[i]);
+                }
+
+                return count;
+            }
+
             internal override int CollectChildrenInto(
                 Component source,
                 bool includeInactive,
@@ -199,17 +210,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 );
                 source.GetComponentsInParent(includeInactive, buffer);
                 return Drain(buffer, destination);
-            }
-
-            private static int Drain(List<TElement> buffer, List<Component> destination)
-            {
-                int count = buffer.Count;
-                for (int i = 0; i < count; ++i)
-                {
-                    destination.Add(buffer[i]);
-                }
-
-                return count;
             }
         }
     }

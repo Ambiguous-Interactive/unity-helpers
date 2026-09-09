@@ -1605,12 +1605,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         */
         internal sealed class SortedSample : IComparable<SortedSample>, IComparable
         {
+            public string Token { get; }
+
             public SortedSample(string token)
             {
                 Token = token;
             }
-
-            public string Token { get; }
 
             public override bool Equals(object candidate)
             {
@@ -1661,33 +1661,18 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             : IComparable<CaseInsensitiveString>,
                 IComparable
         {
+            public string Value { get; }
+
             public CaseInsensitiveString(string value)
             {
                 Value = value;
             }
-
-            public string Value { get; }
 
             public int CompareTo(CaseInsensitiveString other)
             {
                 return other == null
                     ? 1
                     : string.Compare(Value, other.Value, StringComparison.OrdinalIgnoreCase);
-            }
-
-            int IComparable.CompareTo(object obj)
-            {
-                if (ReferenceEquals(this, obj))
-                {
-                    return 0;
-                }
-
-                if (obj is CaseInsensitiveString candidate)
-                {
-                    return CompareTo(candidate);
-                }
-
-                return 1;
             }
 
             public override bool Equals(object obj)
@@ -1708,6 +1693,21 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             public override string ToString()
             {
                 return Value ?? string.Empty;
+            }
+
+            int IComparable.CompareTo(object obj)
+            {
+                if (ReferenceEquals(this, obj))
+                {
+                    return 0;
+                }
+
+                if (obj is CaseInsensitiveString candidate)
+                {
+                    return CompareTo(candidate);
+                }
+
+                return 1;
             }
         }
     }

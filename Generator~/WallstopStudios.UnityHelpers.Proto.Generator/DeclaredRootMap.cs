@@ -179,6 +179,77 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
         }
 
+        /// <summary>
+        /// Returns one type-argument list per pair this compilation can register.
+        /// </summary>
+        /// <param name="compilation">The compilation being generated for.</param>
+        /// <returns>
+        /// Strings of the form <c>&lt;global::Declared, global::Root&gt;</c>, ready to append to the
+        /// provider's <c>Register</c> call.
+        /// </returns>
+        internal static IEnumerable<string> Registrations(
+            Compilation compilation,
+            Action<Diagnostic> report,
+            HashSet<string> announced
+        )
+        {
+            HashSet<ITypeSymbol> seen = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
+            List<string> registrations = new List<string>();
+
+            foreach (Pair pair in Pairs(compilation.Assembly))
+            {
+                if (
+                    pair.Declared == null
+                    || pair.Root == null
+                    || !seen.Add(pair.Declared)
+                    || Open(pair.Declared)
+                    || Open(pair.Root)
+                    || SymbolEqualityComparer.Default.Equals(pair.Declared, pair.Root)
+                    || IsContract(pair.Declared)
+                    || Instantiable(pair.Declared)
+                    || !Assignable(pair.Root, pair.Declared)
+                )
+                {
+                    // Invalid pairs must not emit registrations that fail inside generated code.
+                    continue;
+                }
+
+                // Nameability needs its own report so skipped registrations never disappear silently.
+                Location location =
+                    pair.Attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation()
+                    ?? Location.None;
+                if (
+                    TypeNaming.ReportIfUnnameable(
+                        pair.Declared,
+                        compilation,
+                        location,
+                        report,
+                        announced
+                    )
+                    || TypeNaming.ReportIfUnnameable(
+                        pair.Root,
+                        compilation,
+                        location,
+                        report,
+                        announced
+                    )
+                )
+                {
+                    continue;
+                }
+
+                registrations.Add(
+                    "<"
+                        + pair.Declared.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                        + ", "
+                        + pair.Root.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                        + ">"
+                );
+            }
+
+            return registrations;
+        }
+
         private static Dictionary<ITypeSymbol, List<ReferencedDeclaration>> ReferencedDeclarations(
             Compilation compilation,
             Action<Diagnostic> report
@@ -258,77 +329,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 && !IsContract(pair.Declared)
                 && !Instantiable(pair.Declared)
                 && Assignable(pair.Root, pair.Declared);
-        }
-
-        /// <summary>
-        /// Returns one type-argument list per pair this compilation can register.
-        /// </summary>
-        /// <param name="compilation">The compilation being generated for.</param>
-        /// <returns>
-        /// Strings of the form <c>&lt;global::Declared, global::Root&gt;</c>, ready to append to the
-        /// provider's <c>Register</c> call.
-        /// </returns>
-        internal static IEnumerable<string> Registrations(
-            Compilation compilation,
-            Action<Diagnostic> report,
-            HashSet<string> announced
-        )
-        {
-            HashSet<ITypeSymbol> seen = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
-            List<string> registrations = new List<string>();
-
-            foreach (Pair pair in Pairs(compilation.Assembly))
-            {
-                if (
-                    pair.Declared == null
-                    || pair.Root == null
-                    || !seen.Add(pair.Declared)
-                    || Open(pair.Declared)
-                    || Open(pair.Root)
-                    || SymbolEqualityComparer.Default.Equals(pair.Declared, pair.Root)
-                    || IsContract(pair.Declared)
-                    || Instantiable(pair.Declared)
-                    || !Assignable(pair.Root, pair.Declared)
-                )
-                {
-                    // Invalid pairs must not emit registrations that fail inside generated code.
-                    continue;
-                }
-
-                // Nameability needs its own report so skipped registrations never disappear silently.
-                Location location =
-                    pair.Attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation()
-                    ?? Location.None;
-                if (
-                    TypeNaming.ReportIfUnnameable(
-                        pair.Declared,
-                        compilation,
-                        location,
-                        report,
-                        announced
-                    )
-                    || TypeNaming.ReportIfUnnameable(
-                        pair.Root,
-                        compilation,
-                        location,
-                        report,
-                        announced
-                    )
-                )
-                {
-                    continue;
-                }
-
-                registrations.Add(
-                    "<"
-                        + pair.Declared.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
-                        + ", "
-                        + pair.Root.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
-                        + ">"
-                );
-            }
-
-            return registrations;
         }
 
         /// <summary>
@@ -454,31 +454,31 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         private readonly struct Pair
         {
+            internal ITypeSymbol Declared { get; }
+
+            internal ITypeSymbol Root { get; }
+
+            internal AttributeData Attribute { get; }
+
             internal Pair(ITypeSymbol declared, ITypeSymbol root, AttributeData attribute)
             {
                 Declared = declared;
                 Root = root;
                 Attribute = attribute;
             }
-
-            internal ITypeSymbol Declared { get; }
-
-            internal ITypeSymbol Root { get; }
-
-            internal AttributeData Attribute { get; }
         }
 
         private readonly struct ReferencedDeclaration
         {
+            internal ITypeSymbol Root { get; }
+
+            internal string AssemblyName { get; }
+
             internal ReferencedDeclaration(ITypeSymbol root, string assemblyName)
             {
                 Root = root;
                 AssemblyName = assemblyName;
             }
-
-            internal ITypeSymbol Root { get; }
-
-            internal string AssemblyName { get; }
         }
     }
 }

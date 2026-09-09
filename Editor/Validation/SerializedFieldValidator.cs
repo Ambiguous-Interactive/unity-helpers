@@ -16,6 +16,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     /// </summary>
     public readonly struct DroppedSerializedField
     {
+        /// <summary>The type declaring the field.</summary>
+        public Type Owner { get; }
+
+        /// <summary>The field's name.</summary>
+        public string FieldName { get; }
+
+        /// <summary>The field's declared type.</summary>
+        public Type FieldType { get; }
+
+        /// <summary>The package stand-in to use instead, or <c>null</c> when there is none.</summary>
+        public string StandIn { get; }
+
         /// <summary>Initializes a new instance of the <see cref="DroppedSerializedField"/> struct.</summary>
         /// <param name="owner">The type declaring the field.</param>
         /// <param name="fieldName">The field's name.</param>
@@ -28,18 +40,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             FieldType = fieldType;
             StandIn = standIn;
         }
-
-        /// <summary>The type declaring the field.</summary>
-        public Type Owner { get; }
-
-        /// <summary>The field's name.</summary>
-        public string FieldName { get; }
-
-        /// <summary>The field's declared type.</summary>
-        public Type FieldType { get; }
-
-        /// <summary>The package stand-in to use instead, or <c>null</c> when there is none.</summary>
-        public string StandIn { get; }
 
         /// <summary>Renders the finding as one line, naming the fix where there is one.</summary>
         /// <returns>A human-readable description.</returns>
@@ -85,6 +85,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     /// </remarks>
     public static class SerializedFieldValidator
     {
+        /// <summary>
+        /// The depth Unity itself stops at for a plain <c>[Serializable]</c> class.
+        /// </summary>
+        /// <remarks>
+        /// A bound rather than a guess about cycles: <see cref="Inspect"/> already refuses a type it
+        /// is inside, which handles a graph that points back at itself. This handles the graph that
+        /// merely goes on for a long time, and the number is Unity's own nesting limit.
+        /// </remarks>
+        private const int MaximumNesting = 7;
+
         /// <summary>
         /// Reports every field of <paramref name="type"/> that Unity will not serialize.
         /// </summary>
@@ -152,14 +162,61 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         }
 
         /// <summary>
-        /// The depth Unity itself stops at for a plain <c>[Serializable]</c> class.
+        /// Reports whether a type can be probed by constructing one.
         /// </summary>
+        /// <param name="type">The candidate type.</param>
+        /// <returns><c>true</c> when an instance can be made and inspected.</returns>
+        public static bool IsInspectable(Type type)
+        {
+            return type != null
+                && !type.IsAbstract
+                && !type.IsGenericTypeDefinition
+                && !type.ContainsGenericParameters
+                && (
+                    typeof(ScriptableObject).IsAssignableFrom(type)
+                    || typeof(MonoBehaviour).IsAssignableFrom(type)
+                );
+        }
+
+        /// <summary>
+        /// Enumerates the fields the developer asked Unity to serialize, base types included.
+        /// </summary>
+        /// <param name="type">The type to walk.</param>
+        /// <returns>Each candidate field, most-derived first.</returns>
         /// <remarks>
-        /// A bound rather than a guess about cycles: <see cref="Inspect"/> already refuses a type it
-        /// is inside, which handles a graph that points back at itself. This handles the graph that
-        /// merely goes on for a long time, and the number is Unity's own nesting limit.
+        /// Walked explicitly rather than through <c>BindingFlags.FlattenHierarchy</c>, which does not
+        /// return private fields of a base type -- and a <c>[SerializeField]</c> on a base is exactly
+        /// as droppable as one declared here.
         /// </remarks>
-        private const int MaximumNesting = 7;
+        public static IEnumerable<FieldInfo> DeclaredSerializationCandidates(Type type)
+        {
+            HashSet<string> seen = new();
+            for (
+                Type current = type;
+                current != null
+                    && current != typeof(MonoBehaviour)
+                    && current != typeof(ScriptableObject);
+                current = current.BaseType
+            )
+            {
+                FieldInfo[] fields = current.GetFields(
+                    BindingFlags.Instance
+                        | BindingFlags.Public
+                        | BindingFlags.NonPublic
+                        | BindingFlags.DeclaredOnly
+                );
+
+                foreach (FieldInfo field in fields)
+                {
+                    if (!IsCandidate(field) || !seen.Add(field.Name))
+                    {
+                        continue;
+                    }
+
+                    yield return field;
+                }
+            }
+        }
 
         /// <summary>
         /// Reports the dropped fields of <paramref name="type"/>, then of everything nested in it.
@@ -297,63 +354,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             }
 
             return declared;
-        }
-
-        /// <summary>
-        /// Reports whether a type can be probed by constructing one.
-        /// </summary>
-        /// <param name="type">The candidate type.</param>
-        /// <returns><c>true</c> when an instance can be made and inspected.</returns>
-        public static bool IsInspectable(Type type)
-        {
-            return type != null
-                && !type.IsAbstract
-                && !type.IsGenericTypeDefinition
-                && !type.ContainsGenericParameters
-                && (
-                    typeof(ScriptableObject).IsAssignableFrom(type)
-                    || typeof(MonoBehaviour).IsAssignableFrom(type)
-                );
-        }
-
-        /// <summary>
-        /// Enumerates the fields the developer asked Unity to serialize, base types included.
-        /// </summary>
-        /// <param name="type">The type to walk.</param>
-        /// <returns>Each candidate field, most-derived first.</returns>
-        /// <remarks>
-        /// Walked explicitly rather than through <c>BindingFlags.FlattenHierarchy</c>, which does not
-        /// return private fields of a base type -- and a <c>[SerializeField]</c> on a base is exactly
-        /// as droppable as one declared here.
-        /// </remarks>
-        public static IEnumerable<FieldInfo> DeclaredSerializationCandidates(Type type)
-        {
-            HashSet<string> seen = new();
-            for (
-                Type current = type;
-                current != null
-                    && current != typeof(MonoBehaviour)
-                    && current != typeof(ScriptableObject);
-                current = current.BaseType
-            )
-            {
-                FieldInfo[] fields = current.GetFields(
-                    BindingFlags.Instance
-                        | BindingFlags.Public
-                        | BindingFlags.NonPublic
-                        | BindingFlags.DeclaredOnly
-                );
-
-                foreach (FieldInfo field in fields)
-                {
-                    if (!IsCandidate(field) || !seen.Add(field.Name))
-                    {
-                        continue;
-                    }
-
-                    yield return field;
-                }
-            }
         }
 
         private static bool IsCandidate(FieldInfo field)

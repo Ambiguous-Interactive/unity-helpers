@@ -27,6 +27,41 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         private const string FirstGuid = "00000000000000000000000000000001";
         private const string SecondGuid = "00000000000000000000000000000002";
 
+        private static ValidationFinding Finding(Object target)
+        {
+            return new ValidationFinding(
+                "rule",
+                ValidationSeverity.Error,
+                target,
+                FirstGuid,
+                "Assets/Real.asset",
+                null,
+                "message"
+            );
+        }
+
+        private static Object Never(ValidationTarget target)
+        {
+            return null;
+        }
+
+        private static List<ValidationTarget> OneTarget()
+        {
+            return new List<ValidationTarget>
+            {
+                new ValidationTarget(FirstGuid, "Assets/First.asset", typeof(ScriptableObject)),
+            };
+        }
+
+        private static List<ValidationTarget> TwoTargets()
+        {
+            List<ValidationTarget> targets = OneTarget();
+            targets.Add(
+                new ValidationTarget(SecondGuid, "Assets/Second.asset", typeof(ScriptableObject))
+            );
+            return targets;
+        }
+
         [Test]
         public void AnEmptyRunIsCompleteBeforeItStarts()
         {
@@ -433,58 +468,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assert.IsEmpty(ValidationTargets.Enumerate("Assets/NoSuchFolderForValidationTests"));
         }
 
-        private static ValidationFinding Finding(Object target)
-        {
-            return new ValidationFinding(
-                "rule",
-                ValidationSeverity.Error,
-                target,
-                FirstGuid,
-                "Assets/Real.asset",
-                null,
-                "message"
-            );
-        }
-
-        private static Object Never(ValidationTarget target)
-        {
-            return null;
-        }
-
-        private static List<ValidationTarget> OneTarget()
-        {
-            return new List<ValidationTarget>
-            {
-                new ValidationTarget(FirstGuid, "Assets/First.asset", typeof(ScriptableObject)),
-            };
-        }
-
-        private static List<ValidationTarget> TwoTargets()
-        {
-            List<ValidationTarget> targets = OneTarget();
-            targets.Add(
-                new ValidationTarget(SecondGuid, "Assets/Second.asset", typeof(ScriptableObject))
-            );
-            return targets;
-        }
-
         /// <summary>Counts what the engine asked it, and answers the same way every time.</summary>
         private sealed class CountingRule : IValidationRule
         {
+            public string RuleId => nameof(CountingRule);
+
+            public string DisplayName => nameof(CountingRule);
+
+            internal int AppliesToCalls { get; private set; }
+
+            internal int ValidateCalls { get; private set; }
+
             private readonly bool _claims;
 
             internal CountingRule(bool claims)
             {
                 _claims = claims;
             }
-
-            internal int AppliesToCalls { get; private set; }
-
-            internal int ValidateCalls { get; private set; }
-
-            public string RuleId => nameof(CountingRule);
-
-            public string DisplayName => nameof(CountingRule);
 
             public bool AppliesTo(in ValidationTarget target)
             {
@@ -505,6 +505,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         /// <summary>Reports a fixed number of findings per asset and remembers what it was given.</summary>
         private sealed class ReportingRule : IValidationRule
         {
+            public string RuleId => nameof(ReportingRule);
+
+            public string DisplayName => nameof(ReportingRule);
+
+            internal int ValidateCalls { get; private set; }
+
+            internal Object LastAsset { get; private set; }
+
             private readonly ValidationSeverity _severity;
             private readonly int _perAsset;
 
@@ -513,14 +521,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 _severity = severity;
                 _perAsset = perAsset;
             }
-
-            internal int ValidateCalls { get; private set; }
-
-            internal Object LastAsset { get; private set; }
-
-            public string RuleId => nameof(ReportingRule);
-
-            public string DisplayName => nameof(ReportingRule);
 
             public bool AppliesTo(in ValidationTarget target)
             {
@@ -577,20 +577,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         /// <summary>Throws from whichever half the test names, optionally after reporting.</summary>
         private sealed class ThrowingRule : IValidationRule
         {
+            public string RuleId => nameof(ThrowingRule);
+
+            public string DisplayName => nameof(ThrowingRule);
+
+            internal int FindingsBeforeThrowing { get; set; }
+
+            internal int ValidateCalls { get; private set; }
+
             private readonly bool _throwFromAppliesTo;
 
             internal ThrowingRule(bool throwFromAppliesTo)
             {
                 _throwFromAppliesTo = throwFromAppliesTo;
             }
-
-            internal int FindingsBeforeThrowing { get; set; }
-
-            internal int ValidateCalls { get; private set; }
-
-            public string RuleId => nameof(ThrowingRule);
-
-            public string DisplayName => nameof(ThrowingRule);
 
             public bool AppliesTo(in ValidationTarget target)
             {

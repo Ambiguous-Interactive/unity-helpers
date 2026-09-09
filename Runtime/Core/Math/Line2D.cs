@@ -30,31 +30,19 @@ namespace WallstopStudios.UnityHelpers.Core.Math
     public readonly partial struct Line2D : IEquatable<Line2D>
     {
         /// <summary>
-        /// The starting point of the line segment.
+        /// Equality operator.
         /// </summary>
-        [DataMember]
-        [ProtoMember(1)]
-        [WProtoMember(1)]
-        public readonly Vector2 from;
-
-        /// <summary>
-        /// The ending point of the line segment.
-        /// </summary>
-        [DataMember]
-        [ProtoMember(2)]
-        [WProtoMember(2)]
-        public readonly Vector2 to;
-
-        /// <summary>
-        /// Constructs a line segment from two points.
-        /// </summary>
-        /// <param name="from">The starting point.</param>
-        /// <param name="to">The ending point.</param>
-        [JsonConstructor]
-        public Line2D(Vector2 from, Vector2 to)
+        public static bool operator ==(Line2D left, Line2D right)
         {
-            this.from = from;
-            this.to = to;
+            return left.Equals(right);
+        }
+
+        /// <summary>
+        /// Inequality operator.
+        /// </summary>
+        public static bool operator !=(Line2D left, Line2D right)
+        {
+            return !left.Equals(right);
         }
 
         /// <summary>
@@ -84,6 +72,34 @@ namespace WallstopStudios.UnityHelpers.Core.Math
         /// Gets the normalized direction vector from 'from' to 'to'.
         /// </summary>
         public Vector2 NormalizedDirection => (to - from).normalized;
+
+        /// <summary>
+        /// The starting point of the line segment.
+        /// </summary>
+        [DataMember]
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public readonly Vector2 from;
+
+        /// <summary>
+        /// The ending point of the line segment.
+        /// </summary>
+        [DataMember]
+        [ProtoMember(2)]
+        [WProtoMember(2)]
+        public readonly Vector2 to;
+
+        /// <summary>
+        /// Constructs a line segment from two points.
+        /// </summary>
+        /// <param name="from">The starting point.</param>
+        /// <param name="to">The ending point.</param>
+        [JsonConstructor]
+        public Line2D(Vector2 from, Vector2 to)
+        {
+            this.from = from;
+            this.to = to;
+        }
 
         /// <summary>
         /// Checks if this line segment intersects with another line segment.
@@ -274,22 +290,6 @@ namespace WallstopStudios.UnityHelpers.Core.Math
         public override string ToString()
         {
             return $"Line2D(from: {from}, to: {to})";
-        }
-
-        /// <summary>
-        /// Equality operator.
-        /// </summary>
-        public static bool operator ==(Line2D left, Line2D right)
-        {
-            return left.Equals(right);
-        }
-
-        /// <summary>
-        /// Inequality operator.
-        /// </summary>
-        public static bool operator !=(Line2D left, Line2D right)
-        {
-            return !left.Equals(right);
         }
     }
 }

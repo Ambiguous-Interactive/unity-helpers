@@ -11,15 +11,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
     /// </summary>
     public abstract class RelationalInheritanceBase : MonoBehaviour
     {
-        [SiblingComponent]
-        private BoxCollider _sibling;
-
-        [ChildComponent]
-        private SpriteRenderer _child;
-
-        [ParentComponent]
-        private Rigidbody _parent;
-
         /// <summary>The sibling this base declared, or null when nothing bound it.</summary>
         public BoxCollider Sibling => _sibling;
 
@@ -28,5 +19,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
 
         /// <summary>The parent this base declared, or null when nothing bound it.</summary>
         public Rigidbody Parent => _parent;
+
+        [SiblingComponent]
+        private BoxCollider _sibling;
+
+        [ChildComponent]
+        private SpriteRenderer _child;
+
+        [ParentComponent]
+        private Rigidbody _parent;
     }
 }

@@ -138,17 +138,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         // Scratch for InternalState only; never part of the generator's value or its serialized form.
         private byte[] _payload;
 
-        private void EnsureNonZeroState()
-        {
-            if ((_a | _b | _c) == 0 && _counter == 0)
-            {
-                _a = 0x9E3779B97F4A7C15UL;
-                _b = 0xBF58476D1CE4E5B9UL;
-                _c = 0x94D049BB133111EBUL;
-                _counter = InitialCounter;
-            }
-        }
-
         public Sfc64Random()
             : this(Guid.NewGuid()) { }
 
@@ -181,63 +170,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
             RestoreCommonState(internalState);
             EnsureNonZeroState();
-        }
-
-        protected override void OnAfterDeserialization()
-        {
-            EnsureNonZeroState();
-        }
-
-        public override ulong NextUlong()
-        {
-            return NextWord();
-        }
-
-        public override uint NextUint()
-        {
-            unchecked
-            {
-                return (uint)(NextWord() >> 32);
-            }
-        }
-
-        public override IRandom Copy()
-        {
-            return new Sfc64Random(InternalState);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void Seed(ulong seed0, ulong seed1, ulong seed2)
-        {
-            _a = seed0;
-            _b = seed1;
-            _c = seed2;
-            _counter = InitialCounter;
-            Warmup();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void Warmup()
-        {
-            for (int i = 0; i < WarmupDraws; ++i)
-            {
-                NextWord();
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private ulong NextWord()
-        {
-            unchecked
-            {
-                ulong result = _a + _b + _counter++;
-
-                _a = _b ^ (_b >> 11);
-                _b = _c + (_c << 3);
-                _c = Rotl(_c, 24) + result;
-
-                return result;
-            }
         }
 
         private static bool TryReadStatePayload(
@@ -281,6 +213,24 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         private static ulong Rotl(ulong x, int k)
         {
             return (x << k) | (x >> (64 - k));
+        }
+
+        public override ulong NextUlong()
+        {
+            return NextWord();
+        }
+
+        public override uint NextUint()
+        {
+            unchecked
+            {
+                return (uint)(NextWord() >> 32);
+            }
+        }
+
+        public override IRandom Copy()
+        {
+            return new Sfc64Random(InternalState);
         }
 
         public override bool Equals(object obj)
@@ -339,6 +289,56 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
 
             return _counter.CompareTo(other._counter);
+        }
+
+        protected override void OnAfterDeserialization()
+        {
+            EnsureNonZeroState();
+        }
+
+        private void EnsureNonZeroState()
+        {
+            if ((_a | _b | _c) == 0 && _counter == 0)
+            {
+                _a = 0x9E3779B97F4A7C15UL;
+                _b = 0xBF58476D1CE4E5B9UL;
+                _c = 0x94D049BB133111EBUL;
+                _counter = InitialCounter;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void Seed(ulong seed0, ulong seed1, ulong seed2)
+        {
+            _a = seed0;
+            _b = seed1;
+            _c = seed2;
+            _counter = InitialCounter;
+            Warmup();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void Warmup()
+        {
+            for (int i = 0; i < WarmupDraws; ++i)
+            {
+                NextWord();
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private ulong NextWord()
+        {
+            unchecked
+            {
+                ulong result = _a + _b + _counter++;
+
+                _a = _b ^ (_b >> 11);
+                _b = _c + (_c << 3);
+                _c = Rotl(_c, 24) + result;
+
+                return result;
+            }
         }
     }
 }

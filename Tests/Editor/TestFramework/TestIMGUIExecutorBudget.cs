@@ -10,6 +10,11 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
         private const int DefaultMaxFrames = 10000;
         private const double DefaultMaxSeconds = 60d;
 
+        internal static TestIMGUIExecutorBudget Default
+        {
+            get { return new TestIMGUIExecutorBudget(DefaultMaxFrames, DefaultMaxSeconds); }
+        }
+
         internal int MaxFrames { get; }
         internal double MaxSeconds { get; }
 
@@ -17,11 +22,6 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
         {
             MaxFrames = maxFrames;
             MaxSeconds = maxSeconds;
-        }
-
-        internal static TestIMGUIExecutorBudget Default
-        {
-            get { return new TestIMGUIExecutorBudget(DefaultMaxFrames, DefaultMaxSeconds); }
         }
 
         internal static TestIMGUIExecutorBudget WithFrames(int maxFrames)

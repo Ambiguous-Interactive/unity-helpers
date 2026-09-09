@@ -28,21 +28,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [Preserve]
     public sealed class RandomGeneratorMetadataAttribute : Attribute
     {
-        public RandomGeneratorMetadataAttribute(
-            RandomQuality quality,
-            string notes,
-            string reference = "",
-            string referenceUrl = "",
-            string period = ""
-        )
-        {
-            Quality = quality;
-            Notes = notes ?? string.Empty;
-            Reference = reference ?? string.Empty;
-            ReferenceUrl = referenceUrl ?? string.Empty;
-            Period = period ?? string.Empty;
-        }
-
         public RandomQuality Quality { get; }
 
         public string Notes { get; }
@@ -63,6 +48,21 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         public string Period { get; }
 
         public int QualitySortValue => (int)Quality;
+
+        public RandomGeneratorMetadataAttribute(
+            RandomQuality quality,
+            string notes,
+            string reference = "",
+            string referenceUrl = "",
+            string period = ""
+        )
+        {
+            Quality = quality;
+            Notes = notes ?? string.Empty;
+            Reference = reference ?? string.Empty;
+            ReferenceUrl = referenceUrl ?? string.Empty;
+            Period = period ?? string.Empty;
+        }
     }
 
     /// <summary>
@@ -127,23 +127,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             string.Empty
         );
 
-        public RandomGeneratorMetadata(
-            Type type,
-            RandomQuality quality,
-            string notes,
-            string reference,
-            string referenceUrl,
-            string period = ""
-        )
-        {
-            Type = type;
-            Quality = quality;
-            Notes = notes ?? string.Empty;
-            Reference = reference ?? string.Empty;
-            ReferenceUrl = referenceUrl ?? string.Empty;
-            Period = period ?? string.Empty;
-        }
-
         public Type Type { get; }
 
         public RandomQuality Quality { get; }
@@ -195,6 +178,23 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 string label = string.IsNullOrWhiteSpace(Reference) ? ReferenceUrl : Reference;
                 return $"[{label}]({ReferenceUrl})";
             }
+        }
+
+        public RandomGeneratorMetadata(
+            Type type,
+            RandomQuality quality,
+            string notes,
+            string reference,
+            string referenceUrl,
+            string period = ""
+        )
+        {
+            Type = type;
+            Quality = quality;
+            Notes = notes ?? string.Empty;
+            Reference = reference ?? string.Empty;
+            ReferenceUrl = referenceUrl ?? string.Empty;
+            Period = period ?? string.Empty;
         }
     }
 }

@@ -73,11 +73,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             return result;
         }
 
-        private static string SanitizePath(string p)
-        {
-            return string.IsNullOrEmpty(p) ? p : p.SanitizePath();
-        }
-
         /// <summary>
         /// Finds the highest-priority profile matching the asset path.
         /// </summary>
@@ -155,81 +150,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
             return best;
-        }
-
-        /// <summary>
-        /// Pure decision: given a snapshot of the current texture-import state and a matched
-        /// profile, returns whether applying the profile would change any value. Performs NO
-        /// AssetDatabase/importer I/O, so it is exercised by fast unit tests instead of full
-        /// texture-import round-trips. This is the behavior previously inlined in
-        /// <see cref="WillTextureSettingsChange"/>.
-        /// </summary>
-        internal static bool WouldTextureSettingsChange(
-            in TextureSettingsState current,
-            SpriteSettings spriteData
-        )
-        {
-            if (spriteData == null)
-            {
-                return false;
-            }
-
-            bool changed = false;
-            if (spriteData.applyPixelsPerUnit)
-            {
-                changed |= current.SpritePixelsPerUnit != spriteData.pixelsPerUnit;
-            }
-            if (spriteData.applyPivot)
-            {
-                changed |= current.SpritePivot != spriteData.pivot;
-            }
-            if (spriteData.applyGenerateMipMaps)
-            {
-                changed |= current.MipmapEnabled != spriteData.generateMipMaps;
-            }
-            if (spriteData.applyCrunchCompression)
-            {
-                changed |= current.CrunchedCompression != spriteData.useCrunchCompression;
-            }
-            if (spriteData.applyCompression)
-            {
-                changed |= current.TextureCompression != spriteData.compressionLevel;
-            }
-
-            if (spriteData.applyTextureType)
-            {
-                changed |= current.TextureType != spriteData.textureType;
-            }
-            if (spriteData.applyPivot)
-            {
-                changed |= current.SpriteAlignment != (int)SpriteAlignment.Custom;
-            }
-            if (spriteData.applyAlphaIsTransparency)
-            {
-                changed |= current.AlphaIsTransparency != spriteData.alphaIsTransparency;
-            }
-            if (spriteData.applyReadWriteEnabled)
-            {
-                changed |= current.Readable != spriteData.readWriteEnabled;
-            }
-            if (spriteData.applySpriteMode)
-            {
-                changed |= current.SpriteImportMode != spriteData.spriteMode;
-                changed |= current.SpriteMode != (int)spriteData.spriteMode;
-            }
-            if (spriteData.applyExtrudeEdges)
-            {
-                changed |= current.SpriteExtrude != spriteData.extrudeEdges;
-            }
-            if (spriteData.applyWrapMode)
-            {
-                changed |= current.WrapMode != spriteData.wrapMode;
-            }
-            if (spriteData.applyFilterMode)
-            {
-                changed |= current.FilterMode != spriteData.filterMode;
-            }
-            return changed;
         }
 
         /// <summary>
@@ -507,6 +427,86 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 Undo.RecordObject(localTextureImporter, "Apply Sprite Settings");
                 undoRecorded = true;
             }
+        }
+
+        /// <summary>
+        /// Pure decision: given a snapshot of the current texture-import state and a matched
+        /// profile, returns whether applying the profile would change any value. Performs NO
+        /// AssetDatabase/importer I/O, so it is exercised by fast unit tests instead of full
+        /// texture-import round-trips. This is the behavior previously inlined in
+        /// <see cref="WillTextureSettingsChange"/>.
+        /// </summary>
+        internal static bool WouldTextureSettingsChange(
+            in TextureSettingsState current,
+            SpriteSettings spriteData
+        )
+        {
+            if (spriteData == null)
+            {
+                return false;
+            }
+
+            bool changed = false;
+            if (spriteData.applyPixelsPerUnit)
+            {
+                changed |= current.SpritePixelsPerUnit != spriteData.pixelsPerUnit;
+            }
+            if (spriteData.applyPivot)
+            {
+                changed |= current.SpritePivot != spriteData.pivot;
+            }
+            if (spriteData.applyGenerateMipMaps)
+            {
+                changed |= current.MipmapEnabled != spriteData.generateMipMaps;
+            }
+            if (spriteData.applyCrunchCompression)
+            {
+                changed |= current.CrunchedCompression != spriteData.useCrunchCompression;
+            }
+            if (spriteData.applyCompression)
+            {
+                changed |= current.TextureCompression != spriteData.compressionLevel;
+            }
+
+            if (spriteData.applyTextureType)
+            {
+                changed |= current.TextureType != spriteData.textureType;
+            }
+            if (spriteData.applyPivot)
+            {
+                changed |= current.SpriteAlignment != (int)SpriteAlignment.Custom;
+            }
+            if (spriteData.applyAlphaIsTransparency)
+            {
+                changed |= current.AlphaIsTransparency != spriteData.alphaIsTransparency;
+            }
+            if (spriteData.applyReadWriteEnabled)
+            {
+                changed |= current.Readable != spriteData.readWriteEnabled;
+            }
+            if (spriteData.applySpriteMode)
+            {
+                changed |= current.SpriteImportMode != spriteData.spriteMode;
+                changed |= current.SpriteMode != (int)spriteData.spriteMode;
+            }
+            if (spriteData.applyExtrudeEdges)
+            {
+                changed |= current.SpriteExtrude != spriteData.extrudeEdges;
+            }
+            if (spriteData.applyWrapMode)
+            {
+                changed |= current.WrapMode != spriteData.wrapMode;
+            }
+            if (spriteData.applyFilterMode)
+            {
+                changed |= current.FilterMode != spriteData.filterMode;
+            }
+            return changed;
+        }
+
+        private static string SanitizePath(string p)
+        {
+            return string.IsNullOrEmpty(p) ? p : p.SanitizePath();
         }
 
         public sealed class PreparedProfile

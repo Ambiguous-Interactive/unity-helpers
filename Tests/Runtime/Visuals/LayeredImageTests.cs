@@ -19,6 +19,38 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
     [NUnit.Framework.Category("Fast")]
     public sealed class LayeredImageTests : CommonTestBase
     {
+        private static TimeSpan TimeSpanFromFractionalMilliseconds(double milliseconds)
+        {
+            return TimeSpan.FromTicks(
+                (long)Math.Floor(milliseconds * TimeSpan.TicksPerMillisecond)
+            );
+        }
+
+        private static IEnumerator WaitUntilBackgroundIs(
+            LayeredImage image,
+            Texture2D expected,
+            string description,
+            float timeoutSeconds = 0.5f
+        )
+        {
+            float timeout = Time.time + timeoutSeconds;
+            while (Time.time < timeout)
+            {
+                if (ReferenceEquals(image.style.backgroundImage.value.texture, expected))
+                {
+                    yield break;
+                }
+
+                yield return null;
+            }
+
+            Assert.AreSame(
+                expected,
+                image.style.backgroundImage.value.texture,
+                $"Timed out waiting for {description}."
+            );
+        }
+
         [Test]
         public void ComputeTexturesWithNoLayersReturnsEmptyArray()
         {
@@ -297,43 +329,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                 elapsedMilliseconds: (1000d / 61f + 16d) / 2d,
                 expectedFrameIndex: 1,
                 description: "rounded-down scheduler interval"
-            );
-        }
-
-        private IEnumerator AssertManualUpdateAtElapsedSinceLastFrame(
-            float fps,
-            double elapsedMilliseconds,
-            int expectedFrameIndex,
-            string description
-        )
-        {
-            AnimatedSpriteLayer layer = CreateRgbLayer();
-            LayeredImage image = CreateLayeredImage(
-                new[] { layer },
-                Color.clear,
-                fps: fps,
-                updatesSelf: false
-            );
-            Texture2D[] computed = VisualsTestHelpers.GetComputedTextures(image, _trackedObjects);
-
-            yield return AttachToRuntimePanel(image);
-
-            image.SetElapsedSinceLastFrameForTests(
-                TimeSpanFromFractionalMilliseconds(elapsedMilliseconds)
-            );
-            image.Update();
-
-            Assert.AreSame(
-                computed[expectedFrameIndex],
-                image.style.backgroundImage.value.texture,
-                $"Manual Update must use the scheduler-rounded frame interval for {description}."
-            );
-        }
-
-        private static TimeSpan TimeSpanFromFractionalMilliseconds(double milliseconds)
-        {
-            return TimeSpan.FromTicks(
-                (long)Math.Floor(milliseconds * TimeSpan.TicksPerMillisecond)
             );
         }
 
@@ -731,6 +726,36 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             );
         }
 
+        private IEnumerator AssertManualUpdateAtElapsedSinceLastFrame(
+            float fps,
+            double elapsedMilliseconds,
+            int expectedFrameIndex,
+            string description
+        )
+        {
+            AnimatedSpriteLayer layer = CreateRgbLayer();
+            LayeredImage image = CreateLayeredImage(
+                new[] { layer },
+                Color.clear,
+                fps: fps,
+                updatesSelf: false
+            );
+            Texture2D[] computed = VisualsTestHelpers.GetComputedTextures(image, _trackedObjects);
+
+            yield return AttachToRuntimePanel(image);
+
+            image.SetElapsedSinceLastFrameForTests(
+                TimeSpanFromFractionalMilliseconds(elapsedMilliseconds)
+            );
+            image.Update();
+
+            Assert.AreSame(
+                computed[expectedFrameIndex],
+                image.style.backgroundImage.value.texture,
+                $"Manual Update must use the scheduler-rounded frame interval for {description}."
+            );
+        }
+
         private LayeredImage CreateLayeredImage(
             IEnumerable<AnimatedSpriteLayer> layers,
             Color backgroundColor,
@@ -793,31 +818,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             yield return null;
 
             Assert.IsTrue(image.panel != null);
-        }
-
-        private static IEnumerator WaitUntilBackgroundIs(
-            LayeredImage image,
-            Texture2D expected,
-            string description,
-            float timeoutSeconds = 0.5f
-        )
-        {
-            float timeout = Time.time + timeoutSeconds;
-            while (Time.time < timeout)
-            {
-                if (ReferenceEquals(image.style.backgroundImage.value.texture, expected))
-                {
-                    yield break;
-                }
-
-                yield return null;
-            }
-
-            Assert.AreSame(
-                expected,
-                image.style.backgroundImage.value.texture,
-                $"Timed out waiting for {description}."
-            );
         }
     }
 }

@@ -149,11 +149,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             RestoreCommonState(internalState);
         }
 
-        protected override void OnAfterDeserialization()
-        {
-            EnsureElements();
-        }
-
         public override uint NextUint()
         {
             unchecked
@@ -249,6 +244,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         public override string ToString()
         {
             return this.ToJson();
+        }
+
+        protected override void OnAfterDeserialization()
+        {
+            EnsureElements();
         }
 
         private void InitializeFromGuid(Guid guid)

@@ -33,6 +33,90 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
 
         private string _outputDirectory;
 
+        private static void SkipWithoutGraphicsDevice()
+        {
+            if (!EditorSurfaceCapture.IsSupported)
+            {
+                Assert.Ignore(EditorSurfaceCapture.UnsupportedReason);
+            }
+        }
+
+        private static void AssertNoLeakedCaptureTextures()
+        {
+            List<string> leaked = new();
+            Texture[] textures = Resources.FindObjectsOfTypeAll<Texture>();
+            foreach (Texture texture in textures)
+            {
+                if (texture == null)
+                {
+                    continue;
+                }
+
+                if (
+                    string.Equals(
+                        texture.name,
+                        EditorSurfaceCapture.CanvasObjectName,
+                        StringComparison.Ordinal
+                    )
+                    || string.Equals(
+                        texture.name,
+                        EditorSurfaceCapture.ReadbackObjectName,
+                        StringComparison.Ordinal
+                    )
+                )
+                {
+                    leaked.Add(texture.name);
+                }
+            }
+
+            Assert.IsEmpty(
+                leaked,
+                "Capture must destroy the offscreen canvas and readback texture it created; "
+                    + $"found {leaked.Count} still alive."
+            );
+        }
+
+        private static int CountDistinctColors(Texture2D texture)
+        {
+            Color32[] pixels = texture.GetPixels32();
+            HashSet<int> distinct = new();
+            foreach (Color32 pixel in pixels)
+            {
+                distinct.Add((pixel.r << 16) | (pixel.g << 8) | pixel.b);
+            }
+
+            return distinct.Count;
+        }
+
+        private static VisualElement BuildSolidSurface(Color color)
+        {
+            return BuildSolidSurface(color, SurfaceWidth, SurfaceHeight);
+        }
+
+        private static VisualElement BuildSolidSurface(Color color, float width, float height)
+        {
+            VisualElement surface = new();
+            surface.style.width = width;
+            surface.style.height = height;
+            surface.style.backgroundColor = color;
+            return surface;
+        }
+
+        private static VisualElement BuildLabelSurface(string text)
+        {
+            VisualElement surface = new();
+            surface.style.width = SurfaceWidth;
+            surface.style.height = SurfaceHeight;
+            surface.style.backgroundColor = new Color(0.2196f, 0.2196f, 0.2196f, 1f);
+            surface.style.paddingLeft = 6f;
+            surface.style.paddingTop = 6f;
+
+            Label label = new(text);
+            label.style.color = Color.white;
+            surface.Add(label);
+            return surface;
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -485,90 +569,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
             }
         }
 
-        private static void SkipWithoutGraphicsDevice()
-        {
-            if (!EditorSurfaceCapture.IsSupported)
-            {
-                Assert.Ignore(EditorSurfaceCapture.UnsupportedReason);
-            }
-        }
-
-        private static void AssertNoLeakedCaptureTextures()
-        {
-            List<string> leaked = new();
-            Texture[] textures = Resources.FindObjectsOfTypeAll<Texture>();
-            foreach (Texture texture in textures)
-            {
-                if (texture == null)
-                {
-                    continue;
-                }
-
-                if (
-                    string.Equals(
-                        texture.name,
-                        EditorSurfaceCapture.CanvasObjectName,
-                        StringComparison.Ordinal
-                    )
-                    || string.Equals(
-                        texture.name,
-                        EditorSurfaceCapture.ReadbackObjectName,
-                        StringComparison.Ordinal
-                    )
-                )
-                {
-                    leaked.Add(texture.name);
-                }
-            }
-
-            Assert.IsEmpty(
-                leaked,
-                "Capture must destroy the offscreen canvas and readback texture it created; "
-                    + $"found {leaked.Count} still alive."
-            );
-        }
-
-        private static int CountDistinctColors(Texture2D texture)
-        {
-            Color32[] pixels = texture.GetPixels32();
-            HashSet<int> distinct = new();
-            foreach (Color32 pixel in pixels)
-            {
-                distinct.Add((pixel.r << 16) | (pixel.g << 8) | pixel.b);
-            }
-
-            return distinct.Count;
-        }
-
-        private static VisualElement BuildSolidSurface(Color color)
-        {
-            return BuildSolidSurface(color, SurfaceWidth, SurfaceHeight);
-        }
-
-        private static VisualElement BuildSolidSurface(Color color, float width, float height)
-        {
-            VisualElement surface = new();
-            surface.style.width = width;
-            surface.style.height = height;
-            surface.style.backgroundColor = color;
-            return surface;
-        }
-
-        private static VisualElement BuildLabelSurface(string text)
-        {
-            VisualElement surface = new();
-            surface.style.width = SurfaceWidth;
-            surface.style.height = SurfaceHeight;
-            surface.style.backgroundColor = new Color(0.2196f, 0.2196f, 0.2196f, 1f);
-            surface.style.paddingLeft = 6f;
-            surface.style.paddingTop = 6f;
-
-            Label label = new(text);
-            label.style.color = Color.white;
-            surface.Add(label);
-            return surface;
-        }
-
         private Texture2D DecodePng(string path)
         {
             Texture2D decoded = Track(new Texture2D(2, 2, TextureFormat.RGB24, false, true));
@@ -624,14 +624,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
 
         private sealed class ProbePanelOwner : IDisposable
         {
+            internal bool IsDisposed { get; private set; }
+
             private readonly bool _failDisposal;
 
             internal ProbePanelOwner(bool failDisposal)
             {
                 _failDisposal = failDisposal;
             }
-
-            internal bool IsDisposed { get; private set; }
 
             public void Dispose()
             {

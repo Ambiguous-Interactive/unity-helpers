@@ -371,7 +371,10 @@
         "finalizable",
         "finalizer",
         "devirtualizing",
-        "sln"
+        "sln",
+        "SWAR",
+        "cctor",
+        "NRE"
       ]
     },
     {
@@ -517,7 +520,8 @@
         "asmref",
         "sfc64",
         "stcf",
-        "wvalue"
+        "wvalue",
+        "rebitcast"
       ]
     },
     {

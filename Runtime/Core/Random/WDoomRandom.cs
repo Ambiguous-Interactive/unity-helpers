@@ -86,9 +86,14 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         private const int TableSize = 1024;
         private const ulong TableSeed = 0x1D00_0000_1D00_0000UL;
 
-        private static readonly uint[] Table = BuildTable();
-
         public static WDoomRandom Instance => ThreadLocalRandom<WDoomRandom>.Instance;
+
+        /// <summary>
+        /// The 1024 table entries, in the order the generator walks them.
+        /// </summary>
+        public static ReadOnlySpan<uint> LookupTable => Table;
+
+        private static readonly uint[] Table = BuildTable();
 
         public override RandomState InternalState => BuildState((ulong)_index);
 
@@ -117,23 +122,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             RestoreCommonState(internalState);
         }
 
-        /// <summary>
-        /// The 1024 table entries, in the order the generator walks them.
-        /// </summary>
-        public static ReadOnlySpan<uint> LookupTable => Table;
-
-        public override uint NextUint()
-        {
-            // WrappedIncrement preserves correctness if the table length stops being a power of two.
-            _index = _index.WrappedIncrement(TableSize);
-            return Table[_index];
-        }
-
-        public override IRandom Copy()
-        {
-            return new WDoomRandom(InternalState);
-        }
-
         // Reject duplicate table values so a complete cycle emits each value only once.
         private static uint[] BuildTable()
         {
@@ -152,6 +140,18 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
 
             return table;
+        }
+
+        public override uint NextUint()
+        {
+            // WrappedIncrement preserves correctness if the table length stops being a power of two.
+            _index = _index.WrappedIncrement(TableSize);
+            return Table[_index];
+        }
+
+        public override IRandom Copy()
+        {
+            return new WDoomRandom(InternalState);
         }
 
         public override bool Equals(object obj)

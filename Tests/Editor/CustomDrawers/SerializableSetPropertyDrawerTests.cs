@@ -31,6 +31,101 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         private StringSetHost _sharedHost;
         private SerializedObject _sharedSerializedObject;
 
+        private static void SimulateReorderableListMove(
+            ReorderableList list,
+            int oldIndex,
+            int newIndex
+        )
+        {
+            if (list?.list is not { } backing || backing.Count == 0)
+            {
+                return;
+            }
+
+            if (oldIndex < 0 || backing.Count <= oldIndex)
+            {
+                return;
+            }
+
+            object element = backing[oldIndex];
+            backing.RemoveAt(oldIndex);
+
+            int clampedIndex = Mathf.Clamp(newIndex, 0, backing.Count);
+            if (backing.Count <= clampedIndex)
+            {
+                backing.Add(element);
+            }
+            else
+            {
+                backing.Insert(clampedIndex, element);
+            }
+        }
+
+        private static string[] ReadStringValues(SerializedProperty itemsProperty)
+        {
+            if (itemsProperty == null || !itemsProperty.isArray)
+            {
+                return Array.Empty<string>();
+            }
+
+            string[] values = new string[itemsProperty.arraySize];
+            for (int index = 0; index < itemsProperty.arraySize; index++)
+            {
+                values[index] = itemsProperty.GetArrayElementAtIndex(index).stringValue;
+            }
+
+            return values;
+        }
+
+        private static void AssertPlaceholderIsNull(SerializedProperty element)
+        {
+            switch (element.propertyType)
+            {
+                case SerializedPropertyType.ObjectReference:
+                    Assert.IsTrue(
+                        element.objectReferenceValue == null,
+                        "Placeholder object reference should remain null."
+                    );
+                    break;
+                default:
+                    Assert.Fail($"Unsupported placeholder property type {element.propertyType}.");
+                    break;
+            }
+        }
+
+        private static string DumpIntArray(SerializedProperty property)
+        {
+            if (property == null || !property.isArray)
+            {
+                return "<null>";
+            }
+
+            List<int> values = new(property.arraySize);
+            for (int i = 0; i < property.arraySize; i++)
+            {
+                SerializedProperty element = property.GetArrayElementAtIndex(i);
+                values.Add(element?.intValue ?? 0);
+            }
+
+            return string.Join(", ", values);
+        }
+
+        private static string DumpPageEntries(SerializableSetPropertyDrawer.ListPageCache cache)
+        {
+            if (cache?.entries == null || cache.entries.Count == 0)
+            {
+                return "[]";
+            }
+
+            List<int> indices = new(cache.entries.Count);
+            foreach (SerializableSetPropertyDrawer.PageEntry cacheEntry in cache.entries)
+            {
+                indices.Add(cacheEntry?.arrayIndex ?? -1);
+            }
+
+            return $"[{string.Join(", ", indices)}]";
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -54,32 +149,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             }
 
             _sharedHost.Destroy();
-        }
-
-        /// <summary>
-        /// Resets the shared host state between tests to ensure test isolation.
-        /// </summary>
-        private void ResetHostState()
-        {
-            Assert.IsTrue(
-                _sharedSerializedObject != null,
-                "SerializedObject was disposed or null - check OneTimeTearDown ordering"
-            );
-            Assert.IsTrue(
-                _sharedSerializedObject.targetObject != null,
-                "SerializedObject's target was destroyed - check disposal order"
-            );
-
-            _sharedHost.set.Clear();
-            _sharedSerializedObject.Update();
-            SerializedProperty setProperty = _sharedSerializedObject.FindProperty(
-                nameof(StringSetHost.set)
-            );
-            if (setProperty != null)
-            {
-                setProperty.isExpanded = false;
-                _sharedSerializedObject.ApplyModifiedPropertiesWithoutUndo();
-            }
         }
 
         [Test]
@@ -2094,36 +2163,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.AreEqual(20, itemsProperty.GetArrayElementAtIndex(2).intValue);
         }
 
-        private static void SimulateReorderableListMove(
-            ReorderableList list,
-            int oldIndex,
-            int newIndex
-        )
-        {
-            if (list?.list is not { } backing || backing.Count == 0)
-            {
-                return;
-            }
-
-            if (oldIndex < 0 || backing.Count <= oldIndex)
-            {
-                return;
-            }
-
-            object element = backing[oldIndex];
-            backing.RemoveAt(oldIndex);
-
-            int clampedIndex = Mathf.Clamp(newIndex, 0, backing.Count);
-            if (backing.Count <= clampedIndex)
-            {
-                backing.Add(element);
-            }
-            else
-            {
-                backing.Insert(clampedIndex, element);
-            }
-        }
-
         [Test]
         public void EditingStringSetEntryAffectsOnlyTarget()
         {
@@ -2734,38 +2773,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             CollectionAssert.AreEqual(new[] { 1, 3, 5 }, serialized);
             CollectionAssert.AreEqual(new[] { 1, 3, 5 }, host.set.ToArray());
-        }
-
-        private static string[] ReadStringValues(SerializedProperty itemsProperty)
-        {
-            if (itemsProperty == null || !itemsProperty.isArray)
-            {
-                return Array.Empty<string>();
-            }
-
-            string[] values = new string[itemsProperty.arraySize];
-            for (int index = 0; index < itemsProperty.arraySize; index++)
-            {
-                values[index] = itemsProperty.GetArrayElementAtIndex(index).stringValue;
-            }
-
-            return values;
-        }
-
-        private static void AssertPlaceholderIsNull(SerializedProperty element)
-        {
-            switch (element.propertyType)
-            {
-                case SerializedPropertyType.ObjectReference:
-                    Assert.IsTrue(
-                        element.objectReferenceValue == null,
-                        "Placeholder object reference should remain null."
-                    );
-                    break;
-                default:
-                    Assert.Fail($"Unsupported placeholder property type {element.propertyType}.");
-                    break;
-            }
         }
 
         [Test]
@@ -3540,39 +3547,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             serializedHost.ApplyModifiedPropertiesWithoutUndo();
 
             Assert.That(host.trailingScalar, Is.EqualTo(777));
-        }
-
-        private static string DumpIntArray(SerializedProperty property)
-        {
-            if (property == null || !property.isArray)
-            {
-                return "<null>";
-            }
-
-            List<int> values = new(property.arraySize);
-            for (int i = 0; i < property.arraySize; i++)
-            {
-                SerializedProperty element = property.GetArrayElementAtIndex(i);
-                values.Add(element?.intValue ?? 0);
-            }
-
-            return string.Join(", ", values);
-        }
-
-        private static string DumpPageEntries(SerializableSetPropertyDrawer.ListPageCache cache)
-        {
-            if (cache?.entries == null || cache.entries.Count == 0)
-            {
-                return "[]";
-            }
-
-            List<int> indices = new(cache.entries.Count);
-            foreach (SerializableSetPropertyDrawer.PageEntry cacheEntry in cache.entries)
-            {
-                indices.Add(cacheEntry?.arrayIndex ?? -1);
-            }
-
-            return $"[{string.Join(", ", indices)}]";
         }
 
         [Test]
@@ -6025,6 +5999,32 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                     state.animationStartTimes.ContainsKey(i),
                     $"Index {i} should have animation start time."
                 );
+            }
+        }
+
+        /// <summary>
+        /// Resets the shared host state between tests to ensure test isolation.
+        /// </summary>
+        private void ResetHostState()
+        {
+            Assert.IsTrue(
+                _sharedSerializedObject != null,
+                "SerializedObject was disposed or null - check OneTimeTearDown ordering"
+            );
+            Assert.IsTrue(
+                _sharedSerializedObject.targetObject != null,
+                "SerializedObject's target was destroyed - check disposal order"
+            );
+
+            _sharedHost.set.Clear();
+            _sharedSerializedObject.Update();
+            SerializedProperty setProperty = _sharedSerializedObject.FindProperty(
+                nameof(StringSetHost.set)
+            );
+            if (setProperty != null)
+            {
+                setProperty.isExpanded = false;
+                _sharedSerializedObject.ApplyModifiedPropertiesWithoutUndo();
             }
         }
 

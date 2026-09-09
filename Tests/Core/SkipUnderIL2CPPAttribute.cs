@@ -33,15 +33,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             "Reflection-based serialization (protobuf-net / System.Text.Json) is not AOT-compatible "
             + "under IL2CPP; runs on the Mono backend. Interim gate tracked by WallstopProto (issue 343).";
 
+        /// <summary>The human-readable skip reason (also surfaced as the NUnit skip reason).</summary>
+        public string Reason => _reason;
+
         private readonly string _reason;
 
         public SkipUnderIL2CPPAttribute(string reason = DefaultReason)
         {
             _reason = string.IsNullOrEmpty(reason) ? DefaultReason : reason;
         }
-
-        /// <summary>The human-readable skip reason (also surfaced as the NUnit skip reason).</summary>
-        public string Reason => _reason;
 
         public void ApplyToTest(Test test)
         {

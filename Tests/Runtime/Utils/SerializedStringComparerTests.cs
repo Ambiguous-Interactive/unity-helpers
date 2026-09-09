@@ -15,6 +15,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     {
         private CultureInfo _originalCulture;
 
+        private static SerializedStringComparer.StringCompareMode[] AllModes()
+        {
+            return Enum.GetValues(typeof(SerializedStringComparer.StringCompareMode))
+                .OfType<SerializedStringComparer.StringCompareMode>()
+                .ToArray();
+        }
+
         [SetUp]
         public void SetUp()
         {
@@ -371,13 +378,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                     $"Leading whitespace should matter in {mode} mode"
                 );
             }
-        }
-
-        private static SerializedStringComparer.StringCompareMode[] AllModes()
-        {
-            return Enum.GetValues(typeof(SerializedStringComparer.StringCompareMode))
-                .OfType<SerializedStringComparer.StringCompareMode>()
-                .ToArray();
         }
     }
 }

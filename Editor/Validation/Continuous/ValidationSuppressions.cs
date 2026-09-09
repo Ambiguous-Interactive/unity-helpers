@@ -33,6 +33,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     /// </remarks>
     public sealed class ValidationSuppressions
     {
+        /// <summary>A set that suppresses nothing.</summary>
+        public static ValidationSuppressions Empty => EmptySuppressions;
+
         private static readonly string[] NoIds = Array.Empty<string>();
 
         private static readonly ValidationSuppressions EmptySuppressions =
@@ -40,6 +43,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 new List<string>(),
                 new HashSet<string>(StringComparer.Ordinal)
             );
+
+        /// <summary>How many distinct findings this set suppresses.</summary>
+        public int Count => _ordered.Count;
+
+        /// <summary>The suppressed identities, in the order the file listed them.</summary>
+        public IReadOnlyList<string> Ids => _ordered;
 
         private readonly List<string> _ordered;
         private readonly HashSet<string> _ids;
@@ -49,15 +58,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             _ordered = ordered;
             _ids = ids;
         }
-
-        /// <summary>A set that suppresses nothing.</summary>
-        public static ValidationSuppressions Empty => EmptySuppressions;
-
-        /// <summary>How many distinct findings this set suppresses.</summary>
-        public int Count => _ordered.Count;
-
-        /// <summary>The suppressed identities, in the order the file listed them.</summary>
-        public IReadOnlyList<string> Ids => _ordered;
 
         /// <summary>
         /// Reads a suppression file.
@@ -141,6 +141,26 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             return builder.ToString();
         }
 
+        private static IReadOnlyList<T> Safe<T>(IReadOnlyList<T> values)
+        {
+            return values ?? (IReadOnlyList<T>)Array.Empty<T>();
+        }
+
+        /// <summary>
+        /// Flattens a message onto one line, so it cannot become an entry of its own.
+        /// </summary>
+        /// <param name="message">The finding's message.</param>
+        /// <returns>The message with newlines replaced by spaces.</returns>
+        private static string Single(string message)
+        {
+            if (string.IsNullOrEmpty(message))
+            {
+                return "(no message)";
+            }
+
+            return message.Replace("\r\n", " ").Replace('\n', ' ').Replace('\r', ' ');
+        }
+
         /// <summary>Reports whether this set silences a finding.</summary>
         /// <param name="finding">The finding to test.</param>
         /// <returns><c>true</c> when the file lists the finding's identity.</returns>
@@ -183,26 +203,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
 
             return unused.Count == 0 ? NoIds : unused;
-        }
-
-        private static IReadOnlyList<T> Safe<T>(IReadOnlyList<T> values)
-        {
-            return values ?? (IReadOnlyList<T>)Array.Empty<T>();
-        }
-
-        /// <summary>
-        /// Flattens a message onto one line, so it cannot become an entry of its own.
-        /// </summary>
-        /// <param name="message">The finding's message.</param>
-        /// <returns>The message with newlines replaced by spaces.</returns>
-        private static string Single(string message)
-        {
-            if (string.IsNullOrEmpty(message))
-            {
-                return "(no message)";
-            }
-
-            return message.Replace("\r\n", " ").Replace('\n', ' ').Replace('\r', ' ');
         }
     }
 #endif

@@ -21,6 +21,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper.Logging
 
     public readonly struct DecorationEntry
     {
+        internal string Tag { get; }
+        internal bool EditorOnly { get; }
+        internal Func<string, bool> Predicate { get; }
+        internal Func<string, object, string> Formatter { get; }
+
         internal DecorationEntry(
             string tag,
             bool editorOnly,
@@ -33,11 +38,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper.Logging
             Predicate = predicate;
             Formatter = formatter;
         }
-
-        internal string Tag { get; }
-        internal bool EditorOnly { get; }
-        internal Func<string, bool> Predicate { get; }
-        internal Func<string, object, string> Formatter { get; }
     }
 
     /// <summary>
@@ -66,6 +66,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper.Logging
             .Where(kvp => kvp.Value.PropertyType == typeof(Color))
             .Select(kvp => (kvp.Key, ((Color)kvp.Value.GetValue(null)).ToHex()))
             .ToDictionary(StringComparer.OrdinalIgnoreCase);
+        private static readonly Stopwatch FallbackStopwatch = Stopwatch.StartNew();
+        private static int _unityMainThreadId;
+        private static int _mainThreadCaptured;
 
         /// <summary>
         /// All currently registered decorations by tag.
@@ -87,9 +90,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper.Logging
         private readonly StringBuilder _cachedStringBuilder = new();
         private readonly List<string> _cachedDecorators = new();
         private readonly HashSet<string> _appliedTags = new(StringComparer.OrdinalIgnoreCase);
-        private static readonly Stopwatch FallbackStopwatch = Stopwatch.StartNew();
-        private static int _unityMainThreadId;
-        private static int _mainThreadCaptured;
 
         public UnityLogTagFormatter()
             : this(true) { }
@@ -186,12 +186,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper.Logging
         }
 
         [HideInCallstack]
-        public object GetFormat(Type formatType)
-        {
-            return formatType.IsAssignableFrom(typeof(ICustomFormatter)) ? this : null;
-        }
-
-        [HideInCallstack]
         private static string ToSafeString(object arg)
         {
             if (arg is Object unityObj)
@@ -199,6 +193,18 @@ namespace WallstopStudios.UnityHelpers.Core.Helper.Logging
                 return unityObj != null ? unityObj.ToString() : string.Empty;
             }
             return arg?.ToString() ?? string.Empty;
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void CaptureRuntimeMainThread()
+        {
+            CaptureUnityMainThread(Thread.CurrentThread);
+        }
+
+        [HideInCallstack]
+        public object GetFormat(Type formatType)
+        {
+            return formatType.IsAssignableFrom(typeof(ICustomFormatter)) ? this : null;
         }
 
         [HideInCallstack]
@@ -396,12 +402,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper.Logging
             }
 
             return rendered;
-        }
-
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void CaptureRuntimeMainThread()
-        {
-            CaptureUnityMainThread(Thread.CurrentThread);
         }
 
 #if UNITY_EDITOR

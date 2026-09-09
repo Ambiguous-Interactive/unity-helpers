@@ -50,14 +50,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
             ImmutableArray.Create(UnityHelpersDiagnostics.UnityRandomIsNotReplayable);
 
-        /// <inheritdoc />
-        public override void Initialize(AnalysisContext context)
-        {
-            context.EnableConcurrentExecution();
-            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
-            context.RegisterCompilationStartAction(OnCompilationStart);
-        }
-
         private static void OnCompilationStart(CompilationStartAnalysisContext context)
         {
             INamedTypeSymbol unityRandom = context.Compilation.GetTypeByMetadataName(
@@ -237,6 +229,14 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             }
 
             return containingNamespace.ToDisplayString() + "." + type.MetadataName;
+        }
+
+        /// <inheritdoc />
+        public override void Initialize(AnalysisContext context)
+        {
+            context.EnableConcurrentExecution();
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+            context.RegisterCompilationStartAction(OnCompilationStart);
         }
     }
 }

@@ -20,19 +20,14 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         // Reseed each test so a failing tree can be reproduced alone or within the fixture.
         private const uint RandomSeed = 0x5EED0303;
 
-        private IRandom _random = new PcgRandom(RandomSeed);
-
         private IRandom Random => _random;
+
+        private IRandom _random = new PcgRandom(RandomSeed);
 
         [SetUp]
         public void SeedOctTree3DRandom()
         {
             _random = new PcgRandom(RandomSeed);
-        }
-
-        protected override OctTree3D<Vector3> CreateTree(IEnumerable<Vector3> points)
-        {
-            return new OctTree3D<Vector3>(points, point => point);
         }
 
         [TestCase(0)]
@@ -570,6 +565,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             List<Vector3> results = new();
             tree.GetElementsInRange(Vector3.zero, 500f, results);
             CollectionAssert.AreEquivalent(points, results);
+        }
+
+        protected override OctTree3D<Vector3> CreateTree(IEnumerable<Vector3> points)
+        {
+            return new OctTree3D<Vector3>(points, point => point);
         }
     }
 }

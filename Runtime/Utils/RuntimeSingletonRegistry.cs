@@ -19,14 +19,14 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// </summary>
     internal static class RuntimeSingletonRegistry
     {
+        internal static bool IsClearingInstances => _isClearingInstances;
+
         private static readonly Dictionary<Type, RuntimeSingletonRegistration> _registrations =
             new();
 
         private static readonly Queue<Action> _pendingClears = new();
         private static readonly HashSet<Action> _clearingActions = new();
         private static bool _isClearingInstances;
-
-        internal static bool IsClearingInstances => _isClearingInstances;
 
         private static bool _isApplicationQuitting;
 #if UNITY_EDITOR

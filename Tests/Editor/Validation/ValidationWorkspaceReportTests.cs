@@ -14,6 +14,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     [TestFixture]
     public sealed class ValidationWorkspaceReportTests : CommonTestBase
     {
+        private static ValidationFinding Finding(ValidationSeverity severity)
+        {
+            return new ValidationFinding(
+                "project<&rule",
+                severity,
+                null,
+                "guid",
+                "Assets/A<&.asset",
+                "field",
+                "Message <tag> & \"quotes\""
+            );
+        }
+
+        private static ValidationRun Run(ValidationFinding finding)
+        {
+            ValidationRun run = new ValidationRun(
+                new[] { new ReportRule(finding) },
+                new[]
+                {
+                    new ValidationTarget("guid", "Assets/Test.asset", typeof(ScriptableObject)),
+                },
+                _ => null
+            );
+            while (!run.Step(double.MaxValue)) { }
+            return run;
+        }
+
         [Test]
         public void SuppressingPreservesUnobservedEntriesAndComments()
         {
@@ -92,44 +119,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assert.IsTrue(document.SelectSingleNode("//error") != null);
         }
 
-        private static ValidationFinding Finding(ValidationSeverity severity)
-        {
-            return new ValidationFinding(
-                "project<&rule",
-                severity,
-                null,
-                "guid",
-                "Assets/A<&.asset",
-                "field",
-                "Message <tag> & \"quotes\""
-            );
-        }
-
-        private static ValidationRun Run(ValidationFinding finding)
-        {
-            ValidationRun run = new ValidationRun(
-                new[] { new ReportRule(finding) },
-                new[]
-                {
-                    new ValidationTarget("guid", "Assets/Test.asset", typeof(ScriptableObject)),
-                },
-                _ => null
-            );
-            while (!run.Step(double.MaxValue)) { }
-            return run;
-        }
-
         private sealed class ReportRule : IValidationRule
         {
+            public string RuleId => "test.report";
+            public string DisplayName => "Report fixture";
+
             private readonly ValidationFinding _finding;
 
             internal ReportRule(ValidationFinding finding)
             {
                 _finding = finding;
             }
-
-            public string RuleId => "test.report";
-            public string DisplayName => "Report fixture";
 
             public bool AppliesTo(in ValidationTarget target) => true;
 

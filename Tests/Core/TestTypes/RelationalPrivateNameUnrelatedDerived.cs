@@ -11,10 +11,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
     /// </summary>
     public sealed class RelationalPrivateNameUnrelatedDerived : RelationalPrivateNameBase
     {
-        [SerializeField]
-        private BoxCollider _collider;
-
         /// <summary>The unattributed field, which nothing should assign.</summary>
         public BoxCollider DerivedCollider => _collider;
+
+        [SerializeField]
+        private BoxCollider _collider;
     }
 }

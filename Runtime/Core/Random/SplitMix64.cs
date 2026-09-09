@@ -108,22 +108,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             return NextWord();
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private ulong NextWord()
-        {
-            unchecked
-            {
-                _state += 0x9E3779B97F4A7C15UL;
-
-                ulong z = _state;
-                z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL;
-                z = (z ^ (z >> 27)) * 0x94D049BB133111EBUL;
-                z ^= z >> 31;
-
-                return z;
-            }
-        }
-
         public override IRandom Copy()
         {
             return new SplitMix64(InternalState);
@@ -167,6 +151,22 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         public override string ToString()
         {
             return $"{{\"State\": {_state}}}";
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private ulong NextWord()
+        {
+            unchecked
+            {
+                _state += 0x9E3779B97F4A7C15UL;
+
+                ulong z = _state;
+                z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL;
+                z = (z ^ (z >> 27)) * 0x94D049BB133111EBUL;
+                z ^= z >> 31;
+
+                return z;
+            }
         }
     }
 }

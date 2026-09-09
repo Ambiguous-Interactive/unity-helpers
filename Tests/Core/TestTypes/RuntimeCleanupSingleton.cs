@@ -10,20 +10,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
     [ExecuteAlways]
     public sealed class RuntimeCleanupSingleton : RuntimeSingleton<RuntimeCleanupSingleton>
     {
-        public Action disabling;
-        public Action destroying;
-
         protected override bool Preserve => false;
 
-        private void OnDisable()
-        {
-            disabling?.Invoke();
-        }
+        public Action disabling;
+        public Action destroying;
 
         protected override void OnDestroy()
         {
             destroying?.Invoke();
             base.OnDestroy();
+        }
+
+        private void OnDisable()
+        {
+            disabling?.Invoke();
         }
     }
 }

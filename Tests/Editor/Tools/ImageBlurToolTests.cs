@@ -16,6 +16,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
     {
         private const float Tolerance = 1e-4f;
 
+        private static void AssertColor(Color actual, Color expected)
+        {
+            Assert.That(actual.r, Is.EqualTo(expected.r).Within(Tolerance));
+            Assert.That(actual.g, Is.EqualTo(expected.g).Within(Tolerance));
+            Assert.That(actual.b, Is.EqualTo(expected.b).Within(Tolerance));
+            Assert.That(actual.a, Is.EqualTo(expected.a).Within(Tolerance));
+        }
+
+        private static int CountTemporaryTextures()
+        {
+            int count = 0;
+            Texture2D[] textures = Resources.FindObjectsOfTypeAll<Texture2D>();
+            foreach (Texture2D texture in textures)
+            {
+                if (texture != null && texture.name == ImageBlurTool.TemporaryTextureName)
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+
         [TestCase(1)]
         [TestCase(2)]
         [TestCase(3)]
@@ -135,28 +157,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             source.Apply();
             Texture2D blurred = Track(ImageBlurTool.BlurredForTests(source, radius));
             return blurred.GetPixels();
-        }
-
-        private static void AssertColor(Color actual, Color expected)
-        {
-            Assert.That(actual.r, Is.EqualTo(expected.r).Within(Tolerance));
-            Assert.That(actual.g, Is.EqualTo(expected.g).Within(Tolerance));
-            Assert.That(actual.b, Is.EqualTo(expected.b).Within(Tolerance));
-            Assert.That(actual.a, Is.EqualTo(expected.a).Within(Tolerance));
-        }
-
-        private static int CountTemporaryTextures()
-        {
-            int count = 0;
-            Texture2D[] textures = Resources.FindObjectsOfTypeAll<Texture2D>();
-            foreach (Texture2D texture in textures)
-            {
-                if (texture != null && texture.name == ImageBlurTool.TemporaryTextureName)
-                {
-                    count++;
-                }
-            }
-            return count;
         }
     }
 #endif

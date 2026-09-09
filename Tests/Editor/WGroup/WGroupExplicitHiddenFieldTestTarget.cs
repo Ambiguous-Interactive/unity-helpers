@@ -16,14 +16,14 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         [WGroup("Explicit Group")]
         public int groupAnchor;
 
+        public int visibleField;
+
         [WGroup("Explicit Group")]
         [HideInInspector]
         [SerializeField]
 #pragma warning disable CS0649 // Field is never assigned to
         internal int _explicitlyGroupedHiddenField;
 #pragma warning restore CS0649 // Field is never assigned to
-
-        public int visibleField;
     }
 }
 #endif

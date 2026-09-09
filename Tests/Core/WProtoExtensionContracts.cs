@@ -10,14 +10,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     [WProtoInclude(100, typeof(WProtoExtensionKnown))]
     public partial class WProtoExtensionBase
     {
-        [WProtoMember(1)]
-        private int damage;
-
         public int Damage
         {
             get => damage;
             set => damage = value;
         }
+
+        [WProtoMember(1)]
+        private int damage;
     }
 
     [WProtoContract]

@@ -38,6 +38,25 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             [typeof(LinkedList<>)] = "List<{0}>",
         };
 
+        private static readonly Dictionary<Type, string> Keywords = new()
+        {
+            [typeof(bool)] = "bool",
+            [typeof(byte)] = "byte",
+            [typeof(sbyte)] = "sbyte",
+            [typeof(char)] = "char",
+            [typeof(short)] = "short",
+            [typeof(ushort)] = "ushort",
+            [typeof(int)] = "int",
+            [typeof(uint)] = "uint",
+            [typeof(long)] = "long",
+            [typeof(ulong)] = "ulong",
+            [typeof(float)] = "float",
+            [typeof(double)] = "double",
+            [typeof(decimal)] = "decimal",
+            [typeof(string)] = "string",
+            [typeof(object)] = "object",
+        };
+
         /// <summary>
         /// Finds the type to use instead of <paramref name="declared"/>.
         /// </summary>
@@ -93,25 +112,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             standIn = string.Format(template, names);
             return true;
         }
-
-        private static readonly Dictionary<Type, string> Keywords = new()
-        {
-            [typeof(bool)] = "bool",
-            [typeof(byte)] = "byte",
-            [typeof(sbyte)] = "sbyte",
-            [typeof(char)] = "char",
-            [typeof(short)] = "short",
-            [typeof(ushort)] = "ushort",
-            [typeof(int)] = "int",
-            [typeof(uint)] = "uint",
-            [typeof(long)] = "long",
-            [typeof(ulong)] = "ulong",
-            [typeof(float)] = "float",
-            [typeof(double)] = "double",
-            [typeof(decimal)] = "decimal",
-            [typeof(string)] = "string",
-            [typeof(object)] = "object",
-        };
 
         /// <summary>
         /// Writes a type the way a developer would write it in source.

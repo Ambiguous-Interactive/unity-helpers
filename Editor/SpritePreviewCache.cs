@@ -12,6 +12,10 @@ namespace WallstopStudios.UnityHelpers.Editor
     {
         internal const int DefaultMaximumEntries = 128;
         internal const long DefaultMaximumEstimatedBytes = 32 * 1024 * 1024;
+
+        internal int Count => _entries.Count;
+        internal long EstimatedBytes { get; private set; }
+        internal long MaximumEstimatedBytes { get; }
         private readonly int _maximumEntries;
         private readonly Dictionary<Sprite, LinkedListNode<Entry>> _entries = new();
         private readonly LinkedList<Entry> _recency = new();
@@ -25,9 +29,26 @@ namespace WallstopStudios.UnityHelpers.Editor
             MaximumEstimatedBytes = Math.Max(0, maximumBytes);
         }
 
-        internal int Count => _entries.Count;
-        internal long EstimatedBytes { get; private set; }
-        internal long MaximumEstimatedBytes { get; }
+        internal static long EstimateBytes(
+            int width,
+            int height,
+            TextureFormat format,
+            int mipmapCount
+        )
+        {
+            long pixels = 0;
+            for (int level = 0; level < mipmapCount; level++)
+            {
+                pixels += (long)width * height;
+                width = Math.Max(1, width / 2);
+                height = Math.Max(1, height / 2);
+            }
+            int bytesPerPixel =
+                format == TextureFormat.RGBA32 || format == TextureFormat.ARGB32 ? 4 : 16;
+            return pixels * bytesPerPixel * 2 + 4096;
+        }
+
+        private static bool WasProvided(Sprite sprite) => !ReferenceEquals(sprite, null);
 
         internal bool TryGetValue(Sprite sprite, out Texture2D texture)
         {
@@ -97,27 +118,6 @@ namespace WallstopStudios.UnityHelpers.Editor
                 Remove(_recency.First);
             }
         }
-
-        internal static long EstimateBytes(
-            int width,
-            int height,
-            TextureFormat format,
-            int mipmapCount
-        )
-        {
-            long pixels = 0;
-            for (int level = 0; level < mipmapCount; level++)
-            {
-                pixels += (long)width * height;
-                width = Math.Max(1, width / 2);
-                height = Math.Max(1, height / 2);
-            }
-            int bytesPerPixel =
-                format == TextureFormat.RGBA32 || format == TextureFormat.ARGB32 ? 4 : 16;
-            return pixels * bytesPerPixel * 2 + 4096;
-        }
-
-        private static bool WasProvided(Sprite sprite) => !ReferenceEquals(sprite, null);
 
         private void Remove(LinkedListNode<Entry> node)
         {

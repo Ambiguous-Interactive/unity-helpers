@@ -18,6 +18,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
     [NUnit.Framework.Category("Integration")]
     public sealed class AnimationEventEditorViewModelTests : BatchedEditorTestBase
     {
+        private static readonly TestCaseData[] MoveEventCases =
+        {
+            new TestCaseData(0, 2, new[] { "Two", "One", "Three" }).SetName(
+                "MoveEvent_MovesFirstElementTowardsEnd"
+            ),
+            new TestCaseData(2, -3, new[] { "Three", "One", "Two" }).SetName(
+                "MoveEvent_ClampsLowIndexToStart"
+            ),
+            new TestCaseData(1, 1, new[] { "One", "Two", "Three" }).SetName(
+                "MoveEvent_NoOpWhenIndicesMatch"
+            ),
+            new TestCaseData(0, 10, new[] { "Two", "Three", "One" }).SetName(
+                "MoveEvent_ClampsHighIndexToEnd"
+            ),
+        };
+
         [SetUp]
         public void SetUp()
         {
@@ -475,22 +491,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             );
             Assert.AreEqual(0, arr.Length);
         }
-
-        private static readonly TestCaseData[] MoveEventCases =
-        {
-            new TestCaseData(0, 2, new[] { "Two", "One", "Three" }).SetName(
-                "MoveEvent_MovesFirstElementTowardsEnd"
-            ),
-            new TestCaseData(2, -3, new[] { "Three", "One", "Two" }).SetName(
-                "MoveEvent_ClampsLowIndexToStart"
-            ),
-            new TestCaseData(1, 1, new[] { "One", "Two", "Three" }).SetName(
-                "MoveEvent_NoOpWhenIndicesMatch"
-            ),
-            new TestCaseData(0, 10, new[] { "Two", "Three", "One" }).SetName(
-                "MoveEvent_ClampsHighIndexToEnd"
-            ),
-        };
 
         private AnimationClip CreateClipWithEvents(
             float frameRate,

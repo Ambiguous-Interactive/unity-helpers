@@ -62,18 +62,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             }
         }
 
-        private UnityMethodAnalyzerWindow CreateWindow()
-        {
-            _window = ScriptableObject.CreateInstance<UnityMethodAnalyzerWindow>(); // UNH-SUPPRESS: EditorWindow cleaned up in TearDown
-
-            _window.Initialize();
-            _window._analyzer = new MethodAnalyzer(
-                _compilerMessages,
-                "Captured test compiler snapshot."
-            );
-            return _window;
-        }
-
         [Test]
         public void WindowInitializesWithCorrectDefaultState()
         {
@@ -583,42 +571,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             );
         }
 
-        private IEnumerator SuccessfulAnalysisResetsUIStateWithFileCount(int fileCount)
-        {
-            UnityMethodAnalyzerWindow window = CreateWindow();
-
-            for (int i = 0; i < fileCount; i++)
-            {
-                AddCompilerDiagnostic($"FileCountTest{i}.cs");
-            }
-
-            window._isAnalyzing = false;
-            window._sourcePaths = new List<string> { _tempDir };
-
-            TaskCompletionSource<bool> tcs = new();
-            window._analysisCompletionSource = tcs;
-
-            window.StartAnalysis();
-
-            AnalysisWaitResult result = default;
-            yield return WaitForAnalysisCompletion(window, 15f, r => result = r);
-
-            Assert.IsFalse(
-                result.IsAnalyzing,
-                $"isAnalyzing should be false after completion with {fileCount} files. {result}"
-            );
-            Assert.AreEqual(
-                0f,
-                result.Progress,
-                $"Progress should be 0 after completion with {fileCount} files. {result}"
-            );
-            Assert.IsTrue(
-                result.StatusMessage.Contains("reported issues in selected directories")
-                    || result.StatusMessage.Contains("Analysis failed"),
-                $"Status should indicate completion or failure with {fileCount} files. {result}"
-            );
-        }
-
         /// <summary>
         /// Test that verifies the race condition between Progress callback and ResetAnalysisState is handled.
         /// Progress&lt;T&gt; uses SynchronizationContext.Post() which can deliver callbacks after the task
@@ -1123,122 +1075,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             Assert.AreEqual(0, mediumCount, "Medium count should be 0");
             Assert.AreEqual(0, lowCount, "Low count should be 0");
             Assert.AreEqual(0, infoCount, "Info count should be 0");
-        }
-
-        private void AddCompilerDiagnostic(string filename)
-        {
-            _compilerMessages.Add(
-                new CompilerMessage
-                {
-                    file = Path.Combine(_tempDir, filename),
-                    line = 1,
-                    message =
-                        "warning WUH015: 'Fixture.Subject.Update(int)' has an invalid callback signature.",
-                    type = CompilerMessageType.Warning,
-                }
-            );
-        }
-
-        /// <summary>
-        /// Waits for the analysis to complete and captures diagnostic information.
-        /// First waits for the underlying analysis task, then repeatedly flushes
-        /// the main thread queue until the completion callback has been processed.
-        /// </summary>
-        /// <remarks>
-        /// The analysis task completion triggers a ContinueWith callback that runs on a
-        /// thread pool thread, which enqueues HandleAnalysisCompletion onto the main thread
-        /// queue. There's a race between the task completing and the ContinueWith callback
-        /// actually running, so we must loop until the completion source is signaled
-        /// (which happens at the end of HandleAnalysisCompletion via FinalizeAnalysis).
-        /// </remarks>
-        private IEnumerator WaitForAnalysisCompletion(
-            UnityMethodAnalyzerWindow window,
-            float maxWaitTime,
-            Action<AnalysisWaitResult> onComplete
-        )
-        {
-            Task analysisTask = window._analysisTask;
-            TaskCompletionSource<bool> tcs = window._analysisCompletionSource;
-            float startRealTime = Time.realtimeSinceStartup;
-            int frameCount = 0;
-
-            if (analysisTask == null)
-            {
-                UnityEngine.Debug.LogWarning(
-                    $"[WaitForAnalysisCompletion] Analysis task is null! "
-                        + $"IsAnalyzing: {window._isAnalyzing}, Status: '{window._statusMessage}'"
-                );
-            }
-
-            while (
-                (Time.realtimeSinceStartup - startRealTime) < maxWaitTime
-                && analysisTask != null
-                && !analysisTask.IsCompleted
-            )
-            {
-                yield return null;
-                frameCount++;
-
-                if (frameCount % 50 == 0)
-                {
-                    Task currentTask = window._analysisTask;
-                    if (!ReferenceEquals(currentTask, analysisTask))
-                    {
-                        UnityEngine.Debug.LogWarning(
-                            $"[WaitForAnalysisCompletion] Task reference changed at frame {frameCount}!"
-                        );
-                    }
-                }
-            }
-
-            /*
-                The ContinueWith runs on a thread pool thread and enqueues work on the main thread,
-                so flush and yield until the completion source is signaled -- which is what says
-                HandleAnalysisCompletion ran and called FinalizeAnalysis.
-            */
-            while ((Time.realtimeSinceStartup - startRealTime) < maxWaitTime)
-            {
-                UnityMethodAnalyzerWindow.FlushMainThreadQueue();
-
-                bool completionSignaled = tcs != null && tcs.Task.IsCompleted;
-                bool noLongerAnalyzing = !window._isAnalyzing;
-
-                if (completionSignaled || noLongerAnalyzing)
-                {
-                    yield return null;
-                    frameCount++;
-                    UnityMethodAnalyzerWindow.FlushMainThreadQueue();
-                    break;
-                }
-
-                yield return null;
-                frameCount++;
-            }
-
-            float realWaitTime = Time.realtimeSinceStartup - startRealTime;
-
-            if (analysisTask != null && analysisTask.IsFaulted && analysisTask.Exception != null)
-            {
-                string taskExceptionMessage = analysisTask.Exception.GetBaseException().Message;
-                UnityEngine.Debug.LogError(
-                    $"[WaitForAnalysisCompletion] Task faulted with: {taskExceptionMessage}"
-                );
-            }
-
-            AnalysisWaitResult result = new()
-            {
-                WaitTime = realWaitTime,
-                FrameCount = frameCount,
-                AnalysisTaskCompleted = analysisTask != null && analysisTask.IsCompleted,
-                AnalysisTaskStatus = analysisTask?.Status ?? TaskStatus.Created,
-                CompletionSourceSignaled = tcs?.Task.IsCompleted ?? false,
-                CompletionSourceStatus = tcs?.Task.Status ?? TaskStatus.Created,
-                IsAnalyzing = window._isAnalyzing,
-                Progress = window._analysisProgress,
-                StatusMessage = window._statusMessage,
-            };
-
-            onComplete?.Invoke(result);
         }
 
         [Test]
@@ -1858,78 +1694,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             }
         }
 
-        private void AssertExactlyOneGroupBySelected(
-            UnityMethodAnalyzerWindow window,
-            string context
-        )
-        {
-            bool groupByFile = window._groupByFile;
-            bool groupBySeverity = window._groupBySeverity;
-            bool groupByCategory = window._groupByCategory;
-
-            int selectedCount =
-                (groupByFile ? 1 : 0) + (groupBySeverity ? 1 : 0) + (groupByCategory ? 1 : 0);
-            Assert.AreEqual(
-                1,
-                selectedCount,
-                $"[{context}] Exactly one grouping should be selected, but {selectedCount} were selected. "
-                    + $"File={groupByFile}, Severity={groupBySeverity}, Category={groupByCategory}"
-            );
-        }
-
-        /// <summary>
-        /// Simulates clicking a group-by button by setting up state as if the button was clicked.
-        /// The target grouping should be true, others false.
-        /// </summary>
-        private void SimulateGroupByClick(
-            UnityMethodAnalyzerWindow window,
-            bool groupByFile,
-            bool groupBySeverity,
-            bool groupByCategory
-        )
-        {
-            SimulateGroupByClickRaw(window, groupByFile, groupBySeverity, groupByCategory);
-        }
-
-        /// <summary>
-        /// Simulates the raw toggle return values and invokes the internal logic.
-        /// This allows testing edge cases like clicking an already-selected button.
-        /// </summary>
-        private void SimulateGroupByClickRaw(
-            UnityMethodAnalyzerWindow window,
-            bool newGroupByFile,
-            bool newGroupBySeverity,
-            bool newGroupByCategory
-        )
-        {
-            bool currentGroupByFile = window._groupByFile;
-            bool currentGroupBySeverity = window._groupBySeverity;
-            bool currentGroupByCategory = window._groupByCategory;
-
-            bool fileClicked = newGroupByFile && !currentGroupByFile;
-            bool severityClicked = newGroupBySeverity && !currentGroupBySeverity;
-            bool categoryClicked = newGroupByCategory && !currentGroupByCategory;
-
-            if (fileClicked)
-            {
-                window._groupByFile = true;
-                window._groupBySeverity = false;
-                window._groupByCategory = false;
-            }
-            else if (severityClicked)
-            {
-                window._groupByFile = false;
-                window._groupBySeverity = true;
-                window._groupByCategory = false;
-            }
-            else if (categoryClicked)
-            {
-                window._groupByFile = false;
-                window._groupBySeverity = false;
-                window._groupByCategory = true;
-            }
-        }
-
         [Test]
         public void InitializeCreatesAnalyzer()
         {
@@ -2083,39 +1847,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         public IEnumerator CancellationWorksWithLargeFileCount()
         {
             yield return CancellationWorksWithFileCount(50);
-        }
-
-        private IEnumerator CancellationWorksWithFileCount(int fileCount)
-        {
-            UnityMethodAnalyzerWindow window = CreateWindow();
-
-            for (int i = 0; i < fileCount; i++)
-            {
-                AddCompilerDiagnostic($"VaryingTest{i}.cs");
-            }
-
-            window._sourcePaths = new List<string> { _tempDir };
-
-            window.StartAnalysis();
-            yield return null;
-
-            window.CancelAnalysis();
-
-            float waitTime = 0f;
-            float maxWaitTime = 10f;
-            while (waitTime < maxWaitTime && window._isAnalyzing)
-            {
-                yield return null;
-                waitTime += Time.deltaTime;
-            }
-
-            bool isAnalyzing = window._isAnalyzing;
-            string status = window._statusMessage;
-
-            Assert.IsFalse(
-                isAnalyzing,
-                $"Cancellation should work with {fileCount} files. Status: '{status}', WaitTime: {waitTime:F2}s"
-            );
         }
 
         [Test]
@@ -2877,6 +2608,275 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             Assert.IsTrue(
                 completed,
                 $"SemaphoreSlim.WaitAsync should complete. Status: {semaphoreTask.Status}"
+            );
+        }
+
+        private UnityMethodAnalyzerWindow CreateWindow()
+        {
+            _window = ScriptableObject.CreateInstance<UnityMethodAnalyzerWindow>(); // UNH-SUPPRESS: EditorWindow cleaned up in TearDown
+
+            _window.Initialize();
+            _window._analyzer = new MethodAnalyzer(
+                _compilerMessages,
+                "Captured test compiler snapshot."
+            );
+            return _window;
+        }
+
+        private IEnumerator SuccessfulAnalysisResetsUIStateWithFileCount(int fileCount)
+        {
+            UnityMethodAnalyzerWindow window = CreateWindow();
+
+            for (int i = 0; i < fileCount; i++)
+            {
+                AddCompilerDiagnostic($"FileCountTest{i}.cs");
+            }
+
+            window._isAnalyzing = false;
+            window._sourcePaths = new List<string> { _tempDir };
+
+            TaskCompletionSource<bool> tcs = new();
+            window._analysisCompletionSource = tcs;
+
+            window.StartAnalysis();
+
+            AnalysisWaitResult result = default;
+            yield return WaitForAnalysisCompletion(window, 15f, r => result = r);
+
+            Assert.IsFalse(
+                result.IsAnalyzing,
+                $"isAnalyzing should be false after completion with {fileCount} files. {result}"
+            );
+            Assert.AreEqual(
+                0f,
+                result.Progress,
+                $"Progress should be 0 after completion with {fileCount} files. {result}"
+            );
+            Assert.IsTrue(
+                result.StatusMessage.Contains("reported issues in selected directories")
+                    || result.StatusMessage.Contains("Analysis failed"),
+                $"Status should indicate completion or failure with {fileCount} files. {result}"
+            );
+        }
+
+        private void AddCompilerDiagnostic(string filename)
+        {
+            _compilerMessages.Add(
+                new CompilerMessage
+                {
+                    file = Path.Combine(_tempDir, filename),
+                    line = 1,
+                    message =
+                        "warning WUH015: 'Fixture.Subject.Update(int)' has an invalid callback signature.",
+                    type = CompilerMessageType.Warning,
+                }
+            );
+        }
+
+        /// <summary>
+        /// Waits for the analysis to complete and captures diagnostic information.
+        /// First waits for the underlying analysis task, then repeatedly flushes
+        /// the main thread queue until the completion callback has been processed.
+        /// </summary>
+        /// <remarks>
+        /// The analysis task completion triggers a ContinueWith callback that runs on a
+        /// thread pool thread, which enqueues HandleAnalysisCompletion onto the main thread
+        /// queue. There's a race between the task completing and the ContinueWith callback
+        /// actually running, so we must loop until the completion source is signaled
+        /// (which happens at the end of HandleAnalysisCompletion via FinalizeAnalysis).
+        /// </remarks>
+        private IEnumerator WaitForAnalysisCompletion(
+            UnityMethodAnalyzerWindow window,
+            float maxWaitTime,
+            Action<AnalysisWaitResult> onComplete
+        )
+        {
+            Task analysisTask = window._analysisTask;
+            TaskCompletionSource<bool> tcs = window._analysisCompletionSource;
+            float startRealTime = Time.realtimeSinceStartup;
+            int frameCount = 0;
+
+            if (analysisTask == null)
+            {
+                UnityEngine.Debug.LogWarning(
+                    $"[WaitForAnalysisCompletion] Analysis task is null! "
+                        + $"IsAnalyzing: {window._isAnalyzing}, Status: '{window._statusMessage}'"
+                );
+            }
+
+            while (
+                (Time.realtimeSinceStartup - startRealTime) < maxWaitTime
+                && analysisTask != null
+                && !analysisTask.IsCompleted
+            )
+            {
+                yield return null;
+                frameCount++;
+
+                if (frameCount % 50 == 0)
+                {
+                    Task currentTask = window._analysisTask;
+                    if (!ReferenceEquals(currentTask, analysisTask))
+                    {
+                        UnityEngine.Debug.LogWarning(
+                            $"[WaitForAnalysisCompletion] Task reference changed at frame {frameCount}!"
+                        );
+                    }
+                }
+            }
+
+            /*
+                The ContinueWith runs on a thread pool thread and enqueues work on the main thread,
+                so flush and yield until the completion source is signaled -- which is what says
+                HandleAnalysisCompletion ran and called FinalizeAnalysis.
+            */
+            while ((Time.realtimeSinceStartup - startRealTime) < maxWaitTime)
+            {
+                UnityMethodAnalyzerWindow.FlushMainThreadQueue();
+
+                bool completionSignaled = tcs != null && tcs.Task.IsCompleted;
+                bool noLongerAnalyzing = !window._isAnalyzing;
+
+                if (completionSignaled || noLongerAnalyzing)
+                {
+                    yield return null;
+                    frameCount++;
+                    UnityMethodAnalyzerWindow.FlushMainThreadQueue();
+                    break;
+                }
+
+                yield return null;
+                frameCount++;
+            }
+
+            float realWaitTime = Time.realtimeSinceStartup - startRealTime;
+
+            if (analysisTask != null && analysisTask.IsFaulted && analysisTask.Exception != null)
+            {
+                string taskExceptionMessage = analysisTask.Exception.GetBaseException().Message;
+                UnityEngine.Debug.LogError(
+                    $"[WaitForAnalysisCompletion] Task faulted with: {taskExceptionMessage}"
+                );
+            }
+
+            AnalysisWaitResult result = new()
+            {
+                WaitTime = realWaitTime,
+                FrameCount = frameCount,
+                AnalysisTaskCompleted = analysisTask != null && analysisTask.IsCompleted,
+                AnalysisTaskStatus = analysisTask?.Status ?? TaskStatus.Created,
+                CompletionSourceSignaled = tcs?.Task.IsCompleted ?? false,
+                CompletionSourceStatus = tcs?.Task.Status ?? TaskStatus.Created,
+                IsAnalyzing = window._isAnalyzing,
+                Progress = window._analysisProgress,
+                StatusMessage = window._statusMessage,
+            };
+
+            onComplete?.Invoke(result);
+        }
+
+        private void AssertExactlyOneGroupBySelected(
+            UnityMethodAnalyzerWindow window,
+            string context
+        )
+        {
+            bool groupByFile = window._groupByFile;
+            bool groupBySeverity = window._groupBySeverity;
+            bool groupByCategory = window._groupByCategory;
+
+            int selectedCount =
+                (groupByFile ? 1 : 0) + (groupBySeverity ? 1 : 0) + (groupByCategory ? 1 : 0);
+            Assert.AreEqual(
+                1,
+                selectedCount,
+                $"[{context}] Exactly one grouping should be selected, but {selectedCount} were selected. "
+                    + $"File={groupByFile}, Severity={groupBySeverity}, Category={groupByCategory}"
+            );
+        }
+
+        /// <summary>
+        /// Simulates clicking a group-by button by setting up state as if the button was clicked.
+        /// The target grouping should be true, others false.
+        /// </summary>
+        private void SimulateGroupByClick(
+            UnityMethodAnalyzerWindow window,
+            bool groupByFile,
+            bool groupBySeverity,
+            bool groupByCategory
+        )
+        {
+            SimulateGroupByClickRaw(window, groupByFile, groupBySeverity, groupByCategory);
+        }
+
+        /// <summary>
+        /// Simulates the raw toggle return values and invokes the internal logic.
+        /// This allows testing edge cases like clicking an already-selected button.
+        /// </summary>
+        private void SimulateGroupByClickRaw(
+            UnityMethodAnalyzerWindow window,
+            bool newGroupByFile,
+            bool newGroupBySeverity,
+            bool newGroupByCategory
+        )
+        {
+            bool currentGroupByFile = window._groupByFile;
+            bool currentGroupBySeverity = window._groupBySeverity;
+            bool currentGroupByCategory = window._groupByCategory;
+
+            bool fileClicked = newGroupByFile && !currentGroupByFile;
+            bool severityClicked = newGroupBySeverity && !currentGroupBySeverity;
+            bool categoryClicked = newGroupByCategory && !currentGroupByCategory;
+
+            if (fileClicked)
+            {
+                window._groupByFile = true;
+                window._groupBySeverity = false;
+                window._groupByCategory = false;
+            }
+            else if (severityClicked)
+            {
+                window._groupByFile = false;
+                window._groupBySeverity = true;
+                window._groupByCategory = false;
+            }
+            else if (categoryClicked)
+            {
+                window._groupByFile = false;
+                window._groupBySeverity = false;
+                window._groupByCategory = true;
+            }
+        }
+
+        private IEnumerator CancellationWorksWithFileCount(int fileCount)
+        {
+            UnityMethodAnalyzerWindow window = CreateWindow();
+
+            for (int i = 0; i < fileCount; i++)
+            {
+                AddCompilerDiagnostic($"VaryingTest{i}.cs");
+            }
+
+            window._sourcePaths = new List<string> { _tempDir };
+
+            window.StartAnalysis();
+            yield return null;
+
+            window.CancelAnalysis();
+
+            float waitTime = 0f;
+            float maxWaitTime = 10f;
+            while (waitTime < maxWaitTime && window._isAnalyzing)
+            {
+                yield return null;
+                waitTime += Time.deltaTime;
+            }
+
+            bool isAnalyzing = window._isAnalyzing;
+            string status = window._statusMessage;
+
+            Assert.IsFalse(
+                isAnalyzing,
+                $"Cancellation should work with {fileCount} files. Status: '{status}', WaitTime: {waitTime:F2}s"
             );
         }
 

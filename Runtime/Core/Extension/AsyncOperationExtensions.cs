@@ -24,17 +24,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
         private static readonly Action<AsyncOperation> CachedHandler = OnOperationCompleted;
 
-        private static void OnOperationCompleted(AsyncOperation operation)
-        {
-            Handlers.Remove(operation, out Action<AsyncOperation> _);
-            if (!Continuations.Remove(operation, out Action completionCondition))
-            {
-                return;
-            }
-
-            completionCondition?.Invoke();
-        }
-
         /// <summary>
         /// Converts a Unity AsyncOperation to a Task.
         /// </summary>
@@ -77,6 +66,17 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             await asyncOp;
+        }
+
+        private static void OnOperationCompleted(AsyncOperation operation)
+        {
+            Handlers.Remove(operation, out Action<AsyncOperation> _);
+            if (!Continuations.Remove(operation, out Action completionCondition))
+            {
+                return;
+            }
+
+            completionCondition?.Invoke();
         }
 
 #if !UNITY_2023_1_OR_NEWER
@@ -483,6 +483,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// </remarks>
         public readonly struct AsyncOperationAwaiter : INotifyCompletion
         {
+            /// <summary>
+            /// Gets a value indicating whether the async operation has completed.
+            /// </summary>
+            public bool IsCompleted => _operation.isDone;
+
             private readonly AsyncOperation _operation;
 
             /// <summary>
@@ -494,11 +499,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 _operation = operation ?? throw new ArgumentNullException(nameof(operation));
             }
-
-            /// <summary>
-            /// Gets a value indicating whether the async operation has completed.
-            /// </summary>
-            public bool IsCompleted => _operation.isDone;
 
             /// <summary>
             /// Schedules the continuation action to be invoked when the operation completes.

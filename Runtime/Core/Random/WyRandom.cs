@@ -72,68 +72,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public static WyRandom Instance => ThreadLocalRandom<WyRandom>.Instance;
 
-        public override RandomState InternalState => BuildState(_state);
-
-        [ProtoMember(6)]
-        [WProtoMember(6)]
-        private ulong _state;
-
-        public WyRandom()
-            : this(Guid.NewGuid()) { }
-
-        public WyRandom(Guid guid)
-        {
-            _state = RandomUtilities.GuidToUInt64Pair(guid).First;
-        }
-
-        [JsonConstructor]
-        public WyRandom(RandomState internalState)
-        {
-            _state = internalState.State1;
-            RestoreCommonState(internalState);
-        }
-
-        public WyRandom(ulong state)
-        {
-            _state = state;
-        }
-
-        public override uint NextUint()
-        {
-            unchecked
-            {
-                return (uint)NextWord();
-            }
-        }
-
-        public override ulong NextUlong()
-        {
-            return NextWord();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private ulong NextWord()
-        {
-            unchecked
-            {
-                _state += Prime0;
-                return Mum(_state ^ Prime1, _state);
-            }
-        }
-
-        /// <summary>
-        /// Perform a MUM (MUltiply and Mix) operation. Multiplies 2 unsigned 64-bit integers, then combines the
-        /// hi and lo bits of the resulting 128-bit integer using XOR
-        /// </summary>
-        /// <param name="x">First 64-bit integer</param>
-        /// <param name="y">Second 64-bit integer</param>
-        /// <returns>Result of the MUM (MUltiply and Mix) operation</returns>
-        private static ulong Mum(ulong x, ulong y)
-        {
-            (ulong hi, ulong lo) = Multiply64(x, y);
-            return hi ^ lo;
-        }
-
         /// <summary>
         /// Multiplies 2 unsigned 64-bit integers, returning the result in 2 ulongs representing the hi and lo bits
         /// of the resulting 128-bit integer
@@ -183,12 +121,74 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             return (hi, lo);
         }
 
+        public override RandomState InternalState => BuildState(_state);
+
+        [ProtoMember(6)]
+        [WProtoMember(6)]
+        private ulong _state;
+
+        public WyRandom()
+            : this(Guid.NewGuid()) { }
+
+        public WyRandom(Guid guid)
+        {
+            _state = RandomUtilities.GuidToUInt64Pair(guid).First;
+        }
+
+        [JsonConstructor]
+        public WyRandom(RandomState internalState)
+        {
+            _state = internalState.State1;
+            RestoreCommonState(internalState);
+        }
+
+        public WyRandom(ulong state)
+        {
+            _state = state;
+        }
+
+        /// <summary>
+        /// Perform a MUM (MUltiply and Mix) operation. Multiplies 2 unsigned 64-bit integers, then combines the
+        /// hi and lo bits of the resulting 128-bit integer using XOR
+        /// </summary>
+        /// <param name="x">First 64-bit integer</param>
+        /// <param name="y">Second 64-bit integer</param>
+        /// <returns>Result of the MUM (MUltiply and Mix) operation</returns>
+        private static ulong Mum(ulong x, ulong y)
+        {
+            (ulong hi, ulong lo) = Multiply64(x, y);
+            return hi ^ lo;
+        }
+
+        public override uint NextUint()
+        {
+            unchecked
+            {
+                return (uint)NextWord();
+            }
+        }
+
+        public override ulong NextUlong()
+        {
+            return NextWord();
+        }
+
         /// <summary>
         /// Copies the complete generator state, including pending draws.
         /// </summary>
         public override IRandom Copy()
         {
             return new WyRandom(InternalState);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private ulong NextWord()
+        {
+            unchecked
+            {
+                _state += Prime0;
+                return Mum(_state ^ Prime1, _state);
+            }
         }
     }
 }

@@ -118,6 +118,16 @@ namespace WallstopStudios.UnityHelpers.Utils
             _maxIdleCount = maxIdleCount;
         }
 
+        private static bool WasHandedIn(T candidate)
+        {
+            return !ReferenceEquals(candidate, null);
+        }
+
+        private static bool IsGone(T candidate)
+        {
+            return candidate == null;
+        }
+
         /// <summary>
         /// Checks out an item, creating one when none is pooled.
         /// </summary>
@@ -254,16 +264,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                     _onDestroy?.Invoke(current);
                 }
             }
-        }
-
-        private static bool WasHandedIn(T candidate)
-        {
-            return !ReferenceEquals(candidate, null);
-        }
-
-        private static bool IsGone(T candidate)
-        {
-            return candidate == null;
         }
 
         private int IndexOfInFlight(T taken)

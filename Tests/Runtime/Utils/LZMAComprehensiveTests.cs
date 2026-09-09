@@ -13,6 +13,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     [NUnit.Framework.Category("Fast")]
     public sealed class LZMAComprehensiveTests
     {
+        private static void FillDeterministicBytes(byte[] buffer, long seed)
+        {
+            IRandom random = new PcgRandom(seed);
+            random.NextBytes(buffer);
+        }
+
         [Test]
         public void RoundtripVariousSizes()
         {
@@ -250,12 +256,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             Assert.AreEqual(a, aRound, "Parallel roundtrip mismatch for first buffer");
             Assert.AreEqual(b, bRound, "Parallel roundtrip mismatch for second buffer");
-        }
-
-        private static void FillDeterministicBytes(byte[] buffer, long seed)
-        {
-            IRandom random = new PcgRandom(seed);
-            random.NextBytes(buffer);
         }
     }
 }

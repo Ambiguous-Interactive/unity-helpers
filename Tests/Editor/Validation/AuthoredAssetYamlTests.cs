@@ -18,6 +18,47 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     [TestFixture]
     public sealed class AuthoredAssetYamlTests
     {
+        private static readonly string[] MonoBehaviourAsset =
+        {
+            "%YAML 1.1",
+            "%TAG !u! tag:unity3d.com,2011:",
+            "--- !u!114 &11400000",
+            "MonoBehaviour:",
+            "  m_ObjectHideFlags: 0",
+            "  m_Script: {fileID: 11500000, guid: 5a04e8d1c9d3a4f2f8c5e9a7b6d4c3e1, type: 3}",
+            "  m_Name: Sample",
+            "  _shared: outer",
+            "  _keys:",
+            "  - alpha",
+            "  - beta",
+            "  _values: []",
+            "  _rows:",
+            "  - _name: first",
+            "    _clip: {fileID: 0}",
+            "  - _name: second",
+            "    _clip: {fileID: 21300000, guid: 1111, type: 3}",
+            "  _nested:",
+            "    _inner: 7",
+            "    _shared: inner",
+            "  _text: |",
+            "    notAKey: still text",
+            "  _afterBlock: 1",
+        };
+
+        private static readonly string[] SceneAsset =
+        {
+            "%YAML 1.1",
+            "--- !u!1 &519420028",
+            "GameObject:",
+            "  m_Name: Root",
+            "--- !u!114 &519420031",
+            "MonoBehaviour:",
+            "  m_Script: {fileID: 11500000, guid: aaaa, type: 3}",
+            "--- !u!1001 &1234567890 stripped",
+            "PrefabInstance:",
+            "  m_SourcePrefab: {fileID: 100100000, guid: bbbb, type: 3}",
+        };
+
         [Test]
         public void ADocumentCarriesItsClassAnchorAndScript()
         {
@@ -225,46 +266,5 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assert.AreEqual(0, lines.Count);
             Assert.AreEqual(0, documents.Count);
         }
-
-        private static readonly string[] MonoBehaviourAsset =
-        {
-            "%YAML 1.1",
-            "%TAG !u! tag:unity3d.com,2011:",
-            "--- !u!114 &11400000",
-            "MonoBehaviour:",
-            "  m_ObjectHideFlags: 0",
-            "  m_Script: {fileID: 11500000, guid: 5a04e8d1c9d3a4f2f8c5e9a7b6d4c3e1, type: 3}",
-            "  m_Name: Sample",
-            "  _shared: outer",
-            "  _keys:",
-            "  - alpha",
-            "  - beta",
-            "  _values: []",
-            "  _rows:",
-            "  - _name: first",
-            "    _clip: {fileID: 0}",
-            "  - _name: second",
-            "    _clip: {fileID: 21300000, guid: 1111, type: 3}",
-            "  _nested:",
-            "    _inner: 7",
-            "    _shared: inner",
-            "  _text: |",
-            "    notAKey: still text",
-            "  _afterBlock: 1",
-        };
-
-        private static readonly string[] SceneAsset =
-        {
-            "%YAML 1.1",
-            "--- !u!1 &519420028",
-            "GameObject:",
-            "  m_Name: Root",
-            "--- !u!114 &519420031",
-            "MonoBehaviour:",
-            "  m_Script: {fileID: 11500000, guid: aaaa, type: 3}",
-            "--- !u!1001 &1234567890 stripped",
-            "PrefabInstance:",
-            "  m_SourcePrefab: {fileID: 100100000, guid: bbbb, type: 3}",
-        };
     }
 }

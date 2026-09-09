@@ -183,13 +183,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             RestoreCommonState(internalState);
         }
 
-        protected override void OnAfterDeserialization()
-        {
-            EnsureElements();
-            NormalizeIndex();
-            EnsurePrimed();
-        }
-
         public override uint NextUint()
         {
             if (BlockSize <= _index)
@@ -305,6 +298,13 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
 
             return 0;
+        }
+
+        protected override void OnAfterDeserialization()
+        {
+            EnsureElements();
+            NormalizeIndex();
+            EnsurePrimed();
         }
 
         private void EnsureElements()

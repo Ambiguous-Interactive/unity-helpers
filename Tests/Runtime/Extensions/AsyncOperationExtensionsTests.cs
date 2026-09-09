@@ -106,6 +106,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         }
 
 #if !UNITY_2023_1_OR_NEWER
+
+        private static async Task GetAwaiterReturnsValidAwaiterAsync()
+        {
+            AsyncOperation operation = CreateAsyncOperation();
+            AsyncOperationExtensions.AsyncOperationAwaiter awaiter = operation.GetAwaiter();
+
+            while (!operation.isDone)
+            {
+                await Task.Yield();
+            }
+
+            Assert.IsTrue(awaiter.IsCompleted);
+        }
+
         [Test]
         public void GetAwaiterThrowsOnNullOperation()
         {
@@ -121,11 +135,210 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         {
             return GetAwaiterReturnsValidAwaiterAsync().AsCoroutine();
         }
+#endif
 
-        private static async Task GetAwaiterReturnsValidAwaiterAsync()
+        private static IEnumerator TestCoroutine(Action onComplete)
+        {
+            for (int i = 0; i < 3; i++)
+            {
+                yield return null;
+            }
+            onComplete?.Invoke();
+        }
+
+        private static IEnumerator ComplexTestCoroutine(Action<int> onComplete)
+        {
+            int count = 0;
+            for (int i = 0; i < 5; i++)
+            {
+                count++;
+                yield return null;
+            }
+            onComplete?.Invoke(count);
+        }
+
+        private static async Task CreateDelayedTask(Action onComplete)
+        {
+            // Use Task.Yield instead of Task.Delay to avoid threading issues
+            for (int i = 0; i < 3; i++)
+            {
+                await Task.Yield();
+            }
+            onComplete?.Invoke();
+        }
+
+        private static async Task<T> CreateDelayedTask<T>(Func<T> factory)
+        {
+            // Use Task.Yield instead of Task.Delay to avoid threading issues
+            for (int i = 0; i < 3; i++)
+            {
+                await Task.Yield();
+            }
+            return factory();
+        }
+
+        private static Task CreateFaultedTask()
+        {
+            TaskCompletionSource<bool> tcs = new();
+            tcs.SetException(new InvalidOperationException("Test exception"));
+            return tcs.Task;
+        }
+
+        private static Task<T> CreateFaultedTask<T>()
+        {
+            TaskCompletionSource<T> tcs = new();
+            tcs.SetException(new InvalidOperationException("Test exception"));
+            return tcs.Task;
+        }
+
+        private static AsyncOperation CreateAsyncOperation()
+        {
+            return Resources.LoadAsync<Texture2D>("NonExistentResource");
+        }
+
+        private static AsyncOperation CreateCompletedAsyncOperation()
+        {
+            AsyncOperation operation = Resources.LoadAsync<Texture2D>("NonExistentResource");
+            /*
+                This synchronous fixture assumes a missing-resource load completes before use; a delayed
+                platform needs the yielding helper.
+            */
+            return operation;
+        }
+
+        private static async Task IEnumeratorAsValueTaskCompletesSuccessfullyAsync()
+        {
+            bool completed = false;
+            IEnumerator testCoroutine = TestCoroutine(() => completed = true);
+
+            await testCoroutine.AsValueTask();
+
+            Assert.IsTrue(completed);
+        }
+
+        private static async Task IEnumeratorAsValueTaskThrowsOnNullAsync()
+        {
+            IEnumerator nullCoroutine = null;
+            try
+            {
+                await nullCoroutine.AsValueTask();
+                Assert.Fail("Expected ArgumentNullException");
+            }
+            catch (ArgumentNullException) { }
+            catch (AggregateException e)
+            {
+                Assert.IsTrue(
+                    e.Flatten().InnerExceptions.Any(inner => inner is ArgumentNullException),
+                    e.ToString()
+                );
+            }
+        }
+
+        private static async Task IEnumeratorAsTaskCompletesSuccessfullyAsync()
+        {
+            bool completed = false;
+            IEnumerator testCoroutine = TestCoroutine(() => completed = true);
+
+            await testCoroutine.AsTask();
+
+            Assert.IsTrue(completed);
+        }
+
+        private static async Task IEnumeratorAsTaskThrowsOnNullAsync()
+        {
+            IEnumerator nullCoroutine = null;
+            try
+            {
+                await nullCoroutine.AsTask();
+                Assert.Fail("Expected ArgumentNullException");
+            }
+            catch (ArgumentNullException) { }
+            catch (AggregateException e)
+            {
+                Assert.IsTrue(
+                    e.Flatten().InnerExceptions.Any(inner => inner is ArgumentNullException),
+                    e.ToString()
+                );
+            }
+        }
+
+        private static async Task AsyncOperationAwaiterResumesAnOperationThatIsAlreadyDoneAsync()
         {
             AsyncOperation operation = CreateAsyncOperation();
-            AsyncOperationExtensions.AsyncOperationAwaiter awaiter = operation.GetAwaiter();
+            while (!operation.isDone)
+            {
+                await Task.Yield();
+            }
+
+            Assert.IsTrue(operation.isDone, "The probe must have had a finished operation.");
+
+            AsyncOperationExtensions.AsyncOperationAwaiter awaiter = new(operation);
+            bool continuationInvoked = false;
+            awaiter.OnCompleted(() => continuationInvoked = true);
+
+            Assert.IsTrue(
+                continuationInvoked,
+                "Subscribing to a finished operation resumes the await on the calling stack."
+            );
+        }
+
+        private static async Task AsyncOperationAwaiterOnCompletedInvokesContinuationAsync()
+        {
+            AsyncOperation operation = CreateAsyncOperation();
+            AsyncOperationExtensions.AsyncOperationAwaiter awaiter = new(operation);
+
+            bool continuationInvoked = false;
+            awaiter.OnCompleted(() => continuationInvoked = true);
+
+            while (!operation.isDone)
+            {
+                await Task.Yield();
+            }
+
+            // Give it a frame to invoke the continuation
+            await Task.Yield();
+
+            Assert.IsTrue(continuationInvoked);
+        }
+
+        // Multiple awaiters expose the old dictionary overwrite that retained only the last continuation.
+        private static async Task AsyncOperationAwaiterOnCompletedInvokesEveryContinuationAsync(
+            int continuationCount
+        )
+        {
+            AsyncOperation operation = CreateAsyncOperation();
+            AsyncOperationExtensions.AsyncOperationAwaiter awaiter = new(operation);
+
+            int[] invocations = new int[continuationCount];
+            for (int index = 0; index < continuationCount; index++)
+            {
+                int captured = index;
+                awaiter.OnCompleted(() => invocations[captured]++);
+            }
+
+            while (!operation.isDone)
+            {
+                await Task.Yield();
+            }
+
+            await Task.Yield();
+
+            for (int index = 0; index < continuationCount; index++)
+            {
+                Assert.AreEqual(
+                    1,
+                    invocations[index],
+                    $"Continuation {index} of {continuationCount} ran {invocations[index]} time(s)."
+                );
+            }
+        }
+
+        private static async Task AsyncOperationAwaiterIsCompletedReturnsTrueWhenDoneAsync()
+        {
+            AsyncOperation operation = CreateAsyncOperation();
+            AsyncOperationExtensions.AsyncOperationAwaiter awaiter = new(operation);
+
+            Assert.IsFalse(awaiter.IsCompleted);
 
             while (!operation.isDone)
             {
@@ -134,7 +347,53 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             Assert.IsTrue(awaiter.IsCompleted);
         }
-#endif
+
+        private static async Task AsValueTaskReturnsImmediatelyWhenAlreadyDoneAsync()
+        {
+            AsyncOperation operation = CreateCompletedAsyncOperation();
+            await operation.AsValueTask();
+            Assert.IsTrue(operation.isDone);
+        }
+
+        private static async Task AsTaskCompletesWhenOperationIsDoneAsync()
+        {
+            AsyncOperation operation = CreateAsyncOperation();
+            Task task = operation.AsTask();
+
+            while (!operation.isDone)
+            {
+                await Task.Yield();
+            }
+
+            await task;
+            Assert.IsTrue(operation.isDone);
+        }
+
+        private static async Task AsTaskReturnsImmediatelyWhenAlreadyDoneAsync()
+        {
+            AsyncOperation operation = CreateAsyncOperation();
+            while (!operation.isDone)
+            {
+                await Task.Yield();
+            }
+
+            await operation.AsTask();
+            Assert.IsTrue(operation.isDone);
+        }
+
+        private static async Task AsValueTaskCompletesWhenOperationIsDoneAsync()
+        {
+            AsyncOperation operation = CreateAsyncOperation();
+            ValueTask task = operation.AsValueTask();
+
+            while (!operation.isDone)
+            {
+                await Task.Yield();
+            }
+
+            await task;
+            Assert.IsTrue(operation.isDone);
+        }
 
         [UnityTest]
         public IEnumerator AsyncOperationAwaiterIsCompletedReturnsTrueWhenDone()
@@ -638,264 +897,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             await testCoroutine.AsValueTask();
 
             Assert.AreEqual(5, counter);
-        }
-
-        private static IEnumerator TestCoroutine(Action onComplete)
-        {
-            for (int i = 0; i < 3; i++)
-            {
-                yield return null;
-            }
-            onComplete?.Invoke();
-        }
-
-        private static IEnumerator ComplexTestCoroutine(Action<int> onComplete)
-        {
-            int count = 0;
-            for (int i = 0; i < 5; i++)
-            {
-                count++;
-                yield return null;
-            }
-            onComplete?.Invoke(count);
-        }
-
-        private static async Task CreateDelayedTask(Action onComplete)
-        {
-            // Use Task.Yield instead of Task.Delay to avoid threading issues
-            for (int i = 0; i < 3; i++)
-            {
-                await Task.Yield();
-            }
-            onComplete?.Invoke();
-        }
-
-        private static async Task<T> CreateDelayedTask<T>(Func<T> factory)
-        {
-            // Use Task.Yield instead of Task.Delay to avoid threading issues
-            for (int i = 0; i < 3; i++)
-            {
-                await Task.Yield();
-            }
-            return factory();
-        }
-
-        private static Task CreateFaultedTask()
-        {
-            TaskCompletionSource<bool> tcs = new();
-            tcs.SetException(new InvalidOperationException("Test exception"));
-            return tcs.Task;
-        }
-
-        private static Task<T> CreateFaultedTask<T>()
-        {
-            TaskCompletionSource<T> tcs = new();
-            tcs.SetException(new InvalidOperationException("Test exception"));
-            return tcs.Task;
-        }
-
-        private static AsyncOperation CreateAsyncOperation()
-        {
-            return Resources.LoadAsync<Texture2D>("NonExistentResource");
-        }
-
-        private static AsyncOperation CreateCompletedAsyncOperation()
-        {
-            AsyncOperation operation = Resources.LoadAsync<Texture2D>("NonExistentResource");
-            /*
-                This synchronous fixture assumes a missing-resource load completes before use; a delayed
-                platform needs the yielding helper.
-            */
-            return operation;
-        }
-
-        private static async Task IEnumeratorAsValueTaskCompletesSuccessfullyAsync()
-        {
-            bool completed = false;
-            IEnumerator testCoroutine = TestCoroutine(() => completed = true);
-
-            await testCoroutine.AsValueTask();
-
-            Assert.IsTrue(completed);
-        }
-
-        private static async Task IEnumeratorAsValueTaskThrowsOnNullAsync()
-        {
-            IEnumerator nullCoroutine = null;
-            try
-            {
-                await nullCoroutine.AsValueTask();
-                Assert.Fail("Expected ArgumentNullException");
-            }
-            catch (ArgumentNullException) { }
-            catch (AggregateException e)
-            {
-                Assert.IsTrue(
-                    e.Flatten().InnerExceptions.Any(inner => inner is ArgumentNullException),
-                    e.ToString()
-                );
-            }
-        }
-
-        private static async Task IEnumeratorAsTaskCompletesSuccessfullyAsync()
-        {
-            bool completed = false;
-            IEnumerator testCoroutine = TestCoroutine(() => completed = true);
-
-            await testCoroutine.AsTask();
-
-            Assert.IsTrue(completed);
-        }
-
-        private static async Task IEnumeratorAsTaskThrowsOnNullAsync()
-        {
-            IEnumerator nullCoroutine = null;
-            try
-            {
-                await nullCoroutine.AsTask();
-                Assert.Fail("Expected ArgumentNullException");
-            }
-            catch (ArgumentNullException) { }
-            catch (AggregateException e)
-            {
-                Assert.IsTrue(
-                    e.Flatten().InnerExceptions.Any(inner => inner is ArgumentNullException),
-                    e.ToString()
-                );
-            }
-        }
-
-        private static async Task AsyncOperationAwaiterResumesAnOperationThatIsAlreadyDoneAsync()
-        {
-            AsyncOperation operation = CreateAsyncOperation();
-            while (!operation.isDone)
-            {
-                await Task.Yield();
-            }
-
-            Assert.IsTrue(operation.isDone, "The probe must have had a finished operation.");
-
-            AsyncOperationExtensions.AsyncOperationAwaiter awaiter = new(operation);
-            bool continuationInvoked = false;
-            awaiter.OnCompleted(() => continuationInvoked = true);
-
-            Assert.IsTrue(
-                continuationInvoked,
-                "Subscribing to a finished operation resumes the await on the calling stack."
-            );
-        }
-
-        private static async Task AsyncOperationAwaiterOnCompletedInvokesContinuationAsync()
-        {
-            AsyncOperation operation = CreateAsyncOperation();
-            AsyncOperationExtensions.AsyncOperationAwaiter awaiter = new(operation);
-
-            bool continuationInvoked = false;
-            awaiter.OnCompleted(() => continuationInvoked = true);
-
-            while (!operation.isDone)
-            {
-                await Task.Yield();
-            }
-
-            // Give it a frame to invoke the continuation
-            await Task.Yield();
-
-            Assert.IsTrue(continuationInvoked);
-        }
-
-        // Multiple awaiters expose the old dictionary overwrite that retained only the last continuation.
-        private static async Task AsyncOperationAwaiterOnCompletedInvokesEveryContinuationAsync(
-            int continuationCount
-        )
-        {
-            AsyncOperation operation = CreateAsyncOperation();
-            AsyncOperationExtensions.AsyncOperationAwaiter awaiter = new(operation);
-
-            int[] invocations = new int[continuationCount];
-            for (int index = 0; index < continuationCount; index++)
-            {
-                int captured = index;
-                awaiter.OnCompleted(() => invocations[captured]++);
-            }
-
-            while (!operation.isDone)
-            {
-                await Task.Yield();
-            }
-
-            await Task.Yield();
-
-            for (int index = 0; index < continuationCount; index++)
-            {
-                Assert.AreEqual(
-                    1,
-                    invocations[index],
-                    $"Continuation {index} of {continuationCount} ran {invocations[index]} time(s)."
-                );
-            }
-        }
-
-        private static async Task AsyncOperationAwaiterIsCompletedReturnsTrueWhenDoneAsync()
-        {
-            AsyncOperation operation = CreateAsyncOperation();
-            AsyncOperationExtensions.AsyncOperationAwaiter awaiter = new(operation);
-
-            Assert.IsFalse(awaiter.IsCompleted);
-
-            while (!operation.isDone)
-            {
-                await Task.Yield();
-            }
-
-            Assert.IsTrue(awaiter.IsCompleted);
-        }
-
-        private static async Task AsValueTaskReturnsImmediatelyWhenAlreadyDoneAsync()
-        {
-            AsyncOperation operation = CreateCompletedAsyncOperation();
-            await operation.AsValueTask();
-            Assert.IsTrue(operation.isDone);
-        }
-
-        private static async Task AsTaskCompletesWhenOperationIsDoneAsync()
-        {
-            AsyncOperation operation = CreateAsyncOperation();
-            Task task = operation.AsTask();
-
-            while (!operation.isDone)
-            {
-                await Task.Yield();
-            }
-
-            await task;
-            Assert.IsTrue(operation.isDone);
-        }
-
-        private static async Task AsTaskReturnsImmediatelyWhenAlreadyDoneAsync()
-        {
-            AsyncOperation operation = CreateAsyncOperation();
-            while (!operation.isDone)
-            {
-                await Task.Yield();
-            }
-
-            await operation.AsTask();
-            Assert.IsTrue(operation.isDone);
-        }
-
-        private static async Task AsValueTaskCompletesWhenOperationIsDoneAsync()
-        {
-            AsyncOperation operation = CreateAsyncOperation();
-            ValueTask task = operation.AsValueTask();
-
-            while (!operation.isDone)
-            {
-                await Task.Yield();
-            }
-
-            await task;
-            Assert.IsTrue(operation.isDone);
         }
     }
 }

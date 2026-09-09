@@ -57,14 +57,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private const string DirToolName = "SpriteAnimationEditor";
         private const string DirContextKey = "Clips";
 
-        [MenuItem("Tools/Wallstop Studios/Unity Helpers/Sprite Animation Editor")]
-        public static void ShowWindow()
-        {
-            AnimationViewerWindow wnd = GetWindow<AnimationViewerWindow>();
-            wnd.titleContent = new GUIContent("2D Animation Viewer");
-            wnd.minSize = new Vector2(750, 500);
-        }
-
         private VisualTreeAsset _visualTree;
         private StyleSheet _styleSheet;
 
@@ -98,6 +90,79 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private Vector3 _clipDragStartPosition;
         private VisualElement _clipDragPendingElement;
         private int _clipDragPendingOriginalIndex;
+
+        [MenuItem("Tools/Wallstop Studios/Unity Helpers/Sprite Animation Editor")]
+        public static void ShowWindow()
+        {
+            AnimationViewerWindow wnd = GetWindow<AnimationViewerWindow>();
+            wnd.titleContent = new GUIContent("2D Animation Viewer");
+            wnd.minSize = new Vector2(750, 500);
+        }
+
+        private static string GetLastAnimationDirectory()
+        {
+            try
+            {
+                PersistentDirectorySettings settings = PersistentDirectorySettings.Instance;
+                DirectoryUsageData[] paths =
+                    settings != null
+                        ? settings.GetPaths(DirToolName, DirContextKey, topOnly: true, topN: 1)
+                        : Array.Empty<DirectoryUsageData>();
+                string candidate = paths is { Length: > 0 } ? paths[0]?.path : null;
+
+                if (string.IsNullOrWhiteSpace(candidate))
+                {
+                    return "Assets";
+                }
+
+                // Prefer Assets-relative paths for UI components that expect them
+                if (!candidate.StartsWith("Assets", StringComparison.OrdinalIgnoreCase))
+                {
+                    string assetsRoot = Application.dataPath.SanitizePath();
+                    string full = candidate.SanitizePath();
+                    if (full.StartsWith(assetsRoot, StringComparison.OrdinalIgnoreCase))
+                    {
+                        candidate = "Assets" + full.Substring(assetsRoot.Length);
+                    }
+                }
+
+                return string.IsNullOrWhiteSpace(candidate) ? "Assets" : candidate;
+            }
+            catch
+            {
+                return "Assets";
+            }
+        }
+
+        private static void RecordLastAnimationDirectory(string assetsRelativeDir)
+        {
+            if (string.IsNullOrWhiteSpace(assetsRelativeDir))
+            {
+                return;
+            }
+
+            string path = assetsRelativeDir.SanitizePath();
+            if (!path.StartsWith("Assets", StringComparison.OrdinalIgnoreCase))
+            {
+                string assetsRoot = Application.dataPath.SanitizePath();
+                string full = path;
+                if (full.StartsWith(assetsRoot, StringComparison.OrdinalIgnoreCase))
+                {
+                    path = "Assets" + full.Substring(assetsRoot.Length);
+                }
+            }
+
+            PersistentDirectorySettings settings = PersistentDirectorySettings.Instance;
+            if (settings != null)
+            {
+                settings.RecordPath(DirToolName, DirContextKey, path);
+            }
+        }
+
+        private static string FormatFps(float fps)
+        {
+            return fps.ToString("F1");
+        }
 
         public void CreateGUI()
         {
@@ -436,66 +501,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 {
                     AddEditorLayer(clip);
                 }
-            }
-        }
-
-        private static string GetLastAnimationDirectory()
-        {
-            try
-            {
-                PersistentDirectorySettings settings = PersistentDirectorySettings.Instance;
-                DirectoryUsageData[] paths =
-                    settings != null
-                        ? settings.GetPaths(DirToolName, DirContextKey, topOnly: true, topN: 1)
-                        : Array.Empty<DirectoryUsageData>();
-                string candidate = paths is { Length: > 0 } ? paths[0]?.path : null;
-
-                if (string.IsNullOrWhiteSpace(candidate))
-                {
-                    return "Assets";
-                }
-
-                // Prefer Assets-relative paths for UI components that expect them
-                if (!candidate.StartsWith("Assets", StringComparison.OrdinalIgnoreCase))
-                {
-                    string assetsRoot = Application.dataPath.SanitizePath();
-                    string full = candidate.SanitizePath();
-                    if (full.StartsWith(assetsRoot, StringComparison.OrdinalIgnoreCase))
-                    {
-                        candidate = "Assets" + full.Substring(assetsRoot.Length);
-                    }
-                }
-
-                return string.IsNullOrWhiteSpace(candidate) ? "Assets" : candidate;
-            }
-            catch
-            {
-                return "Assets";
-            }
-        }
-
-        private static void RecordLastAnimationDirectory(string assetsRelativeDir)
-        {
-            if (string.IsNullOrWhiteSpace(assetsRelativeDir))
-            {
-                return;
-            }
-
-            string path = assetsRelativeDir.SanitizePath();
-            if (!path.StartsWith("Assets", StringComparison.OrdinalIgnoreCase))
-            {
-                string assetsRoot = Application.dataPath.SanitizePath();
-                string full = path;
-                if (full.StartsWith(assetsRoot, StringComparison.OrdinalIgnoreCase))
-                {
-                    path = "Assets" + full.Substring(assetsRoot.Length);
-                }
-            }
-
-            PersistentDirectorySettings settings = PersistentDirectorySettings.Instance;
-            if (settings != null)
-            {
-                settings.RecordPath(DirToolName, DirContextKey, path);
             }
         }
 
@@ -1173,11 +1178,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             _fpsDebugLabel.text =
                 $"Active Clip FPS (Original): {FormatFps(_activeEditorLayer.OriginalClipFps)}fps. Preview uses global FPS.";
-        }
-
-        private static string FormatFps(float fps)
-        {
-            return fps.ToString("F1");
         }
 
         private void RebuildFramesListUI()

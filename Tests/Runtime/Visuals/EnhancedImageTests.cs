@@ -13,6 +13,41 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
     [NUnit.Framework.Category("Fast")]
     public sealed class EnhancedImageTests : CommonTestBase
     {
+        private static readonly object[] HdrColorPreservedTestCases =
+        {
+            new object[] { new Color(2f, 1.5f, 1f, 1f), "Standard HDR color" },
+            new object[] { new Color(100f, 50f, 25f, 1f), "Extreme HDR color" },
+            new object[] { new Color(1.001f, 0.5f, 0.5f, 1f), "Barely HDR color" },
+            new object[] { new Color(0.5f, 0.5f, 0.5f, 1f), "Mid-gray color" },
+            new object[] { new Color(0f, 0f, 0f, 1f), "Black color" },
+            new object[] { new Color(1f, 1f, 1f, 1f), "White color" },
+            new object[] { new Color(0f, 0f, 0f, 0f), "Fully transparent black" },
+            new object[] { new Color(1f, 0f, 0f, 0.5f), "Semi-transparent red" },
+            new object[] { new Color(2f, 1.5f, 1f, 0f), "HDR with zero alpha" },
+        };
+
+        private static readonly object[] ClampedColorTestCases =
+        {
+            new object[]
+            {
+                new Color(-0.5f, -0.2f, 0.1f, 1f),
+                new Color(0f, 0f, 0.1f, 1f),
+                "Negative RGB values",
+            },
+            new object[]
+            {
+                new Color(-1f, -1f, -1f, 1f),
+                new Color(0f, 0f, 0f, 1f),
+                "All negative RGB",
+            },
+            new object[]
+            {
+                new Color(0.5f, -0.1f, 0.8f, 0.5f),
+                new Color(0.5f, 0f, 0.8f, 0.5f),
+                "Mixed positive and negative",
+            },
+        };
+
         [Test]
         public void StartCreatesMaterialInstanceAndAppliesHdrColor()
         {
@@ -1142,19 +1177,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             Assert.IsTrue(originalInstance == null, "Original instance should have been destroyed");
         }
 
-        private static readonly object[] HdrColorPreservedTestCases =
-        {
-            new object[] { new Color(2f, 1.5f, 1f, 1f), "Standard HDR color" },
-            new object[] { new Color(100f, 50f, 25f, 1f), "Extreme HDR color" },
-            new object[] { new Color(1.001f, 0.5f, 0.5f, 1f), "Barely HDR color" },
-            new object[] { new Color(0.5f, 0.5f, 0.5f, 1f), "Mid-gray color" },
-            new object[] { new Color(0f, 0f, 0f, 1f), "Black color" },
-            new object[] { new Color(1f, 1f, 1f, 1f), "White color" },
-            new object[] { new Color(0f, 0f, 0f, 0f), "Fully transparent black" },
-            new object[] { new Color(1f, 0f, 0f, 0.5f), "Semi-transparent red" },
-            new object[] { new Color(2f, 1.5f, 1f, 0f), "HDR with zero alpha" },
-        };
-
         [Test]
         [TestCaseSource(nameof(HdrColorPreservedTestCases))]
         public void HdrColorIsPreservedInMaterial(Color hdrColor, string description)
@@ -1179,28 +1201,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
                 $"Material color {materialColor} should match {description} {hdrColor}"
             );
         }
-
-        private static readonly object[] ClampedColorTestCases =
-        {
-            new object[]
-            {
-                new Color(-0.5f, -0.2f, 0.1f, 1f),
-                new Color(0f, 0f, 0.1f, 1f),
-                "Negative RGB values",
-            },
-            new object[]
-            {
-                new Color(-1f, -1f, -1f, 1f),
-                new Color(0f, 0f, 0f, 1f),
-                "All negative RGB",
-            },
-            new object[]
-            {
-                new Color(0.5f, -0.1f, 0.8f, 0.5f),
-                new Color(0.5f, 0f, 0.8f, 0.5f),
-                "Mixed positive and negative",
-            },
-        };
 
         [Test]
         [TestCaseSource(nameof(ClampedColorTestCases))]

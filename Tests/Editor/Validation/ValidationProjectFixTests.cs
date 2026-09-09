@@ -25,6 +25,46 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         private Scene _previous;
         private string _scenePath;
 
+        private static ValidationWorkspaceSettings.RuleDefinition Rule()
+        {
+            return new ValidationWorkspaceSettings.RuleDefinition
+            {
+                id = "project.fix",
+                name = "Heavy bodies",
+                pathFilter = string.Empty,
+                fix = "Remove component",
+                checks = new List<ValidationWorkspaceSettings.RuleCondition>
+                {
+                    new ValidationWorkspaceSettings.RuleCondition
+                    {
+                        property = "Rigidbody.mass",
+                        comparison = ">",
+                        value = "10",
+                    },
+                },
+            };
+        }
+
+        private static List<ValidationFinding> Scan(
+            string path,
+            ValidationWorkspaceSettings.RuleDefinition rule
+        )
+        {
+            ValidationTarget target = new ValidationTarget(
+                AssetDatabase.AssetPathToGUID(path),
+                path,
+                AssetDatabase.GetMainAssetTypeAtPath(path)
+            );
+            List<ValidationFinding> findings = new List<ValidationFinding>();
+            new ValidationProjectRule(rule).Validate(
+                in target,
+                AssetDatabase.LoadMainAssetAtPath(path),
+                findings
+            );
+            Assert.IsNotEmpty(findings);
+            return findings;
+        }
+
         [SetUp]
         public void SetUp()
         {
@@ -346,46 +386,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             foreach (GameObject root in _scene.GetRootGameObjects())
                 count += root.GetComponentsInChildren<Rigidbody>(true).Length;
             return count;
-        }
-
-        private static ValidationWorkspaceSettings.RuleDefinition Rule()
-        {
-            return new ValidationWorkspaceSettings.RuleDefinition
-            {
-                id = "project.fix",
-                name = "Heavy bodies",
-                pathFilter = string.Empty,
-                fix = "Remove component",
-                checks = new List<ValidationWorkspaceSettings.RuleCondition>
-                {
-                    new ValidationWorkspaceSettings.RuleCondition
-                    {
-                        property = "Rigidbody.mass",
-                        comparison = ">",
-                        value = "10",
-                    },
-                },
-            };
-        }
-
-        private static List<ValidationFinding> Scan(
-            string path,
-            ValidationWorkspaceSettings.RuleDefinition rule
-        )
-        {
-            ValidationTarget target = new ValidationTarget(
-                AssetDatabase.AssetPathToGUID(path),
-                path,
-                AssetDatabase.GetMainAssetTypeAtPath(path)
-            );
-            List<ValidationFinding> findings = new List<ValidationFinding>();
-            new ValidationProjectRule(rule).Validate(
-                in target,
-                AssetDatabase.LoadMainAssetAtPath(path),
-                findings
-            );
-            Assert.IsNotEmpty(findings);
-            return findings;
         }
     }
 }

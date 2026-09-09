@@ -20,11 +20,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Styles
         private const string StylesFileName = "WDropDownStyles.uss";
         private const string LightThemeFileName = "WDropDownLight.uss";
 
-        private static StyleSheet _variablesStyleSheet;
-        private static StyleSheet _stylesStyleSheet;
-        private static StyleSheet _lightThemeStyleSheet;
-        private static bool _initialized;
-
         /// <summary>
         /// Gets the variables stylesheet containing CSS custom properties.
         /// </summary>
@@ -65,6 +60,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Styles
         /// Returns true if the current editor is using the Pro (dark) skin.
         /// </summary>
         public static bool IsProSkin => EditorGUIUtility.isProSkin;
+
+        private static StyleSheet _variablesStyleSheet;
+        private static StyleSheet _stylesStyleSheet;
+        private static StyleSheet _lightThemeStyleSheet;
+        private static bool _initialized;
 
         /// <summary>
         /// Applies all dropdown stylesheets to a visual element in the correct order.
