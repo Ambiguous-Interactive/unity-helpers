@@ -67,8 +67,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 }
             }
 
-            // A public environment query must answer without throwing even when the host refuses
-            // to share its command line; the agreement with the tokens it documents is the contract.
+            // A public environment query must answer without throwing even on a locked-down host.
             Assert.DoesNotThrow(() => EditorUtilities.IsInvokedByTestRunner());
             Assert.AreEqual(
                 expected,

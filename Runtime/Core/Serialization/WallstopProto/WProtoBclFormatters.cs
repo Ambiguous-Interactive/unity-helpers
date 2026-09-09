@@ -6,7 +6,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     using System;
     using System.Buffers.Binary;
     using System.Runtime.InteropServices;
-    using WallstopStudios.UnityHelpers.Core.Extension;
+    using System.Text;
 
     /// <summary>
     /// Shared pieces of the wire encoding protobuf-net gives the base-class-library value types,
@@ -1044,7 +1044,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// <inheritdoc />
         public bool Write(ref WProtoWriter writer, in Uri value)
         {
-            byte[] encoded = value.OriginalString.GetBytes();
+            byte[] encoded = Encoding.UTF8.GetBytes(value.OriginalString);
             return writer.TryWriteRaw(encoded);
         }
 
