@@ -986,9 +986,15 @@ function analyzeFile(text) {
         const init = slice.slice(eq);
         const name = /([A-Za-z_]\w*)\s*(<[^<>]*>)?\s*$/.exec(prefix.prefix)?.[1] ?? "";
         const declaredType = prefix.prefix.slice(0, Math.max(0, prefix.prefix.lastIndexOf(name)));
+        // The OUTER type identifier decides self-typedness: `Dictionary<string, Noise> M = new()`
+        // constructs a Dictionary, not the containing type, so a substring match on a generic
+        // argument would barrier members that are safe to move. The type name is the identifier
+        // immediately before the declared name.
+        const declaredTypeName =
+          /([A-Za-z_]\w*)\s*(<[^<>]*>)?\s*$/.exec(declaredType.trim())?.[1] ?? "";
         const selfTyped =
           new RegExp("\\bnew\\s+" + body.name + "\\b").test(init) ||
-          (/=\s*new\s*\(\s*\)/.test(init) && declaredType.includes(body.name));
+          (declaredTypeName === body.name && /=\s*new\s*[\s(]/.test(init));
         const readsSibling =
           !selfTyped &&
           staticMemberNames.some(

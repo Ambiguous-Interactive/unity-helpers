@@ -530,25 +530,70 @@ runTest("--fix still moves a type whose siblings carry a whole conditional insid
 
 runTest("ordering: --fix never moves a self-typed singleton past its dependencies", () => {
   // Static initializers run in textual order: `Instance = new()` reads DefaultPermutations in
-  // its constructor, so reordering them into accessibility order is a NullReferenceException
-  // (#672, caught by the IL2CPP standalone leg). The fixer must refuse the move even though the
-  // accessibility ordering asks for it; the fix is the property-over-backing-field reshape.
+  // its constructor. The accessibility ordering itself asks for public-before-private here, so
+  // the descent IS reported and an unguarded fix would create exactly the null-table NRE the
+  // IL2CPP standalone leg caught on #672. The barrier must refuse the move; the fix is the
+  // property-over-backing-field reshape.
   const source = [
     "class Noise",
     "{",
-    "    public static readonly Noise Instance = new();",
-    "",
     "    private static readonly int[] DefaultPermutations = { 151, 160 };",
+    "",
+    "    public static readonly Noise Instance = new();",
     "",
     "    private readonly int[] _permutations = new int[DefaultPermutations.Length];",
     "}"
   ].join("\n");
-  // The accessibility ordering itself asks for public-before-private here, so no violation is
-  // reported and no edit is possible; the assertion is that no fix run ever reorders it either.
+  const violations = violationsIn(source);
+  assert.strictEqual(violations.length, 1, "the accessibility descent must be reported");
+  assert.strictEqual(violations[0].name, "Instance");
   assert.strictEqual(
     fixedText(source),
     source,
     "moving Instance before its table changes what is null when the cctor runs"
+  );
+});
+
+runTest("ordering: --fix treats target-typed new(args) as a self-typed construction", () => {
+  const source = [
+    "class Noise",
+    "{",
+    "    private static readonly int[] Table = { 151, 160 };",
+    "",
+    "    public static readonly Noise Seeded = new(7);",
+    "",
+    "    private readonly int[] _permutations;",
+    "",
+    "    private Noise(int seed)",
+    "    {",
+    "        _permutations = new int[Table.Length];",
+    "    }",
+    "}"
+  ].join("\n");
+  const violations = violationsIn(source);
+  assert.strictEqual(violations.length, 1, "the accessibility descent must be reported");
+  assert.strictEqual(
+    fixedText(source),
+    source,
+    "new(args) constructs the containing type and must be a barrier"
+  );
+});
+
+runTest("ordering: a generic-typed member built with new() is not self-typed", () => {
+  // `Dictionary<string, Noise> Map = new()` constructs a Dictionary; the body type only appears
+  // as a type argument, so this member stays movable.
+  const source = [
+    "class Noise",
+    "{",
+    "    private const int A = 1;",
+    "    private static readonly System.Collections.Generic.Dictionary<string, Noise> Map = new();",
+    "    private static readonly int[] Entries = { A };",
+    "}"
+  ].join("\n");
+  assert.strictEqual(
+    fixedText(source),
+    source,
+    "the members are already in canonical order, so nothing moves"
   );
 });
 
