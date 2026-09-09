@@ -97,6 +97,37 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             ).SetName("RotateTexture90.Clockwise.OneByFour");
         }
 
+        private static IEnumerable<Color32> EnumerateSource(int width, int height)
+        {
+            for (int y = 0; y < height; ++y)
+            {
+                for (int x = 0; x < width; ++x)
+                {
+                    yield return NewColor(x, y);
+                }
+            }
+        }
+
+        private static Color32[] BuildSourcePixels(int width, int height)
+        {
+            Color32[] pixels = new Color32[width * height];
+            int index = 0;
+            for (int y = 0; y < height; ++y)
+            {
+                for (int x = 0; x < width; ++x)
+                {
+                    pixels[index] = NewColor(x, y);
+                    ++index;
+                }
+            }
+            return pixels;
+        }
+
+        private static Color32 NewColor(int x, int y)
+        {
+            return new Color32((byte)(8 * x + 1), (byte)(8 * y + 2), 7, 255);
+        }
+
         [Test]
         [TestCaseSource(nameof(RotationCases))]
         public void RotateTexture90ProducesExpectedPixelGrid(
@@ -203,17 +234,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(((Sprite)null).ExtractSpriteRect() == null);
         }
 
-        private static IEnumerable<Color32> EnumerateSource(int width, int height)
-        {
-            for (int y = 0; y < height; ++y)
-            {
-                for (int x = 0; x < width; ++x)
-                {
-                    yield return NewColor(x, y);
-                }
-            }
-        }
-
         private Texture2D CreateTexture(int width, int height)
         {
             Color32[] pixels = BuildSourcePixels(width, height);
@@ -221,26 +241,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             texture.SetPixels32(pixels);
             texture.Apply();
             return texture;
-        }
-
-        private static Color32[] BuildSourcePixels(int width, int height)
-        {
-            Color32[] pixels = new Color32[width * height];
-            int index = 0;
-            for (int y = 0; y < height; ++y)
-            {
-                for (int x = 0; x < width; ++x)
-                {
-                    pixels[index] = NewColor(x, y);
-                    ++index;
-                }
-            }
-            return pixels;
-        }
-
-        private static Color32 NewColor(int x, int y)
-        {
-            return new Color32((byte)(8 * x + 1), (byte)(8 * y + 2), 7, 255);
         }
     }
 }
