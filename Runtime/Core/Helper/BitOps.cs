@@ -26,8 +26,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int PopCount(ulong value)
         {
-            // SWAR pairwise reduction: fold adjacent bits, pairs, nibbles, then bytes; the final
-            // multiply sums the eight byte counts into the top byte.
+            /*
+                SWAR pairwise reduction: fold adjacent bits, pairs, nibbles, then bytes; the final
+                multiply sums the eight byte counts into the top byte.
+            */
             value -= (value >> 1) & 0x5555555555555555UL;
             value = (value & 0x3333333333333333UL) + ((value >> 2) & 0x3333333333333333UL);
             value = (value + (value >> 4)) & 0x0F0F0F0F0F0F0F0FUL;
@@ -75,8 +77,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int TrailingZeroCount(ulong value)
         {
-            // Isolating the lowest set bit and decrementing leaves exactly that many lower bits
-            // set; zero wraps to all ones, which PopCount scores as 64.
+            /*
+                Isolating the lowest set bit and decrementing leaves exactly that many lower bits
+                set; zero wraps to all ones, which PopCount scores as 64.
+            */
             return PopCount((value & (0UL - value)) - 1UL);
         }
 
