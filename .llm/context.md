@@ -346,8 +346,14 @@ Lint-error-code prefixes (`^[A-Z]{2,}\d{3}$` tokens like `UNH001`, `PWS002`) mus
   See [ship-changes](./skills/ship-changes.md#step-9b-open-the-pull-request-yourself)
 - **`npm run pr:feedback -- <number>` after every push and before declaring done.** Inline review
   threads are `GET /pulls/{n}/comments`, a DIFFERENT endpoint from PR comments, so polling only the
-  latter reports "no feedback" while a human waits. Treat a line-scoped comment as a policy: fix the
-  line, sweep the class, decide whether a rule should carry it
+  latter reports "no feedback" while a human waits. The thread section leads with a non-bot count
+  and prints non-bot threads first (a human's line-scoped review is a person waiting; bot findings
+  re-post stale on every push), and a human review with an empty body lists in the submissions
+  section pointing at its inline threads. READ THE WHOLE OUTPUT -- sampling the head of the thread
+  section is how fresh human threads got missed under stale bot ones (session 267); for remote
+  GitHub reads prefer the GitHub MCP first per [github-operations](./skills/github-operations.md).
+  Treat a line-scoped comment as a policy: fix the line, sweep the class, decide whether a rule
+  should carry it
 
 ### Re-running local aggregates costs your session -- CI runs them anyway
 
