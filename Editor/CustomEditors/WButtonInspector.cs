@@ -35,6 +35,69 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
         private readonly Dictionary<WButtonGroupKey, bool> _foldoutStates = new();
         private readonly Dictionary<int, bool> _groupFoldoutStates = new();
 
+        private static SerializedProperty BuildPropertyLookup(
+            SerializedObject serializedObject,
+            Dictionary<string, SerializedProperty> propertyLookup
+        )
+        {
+            propertyLookup.Clear();
+            SerializedProperty scriptProperty = null;
+            SerializedProperty iterator = serializedObject.GetIterator();
+            bool enterChildren = true;
+
+            while (iterator.NextVisible(enterChildren))
+            {
+                enterChildren = false;
+                string path = iterator.propertyPath;
+
+                if (string.Equals(path, ScriptPropertyPath, StringComparison.Ordinal))
+                {
+                    scriptProperty = iterator.Copy();
+                    continue;
+                }
+
+                propertyLookup[path] = iterator.Copy();
+            }
+
+            return scriptProperty;
+        }
+
+        /// <summary>
+        /// Draws validation HelpBox for arrays/lists with ValidateAssignment or WNotNull attributes.
+        /// PropertyDrawers for attributes on arrays only affect elements, not the array itself,
+        /// so we handle array-level validation here in the custom editor.
+        /// </summary>
+        private static void DrawValidationHelpBoxIfNeeded(SerializedProperty property)
+        {
+            if (!property.isArray || property.propertyType == SerializedPropertyType.String)
+            {
+                return;
+            }
+
+            property.GetEnclosingObject(out FieldInfo fieldInfo);
+            if (fieldInfo == null)
+            {
+                return;
+            }
+
+            ValidateAssignmentAttribute validateAttribute =
+                fieldInfo.GetCustomAttribute<ValidateAssignmentAttribute>();
+            if (validateAttribute != null)
+            {
+                ValidateAssignmentPropertyDrawer.DrawValidationHelpBoxIfNeeded(
+                    property,
+                    validateAttribute
+                );
+                return;
+            }
+
+            WNotNullAttribute notNullAttribute = fieldInfo.GetCustomAttribute<WNotNullAttribute>();
+            if (notNullAttribute != null)
+            {
+                WNotNullPropertyDrawer.DrawValidationHelpBoxIfNeeded(property, notNullAttribute);
+            }
+        }
+
         public override void OnInspectorGUI()
         {
             if (serializedObject == null || serializedObject.targetObject == null)
@@ -161,69 +224,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
             if (0 < triggeredContexts.Count)
             {
                 WButtonInvocationController.ProcessTriggeredMethods(triggeredContexts);
-            }
-        }
-
-        private static SerializedProperty BuildPropertyLookup(
-            SerializedObject serializedObject,
-            Dictionary<string, SerializedProperty> propertyLookup
-        )
-        {
-            propertyLookup.Clear();
-            SerializedProperty scriptProperty = null;
-            SerializedProperty iterator = serializedObject.GetIterator();
-            bool enterChildren = true;
-
-            while (iterator.NextVisible(enterChildren))
-            {
-                enterChildren = false;
-                string path = iterator.propertyPath;
-
-                if (string.Equals(path, ScriptPropertyPath, StringComparison.Ordinal))
-                {
-                    scriptProperty = iterator.Copy();
-                    continue;
-                }
-
-                propertyLookup[path] = iterator.Copy();
-            }
-
-            return scriptProperty;
-        }
-
-        /// <summary>
-        /// Draws validation HelpBox for arrays/lists with ValidateAssignment or WNotNull attributes.
-        /// PropertyDrawers for attributes on arrays only affect elements, not the array itself,
-        /// so we handle array-level validation here in the custom editor.
-        /// </summary>
-        private static void DrawValidationHelpBoxIfNeeded(SerializedProperty property)
-        {
-            if (!property.isArray || property.propertyType == SerializedPropertyType.String)
-            {
-                return;
-            }
-
-            property.GetEnclosingObject(out FieldInfo fieldInfo);
-            if (fieldInfo == null)
-            {
-                return;
-            }
-
-            ValidateAssignmentAttribute validateAttribute =
-                fieldInfo.GetCustomAttribute<ValidateAssignmentAttribute>();
-            if (validateAttribute != null)
-            {
-                ValidateAssignmentPropertyDrawer.DrawValidationHelpBoxIfNeeded(
-                    property,
-                    validateAttribute
-                );
-                return;
-            }
-
-            WNotNullAttribute notNullAttribute = fieldInfo.GetCustomAttribute<WNotNullAttribute>();
-            if (notNullAttribute != null)
-            {
-                WNotNullPropertyDrawer.DrawValidationHelpBoxIfNeeded(property, notNullAttribute);
             }
         }
     }

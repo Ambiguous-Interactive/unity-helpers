@@ -60,354 +60,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private const string ProtobufMemberAttributeName = "ProtoMemberAttribute";
         private const string ProtobufContractAttribute =
             ProtobufNamespace + "." + ProtobufContractAttributeName;
+        private const string DataMemberOrder = nameof(DataMemberAttribute.Order);
 
         private static readonly string AttributeBaseName = typeof(Attribute).FullName;
         private static readonly string DataContractAttributeName =
             typeof(DataContractAttribute).FullName;
         private static readonly string DataMemberAttributeName =
             typeof(DataMemberAttribute).FullName;
-        private const string DataMemberOrder = nameof(DataMemberAttribute.Order);
-
-        /// <inheritdoc />
-        public void Initialize(GeneratorInitializationContext context)
-        {
-            context.RegisterForSyntaxNotifications(() => new Receiver());
-        }
-
-        /// <inheritdoc />
-        public void Execute(GeneratorExecutionContext context)
-        {
-            if (!(context.SyntaxReceiver is Receiver receiver))
-            {
-                return;
-            }
-
-            bool disableModuleInitializer = DisableModuleInitializer(context);
-
-            List<INamedTypeSymbol> contracts = new List<INamedTypeSymbol>();
-            HashSet<INamedTypeSymbol> seen = new HashSet<INamedTypeSymbol>(
-                SymbolEqualityComparer.Default
-            );
-
-            // Cache the reference search once per compilation instead of repeating it for every DataContract.
-            bool? referencesProtobufNet = null;
-
-            /*
-             * Validate the manifest before resolving tagless subtypes so each corrupt entry reports once at
-             * its source.
-             */
-            SubtypeTagManifest manifest = SubtypeTagManifest.Build(context.Compilation);
-            SubtypeTagManifest.Validate(context.Compilation, context.ReportDiagnostic);
-            bool editorCompilation = IsEditorCompilation(context);
-
-            // Reuse one semantic model per tree because ordinary subclasses also enter this scan.
-            Dictionary<SyntaxTree, SemanticModel> models =
-                new Dictionary<SyntaxTree, SemanticModel>();
-
-            foreach (TypeDeclarationSyntax declaration in receiver.Types)
-            {
-                SemanticModel model = ModelFor(context.Compilation, models, declaration.SyntaxTree);
-                if (!(model.GetDeclaredSymbol(declaration) is INamedTypeSymbol symbol))
-                {
-                    continue;
-                }
-
-                if (!seen.Add(symbol))
-                {
-                    continue;
-                }
-
-                bool isContract = IsContract(symbol);
-                if (HasAttribute(symbol, NotSerializedAttribute))
-                {
-                    /*
-                     * Contradictory opt-out and contract declarations must report before traversal order can
-                     * choose one.
-                     */
-                    string contradiction =
-                        HasAttribute(symbol, ContractAttribute) ? "[WProtoContract]"
-                        : HasAttribute(symbol, SubtypeAttribute) ? "[WProtoSubtype]"
-                        : null;
-                    if (contradiction != null)
-                    {
-                        context.ReportDiagnostic(
-                            Diagnostic.Create(
-                                WProtoDiagnostics.ContradictoryNotSerialized,
-                                symbol.Locations.FirstOrDefault(),
-                                symbol.Name,
-                                "carries " + contradiction
-                            )
-                        );
-                    }
-                }
-
-                if (isContract)
-                {
-                    contracts.Add(symbol);
-                    continue;
-                }
-
-                ReportUndeclaredSubclass(context, symbol);
-
-                if (
-                    TryFindUnportedProtobufContract(
-                        context.Compilation,
-                        symbol,
-                        ref referencesProtobufNet,
-                        out AttributeData protobufContract,
-                        out string matchedBecause
-                    )
-                )
-                {
-                    Location location =
-                        protobufContract.ApplicationSyntaxReference?.GetSyntax().GetLocation()
-                        ?? symbol.Locations.FirstOrDefault();
-                    context.ReportDiagnostic(
-                        Diagnostic.Create(
-                            WProtoDiagnostics.UnportedProtobufContract,
-                            location,
-                            symbol.ToDisplayString(),
-                            matchedBecause
-                        )
-                    );
-                }
-
-                ReportOrphanedHooks(context, symbol);
-
-                SubtypeMap.Validate(
-                    context.ReportDiagnostic,
-                    symbol,
-                    true,
-                    manifest,
-                    editorCompilation
-                );
-            }
-
-            foreach (TypeDeclarationSyntax derived in receiver.Derived)
-            {
-                SemanticModel model = ModelFor(context.Compilation, models, derived.SyntaxTree);
-                if (!(model.GetDeclaredSymbol(derived) is INamedTypeSymbol symbol))
-                {
-                    continue;
-                }
-
-                // Another partial declaration may already have registered this contract.
-                if (!seen.Add(symbol))
-                {
-                    continue;
-                }
-
-                if (IsContract(symbol))
-                {
-                    contracts.Add(symbol);
-                    continue;
-                }
-
-                ReportUndeclaredSubclass(context, symbol);
-            }
-
-            foreach (EnumDeclarationSyntax enumeration in receiver.Enums)
-            {
-                SemanticModel model = ModelFor(context.Compilation, models, enumeration.SyntaxTree);
-                if (
-                    model.GetDeclaredSymbol(enumeration) is INamedTypeSymbol enumSymbol
-                    && seen.Add(enumSymbol)
-                )
-                {
-                    ReportReservedEnumMembers(context, enumSymbol);
-                }
-            }
-
-            // Collect subtype declarations before emitting bases, regardless of source order.
-            SubtypeMap subtypes = SubtypeMap.Build(contracts, manifest);
-
-            SurrogateMap surrogates = SurrogateMap.Build(context.Compilation);
-            SurrogateMap.Validate(context.Compilation, context.ReportDiagnostic);
-
-            MarshalMap marshals = MarshalMap.Build(context.Compilation);
-            MarshalMap.Validate(context.Compilation, context.ReportDiagnostic);
-
-            JsonConverterMap jsonConverters = JsonConverterMap.Build(context.Compilation);
-            JsonConverterMap.Validate(context.Compilation, context.ReportDiagnostic);
-
-            DeclaredRootMap.Validate(context.Compilation, context.ReportDiagnostic);
-
-            // All scans share diagnostics so one unnameable closure reports only once.
-            HashSet<string> announced = new HashSet<string>();
-
-            List<string> registrations = new List<string>();
-            List<string> replacements;
-            HashSet<INamedTypeSymbol> emittedContracts = new HashSet<INamedTypeSymbol>(
-                SymbolEqualityComparer.Default
-            );
-            HashSet<INamedTypeSymbol> enumClosures = new HashSet<INamedTypeSymbol>(
-                SymbolEqualityComparer.Default
-            );
-            /*
-             * Emit deepest-first and filter refused includes so no published formatter names an unpublished
-             * formatter.
-             */
-            List<Emission> emissions = new List<Emission>();
-            HashSet<INamedTypeSymbol> refused = new HashSet<INamedTypeSymbol>(
-                SymbolEqualityComparer.Default
-            );
-            foreach (INamedTypeSymbol contract in DeepestFirst(contracts))
-            {
-                string source = Emit(
-                    context,
-                    contract,
-                    surrogates,
-                    subtypes,
-                    refused,
-                    out string registration
-                );
-                if (source == null)
-                {
-                    refused.Add(contract);
-                    continue;
-                }
-
-                emissions.Add(new Emission(contract, source, registration));
-            }
-
-            IReadOnlyList<ClosureScan.TypeUse> typeUses = ClosureScan.Types(
-                context.Compilation,
-                models
-            );
-
-            foreach (Emission emission in emissions)
-            {
-                /*
-                 * CanServe names every ancestor formatter; withhold descendants of a refused ancestor even if
-                 * inherited nested types let the reference compile.
-                 */
-                if (HasRefusedAncestor(emission.Contract, refused))
-                {
-                    continue;
-                }
-
-                context.AddSource(
-                    FileNameFor(emission.Contract),
-                    SourceText.From(emission.Source, Encoding.UTF8)
-                );
-                emittedContracts.Add(emission.Contract);
-                if (emission.Registration != null)
-                {
-                    registrations.Add(emission.Registration);
-                }
-                else
-                {
-                    string entryPoint =
-                        RootContract(emission.Contract) == null
-                            ? "." + WProtoGeneratedNames.Formatter + ".Instance"
-                            : "." + WProtoGeneratedNames.RootFormatter + ".Instance";
-                    foreach (
-                        string closed in ClosedConstructions(
-                            context.Compilation,
-                            typeUses,
-                            emission.Contract,
-                            context.ReportDiagnostic,
-                            announced
-                        )
-                    )
-                    {
-                        registrations.Add(closed + entryPoint);
-                    }
-                }
-            }
-
-            replacements = EmitReplacements(context, subtypes, emittedContracts);
-
-            foreach (
-                string surrogateRegistration in SurrogateClosures(
-                    context.Compilation,
-                    typeUses,
-                    surrogates,
-                    emittedContracts,
-                    enumClosures,
-                    context.ReportDiagnostic,
-                    announced
-                )
-            )
-            {
-                if (!registrations.Contains(surrogateRegistration))
-                {
-                    registrations.Add(surrogateRegistration);
-                }
-            }
-
-            foreach (
-                string foreignRegistration in ForeignClosures(
-                    context.Compilation,
-                    typeUses,
-                    context.ReportDiagnostic,
-                    announced
-                )
-            )
-            {
-                if (!registrations.Contains(foreignRegistration))
-                {
-                    registrations.Add(foreignRegistration);
-                }
-            }
-
-            List<string> rootMarshals = new List<string>(
-                marshals.Registrations(
-                    context.Compilation,
-                    typeUses,
-                    context.ReportDiagnostic,
-                    announced
-                )
-            );
-
-            List<string> declaredRoots = new List<string>(
-                DeclaredRootMap.Registrations(
-                    context.Compilation,
-                    context.ReportDiagnostic,
-                    announced
-                )
-            );
-
-            if (0 < registrations.Count || 0 < rootMarshals.Count || 0 < declaredRoots.Count)
-            {
-                context.AddSource(
-                    "WProtoGeneratedRegistrar.g.cs",
-                    SourceText.From(
-                        EmitRegistrar(
-                            context,
-                            registrations,
-                            replacements,
-                            rootMarshals,
-                            declaredRoots,
-                            enumClosures,
-                            disableModuleInitializer
-                        ),
-                        Encoding.UTF8
-                    )
-                );
-            }
-
-            // Separate registrars keep JSON and protobuf opt-outs independent.
-            List<string> jsonRegistrations = new List<string>(
-                jsonConverters.Registrations(
-                    context.Compilation,
-                    typeUses,
-                    context.ReportDiagnostic,
-                    announced
-                )
-            );
-
-            if (0 < jsonRegistrations.Count)
-            {
-                context.AddSource(
-                    "WJsonGeneratedRegistrar.g.cs",
-                    SourceText.From(
-                        EmitJsonRegistrar(jsonRegistrations, disableModuleInitializer),
-                        Encoding.UTF8
-                    )
-                );
-            }
-        }
 
         /// <summary>
         /// Whether this compilation is one the editor performs, rather than one a player ships.
@@ -4276,23 +3935,364 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return false;
         }
 
+        /// <inheritdoc />
+        public void Initialize(GeneratorInitializationContext context)
+        {
+            context.RegisterForSyntaxNotifications(() => new Receiver());
+        }
+
+        /// <inheritdoc />
+        public void Execute(GeneratorExecutionContext context)
+        {
+            if (!(context.SyntaxReceiver is Receiver receiver))
+            {
+                return;
+            }
+
+            bool disableModuleInitializer = DisableModuleInitializer(context);
+
+            List<INamedTypeSymbol> contracts = new List<INamedTypeSymbol>();
+            HashSet<INamedTypeSymbol> seen = new HashSet<INamedTypeSymbol>(
+                SymbolEqualityComparer.Default
+            );
+
+            // Cache the reference search once per compilation instead of repeating it for every DataContract.
+            bool? referencesProtobufNet = null;
+
+            /*
+             * Validate the manifest before resolving tagless subtypes so each corrupt entry reports once at
+             * its source.
+             */
+            SubtypeTagManifest manifest = SubtypeTagManifest.Build(context.Compilation);
+            SubtypeTagManifest.Validate(context.Compilation, context.ReportDiagnostic);
+            bool editorCompilation = IsEditorCompilation(context);
+
+            // Reuse one semantic model per tree because ordinary subclasses also enter this scan.
+            Dictionary<SyntaxTree, SemanticModel> models =
+                new Dictionary<SyntaxTree, SemanticModel>();
+
+            foreach (TypeDeclarationSyntax declaration in receiver.Types)
+            {
+                SemanticModel model = ModelFor(context.Compilation, models, declaration.SyntaxTree);
+                if (!(model.GetDeclaredSymbol(declaration) is INamedTypeSymbol symbol))
+                {
+                    continue;
+                }
+
+                if (!seen.Add(symbol))
+                {
+                    continue;
+                }
+
+                bool isContract = IsContract(symbol);
+                if (HasAttribute(symbol, NotSerializedAttribute))
+                {
+                    /*
+                     * Contradictory opt-out and contract declarations must report before traversal order can
+                     * choose one.
+                     */
+                    string contradiction =
+                        HasAttribute(symbol, ContractAttribute) ? "[WProtoContract]"
+                        : HasAttribute(symbol, SubtypeAttribute) ? "[WProtoSubtype]"
+                        : null;
+                    if (contradiction != null)
+                    {
+                        context.ReportDiagnostic(
+                            Diagnostic.Create(
+                                WProtoDiagnostics.ContradictoryNotSerialized,
+                                symbol.Locations.FirstOrDefault(),
+                                symbol.Name,
+                                "carries " + contradiction
+                            )
+                        );
+                    }
+                }
+
+                if (isContract)
+                {
+                    contracts.Add(symbol);
+                    continue;
+                }
+
+                ReportUndeclaredSubclass(context, symbol);
+
+                if (
+                    TryFindUnportedProtobufContract(
+                        context.Compilation,
+                        symbol,
+                        ref referencesProtobufNet,
+                        out AttributeData protobufContract,
+                        out string matchedBecause
+                    )
+                )
+                {
+                    Location location =
+                        protobufContract.ApplicationSyntaxReference?.GetSyntax().GetLocation()
+                        ?? symbol.Locations.FirstOrDefault();
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            WProtoDiagnostics.UnportedProtobufContract,
+                            location,
+                            symbol.ToDisplayString(),
+                            matchedBecause
+                        )
+                    );
+                }
+
+                ReportOrphanedHooks(context, symbol);
+
+                SubtypeMap.Validate(
+                    context.ReportDiagnostic,
+                    symbol,
+                    true,
+                    manifest,
+                    editorCompilation
+                );
+            }
+
+            foreach (TypeDeclarationSyntax derived in receiver.Derived)
+            {
+                SemanticModel model = ModelFor(context.Compilation, models, derived.SyntaxTree);
+                if (!(model.GetDeclaredSymbol(derived) is INamedTypeSymbol symbol))
+                {
+                    continue;
+                }
+
+                // Another partial declaration may already have registered this contract.
+                if (!seen.Add(symbol))
+                {
+                    continue;
+                }
+
+                if (IsContract(symbol))
+                {
+                    contracts.Add(symbol);
+                    continue;
+                }
+
+                ReportUndeclaredSubclass(context, symbol);
+            }
+
+            foreach (EnumDeclarationSyntax enumeration in receiver.Enums)
+            {
+                SemanticModel model = ModelFor(context.Compilation, models, enumeration.SyntaxTree);
+                if (
+                    model.GetDeclaredSymbol(enumeration) is INamedTypeSymbol enumSymbol
+                    && seen.Add(enumSymbol)
+                )
+                {
+                    ReportReservedEnumMembers(context, enumSymbol);
+                }
+            }
+
+            // Collect subtype declarations before emitting bases, regardless of source order.
+            SubtypeMap subtypes = SubtypeMap.Build(contracts, manifest);
+
+            SurrogateMap surrogates = SurrogateMap.Build(context.Compilation);
+            SurrogateMap.Validate(context.Compilation, context.ReportDiagnostic);
+
+            MarshalMap marshals = MarshalMap.Build(context.Compilation);
+            MarshalMap.Validate(context.Compilation, context.ReportDiagnostic);
+
+            JsonConverterMap jsonConverters = JsonConverterMap.Build(context.Compilation);
+            JsonConverterMap.Validate(context.Compilation, context.ReportDiagnostic);
+
+            DeclaredRootMap.Validate(context.Compilation, context.ReportDiagnostic);
+
+            // All scans share diagnostics so one unnameable closure reports only once.
+            HashSet<string> announced = new HashSet<string>();
+
+            List<string> registrations = new List<string>();
+            List<string> replacements;
+            HashSet<INamedTypeSymbol> emittedContracts = new HashSet<INamedTypeSymbol>(
+                SymbolEqualityComparer.Default
+            );
+            HashSet<INamedTypeSymbol> enumClosures = new HashSet<INamedTypeSymbol>(
+                SymbolEqualityComparer.Default
+            );
+            /*
+             * Emit deepest-first and filter refused includes so no published formatter names an unpublished
+             * formatter.
+             */
+            List<Emission> emissions = new List<Emission>();
+            HashSet<INamedTypeSymbol> refused = new HashSet<INamedTypeSymbol>(
+                SymbolEqualityComparer.Default
+            );
+            foreach (INamedTypeSymbol contract in DeepestFirst(contracts))
+            {
+                string source = Emit(
+                    context,
+                    contract,
+                    surrogates,
+                    subtypes,
+                    refused,
+                    out string registration
+                );
+                if (source == null)
+                {
+                    refused.Add(contract);
+                    continue;
+                }
+
+                emissions.Add(new Emission(contract, source, registration));
+            }
+
+            IReadOnlyList<ClosureScan.TypeUse> typeUses = ClosureScan.Types(
+                context.Compilation,
+                models
+            );
+
+            foreach (Emission emission in emissions)
+            {
+                /*
+                 * CanServe names every ancestor formatter; withhold descendants of a refused ancestor even if
+                 * inherited nested types let the reference compile.
+                 */
+                if (HasRefusedAncestor(emission.Contract, refused))
+                {
+                    continue;
+                }
+
+                context.AddSource(
+                    FileNameFor(emission.Contract),
+                    SourceText.From(emission.Source, Encoding.UTF8)
+                );
+                emittedContracts.Add(emission.Contract);
+                if (emission.Registration != null)
+                {
+                    registrations.Add(emission.Registration);
+                }
+                else
+                {
+                    string entryPoint =
+                        RootContract(emission.Contract) == null
+                            ? "." + WProtoGeneratedNames.Formatter + ".Instance"
+                            : "." + WProtoGeneratedNames.RootFormatter + ".Instance";
+                    foreach (
+                        string closed in ClosedConstructions(
+                            context.Compilation,
+                            typeUses,
+                            emission.Contract,
+                            context.ReportDiagnostic,
+                            announced
+                        )
+                    )
+                    {
+                        registrations.Add(closed + entryPoint);
+                    }
+                }
+            }
+
+            replacements = EmitReplacements(context, subtypes, emittedContracts);
+
+            foreach (
+                string surrogateRegistration in SurrogateClosures(
+                    context.Compilation,
+                    typeUses,
+                    surrogates,
+                    emittedContracts,
+                    enumClosures,
+                    context.ReportDiagnostic,
+                    announced
+                )
+            )
+            {
+                if (!registrations.Contains(surrogateRegistration))
+                {
+                    registrations.Add(surrogateRegistration);
+                }
+            }
+
+            foreach (
+                string foreignRegistration in ForeignClosures(
+                    context.Compilation,
+                    typeUses,
+                    context.ReportDiagnostic,
+                    announced
+                )
+            )
+            {
+                if (!registrations.Contains(foreignRegistration))
+                {
+                    registrations.Add(foreignRegistration);
+                }
+            }
+
+            List<string> rootMarshals = new List<string>(
+                marshals.Registrations(
+                    context.Compilation,
+                    typeUses,
+                    context.ReportDiagnostic,
+                    announced
+                )
+            );
+
+            List<string> declaredRoots = new List<string>(
+                DeclaredRootMap.Registrations(
+                    context.Compilation,
+                    context.ReportDiagnostic,
+                    announced
+                )
+            );
+
+            if (0 < registrations.Count || 0 < rootMarshals.Count || 0 < declaredRoots.Count)
+            {
+                context.AddSource(
+                    "WProtoGeneratedRegistrar.g.cs",
+                    SourceText.From(
+                        EmitRegistrar(
+                            context,
+                            registrations,
+                            replacements,
+                            rootMarshals,
+                            declaredRoots,
+                            enumClosures,
+                            disableModuleInitializer
+                        ),
+                        Encoding.UTF8
+                    )
+                );
+            }
+
+            // Separate registrars keep JSON and protobuf opt-outs independent.
+            List<string> jsonRegistrations = new List<string>(
+                jsonConverters.Registrations(
+                    context.Compilation,
+                    typeUses,
+                    context.ReportDiagnostic,
+                    announced
+                )
+            );
+
+            if (0 < jsonRegistrations.Count)
+            {
+                context.AddSource(
+                    "WJsonGeneratedRegistrar.g.cs",
+                    SourceText.From(
+                        EmitJsonRegistrar(jsonRegistrations, disableModuleInitializer),
+                        Encoding.UTF8
+                    )
+                );
+            }
+        }
+
         /// <summary>
         /// One contract's generated source, held until it is known whether it may be published.
         /// </summary>
         private sealed class Emission
         {
+            internal INamedTypeSymbol Contract { get; }
+
+            internal string Source { get; }
+
+            internal string Registration { get; }
+
             internal Emission(INamedTypeSymbol contract, string source, string registration)
             {
                 Contract = contract;
                 Source = source;
                 Registration = registration;
             }
-
-            internal INamedTypeSymbol Contract { get; }
-
-            internal string Source { get; }
-
-            internal string Registration { get; }
         }
 
         private sealed class Receiver : ISyntaxReceiver

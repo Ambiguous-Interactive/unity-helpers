@@ -36,6 +36,247 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     {
         private const int ScratchSize = 512;
 
+        private static int GridBytes(int originX, int originY)
+        {
+            int total = 0;
+            for (int x = originX; x < originX + 40; x++)
+            {
+                for (int y = originY; y < originY + 25; y++)
+                {
+                    total += Encode(new FastVector2Int(x, y)).Length;
+                }
+            }
+
+            return total;
+        }
+
+        private static void AssertMatchesOracle<T>(T value, ref int checks)
+        {
+            byte[] mine = Encode(value);
+            byte[] oracle;
+            using (MemoryStream stream = new())
+            {
+                ProtoBuf.Serializer.Serialize(stream, value);
+                oracle = stream.ToArray();
+            }
+
+            checks++;
+            Assert.AreEqual(ToHex(oracle), ToHex(mine), $"{typeof(T).Name} bytes diverged");
+
+            /*
+                Bytes matching is not the same as agreeing on what they mean, so both directions are decoded as
+                well.
+            */
+            WProtoReader reader = new(oracle);
+            Assert.IsTrue(WProtoFormatterProvider.Get<T>().TryRead(ref reader, out T decoded));
+            Assert.AreEqual(value, decoded);
+
+            using (MemoryStream stream = new(mine))
+            {
+                Assert.AreEqual(value, ProtoBuf.Serializer.Deserialize<T>(stream));
+            }
+        }
+
+        private static void AssertRoundTrip<T>(T value, string expectedHex)
+        {
+            byte[] encoded = Encode(value);
+            Assert.AreEqual(expectedHex, ToHex(encoded));
+
+            WProtoReader reader = new(encoded);
+            Assert.IsTrue(WProtoFormatterProvider.Get<T>().TryRead(ref reader, out T restored));
+            Assert.AreEqual(value, restored);
+        }
+
+        private static void AssertLegacyReadsBack<T>(string legacyHex, T expected)
+        {
+            byte[] legacy = FromHex(legacyHex);
+            WProtoReader reader = new(legacy);
+            Assert.IsTrue(
+                WProtoFormatterProvider.Get<T>().TryRead(ref reader, out T restored),
+                $"A payload carrying the retired hash field no longer reads: {legacyHex}"
+            );
+            Assert.AreEqual(expected, restored);
+            Assert.AreEqual(expected.GetHashCode(), restored.GetHashCode());
+        }
+
+        private static byte[] FromHex(string hex)
+        {
+            byte[] bytes = new byte[hex.Length / 2];
+            for (int i = 0; i < bytes.Length; ++i)
+            {
+                bytes[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
+            }
+
+            return bytes;
+        }
+
+        private static byte[] Encode<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            int measured = formatter.Measure(value);
+
+            byte[] scratch = new byte[ScratchSize];
+            WProtoWriter writer = new(scratch);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+            Assert.IsFalse(writer.Faulted);
+            Assert.AreEqual(
+                measured,
+                writer.Position,
+                "Measure must predict Write exactly, or every enclosing length prefix lies"
+            );
+
+            byte[] result = new byte[writer.Position];
+            Array.Copy(scratch, result, writer.Position);
+            return result;
+        }
+
+        private static string ToHex(byte[] bytes)
+        {
+            char[] characters = new char[bytes.Length * 2];
+            for (int i = 0; i < bytes.Length; i++)
+            {
+                characters[i * 2] = "0123456789ABCDEF"[bytes[i] >> 4];
+                characters[(i * 2) + 1] = "0123456789ABCDEF"[bytes[i] & 0xF];
+            }
+
+            return new string(characters);
+        }
+
+        /// <summary>Returns the offset of a top-level field key, or -1 when absent.</summary>
+        private static int IndexOfTag(byte[] encoded, int fieldNumber)
+        {
+            WProtoReader reader = new(encoded);
+            while (true)
+            {
+                int position = reader.Position;
+                if (!reader.TryReadTag(out int number, out int wireType))
+                {
+                    return -1;
+                }
+
+                if (number == fieldNumber)
+                {
+                    return position;
+                }
+
+                if (!reader.TrySkipField(number, wireType))
+                {
+                    return -1;
+                }
+            }
+        }
+
+        /// <summary>Builds <paramref name="depth"/> levels of "field 1 is a sub-message".</summary>
+        /// <remarks>
+        /// The length prefix is a real varint. Writing it as a single byte caps honest nesting at
+        /// 127 levels and then silently wraps, which makes a deep payload malformed for a reason
+        /// that has nothing to do with depth -- a bomb test built that way passes with the depth
+        /// bound removed, which is how this was found.
+        /// </remarks>
+        private static byte[] BuildNesting(int depth)
+        {
+            return BuildNesting(depth, Array.Empty<byte>());
+        }
+
+        /// <summary>Wraps <paramref name="innermost"/> in <paramref name="depth"/> sub-messages.</summary>
+        private static byte[] BuildNesting(int depth, byte[] innermost)
+        {
+            byte[] payload = innermost;
+            for (int level = 0; level < depth; level++)
+            {
+                int lengthSize = WProtoSizes.Varint32Size((uint)payload.Length);
+                byte[] next = new byte[1 + lengthSize + payload.Length];
+                next[0] = (byte)((1 << 3) | WProtoWireType.LengthDelimited);
+
+                uint remainingLength = (uint)payload.Length;
+                int cursor = 1;
+                while (0x80u <= remainingLength)
+                {
+                    next[cursor++] = (byte)(remainingLength | 0x80u);
+                    remainingLength >>= 7;
+                }
+
+                next[cursor++] = (byte)remainingLength;
+                Array.Copy(payload, 0, next, cursor, payload.Length);
+                payload = next;
+            }
+
+            return payload;
+        }
+
+        /// <summary>Builds <paramref name="depth"/> nested groups on field 2, innermost empty.</summary>
+        private static byte[] BuildGroupNesting(int depth)
+        {
+            byte[] payload = Array.Empty<byte>();
+            for (int level = 0; level < depth; level++)
+            {
+                byte[] next = new byte[payload.Length + 2];
+                next[0] = (byte)((2 << 3) | WProtoWireType.StartGroup);
+                Array.Copy(payload, 0, next, 1, payload.Length);
+                next[payload.Length + 1] = (byte)((2 << 3) | WProtoWireType.EndGroup);
+                payload = next;
+            }
+
+            return payload;
+        }
+
+        /// <summary>Descends the nesting the way a generated formatter would: recursively.</summary>
+        /// <remarks>
+        /// Failure propagates through the return value rather than through the root reader's
+        /// <c>Malformed</c> flag, because that is the formatter contract: a refused nested read is
+        /// reported by the nested reader, and the caller's job is to stop. Asserting on the root's
+        /// flag instead passes with the depth bound removed, since the root's own stream was never
+        /// the thing that failed.
+        /// </remarks>
+        private static bool TryWalkNesting(ref WProtoReader reader, ref int deepest)
+        {
+            if (deepest < reader.Depth)
+            {
+                deepest = reader.Depth;
+            }
+
+            while (reader.TryReadTag(out int fieldNumber, out int wireType))
+            {
+                if (fieldNumber == 1 && wireType == WProtoWireType.LengthDelimited)
+                {
+                    if (!reader.TryReadMessage(out WProtoReader nested))
+                    {
+                        return false;
+                    }
+
+                    if (!TryWalkNesting(ref nested, ref deepest))
+                    {
+                        return false;
+                    }
+
+                    continue;
+                }
+
+                if (!reader.TrySkipField(fieldNumber, wireType))
+                {
+                    return false;
+                }
+            }
+
+            return !reader.Malformed;
+        }
+
+        /// <summary>Descends to the bound, then asserts the level past it is refused.</summary>
+        private static void AssertDescendingPastTheBoundIsRefused(ref WProtoReader reader)
+        {
+            if (WProtoReader.MaxNestingDepth <= reader.Depth)
+            {
+                WProtoReader past = new(new byte[] { 0x08, 0x01 }, in reader);
+                Assert.IsTrue(past.Malformed);
+                Assert.IsFalse(past.TryReadTag(out _, out _));
+                return;
+            }
+
+            Assert.IsTrue(reader.TryReadTag(out _, out _));
+            Assert.IsTrue(reader.TryReadMessage(out WProtoReader nested));
+            AssertDescendingPastTheBoundIsRefused(ref nested);
+        }
+
         /*
             Resolve without RegisterAll so this fixture detects a stripped or unreached startup bootstrap in
             IL2CPP.
@@ -154,20 +395,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         {
             Assert.AreEqual(3870, GridBytes(0, 0));
             Assert.AreEqual(3870, GridBytes(-20, -12));
-        }
-
-        private static int GridBytes(int originX, int originY)
-        {
-            int total = 0;
-            for (int x = originX; x < originX + 40; x++)
-            {
-                for (int y = originY; y < originY + 25; y++)
-                {
-                    total += Encode(new FastVector2Int(x, y)).Length;
-                }
-            }
-
-            return total;
         }
 
         [Test]
@@ -535,233 +762,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             }
 
             Assert.Greater(checks, 200, "The differential corpus shrank; that is a coverage loss");
-        }
-
-        private static void AssertMatchesOracle<T>(T value, ref int checks)
-        {
-            byte[] mine = Encode(value);
-            byte[] oracle;
-            using (MemoryStream stream = new())
-            {
-                ProtoBuf.Serializer.Serialize(stream, value);
-                oracle = stream.ToArray();
-            }
-
-            checks++;
-            Assert.AreEqual(ToHex(oracle), ToHex(mine), $"{typeof(T).Name} bytes diverged");
-
-            /*
-                Bytes matching is not the same as agreeing on what they mean, so both directions are decoded as
-                well.
-            */
-            WProtoReader reader = new(oracle);
-            Assert.IsTrue(WProtoFormatterProvider.Get<T>().TryRead(ref reader, out T decoded));
-            Assert.AreEqual(value, decoded);
-
-            using (MemoryStream stream = new(mine))
-            {
-                Assert.AreEqual(value, ProtoBuf.Serializer.Deserialize<T>(stream));
-            }
-        }
-
-        private static void AssertRoundTrip<T>(T value, string expectedHex)
-        {
-            byte[] encoded = Encode(value);
-            Assert.AreEqual(expectedHex, ToHex(encoded));
-
-            WProtoReader reader = new(encoded);
-            Assert.IsTrue(WProtoFormatterProvider.Get<T>().TryRead(ref reader, out T restored));
-            Assert.AreEqual(value, restored);
-        }
-
-        private static void AssertLegacyReadsBack<T>(string legacyHex, T expected)
-        {
-            byte[] legacy = FromHex(legacyHex);
-            WProtoReader reader = new(legacy);
-            Assert.IsTrue(
-                WProtoFormatterProvider.Get<T>().TryRead(ref reader, out T restored),
-                $"A payload carrying the retired hash field no longer reads: {legacyHex}"
-            );
-            Assert.AreEqual(expected, restored);
-            Assert.AreEqual(expected.GetHashCode(), restored.GetHashCode());
-        }
-
-        private static byte[] FromHex(string hex)
-        {
-            byte[] bytes = new byte[hex.Length / 2];
-            for (int i = 0; i < bytes.Length; ++i)
-            {
-                bytes[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
-            }
-
-            return bytes;
-        }
-
-        private static byte[] Encode<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            int measured = formatter.Measure(value);
-
-            byte[] scratch = new byte[ScratchSize];
-            WProtoWriter writer = new(scratch);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-            Assert.IsFalse(writer.Faulted);
-            Assert.AreEqual(
-                measured,
-                writer.Position,
-                "Measure must predict Write exactly, or every enclosing length prefix lies"
-            );
-
-            byte[] result = new byte[writer.Position];
-            Array.Copy(scratch, result, writer.Position);
-            return result;
-        }
-
-        private static string ToHex(byte[] bytes)
-        {
-            char[] characters = new char[bytes.Length * 2];
-            for (int i = 0; i < bytes.Length; i++)
-            {
-                characters[i * 2] = "0123456789ABCDEF"[bytes[i] >> 4];
-                characters[(i * 2) + 1] = "0123456789ABCDEF"[bytes[i] & 0xF];
-            }
-
-            return new string(characters);
-        }
-
-        /// <summary>Returns the offset of a top-level field key, or -1 when absent.</summary>
-        private static int IndexOfTag(byte[] encoded, int fieldNumber)
-        {
-            WProtoReader reader = new(encoded);
-            while (true)
-            {
-                int position = reader.Position;
-                if (!reader.TryReadTag(out int number, out int wireType))
-                {
-                    return -1;
-                }
-
-                if (number == fieldNumber)
-                {
-                    return position;
-                }
-
-                if (!reader.TrySkipField(number, wireType))
-                {
-                    return -1;
-                }
-            }
-        }
-
-        /// <summary>Builds <paramref name="depth"/> levels of "field 1 is a sub-message".</summary>
-        /// <remarks>
-        /// The length prefix is a real varint. Writing it as a single byte caps honest nesting at
-        /// 127 levels and then silently wraps, which makes a deep payload malformed for a reason
-        /// that has nothing to do with depth -- a bomb test built that way passes with the depth
-        /// bound removed, which is how this was found.
-        /// </remarks>
-        private static byte[] BuildNesting(int depth)
-        {
-            return BuildNesting(depth, Array.Empty<byte>());
-        }
-
-        /// <summary>Wraps <paramref name="innermost"/> in <paramref name="depth"/> sub-messages.</summary>
-        private static byte[] BuildNesting(int depth, byte[] innermost)
-        {
-            byte[] payload = innermost;
-            for (int level = 0; level < depth; level++)
-            {
-                int lengthSize = WProtoSizes.Varint32Size((uint)payload.Length);
-                byte[] next = new byte[1 + lengthSize + payload.Length];
-                next[0] = (byte)((1 << 3) | WProtoWireType.LengthDelimited);
-
-                uint remainingLength = (uint)payload.Length;
-                int cursor = 1;
-                while (0x80u <= remainingLength)
-                {
-                    next[cursor++] = (byte)(remainingLength | 0x80u);
-                    remainingLength >>= 7;
-                }
-
-                next[cursor++] = (byte)remainingLength;
-                Array.Copy(payload, 0, next, cursor, payload.Length);
-                payload = next;
-            }
-
-            return payload;
-        }
-
-        /// <summary>Builds <paramref name="depth"/> nested groups on field 2, innermost empty.</summary>
-        private static byte[] BuildGroupNesting(int depth)
-        {
-            byte[] payload = Array.Empty<byte>();
-            for (int level = 0; level < depth; level++)
-            {
-                byte[] next = new byte[payload.Length + 2];
-                next[0] = (byte)((2 << 3) | WProtoWireType.StartGroup);
-                Array.Copy(payload, 0, next, 1, payload.Length);
-                next[payload.Length + 1] = (byte)((2 << 3) | WProtoWireType.EndGroup);
-                payload = next;
-            }
-
-            return payload;
-        }
-
-        /// <summary>Descends the nesting the way a generated formatter would: recursively.</summary>
-        /// <remarks>
-        /// Failure propagates through the return value rather than through the root reader's
-        /// <c>Malformed</c> flag, because that is the formatter contract: a refused nested read is
-        /// reported by the nested reader, and the caller's job is to stop. Asserting on the root's
-        /// flag instead passes with the depth bound removed, since the root's own stream was never
-        /// the thing that failed.
-        /// </remarks>
-        private static bool TryWalkNesting(ref WProtoReader reader, ref int deepest)
-        {
-            if (deepest < reader.Depth)
-            {
-                deepest = reader.Depth;
-            }
-
-            while (reader.TryReadTag(out int fieldNumber, out int wireType))
-            {
-                if (fieldNumber == 1 && wireType == WProtoWireType.LengthDelimited)
-                {
-                    if (!reader.TryReadMessage(out WProtoReader nested))
-                    {
-                        return false;
-                    }
-
-                    if (!TryWalkNesting(ref nested, ref deepest))
-                    {
-                        return false;
-                    }
-
-                    continue;
-                }
-
-                if (!reader.TrySkipField(fieldNumber, wireType))
-                {
-                    return false;
-                }
-            }
-
-            return !reader.Malformed;
-        }
-
-        /// <summary>Descends to the bound, then asserts the level past it is refused.</summary>
-        private static void AssertDescendingPastTheBoundIsRefused(ref WProtoReader reader)
-        {
-            if (WProtoReader.MaxNestingDepth <= reader.Depth)
-            {
-                WProtoReader past = new(new byte[] { 0x08, 0x01 }, in reader);
-                Assert.IsTrue(past.Malformed);
-                Assert.IsFalse(past.TryReadTag(out _, out _));
-                return;
-            }
-
-            Assert.IsTrue(reader.TryReadTag(out _, out _));
-            Assert.IsTrue(reader.TryReadMessage(out WProtoReader nested));
-            AssertDescendingPastTheBoundIsRefused(ref nested);
         }
 
         /// <summary>A self-nesting contract: the shape whose formatter has to carry the depth.</summary>

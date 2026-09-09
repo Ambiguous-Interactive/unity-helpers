@@ -35,6 +35,61 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private const string Contract =
             "[WProtoContract] public partial class Box<T> { [WProtoMember(1)] public T Value; } ";
 
+        private static IReadOnlyList<string> Registrations(params string[] bodies)
+        {
+            List<SyntaxTree> trees = new List<SyntaxTree>();
+            foreach (string body in bodies)
+            {
+                string source =
+                    "using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;\n"
+                    + "namespace Consumer { "
+                    + body
+                    + " }";
+                trees.Add(CSharpSyntaxTree.ParseText(source));
+            }
+
+            List<MetadataReference> references = new List<MetadataReference>();
+            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
+                {
+                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
+                }
+            }
+
+            CSharpCompilation compilation = CSharpCompilation.Create(
+                "ConsumerAssembly",
+                trees,
+                references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+            );
+
+            CSharpGeneratorDriver
+                .Create(new WProtoGenerator())
+                .RunGeneratorsAndUpdateCompilation(
+                    compilation,
+                    out Compilation updated,
+                    out ImmutableArray<Diagnostic> _
+                );
+
+            SyntaxTree registrar = updated.SyntaxTrees.FirstOrDefault(tree =>
+                tree.FilePath.Contains("WProtoGeneratedRegistrar", StringComparison.Ordinal)
+            );
+
+            if (registrar == null)
+            {
+                return Array.Empty<string>();
+            }
+
+            return registrar
+                .GetText()
+                .ToString()
+                .Split('\n')
+                .Where(line => line.Contains(".Register(", StringComparison.Ordinal))
+                .Select(line => line.Trim())
+                .ToList();
+        }
+
         [TestCase(
             "public static class Use { public static object Make() { return new Box<int>(); } }",
             TestName = "AnObjectCreationIsAConstruction"
@@ -213,61 +268,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.That(registrations, Has.Some.Contains("Box<string>"));
             Assert.That(registrations, Has.Some.Contains("Crate<int>"));
             Assert.That(registrations, Has.Some.Contains("Crate<string>"));
-        }
-
-        private static IReadOnlyList<string> Registrations(params string[] bodies)
-        {
-            List<SyntaxTree> trees = new List<SyntaxTree>();
-            foreach (string body in bodies)
-            {
-                string source =
-                    "using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;\n"
-                    + "namespace Consumer { "
-                    + body
-                    + " }";
-                trees.Add(CSharpSyntaxTree.ParseText(source));
-            }
-
-            List<MetadataReference> references = new List<MetadataReference>();
-            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
-                {
-                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
-                }
-            }
-
-            CSharpCompilation compilation = CSharpCompilation.Create(
-                "ConsumerAssembly",
-                trees,
-                references,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-            );
-
-            CSharpGeneratorDriver
-                .Create(new WProtoGenerator())
-                .RunGeneratorsAndUpdateCompilation(
-                    compilation,
-                    out Compilation updated,
-                    out ImmutableArray<Diagnostic> _
-                );
-
-            SyntaxTree registrar = updated.SyntaxTrees.FirstOrDefault(tree =>
-                tree.FilePath.Contains("WProtoGeneratedRegistrar", StringComparison.Ordinal)
-            );
-
-            if (registrar == null)
-            {
-                return Array.Empty<string>();
-            }
-
-            return registrar
-                .GetText()
-                .ToString()
-                .Split('\n')
-                .Where(line => line.Contains(".Register(", StringComparison.Ordinal))
-                .Select(line => line.Trim())
-                .ToList();
         }
     }
 }

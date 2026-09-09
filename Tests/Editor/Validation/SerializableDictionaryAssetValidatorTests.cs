@@ -23,103 +23,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     [TestFixture]
     public sealed class SerializableDictionaryAssetValidatorTests
     {
-        [SetUp]
-        public void CreateScanRoot()
-        {
-            _root = Path.Combine(Path.GetTempPath(), $"serializable-dictionary-{Guid.NewGuid():N}");
-            Directory.CreateDirectory(_root);
-        }
-
-        [TearDown]
-        public void DeleteScanRoot()
-        {
-            if (!string.IsNullOrEmpty(_root) && Directory.Exists(_root))
-            {
-                Directory.Delete(_root, recursive: true);
-            }
-
-            _root = null;
-        }
-
-        [TestCaseSource(nameof(AuthoredStates))]
-        public void AnAuthoredDictionaryIsJudgedByWhatCarriesItsValues(
-            string name,
-            string[] body,
-            int expectedInspected,
-            SerializableDictionaryAssetProblem[] expected
-        )
-        {
-            string assetPath = WriteAsset(name, body);
-            List<SerializableDictionaryAssetFinding> findings = new();
-
-            Assert.IsTrue(
-                SerializableDictionaryAssetValidator.TryScan(
-                    new[] { assetPath },
-                    findings,
-                    out int inspected
-                )
-            );
-
-            Assert.AreEqual(expectedInspected, inspected);
-            CollectionAssert.AreEqual(
-                expected,
-                findings.Select(finding => finding.Problem).ToArray(),
-                string.Join(Environment.NewLine, findings.Select(finding => finding.ToString()))
-            );
-        }
-
-        [Test]
-        public void AFindingNamesTheLineTheEvidenceIsOn()
-        {
-            string assetPath = WriteAsset(
-                "NullValue",
-                new[]
-                {
-                    "  _map:",
-                    "    _keys:",
-                    "    - Idle",
-                    "    - Run",
-                    "    _values:",
-                    "    - {fileID: 7400000, guid: bbb, type: 3}",
-                    "    - {fileID: 0}",
-                    "    _boxedValues: []",
-                }
-            );
-
-            List<SerializableDictionaryAssetFinding> findings = new();
-            SerializableDictionaryAssetValidator.TryScan(new[] { assetPath }, findings, out int _);
-
-            Assert.AreEqual(1, findings.Count);
-            Assert.AreEqual(13, findings[0].LineNumber);
-            Assert.AreEqual(assetPath, findings[0].AssetPath);
-        }
-
-        [Test]
-        public void AScanWithNothingToReadIsRefusedRatherThanReportedClean()
-        {
-            List<SerializableDictionaryAssetFinding> findings = new();
-
-            Assert.IsFalse(SerializableDictionaryAssetValidator.TryScan(null, findings, out int _));
-            Assert.IsFalse(
-                SerializableDictionaryAssetValidator.TryScan(Array.Empty<string>(), null, out int _)
-            );
-        }
-
-        [Test]
-        public void AnAssetThatCannotBeReadIsSkippedRatherThanThrowing()
-        {
-            List<SerializableDictionaryAssetFinding> findings = new();
-
-            Assert.IsTrue(
-                SerializableDictionaryAssetValidator.TryScan(
-                    new[] { Path.Combine(_root, "absent.asset") },
-                    findings,
-                    out int inspected
-                )
-            );
-            Assert.AreEqual(0, inspected);
-            Assert.AreEqual(0, findings.Count);
-        }
+        private string _root;
 
         private static IEnumerable<TestCaseData> AuthoredStates()
         {
@@ -249,6 +153,104 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             ).SetName("AnAssetWithNoDictionaryIsNotJudged");
         }
 
+        [SetUp]
+        public void CreateScanRoot()
+        {
+            _root = Path.Combine(Path.GetTempPath(), $"serializable-dictionary-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(_root);
+        }
+
+        [TearDown]
+        public void DeleteScanRoot()
+        {
+            if (!string.IsNullOrEmpty(_root) && Directory.Exists(_root))
+            {
+                Directory.Delete(_root, recursive: true);
+            }
+
+            _root = null;
+        }
+
+        [TestCaseSource(nameof(AuthoredStates))]
+        public void AnAuthoredDictionaryIsJudgedByWhatCarriesItsValues(
+            string name,
+            string[] body,
+            int expectedInspected,
+            SerializableDictionaryAssetProblem[] expected
+        )
+        {
+            string assetPath = WriteAsset(name, body);
+            List<SerializableDictionaryAssetFinding> findings = new();
+
+            Assert.IsTrue(
+                SerializableDictionaryAssetValidator.TryScan(
+                    new[] { assetPath },
+                    findings,
+                    out int inspected
+                )
+            );
+
+            Assert.AreEqual(expectedInspected, inspected);
+            CollectionAssert.AreEqual(
+                expected,
+                findings.Select(finding => finding.Problem).ToArray(),
+                string.Join(Environment.NewLine, findings.Select(finding => finding.ToString()))
+            );
+        }
+
+        [Test]
+        public void AFindingNamesTheLineTheEvidenceIsOn()
+        {
+            string assetPath = WriteAsset(
+                "NullValue",
+                new[]
+                {
+                    "  _map:",
+                    "    _keys:",
+                    "    - Idle",
+                    "    - Run",
+                    "    _values:",
+                    "    - {fileID: 7400000, guid: bbb, type: 3}",
+                    "    - {fileID: 0}",
+                    "    _boxedValues: []",
+                }
+            );
+
+            List<SerializableDictionaryAssetFinding> findings = new();
+            SerializableDictionaryAssetValidator.TryScan(new[] { assetPath }, findings, out int _);
+
+            Assert.AreEqual(1, findings.Count);
+            Assert.AreEqual(13, findings[0].LineNumber);
+            Assert.AreEqual(assetPath, findings[0].AssetPath);
+        }
+
+        [Test]
+        public void AScanWithNothingToReadIsRefusedRatherThanReportedClean()
+        {
+            List<SerializableDictionaryAssetFinding> findings = new();
+
+            Assert.IsFalse(SerializableDictionaryAssetValidator.TryScan(null, findings, out int _));
+            Assert.IsFalse(
+                SerializableDictionaryAssetValidator.TryScan(Array.Empty<string>(), null, out int _)
+            );
+        }
+
+        [Test]
+        public void AnAssetThatCannotBeReadIsSkippedRatherThanThrowing()
+        {
+            List<SerializableDictionaryAssetFinding> findings = new();
+
+            Assert.IsTrue(
+                SerializableDictionaryAssetValidator.TryScan(
+                    new[] { Path.Combine(_root, "absent.asset") },
+                    findings,
+                    out int inspected
+                )
+            );
+            Assert.AreEqual(0, inspected);
+            Assert.AreEqual(0, findings.Count);
+        }
+
         private string WriteAsset(string name, IReadOnlyList<string> body)
         {
             List<string> lines = new()
@@ -266,7 +268,5 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             File.WriteAllLines(assetPath, lines);
             return assetPath;
         }
-
-        private string _root;
     }
 }

@@ -54,6 +54,112 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                   }
               }";
 
+        private static string FindRepositoryRoot()
+        {
+            DirectoryInfo directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
+            while (directory != null)
+            {
+                if (Directory.Exists(Path.Combine(directory.FullName, "Runtime")))
+                {
+                    return directory.FullName;
+                }
+
+                directory = directory.Parent;
+            }
+
+            throw new DirectoryNotFoundException(
+                "Could not find the repository root above the test directory"
+            );
+        }
+
+        private static Diagnostic Single(string body)
+        {
+            ImmutableArray<Diagnostic> reported = Analyze(body);
+            Assert.AreEqual(1, reported.Length, "Expected exactly one diagnostic");
+            return reported[0];
+        }
+
+        private static ImmutableArray<Diagnostic> Analyze(string body)
+        {
+            return Analyze(body, LanguageVersion.CSharp9);
+        }
+
+        private static ImmutableArray<Diagnostic> Analyze(string body, LanguageVersion language)
+        {
+            return Analyze(body, language, ReportDiagnostic.Default);
+        }
+
+        /// <summary>
+        /// Compiles <paramref name="body"/> and runs the analyzer over it.
+        /// </summary>
+        /// <param name="body">Members of a static class in namespace <c>Consumer</c>.</param>
+        /// <param name="language">Language version the fixture is parsed at.</param>
+        /// <param name="reportedAs">
+        /// What the compilation says about the diagnostic -- <see cref="ReportDiagnostic.Default"/>
+        /// for a consumer who configures nothing, or anything else for the ruleset /
+        /// <c>.editorconfig</c> entry they would write, expressed as the option Roslyn resolves both
+        /// of them to.
+        /// </param>
+        /// <returns>Everything the analyzer reported.</returns>
+        private static ImmutableArray<Diagnostic> Analyze(
+            string body,
+            LanguageVersion language,
+            ReportDiagnostic reportedAs
+        )
+        {
+            string source =
+                "using System;\n"
+                + "using System.Collections.Generic;\n"
+                + "using System.Collections.Concurrent;\n"
+                + "using System.Runtime.CompilerServices;\n"
+                + "using WallstopStudios.UnityHelpers.Core.Extension;\n"
+                + "namespace Other { public static class Ext { public static int GetOrAdd<K, V>(this Dictionary<K, V> d, K k, Func<K, int> f) => f(k); } }\n"
+                + "namespace Consumer { public static class Subject { "
+                + body
+                + " } }\n"
+                + PackageDictionaryExtensions;
+
+            List<MetadataReference> references = new List<MetadataReference>();
+            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
+                {
+                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
+                }
+            }
+
+            CSharpCompilation compilation = CSharpCompilation.Create(
+                "ConsumerAssembly",
+                new[] { CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(language)) },
+                references,
+                new CSharpCompilationOptions(
+                    OutputKind.DynamicallyLinkedLibrary
+                ).WithSpecificDiagnosticOptions(
+                    ImmutableDictionary<string, ReportDiagnostic>.Empty.Add(
+                        DiagnosticId,
+                        reportedAs
+                    )
+                )
+            );
+
+            ImmutableArray<Diagnostic> compileErrors = compilation
+                .GetDiagnostics()
+                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+                .ToImmutableArray();
+            Assert.IsEmpty(
+                compileErrors.Select(diagnostic => diagnostic.ToString()).ToArray(),
+                "The fixture must compile"
+            );
+
+            return compilation
+                .WithAnalyzers(
+                    ImmutableArray.Create<DiagnosticAnalyzer>(new CacheFactoryAnalyzer())
+                )
+                .GetAnalyzerDiagnosticsAsync()
+                .GetAwaiter()
+                .GetResult();
+        }
+
         [Test]
         public void AMethodGroupFactoryIsReported()
         {
@@ -341,112 +447,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                     $"the analyzer covers {method}, so it has to still be there"
                 );
             }
-        }
-
-        private static string FindRepositoryRoot()
-        {
-            DirectoryInfo directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-            while (directory != null)
-            {
-                if (Directory.Exists(Path.Combine(directory.FullName, "Runtime")))
-                {
-                    return directory.FullName;
-                }
-
-                directory = directory.Parent;
-            }
-
-            throw new DirectoryNotFoundException(
-                "Could not find the repository root above the test directory"
-            );
-        }
-
-        private static Diagnostic Single(string body)
-        {
-            ImmutableArray<Diagnostic> reported = Analyze(body);
-            Assert.AreEqual(1, reported.Length, "Expected exactly one diagnostic");
-            return reported[0];
-        }
-
-        private static ImmutableArray<Diagnostic> Analyze(string body)
-        {
-            return Analyze(body, LanguageVersion.CSharp9);
-        }
-
-        private static ImmutableArray<Diagnostic> Analyze(string body, LanguageVersion language)
-        {
-            return Analyze(body, language, ReportDiagnostic.Default);
-        }
-
-        /// <summary>
-        /// Compiles <paramref name="body"/> and runs the analyzer over it.
-        /// </summary>
-        /// <param name="body">Members of a static class in namespace <c>Consumer</c>.</param>
-        /// <param name="language">Language version the fixture is parsed at.</param>
-        /// <param name="reportedAs">
-        /// What the compilation says about the diagnostic -- <see cref="ReportDiagnostic.Default"/>
-        /// for a consumer who configures nothing, or anything else for the ruleset /
-        /// <c>.editorconfig</c> entry they would write, expressed as the option Roslyn resolves both
-        /// of them to.
-        /// </param>
-        /// <returns>Everything the analyzer reported.</returns>
-        private static ImmutableArray<Diagnostic> Analyze(
-            string body,
-            LanguageVersion language,
-            ReportDiagnostic reportedAs
-        )
-        {
-            string source =
-                "using System;\n"
-                + "using System.Collections.Generic;\n"
-                + "using System.Collections.Concurrent;\n"
-                + "using System.Runtime.CompilerServices;\n"
-                + "using WallstopStudios.UnityHelpers.Core.Extension;\n"
-                + "namespace Other { public static class Ext { public static int GetOrAdd<K, V>(this Dictionary<K, V> d, K k, Func<K, int> f) => f(k); } }\n"
-                + "namespace Consumer { public static class Subject { "
-                + body
-                + " } }\n"
-                + PackageDictionaryExtensions;
-
-            List<MetadataReference> references = new List<MetadataReference>();
-            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
-                {
-                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
-                }
-            }
-
-            CSharpCompilation compilation = CSharpCompilation.Create(
-                "ConsumerAssembly",
-                new[] { CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(language)) },
-                references,
-                new CSharpCompilationOptions(
-                    OutputKind.DynamicallyLinkedLibrary
-                ).WithSpecificDiagnosticOptions(
-                    ImmutableDictionary<string, ReportDiagnostic>.Empty.Add(
-                        DiagnosticId,
-                        reportedAs
-                    )
-                )
-            );
-
-            ImmutableArray<Diagnostic> compileErrors = compilation
-                .GetDiagnostics()
-                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-                .ToImmutableArray();
-            Assert.IsEmpty(
-                compileErrors.Select(diagnostic => diagnostic.ToString()).ToArray(),
-                "The fixture must compile"
-            );
-
-            return compilation
-                .WithAnalyzers(
-                    ImmutableArray.Create<DiagnosticAnalyzer>(new CacheFactoryAnalyzer())
-                )
-                .GetAnalyzerDiagnosticsAsync()
-                .GetAwaiter()
-                .GetResult();
         }
     }
 }

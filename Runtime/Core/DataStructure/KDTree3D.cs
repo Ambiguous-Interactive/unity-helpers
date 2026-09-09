@@ -38,15 +38,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     [Serializable]
     public sealed class KdTree3D<T> : ISpatialTree3D<T>
     {
-        private const float MinimumNodeSize = 0.001f;
-        private const int SmallPartitionThreshold = 32;
-
         /// <summary>
         /// Default bucket size for leaves before stopping recursion.
         /// </summary>
         public const int DefaultBucketSize = 12;
 
-        public readonly ImmutableArray<T> elements;
+        private const float MinimumNodeSize = 0.001f;
+        private const int SmallPartitionThreshold = 32;
 
         /// <summary>
         /// Gets the overall bounding box of the tree.
@@ -54,6 +52,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <remarks>Bounds conservatively enclose finite entries. Float size or edges can be infinite
         /// when the enclosing span is not representable; queries still test the stored geometry.</remarks>
         public Bounds Boundary => _bounds;
+
+        public readonly ImmutableArray<T> elements;
 
         private readonly Bounds _bounds;
         private readonly float[] _positionsX;
@@ -172,243 +172,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _bounds = root.boundary;
         }
 
-        private KdTreeNode BuildBalanced(int startIndex, int count, int depth)
-        {
-            if (count <= _bucketSize)
-            {
-                Bounds leafBounds = CalculateLeafBounds(startIndex, count);
-                return KdTreeNode.CreateLeaf(leafBounds, startIndex, count);
-            }
-
-            int axis = depth % 3;
-
-            Span<int> span = _indices.AsSpan(startIndex, count);
-            int leftCount = count / 2;
-            if (leftCount == 0)
-            {
-                Bounds leafBounds = CalculateLeafBounds(startIndex, count);
-                return KdTreeNode.CreateLeaf(leafBounds, startIndex, count);
-            }
-
-            SelectKth(span, leftCount, axis);
-            int rightCount = count - leftCount;
-            if (rightCount == 0)
-            {
-                Bounds leafBounds = CalculateLeafBounds(startIndex, count);
-                return KdTreeNode.CreateLeaf(leafBounds, startIndex, count);
-            }
-
-            KdTreeNode left = BuildBalanced(startIndex, leftCount, depth + 1);
-            KdTreeNode right = BuildBalanced(startIndex + leftCount, rightCount, depth + 1);
-            Bounds boundary = CombineChildBounds(left.boundary, right.boundary);
-            return KdTreeNode.CreateInternal(boundary, left, right, startIndex, count);
-        }
-
-        private KdTreeNode BuildUnbalanced(int startIndex, int count, int axis, int[] scratch)
-        {
-            Span<int> source = _indices.AsSpan(startIndex, count);
-            Span<int> temp = scratch.AsSpan(0, count);
-            float[] positionsX = _positionsX;
-            float[] positionsY = _positionsY;
-            float[] positionsZ = _positionsZ;
-
-            float minX = float.PositiveInfinity;
-            float minY = float.PositiveInfinity;
-            float minZ = float.PositiveInfinity;
-            float maxX = float.NegativeInfinity;
-            float maxY = float.NegativeInfinity;
-            float maxZ = float.NegativeInfinity;
-
-            for (int i = 0; i < count; ++i)
-            {
-                int entryIndex = source[i];
-                float px = positionsX[entryIndex];
-                float py = positionsY[entryIndex];
-                float pz = positionsZ[entryIndex];
-                if (px < minX)
-                {
-                    minX = px;
-                }
-                if (py < minY)
-                {
-                    minY = py;
-                }
-                if (pz < minZ)
-                {
-                    minZ = pz;
-                }
-                if (maxX < px)
-                {
-                    maxX = px;
-                }
-                if (maxY < py)
-                {
-                    maxY = py;
-                }
-                if (maxZ < pz)
-                {
-                    maxZ = pz;
-                }
-            }
-
-            Bounds nodeBounds = CreateBounds(minX, maxX, minY, maxY, minZ, maxZ);
-
-            if (count <= _bucketSize)
-            {
-                return KdTreeNode.CreateLeaf(nodeBounds, startIndex, count);
-            }
-
-            float cutoff = GetAxisValue(nodeBounds.center, axis);
-
-            int leftWrite = 0;
-            int rightWrite = count - 1;
-            float[] axisArray = GetAxisArray(axis);
-            for (int i = 0; i < count; ++i)
-            {
-                int entryIndex = source[i];
-                float value = axisArray[entryIndex];
-                if (value <= cutoff)
-                {
-                    temp[leftWrite++] = entryIndex;
-                }
-                else
-                {
-                    temp[rightWrite--] = entryIndex;
-                }
-            }
-
-            int leftCount = leftWrite;
-            int rightCount = count - leftCount;
-
-            if (leftCount == 0 || rightCount == 0)
-            {
-                return KdTreeNode.CreateLeaf(nodeBounds, startIndex, count);
-            }
-
-            temp.CopyTo(source);
-
-            int nextAxis = (axis + 1) % 3;
-            KdTreeNode left = BuildUnbalanced(startIndex, leftCount, nextAxis, scratch);
-            KdTreeNode right = BuildUnbalanced(
-                startIndex + leftCount,
-                rightCount,
-                nextAxis,
-                scratch
-            );
-            Bounds boundary = CombineChildBounds(left.boundary, right.boundary);
-            return KdTreeNode.CreateInternal(boundary, left, right, startIndex, count);
-        }
-
-        private Bounds CalculateLeafBounds(int startIndex, int count)
-        {
-            if (count <= 0)
-            {
-                return new Bounds();
-            }
-
-            int[] indices = _indices;
-            float[] positionsX = _positionsX;
-            float[] positionsY = _positionsY;
-            float[] positionsZ = _positionsZ;
-            float minX = float.PositiveInfinity;
-            float minY = float.PositiveInfinity;
-            float minZ = float.PositiveInfinity;
-            float maxX = float.NegativeInfinity;
-            float maxY = float.NegativeInfinity;
-            float maxZ = float.NegativeInfinity;
-
-            int end = startIndex + count;
-            for (int i = startIndex; i < end; ++i)
-            {
-                int entryIndex = indices[i];
-                float px = positionsX[entryIndex];
-                float py = positionsY[entryIndex];
-                float pz = positionsZ[entryIndex];
-                if (px < minX)
-                {
-                    minX = px;
-                }
-                if (py < minY)
-                {
-                    minY = py;
-                }
-                if (pz < minZ)
-                {
-                    minZ = pz;
-                }
-                if (maxX < px)
-                {
-                    maxX = px;
-                }
-                if (maxY < py)
-                {
-                    maxY = py;
-                }
-                if (maxZ < pz)
-                {
-                    maxZ = pz;
-                }
-            }
-
-            return CreateBounds(minX, maxX, minY, maxY, minZ, maxZ);
-        }
-
-        private void SelectKth(Span<int> span, int k, int axis)
-        {
-            float[] axisValues = GetAxisArray(axis);
-            int left = 0;
-            int right = span.Length - 1;
-
-            while (left < right)
-            {
-                if (right - left <= SmallPartitionThreshold)
-                {
-                    InsertionSort(span.Slice(left, right - left + 1), axisValues);
-                    return;
-                }
-
-                int pivotIndex = SelectPivot(span, left, right, axisValues);
-                float pivot = axisValues[span[pivotIndex]];
-
-                int i = left;
-                int j = right;
-
-                while (i <= j)
-                {
-                    while (i <= j && axisValues[span[i]] < pivot)
-                    {
-                        i++;
-                    }
-
-                    while (i <= j && pivot < axisValues[span[j]])
-                    {
-                        j--;
-                    }
-
-                    if (i <= j)
-                    {
-                        (span[i], span[j]) = (span[j], span[i]);
-                        i++;
-                        j--;
-                    }
-                }
-
-                if (k <= j)
-                {
-                    right = j;
-                    continue;
-                }
-
-                if (i <= k)
-                {
-                    left = i;
-                    continue;
-                }
-
-                return;
-            }
-        }
-
         private static int SelectPivot(Span<int> span, int left, int right, float[] axisValues)
         {
             int mid = left + ((right - left) >> 1);
@@ -505,40 +268,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 bounds.max,
                 MinimumNodeSize
             );
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private float[] GetAxisArray(int axis)
-        {
-            return axis switch
-            {
-                0 => _positionsX,
-                1 => _positionsY,
-                _ => _positionsZ,
-            };
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private Vector3 GetPosition(int index)
-        {
-            return new Vector3(_positionsX[index], _positionsY[index], _positionsZ[index]);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private float GetDistanceSquared(int index, Vector3 point)
-        {
-            float dx = _positionsX[index] - point.x;
-            float dy = _positionsY[index] - point.y;
-            float dz = _positionsZ[index] - point.z;
-            return dx * dx + dy * dy + dz * dz;
-        }
-
-        private double GetExactDistanceSquared(int index, Vector3 point)
-        {
-            double dx = (double)_positionsX[index] - point.x;
-            double dy = (double)_positionsY[index] - point.y;
-            double dz = (double)_positionsZ[index] - point.z;
-            return (dx * dx) + (dy * dy) + (dz * dz);
         }
 
         /// <summary>
@@ -971,6 +700,277 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return nearestNeighbors;
         }
 
+        private KdTreeNode BuildBalanced(int startIndex, int count, int depth)
+        {
+            if (count <= _bucketSize)
+            {
+                Bounds leafBounds = CalculateLeafBounds(startIndex, count);
+                return KdTreeNode.CreateLeaf(leafBounds, startIndex, count);
+            }
+
+            int axis = depth % 3;
+
+            Span<int> span = _indices.AsSpan(startIndex, count);
+            int leftCount = count / 2;
+            if (leftCount == 0)
+            {
+                Bounds leafBounds = CalculateLeafBounds(startIndex, count);
+                return KdTreeNode.CreateLeaf(leafBounds, startIndex, count);
+            }
+
+            SelectKth(span, leftCount, axis);
+            int rightCount = count - leftCount;
+            if (rightCount == 0)
+            {
+                Bounds leafBounds = CalculateLeafBounds(startIndex, count);
+                return KdTreeNode.CreateLeaf(leafBounds, startIndex, count);
+            }
+
+            KdTreeNode left = BuildBalanced(startIndex, leftCount, depth + 1);
+            KdTreeNode right = BuildBalanced(startIndex + leftCount, rightCount, depth + 1);
+            Bounds boundary = CombineChildBounds(left.boundary, right.boundary);
+            return KdTreeNode.CreateInternal(boundary, left, right, startIndex, count);
+        }
+
+        private KdTreeNode BuildUnbalanced(int startIndex, int count, int axis, int[] scratch)
+        {
+            Span<int> source = _indices.AsSpan(startIndex, count);
+            Span<int> temp = scratch.AsSpan(0, count);
+            float[] positionsX = _positionsX;
+            float[] positionsY = _positionsY;
+            float[] positionsZ = _positionsZ;
+
+            float minX = float.PositiveInfinity;
+            float minY = float.PositiveInfinity;
+            float minZ = float.PositiveInfinity;
+            float maxX = float.NegativeInfinity;
+            float maxY = float.NegativeInfinity;
+            float maxZ = float.NegativeInfinity;
+
+            for (int i = 0; i < count; ++i)
+            {
+                int entryIndex = source[i];
+                float px = positionsX[entryIndex];
+                float py = positionsY[entryIndex];
+                float pz = positionsZ[entryIndex];
+                if (px < minX)
+                {
+                    minX = px;
+                }
+                if (py < minY)
+                {
+                    minY = py;
+                }
+                if (pz < minZ)
+                {
+                    minZ = pz;
+                }
+                if (maxX < px)
+                {
+                    maxX = px;
+                }
+                if (maxY < py)
+                {
+                    maxY = py;
+                }
+                if (maxZ < pz)
+                {
+                    maxZ = pz;
+                }
+            }
+
+            Bounds nodeBounds = CreateBounds(minX, maxX, minY, maxY, minZ, maxZ);
+
+            if (count <= _bucketSize)
+            {
+                return KdTreeNode.CreateLeaf(nodeBounds, startIndex, count);
+            }
+
+            float cutoff = GetAxisValue(nodeBounds.center, axis);
+
+            int leftWrite = 0;
+            int rightWrite = count - 1;
+            float[] axisArray = GetAxisArray(axis);
+            for (int i = 0; i < count; ++i)
+            {
+                int entryIndex = source[i];
+                float value = axisArray[entryIndex];
+                if (value <= cutoff)
+                {
+                    temp[leftWrite++] = entryIndex;
+                }
+                else
+                {
+                    temp[rightWrite--] = entryIndex;
+                }
+            }
+
+            int leftCount = leftWrite;
+            int rightCount = count - leftCount;
+
+            if (leftCount == 0 || rightCount == 0)
+            {
+                return KdTreeNode.CreateLeaf(nodeBounds, startIndex, count);
+            }
+
+            temp.CopyTo(source);
+
+            int nextAxis = (axis + 1) % 3;
+            KdTreeNode left = BuildUnbalanced(startIndex, leftCount, nextAxis, scratch);
+            KdTreeNode right = BuildUnbalanced(
+                startIndex + leftCount,
+                rightCount,
+                nextAxis,
+                scratch
+            );
+            Bounds boundary = CombineChildBounds(left.boundary, right.boundary);
+            return KdTreeNode.CreateInternal(boundary, left, right, startIndex, count);
+        }
+
+        private Bounds CalculateLeafBounds(int startIndex, int count)
+        {
+            if (count <= 0)
+            {
+                return new Bounds();
+            }
+
+            int[] indices = _indices;
+            float[] positionsX = _positionsX;
+            float[] positionsY = _positionsY;
+            float[] positionsZ = _positionsZ;
+            float minX = float.PositiveInfinity;
+            float minY = float.PositiveInfinity;
+            float minZ = float.PositiveInfinity;
+            float maxX = float.NegativeInfinity;
+            float maxY = float.NegativeInfinity;
+            float maxZ = float.NegativeInfinity;
+
+            int end = startIndex + count;
+            for (int i = startIndex; i < end; ++i)
+            {
+                int entryIndex = indices[i];
+                float px = positionsX[entryIndex];
+                float py = positionsY[entryIndex];
+                float pz = positionsZ[entryIndex];
+                if (px < minX)
+                {
+                    minX = px;
+                }
+                if (py < minY)
+                {
+                    minY = py;
+                }
+                if (pz < minZ)
+                {
+                    minZ = pz;
+                }
+                if (maxX < px)
+                {
+                    maxX = px;
+                }
+                if (maxY < py)
+                {
+                    maxY = py;
+                }
+                if (maxZ < pz)
+                {
+                    maxZ = pz;
+                }
+            }
+
+            return CreateBounds(minX, maxX, minY, maxY, minZ, maxZ);
+        }
+
+        private void SelectKth(Span<int> span, int k, int axis)
+        {
+            float[] axisValues = GetAxisArray(axis);
+            int left = 0;
+            int right = span.Length - 1;
+
+            while (left < right)
+            {
+                if (right - left <= SmallPartitionThreshold)
+                {
+                    InsertionSort(span.Slice(left, right - left + 1), axisValues);
+                    return;
+                }
+
+                int pivotIndex = SelectPivot(span, left, right, axisValues);
+                float pivot = axisValues[span[pivotIndex]];
+
+                int i = left;
+                int j = right;
+
+                while (i <= j)
+                {
+                    while (i <= j && axisValues[span[i]] < pivot)
+                    {
+                        i++;
+                    }
+
+                    while (i <= j && pivot < axisValues[span[j]])
+                    {
+                        j--;
+                    }
+
+                    if (i <= j)
+                    {
+                        (span[i], span[j]) = (span[j], span[i]);
+                        i++;
+                        j--;
+                    }
+                }
+
+                if (k <= j)
+                {
+                    right = j;
+                    continue;
+                }
+
+                if (i <= k)
+                {
+                    left = i;
+                    continue;
+                }
+
+                return;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private float[] GetAxisArray(int axis)
+        {
+            return axis switch
+            {
+                0 => _positionsX,
+                1 => _positionsY,
+                _ => _positionsZ,
+            };
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private Vector3 GetPosition(int index)
+        {
+            return new Vector3(_positionsX[index], _positionsY[index], _positionsZ[index]);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private float GetDistanceSquared(int index, Vector3 point)
+        {
+            float dx = _positionsX[index] - point.x;
+            float dy = _positionsY[index] - point.y;
+            float dz = _positionsZ[index] - point.z;
+            return dx * dx + dy * dy + dz * dz;
+        }
+
+        private double GetExactDistanceSquared(int index, Vector3 point)
+        {
+            double dx = (double)_positionsX[index] - point.x;
+            double dy = (double)_positionsY[index] - point.y;
+            double dz = (double)_positionsZ[index] - point.z;
+            return (dx * dx) + (dy * dy) + (dz * dz);
+        }
+
         private sealed class NeighborComparer : IComparer<Neighbor>
         {
             internal static readonly NeighborComparer Instance = new();
@@ -1000,9 +1000,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             public readonly Bounds boundary;
             public readonly KdTreeNode left;
             public readonly KdTreeNode right;
+            public readonly bool isTerminal;
             internal readonly int _startIndex;
             internal readonly int _count;
-            public readonly bool isTerminal;
 
             private KdTreeNode(
                 Bounds boundary,

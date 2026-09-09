@@ -17,6 +17,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     [NUnit.Framework.Category("Fast")]
     public sealed class IEnumerableExtensionsTests : CommonTestBase
     {
+        private static IEnumerable<int> ThrowsPartWayThrough()
+        {
+            for (int index = 0; index < 6; ++index)
+            {
+                yield return index;
+            }
+
+            throw new InvalidOperationException("the source stopped part way through a partition");
+        }
+
+        private static void EnumerateWithoutDisposing(List<int> values)
+        {
+            using IEnumerator<PooledResource<List<int>>> enumerator = values
+                .PartitionPooled(8)
+                .GetEnumerator();
+            while (enumerator.MoveNext())
+            {
+                Assert.LessOrEqual(enumerator.Current.resource.Count, 8);
+            }
+        }
+
+        private static IEnumerable<int> StreamingSequence()
+        {
+            yield return 0;
+            yield return 1;
+        }
+
         [Test]
         public void ToLinkedListPreservesOrder()
         {
@@ -247,27 +274,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             );
         }
 
-        private static IEnumerable<int> ThrowsPartWayThrough()
-        {
-            for (int index = 0; index < 6; ++index)
-            {
-                yield return index;
-            }
-
-            throw new InvalidOperationException("the source stopped part way through a partition");
-        }
-
-        private static void EnumerateWithoutDisposing(List<int> values)
-        {
-            using IEnumerator<PooledResource<List<int>>> enumerator = values
-                .PartitionPooled(8)
-                .GetEnumerator();
-            while (enumerator.MoveNext())
-            {
-                Assert.LessOrEqual(enumerator.Current.resource.Count, 8);
-            }
-        }
-
         [Test]
         public void PartitionPooledThrowsOnNonPositiveSize()
         {
@@ -400,12 +406,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 buffer.Count,
                 "Enumerator disposal should release outstanding pooled lists."
             );
-        }
-
-        private static IEnumerable<int> StreamingSequence()
-        {
-            yield return 0;
-            yield return 1;
         }
 
         [UnityTest]

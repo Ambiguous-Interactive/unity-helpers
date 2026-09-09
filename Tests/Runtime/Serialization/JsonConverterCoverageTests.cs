@@ -61,6 +61,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 "System.Text.Json's own enum converter; it writes a name for any enum, so no fixed type covers it and its behaviour is not this package's contract",
         };
 
+        private static List<Type> RegisteredTypes(JsonSerializerOptions options)
+        {
+            List<Type> types = new();
+            foreach (JsonConverter converter in options.Converters)
+            {
+                if (converter != null)
+                {
+                    types.Add(converter.GetType());
+                }
+            }
+
+            return types;
+        }
+
+        private static string Join(IReadOnlyList<string> failures)
+        {
+            StringBuilder builder = new();
+            for (int i = 0; i < failures.Count; ++i)
+            {
+                builder.AppendLine(failures[i]);
+            }
+
+            return builder.ToString();
+        }
+
         /// <summary>
         /// Every converter in the shipped options must be reachable from the fuzz corpus, declared
         /// write-only, or declared as not ours.
@@ -304,31 +329,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 normal.IndexOf(typeof(JsonStringEnumConverter)),
                 "JsonStringEnumConverter must stay at the index it has always occupied; moving it changes which converter claims an enum-shaped type first."
             );
-        }
-
-        private static List<Type> RegisteredTypes(JsonSerializerOptions options)
-        {
-            List<Type> types = new();
-            foreach (JsonConverter converter in options.Converters)
-            {
-                if (converter != null)
-                {
-                    types.Add(converter.GetType());
-                }
-            }
-
-            return types;
-        }
-
-        private static string Join(IReadOnlyList<string> failures)
-        {
-            StringBuilder builder = new();
-            for (int i = 0; i < failures.Count; ++i)
-            {
-                builder.AppendLine(failures[i]);
-            }
-
-            return builder.ToString();
         }
     }
 }

@@ -28,6 +28,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     {
         private bool _previousGlobalLogging;
 
+        private static void AssertStripped(string member)
+        {
+            Assert.That(
+                LoggingCallSiteProbe.ReceiverEvaluations,
+                Is.Zero,
+                $"{member} must not survive when only WARN_LOGGING is defined."
+            );
+            Assert.That(LoggingCallSiteProbe.ArgumentEvaluations, Is.Zero);
+        }
+
+        private static void AssertRetained(string member)
+        {
+            Assert.That(
+                LoggingCallSiteProbe.ReceiverEvaluations,
+                Is.EqualTo(1),
+                $"{member} is warn-level, so WARN_LOGGING alone must keep it."
+            );
+            Assert.That(LoggingCallSiteProbe.ArgumentEvaluations, Is.EqualTo(1));
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -98,26 +118,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 $"{nameof(ValidateAssignmentExtensions.ValidateAssignments)} logs warnings, so "
                     + "WARN_LOGGING alone must keep it."
             );
-        }
-
-        private static void AssertStripped(string member)
-        {
-            Assert.That(
-                LoggingCallSiteProbe.ReceiverEvaluations,
-                Is.Zero,
-                $"{member} must not survive when only WARN_LOGGING is defined."
-            );
-            Assert.That(LoggingCallSiteProbe.ArgumentEvaluations, Is.Zero);
-        }
-
-        private static void AssertRetained(string member)
-        {
-            Assert.That(
-                LoggingCallSiteProbe.ReceiverEvaluations,
-                Is.EqualTo(1),
-                $"{member} is warn-level, so WARN_LOGGING alone must keep it."
-            );
-            Assert.That(LoggingCallSiteProbe.ArgumentEvaluations, Is.EqualTo(1));
         }
     }
 }

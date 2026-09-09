@@ -23,6 +23,110 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [TestFixture]
     public sealed class ZigZagDifferentialTests
     {
+        private static int GridBytes(int originX, int originY)
+        {
+            int total = 0;
+            for (int x = originX; x < originX + 40; x++)
+            {
+                for (int y = originY; y < originY + 25; y++)
+                {
+                    total += Encode(new GridCellShape { X = x, Y = y }).Length / 2;
+                }
+            }
+
+            return total;
+        }
+
+        private static IEnumerable<ZigZagContract> Corpus()
+        {
+            int[] int32Values = { 0, 1, -1, 63, 64, -64, -65, int.MaxValue, int.MinValue };
+
+            foreach (int value in int32Values)
+            {
+                yield return new ZigZagContract { Int32 = value };
+                yield return new ZigZagContract { MaybeInt32 = value };
+                yield return new ZigZagContract { Plain = value };
+            }
+
+            foreach (long value in new[] { 0L, 1L, -1L, long.MaxValue, long.MinValue })
+            {
+                yield return new ZigZagContract { Int64 = value };
+            }
+
+            foreach (short value in new short[] { 0, 1, -1, short.MaxValue, short.MinValue })
+            {
+                yield return new ZigZagContract { Int16 = value };
+            }
+
+            foreach (sbyte value in new sbyte[] { 0, 1, -1, sbyte.MaxValue, sbyte.MinValue })
+            {
+                yield return new ZigZagContract { Int8 = value };
+            }
+
+            yield return new ZigZagContract
+            {
+                Int32 = -12345,
+                Int64 = -1234567890123L,
+                Int16 = -321,
+                Int8 = -21,
+                MaybeInt32 = -7,
+                Plain = -7,
+            };
+        }
+
+        private static void AssertSameValue(
+            ZigZagContract expected,
+            ZigZagContract actual,
+            string context
+        )
+        {
+            Assert.AreEqual(expected.Int32, actual.Int32, context);
+            Assert.AreEqual(expected.Int64, actual.Int64, context);
+            Assert.AreEqual(expected.Int16, actual.Int16, context);
+            Assert.AreEqual(expected.Int8, actual.Int8, context);
+            Assert.AreEqual(expected.MaybeInt32, actual.MaybeInt32, context);
+            Assert.AreEqual(expected.Plain, actual.Plain, context);
+        }
+
+        private static byte[] Parse(string hex)
+        {
+            byte[] bytes = new byte[hex.Length / 2];
+            for (int index = 0; index < bytes.Length; index++)
+            {
+                bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
+            }
+
+            return bytes;
+        }
+
+        private static string OracleHex<T>(T value)
+        {
+            using MemoryStream stream = new();
+            ProtoBuf.Serializer.Serialize(stream, value);
+            return ToHex(stream.ToArray());
+        }
+
+        private static string ToHex(byte[] bytes)
+        {
+            StringBuilder builder = new(bytes.Length * 2);
+            foreach (byte current in bytes)
+            {
+                builder.Append(current.ToString("X2"));
+            }
+
+            return builder.ToString();
+        }
+
+        private static string Encode<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+            Assert.AreEqual(buffer.Length, writer.Position, "Measure disagreed with Write");
+            return ToHex(buffer);
+        }
+
         [Test]
         public void EveryZigZagShapeEncodesExactlyAsProtobufNetDoes()
         {
@@ -194,110 +298,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.AreEqual(0, cell.X, "a legacy payload carries no zigzag field");
             Assert.AreEqual(0, cell.Y);
             Assert.AreEqual(0, cell.Z);
-        }
-
-        private static int GridBytes(int originX, int originY)
-        {
-            int total = 0;
-            for (int x = originX; x < originX + 40; x++)
-            {
-                for (int y = originY; y < originY + 25; y++)
-                {
-                    total += Encode(new GridCellShape { X = x, Y = y }).Length / 2;
-                }
-            }
-
-            return total;
-        }
-
-        private static IEnumerable<ZigZagContract> Corpus()
-        {
-            int[] int32Values = { 0, 1, -1, 63, 64, -64, -65, int.MaxValue, int.MinValue };
-
-            foreach (int value in int32Values)
-            {
-                yield return new ZigZagContract { Int32 = value };
-                yield return new ZigZagContract { MaybeInt32 = value };
-                yield return new ZigZagContract { Plain = value };
-            }
-
-            foreach (long value in new[] { 0L, 1L, -1L, long.MaxValue, long.MinValue })
-            {
-                yield return new ZigZagContract { Int64 = value };
-            }
-
-            foreach (short value in new short[] { 0, 1, -1, short.MaxValue, short.MinValue })
-            {
-                yield return new ZigZagContract { Int16 = value };
-            }
-
-            foreach (sbyte value in new sbyte[] { 0, 1, -1, sbyte.MaxValue, sbyte.MinValue })
-            {
-                yield return new ZigZagContract { Int8 = value };
-            }
-
-            yield return new ZigZagContract
-            {
-                Int32 = -12345,
-                Int64 = -1234567890123L,
-                Int16 = -321,
-                Int8 = -21,
-                MaybeInt32 = -7,
-                Plain = -7,
-            };
-        }
-
-        private static void AssertSameValue(
-            ZigZagContract expected,
-            ZigZagContract actual,
-            string context
-        )
-        {
-            Assert.AreEqual(expected.Int32, actual.Int32, context);
-            Assert.AreEqual(expected.Int64, actual.Int64, context);
-            Assert.AreEqual(expected.Int16, actual.Int16, context);
-            Assert.AreEqual(expected.Int8, actual.Int8, context);
-            Assert.AreEqual(expected.MaybeInt32, actual.MaybeInt32, context);
-            Assert.AreEqual(expected.Plain, actual.Plain, context);
-        }
-
-        private static byte[] Parse(string hex)
-        {
-            byte[] bytes = new byte[hex.Length / 2];
-            for (int index = 0; index < bytes.Length; index++)
-            {
-                bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
-            }
-
-            return bytes;
-        }
-
-        private static string OracleHex<T>(T value)
-        {
-            using MemoryStream stream = new();
-            ProtoBuf.Serializer.Serialize(stream, value);
-            return ToHex(stream.ToArray());
-        }
-
-        private static string ToHex(byte[] bytes)
-        {
-            StringBuilder builder = new(bytes.Length * 2);
-            foreach (byte current in bytes)
-            {
-                builder.Append(current.ToString("X2"));
-            }
-
-            return builder.ToString();
-        }
-
-        private static string Encode<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-            Assert.AreEqual(buffer.Length, writer.Position, "Measure disagreed with Write");
-            return ToHex(buffer);
         }
     }
 }

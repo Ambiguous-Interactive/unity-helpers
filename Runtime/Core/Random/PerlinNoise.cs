@@ -14,6 +14,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
     public sealed class PerlinNoise
     {
+        public static readonly PerlinNoise Instance = new();
+
         private static readonly int[] DefaultPermutations =
         {
             151,
@@ -273,8 +275,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             156,
             180,
         };
-
-        public static readonly PerlinNoise Instance = new();
 
         private readonly int[] _permutations = new int[DefaultPermutations.Length];
 

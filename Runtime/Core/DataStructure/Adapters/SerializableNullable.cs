@@ -50,6 +50,29 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             IUnderlyingValueProvider
         where T : struct
     {
+        private static WShowIfAttribute ValueFieldAttribute;
+
+        /// <summary>
+        /// Gets a value indicating whether the instance currently stores a value.
+        /// </summary>
+        public bool HasValue => _hasValue;
+
+        /// <summary>
+        /// Gets the stored value, throwing when the value is absent.
+        /// </summary>
+        public T Value
+        {
+            get
+            {
+                if (!_hasValue)
+                {
+                    throw new InvalidOperationException("Nullable object must have a value.");
+                }
+
+                return _value;
+            }
+        }
+
         [SerializeField]
         [ProtoMember(1)]
         [WProtoMember(1)]
@@ -96,24 +119,63 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         }
 
         /// <summary>
-        /// Gets a value indicating whether the instance currently stores a value.
+        /// Implicit conversion from value to nullable wrapper.
         /// </summary>
-        public bool HasValue => _hasValue;
+        public static implicit operator SerializableNullable<T>(T value)
+        {
+            SerializableNullable<T> wrapper = new(value);
+            return wrapper;
+        }
 
         /// <summary>
-        /// Gets the stored value, throwing when the value is absent.
+        /// Implicit conversion from <see cref="Nullable{T}"/> to wrapper.
         /// </summary>
-        public T Value
+        public static implicit operator SerializableNullable<T>(T? value)
         {
-            get
-            {
-                if (!_hasValue)
-                {
-                    throw new InvalidOperationException("Nullable object must have a value.");
-                }
+            SerializableNullable<T> wrapper = new(value);
+            return wrapper;
+        }
 
-                return _value;
+        /// <summary>
+        /// Implicit conversion to <see cref="Nullable{T}"/>.
+        /// </summary>
+        public static implicit operator T?(SerializableNullable<T> value)
+        {
+            if (!value._hasValue)
+            {
+                return null;
             }
+
+            return value._value;
+        }
+
+        /// <summary>
+        /// Explicit conversion to the underlying value.
+        /// </summary>
+        public static explicit operator T(SerializableNullable<T> value)
+        {
+            return value.Value;
+        }
+
+        internal static bool TryGetValueFieldAttribute(out WShowIfAttribute attribute)
+        {
+            attribute = ValueFieldAttribute ??= ResolveValueFieldAttribute();
+            return attribute != null;
+        }
+
+        private static WShowIfAttribute ResolveValueFieldAttribute()
+        {
+            FieldInfo valueField = typeof(SerializableNullable<T>).GetField(
+                SerializedPropertyNames.Value,
+                BindingFlags.Instance | BindingFlags.NonPublic
+            );
+            return ReflectionHelpers.TryGetAttributeSafe<WShowIfAttribute>(
+                valueField,
+                out WShowIfAttribute attribute,
+                inherit: false
+            )
+                ? attribute
+                : null;
         }
 
         /// <summary>
@@ -202,18 +264,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             return obj is SerializableNullable<T> otherNullable && Equals(otherNullable);
         }
 
-        bool IUnderlyingValueProvider.TryGetUnderlyingValue(out object value)
-        {
-            if (!_hasValue)
-            {
-                value = null;
-                return false;
-            }
-
-            value = _value;
-            return true;
-        }
-
         /// <inheritdoc/>
         public bool Equals(SerializableNullable<T> other)
         {
@@ -260,43 +310,22 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             return comparer.Equals(_value, other);
         }
 
-        /// <summary>
-        /// Implicit conversion from value to nullable wrapper.
-        /// </summary>
-        public static implicit operator SerializableNullable<T>(T value)
+        internal void ForceStateForTesting(bool hasValue, T rawValue)
         {
-            SerializableNullable<T> wrapper = new(value);
-            return wrapper;
+            _hasValue = hasValue;
+            _value = rawValue;
         }
 
-        /// <summary>
-        /// Implicit conversion from <see cref="Nullable{T}"/> to wrapper.
-        /// </summary>
-        public static implicit operator SerializableNullable<T>(T? value)
+        bool IUnderlyingValueProvider.TryGetUnderlyingValue(out object value)
         {
-            SerializableNullable<T> wrapper = new(value);
-            return wrapper;
-        }
-
-        /// <summary>
-        /// Implicit conversion to <see cref="Nullable{T}"/>.
-        /// </summary>
-        public static implicit operator T?(SerializableNullable<T> value)
-        {
-            if (!value._hasValue)
+            if (!_hasValue)
             {
-                return null;
+                value = null;
+                return false;
             }
 
-            return value._value;
-        }
-
-        /// <summary>
-        /// Explicit conversion to the underlying value.
-        /// </summary>
-        public static explicit operator T(SerializableNullable<T> value)
-        {
-            return value.Value;
+            value = _value;
+            return true;
         }
 
         /// <inheritdoc/>
@@ -325,35 +354,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             {
                 info.AddValue(nameof(_value), _value, typeof(T));
             }
-        }
-
-        internal void ForceStateForTesting(bool hasValue, T rawValue)
-        {
-            _hasValue = hasValue;
-            _value = rawValue;
-        }
-
-        internal static bool TryGetValueFieldAttribute(out WShowIfAttribute attribute)
-        {
-            attribute = ValueFieldAttribute ??= ResolveValueFieldAttribute();
-            return attribute != null;
-        }
-
-        private static WShowIfAttribute ValueFieldAttribute;
-
-        private static WShowIfAttribute ResolveValueFieldAttribute()
-        {
-            FieldInfo valueField = typeof(SerializableNullable<T>).GetField(
-                SerializedPropertyNames.Value,
-                BindingFlags.Instance | BindingFlags.NonPublic
-            );
-            return ReflectionHelpers.TryGetAttributeSafe<WShowIfAttribute>(
-                valueField,
-                out WShowIfAttribute attribute,
-                inherit: false
-            )
-                ? attribute
-                : null;
         }
 
         internal static class SerializedPropertyNames

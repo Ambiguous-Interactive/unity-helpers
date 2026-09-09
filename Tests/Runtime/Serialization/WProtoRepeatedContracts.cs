@@ -146,13 +146,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     {
         private static readonly List<int> Empty = new();
 
-        private List<int> _items;
-
         /// <inheritdoc />
         public int Count => _items?.Count ?? 0;
 
         /// <inheritdoc />
         public bool IsReadOnly => false;
+
+        private List<int> _items;
 
         /// <inheritdoc />
         public void Add(int item)

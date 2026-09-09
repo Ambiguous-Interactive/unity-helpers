@@ -21,6 +21,125 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private const int MeasurementRounds = 5;
         private const int ShapeIterations = 2_000;
 
+        private static Measurement Summarize(Measurement[] measurements)
+        {
+            long maximumAllocatedBytes = 0;
+            double[] nanosecondsPerOperation = new double[measurements.Length];
+            for (int index = 0; index < measurements.Length; index++)
+            {
+                maximumAllocatedBytes = Math.Max(
+                    maximumAllocatedBytes,
+                    measurements[index].AllocatedBytes
+                );
+                nanosecondsPerOperation[index] = measurements[index].NanosecondsPerOperation;
+            }
+
+            Array.Sort(nanosecondsPerOperation);
+            return new Measurement(
+                maximumAllocatedBytes,
+                nanosecondsPerOperation[nanosecondsPerOperation.Length / 2],
+                nanosecondsPerOperation[0]
+            );
+        }
+
+        private static Measurement MeasureWallstopProtoSerialize(
+            AllocationContract value,
+            ref byte[] buffer
+        )
+        {
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            long started = Stopwatch.GetTimestamp();
+            for (int iteration = 0; iteration < MeasuredIterations; iteration++)
+            {
+                WProtoWriteResult result = WProtoFacade.Serialize(value, ref buffer);
+                if (!result.Served || result.Resized)
+                {
+                    Assert.Fail("The warmed serialization path stopped reusing its buffer.");
+                }
+            }
+
+            long elapsed = Stopwatch.GetTimestamp() - started;
+            return new Measurement(GC.GetAllocatedBytesForCurrentThread() - before, elapsed);
+        }
+
+        private static Measurement MeasureProtobufNetSerialize(
+            AllocationContract value,
+            MemoryStream destination
+        )
+        {
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            long started = Stopwatch.GetTimestamp();
+            for (int iteration = 0; iteration < MeasuredIterations; iteration++)
+            {
+                destination.Position = 0;
+                destination.SetLength(0);
+                ProtoBuf.Serializer.Serialize(destination, value);
+            }
+
+            long elapsed = Stopwatch.GetTimestamp() - started;
+            return new Measurement(GC.GetAllocatedBytesForCurrentThread() - before, elapsed);
+        }
+
+        private static Measurement MeasureWallstopProtoDeserialize(byte[] payload)
+        {
+            AllocationContract restored = null;
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            long started = Stopwatch.GetTimestamp();
+            for (int iteration = 0; iteration < MeasuredIterations; iteration++)
+            {
+                if (!WProtoFacade.TryDeserialize(payload, out restored))
+                {
+                    Assert.Fail("The representative contract stopped using WallstopProto.");
+                }
+            }
+
+            long elapsed = Stopwatch.GetTimestamp() - started;
+            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            GC.KeepAlive(restored);
+            return new Measurement(allocated, elapsed);
+        }
+
+        private static Measurement MeasureProtobufNetDeserialize(MemoryStream source)
+        {
+            AllocationContract restored = null;
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            long started = Stopwatch.GetTimestamp();
+            for (int iteration = 0; iteration < MeasuredIterations; iteration++)
+            {
+                source.Position = 0;
+                restored = ProtoBuf.Serializer.Deserialize<AllocationContract>(source);
+            }
+
+            long elapsed = Stopwatch.GetTimestamp() - started;
+            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            GC.KeepAlive(restored);
+            return new Measurement(allocated, elapsed);
+        }
+
+        private static AllocationContract CreateRepresentativeContract()
+        {
+            int[] values = new int[128];
+            for (int index = 0; index < values.Length; index++)
+            {
+                values[index] = index * 17 + 3;
+            }
+
+            Dictionary<string, int> scores = new Dictionary<string, int>(32);
+            for (int index = 0; index < 32; index++)
+            {
+                scores.Add($"score-{index:D2}", index * 23 + 11);
+            }
+
+            return new AllocationContract
+            {
+                Id = 42,
+                Label = "allocation-baseline",
+                Values = values,
+                Scores = scores,
+                Child = new AllocationChild { Sequence = 987_654_321L, Name = "nested" },
+            };
+        }
+
         [Test]
         public void RepresentativeContractAllocationAndThroughputBaseline()
         {
@@ -206,127 +325,17 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
-        private static Measurement Summarize(Measurement[] measurements)
-        {
-            long maximumAllocatedBytes = 0;
-            double[] nanosecondsPerOperation = new double[measurements.Length];
-            for (int index = 0; index < measurements.Length; index++)
-            {
-                maximumAllocatedBytes = Math.Max(
-                    maximumAllocatedBytes,
-                    measurements[index].AllocatedBytes
-                );
-                nanosecondsPerOperation[index] = measurements[index].NanosecondsPerOperation;
-            }
-
-            Array.Sort(nanosecondsPerOperation);
-            return new Measurement(
-                maximumAllocatedBytes,
-                nanosecondsPerOperation[nanosecondsPerOperation.Length / 2],
-                nanosecondsPerOperation[0]
-            );
-        }
-
-        private static Measurement MeasureWallstopProtoSerialize(
-            AllocationContract value,
-            ref byte[] buffer
-        )
-        {
-            long before = GC.GetAllocatedBytesForCurrentThread();
-            long started = Stopwatch.GetTimestamp();
-            for (int iteration = 0; iteration < MeasuredIterations; iteration++)
-            {
-                WProtoWriteResult result = WProtoFacade.Serialize(value, ref buffer);
-                if (!result.Served || result.Resized)
-                {
-                    Assert.Fail("The warmed serialization path stopped reusing its buffer.");
-                }
-            }
-
-            long elapsed = Stopwatch.GetTimestamp() - started;
-            return new Measurement(GC.GetAllocatedBytesForCurrentThread() - before, elapsed);
-        }
-
-        private static Measurement MeasureProtobufNetSerialize(
-            AllocationContract value,
-            MemoryStream destination
-        )
-        {
-            long before = GC.GetAllocatedBytesForCurrentThread();
-            long started = Stopwatch.GetTimestamp();
-            for (int iteration = 0; iteration < MeasuredIterations; iteration++)
-            {
-                destination.Position = 0;
-                destination.SetLength(0);
-                ProtoBuf.Serializer.Serialize(destination, value);
-            }
-
-            long elapsed = Stopwatch.GetTimestamp() - started;
-            return new Measurement(GC.GetAllocatedBytesForCurrentThread() - before, elapsed);
-        }
-
-        private static Measurement MeasureWallstopProtoDeserialize(byte[] payload)
-        {
-            AllocationContract restored = null;
-            long before = GC.GetAllocatedBytesForCurrentThread();
-            long started = Stopwatch.GetTimestamp();
-            for (int iteration = 0; iteration < MeasuredIterations; iteration++)
-            {
-                if (!WProtoFacade.TryDeserialize(payload, out restored))
-                {
-                    Assert.Fail("The representative contract stopped using WallstopProto.");
-                }
-            }
-
-            long elapsed = Stopwatch.GetTimestamp() - started;
-            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
-            GC.KeepAlive(restored);
-            return new Measurement(allocated, elapsed);
-        }
-
-        private static Measurement MeasureProtobufNetDeserialize(MemoryStream source)
-        {
-            AllocationContract restored = null;
-            long before = GC.GetAllocatedBytesForCurrentThread();
-            long started = Stopwatch.GetTimestamp();
-            for (int iteration = 0; iteration < MeasuredIterations; iteration++)
-            {
-                source.Position = 0;
-                restored = ProtoBuf.Serializer.Deserialize<AllocationContract>(source);
-            }
-
-            long elapsed = Stopwatch.GetTimestamp() - started;
-            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
-            GC.KeepAlive(restored);
-            return new Measurement(allocated, elapsed);
-        }
-
-        private static AllocationContract CreateRepresentativeContract()
-        {
-            int[] values = new int[128];
-            for (int index = 0; index < values.Length; index++)
-            {
-                values[index] = index * 17 + 3;
-            }
-
-            Dictionary<string, int> scores = new Dictionary<string, int>(32);
-            for (int index = 0; index < 32; index++)
-            {
-                scores.Add($"score-{index:D2}", index * 23 + 11);
-            }
-
-            return new AllocationContract
-            {
-                Id = 42,
-                Label = "allocation-baseline",
-                Values = values,
-                Scores = scores,
-                Child = new AllocationChild { Sequence = 987_654_321L, Name = "nested" },
-            };
-        }
-
         private readonly struct Measurement
         {
+            public long AllocatedBytes { get; }
+
+            public double BytesPerOperation { get; }
+
+            public double NanosecondsPerOperation { get; }
+
+            /// <summary>The fastest round, which is the one least contaminated by the machine.</summary>
+            public double FastestNanosecondsPerOperation { get; }
+
             public Measurement(long allocatedBytes, long elapsedTimestampTicks)
             {
                 AllocatedBytes = allocatedBytes;
@@ -349,15 +358,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 NanosecondsPerOperation = nanosecondsPerOperation;
                 FastestNanosecondsPerOperation = fastestNanosecondsPerOperation;
             }
-
-            public long AllocatedBytes { get; }
-
-            public double BytesPerOperation { get; }
-
-            public double NanosecondsPerOperation { get; }
-
-            /// <summary>The fastest round, which is the one least contaminated by the machine.</summary>
-            public double FastestNanosecondsPerOperation { get; }
         }
 
         /// <summary>One member shape, measured on both serializers.</summary>
@@ -367,12 +367,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// </remarks>
         private abstract class ShapeCase
         {
+            internal string Name { get; }
+
             protected ShapeCase(string name)
             {
                 Name = name;
             }
-
-            internal string Name { get; }
 
             internal abstract ShapeComparison Measure();
         }
@@ -447,6 +447,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
         private readonly struct ShapeComparison
         {
+            internal double WallstopProtoBytesPerOperation { get; }
+
+            internal double ProtobufNetBytesPerOperation { get; }
+
             internal ShapeComparison(
                 double wallstopProtoBytesPerOperation,
                 double protobufNetBytesPerOperation
@@ -455,10 +459,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 WallstopProtoBytesPerOperation = wallstopProtoBytesPerOperation;
                 ProtobufNetBytesPerOperation = protobufNetBytesPerOperation;
             }
-
-            internal double WallstopProtoBytesPerOperation { get; }
-
-            internal double ProtobufNetBytesPerOperation { get; }
         }
 
         [ProtoContract]

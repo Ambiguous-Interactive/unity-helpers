@@ -23,6 +23,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
     internal sealed class ValidationProjectRule : IValidationRule
     {
+        /// <inheritdoc />
+        public string RuleId => _definition.id;
+
+        /// <inheritdoc />
+        public string DisplayName => _definition.name;
+
         private readonly ValidationWorkspaceSettings.RuleDefinition _definition;
 
         internal ValidationProjectRule(ValidationWorkspaceSettings.RuleDefinition definition)
@@ -96,95 +102,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             return error == null;
         }
 
-        /// <inheritdoc />
-        public string RuleId => _definition.id;
-
-        /// <inheritdoc />
-        public string DisplayName => _definition.name;
-
-        /// <inheritdoc />
-        public bool AppliesTo(in ValidationTarget target)
-        {
-            if (ValidationWorkspaceSettings.CategoryFor(target.AssetPath) != _definition.target)
-            {
-                return false;
-            }
-            string filter = (_definition.pathFilter ?? string.Empty).TrimEnd('/', '\\');
-            return filter.Length == 0
-                || string.Equals(target.AssetPath, filter, StringComparison.Ordinal)
-                || target.AssetPath.StartsWith(filter + "/", StringComparison.Ordinal);
-        }
-
-        /// <inheritdoc />
-        public void Validate(
-            in ValidationTarget target,
-            Object asset,
-            List<ValidationFinding> findings
-        )
-        {
-            if (_definition.checks == null || _definition.checks.Count == 0 || findings == null)
-            {
-                return;
-            }
-            if (asset is SceneAsset)
-            {
-                Scene previous = SceneManager.GetActiveScene();
-                Scene scene = SceneManager.GetSceneByPath(target.AssetPath);
-                bool opened = !scene.IsValid() || !scene.isLoaded;
-                if (opened)
-                    scene = EditorSceneManager.OpenScene(target.AssetPath, OpenSceneMode.Additive);
-                try
-                {
-                    foreach (GameObject root in scene.GetRootGameObjects())
-                        ValidateHierarchy(in target, root, findings);
-                }
-                finally
-                {
-                    if (opened)
-                        EditorSceneManager.CloseScene(scene, true);
-                    if (previous.IsValid() && previous.isLoaded)
-                        SceneManager.SetActiveScene(previous);
-                }
-            }
-            else if (asset is GameObject gameObject)
-            {
-                ValidateHierarchy(in target, gameObject, findings);
-            }
-            else
-            {
-                ValidateObject(in target, asset, string.Empty, findings);
-            }
-        }
-
-        private void ValidateHierarchy(
-            in ValidationTarget target,
-            GameObject root,
-            List<ValidationFinding> findings
-        )
-        {
-            Type componentType = PrimaryComponentType(_definition);
-            foreach (Transform transform in root.GetComponentsInChildren<Transform>(true))
-            {
-                if (componentType != null)
-                {
-                    foreach (Component component in transform.GetComponents(componentType))
-                        ValidateObject(
-                            in target,
-                            component,
-                            Identity(component, transform),
-                            findings
-                        );
-                }
-                else
-                    ValidateObject(
-                        in target,
-                        transform.gameObject,
-                        Identity(transform.gameObject, transform),
-                        findings
-                    );
-            }
-        }
-
         internal static Type PrimaryComponentType(
             ValidationWorkspaceSettings.RuleDefinition definition
         )
@@ -201,23 +118,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     return typeof(Collider);
             }
             return null;
-        }
-
-        private static string Identity(Object subject, Transform transform)
-        {
-            GlobalObjectId id = GlobalObjectId.GetGlobalObjectIdSlow(subject);
-            if (id.assetGUID.ToString() != "00000000000000000000000000000000")
-                return id.ToString();
-            string path = transform.GetSiblingIndex().ToString(CultureInfo.InvariantCulture);
-            for (Transform parent = transform.parent; parent != null; parent = parent.parent)
-                path = parent.GetSiblingIndex().ToString(CultureInfo.InvariantCulture) + "/" + path;
-            if (subject is Component component)
-            {
-                Component[] siblings = transform.GetComponents(component.GetType());
-                path +=
-                    ":" + Array.IndexOf(siblings, component).ToString(CultureInfo.InvariantCulture);
-            }
-            return "transient:" + path;
         }
 
         /// <summary>
@@ -271,53 +171,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             catch (JsonException)
             {
                 return json;
-            }
-        }
-
-        private static void WriteNormalizedReferences(
-            JsonElement element,
-            string path,
-            IReadOnlyDictionary<string, string> references,
-            Utf8JsonWriter writer
-        )
-        {
-            if (references.TryGetValue(path, out string identity))
-            {
-                writer.WriteStringValue(identity);
-                return;
-            }
-            switch (element.ValueKind)
-            {
-                case JsonValueKind.Object:
-                    writer.WriteStartObject();
-                    foreach (JsonProperty property in element.EnumerateObject())
-                    {
-                        writer.WritePropertyName(property.Name);
-                        string childPath = string.IsNullOrEmpty(path)
-                            ? property.Name
-                            : path + "." + property.Name;
-                        WriteNormalizedReferences(property.Value, childPath, references, writer);
-                    }
-                    writer.WriteEndObject();
-                    break;
-                case JsonValueKind.Array:
-                    writer.WriteStartArray();
-                    int index = 0;
-                    foreach (JsonElement child in element.EnumerateArray())
-                    {
-                        string childPath =
-                            path
-                            + ".Array.data["
-                            + index.ToString(CultureInfo.InvariantCulture)
-                            + "]";
-                        WriteNormalizedReferences(child, childPath, references, writer);
-                        index++;
-                    }
-                    writer.WriteEndArray();
-                    break;
-                default:
-                    writer.WriteRawValue(element.GetRawText());
-                    break;
             }
         }
 
@@ -391,42 +244,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 + AssetDatabase.GetAssetDependencyHash(path);
         }
 
-        internal bool MatchesSubject(Object subject, string path)
-        {
-            foreach (ValidationWorkspaceSettings.RuleCondition condition in _definition.checks)
-                if (
-                    !TryRead(subject, path, condition.property, out object value)
-                    || !Matches(value, condition.comparison, condition.value)
-                )
-                    return false;
-            return 0 < _definition.checks.Count;
-        }
-
-        private void ValidateObject(
-            in ValidationTarget target,
-            Object subject,
-            string discriminator,
-            List<ValidationFinding> findings
-        )
-        {
-            if (!MatchesSubject(subject, target.AssetPath))
-                return;
-            if (string.IsNullOrEmpty(discriminator) && subject != null)
-                discriminator = GlobalObjectId.GetGlobalObjectIdSlow(subject).ToString();
-            findings.Add(
-                new ValidationFinding(
-                    RuleId,
-                    _definition.severity,
-                    subject,
-                    target.AssetGuid,
-                    target.AssetPath,
-                    discriminator,
-                    _definition.message,
-                    subject == null ? string.Empty : Fingerprint(subject, target.AssetPath)
-                )
-            );
-        }
-
         internal static bool Matches(object actual, string comparison, string expected)
         {
             bool isNull = actual == null || actual is Object unityObject && unityObject == null;
@@ -475,6 +292,70 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             if (comparison == "!=")
                 return !string.Equals(text, expected, StringComparison.OrdinalIgnoreCase);
             return false;
+        }
+
+        private static string Identity(Object subject, Transform transform)
+        {
+            GlobalObjectId id = GlobalObjectId.GetGlobalObjectIdSlow(subject);
+            if (id.assetGUID.ToString() != "00000000000000000000000000000000")
+                return id.ToString();
+            string path = transform.GetSiblingIndex().ToString(CultureInfo.InvariantCulture);
+            for (Transform parent = transform.parent; parent != null; parent = parent.parent)
+                path = parent.GetSiblingIndex().ToString(CultureInfo.InvariantCulture) + "/" + path;
+            if (subject is Component component)
+            {
+                Component[] siblings = transform.GetComponents(component.GetType());
+                path +=
+                    ":" + Array.IndexOf(siblings, component).ToString(CultureInfo.InvariantCulture);
+            }
+            return "transient:" + path;
+        }
+
+        private static void WriteNormalizedReferences(
+            JsonElement element,
+            string path,
+            IReadOnlyDictionary<string, string> references,
+            Utf8JsonWriter writer
+        )
+        {
+            if (references.TryGetValue(path, out string identity))
+            {
+                writer.WriteStringValue(identity);
+                return;
+            }
+            switch (element.ValueKind)
+            {
+                case JsonValueKind.Object:
+                    writer.WriteStartObject();
+                    foreach (JsonProperty property in element.EnumerateObject())
+                    {
+                        writer.WritePropertyName(property.Name);
+                        string childPath = string.IsNullOrEmpty(path)
+                            ? property.Name
+                            : path + "." + property.Name;
+                        WriteNormalizedReferences(property.Value, childPath, references, writer);
+                    }
+                    writer.WriteEndObject();
+                    break;
+                case JsonValueKind.Array:
+                    writer.WriteStartArray();
+                    int index = 0;
+                    foreach (JsonElement child in element.EnumerateArray())
+                    {
+                        string childPath =
+                            path
+                            + ".Array.data["
+                            + index.ToString(CultureInfo.InvariantCulture)
+                            + "]";
+                        WriteNormalizedReferences(child, childPath, references, writer);
+                        index++;
+                    }
+                    writer.WriteEndArray();
+                    break;
+                default:
+                    writer.WriteRawValue(element.GetRawText());
+                    break;
+            }
         }
 
         private static bool RequiredFields(Object subject, ref bool found)
@@ -627,6 +508,125 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     value = null;
                     return false;
             }
+        }
+
+        /// <inheritdoc />
+        public bool AppliesTo(in ValidationTarget target)
+        {
+            if (ValidationWorkspaceSettings.CategoryFor(target.AssetPath) != _definition.target)
+            {
+                return false;
+            }
+            string filter = (_definition.pathFilter ?? string.Empty).TrimEnd('/', '\\');
+            return filter.Length == 0
+                || string.Equals(target.AssetPath, filter, StringComparison.Ordinal)
+                || target.AssetPath.StartsWith(filter + "/", StringComparison.Ordinal);
+        }
+
+        /// <inheritdoc />
+        public void Validate(
+            in ValidationTarget target,
+            Object asset,
+            List<ValidationFinding> findings
+        )
+        {
+            if (_definition.checks == null || _definition.checks.Count == 0 || findings == null)
+            {
+                return;
+            }
+            if (asset is SceneAsset)
+            {
+                Scene previous = SceneManager.GetActiveScene();
+                Scene scene = SceneManager.GetSceneByPath(target.AssetPath);
+                bool opened = !scene.IsValid() || !scene.isLoaded;
+                if (opened)
+                    scene = EditorSceneManager.OpenScene(target.AssetPath, OpenSceneMode.Additive);
+                try
+                {
+                    foreach (GameObject root in scene.GetRootGameObjects())
+                        ValidateHierarchy(in target, root, findings);
+                }
+                finally
+                {
+                    if (opened)
+                        EditorSceneManager.CloseScene(scene, true);
+                    if (previous.IsValid() && previous.isLoaded)
+                        SceneManager.SetActiveScene(previous);
+                }
+            }
+            else if (asset is GameObject gameObject)
+            {
+                ValidateHierarchy(in target, gameObject, findings);
+            }
+            else
+            {
+                ValidateObject(in target, asset, string.Empty, findings);
+            }
+        }
+
+        internal bool MatchesSubject(Object subject, string path)
+        {
+            foreach (ValidationWorkspaceSettings.RuleCondition condition in _definition.checks)
+                if (
+                    !TryRead(subject, path, condition.property, out object value)
+                    || !Matches(value, condition.comparison, condition.value)
+                )
+                    return false;
+            return 0 < _definition.checks.Count;
+        }
+
+        private void ValidateHierarchy(
+            in ValidationTarget target,
+            GameObject root,
+            List<ValidationFinding> findings
+        )
+        {
+            Type componentType = PrimaryComponentType(_definition);
+            foreach (Transform transform in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (componentType != null)
+                {
+                    foreach (Component component in transform.GetComponents(componentType))
+                        ValidateObject(
+                            in target,
+                            component,
+                            Identity(component, transform),
+                            findings
+                        );
+                }
+                else
+                    ValidateObject(
+                        in target,
+                        transform.gameObject,
+                        Identity(transform.gameObject, transform),
+                        findings
+                    );
+            }
+        }
+
+        private void ValidateObject(
+            in ValidationTarget target,
+            Object subject,
+            string discriminator,
+            List<ValidationFinding> findings
+        )
+        {
+            if (!MatchesSubject(subject, target.AssetPath))
+                return;
+            if (string.IsNullOrEmpty(discriminator) && subject != null)
+                discriminator = GlobalObjectId.GetGlobalObjectIdSlow(subject).ToString();
+            findings.Add(
+                new ValidationFinding(
+                    RuleId,
+                    _definition.severity,
+                    subject,
+                    target.AssetGuid,
+                    target.AssetPath,
+                    discriminator,
+                    _definition.message,
+                    subject == null ? string.Empty : Fingerprint(subject, target.AssetPath)
+                )
+            );
         }
     }
 #endif

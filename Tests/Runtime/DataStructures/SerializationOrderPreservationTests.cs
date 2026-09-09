@@ -22,6 +22,315 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
     public sealed class SerializationOrderPreservationTests : CommonTestBase
     {
+        /// <summary>
+        /// Test cases for HashSet mutation scenarios that should preserve order.
+        /// Format: (initialItems, itemsToRemove, itemsToAdd, expectedOrder)
+        /// </summary>
+        private static IEnumerable<TestCaseData> HashSetMutationTestCases()
+        {
+            yield return new TestCaseData(
+                new[] { 1, 2, 3, 4, 5 },
+                new[] { 2, 4 },
+                new[] { 6 },
+                new[] { 1, 3, 5, 6 }
+            ).SetName("Remove middle items, add one");
+
+            yield return new TestCaseData(
+                new[] { 10, 20, 30 },
+                new int[0],
+                new[] { 5, 25 },
+                new[] { 10, 20, 30, 5, 25 }
+            ).SetName("Add items without removing");
+
+            yield return new TestCaseData(
+                new[] { 100, 50, 75 },
+                new[] { 100, 75 },
+                new int[0],
+                new[] { 50 }
+            ).SetName("Remove items without adding");
+
+            yield return new TestCaseData(
+                new[] { 1, 2, 3, 4, 5 },
+                new[] { 1, 2, 3, 4, 5 },
+                new[] { 10, 20 },
+                new[] { 10, 20 }
+            ).SetName("Remove all, add new items");
+
+            yield return new TestCaseData(
+                new[] { 5, 3, 7, 1, 9 },
+                new[] { 5, 7 },
+                new[] { 2, 8 },
+                new[] { 3, 1, 9, 2, 8 }
+            ).SetName("Non-sorted initial order preserved");
+        }
+
+        /// <summary>
+        /// Test cases for SortedDictionary mutation scenarios that should preserve order.
+        /// Format: (initialKeys, initialValues, keysToRemove, keysToAdd, valuesToAdd, expectedKeys)
+        /// </summary>
+        private static IEnumerable<TestCaseData> SortedDictionaryMutationTestCases()
+        {
+            yield return new TestCaseData(
+                new[] { 30, 10, 20 },
+                new[] { "thirty", "ten", "twenty" },
+                new[] { 10 },
+                new[] { 15 },
+                new[] { "fifteen" },
+                new[] { 30, 20, 15 }
+            ).SetName("Remove and add key");
+
+            yield return new TestCaseData(
+                new[] { 5, 3, 1 },
+                new[] { "five", "three", "one" },
+                new int[0],
+                new[] { 2, 4 },
+                new[] { "two", "four" },
+                new[] { 5, 3, 1, 2, 4 }
+            ).SetName("Add keys without removing");
+
+            yield return new TestCaseData(
+                new[] { 100, 50, 25, 75 },
+                new[] { "a", "b", "c", "d" },
+                new[] { 50, 75 },
+                new int[0],
+                new string[0],
+                new[] { 100, 25 }
+            ).SetName("Remove keys without adding");
+        }
+
+        private static IEnumerable<TestCaseData> HashSetProtoSerializationTestCases()
+        {
+            yield return new TestCaseData(new[] { 1 }).SetName("SingleElement");
+            yield return new TestCaseData(new[] { 5, 3, 8, 1, 9 }).SetName(
+                "MultipleElements.Unordered"
+            );
+            yield return new TestCaseData(new[] { 1, 2, 3, 4, 5 }).SetName(
+                "MultipleElements.Ascending"
+            );
+            yield return new TestCaseData(new[] { 5, 4, 3, 2, 1 }).SetName(
+                "MultipleElements.Descending"
+            );
+            yield return new TestCaseData(new[] { 100, 1, 50, -10, 25 }).SetName(
+                "MixedPositiveNegative"
+            );
+            yield return new TestCaseData(new[] { int.MaxValue, int.MinValue, 0 }).SetName(
+                "ExtremeBoundaryValues"
+            );
+            yield return new TestCaseData(Enumerable.Range(0, 100).Reverse().ToArray()).SetName(
+                "LargeArray.100Elements"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> SortedSetProtoSerializationTestCases()
+        {
+            yield return new TestCaseData(new[] { 42 }).SetName("SingleElement");
+            yield return new TestCaseData(new[] { 100, 50, 75, 25 }).SetName(
+                "MultipleElements.Unordered"
+            );
+            yield return new TestCaseData(new[] { 10, 20, 30, 40 }).SetName(
+                "MultipleElements.Ascending"
+            );
+            yield return new TestCaseData(new[] { 40, 30, 20, 10 }).SetName(
+                "MultipleElements.Descending"
+            );
+            yield return new TestCaseData(new[] { 0, -1, 1, -100, 100 }).SetName(
+                "MixedPositiveNegative"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> SortedDictionaryProtoSerializationTestCases()
+        {
+            yield return new TestCaseData(new[] { 1 }, new[] { "one" }).SetName("SingleEntry");
+            yield return new TestCaseData(
+                new[] { 30, 10, 20 },
+                new[] { "thirty", "ten", "twenty" }
+            ).SetName("MultipleEntries Unordered");
+            yield return new TestCaseData(
+                new[] { 1, 2, 3, 4, 5 },
+                new[] { "one", "two", "three", "four", "five" }
+            ).SetName("MultipleEntries Ascending");
+            yield return new TestCaseData(
+                new[] { 5, 4, 3, 2, 1 },
+                new[] { "five", "four", "three", "two", "one" }
+            ).SetName("MultipleEntries Descending");
+            yield return new TestCaseData(
+                new[] { 100, -50, 0, 25, -25 },
+                new[] { "hundred", "neg-fifty", "zero", "twenty-five", "neg-twenty-five" }
+            ).SetName("MixedPositiveNegative");
+        }
+
+        private static IEnumerable<TestCaseData> ProtoSerializationDiagnosticTestCases()
+        {
+            yield return new TestCaseData(new[] { 42 }).SetName("SingleInt");
+            yield return new TestCaseData(new[] { 1, 2, 3 }).SetName("ThreeInts");
+            yield return new TestCaseData(new[] { int.MaxValue, int.MinValue, 0 }).SetName(
+                "BoundaryInts"
+            );
+            yield return new TestCaseData(new[] { -1, -2, -3, -4, -5 }).SetName("NegativeInts");
+            yield return new TestCaseData(Enumerable.Range(1, 50).ToArray()).SetName("FiftyInts");
+        }
+
+        private static IEnumerable<TestCaseData> DictionaryProtoSerializationDiagnosticTestCases()
+        {
+            yield return new TestCaseData(new[] { 1 }, new[] { "one" }).SetName("SingleEntry");
+            yield return new TestCaseData(
+                new[] { 1, 2, 3 },
+                new[] { "one", "two", "three" }
+            ).SetName("ThreeEntries");
+            yield return new TestCaseData(
+                new[] { int.MaxValue, int.MinValue, 0 },
+                new[] { "max", "min", "zero" }
+            ).SetName("BoundaryKeys");
+            yield return new TestCaseData(
+                Enumerable.Range(1, 20).ToArray(),
+                Enumerable.Range(1, 20).Select(i => $"value{i}").ToArray()
+            ).SetName("TwentyEntries");
+        }
+
+        /// <summary>
+        /// Test cases for Dictionary mutation scenarios that should preserve order.
+        /// Format: (initialKeys, initialValues, keysToRemove, keysToAdd, valuesToAdd, expectedKeys)
+        /// </summary>
+        private static IEnumerable<TestCaseData> DictionaryMutationTestCases()
+        {
+            yield return new TestCaseData(
+                new[] { 30, 10, 20 },
+                new[] { "thirty", "ten", "twenty" },
+                new[] { 10 },
+                new[] { 15 },
+                new[] { "fifteen" },
+                new[] { 30, 20, 15 }
+            ).SetName("DictionaryMutation.RemoveAndAddKey");
+
+            yield return new TestCaseData(
+                new[] { 5, 3, 1 },
+                new[] { "five", "three", "one" },
+                new int[0],
+                new[] { 2, 4 },
+                new[] { "two", "four" },
+                new[] { 5, 3, 1, 2, 4 }
+            ).SetName("DictionaryMutation.AddKeysWithoutRemoving");
+
+            yield return new TestCaseData(
+                new[] { 100, 50, 25, 75 },
+                new[] { "a", "b", "c", "d" },
+                new[] { 50, 75 },
+                new int[0],
+                new string[0],
+                new[] { 100, 25 }
+            ).SetName("DictionaryMutation.RemoveKeysWithoutAdding");
+
+            yield return new TestCaseData(
+                new[] { 1, 2, 3, 4, 5 },
+                new[] { "one", "two", "three", "four", "five" },
+                new[] { 1, 2, 3, 4, 5 },
+                new[] { 10, 20 },
+                new[] { "ten", "twenty" },
+                new[] { 10, 20 }
+            ).SetName("DictionaryMutation.RemoveAllAddNew");
+
+            yield return new TestCaseData(
+                new[] { 50, 30, 70, 10, 90 },
+                new[] { "fifty", "thirty", "seventy", "ten", "ninety" },
+                new[] { 50, 70 },
+                new[] { 20, 80 },
+                new[] { "twenty", "eighty" },
+                new[] { 30, 10, 90, 20, 80 }
+            ).SetName("DictionaryMutation.NonSortedInitialOrderPreserved");
+        }
+
+        private static IEnumerable<TestCaseData> DictionaryProtoSerializationTestCases()
+        {
+            yield return new TestCaseData(new[] { 1 }, new[] { "one" }).SetName(
+                "Dictionary.SingleEntry"
+            );
+            yield return new TestCaseData(
+                new[] { 30, 10, 20 },
+                new[] { "thirty", "ten", "twenty" }
+            ).SetName("Dictionary.MultipleEntries.Unordered");
+            yield return new TestCaseData(
+                new[] { 1, 2, 3, 4, 5 },
+                new[] { "one", "two", "three", "four", "five" }
+            ).SetName("Dictionary.MultipleEntries.Ascending");
+            yield return new TestCaseData(
+                new[] { 5, 4, 3, 2, 1 },
+                new[] { "five", "four", "three", "two", "one" }
+            ).SetName("Dictionary.MultipleEntries.Descending");
+            yield return new TestCaseData(
+                new[] { 100, -50, 0, 25, -25 },
+                new[] { "hundred", "neg-fifty", "zero", "twenty-five", "neg-twenty-five" }
+            ).SetName("Dictionary.MixedPositiveNegative");
+            yield return new TestCaseData(
+                new[] { int.MaxValue, int.MinValue, 0 },
+                new[] { "max", "min", "zero" }
+            ).SetName("Dictionary.ExtremeBoundaryValues");
+            yield return new TestCaseData(
+                Enumerable.Range(0, 100).Reverse().ToArray(),
+                Enumerable.Range(0, 100).Reverse().Select(i => $"value{i}").ToArray()
+            ).SetName("Dictionary.LargeArray.100Elements");
+        }
+
+        /// <summary>
+        /// Additional data-driven test cases that exercise various mutation patterns
+        /// to ensure order preservation works correctly across different scenarios.
+        /// </summary>
+        private static IEnumerable<TestCaseData> DictionaryOrderPreservationEdgeCases()
+        {
+            yield return new TestCaseData(
+                new[] { 100 },
+                new[] { "hundred" },
+                new int[0],
+                new[] { 50, 75, 25 },
+                new[] { "fifty", "seventy-five", "twenty-five" },
+                new[] { 100, 50, 75, 25 }
+            ).SetName("Dictionary.SingleInitialWithMultipleAdds");
+
+            yield return new TestCaseData(
+                new[] { 10, 20, 30 },
+                new[] { "ten", "twenty", "thirty" },
+                new[] { 10 },
+                new[] { 5 },
+                new[] { "five" },
+                new[] { 20, 30, 5 }
+            ).SetName("Dictionary.RemoveFirstAddNew");
+
+            yield return new TestCaseData(
+                new[] { 10, 20, 30 },
+                new[] { "ten", "twenty", "thirty" },
+                new[] { 30 },
+                new[] { 40, 50 },
+                new[] { "forty", "fifty" },
+                new[] { 10, 20, 40, 50 }
+            ).SetName("Dictionary.RemoveLastAddNew");
+
+            yield return new TestCaseData(
+                new[] { 10, 20, 30, 40, 50 },
+                new[] { "a", "b", "c", "d", "e" },
+                new[] { 20, 40 },
+                new[] { 15, 25, 35 },
+                new[] { "fifteen", "twenty-five", "thirty-five" },
+                new[] { 10, 30, 50, 15, 25, 35 }
+            ).SetName("Dictionary.RemoveMultipleMiddleAddMultipleNew");
+
+            yield return new TestCaseData(
+                new int[0],
+                new string[0],
+                new int[0],
+                new[] { 3, 1, 4, 1, 5 },
+                new[] { "three", "one", "four", "one-dup", "five" },
+                new[] { 3, 1, 4, 5 }
+            ).SetName("Dictionary.StartEmptyAddWithDuplicateAttempts");
+
+            yield return new TestCaseData(
+                new[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 },
+                new[] { "1", "2", "3", "4", "5", "6", "7", "8", "9", "10" },
+                new[] { 2, 4, 6, 8, 10 },
+                new[] { 11, 12 },
+                new[] { "11", "12" },
+                new[] { 1, 3, 5, 7, 9, 11, 12 }
+            ).SetName("Dictionary.RemoveEvenNumbersAddNew");
+        }
+
         [Test]
         public void SortedDictionaryPreservesSerializedKeyOrderAcrossSerializationCycle()
         {
@@ -945,48 +1254,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
         }
 
-        /// <summary>
-        /// Test cases for HashSet mutation scenarios that should preserve order.
-        /// Format: (initialItems, itemsToRemove, itemsToAdd, expectedOrder)
-        /// </summary>
-        private static IEnumerable<TestCaseData> HashSetMutationTestCases()
-        {
-            yield return new TestCaseData(
-                new[] { 1, 2, 3, 4, 5 },
-                new[] { 2, 4 },
-                new[] { 6 },
-                new[] { 1, 3, 5, 6 }
-            ).SetName("Remove middle items, add one");
-
-            yield return new TestCaseData(
-                new[] { 10, 20, 30 },
-                new int[0],
-                new[] { 5, 25 },
-                new[] { 10, 20, 30, 5, 25 }
-            ).SetName("Add items without removing");
-
-            yield return new TestCaseData(
-                new[] { 100, 50, 75 },
-                new[] { 100, 75 },
-                new int[0],
-                new[] { 50 }
-            ).SetName("Remove items without adding");
-
-            yield return new TestCaseData(
-                new[] { 1, 2, 3, 4, 5 },
-                new[] { 1, 2, 3, 4, 5 },
-                new[] { 10, 20 },
-                new[] { 10, 20 }
-            ).SetName("Remove all, add new items");
-
-            yield return new TestCaseData(
-                new[] { 5, 3, 7, 1, 9 },
-                new[] { 5, 7 },
-                new[] { 2, 8 },
-                new[] { 3, 1, 9, 2, 8 }
-            ).SetName("Non-sorted initial order preserved");
-        }
-
         [Test]
         [TestCaseSource(nameof(HashSetMutationTestCases))]
         public void HashSetMutationPreservesOrder(
@@ -1016,40 +1283,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 set._items,
                 $"Expected [{expectedItems}], got [{actualItems}]"
             );
-        }
-
-        /// <summary>
-        /// Test cases for SortedDictionary mutation scenarios that should preserve order.
-        /// Format: (initialKeys, initialValues, keysToRemove, keysToAdd, valuesToAdd, expectedKeys)
-        /// </summary>
-        private static IEnumerable<TestCaseData> SortedDictionaryMutationTestCases()
-        {
-            yield return new TestCaseData(
-                new[] { 30, 10, 20 },
-                new[] { "thirty", "ten", "twenty" },
-                new[] { 10 },
-                new[] { 15 },
-                new[] { "fifteen" },
-                new[] { 30, 20, 15 }
-            ).SetName("Remove and add key");
-
-            yield return new TestCaseData(
-                new[] { 5, 3, 1 },
-                new[] { "five", "three", "one" },
-                new int[0],
-                new[] { 2, 4 },
-                new[] { "two", "four" },
-                new[] { 5, 3, 1, 2, 4 }
-            ).SetName("Add keys without removing");
-
-            yield return new TestCaseData(
-                new[] { 100, 50, 25, 75 },
-                new[] { "a", "b", "c", "d" },
-                new[] { 50, 75 },
-                new int[0],
-                new string[0],
-                new[] { 100, 25 }
-            ).SetName("Remove keys without adding");
         }
 
         [Test]
@@ -1416,29 +1649,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual("TEN_UPDATED", dict.ValueFor(10), "Value should be updated");
         }
 
-        private static IEnumerable<TestCaseData> HashSetProtoSerializationTestCases()
-        {
-            yield return new TestCaseData(new[] { 1 }).SetName("SingleElement");
-            yield return new TestCaseData(new[] { 5, 3, 8, 1, 9 }).SetName(
-                "MultipleElements.Unordered"
-            );
-            yield return new TestCaseData(new[] { 1, 2, 3, 4, 5 }).SetName(
-                "MultipleElements.Ascending"
-            );
-            yield return new TestCaseData(new[] { 5, 4, 3, 2, 1 }).SetName(
-                "MultipleElements.Descending"
-            );
-            yield return new TestCaseData(new[] { 100, 1, 50, -10, 25 }).SetName(
-                "MixedPositiveNegative"
-            );
-            yield return new TestCaseData(new[] { int.MaxValue, int.MinValue, 0 }).SetName(
-                "ExtremeBoundaryValues"
-            );
-            yield return new TestCaseData(Enumerable.Range(0, 100).Reverse().ToArray()).SetName(
-                "LargeArray.100Elements"
-            );
-        }
-
         [TestCaseSource(nameof(HashSetProtoSerializationTestCases))]
         public void HashSetProtoSerializationPreservesOrderDataDriven(int[] items)
         {
@@ -1485,23 +1695,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
         }
 
-        private static IEnumerable<TestCaseData> SortedSetProtoSerializationTestCases()
-        {
-            yield return new TestCaseData(new[] { 42 }).SetName("SingleElement");
-            yield return new TestCaseData(new[] { 100, 50, 75, 25 }).SetName(
-                "MultipleElements.Unordered"
-            );
-            yield return new TestCaseData(new[] { 10, 20, 30, 40 }).SetName(
-                "MultipleElements.Ascending"
-            );
-            yield return new TestCaseData(new[] { 40, 30, 20, 10 }).SetName(
-                "MultipleElements.Descending"
-            );
-            yield return new TestCaseData(new[] { 0, -1, 1, -100, 100 }).SetName(
-                "MixedPositiveNegative"
-            );
-        }
-
         [TestCaseSource(nameof(SortedSetProtoSerializationTestCases))]
         public void SortedSetProtoSerializationPreservesOrderDataDriven(int[] items)
         {
@@ -1533,27 +1726,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 restored._items,
                 $"Expected [{expectedStr}], got [{actualStr}]"
             );
-        }
-
-        private static IEnumerable<TestCaseData> SortedDictionaryProtoSerializationTestCases()
-        {
-            yield return new TestCaseData(new[] { 1 }, new[] { "one" }).SetName("SingleEntry");
-            yield return new TestCaseData(
-                new[] { 30, 10, 20 },
-                new[] { "thirty", "ten", "twenty" }
-            ).SetName("MultipleEntries Unordered");
-            yield return new TestCaseData(
-                new[] { 1, 2, 3, 4, 5 },
-                new[] { "one", "two", "three", "four", "five" }
-            ).SetName("MultipleEntries Ascending");
-            yield return new TestCaseData(
-                new[] { 5, 4, 3, 2, 1 },
-                new[] { "five", "four", "three", "two", "one" }
-            ).SetName("MultipleEntries Descending");
-            yield return new TestCaseData(
-                new[] { 100, -50, 0, 25, -25 },
-                new[] { "hundred", "neg-fifty", "zero", "twenty-five", "neg-twenty-five" }
-            ).SetName("MixedPositiveNegative");
         }
 
         [TestCaseSource(nameof(SortedDictionaryProtoSerializationTestCases))]
@@ -1652,17 +1824,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(0, restored.Count, "Restored dictionary should be empty");
         }
 
-        private static IEnumerable<TestCaseData> ProtoSerializationDiagnosticTestCases()
-        {
-            yield return new TestCaseData(new[] { 42 }).SetName("SingleInt");
-            yield return new TestCaseData(new[] { 1, 2, 3 }).SetName("ThreeInts");
-            yield return new TestCaseData(new[] { int.MaxValue, int.MinValue, 0 }).SetName(
-                "BoundaryInts"
-            );
-            yield return new TestCaseData(new[] { -1, -2, -3, -4, -5 }).SetName("NegativeInts");
-            yield return new TestCaseData(Enumerable.Range(1, 50).ToArray()).SetName("FiftyInts");
-        }
-
         [TestCaseSource(nameof(ProtoSerializationDiagnosticTestCases))]
         public void HashSetProtoSerializationDiagnosticVerifiesInternalState(int[] items)
         {
@@ -1757,23 +1918,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 restored._items,
                 $"Items should match exactly. Expected=[{string.Join(", ", items)}], Got=[{string.Join(", ", restored._items)}]"
             );
-        }
-
-        private static IEnumerable<TestCaseData> DictionaryProtoSerializationDiagnosticTestCases()
-        {
-            yield return new TestCaseData(new[] { 1 }, new[] { "one" }).SetName("SingleEntry");
-            yield return new TestCaseData(
-                new[] { 1, 2, 3 },
-                new[] { "one", "two", "three" }
-            ).SetName("ThreeEntries");
-            yield return new TestCaseData(
-                new[] { int.MaxValue, int.MinValue, 0 },
-                new[] { "max", "min", "zero" }
-            ).SetName("BoundaryKeys");
-            yield return new TestCaseData(
-                Enumerable.Range(1, 20).ToArray(),
-                Enumerable.Range(1, 20).Select(i => $"value{i}").ToArray()
-            ).SetName("TwentyEntries");
         }
 
         [Test]
@@ -2194,58 +2338,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
         }
 
-        /// <summary>
-        /// Test cases for Dictionary mutation scenarios that should preserve order.
-        /// Format: (initialKeys, initialValues, keysToRemove, keysToAdd, valuesToAdd, expectedKeys)
-        /// </summary>
-        private static IEnumerable<TestCaseData> DictionaryMutationTestCases()
-        {
-            yield return new TestCaseData(
-                new[] { 30, 10, 20 },
-                new[] { "thirty", "ten", "twenty" },
-                new[] { 10 },
-                new[] { 15 },
-                new[] { "fifteen" },
-                new[] { 30, 20, 15 }
-            ).SetName("DictionaryMutation.RemoveAndAddKey");
-
-            yield return new TestCaseData(
-                new[] { 5, 3, 1 },
-                new[] { "five", "three", "one" },
-                new int[0],
-                new[] { 2, 4 },
-                new[] { "two", "four" },
-                new[] { 5, 3, 1, 2, 4 }
-            ).SetName("DictionaryMutation.AddKeysWithoutRemoving");
-
-            yield return new TestCaseData(
-                new[] { 100, 50, 25, 75 },
-                new[] { "a", "b", "c", "d" },
-                new[] { 50, 75 },
-                new int[0],
-                new string[0],
-                new[] { 100, 25 }
-            ).SetName("DictionaryMutation.RemoveKeysWithoutAdding");
-
-            yield return new TestCaseData(
-                new[] { 1, 2, 3, 4, 5 },
-                new[] { "one", "two", "three", "four", "five" },
-                new[] { 1, 2, 3, 4, 5 },
-                new[] { 10, 20 },
-                new[] { "ten", "twenty" },
-                new[] { 10, 20 }
-            ).SetName("DictionaryMutation.RemoveAllAddNew");
-
-            yield return new TestCaseData(
-                new[] { 50, 30, 70, 10, 90 },
-                new[] { "fifty", "thirty", "seventy", "ten", "ninety" },
-                new[] { 50, 70 },
-                new[] { 20, 80 },
-                new[] { "twenty", "eighty" },
-                new[] { 30, 10, 90, 20, 80 }
-            ).SetName("DictionaryMutation.NonSortedInitialOrderPreserved");
-        }
-
         [Test]
         [TestCaseSource(nameof(DictionaryMutationTestCases))]
         public void DictionaryMutationPreservesOrder(
@@ -2425,37 +2517,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 "Key order should be preserved after value update"
             );
             Assert.AreEqual("TEN_UPDATED", dict.ValueFor(10), "Value should be updated");
-        }
-
-        private static IEnumerable<TestCaseData> DictionaryProtoSerializationTestCases()
-        {
-            yield return new TestCaseData(new[] { 1 }, new[] { "one" }).SetName(
-                "Dictionary.SingleEntry"
-            );
-            yield return new TestCaseData(
-                new[] { 30, 10, 20 },
-                new[] { "thirty", "ten", "twenty" }
-            ).SetName("Dictionary.MultipleEntries.Unordered");
-            yield return new TestCaseData(
-                new[] { 1, 2, 3, 4, 5 },
-                new[] { "one", "two", "three", "four", "five" }
-            ).SetName("Dictionary.MultipleEntries.Ascending");
-            yield return new TestCaseData(
-                new[] { 5, 4, 3, 2, 1 },
-                new[] { "five", "four", "three", "two", "one" }
-            ).SetName("Dictionary.MultipleEntries.Descending");
-            yield return new TestCaseData(
-                new[] { 100, -50, 0, 25, -25 },
-                new[] { "hundred", "neg-fifty", "zero", "twenty-five", "neg-twenty-five" }
-            ).SetName("Dictionary.MixedPositiveNegative");
-            yield return new TestCaseData(
-                new[] { int.MaxValue, int.MinValue, 0 },
-                new[] { "max", "min", "zero" }
-            ).SetName("Dictionary.ExtremeBoundaryValues");
-            yield return new TestCaseData(
-                Enumerable.Range(0, 100).Reverse().ToArray(),
-                Enumerable.Range(0, 100).Reverse().Select(i => $"value{i}").ToArray()
-            ).SetName("Dictionary.LargeArray.100Elements");
         }
 
         [TestCaseSource(nameof(DictionaryProtoSerializationTestCases))]
@@ -2921,67 +2982,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 restored._values,
                 $"Expected [3, 1, 2], got [{string.Join(", ", restored._values)}]"
             );
-        }
-
-        /// <summary>
-        /// Additional data-driven test cases that exercise various mutation patterns
-        /// to ensure order preservation works correctly across different scenarios.
-        /// </summary>
-        private static IEnumerable<TestCaseData> DictionaryOrderPreservationEdgeCases()
-        {
-            yield return new TestCaseData(
-                new[] { 100 },
-                new[] { "hundred" },
-                new int[0],
-                new[] { 50, 75, 25 },
-                new[] { "fifty", "seventy-five", "twenty-five" },
-                new[] { 100, 50, 75, 25 }
-            ).SetName("Dictionary.SingleInitialWithMultipleAdds");
-
-            yield return new TestCaseData(
-                new[] { 10, 20, 30 },
-                new[] { "ten", "twenty", "thirty" },
-                new[] { 10 },
-                new[] { 5 },
-                new[] { "five" },
-                new[] { 20, 30, 5 }
-            ).SetName("Dictionary.RemoveFirstAddNew");
-
-            yield return new TestCaseData(
-                new[] { 10, 20, 30 },
-                new[] { "ten", "twenty", "thirty" },
-                new[] { 30 },
-                new[] { 40, 50 },
-                new[] { "forty", "fifty" },
-                new[] { 10, 20, 40, 50 }
-            ).SetName("Dictionary.RemoveLastAddNew");
-
-            yield return new TestCaseData(
-                new[] { 10, 20, 30, 40, 50 },
-                new[] { "a", "b", "c", "d", "e" },
-                new[] { 20, 40 },
-                new[] { 15, 25, 35 },
-                new[] { "fifteen", "twenty-five", "thirty-five" },
-                new[] { 10, 30, 50, 15, 25, 35 }
-            ).SetName("Dictionary.RemoveMultipleMiddleAddMultipleNew");
-
-            yield return new TestCaseData(
-                new int[0],
-                new string[0],
-                new int[0],
-                new[] { 3, 1, 4, 1, 5 },
-                new[] { "three", "one", "four", "one-dup", "five" },
-                new[] { 3, 1, 4, 5 }
-            ).SetName("Dictionary.StartEmptyAddWithDuplicateAttempts");
-
-            yield return new TestCaseData(
-                new[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 },
-                new[] { "1", "2", "3", "4", "5", "6", "7", "8", "9", "10" },
-                new[] { 2, 4, 6, 8, 10 },
-                new[] { 11, 12 },
-                new[] { "11", "12" },
-                new[] { 1, 3, 5, 7, 9, 11, 12 }
-            ).SetName("Dictionary.RemoveEvenNumbersAddNew");
         }
 
         [Test]

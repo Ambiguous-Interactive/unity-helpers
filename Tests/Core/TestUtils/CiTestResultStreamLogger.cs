@@ -57,6 +57,48 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
 
         private sealed class StreamingCallbacks : ICallbacks
         {
+            private static void CountLeaves(
+                ITestResultAdaptor result,
+                ref int passed,
+                ref int failed,
+                ref int other
+            )
+            {
+                if (result?.Test == null)
+                {
+                    return;
+                }
+
+                if (!result.Test.IsSuite)
+                {
+                    switch (result.TestStatus)
+                    {
+                        case TestStatus.Passed:
+                            passed++;
+                            break;
+                        case TestStatus.Failed:
+                            failed++;
+                            break;
+                        default:
+                            other++;
+                            break;
+                    }
+
+                    return;
+                }
+
+                IEnumerable<ITestResultAdaptor> children = result.Children;
+                if (children == null)
+                {
+                    return;
+                }
+
+                foreach (ITestResultAdaptor child in children)
+                {
+                    CountLeaves(child, ref passed, ref failed, ref other);
+                }
+            }
+
             public void RunStarted(ITestAdaptor testsToRun)
             {
                 Debug.Log(
@@ -119,48 +161,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                             + "(mid-run domain reload / abort). The streamed per-test lines "
                             + "above are the authoritative record; results.xml is not."
                     );
-                }
-            }
-
-            private static void CountLeaves(
-                ITestResultAdaptor result,
-                ref int passed,
-                ref int failed,
-                ref int other
-            )
-            {
-                if (result?.Test == null)
-                {
-                    return;
-                }
-
-                if (!result.Test.IsSuite)
-                {
-                    switch (result.TestStatus)
-                    {
-                        case TestStatus.Passed:
-                            passed++;
-                            break;
-                        case TestStatus.Failed:
-                            failed++;
-                            break;
-                        default:
-                            other++;
-                            break;
-                    }
-
-                    return;
-                }
-
-                IEnumerable<ITestResultAdaptor> children = result.Children;
-                if (children == null)
-                {
-                    return;
-                }
-
-                foreach (ITestResultAdaptor child in children)
-                {
-                    CountLeaves(child, ref passed, ref failed, ref other);
                 }
             }
         }

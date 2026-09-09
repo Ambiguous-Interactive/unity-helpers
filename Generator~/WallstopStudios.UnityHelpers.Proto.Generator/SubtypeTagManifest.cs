@@ -42,6 +42,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         internal const string RetiredAttribute =
             "WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoRetiredSubtypeTagAttribute";
 
+        /// <summary>A manifest with no entries, for a compilation that declares none.</summary>
+        internal static SubtypeTagManifest Empty => EmptyManifest;
+
         private static readonly SubtypeTagManifest EmptyManifest = new SubtypeTagManifest(
             new Dictionary<string, int>(StringComparer.Ordinal),
             new Dictionary<string, string>(StringComparer.Ordinal)
@@ -58,9 +61,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             _assigned = assigned;
             _retired = retired;
         }
-
-        /// <summary>A manifest with no entries, for a compilation that declares none.</summary>
-        internal static SubtypeTagManifest Empty => EmptyManifest;
 
         /// <summary>
         /// Indexes the compilation's own manifest entries.
@@ -123,49 +123,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return assigned.Count == 0 && retired.Count == 0
                 ? EmptyManifest
                 : new SubtypeTagManifest(assigned, retired);
-        }
-
-        /// <summary>
-        /// Looks up the subtype a retired field number used to belong to.
-        /// </summary>
-        /// <param name="baseType">The base the number lives on.</param>
-        /// <param name="tag">The field number being claimed.</param>
-        /// <param name="retiredBy">The fully qualified name of the type that held it.</param>
-        /// <returns><c>false</c> when the number is not retired on that base.</returns>
-        /// <remarks>
-        /// The enforcement half of the retirement record. <c>WPROTO039</c> fires when two types
-        /// claim one number at the same TIME and so has no memory: a number freed by a deletion is
-        /// indistinguishable from one never used, and handing it to a later subtype reads every
-        /// payload written by an older build back as the wrong type
-        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/606">#606</see>).
-        /// </remarks>
-        internal bool TryRetired(INamedTypeSymbol baseType, int tag, out string retiredBy)
-        {
-            if (baseType == null)
-            {
-                retiredBy = null;
-                return false;
-            }
-
-            return _retired.TryGetValue(TagKeyOf(baseType, tag), out retiredBy);
-        }
-
-        /// <summary>
-        /// Looks up the number committed for one subtype-base pair.
-        /// </summary>
-        /// <param name="subType">The subtype whose declaration omitted a number.</param>
-        /// <param name="baseType">The base it named.</param>
-        /// <param name="tag">The committed field number.</param>
-        /// <returns><c>false</c> when the manifest has no entry for the pair.</returns>
-        internal bool TryResolve(INamedTypeSymbol subType, INamedTypeSymbol baseType, out int tag)
-        {
-            if (subType == null || baseType == null)
-            {
-                tag = 0;
-                return false;
-            }
-
-            return _assigned.TryGetValue(KeyOf(subType.ToDisplayString(), baseType), out tag);
         }
 
         /// <summary>
@@ -397,6 +354,49 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             SyntaxReference reference = attribute.ApplicationSyntaxReference;
             return reference == null ? Location.None : reference.GetSyntax().GetLocation();
+        }
+
+        /// <summary>
+        /// Looks up the subtype a retired field number used to belong to.
+        /// </summary>
+        /// <param name="baseType">The base the number lives on.</param>
+        /// <param name="tag">The field number being claimed.</param>
+        /// <param name="retiredBy">The fully qualified name of the type that held it.</param>
+        /// <returns><c>false</c> when the number is not retired on that base.</returns>
+        /// <remarks>
+        /// The enforcement half of the retirement record. <c>WPROTO039</c> fires when two types
+        /// claim one number at the same TIME and so has no memory: a number freed by a deletion is
+        /// indistinguishable from one never used, and handing it to a later subtype reads every
+        /// payload written by an older build back as the wrong type
+        /// (<see href="https://github.com/Ambiguous-Interactive/unity-helpers/issues/606">#606</see>).
+        /// </remarks>
+        internal bool TryRetired(INamedTypeSymbol baseType, int tag, out string retiredBy)
+        {
+            if (baseType == null)
+            {
+                retiredBy = null;
+                return false;
+            }
+
+            return _retired.TryGetValue(TagKeyOf(baseType, tag), out retiredBy);
+        }
+
+        /// <summary>
+        /// Looks up the number committed for one subtype-base pair.
+        /// </summary>
+        /// <param name="subType">The subtype whose declaration omitted a number.</param>
+        /// <param name="baseType">The base it named.</param>
+        /// <param name="tag">The committed field number.</param>
+        /// <returns><c>false</c> when the manifest has no entry for the pair.</returns>
+        internal bool TryResolve(INamedTypeSymbol subType, INamedTypeSymbol baseType, out int tag)
+        {
+            if (subType == null || baseType == null)
+            {
+                tag = 0;
+                return false;
+            }
+
+            return _assigned.TryGetValue(KeyOf(subType.ToDisplayString(), baseType), out tag);
         }
     }
 }

@@ -35,19 +35,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
             "Packages/com.wallstop-studios.unity-helpers/Tests/Editor/TestAssets/Prefabs";
         private const string DynamicAssetsDir = "Assets/Temp/DynamicPrefabFixtures";
 
-        private static readonly object Lock = new();
-        private static int _referenceCount;
-        private static bool _fixturesVerified;
-
-        private static GameObject _cachedPrefabHandler;
-        private static GameObject _cachedNestedHandler;
-        private static GameObject _cachedMultipleHandlers;
-        private static GameObject _cachedCombinedHandler;
-        private static GameObject _cachedSceneHandler;
-
-        private static readonly ConcurrentDictionary<string, DynamicPrefabFixture> DynamicFixtures =
-            new();
-
         /// <summary>
         /// Path to the shared prefab handler fixture (single TestPrefabAssetChangeHandler component).
         /// </summary>
@@ -132,6 +119,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
                 }
             }
         }
+
+        private static readonly object Lock = new();
+        private static int _referenceCount;
+        private static bool _fixturesVerified;
+
+        private static GameObject _cachedPrefabHandler;
+        private static GameObject _cachedNestedHandler;
+        private static GameObject _cachedMultipleHandlers;
+        private static GameObject _cachedCombinedHandler;
+        private static GameObject _cachedSceneHandler;
+
+        private static readonly ConcurrentDictionary<string, DynamicPrefabFixture> DynamicFixtures =
+            new();
 
         /// <summary>
         /// Acquires a reference to the shared fixtures. Verifies assets if this is the first call.

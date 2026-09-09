@@ -20,6 +20,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         : IWProtoFormatter<SerializableHashSet<T>>,
             IWProtoConditionalFormatter
     {
+        private static SerializableHashSetProtoWrapper<T> Wrap(SerializableHashSet<T> value)
+        {
+            return new SerializableHashSetProtoWrapper<T> { Items = value.SerializedItems };
+        }
+
         /// <inheritdoc />
         public bool CanServe()
         {
@@ -64,11 +69,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             value = restored;
             return true;
         }
-
-        private static SerializableHashSetProtoWrapper<T> Wrap(SerializableHashSet<T> value)
-        {
-            return new SerializableHashSetProtoWrapper<T> { Items = value.SerializedItems };
-        }
     }
 
     /// <summary>
@@ -80,6 +80,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             IWProtoConditionalFormatter
         where T : IComparable<T>
     {
+        private static SerializableSortedSetProtoWrapper<T> Wrap(SerializableSortedSet<T> value)
+        {
+            return new SerializableSortedSetProtoWrapper<T> { Items = value.SerializedItems };
+        }
+
         /// <inheritdoc />
         public bool CanServe()
         {
@@ -126,11 +131,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             value = restored;
             return true;
         }
-
-        private static SerializableSortedSetProtoWrapper<T> Wrap(SerializableSortedSet<T> value)
-        {
-            return new SerializableSortedSetProtoWrapper<T> { Items = value.SerializedItems };
-        }
     }
 
     /// <summary>
@@ -142,6 +142,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         : IWProtoFormatter<SerializableDictionary<TKey, TValue>>,
             IWProtoConditionalFormatter
     {
+        private static SerializableDictionaryProtoWrapper<TKey, TValue> Wrap(
+            SerializableDictionary<TKey, TValue> value
+        )
+        {
+            return new SerializableDictionaryProtoWrapper<TKey, TValue>
+            {
+                Keys = value.SerializedKeys,
+                Values = value.SerializedValues,
+            };
+        }
+
         /// <inheritdoc />
         public bool CanServe()
         {
@@ -191,17 +202,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             value = restored;
             return true;
         }
-
-        private static SerializableDictionaryProtoWrapper<TKey, TValue> Wrap(
-            SerializableDictionary<TKey, TValue> value
-        )
-        {
-            return new SerializableDictionaryProtoWrapper<TKey, TValue>
-            {
-                Keys = value.SerializedKeys,
-                Values = value.SerializedValues,
-            };
-        }
     }
 
     /// <summary>
@@ -215,6 +215,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             IWProtoConditionalFormatter
         where TKey : IComparable<TKey>
     {
+        private static SerializableSortedDictionaryProtoWrapper<TKey, TValue> Wrap(
+            SerializableSortedDictionary<TKey, TValue> value
+        )
+        {
+            return new SerializableSortedDictionaryProtoWrapper<TKey, TValue>
+            {
+                Keys = value.SerializedKeys,
+                Values = value.SerializedValues,
+            };
+        }
+
         /// <inheritdoc />
         public bool CanServe()
         {
@@ -273,17 +284,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             value = restored;
             return true;
         }
-
-        private static SerializableSortedDictionaryProtoWrapper<TKey, TValue> Wrap(
-            SerializableSortedDictionary<TKey, TValue> value
-        )
-        {
-            return new SerializableSortedDictionaryProtoWrapper<TKey, TValue>
-            {
-                Keys = value.SerializedKeys,
-                Values = value.SerializedValues,
-            };
-        }
     }
 
     /// <summary>
@@ -294,6 +294,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         : IWProtoFormatter<Deque<T>>,
             IWProtoConditionalFormatter
     {
+        private static DequeProtoWrapper<T> Wrap(Deque<T> value)
+        {
+            return new DequeProtoWrapper<T> { Items = value.ToArray(), Capacity = value.Capacity };
+        }
+
         /// <inheritdoc />
         public bool CanServe()
         {
@@ -350,11 +355,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             value = restored;
             return true;
         }
-
-        private static DequeProtoWrapper<T> Wrap(Deque<T> value)
-        {
-            return new DequeProtoWrapper<T> { Items = value.ToArray(), Capacity = value.Capacity };
-        }
     }
 
     /// <summary>
@@ -365,6 +365,22 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         : IWProtoFormatter<CyclicBuffer<T>>,
             IWProtoConditionalFormatter
     {
+        private static CyclicBufferProtoWrapper<T> Wrap(CyclicBuffer<T> value)
+        {
+            int count = value.Count;
+            T[] items = null;
+            if (0 < count)
+            {
+                items = new T[count];
+                for (int index = 0; index < count; index++)
+                {
+                    items[index] = value[index];
+                }
+            }
+
+            return new CyclicBufferProtoWrapper<T> { Items = items, Capacity = value.Capacity };
+        }
+
         /// <inheritdoc />
         public bool CanServe()
         {
@@ -409,22 +425,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             value = new CyclicBuffer<T>(capacity, wrapper.Items);
             return true;
         }
-
-        private static CyclicBufferProtoWrapper<T> Wrap(CyclicBuffer<T> value)
-        {
-            int count = value.Count;
-            T[] items = null;
-            if (0 < count)
-            {
-                items = new T[count];
-                for (int index = 0; index < count; index++)
-                {
-                    items[index] = value[index];
-                }
-            }
-
-            return new CyclicBufferProtoWrapper<T> { Items = items, Capacity = value.Capacity };
-        }
     }
 
     /// <summary>
@@ -432,6 +432,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     /// </summary>
     public sealed class SparseSetMarshalFormatter : IWProtoFormatter<SparseSet>
     {
+        private static SparseSetProtoWrapper Wrap(SparseSet value)
+        {
+            return new SparseSetProtoWrapper
+            {
+                Elements = value.ToArray(),
+                Capacity = value.Capacity,
+            };
+        }
+
         /// <inheritdoc />
         public int Measure(in SparseSet value)
         {
@@ -465,15 +474,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             }
 
             return wrapper.TryRestore(out value);
-        }
-
-        private static SparseSetProtoWrapper Wrap(SparseSet value)
-        {
-            return new SparseSetProtoWrapper
-            {
-                Elements = value.ToArray(),
-                Capacity = value.Capacity,
-            };
         }
     }
 }

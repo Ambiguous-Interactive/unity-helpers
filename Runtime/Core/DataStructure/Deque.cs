@@ -38,32 +38,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         private const int MinimumGrowth = 4;
 
-        [SerializeField]
-        [ProtoIgnore]
-        private T[] _items;
-
-        [ProtoMember(1)]
-        private List<T> _serializedItems;
-
-        [ProtoIgnore]
-        private PooledResource<List<T>> _serializedItemsLease;
-
-        [SerializeField]
-        [ProtoMember(2)]
-        private int _head;
-
-        [SerializeField]
-        [ProtoMember(3)]
-        private int _tail;
-
-        [SerializeField]
-        [ProtoMember(4)]
-        private int _count;
-
-        [SerializeField]
-        [ProtoMember(5)]
-        private int _serializedCapacity;
-
         /// <summary>
         /// Gets the number of elements in the deque.
         /// </summary>
@@ -108,13 +82,31 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
         }
 
-        private Deque()
-        {
-            _items = Array.Empty<T>();
-            _head = 0;
-            _tail = 0;
-            _count = 0;
-        }
+        [SerializeField]
+        [ProtoIgnore]
+        private T[] _items;
+
+        [ProtoMember(1)]
+        private List<T> _serializedItems;
+
+        [ProtoIgnore]
+        private PooledResource<List<T>> _serializedItemsLease;
+
+        [SerializeField]
+        [ProtoMember(2)]
+        private int _head;
+
+        [SerializeField]
+        [ProtoMember(3)]
+        private int _tail;
+
+        [SerializeField]
+        [ProtoMember(4)]
+        private int _count;
+
+        [SerializeField]
+        [ProtoMember(5)]
+        private int _serializedCapacity;
 
         /// <summary>
         /// Constructs an empty deque with the specified capacity.
@@ -193,6 +185,28 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     break;
                 }
             }
+        }
+
+        private Deque()
+        {
+            _items = Array.Empty<T>();
+            _head = 0;
+            _tail = 0;
+            _count = 0;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int ComputeGrowth(int currentCapacity)
+        {
+            int growth = currentCapacity + (currentCapacity >> 1);
+            int newCapacity = currentCapacity + Math.Max(growth - currentCapacity, MinimumGrowth);
+
+            if (0X7FFFFFC7 < (uint)newCapacity)
+            {
+                newCapacity = 0X7FFFFFC7;
+            }
+
+            return newCapacity;
         }
 
         /// <summary>
@@ -398,6 +412,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
         }
 
+        public DequeEnumerator GetEnumerator()
+        {
+            return new DequeEnumerator(_items, _head, _count, _items.Length);
+        }
+
         [ProtoBeforeSerialization]
         private void OnProtoSerialize()
         {
@@ -470,20 +489,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _serializedItemsLease.Dispose();
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static int ComputeGrowth(int currentCapacity)
-        {
-            int growth = currentCapacity + (currentCapacity >> 1);
-            int newCapacity = currentCapacity + Math.Max(growth - currentCapacity, MinimumGrowth);
-
-            if (0X7FFFFFC7 < (uint)newCapacity)
-            {
-                newCapacity = 0X7FFFFFC7;
-            }
-
-            return newCapacity;
-        }
-
         private void Resize(int newCapacity)
         {
             if (newCapacity <= _count)
@@ -511,11 +516,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _tail = _count;
         }
 
-        public DequeEnumerator GetEnumerator()
-        {
-            return new DequeEnumerator(_items, _head, _count, _items.Length);
-        }
-
         IEnumerator<T> IEnumerable<T>.GetEnumerator()
         {
             return GetEnumerator();
@@ -528,6 +528,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         public struct DequeEnumerator : IEnumerator<T>
         {
+            public T Current => _current;
+
+            object IEnumerator.Current => Current;
+
             private readonly T[] _items;
             private readonly int _head;
             private readonly int _count;
@@ -557,10 +561,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 _current = default;
                 return false;
             }
-
-            public T Current => _current;
-
-            object IEnumerator.Current => Current;
 
             public void Reset()
             {

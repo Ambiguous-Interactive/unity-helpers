@@ -44,30 +44,6 @@ namespace WallstopStudios.UnityHelpers.Utils
         private int _lastAlphaThreshold;
         private float _lastMinimumTracedArea;
 
-        private void Awake()
-        {
-            if (enabled)
-            {
-                RebuildCollider();
-            }
-        }
-
-        private void Update()
-        {
-            Sprite current = ResolveSprite();
-            if (
-                _lastHandled == current
-                && _lastTraceExactly == traceExactly
-                && _lastAlphaThreshold == alphaThreshold
-                && _lastMinimumTracedArea.Equals(minimumTracedArea)
-            )
-            {
-                return;
-            }
-
-            RebuildCollider();
-        }
-
         /// <summary>Resolves component references in the Editor; player callers rebuild the collider.</summary>
         public void OnValidate()
         {
@@ -166,6 +142,30 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 colliderUpdated?.Invoke();
             }
+        }
+
+        private void Awake()
+        {
+            if (enabled)
+            {
+                RebuildCollider();
+            }
+        }
+
+        private void Update()
+        {
+            Sprite current = ResolveSprite();
+            if (
+                _lastHandled == current
+                && _lastTraceExactly == traceExactly
+                && _lastAlphaThreshold == alphaThreshold
+                && _lastMinimumTracedArea.Equals(minimumTracedArea)
+            )
+            {
+                return;
+            }
+
+            RebuildCollider();
         }
 
         private Sprite ResolveSprite()

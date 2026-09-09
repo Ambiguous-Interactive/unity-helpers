@@ -27,6 +27,90 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
 
         private readonly List<string> createdAssetPaths = new();
 
+        private static IEnumerable<TestCaseData> ExceptionScenarioTestCases()
+        {
+            yield return new TestCaseData(
+                new Action<Action, Action>(
+                    (setAssetsRefreshed, setCompilationRequested) =>
+                    {
+                        ManualRecompile.AssetsRefreshedForTests = () =>
+                        {
+                            setAssetsRefreshed();
+                            throw new InvalidOperationException("AssetsRefreshed exception");
+                        };
+                    }
+                ),
+                true,
+                "AssetsRefreshedCallback"
+            ).SetName("Exception.InAssetsRefreshedCallback.FlagIsReset");
+
+            yield return new TestCaseData(
+                new Action<Action, Action>(
+                    (setAssetsRefreshed, setCompilationRequested) =>
+                    {
+                        ManualRecompile.SkipCompilationRequestForTests = false;
+                        ManualRecompile.AssetsRefreshedForTests = setAssetsRefreshed;
+                        ManualRecompile.CompilationRequestedForTests = () =>
+                        {
+                            setCompilationRequested();
+                            throw new InvalidOperationException("CompilationRequested exception");
+                        };
+                    }
+                ),
+                false,
+                "CompilationRequestedCallback"
+            ).SetName("Exception.InCompilationRequestedCallback.FlagIsReset");
+
+            yield return new TestCaseData(
+                new Action<Action, Action>(
+                    (setAssetsRefreshed, setCompilationRequested) =>
+                    {
+                        ManualRecompile.AssetsRefreshedForTests = () =>
+                        {
+                            setAssetsRefreshed();
+                            throw new ArgumentException("ArgumentException from callback");
+                        };
+                    }
+                ),
+                true,
+                "AssetsRefreshedCallbackWithArgumentException"
+            ).SetName("Exception.ArgumentException.FlagIsReset");
+
+            yield return new TestCaseData(
+                new Action<Action, Action>(
+                    (setAssetsRefreshed, setCompilationRequested) =>
+                    {
+                        ManualRecompile.AssetsRefreshedForTests = () =>
+                        {
+                            setAssetsRefreshed();
+                            throw new NullReferenceException(
+                                "NullReferenceException from callback"
+                            );
+                        };
+                    }
+                ),
+                true,
+                "AssetsRefreshedCallbackWithNullReferenceException"
+            ).SetName("Exception.NullReferenceException.FlagIsReset");
+        }
+
+        private static void EnsureParentDirectoryExists(string absolutePath)
+        {
+            string directoryPath = Path.GetDirectoryName(absolutePath) ?? string.Empty;
+
+            if (0 < directoryPath.Length)
+            {
+                Directory.CreateDirectory(directoryPath);
+            }
+        }
+
+        private static string GetAbsolutePath(string relativePath)
+        {
+            string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            string normalizedRelativePath = relativePath.Replace('/', Path.DirectorySeparatorChar);
+            return Path.Combine(projectRoot, normalizedRelativePath);
+        }
+
         [TearDown]
         public void TearDown()
         {
@@ -464,73 +548,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             );
         }
 
-        private static IEnumerable<TestCaseData> ExceptionScenarioTestCases()
-        {
-            yield return new TestCaseData(
-                new Action<Action, Action>(
-                    (setAssetsRefreshed, setCompilationRequested) =>
-                    {
-                        ManualRecompile.AssetsRefreshedForTests = () =>
-                        {
-                            setAssetsRefreshed();
-                            throw new InvalidOperationException("AssetsRefreshed exception");
-                        };
-                    }
-                ),
-                true,
-                "AssetsRefreshedCallback"
-            ).SetName("Exception.InAssetsRefreshedCallback.FlagIsReset");
-
-            yield return new TestCaseData(
-                new Action<Action, Action>(
-                    (setAssetsRefreshed, setCompilationRequested) =>
-                    {
-                        ManualRecompile.SkipCompilationRequestForTests = false;
-                        ManualRecompile.AssetsRefreshedForTests = setAssetsRefreshed;
-                        ManualRecompile.CompilationRequestedForTests = () =>
-                        {
-                            setCompilationRequested();
-                            throw new InvalidOperationException("CompilationRequested exception");
-                        };
-                    }
-                ),
-                false,
-                "CompilationRequestedCallback"
-            ).SetName("Exception.InCompilationRequestedCallback.FlagIsReset");
-
-            yield return new TestCaseData(
-                new Action<Action, Action>(
-                    (setAssetsRefreshed, setCompilationRequested) =>
-                    {
-                        ManualRecompile.AssetsRefreshedForTests = () =>
-                        {
-                            setAssetsRefreshed();
-                            throw new ArgumentException("ArgumentException from callback");
-                        };
-                    }
-                ),
-                true,
-                "AssetsRefreshedCallbackWithArgumentException"
-            ).SetName("Exception.ArgumentException.FlagIsReset");
-
-            yield return new TestCaseData(
-                new Action<Action, Action>(
-                    (setAssetsRefreshed, setCompilationRequested) =>
-                    {
-                        ManualRecompile.AssetsRefreshedForTests = () =>
-                        {
-                            setAssetsRefreshed();
-                            throw new NullReferenceException(
-                                "NullReferenceException from callback"
-                            );
-                        };
-                    }
-                ),
-                true,
-                "AssetsRefreshedCallbackWithNullReferenceException"
-            ).SetName("Exception.NullReferenceException.FlagIsReset");
-        }
-
         [Test]
         [TestCaseSource(nameof(ExceptionScenarioTestCases))]
         public void SkipFlagIsResetOnExceptionInCallbacks(
@@ -669,23 +686,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 $"Skip flag should be reset even when AssetsRefreshed throws. "
                     + $"CallOrder: {callOrder}, AssetsRefreshedOrder: {assetsRefreshedOrder}"
             );
-        }
-
-        private static void EnsureParentDirectoryExists(string absolutePath)
-        {
-            string directoryPath = Path.GetDirectoryName(absolutePath) ?? string.Empty;
-
-            if (0 < directoryPath.Length)
-            {
-                Directory.CreateDirectory(directoryPath);
-            }
-        }
-
-        private static string GetAbsolutePath(string relativePath)
-        {
-            string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-            string normalizedRelativePath = relativePath.Replace('/', Path.DirectorySeparatorChar);
-            return Path.Combine(projectRoot, normalizedRelativePath);
         }
     }
 }

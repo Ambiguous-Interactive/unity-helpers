@@ -23,6 +23,109 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [TestFixture]
     public sealed class GenericDifferentialTests
     {
+        private static int Measure<T>(T value)
+        {
+            return WProtoFormatterProvider.Get<T>().Measure(value);
+        }
+
+        private static T Deserialize<T>(byte[] bytes)
+        {
+            using (MemoryStream stream = new MemoryStream(bytes))
+            {
+                return ProtoBuf.Serializer.Deserialize<T>(stream);
+            }
+        }
+
+        /// <summary>
+        /// Asserts protobuf-net decodes this closure's bytes to the values it would have produced.
+        /// </summary>
+        /// <remarks>
+        /// Not byte equality: <c>Many</c> is a repeated member, and a closure whose element packs is
+        /// written PACKED here where protobuf-net writes one key per element. Which closures pack is
+        /// decided at runtime by <c>WProtoGeneric&lt;T&gt;.Packable</c> -- <c>Box&lt;int&gt;</c> does,
+        /// <c>Box&lt;string&gt;</c> cannot -- so this covers both branches of that decision.
+        /// </remarks>
+        private static void AssertMatches<T>(Box<T> value)
+        {
+            string label = typeof(T).Name + " " + Describe(value);
+            byte[] mine = ParseHex(Encode(value));
+
+            Box<T> theirs = Deserialize<Box<T>>(mine);
+            Box<T> reference = Deserialize<Box<T>>(ParseHex(OracleHex(value)));
+
+            Assert.AreEqual(OracleHex(reference), OracleHex(theirs), label);
+        }
+
+        private static byte[] ParseHex(string hex)
+        {
+            byte[] bytes = new byte[hex.Length / 2];
+            for (int index = 0; index < bytes.Length; index++)
+            {
+                bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
+            }
+
+            return bytes;
+        }
+
+        private static string Describe<T>(Box<T> value)
+        {
+            return "Value="
+                + (value.Value == null ? "null" : value.Value.ToString())
+                + " Many="
+                + (value.Many == null ? "null" : value.Many.Length.ToString())
+                + " Trailer="
+                + value.Trailer;
+        }
+
+        private static string OracleHex<T>(T value)
+        {
+            using (MemoryStream stream = new MemoryStream())
+            {
+                ProtoBuf.Serializer.Serialize(stream, value);
+                return ToHex(stream.ToArray());
+            }
+        }
+
+        private static string ToHex(byte[] bytes)
+        {
+            StringBuilder builder = new StringBuilder(bytes.Length * 2);
+            foreach (byte current in bytes)
+            {
+                builder.Append(current.ToString("X2"));
+            }
+
+            return builder.ToString();
+        }
+
+        private static string Encode<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new WProtoWriter(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+            Assert.AreEqual(buffer.Length, writer.Position, "Measure disagreed with Write");
+            return ToHex(buffer);
+        }
+
+        private static T RoundTrip<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new WProtoWriter(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+
+            WProtoReader reader = new WProtoReader(buffer);
+            Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
+            return restored;
+        }
+
+        private static void AssertUsed(CountingDateTimeFormatter formatter, string path)
+        {
+            Assert.Greater(formatter.MeasureCount, 0, path + " measure");
+            Assert.Greater(formatter.WriteCount, 0, path + " write");
+            Assert.Greater(formatter.ReadCount, 0, path + " read");
+        }
+
         [OneTimeSetUp]
         public void RegisterBclFormatters()
         {
@@ -212,11 +315,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
-        private static int Measure<T>(T value)
-        {
-            return WProtoFormatterProvider.Get<T>().Measure(value);
-        }
-
         [Test]
         public void EveryClosureNamedInSourceIsRegisteredWithoutAnythingBeingCalled()
         {
@@ -369,114 +467,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
         }
 
-        private static T Deserialize<T>(byte[] bytes)
-        {
-            using (MemoryStream stream = new MemoryStream(bytes))
-            {
-                return ProtoBuf.Serializer.Deserialize<T>(stream);
-            }
-        }
-
-        /// <summary>
-        /// Asserts protobuf-net decodes this closure's bytes to the values it would have produced.
-        /// </summary>
-        /// <remarks>
-        /// Not byte equality: <c>Many</c> is a repeated member, and a closure whose element packs is
-        /// written PACKED here where protobuf-net writes one key per element. Which closures pack is
-        /// decided at runtime by <c>WProtoGeneric&lt;T&gt;.Packable</c> -- <c>Box&lt;int&gt;</c> does,
-        /// <c>Box&lt;string&gt;</c> cannot -- so this covers both branches of that decision.
-        /// </remarks>
-        private static void AssertMatches<T>(Box<T> value)
-        {
-            string label = typeof(T).Name + " " + Describe(value);
-            byte[] mine = ParseHex(Encode(value));
-
-            Box<T> theirs = Deserialize<Box<T>>(mine);
-            Box<T> reference = Deserialize<Box<T>>(ParseHex(OracleHex(value)));
-
-            Assert.AreEqual(OracleHex(reference), OracleHex(theirs), label);
-        }
-
-        private static byte[] ParseHex(string hex)
-        {
-            byte[] bytes = new byte[hex.Length / 2];
-            for (int index = 0; index < bytes.Length; index++)
-            {
-                bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
-            }
-
-            return bytes;
-        }
-
-        private static string Describe<T>(Box<T> value)
-        {
-            return "Value="
-                + (value.Value == null ? "null" : value.Value.ToString())
-                + " Many="
-                + (value.Many == null ? "null" : value.Many.Length.ToString())
-                + " Trailer="
-                + value.Trailer;
-        }
-
-        private static string OracleHex<T>(T value)
-        {
-            using (MemoryStream stream = new MemoryStream())
-            {
-                ProtoBuf.Serializer.Serialize(stream, value);
-                return ToHex(stream.ToArray());
-            }
-        }
-
-        private static string ToHex(byte[] bytes)
-        {
-            StringBuilder builder = new StringBuilder(bytes.Length * 2);
-            foreach (byte current in bytes)
-            {
-                builder.Append(current.ToString("X2"));
-            }
-
-            return builder.ToString();
-        }
-
-        private static string Encode<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new WProtoWriter(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-            Assert.AreEqual(buffer.Length, writer.Position, "Measure disagreed with Write");
-            return ToHex(buffer);
-        }
-
-        private static T RoundTrip<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new WProtoWriter(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-
-            WProtoReader reader = new WProtoReader(buffer);
-            Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
-            return restored;
-        }
-
-        private static void AssertUsed(CountingDateTimeFormatter formatter, string path)
-        {
-            Assert.Greater(formatter.MeasureCount, 0, path + " measure");
-            Assert.Greater(formatter.WriteCount, 0, path + " write");
-            Assert.Greater(formatter.ReadCount, 0, path + " read");
-        }
-
         private sealed class CountingDateTimeFormatter
             : IWProtoFormatter<DateTime>,
                 IWProtoConditionalFormatter
         {
-            private readonly IWProtoFormatter<DateTime> _inner;
-
             internal int MeasureCount { get; private set; }
             internal int WriteCount { get; private set; }
             internal int ReadCount { get; private set; }
             internal bool Enabled { get; set; } = true;
+
+            private readonly IWProtoFormatter<DateTime> _inner;
 
             internal CountingDateTimeFormatter(IWProtoFormatter<DateTime> inner)
             {

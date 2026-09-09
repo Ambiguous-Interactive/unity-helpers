@@ -25,154 +25,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [TestFixture]
     public sealed class BclDifferentialTests
     {
-        [OneTimeSetUp]
-        public void RegisterBclFormatters()
-        {
-            WProtoBcl.RegisterAll();
-        }
-
-        [Test]
-        public void EveryBclShapeEncodesExactlyAsProtobufNetDoes()
-        {
-            int checks = 0;
-            foreach (BclScalarContract value in Corpus())
-            {
-                AssertMatchesOracle(value, ref checks);
-            }
-
-            Assert.GreaterOrEqual(
-                checks,
-                100,
-                "The differential corpus shrank; that is a coverage loss"
-            );
-        }
-
-        [Test]
-        public void TheGoldenBytesFromTheOracleSweepHold()
-        {
-            Assert.AreEqual(
-                "0A040801100F",
-                MineHex(new BclScalarContract { When = DateTime.MinValue })
-            );
-            Assert.AreEqual(
-                "0A0908AA8288E187681004",
-                MineHex(
-                    new BclScalarContract
-                    {
-                        When = new DateTime(2026, 8, 26, 12, 34, 56, 789, DateTimeKind.Utc),
-                    }
-                )
-            );
-            Assert.AreEqual(
-                "0A040801100F",
-                MineHex(new BclScalarContract { Duration = TimeSpan.Zero })
-            );
-            Assert.AreEqual(
-                "0A040801100F120508C8011004",
-                MineHex(new BclScalarContract { Duration = TimeSpan.FromMilliseconds(100) })
-            );
-            Assert.AreEqual(
-                "0A040801100F12050886031002",
-                MineHex(new BclScalarContract { Duration = TimeSpan.FromHours(3.25) })
-            );
-            Assert.AreEqual(
-                "0A040801100F",
-                MineHex(new BclScalarContract { Identifier = Guid.Empty })
-            );
-            Assert.AreEqual(
-                "0A040801100F220408051802",
-                MineHex(new BclScalarContract { Amount = 0.5m })
-            );
-            Assert.AreEqual(
-                "0A040801100F",
-                MineHex(new BclScalarContract { Amount = decimal.Negate(decimal.Zero) })
-            );
-        }
-
-        [Test]
-        public void ARepeatedBclMemberTakesTheLastOccurrence()
-        {
-            byte[] payload = Parse("0A0208020A021003");
-            BclScalarContract oracle;
-            using (MemoryStream stream = new MemoryStream(payload))
-            {
-                oracle = ProtoBuf.Serializer.Deserialize<BclScalarContract>(stream);
-            }
-
-            WProtoReader reader = new WProtoReader(payload);
-            Assert.IsTrue(
-                WProtoFormatterProvider
-                    .Get<BclScalarContract>()
-                    .TryRead(ref reader, out BclScalarContract restored)
-            );
-            Assert.AreEqual(new DateTime(WProtoBcl.EpochTicks), oracle.When);
-            Assert.AreEqual(oracle.When, restored.When);
-        }
-
-        [Test]
-        public void DateTimeKindFieldsMatchProtobufNetSemantics()
-        {
-            Assert.IsTrue(TryRead("1801", WProtoDateTimeFormatter.Instance, out DateTime utcEpoch));
-            Assert.AreEqual(new DateTime(WProtoBcl.EpochTicks, DateTimeKind.Utc), utcEpoch);
-
-            Assert.IsTrue(
-                TryRead("0801100F1801", WProtoDateTimeFormatter.Instance, out DateTime minimum)
-            );
-            Assert.AreEqual(DateTime.MinValue, minimum);
-            Assert.AreEqual(DateTimeKind.Unspecified, minimum.Kind);
-
-            Assert.IsTrue(TryRead("1802", WProtoTimeSpanFormatter.Instance, out TimeSpan zero));
-            Assert.AreEqual(TimeSpan.Zero, zero);
-
-            Assert.IsFalse(TryRead("1803", WProtoDateTimeFormatter.Instance, out DateTime _));
-            Assert.IsFalse(TryRead("1803", WProtoTimeSpanFormatter.Instance, out TimeSpan _));
-        }
-
-        [Test]
-        public void BclRootFormattersMatchProtobufNet()
-        {
-            AssertRootMatches(
-                new DateTime(2026, 1, 1),
-                WProtoDateTimeFormatter.Instance,
-                "0A0408CCBF02"
-            );
-            AssertRootMatches(
-                TimeSpan.FromHours(3),
-                WProtoTimeSpanFormatter.Instance,
-                "0A0408061001"
-            );
-            AssertRootMatches(
-                new Guid("12345678-1234-1234-1234-123456789abc"),
-                WProtoGuidFormatter.Instance,
-                "0A12097856341234123412111234123456789ABC"
-            );
-            AssertRootMatches(0.5m, WProtoDecimalFormatter.Instance, "0A0408051802");
-
-            // Root char zero is encoded, unlike an omitted default-valued member.
-            FacadeRootRoundTrips('A', "0841");
-            FacadeRootRoundTrips('\0', "0800");
-#if !PROTOBUF_NET_ORACLE_V2
-            FacadeRootRoundTrips(
-                new Uri("https://EXAMPLE.com/PaTh?q=1"),
-                "0A1C68747470733A2F2F4558414D504C452E636F6D2F506154683F713D31"
-            );
-            FacadeRootRoundTrips(
-                new Uri("/relative/path", UriKind.RelativeOrAbsolute),
-                "0A0E2F72656C61746976652F70617468"
-            );
-#endif
-
-            Assert.IsTrue(
-                WProtoFacade.TryDeserialize(Parse("0A0208020A021003"), out DateTime lastRootWins)
-            );
-            Assert.AreEqual(new DateTime(WProtoBcl.EpochTicks), lastRootWins);
-
-            Assert.IsTrue(
-                WProtoFacade.TryDeserialize(Parse("0A04080210030A00"), out DateTime emptyLastWins)
-            );
-            Assert.AreEqual(new DateTime(WProtoBcl.EpochTicks), emptyLastWins);
-        }
-
         /// <summary>
         /// Round-trips one root value through the facade against a transcribed byte vector.
         /// </summary>
@@ -195,122 +47,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 typeof(T).Name + " read"
             );
             Assert.AreEqual(value, restored, typeof(T).Name + " value");
-        }
-
-        [Test]
-        public void BclMapKeysMatchProtobufNet()
-        {
-            DateTime date = new DateTime(2026, 1, 1);
-            TimeSpan duration = TimeSpan.FromHours(3);
-            Guid identifier = new Guid("12345678-1234-1234-1234-123456789abc");
-            const decimal amount = 0.5m;
-            BclKeyContract value = new BclKeyContract
-            {
-                ByDate = new Dictionary<DateTime, int> { { date, 7 } },
-                ByDuration = new Dictionary<TimeSpan, int> { { duration, 7 } },
-                ByIdentifier = new Dictionary<Guid, int> { { identifier, 7 } },
-                ByAmount = new Dictionary<decimal, int> { { amount, 7 } },
-                ByCode = new Dictionary<char, int> { { 'A', 7 }, { '\u00E9', 0 } },
-            };
-
-            string oracle = OracleHex(value);
-            Assert.AreEqual(oracle, MineHex(value));
-
-            WProtoReader reader = new WProtoReader(Parse(oracle));
-            Assert.IsTrue(
-                WProtoFormatterProvider
-                    .Get<BclKeyContract>()
-                    .TryRead(ref reader, out BclKeyContract restored)
-            );
-            Assert.AreEqual(7, restored.ByDate[date]);
-            Assert.AreEqual(7, restored.ByDuration[duration]);
-            Assert.AreEqual(7, restored.ByIdentifier[identifier]);
-            Assert.AreEqual(7, restored.ByAmount[amount]);
-            Assert.AreEqual(7, restored.ByCode['A']);
-            Assert.AreEqual(0, restored.ByCode['\u00E9']);
-        }
-
-        [Test]
-        public void MalformedBclPayloadsAreRefusedAndMismatchedFieldsAreSkippedCleanly()
-        {
-            Assert.IsFalse(
-                TryRead(
-                    "088080808080808080808000",
-                    WProtoDateTimeFormatter.Instance,
-                    out DateTime _
-                ),
-                "overlong DateTime varint"
-            );
-            Assert.IsFalse(
-                TryRead("1006", WProtoTimeSpanFormatter.Instance, out TimeSpan _),
-                "unknown TimeSpan scale"
-            );
-            Assert.IsFalse(
-                TryRead("0804100F", WProtoTimeSpanFormatter.Instance, out TimeSpan _),
-                "invalid MinMax sentinel"
-            );
-            Assert.IsFalse(
-                TryRead(
-                    "08FEFFFFFFFFFFFFFFFF011005",
-                    WProtoDateTimeFormatter.Instance,
-                    out DateTime _
-                ),
-                "DateTime tick overflow"
-            );
-            Assert.IsFalse(
-                TryRead("183A", WProtoDecimalFormatter.Instance, out decimal _),
-                "decimal scale above 28"
-            );
-            Assert.IsTrue(
-                TryRead("0D00000000", WProtoDateTimeFormatter.Instance, out DateTime mismatched),
-                "a valid field with the wrong wire type is an unknown field"
-            );
-            Assert.AreEqual(new DateTime(WProtoBcl.EpochTicks), mismatched);
-            Assert.IsFalse(
-                TryRead("0F", WProtoDateTimeFormatter.Instance, out DateTime _),
-                "invalid DateTime wire type"
-            );
-            Assert.IsFalse(
-                TryRead("090102", WProtoGuidFormatter.Instance, out Guid _),
-                "truncated Guid fixed64"
-            );
-            Assert.IsFalse(
-                TryRead("FFFE", WProtoUriFormatter.Instance, out Uri _),
-                "invalid UTF-8 inside a Uri region"
-            );
-            Assert.IsFalse(
-                TryRead("", WProtoUriFormatter.Instance, out Uri _),
-                "an empty Uri region refuses rather than manufacturing a value"
-            );
-            Assert.IsFalse(
-                TryRead(
-                    "68747470733A2F2F4558414D504C452E636F6D3AEFBFBD2F",
-                    WProtoUriFormatter.Instance,
-                    out Uri _
-                ),
-                "text that no Uri constructor accepts is refused, not defaulted"
-            );
-            Uri loneSurrogate = new Uri("/\ud800", UriKind.RelativeOrAbsolute);
-            int measured = WProtoUriFormatter.Instance.Measure(loneSurrogate);
-            WProtoWriter surrogateWriter = new WProtoWriter(new byte[64]);
-            Assert.IsTrue(
-                WProtoUriFormatter.Instance.Write(ref surrogateWriter, loneSurrogate),
-                "a lone surrogate must reach the wire as replacement bytes, not throw"
-            );
-            Assert.AreEqual(
-                measured,
-                surrogateWriter.Position,
-                "Measure must agree with Write for a lone surrogate, or every enclosing prefix lies"
-            );
-            Assert.AreEqual(
-                "2FEFBFBD",
-                ToHex(surrogateWriter.Written.ToArray()),
-                "the lone surrogate encodes as U+FFFD, matching every other string-shaped field"
-            );
-            Assert.Throws<InvalidOperationException>(
-                () => WProtoFacade.TryDeserialize(Parse("0A050801"), out DateTime _),
-                "the facade reports an owned malformed root with its documented exception"
-            );
         }
 
         private static IEnumerable<BclScalarContract> Corpus()
@@ -737,6 +473,270 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 typeof(T).Name
             );
             Assert.AreEqual(rootHex, OracleHex(restored), typeof(T).Name);
+        }
+
+        [OneTimeSetUp]
+        public void RegisterBclFormatters()
+        {
+            WProtoBcl.RegisterAll();
+        }
+
+        [Test]
+        public void EveryBclShapeEncodesExactlyAsProtobufNetDoes()
+        {
+            int checks = 0;
+            foreach (BclScalarContract value in Corpus())
+            {
+                AssertMatchesOracle(value, ref checks);
+            }
+
+            Assert.GreaterOrEqual(
+                checks,
+                100,
+                "The differential corpus shrank; that is a coverage loss"
+            );
+        }
+
+        [Test]
+        public void TheGoldenBytesFromTheOracleSweepHold()
+        {
+            Assert.AreEqual(
+                "0A040801100F",
+                MineHex(new BclScalarContract { When = DateTime.MinValue })
+            );
+            Assert.AreEqual(
+                "0A0908AA8288E187681004",
+                MineHex(
+                    new BclScalarContract
+                    {
+                        When = new DateTime(2026, 8, 26, 12, 34, 56, 789, DateTimeKind.Utc),
+                    }
+                )
+            );
+            Assert.AreEqual(
+                "0A040801100F",
+                MineHex(new BclScalarContract { Duration = TimeSpan.Zero })
+            );
+            Assert.AreEqual(
+                "0A040801100F120508C8011004",
+                MineHex(new BclScalarContract { Duration = TimeSpan.FromMilliseconds(100) })
+            );
+            Assert.AreEqual(
+                "0A040801100F12050886031002",
+                MineHex(new BclScalarContract { Duration = TimeSpan.FromHours(3.25) })
+            );
+            Assert.AreEqual(
+                "0A040801100F",
+                MineHex(new BclScalarContract { Identifier = Guid.Empty })
+            );
+            Assert.AreEqual(
+                "0A040801100F220408051802",
+                MineHex(new BclScalarContract { Amount = 0.5m })
+            );
+            Assert.AreEqual(
+                "0A040801100F",
+                MineHex(new BclScalarContract { Amount = decimal.Negate(decimal.Zero) })
+            );
+        }
+
+        [Test]
+        public void ARepeatedBclMemberTakesTheLastOccurrence()
+        {
+            byte[] payload = Parse("0A0208020A021003");
+            BclScalarContract oracle;
+            using (MemoryStream stream = new MemoryStream(payload))
+            {
+                oracle = ProtoBuf.Serializer.Deserialize<BclScalarContract>(stream);
+            }
+
+            WProtoReader reader = new WProtoReader(payload);
+            Assert.IsTrue(
+                WProtoFormatterProvider
+                    .Get<BclScalarContract>()
+                    .TryRead(ref reader, out BclScalarContract restored)
+            );
+            Assert.AreEqual(new DateTime(WProtoBcl.EpochTicks), oracle.When);
+            Assert.AreEqual(oracle.When, restored.When);
+        }
+
+        [Test]
+        public void DateTimeKindFieldsMatchProtobufNetSemantics()
+        {
+            Assert.IsTrue(TryRead("1801", WProtoDateTimeFormatter.Instance, out DateTime utcEpoch));
+            Assert.AreEqual(new DateTime(WProtoBcl.EpochTicks, DateTimeKind.Utc), utcEpoch);
+
+            Assert.IsTrue(
+                TryRead("0801100F1801", WProtoDateTimeFormatter.Instance, out DateTime minimum)
+            );
+            Assert.AreEqual(DateTime.MinValue, minimum);
+            Assert.AreEqual(DateTimeKind.Unspecified, minimum.Kind);
+
+            Assert.IsTrue(TryRead("1802", WProtoTimeSpanFormatter.Instance, out TimeSpan zero));
+            Assert.AreEqual(TimeSpan.Zero, zero);
+
+            Assert.IsFalse(TryRead("1803", WProtoDateTimeFormatter.Instance, out DateTime _));
+            Assert.IsFalse(TryRead("1803", WProtoTimeSpanFormatter.Instance, out TimeSpan _));
+        }
+
+        [Test]
+        public void BclRootFormattersMatchProtobufNet()
+        {
+            AssertRootMatches(
+                new DateTime(2026, 1, 1),
+                WProtoDateTimeFormatter.Instance,
+                "0A0408CCBF02"
+            );
+            AssertRootMatches(
+                TimeSpan.FromHours(3),
+                WProtoTimeSpanFormatter.Instance,
+                "0A0408061001"
+            );
+            AssertRootMatches(
+                new Guid("12345678-1234-1234-1234-123456789abc"),
+                WProtoGuidFormatter.Instance,
+                "0A12097856341234123412111234123456789ABC"
+            );
+            AssertRootMatches(0.5m, WProtoDecimalFormatter.Instance, "0A0408051802");
+
+            // Root char zero is encoded, unlike an omitted default-valued member.
+            FacadeRootRoundTrips('A', "0841");
+            FacadeRootRoundTrips('\0', "0800");
+#if !PROTOBUF_NET_ORACLE_V2
+            FacadeRootRoundTrips(
+                new Uri("https://EXAMPLE.com/PaTh?q=1"),
+                "0A1C68747470733A2F2F4558414D504C452E636F6D2F506154683F713D31"
+            );
+            FacadeRootRoundTrips(
+                new Uri("/relative/path", UriKind.RelativeOrAbsolute),
+                "0A0E2F72656C61746976652F70617468"
+            );
+#endif
+
+            Assert.IsTrue(
+                WProtoFacade.TryDeserialize(Parse("0A0208020A021003"), out DateTime lastRootWins)
+            );
+            Assert.AreEqual(new DateTime(WProtoBcl.EpochTicks), lastRootWins);
+
+            Assert.IsTrue(
+                WProtoFacade.TryDeserialize(Parse("0A04080210030A00"), out DateTime emptyLastWins)
+            );
+            Assert.AreEqual(new DateTime(WProtoBcl.EpochTicks), emptyLastWins);
+        }
+
+        [Test]
+        public void BclMapKeysMatchProtobufNet()
+        {
+            DateTime date = new DateTime(2026, 1, 1);
+            TimeSpan duration = TimeSpan.FromHours(3);
+            Guid identifier = new Guid("12345678-1234-1234-1234-123456789abc");
+            const decimal amount = 0.5m;
+            BclKeyContract value = new BclKeyContract
+            {
+                ByDate = new Dictionary<DateTime, int> { { date, 7 } },
+                ByDuration = new Dictionary<TimeSpan, int> { { duration, 7 } },
+                ByIdentifier = new Dictionary<Guid, int> { { identifier, 7 } },
+                ByAmount = new Dictionary<decimal, int> { { amount, 7 } },
+                ByCode = new Dictionary<char, int> { { 'A', 7 }, { '\u00E9', 0 } },
+            };
+
+            string oracle = OracleHex(value);
+            Assert.AreEqual(oracle, MineHex(value));
+
+            WProtoReader reader = new WProtoReader(Parse(oracle));
+            Assert.IsTrue(
+                WProtoFormatterProvider
+                    .Get<BclKeyContract>()
+                    .TryRead(ref reader, out BclKeyContract restored)
+            );
+            Assert.AreEqual(7, restored.ByDate[date]);
+            Assert.AreEqual(7, restored.ByDuration[duration]);
+            Assert.AreEqual(7, restored.ByIdentifier[identifier]);
+            Assert.AreEqual(7, restored.ByAmount[amount]);
+            Assert.AreEqual(7, restored.ByCode['A']);
+            Assert.AreEqual(0, restored.ByCode['\u00E9']);
+        }
+
+        [Test]
+        public void MalformedBclPayloadsAreRefusedAndMismatchedFieldsAreSkippedCleanly()
+        {
+            Assert.IsFalse(
+                TryRead(
+                    "088080808080808080808000",
+                    WProtoDateTimeFormatter.Instance,
+                    out DateTime _
+                ),
+                "overlong DateTime varint"
+            );
+            Assert.IsFalse(
+                TryRead("1006", WProtoTimeSpanFormatter.Instance, out TimeSpan _),
+                "unknown TimeSpan scale"
+            );
+            Assert.IsFalse(
+                TryRead("0804100F", WProtoTimeSpanFormatter.Instance, out TimeSpan _),
+                "invalid MinMax sentinel"
+            );
+            Assert.IsFalse(
+                TryRead(
+                    "08FEFFFFFFFFFFFFFFFF011005",
+                    WProtoDateTimeFormatter.Instance,
+                    out DateTime _
+                ),
+                "DateTime tick overflow"
+            );
+            Assert.IsFalse(
+                TryRead("183A", WProtoDecimalFormatter.Instance, out decimal _),
+                "decimal scale above 28"
+            );
+            Assert.IsTrue(
+                TryRead("0D00000000", WProtoDateTimeFormatter.Instance, out DateTime mismatched),
+                "a valid field with the wrong wire type is an unknown field"
+            );
+            Assert.AreEqual(new DateTime(WProtoBcl.EpochTicks), mismatched);
+            Assert.IsFalse(
+                TryRead("0F", WProtoDateTimeFormatter.Instance, out DateTime _),
+                "invalid DateTime wire type"
+            );
+            Assert.IsFalse(
+                TryRead("090102", WProtoGuidFormatter.Instance, out Guid _),
+                "truncated Guid fixed64"
+            );
+            Assert.IsFalse(
+                TryRead("FFFE", WProtoUriFormatter.Instance, out Uri _),
+                "invalid UTF-8 inside a Uri region"
+            );
+            Assert.IsFalse(
+                TryRead("", WProtoUriFormatter.Instance, out Uri _),
+                "an empty Uri region refuses rather than manufacturing a value"
+            );
+            Assert.IsFalse(
+                TryRead(
+                    "68747470733A2F2F4558414D504C452E636F6D3AEFBFBD2F",
+                    WProtoUriFormatter.Instance,
+                    out Uri _
+                ),
+                "text that no Uri constructor accepts is refused, not defaulted"
+            );
+            Uri loneSurrogate = new Uri("/\ud800", UriKind.RelativeOrAbsolute);
+            int measured = WProtoUriFormatter.Instance.Measure(loneSurrogate);
+            WProtoWriter surrogateWriter = new WProtoWriter(new byte[64]);
+            Assert.IsTrue(
+                WProtoUriFormatter.Instance.Write(ref surrogateWriter, loneSurrogate),
+                "a lone surrogate must reach the wire as replacement bytes, not throw"
+            );
+            Assert.AreEqual(
+                measured,
+                surrogateWriter.Position,
+                "Measure must agree with Write for a lone surrogate, or every enclosing prefix lies"
+            );
+            Assert.AreEqual(
+                "2FEFBFBD",
+                ToHex(surrogateWriter.Written.ToArray()),
+                "the lone surrogate encodes as U+FFFD, matching every other string-shaped field"
+            );
+            Assert.Throws<InvalidOperationException>(
+                () => WProtoFacade.TryDeserialize(Parse("0A050801"), out DateTime _),
+                "the facade reports an owned malformed root with its documented exception"
+            );
         }
     }
 }

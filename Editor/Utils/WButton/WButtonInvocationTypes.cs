@@ -25,6 +25,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
     internal sealed class WButtonResultEntry
     {
+        internal WButtonResultKind Kind { get; }
+
+        internal DateTime Timestamp { get; }
+
+        internal object Value { get; }
+
+        internal string Summary { get; }
+
+        internal UnityEngine.Object ObjectReference { get; }
+
+        internal Exception Exception { get; }
+
         private string _cachedDisplayString;
 
         internal WButtonResultEntry(
@@ -43,18 +55,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             ObjectReference = objectReference;
             Exception = exception;
         }
-
-        internal WButtonResultKind Kind { get; }
-
-        internal DateTime Timestamp { get; }
-
-        internal object Value { get; }
-
-        internal string Summary { get; }
-
-        internal UnityEngine.Object ObjectReference { get; }
-
-        internal Exception Exception { get; }
 
         internal string GetDisplayString()
         {
@@ -79,22 +79,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
     internal sealed class WButtonInvocationHandle
     {
-        internal WButtonInvocationHandle(
-            WButtonMethodState methodState,
-            UnityEngine.Object target,
-            WButtonExecutionKind executionKind,
-            CancellationTokenSource cancellationTokenSource
-        )
-        {
-            MethodState = methodState;
-            Target = target;
-            ExecutionKind = executionKind;
-            CancellationTokenSource = cancellationTokenSource;
-            SupportsCancellation = cancellationTokenSource != null;
-            StartedAt = DateTime.UtcNow;
-            Status = WButtonInvocationStatus.Running;
-        }
-
         internal WButtonMethodState MethodState { get; }
 
         internal UnityEngine.Object Target { get; }
@@ -114,6 +98,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         internal DateTime StartedAt { get; }
 
         internal WButtonCoroutineTicket CoroutineTicket { get; set; }
+
+        internal WButtonInvocationHandle(
+            WButtonMethodState methodState,
+            UnityEngine.Object target,
+            WButtonExecutionKind executionKind,
+            CancellationTokenSource cancellationTokenSource
+        )
+        {
+            MethodState = methodState;
+            Target = target;
+            ExecutionKind = executionKind;
+            CancellationTokenSource = cancellationTokenSource;
+            SupportsCancellation = cancellationTokenSource != null;
+            StartedAt = DateTime.UtcNow;
+            Status = WButtonInvocationStatus.Running;
+        }
 
         internal void Cancel()
         {

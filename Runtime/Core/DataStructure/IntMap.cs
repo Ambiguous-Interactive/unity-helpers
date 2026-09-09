@@ -51,6 +51,59 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private const int EmptySlot = int.MinValue;
         private const int TombstoneSlot = int.MinValue + 1;
 
+        /// <summary>Gets how many live entries the map holds.</summary>
+        public int Count => _count;
+
+        /// <summary>Gets whether the map holds no entries.</summary>
+        public bool IsEmpty => _count == 0;
+
+        /// <summary>Gets the number of slots in the underlying table.</summary>
+        public int Capacity => _keys.Length;
+
+        /// <summary>
+        /// Gets the value stored under <paramref name="key"/>.
+        /// </summary>
+        /// <param name="key">The key.</param>
+        /// <exception cref="KeyNotFoundException">Thrown when the key is absent.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// Thrown when <paramref name="key"/> falls below <see cref="MinimumAllowedKey"/>.
+        /// </exception>
+        public TValue this[int key]
+        {
+            get
+            {
+                Validate(key);
+                int slot = FindSlot(key);
+                if (_keys[slot] == key)
+                {
+                    return _values[slot];
+                }
+
+                throw new KeyNotFoundException($"No value is stored under {key}.");
+            }
+            set => SetInternal(Validate(key), value);
+        }
+
+        /// <summary>Gets the stored keys, in table order.</summary>
+        /// <remarks>
+        /// Returns the concrete <see cref="KeyView"/> rather than <see cref="IEnumerable{T}"/> so
+        /// typed <c>foreach</c> binds the struct enumerator directly and allocates nothing; the
+        /// <c>IReadOnlyDictionary</c> surface reaches this same view through its explicit
+        /// interface implementation.
+        /// </remarks>
+        public KeyView Keys => new KeyView(this);
+
+        /// <summary>Gets the stored values, in table order.</summary>
+        /// <remarks>
+        /// Returns the concrete <see cref="ValueView"/> for the same reason <see cref="Keys"/>
+        /// does: typed <c>foreach</c> must reach the struct enumerator without boxing.
+        /// </remarks>
+        public ValueView Values => new ValueView(this);
+
+        IEnumerable<int> IReadOnlyDictionary<int, TValue>.Keys => Keys;
+
+        IEnumerable<TValue> IReadOnlyDictionary<int, TValue>.Values => Values;
+
         private int[] _keys;
         private TValue[] _values;
         private int _mask;
@@ -95,37 +148,36 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             Rebuild(power);
         }
 
-        /// <summary>Gets how many live entries the map holds.</summary>
-        public int Count => _count;
-
-        /// <summary>Gets whether the map holds no entries.</summary>
-        public bool IsEmpty => _count == 0;
-
-        /// <summary>Gets the number of slots in the underlying table.</summary>
-        public int Capacity => _keys.Length;
-
-        /// <summary>
-        /// Gets the value stored under <paramref name="key"/>.
-        /// </summary>
-        /// <param name="key">The key.</param>
-        /// <exception cref="KeyNotFoundException">Thrown when the key is absent.</exception>
-        /// <exception cref="ArgumentOutOfRangeException">
-        /// Thrown when <paramref name="key"/> falls below <see cref="MinimumAllowedKey"/>.
-        /// </exception>
-        public TValue this[int key]
+        private static uint Mix(int key)
         {
-            get
-            {
-                Validate(key);
-                int slot = FindSlot(key);
-                if (_keys[slot] == key)
-                {
-                    return _values[slot];
-                }
+            return unchecked((uint)key * KeyMultiplier);
+        }
 
-                throw new KeyNotFoundException($"No value is stored under {key}.");
+        private static int SmallestSufficientPower(int capacityHint)
+        {
+            // Bound the power-of-two search before a 32-bit shift can wrap.
+            int power = MinimumTablePower;
+            while (
+                power < MaximumTablePower
+                && 0 < (long)capacityHint
+                && (long)(1 << power) / 2 <= (long)capacityHint
+            )
+            {
+                ++power;
             }
-            set => SetInternal(Validate(key), value);
+
+            return power;
+        }
+
+        private static int PowerOf(int capacity)
+        {
+            int power = MinimumTablePower;
+            while (1 << power < capacity)
+            {
+                ++power;
+            }
+
+            return power;
         }
 
         /// <summary>
@@ -210,26 +262,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return true;
         }
 
-        /// <summary>Gets the stored keys, in table order.</summary>
-        /// <remarks>
-        /// Returns the concrete <see cref="KeyView"/> rather than <see cref="IEnumerable{T}"/> so
-        /// typed <c>foreach</c> binds the struct enumerator directly and allocates nothing; the
-        /// <c>IReadOnlyDictionary</c> surface reaches this same view through its explicit
-        /// interface implementation.
-        /// </remarks>
-        public KeyView Keys => new KeyView(this);
-
-        IEnumerable<int> IReadOnlyDictionary<int, TValue>.Keys => Keys;
-
-        /// <summary>Gets the stored values, in table order.</summary>
-        /// <remarks>
-        /// Returns the concrete <see cref="ValueView"/> for the same reason <see cref="Keys"/>
-        /// does: typed <c>foreach</c> must reach the struct enumerator without boxing.
-        /// </remarks>
-        public ValueView Values => new ValueView(this);
-
-        IEnumerable<TValue> IReadOnlyDictionary<int, TValue>.Values => Values;
-
         /// <summary>
         /// Reports whether <paramref name="key"/> is currently stored.
         /// </summary>
@@ -263,27 +295,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             ++_version;
         }
 
-        bool IReadOnlyDictionary<int, TValue>.TryGetValue(int key, out TValue value)
-        {
-            return TryGet(key, out value);
-        }
-
         /// <inheritdoc />
         public Enumerator GetEnumerator()
         {
             return new Enumerator(this);
-        }
-
-        IEnumerator<KeyValuePair<int, TValue>> IEnumerable<
-            KeyValuePair<int, TValue>
-        >.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
-
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
         }
 
         private void SetInternal(int key, TValue value)
@@ -439,41 +454,31 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return (slot + 1) & _mask;
         }
 
-        private static uint Mix(int key)
+        bool IReadOnlyDictionary<int, TValue>.TryGetValue(int key, out TValue value)
         {
-            return unchecked((uint)key * KeyMultiplier);
+            return TryGet(key, out value);
         }
 
-        private static int SmallestSufficientPower(int capacityHint)
+        IEnumerator<KeyValuePair<int, TValue>> IEnumerable<
+            KeyValuePair<int, TValue>
+        >.GetEnumerator()
         {
-            // Bound the power-of-two search before a 32-bit shift can wrap.
-            int power = MinimumTablePower;
-            while (
-                power < MaximumTablePower
-                && 0 < (long)capacityHint
-                && (long)(1 << power) / 2 <= (long)capacityHint
-            )
-            {
-                ++power;
-            }
-
-            return power;
+            return GetEnumerator();
         }
 
-        private static int PowerOf(int capacity)
+        IEnumerator IEnumerable.GetEnumerator()
         {
-            int power = MinimumTablePower;
-            while (1 << power < capacity)
-            {
-                ++power;
-            }
-
-            return power;
+            return GetEnumerator();
         }
 
         /// <summary>Enumerates live key-value pairs in table order.</summary>
         public struct Enumerator : IEnumerator<KeyValuePair<int, TValue>>
         {
+            /// <inheritdoc />
+            public KeyValuePair<int, TValue> Current => _current;
+
+            object IEnumerator.Current => _current;
+
             private readonly IntMap<TValue> _map;
             private readonly ulong _version;
             private int _slot;
@@ -486,11 +491,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 _slot = 0;
                 _current = default(KeyValuePair<int, TValue>);
             }
-
-            /// <inheritdoc />
-            public KeyValuePair<int, TValue> Current => _current;
-
-            object IEnumerator.Current => _current;
 
             /// <inheritdoc />
             public bool MoveNext()
@@ -595,6 +595,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <summary>Enumerates live keys; fails fast when the map changes mid-walk.</summary>
         public struct KeyEnumerator : IEnumerator<int>
         {
+            /// <inheritdoc />
+            public int Current => _current;
+
+            object IEnumerator.Current => _current;
+
             private readonly IntMap<TValue> _map;
             private readonly ulong _version;
             private int _slot;
@@ -607,11 +612,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 _slot = 0;
                 _current = 0;
             }
-
-            /// <inheritdoc />
-            public int Current => _current;
-
-            object IEnumerator.Current => _current;
 
             /// <inheritdoc />
             public bool MoveNext()
@@ -654,6 +654,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <summary>Enumerates live values; fails fast when the map changes mid-walk.</summary>
         public struct ValueEnumerator : IEnumerator<TValue>
         {
+            /// <inheritdoc />
+            public TValue Current => _current;
+
+            object IEnumerator.Current => _current;
+
             private readonly IntMap<TValue> _map;
             private readonly ulong _version;
             private int _slot;
@@ -666,11 +671,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 _slot = 0;
                 _current = default(TValue);
             }
-
-            /// <inheritdoc />
-            public TValue Current => _current;
-
-            object IEnumerator.Current => _current;
 
             /// <inheritdoc />
             public bool MoveNext()

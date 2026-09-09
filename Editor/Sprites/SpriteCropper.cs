@@ -54,6 +54,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private const string Name = "Sprite Cropper";
 
         private const string CroppedPrefix = "Cropped_";
+
+        private const float AlphaThreshold = 0.01f;
         private static readonly string[] ImageFileExtensions =
         {
             ".png",
@@ -65,7 +67,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             ".gif",
         };
 
-        private const float AlphaThreshold = 0.01f;
+        internal SerializedObject SerializedStateForTesting => _serializedObject;
 
         [SerializeField]
         internal List<Object> _inputDirectories = new();
@@ -120,176 +122,159 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private bool _ackDanger;
 
-        [MenuItem("Tools/Wallstop Studios/Unity Helpers/" + Name)]
-        private static void ShowWindow() => GetWindow<SpriteCropper>(Name);
-
-        internal SerializedObject SerializedStateForTesting => _serializedObject;
-
-        private void BindSerializedState()
+        /// <summary>
+        /// Computes the tight alpha-bounded crop rect (with padding) and the adjusted sprite
+        /// pivot for a source image. Pure: depends only on pixels + parameters, performs NO
+        /// AssetDatabase/importer I/O, so it is exercised by fast unit tests
+        /// (<c>SpriteCropperMathTests</c>) instead of full texture-import round-trips.
+        /// </summary>
+        internal static CropComputation ComputeCrop(
+            Color32[] pixels,
+            int width,
+            int height,
+            int leftPadding,
+            int rightPadding,
+            int topPadding,
+            int bottomPadding,
+            float alphaThreshold,
+            Vector2 origPivot,
+            bool onlyNecessary
+        )
         {
-            ReleaseSerializedState();
-            _serializedObject = new SerializedObject(this);
-            _inputDirectoriesProperty = _serializedObject.FindProperty(nameof(_inputDirectories));
-            _onlyNecessaryProperty = _serializedObject.FindProperty(nameof(_onlyNecessary));
-            _leftPaddingProperty = _serializedObject.FindProperty(nameof(_leftPadding));
-            _rightPaddingProperty = _serializedObject.FindProperty(nameof(_rightPadding));
-            _topPaddingProperty = _serializedObject.FindProperty(nameof(_topPadding));
-            _bottomPaddingProperty = _serializedObject.FindProperty(nameof(_bottomPadding));
-            _spriteNameRegexProperty = _serializedObject.FindProperty(nameof(_spriteNameRegex));
-            _overwriteOriginalsProperty = _serializedObject.FindProperty(
-                nameof(_overwriteOriginals)
-            );
-            _outputDirectoryProperty = _serializedObject.FindProperty(nameof(_outputDirectory));
-            _outputReadabilityProperty = _serializedObject.FindProperty(nameof(_outputReadability));
-            _copyDefaultPlatformSettingsProperty = _serializedObject.FindProperty(
-                nameof(_copyDefaultPlatformSettings)
-            );
-        }
-
-        private void ReleaseSerializedState()
-        {
-            _inputDirectoriesProperty = null;
-            _onlyNecessaryProperty = null;
-            _leftPaddingProperty = null;
-            _rightPaddingProperty = null;
-            _topPaddingProperty = null;
-            _bottomPaddingProperty = null;
-            _spriteNameRegexProperty = null;
-            _overwriteOriginalsProperty = null;
-            _outputDirectoryProperty = null;
-            _outputReadabilityProperty = null;
-            _copyDefaultPlatformSettingsProperty = null;
-            _serializedObject?.Dispose();
-            _serializedObject = null;
-        }
-
-        private void OnDisable()
-        {
-            ReleaseSerializedState();
-        }
-
-        private void OnEnable()
-        {
-            BindSerializedState();
-        }
-
-        private void OnGUI()
-        {
-            EditorGUILayout.LabelField("Input directories", EditorStyles.boldLabel);
-            if (_serializedObject == null)
-            {
-                BindSerializedState();
-            }
-
-            _serializedObject.Update();
-            PersistentDirectoryGUI.PathSelectorObjectArray(
-                _inputDirectoriesProperty,
-                nameof(SpriteCropper)
-            );
-            EditorGUILayout.PropertyField(_spriteNameRegexProperty, true);
-            EditorGUILayout.PropertyField(_onlyNecessaryProperty, true);
-            EditorGUILayout.PropertyField(_leftPaddingProperty, true);
-            EditorGUILayout.PropertyField(_rightPaddingProperty, true);
-            EditorGUILayout.PropertyField(_topPaddingProperty, true);
-            EditorGUILayout.PropertyField(_bottomPaddingProperty, true);
-            EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Output", EditorStyles.boldLabel);
-            EditorGUILayout.PropertyField(
-                _overwriteOriginalsProperty,
-                new GUIContent("Overwrite Originals")
-            );
-            using (new EditorGUI.DisabledScope(_overwriteOriginals))
-            {
-                EditorGUILayout.PropertyField(
-                    _outputDirectoryProperty,
-                    new GUIContent("Output Directory (optional)")
-                );
-            }
-            EditorGUILayout.PropertyField(
-                _outputReadabilityProperty,
-                new GUIContent("Output Readability")
-            );
-            EditorGUILayout.PropertyField(
-                _copyDefaultPlatformSettingsProperty,
-                new GUIContent("Copy Default Platform Settings")
-            );
-            _serializedObject.ApplyModifiedProperties();
-
-            _leftPadding = Mathf.Max(0, _leftPadding);
-            _rightPadding = Mathf.Max(0, _rightPadding);
-            _topPadding = Mathf.Max(0, _topPadding);
-            _bottomPadding = Mathf.Max(0, _bottomPadding);
-
-            if (GUILayout.Button("Find Sprites To Process"))
-            {
-                _regex = !string.IsNullOrWhiteSpace(_spriteNameRegex)
-                    ? new Regex(_spriteNameRegex)
-                    : null;
-                _multiSpriteFiles.Clear();
-                FindFilesToProcess();
-            }
-
-            if (_filesToProcess is { Count: > 0 })
-            {
-                GUILayout.Label(
-                    $"Found {_filesToProcess.Count} sprites to process.",
-                    EditorStyles.boldLabel
-                );
-                if (0 < _multiSpriteFiles.Count)
+            int minX = width;
+            int minY = height;
+            int maxX = 0;
+            int maxY = 0;
+            bool hasVisible = false;
+            object lockObject = new();
+            byte alphaByteThreshold = ColorQuantization.ToThresholdByte(alphaThreshold);
+            Parallel.For(
+                0,
+                width * height,
+                () => (minX: width, minY: height, maxX: 0, maxY: 0, hasVisible: false),
+                (index, _, localState) =>
                 {
-                    EditorGUILayout.HelpBox(
-                        $"Detected {_multiSpriteFiles.Count} textures with Sprite Import Mode = Multiple. SpriteCropper only supports Single sprites. These will be skipped.",
-                        MessageType.Warning
-                    );
-                    if (GUILayout.Button("Log details of Multiple-sprite textures"))
+                    int x = index % width;
+                    int y = index / width;
+
+                    byte a = pixels[index].a;
+                    if (alphaByteThreshold < a)
                     {
-                        foreach (string path in _multiSpriteFiles)
+                        localState.hasVisible = true;
+                        localState.minX = Mathf.Min(localState.minX, x);
+                        localState.minY = Mathf.Min(localState.minY, y);
+                        localState.maxX = Mathf.Max(localState.maxX, x);
+                        localState.maxY = Mathf.Max(localState.maxY, y);
+                    }
+                    return localState;
+                },
+                finalLocalState =>
+                {
+                    if (finalLocalState.hasVisible)
+                    {
+                        lock (lockObject)
                         {
-                            this.LogWarn($"Multiple-sprite texture detected (skipped): {path}");
+                            hasVisible = true;
+                            minX = Mathf.Min(minX, finalLocalState.minX);
+                            minY = Mathf.Min(minY, finalLocalState.minY);
+                            maxX = Mathf.Max(maxX, finalLocalState.maxX);
+                            maxY = Mathf.Max(maxY, finalLocalState.maxY);
                         }
                     }
                 }
-                if (GUILayout.Button($"Process {_filesToProcess.Count} Sprites"))
-                {
-                    ProcessFoundSprites();
-                    _filesToProcess = null;
-                }
-            }
-            else if (_filesToProcess != null)
+            );
+
+            int visibleMinX = minX;
+            int visibleMinY = minY;
+            int visibleMaxX = maxX;
+            int visibleMaxY = maxY;
+
+            if (hasVisible)
             {
-                GUILayout.Label(
-                    "No sprites found to process in the selected directories.",
-                    EditorStyles.label
-                );
+                visibleMinX -= leftPadding;
+                visibleMinY -= bottomPadding;
+                visibleMaxX += rightPadding;
+                visibleMaxY += topPadding;
+            }
+            else
+            {
+                visibleMinX = visibleMinY = 0;
+                visibleMaxX = visibleMaxY = 0;
             }
 
-            EditorGUILayout.Space();
+            int cropWidth = visibleMaxX - visibleMinX + 1;
+            int cropHeight = visibleMaxY - visibleMinY + 1;
 
-            using (new GUILayout.VerticalScope("box"))
+            bool shouldSkip =
+                onlyNecessary && (!hasVisible || (cropWidth == width && cropHeight == height));
+
+            Vector2 origCenter = new(width * origPivot.x, height * origPivot.y);
+            Vector2 newPivotPixels = origCenter - new Vector2(visibleMinX, visibleMinY);
+            Vector2 newPivotNorm = new(
+                0 < cropWidth ? newPivotPixels.x / cropWidth : 0.5f,
+                0 < cropHeight ? newPivotPixels.y / cropHeight : 0.5f
+            );
+
+            if (!hasVisible)
             {
-                Color prev = GUI.color;
-                GUI.color = Color.red;
-                GUILayout.Label(
-                    "Danger Zone: Replace references to originals with Cropped_* versions",
-                    EditorStyles.boldLabel
-                );
-                GUI.color = prev;
-                EditorGUILayout.HelpBox(
-                    "This will scan assets and replace Sprite references pointing to original textures with references to their Cropped_* counterparts. This is potentially destructive. Ensure you have backups/version control.",
-                    MessageType.Error
-                );
-                _ackDanger = EditorGUILayout.ToggleLeft(
-                    "I understand the risks and want to proceed.",
-                    _ackDanger
-                );
-                using (new EditorGUI.DisabledScope(!_ackDanger))
-                {
-                    if (GUILayout.Button("Replace Sprite References With Cropped_* Versions"))
-                    {
-                        ReplaceSpriteReferencesWithCropped();
-                    }
-                }
+                newPivotNorm = new Vector2(0.5f, 0.5f);
             }
+
+            return new CropComputation(
+                hasVisible,
+                shouldSkip,
+                visibleMinX,
+                visibleMinY,
+                visibleMaxX,
+                visibleMaxY,
+                cropWidth,
+                cropHeight,
+                newPivotNorm
+            );
+        }
+
+        [MenuItem("Tools/Wallstop Studios/Unity Helpers/" + Name)]
+        private static void ShowWindow() => GetWindow<SpriteCropper>(Name);
+
+        private static void CheckPreProcessNeeded(
+            string assetPath,
+            Dictionary<string, bool> originalReadable
+        )
+        {
+            string assetDirectory = Path.GetDirectoryName(assetPath);
+            if (string.IsNullOrWhiteSpace(assetDirectory))
+            {
+                return;
+            }
+
+            if (
+                AssetImporter.GetAtPath(assetPath)
+                is not TextureImporter { textureType: TextureImporterType.Sprite } importer
+            )
+            {
+                return;
+            }
+
+            if (!importer.isReadable)
+            {
+                originalReadable.TryAdd(assetPath, false);
+                importer.isReadable = true;
+                importer.SaveAndReimport();
+            }
+            else
+            {
+                originalReadable.TryAdd(assetPath, true);
+            }
+        }
+
+        private static Vector2 GetSpritePivot(TextureImporter importer)
+        {
+            if (importer.spriteImportMode == SpriteImportMode.Single)
+            {
+                return importer.spritePivot;
+            }
+
+            return new Vector2(0.5f, 0.5f);
         }
 
         internal void FindFilesToProcess()
@@ -350,171 +335,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
             Repaint();
-        }
-
-        private void ReplaceSpriteReferencesWithCropped()
-        {
-            try
-            {
-                Dictionary<Sprite, Sprite> mapping = new();
-                if (_inputDirectories is not { Count: > 0 })
-                {
-                    this.LogWarn(
-                        $"No input directories selected; cannot build replacement mapping."
-                    );
-                    return;
-                }
-
-                foreach (Object maybeDirectory in _inputDirectories.Where(d => d != null))
-                {
-                    string dirPath = AssetDatabase.GetAssetPath(maybeDirectory);
-                    if (!AssetDatabase.IsValidFolder(dirPath))
-                    {
-                        continue;
-                    }
-
-                    IEnumerable<string> files = Directory
-                        .GetFiles(dirPath, "*.*", SearchOption.AllDirectories)
-                        .Where(file =>
-                            Array.Exists(
-                                ImageFileExtensions,
-                                extension =>
-                                    file.EndsWith(extension, StringComparison.OrdinalIgnoreCase)
-                            )
-                        );
-
-                    foreach (string file in files)
-                    {
-                        if (file.Contains(CroppedPrefix, StringComparison.OrdinalIgnoreCase))
-                        {
-                            continue;
-                        }
-                        string croppedPath = Path.Combine(
-                            Path.GetDirectoryName(file) ?? string.Empty,
-                            CroppedPrefix + Path.GetFileName(file)
-                        );
-                        if (!File.Exists(croppedPath))
-                        {
-                            continue;
-                        }
-
-                        Sprite original = AssetDatabase.LoadAssetAtPath<Sprite>(file);
-                        Sprite cropped = AssetDatabase.LoadAssetAtPath<Sprite>(croppedPath);
-                        if (original != null && cropped != null)
-                        {
-                            mapping[original] = cropped;
-                        }
-                    }
-                }
-
-                if (mapping.Count == 0)
-                {
-                    this.LogWarn(
-                        $"No original→Cropped_* sprite pairs found. Aborting replacement."
-                    );
-                    return;
-                }
-
-                string[] allAssets = AssetDatabase.GetAllAssetPaths();
-                string[] candidateExts =
-                {
-                    ".prefab",
-                    ".unity",
-                    ".asset",
-                    ".mat",
-                    ".anim",
-                    ".overrideController",
-                };
-                int modifiedAssets = 0;
-
-                using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: true))
-                {
-                    try
-                    {
-                        for (int i = 0; i < allAssets.Length; ++i)
-                        {
-                            string path = allAssets[i];
-                            if (!path.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
-                            {
-                                continue;
-                            }
-                            if (
-                                !candidateExts.Any(ext =>
-                                    path.EndsWith(ext, StringComparison.OrdinalIgnoreCase)
-                                )
-                            )
-                            {
-                                continue;
-                            }
-
-                            if (
-                                Utils.EditorUi.CancelableProgress(
-                                    "Replacing Sprite References",
-                                    $"Scanning {i + 1}/{allAssets.Length}: {Path.GetFileName(path)}",
-                                    i / (float)allAssets.Length
-                                )
-                            )
-                            {
-                                this.LogWarn($"Reference replacement cancelled by user.");
-                                break;
-                            }
-
-                            bool assetModified = false;
-                            Object[] objs = AssetDatabase.LoadAllAssetsAtPath(path);
-                            foreach (Object o in objs)
-                            {
-                                if (o == null)
-                                {
-                                    continue;
-                                }
-                                bool objectModified = false;
-                                using SerializedObject so = new(o);
-                                SerializedProperty it = so.GetIterator();
-                                bool enter = true;
-                                while (it.NextVisible(enter))
-                                {
-                                    enter = false;
-                                    if (it.propertyType == SerializedPropertyType.ObjectReference)
-                                    {
-                                        Sprite s = it.objectReferenceValue as Sprite;
-                                        if (
-                                            s != null
-                                            && mapping.TryGetValue(s, out Sprite replacement)
-                                        )
-                                        {
-                                            it.objectReferenceValue = replacement;
-                                            objectModified = true;
-                                        }
-                                    }
-                                }
-                                if (objectModified)
-                                {
-                                    so.ApplyModifiedProperties();
-                                    EditorUtility.SetDirty(o);
-                                    assetModified = true;
-                                }
-                            }
-                            if (assetModified)
-                            {
-                                modifiedAssets++;
-                            }
-                        }
-                    }
-                    finally
-                    {
-                        Utils.EditorUi.ClearProgress();
-                        AssetDatabase.SaveAssets();
-                    }
-                }
-
-                this.Log(
-                    $"Reference replacement complete. Modified assets: {modifiedAssets}. Mapped pairs: {mapping.Count}."
-                );
-            }
-            catch (Exception e)
-            {
-                this.LogError($"Error during reference replacement.", e);
-            }
         }
 
         internal void ProcessFoundSprites()
@@ -714,146 +534,336 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
         }
 
-        private static void CheckPreProcessNeeded(
-            string assetPath,
-            Dictionary<string, bool> originalReadable
-        )
+        private void BindSerializedState()
         {
-            string assetDirectory = Path.GetDirectoryName(assetPath);
-            if (string.IsNullOrWhiteSpace(assetDirectory))
-            {
-                return;
-            }
-
-            if (
-                AssetImporter.GetAtPath(assetPath)
-                is not TextureImporter { textureType: TextureImporterType.Sprite } importer
-            )
-            {
-                return;
-            }
-
-            if (!importer.isReadable)
-            {
-                originalReadable.TryAdd(assetPath, false);
-                importer.isReadable = true;
-                importer.SaveAndReimport();
-            }
-            else
-            {
-                originalReadable.TryAdd(assetPath, true);
-            }
+            ReleaseSerializedState();
+            _serializedObject = new SerializedObject(this);
+            _inputDirectoriesProperty = _serializedObject.FindProperty(nameof(_inputDirectories));
+            _onlyNecessaryProperty = _serializedObject.FindProperty(nameof(_onlyNecessary));
+            _leftPaddingProperty = _serializedObject.FindProperty(nameof(_leftPadding));
+            _rightPaddingProperty = _serializedObject.FindProperty(nameof(_rightPadding));
+            _topPaddingProperty = _serializedObject.FindProperty(nameof(_topPadding));
+            _bottomPaddingProperty = _serializedObject.FindProperty(nameof(_bottomPadding));
+            _spriteNameRegexProperty = _serializedObject.FindProperty(nameof(_spriteNameRegex));
+            _overwriteOriginalsProperty = _serializedObject.FindProperty(
+                nameof(_overwriteOriginals)
+            );
+            _outputDirectoryProperty = _serializedObject.FindProperty(nameof(_outputDirectory));
+            _outputReadabilityProperty = _serializedObject.FindProperty(nameof(_outputReadability));
+            _copyDefaultPlatformSettingsProperty = _serializedObject.FindProperty(
+                nameof(_copyDefaultPlatformSettings)
+            );
         }
 
-        /// <summary>
-        /// Computes the tight alpha-bounded crop rect (with padding) and the adjusted sprite
-        /// pivot for a source image. Pure: depends only on pixels + parameters, performs NO
-        /// AssetDatabase/importer I/O, so it is exercised by fast unit tests
-        /// (<c>SpriteCropperMathTests</c>) instead of full texture-import round-trips.
-        /// </summary>
-        internal static CropComputation ComputeCrop(
-            Color32[] pixels,
-            int width,
-            int height,
-            int leftPadding,
-            int rightPadding,
-            int topPadding,
-            int bottomPadding,
-            float alphaThreshold,
-            Vector2 origPivot,
-            bool onlyNecessary
-        )
+        private void ReleaseSerializedState()
         {
-            int minX = width;
-            int minY = height;
-            int maxX = 0;
-            int maxY = 0;
-            bool hasVisible = false;
-            object lockObject = new();
-            byte alphaByteThreshold = ColorQuantization.ToThresholdByte(alphaThreshold);
-            Parallel.For(
-                0,
-                width * height,
-                () => (minX: width, minY: height, maxX: 0, maxY: 0, hasVisible: false),
-                (index, _, localState) =>
-                {
-                    int x = index % width;
-                    int y = index / width;
+            _inputDirectoriesProperty = null;
+            _onlyNecessaryProperty = null;
+            _leftPaddingProperty = null;
+            _rightPaddingProperty = null;
+            _topPaddingProperty = null;
+            _bottomPaddingProperty = null;
+            _spriteNameRegexProperty = null;
+            _overwriteOriginalsProperty = null;
+            _outputDirectoryProperty = null;
+            _outputReadabilityProperty = null;
+            _copyDefaultPlatformSettingsProperty = null;
+            _serializedObject?.Dispose();
+            _serializedObject = null;
+        }
 
-                    byte a = pixels[index].a;
-                    if (alphaByteThreshold < a)
-                    {
-                        localState.hasVisible = true;
-                        localState.minX = Mathf.Min(localState.minX, x);
-                        localState.minY = Mathf.Min(localState.minY, y);
-                        localState.maxX = Mathf.Max(localState.maxX, x);
-                        localState.maxY = Mathf.Max(localState.maxY, y);
-                    }
-                    return localState;
-                },
-                finalLocalState =>
+        private void OnDisable()
+        {
+            ReleaseSerializedState();
+        }
+
+        private void OnEnable()
+        {
+            BindSerializedState();
+        }
+
+        private void OnGUI()
+        {
+            EditorGUILayout.LabelField("Input directories", EditorStyles.boldLabel);
+            if (_serializedObject == null)
+            {
+                BindSerializedState();
+            }
+
+            _serializedObject.Update();
+            PersistentDirectoryGUI.PathSelectorObjectArray(
+                _inputDirectoriesProperty,
+                nameof(SpriteCropper)
+            );
+            EditorGUILayout.PropertyField(_spriteNameRegexProperty, true);
+            EditorGUILayout.PropertyField(_onlyNecessaryProperty, true);
+            EditorGUILayout.PropertyField(_leftPaddingProperty, true);
+            EditorGUILayout.PropertyField(_rightPaddingProperty, true);
+            EditorGUILayout.PropertyField(_topPaddingProperty, true);
+            EditorGUILayout.PropertyField(_bottomPaddingProperty, true);
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Output", EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(
+                _overwriteOriginalsProperty,
+                new GUIContent("Overwrite Originals")
+            );
+            using (new EditorGUI.DisabledScope(_overwriteOriginals))
+            {
+                EditorGUILayout.PropertyField(
+                    _outputDirectoryProperty,
+                    new GUIContent("Output Directory (optional)")
+                );
+            }
+            EditorGUILayout.PropertyField(
+                _outputReadabilityProperty,
+                new GUIContent("Output Readability")
+            );
+            EditorGUILayout.PropertyField(
+                _copyDefaultPlatformSettingsProperty,
+                new GUIContent("Copy Default Platform Settings")
+            );
+            _serializedObject.ApplyModifiedProperties();
+
+            _leftPadding = Mathf.Max(0, _leftPadding);
+            _rightPadding = Mathf.Max(0, _rightPadding);
+            _topPadding = Mathf.Max(0, _topPadding);
+            _bottomPadding = Mathf.Max(0, _bottomPadding);
+
+            if (GUILayout.Button("Find Sprites To Process"))
+            {
+                _regex = !string.IsNullOrWhiteSpace(_spriteNameRegex)
+                    ? new Regex(_spriteNameRegex)
+                    : null;
+                _multiSpriteFiles.Clear();
+                FindFilesToProcess();
+            }
+
+            if (_filesToProcess is { Count: > 0 })
+            {
+                GUILayout.Label(
+                    $"Found {_filesToProcess.Count} sprites to process.",
+                    EditorStyles.boldLabel
+                );
+                if (0 < _multiSpriteFiles.Count)
                 {
-                    if (finalLocalState.hasVisible)
+                    EditorGUILayout.HelpBox(
+                        $"Detected {_multiSpriteFiles.Count} textures with Sprite Import Mode = Multiple. SpriteCropper only supports Single sprites. These will be skipped.",
+                        MessageType.Warning
+                    );
+                    if (GUILayout.Button("Log details of Multiple-sprite textures"))
                     {
-                        lock (lockObject)
+                        foreach (string path in _multiSpriteFiles)
                         {
-                            hasVisible = true;
-                            minX = Mathf.Min(minX, finalLocalState.minX);
-                            minY = Mathf.Min(minY, finalLocalState.minY);
-                            maxX = Mathf.Max(maxX, finalLocalState.maxX);
-                            maxY = Mathf.Max(maxY, finalLocalState.maxY);
+                            this.LogWarn($"Multiple-sprite texture detected (skipped): {path}");
                         }
                     }
                 }
-            );
-
-            int visibleMinX = minX;
-            int visibleMinY = minY;
-            int visibleMaxX = maxX;
-            int visibleMaxY = maxY;
-
-            if (hasVisible)
-            {
-                visibleMinX -= leftPadding;
-                visibleMinY -= bottomPadding;
-                visibleMaxX += rightPadding;
-                visibleMaxY += topPadding;
+                if (GUILayout.Button($"Process {_filesToProcess.Count} Sprites"))
+                {
+                    ProcessFoundSprites();
+                    _filesToProcess = null;
+                }
             }
-            else
+            else if (_filesToProcess != null)
             {
-                visibleMinX = visibleMinY = 0;
-                visibleMaxX = visibleMaxY = 0;
+                GUILayout.Label(
+                    "No sprites found to process in the selected directories.",
+                    EditorStyles.label
+                );
             }
 
-            int cropWidth = visibleMaxX - visibleMinX + 1;
-            int cropHeight = visibleMaxY - visibleMinY + 1;
+            EditorGUILayout.Space();
 
-            bool shouldSkip =
-                onlyNecessary && (!hasVisible || (cropWidth == width && cropHeight == height));
-
-            Vector2 origCenter = new(width * origPivot.x, height * origPivot.y);
-            Vector2 newPivotPixels = origCenter - new Vector2(visibleMinX, visibleMinY);
-            Vector2 newPivotNorm = new(
-                0 < cropWidth ? newPivotPixels.x / cropWidth : 0.5f,
-                0 < cropHeight ? newPivotPixels.y / cropHeight : 0.5f
-            );
-
-            if (!hasVisible)
+            using (new GUILayout.VerticalScope("box"))
             {
-                newPivotNorm = new Vector2(0.5f, 0.5f);
+                Color prev = GUI.color;
+                GUI.color = Color.red;
+                GUILayout.Label(
+                    "Danger Zone: Replace references to originals with Cropped_* versions",
+                    EditorStyles.boldLabel
+                );
+                GUI.color = prev;
+                EditorGUILayout.HelpBox(
+                    "This will scan assets and replace Sprite references pointing to original textures with references to their Cropped_* counterparts. This is potentially destructive. Ensure you have backups/version control.",
+                    MessageType.Error
+                );
+                _ackDanger = EditorGUILayout.ToggleLeft(
+                    "I understand the risks and want to proceed.",
+                    _ackDanger
+                );
+                using (new EditorGUI.DisabledScope(!_ackDanger))
+                {
+                    if (GUILayout.Button("Replace Sprite References With Cropped_* Versions"))
+                    {
+                        ReplaceSpriteReferencesWithCropped();
+                    }
+                }
             }
+        }
 
-            return new CropComputation(
-                hasVisible,
-                shouldSkip,
-                visibleMinX,
-                visibleMinY,
-                visibleMaxX,
-                visibleMaxY,
-                cropWidth,
-                cropHeight,
-                newPivotNorm
-            );
+        private void ReplaceSpriteReferencesWithCropped()
+        {
+            try
+            {
+                Dictionary<Sprite, Sprite> mapping = new();
+                if (_inputDirectories is not { Count: > 0 })
+                {
+                    this.LogWarn(
+                        $"No input directories selected; cannot build replacement mapping."
+                    );
+                    return;
+                }
+
+                foreach (Object maybeDirectory in _inputDirectories.Where(d => d != null))
+                {
+                    string dirPath = AssetDatabase.GetAssetPath(maybeDirectory);
+                    if (!AssetDatabase.IsValidFolder(dirPath))
+                    {
+                        continue;
+                    }
+
+                    IEnumerable<string> files = Directory
+                        .GetFiles(dirPath, "*.*", SearchOption.AllDirectories)
+                        .Where(file =>
+                            Array.Exists(
+                                ImageFileExtensions,
+                                extension =>
+                                    file.EndsWith(extension, StringComparison.OrdinalIgnoreCase)
+                            )
+                        );
+
+                    foreach (string file in files)
+                    {
+                        if (file.Contains(CroppedPrefix, StringComparison.OrdinalIgnoreCase))
+                        {
+                            continue;
+                        }
+                        string croppedPath = Path.Combine(
+                            Path.GetDirectoryName(file) ?? string.Empty,
+                            CroppedPrefix + Path.GetFileName(file)
+                        );
+                        if (!File.Exists(croppedPath))
+                        {
+                            continue;
+                        }
+
+                        Sprite original = AssetDatabase.LoadAssetAtPath<Sprite>(file);
+                        Sprite cropped = AssetDatabase.LoadAssetAtPath<Sprite>(croppedPath);
+                        if (original != null && cropped != null)
+                        {
+                            mapping[original] = cropped;
+                        }
+                    }
+                }
+
+                if (mapping.Count == 0)
+                {
+                    this.LogWarn(
+                        $"No original→Cropped_* sprite pairs found. Aborting replacement."
+                    );
+                    return;
+                }
+
+                string[] allAssets = AssetDatabase.GetAllAssetPaths();
+                string[] candidateExts =
+                {
+                    ".prefab",
+                    ".unity",
+                    ".asset",
+                    ".mat",
+                    ".anim",
+                    ".overrideController",
+                };
+                int modifiedAssets = 0;
+
+                using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: true))
+                {
+                    try
+                    {
+                        for (int i = 0; i < allAssets.Length; ++i)
+                        {
+                            string path = allAssets[i];
+                            if (!path.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
+                            {
+                                continue;
+                            }
+                            if (
+                                !candidateExts.Any(ext =>
+                                    path.EndsWith(ext, StringComparison.OrdinalIgnoreCase)
+                                )
+                            )
+                            {
+                                continue;
+                            }
+
+                            if (
+                                Utils.EditorUi.CancelableProgress(
+                                    "Replacing Sprite References",
+                                    $"Scanning {i + 1}/{allAssets.Length}: {Path.GetFileName(path)}",
+                                    i / (float)allAssets.Length
+                                )
+                            )
+                            {
+                                this.LogWarn($"Reference replacement cancelled by user.");
+                                break;
+                            }
+
+                            bool assetModified = false;
+                            Object[] objs = AssetDatabase.LoadAllAssetsAtPath(path);
+                            foreach (Object o in objs)
+                            {
+                                if (o == null)
+                                {
+                                    continue;
+                                }
+                                bool objectModified = false;
+                                using SerializedObject so = new(o);
+                                SerializedProperty it = so.GetIterator();
+                                bool enter = true;
+                                while (it.NextVisible(enter))
+                                {
+                                    enter = false;
+                                    if (it.propertyType == SerializedPropertyType.ObjectReference)
+                                    {
+                                        Sprite s = it.objectReferenceValue as Sprite;
+                                        if (
+                                            s != null
+                                            && mapping.TryGetValue(s, out Sprite replacement)
+                                        )
+                                        {
+                                            it.objectReferenceValue = replacement;
+                                            objectModified = true;
+                                        }
+                                    }
+                                }
+                                if (objectModified)
+                                {
+                                    so.ApplyModifiedProperties();
+                                    EditorUtility.SetDirty(o);
+                                    assetModified = true;
+                                }
+                            }
+                            if (assetModified)
+                            {
+                                modifiedAssets++;
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        Utils.EditorUi.ClearProgress();
+                        AssetDatabase.SaveAssets();
+                    }
+                }
+
+                this.Log(
+                    $"Reference replacement complete. Modified assets: {modifiedAssets}. Mapped pairs: {mapping.Count}."
+                );
+            }
+            catch (Exception e)
+            {
+                this.LogError($"Error during reference replacement.", e);
+            }
         }
 
         private TextureImporter ProcessSprite(
@@ -1065,16 +1075,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             outcome = ProcessOutcome.Success;
             return newImporter;
-        }
-
-        private static Vector2 GetSpritePivot(TextureImporter importer)
-        {
-            if (importer.spriteImportMode == SpriteImportMode.Single)
-            {
-                return importer.spritePivot;
-            }
-
-            return new Vector2(0.5f, 0.5f);
         }
 
         internal enum OutputReadability

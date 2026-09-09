@@ -40,6 +40,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             new object[] { 0.999f, (byte)255 },
         };
 
+        private static int Bits(float value)
+        {
+            return System.BitConverter.SingleToInt32Bits(value);
+        }
+
+        private static float NextUp(float value)
+        {
+            int bits = System.BitConverter.ToInt32(System.BitConverter.GetBytes(value), 0);
+            bits = 0f <= value ? bits + 1 : bits - 1;
+            return System.BitConverter.ToSingle(System.BitConverter.GetBytes(bits), 0);
+        }
+
+        private static float NextDown(float value)
+        {
+            int bits = System.BitConverter.ToInt32(System.BitConverter.GetBytes(value), 0);
+            bits = 0f < value ? bits - 1 : bits + 1;
+            return System.BitConverter.ToSingle(System.BitConverter.GetBytes(bits), 0);
+        }
+
         [Test]
         [TestCaseSource(nameof(EncodeCases))]
         public void ToByteEncodesToNearestChannel(float normalized, byte expected)
@@ -210,25 +229,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(ColorQuantization.ToNormalized(226) <= cutoff);
             Assert.IsFalse(ColorQuantization.ToNormalized(227) <= cutoff);
             Assert.AreEqual(226, ColorQuantization.ToThresholdByte(cutoff));
-        }
-
-        private static int Bits(float value)
-        {
-            return System.BitConverter.SingleToInt32Bits(value);
-        }
-
-        private static float NextUp(float value)
-        {
-            int bits = System.BitConverter.ToInt32(System.BitConverter.GetBytes(value), 0);
-            bits = 0f <= value ? bits + 1 : bits - 1;
-            return System.BitConverter.ToSingle(System.BitConverter.GetBytes(bits), 0);
-        }
-
-        private static float NextDown(float value)
-        {
-            int bits = System.BitConverter.ToInt32(System.BitConverter.GetBytes(value), 0);
-            bits = 0f < value ? bits - 1 : bits + 1;
-            return System.BitConverter.ToSingle(System.BitConverter.GetBytes(bits), 0);
         }
 
         [Test]

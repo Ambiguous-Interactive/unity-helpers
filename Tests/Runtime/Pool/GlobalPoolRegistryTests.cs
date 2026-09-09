@@ -20,11 +20,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         private float _currentTime;
         private bool _wasMemoryPressureEnabled;
 
-        private float TestTimeProvider()
-        {
-            return _currentTime;
-        }
-
         [SetUp]
         public void SetUp()
         {
@@ -553,6 +548,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             GC.KeepAlive(livePool);
         }
 
+        private float TestTimeProvider()
+        {
+            return _currentTime;
+        }
+
 #if !SINGLE_THREADED
         [Test]
         public void EnforceBudgetThreadSafe()
@@ -620,6 +620,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         }
 #endif
 
+        /// <summary>
+        /// Forces collection of pools retained only by the registry's weak references and waits
+        /// (bounded) until <see cref="GlobalPoolRegistry.RegisteredCount"/> drops to
+        /// <paramref name="expectedAliveCount"/>. Returns true if it reached that count. Returns
+        /// false when the platform GC did not reclaim the orphaned pool(s) within the budget -- which
+        /// happens under a conservative GC and is not a product defect, so callers treat a false
+        /// result as inconclusive rather than failing.
+        /// </summary>
+        private static bool TryForceCollectOrphanPools(int expectedAliveCount)
+        {
+            for (int attempt = 0; attempt < 10; attempt++)
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                GC.Collect();
+
+                if (GlobalPoolRegistry.RegisteredCount <= expectedAliveCount)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private WallstopGenericPool<TestPoolItem> CreateTestPool(
             int preWarmCount = 0,
             int minRetainCount = 0
@@ -659,37 +684,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             GC.KeepAlive(pool);
         }
 
-        /// <summary>
-        /// Forces collection of pools retained only by the registry's weak references and waits
-        /// (bounded) until <see cref="GlobalPoolRegistry.RegisteredCount"/> drops to
-        /// <paramref name="expectedAliveCount"/>. Returns true if it reached that count. Returns
-        /// false when the platform GC did not reclaim the orphaned pool(s) within the budget -- which
-        /// happens under a conservative GC and is not a product defect, so callers treat a false
-        /// result as inconclusive rather than failing.
-        /// </summary>
-        private static bool TryForceCollectOrphanPools(int expectedAliveCount)
-        {
-            for (int attempt = 0; attempt < 10; attempt++)
-            {
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-                GC.Collect();
-
-                if (GlobalPoolRegistry.RegisteredCount <= expectedAliveCount)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
         private sealed class TestPoolItem
         {
+            private static int _nextId;
+
             public int Id { get; }
             public bool WasDisposed { get; set; }
-
-            private static int _nextId;
 
             public TestPoolItem()
             {

@@ -40,6 +40,40 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             IUnderlyingValueProvider
     {
         /// <summary>
+        /// Determines whether two fast vectors have identical components.
+        /// </summary>
+        /// <param name="lhs">The left-hand vector.</param>
+        /// <param name="rhs">The right-hand vector.</param>
+        /// <returns><c>true</c> when both vectors match.</returns>
+        /// <example>
+        /// <code>
+        /// bool matches = FastVector3Int.zero == new FastVector3Int(0, 0, 0);
+        /// </code>
+        /// </example>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool operator ==(FastVector3Int lhs, FastVector3Int rhs)
+        {
+            return lhs.Equals(rhs);
+        }
+
+        /// <summary>
+        /// Determines whether two fast vectors differ.
+        /// </summary>
+        /// <param name="lhs">The left-hand vector.</param>
+        /// <param name="rhs">The right-hand vector.</param>
+        /// <returns><c>true</c> when the vectors are not equal.</returns>
+        /// <example>
+        /// <code>
+        /// bool changed = current != previous;
+        /// </code>
+        /// </example>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool operator !=(FastVector3Int lhs, FastVector3Int rhs)
+        {
+            return !lhs.Equals(rhs);
+        }
+
+        /// <summary>
         /// Represents the origin vector <c>(0, 0, 0)</c>, useful as a default without allocating new instances.
         /// </summary>
         /// <example>
@@ -48,6 +82,42 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// </code>
         /// </example>
         public static readonly FastVector3Int zero = new(0, 0, 0);
+
+        // A default struct must hash like the origin; see FastVector2Int.OriginHash.
+        private static readonly int OriginHash = Objects.HashCode(0, 0, 0);
+
+        /// <summary>
+        /// Gets the stored X component.
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// int column = voxel.X;
+        /// </code>
+        /// </example>
+        [JsonPropertyName("x")]
+        public int X => x;
+
+        /// <summary>
+        /// Gets the stored Y component.
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// int row = voxel.Y;
+        /// </code>
+        /// </example>
+        [JsonPropertyName("y")]
+        public int Y => y;
+
+        /// <summary>
+        /// Gets the stored Z component.
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// int level = voxel.Z;
+        /// </code>
+        /// </example>
+        [JsonPropertyName("z")]
+        public int Z => z;
 
         [ProtoMember(1)]
         [JsonIgnore]
@@ -63,9 +133,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
         // Keep z at tag 4: legacy tag 3 held the derived hash.
         private readonly int _hash;
-
-        // A default struct must hash like the origin; see FastVector2Int.OriginHash.
-        private static readonly int OriginHash = Objects.HashCode(0, 0, 0);
 
         /// <summary>
         /// Initializes a fast vector with explicit components and a cached hash.
@@ -111,73 +178,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// </example>
         public FastVector3Int(int x, int y)
             : this(x, y, 0) { }
-
-        /// <summary>
-        /// Gets the stored X component.
-        /// </summary>
-        /// <example>
-        /// <code>
-        /// int column = voxel.X;
-        /// </code>
-        /// </example>
-        [JsonPropertyName("x")]
-        public int X => x;
-
-        /// <summary>
-        /// Gets the stored Y component.
-        /// </summary>
-        /// <example>
-        /// <code>
-        /// int row = voxel.Y;
-        /// </code>
-        /// </example>
-        [JsonPropertyName("y")]
-        public int Y => y;
-
-        /// <summary>
-        /// Gets the stored Z component.
-        /// </summary>
-        /// <example>
-        /// <code>
-        /// int level = voxel.Z;
-        /// </code>
-        /// </example>
-        [JsonPropertyName("z")]
-        public int Z => z;
-
-        /// <summary>
-        /// Determines whether two fast vectors have identical components.
-        /// </summary>
-        /// <param name="lhs">The left-hand vector.</param>
-        /// <param name="rhs">The right-hand vector.</param>
-        /// <returns><c>true</c> when both vectors match.</returns>
-        /// <example>
-        /// <code>
-        /// bool matches = FastVector3Int.zero == new FastVector3Int(0, 0, 0);
-        /// </code>
-        /// </example>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool operator ==(FastVector3Int lhs, FastVector3Int rhs)
-        {
-            return lhs.Equals(rhs);
-        }
-
-        /// <summary>
-        /// Determines whether two fast vectors differ.
-        /// </summary>
-        /// <param name="lhs">The left-hand vector.</param>
-        /// <param name="rhs">The right-hand vector.</param>
-        /// <returns><c>true</c> when the vectors are not equal.</returns>
-        /// <example>
-        /// <code>
-        /// bool changed = current != previous;
-        /// </code>
-        /// </example>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool operator !=(FastVector3Int lhs, FastVector3Int rhs)
-        {
-            return !lhs.Equals(rhs);
-        }
 
         /// <summary>
         /// Adds two fast vectors component-wise.
@@ -524,12 +524,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             return obj is FastVector3Int vector && Equals(vector);
         }
 
-        bool IUnderlyingValueProvider.TryGetUnderlyingValue(out object value)
-        {
-            value = (Vector3Int)this;
-            return true;
-        }
-
         /// <summary>
         /// Determines equality with a Unity <see cref="Vector3Int"/> instance.
         /// </summary>
@@ -732,6 +726,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         public Vector3 AsVector3()
         {
             return new Vector3(x, y, z);
+        }
+
+        bool IUnderlyingValueProvider.TryGetUnderlyingValue(out object value)
+        {
+            value = (Vector3Int)this;
+            return true;
         }
     }
 }

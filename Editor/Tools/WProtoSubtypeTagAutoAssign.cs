@@ -74,17 +74,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         private const string MenuPath =
             "Tools/Wallstop Studios/Unity Helpers/Assign WallstopProto Subtype Tags Automatically";
 
-        private static bool _scheduled;
-        private static bool _running;
-
-        static WProtoSubtypeTagAutoAssign()
-        {
-            // Both initialization paths are idempotent; neither event ordering needs to be assumed.
-            AssemblyReloadEvents.afterAssemblyReload += RunWhenSettled;
-            EditorApplication.playModeStateChanged += OnPlayModeChanged;
-            Schedule();
-        }
-
         /// <summary>
         /// Whether the automatic pass runs at all.
         /// </summary>
@@ -97,6 +86,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         {
             get => EditorPrefs.GetBool(EnabledKey, true);
             set => EditorPrefs.SetBool(EnabledKey, value);
+        }
+
+        private static bool _scheduled;
+        private static bool _running;
+
+        static WProtoSubtypeTagAutoAssign()
+        {
+            // Both initialization paths are idempotent; neither event ordering needs to be assumed.
+            AssemblyReloadEvents.afterAssemblyReload += RunWhenSettled;
+            EditorApplication.playModeStateChanged += OnPlayModeChanged;
+            Schedule();
         }
 
         [MenuItem(MenuPath, priority = 1)]

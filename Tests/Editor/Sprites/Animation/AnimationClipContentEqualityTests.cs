@@ -23,27 +23,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
     {
         private readonly List<Object> _toDestroy = new();
 
-        [TearDown]
-        public void TearDown()
-        {
-            foreach (Object obj in _toDestroy)
-            {
-                if (obj != null)
-                {
-                    Object.DestroyImmediate(obj); // UNH-SUPPRESS: EditMode teardown cleanup of tracked in-memory clips/textures
-                }
-            }
-
-            _toDestroy.Clear();
-        }
-
-        private AnimationClip NewClip(float frameRate = 60f)
-        {
-            AnimationClip clip = new() { frameRate = frameRate };
-            _toDestroy.Add(clip);
-            return clip;
-        }
-
         private static void SetFloatCurve(
             AnimationClip clip,
             string path,
@@ -72,6 +51,57 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         private static bool Equal(AnimationClip a, AnimationClip b)
         {
             return AnimationCopierWindow.AreAnimationClipsContentEqual(a, b);
+        }
+
+        private static void MutateSettingsField(ref AnimationClipSettings s, SettingsField field)
+        {
+            switch (field)
+            {
+                case SettingsField.LoopTime:
+                    s.loopTime = !s.loopTime;
+                    break;
+                case SettingsField.LoopBlend:
+                    s.loopBlend = !s.loopBlend;
+                    break;
+                case SettingsField.CycleOffset:
+                    s.cycleOffset += 0.5f;
+                    break;
+                case SettingsField.KeepOriginalOrientation:
+                    s.keepOriginalOrientation = !s.keepOriginalOrientation;
+                    break;
+                case SettingsField.KeepOriginalPositionXZ:
+                    s.keepOriginalPositionXZ = !s.keepOriginalPositionXZ;
+                    break;
+                case SettingsField.KeepOriginalPositionY:
+                    s.keepOriginalPositionY = !s.keepOriginalPositionY;
+                    break;
+                case SettingsField.HeightFromFeet:
+                    s.heightFromFeet = !s.heightFromFeet;
+                    break;
+                case SettingsField.Mirror:
+                    s.mirror = !s.mirror;
+                    break;
+                case SettingsField.StartTime:
+                    s.startTime += 0.5f;
+                    break;
+                case SettingsField.StopTime:
+                    s.stopTime += 0.5f;
+                    break;
+            }
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            foreach (Object obj in _toDestroy)
+            {
+                if (obj != null)
+                {
+                    Object.DestroyImmediate(obj); // UNH-SUPPRESS: EditMode teardown cleanup of tracked in-memory clips/textures
+                }
+            }
+
+            _toDestroy.Clear();
         }
 
         [Test]
@@ -238,43 +268,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             AnimationUtility.SetAnimationClipSettings(b, modified);
 
             Assert.IsFalse(Equal(a, b), $"Settings field {field} difference should be detected.");
-        }
-
-        private static void MutateSettingsField(ref AnimationClipSettings s, SettingsField field)
-        {
-            switch (field)
-            {
-                case SettingsField.LoopTime:
-                    s.loopTime = !s.loopTime;
-                    break;
-                case SettingsField.LoopBlend:
-                    s.loopBlend = !s.loopBlend;
-                    break;
-                case SettingsField.CycleOffset:
-                    s.cycleOffset += 0.5f;
-                    break;
-                case SettingsField.KeepOriginalOrientation:
-                    s.keepOriginalOrientation = !s.keepOriginalOrientation;
-                    break;
-                case SettingsField.KeepOriginalPositionXZ:
-                    s.keepOriginalPositionXZ = !s.keepOriginalPositionXZ;
-                    break;
-                case SettingsField.KeepOriginalPositionY:
-                    s.keepOriginalPositionY = !s.keepOriginalPositionY;
-                    break;
-                case SettingsField.HeightFromFeet:
-                    s.heightFromFeet = !s.heightFromFeet;
-                    break;
-                case SettingsField.Mirror:
-                    s.mirror = !s.mirror;
-                    break;
-                case SettingsField.StartTime:
-                    s.startTime += 0.5f;
-                    break;
-                case SettingsField.StopTime:
-                    s.stopTime += 0.5f;
-                    break;
-            }
         }
 
         /// <summary>
@@ -714,24 +707,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.IsFalse(Equal(a, b));
         }
 
-        private Texture2D NewTexture()
-        {
-            Texture2D tex = new(2, 2);
-            _toDestroy.Add(tex);
-            return tex;
-        }
-
-        private Sprite NewSprite()
-        {
-            Sprite sprite = Sprite.Create(
-                NewTexture(),
-                new Rect(0, 0, 2, 2),
-                new Vector2(0.5f, 0.5f)
-            );
-            _toDestroy.Add(sprite);
-            return sprite;
-        }
-
         [Test]
         public void DifferingSpriteKeyframeTimeIsDetected()
         {
@@ -829,6 +804,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 }
             );
             Assert.IsFalse(Equal(a, b));
+        }
+
+        private AnimationClip NewClip(float frameRate = 60f)
+        {
+            AnimationClip clip = new() { frameRate = frameRate };
+            _toDestroy.Add(clip);
+            return clip;
+        }
+
+        private Texture2D NewTexture()
+        {
+            Texture2D tex = new(2, 2);
+            _toDestroy.Add(tex);
+            return tex;
+        }
+
+        private Sprite NewSprite()
+        {
+            Sprite sprite = Sprite.Create(
+                NewTexture(),
+                new Rect(0, 0, 2, 2),
+                new Vector2(0.5f, 0.5f)
+            );
+            _toDestroy.Add(sprite);
+            return sprite;
         }
 
         public enum SettingsField

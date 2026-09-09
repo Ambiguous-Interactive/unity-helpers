@@ -38,6 +38,100 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [NUnit.Framework.Category("Serialization")]
     public sealed class WProtoIncludeParityTests
     {
+        private static Dictionary<Type, SortedDictionary<int, Type>> WallstopIncludes(
+            Assembly assembly
+        )
+        {
+            Dictionary<Type, SortedDictionary<int, Type>> byBase =
+                new Dictionary<Type, SortedDictionary<int, Type>>();
+
+            foreach (Type candidate in assembly.GetTypes())
+            {
+                foreach (
+                    WProtoIncludeAttribute include in candidate.GetCustomAttributes<WProtoIncludeAttribute>(
+                        false
+                    )
+                )
+                {
+                    Record(byBase, candidate, include.Tag, include.KnownType);
+                }
+
+                foreach (
+                    WProtoSubtypeAttribute subtype in candidate.GetCustomAttributes<WProtoSubtypeAttribute>(
+                        false
+                    )
+                )
+                {
+                    Record(byBase, subtype.BaseType, subtype.Tag, candidate);
+                }
+            }
+
+            return byBase;
+        }
+
+        private static void Record(
+            Dictionary<Type, SortedDictionary<int, Type>> byBase,
+            Type baseType,
+            int tag,
+            Type subtype
+        )
+        {
+            if (baseType == null)
+            {
+                return;
+            }
+
+            if (!byBase.TryGetValue(baseType, out SortedDictionary<int, Type> declared))
+            {
+                declared = new SortedDictionary<int, Type>();
+                byBase[baseType] = declared;
+            }
+
+            declared[tag] = subtype;
+        }
+
+        private static bool SameMap(
+            SortedDictionary<int, Type> left,
+            SortedDictionary<int, Type> right
+        )
+        {
+            if (left.Count != right.Count)
+            {
+                return false;
+            }
+
+            foreach (KeyValuePair<int, Type> entry in left)
+            {
+                if (!right.TryGetValue(entry.Key, out Type other) || other != entry.Value)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static string Describe(SortedDictionary<int, Type> map)
+        {
+            if (map.Count == 0)
+            {
+                return "nothing";
+            }
+
+            StringBuilder builder = new StringBuilder();
+            foreach (KeyValuePair<int, Type> entry in map)
+            {
+                if (0 < builder.Length)
+                {
+                    builder.Append(", ");
+                }
+
+                builder.Append(entry.Key).Append('=').Append(entry.Value.Name);
+            }
+
+            return builder.ToString();
+        }
+
         [Test]
         public void EveryProtoIncludeHasAWallstopProtoDeclarationUnderTheSameTag()
         {
@@ -133,100 +227,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 "These generators are not serializable through AbstractRandom: "
                     + string.Join(", ", undeclared)
             );
-        }
-
-        private static Dictionary<Type, SortedDictionary<int, Type>> WallstopIncludes(
-            Assembly assembly
-        )
-        {
-            Dictionary<Type, SortedDictionary<int, Type>> byBase =
-                new Dictionary<Type, SortedDictionary<int, Type>>();
-
-            foreach (Type candidate in assembly.GetTypes())
-            {
-                foreach (
-                    WProtoIncludeAttribute include in candidate.GetCustomAttributes<WProtoIncludeAttribute>(
-                        false
-                    )
-                )
-                {
-                    Record(byBase, candidate, include.Tag, include.KnownType);
-                }
-
-                foreach (
-                    WProtoSubtypeAttribute subtype in candidate.GetCustomAttributes<WProtoSubtypeAttribute>(
-                        false
-                    )
-                )
-                {
-                    Record(byBase, subtype.BaseType, subtype.Tag, candidate);
-                }
-            }
-
-            return byBase;
-        }
-
-        private static void Record(
-            Dictionary<Type, SortedDictionary<int, Type>> byBase,
-            Type baseType,
-            int tag,
-            Type subtype
-        )
-        {
-            if (baseType == null)
-            {
-                return;
-            }
-
-            if (!byBase.TryGetValue(baseType, out SortedDictionary<int, Type> declared))
-            {
-                declared = new SortedDictionary<int, Type>();
-                byBase[baseType] = declared;
-            }
-
-            declared[tag] = subtype;
-        }
-
-        private static bool SameMap(
-            SortedDictionary<int, Type> left,
-            SortedDictionary<int, Type> right
-        )
-        {
-            if (left.Count != right.Count)
-            {
-                return false;
-            }
-
-            foreach (KeyValuePair<int, Type> entry in left)
-            {
-                if (!right.TryGetValue(entry.Key, out Type other) || other != entry.Value)
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        private static string Describe(SortedDictionary<int, Type> map)
-        {
-            if (map.Count == 0)
-            {
-                return "nothing";
-            }
-
-            StringBuilder builder = new StringBuilder();
-            foreach (KeyValuePair<int, Type> entry in map)
-            {
-                if (0 < builder.Length)
-                {
-                    builder.Append(", ");
-                }
-
-                builder.Append(entry.Key).Append('=').Append(entry.Value.Name);
-            }
-
-            return builder.ToString();
         }
     }
 }

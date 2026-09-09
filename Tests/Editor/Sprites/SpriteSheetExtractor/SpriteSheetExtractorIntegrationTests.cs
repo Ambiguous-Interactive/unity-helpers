@@ -47,6 +47,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
     {
         private const string RootPath = "Assets/Temp/SpriteSheetExtractorIntegrationTests";
 
+        /// <inheritdoc />
+        protected override string Root => RootPath;
+
+        /// <inheritdoc />
+        protected override string OutputDir => RootPath + "/Output";
+
+        /// <inheritdoc />
+        protected override string SharedDir => SharedSpriteTestFixtures.GetSharedDirectory();
+
         /// <summary>
         /// Shared output directory created once per fixture for all tests.
         /// </summary>
@@ -61,85 +70,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         /// Tracks whether fixture-level batching has been started.
         /// </summary>
         private IDisposable _fixtureBatchScope;
-
-        /// <inheritdoc />
-        protected override string Root => RootPath;
-
-        /// <inheritdoc />
-        protected override string OutputDir => RootPath + "/Output";
-
-        /// <inheritdoc />
-        protected override string SharedDir => SharedSpriteTestFixtures.GetSharedDirectory();
-
-        [SetUp]
-        public override void BaseSetUp()
-        {
-            base.BaseSetUp();
-            if (Application.isPlaying)
-            {
-                Assert.Ignore("AssetDatabase access requires edit mode.");
-            }
-
-            // The test name gives isolation without AssetDatabase overhead.
-            string testName = TestContext.CurrentContext.Test.Name;
-
-            testName = SanitizeTestName(testName);
-            _testOutputDir = Path.Combine(_sharedOutputDir, testName).SanitizePath();
-
-            EnsureDirectoryWithinBatch(_testOutputDir);
-
-            SpriteSheetExtractor.SuppressUserPrompts = true;
-        }
-
-        /// <summary>
-        /// Creates a directory within a batch scope and ensures it is registered with the AssetDatabase.
-        /// </summary>
-        /// <remarks>
-        /// <para>
-        /// When fixture-level batching is active, AssetDatabase.Refresh() is ineffective because
-        /// StartAssetEditing() defers all refresh operations until StopAssetEditing() is called.
-        /// This method pauses the batch temporarily to allow the directory to be registered.
-        /// </para>
-        /// </remarks>
-        /// <param name="assetPath">The Unity relative path (e.g., "Assets/...") to the directory to create.</param>
-        /// <exception cref="AssertionException">Thrown if the directory cannot be verified via AssetDatabase.</exception>
-        private void EnsureDirectoryWithinBatch(string assetPath)
-        {
-            if (string.IsNullOrEmpty(assetPath))
-            {
-                throw new ArgumentNullException(nameof(assetPath));
-            }
-
-            // Pause fixture batching because StartAssetEditing defers refreshes and prevents folder registration.
-            using (AssetDatabaseBatchHelper.PauseBatch())
-            {
-                string fullPath = RelToFull(assetPath);
-                if (!Directory.Exists(fullPath))
-                {
-                    Directory.CreateDirectory(fullPath);
-                }
-
-                // A synchronous refresh works here only because the batch scope is paused above.
-                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
-
-                bool isValidFolder = AssetDatabase.IsValidFolder(assetPath);
-                bool existsOnDisk = Directory.Exists(fullPath);
-
-                if (!isValidFolder)
-                {
-                    StringBuilder diagnostics = new StringBuilder();
-                    diagnostics.AppendLine($"Directory verification failed for: {assetPath}");
-                    diagnostics.AppendLine($"  - Directory.Exists(fullPath): {existsOnDisk}");
-                    diagnostics.AppendLine($"  - Full path: {fullPath}");
-                    diagnostics.AppendLine($"  - AssetDatabase.IsValidFolder: {isValidFolder}");
-                    diagnostics.AppendLine(
-                        $"  - IsCurrentlyBatching: {AssetDatabaseBatchHelper.IsCurrentlyBatching}"
-                    );
-
-                    Assert.Fail(diagnostics.ToString());
-                }
-            }
-        }
 
         /// <summary>
         /// Sanitizes a test name for use as a directory name.
@@ -201,6 +131,59 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
             string guid = AssetDatabase.AssetPathToGUID(assetPath);
             return !string.IsNullOrEmpty(guid);
+        }
+
+        /// <summary>
+        /// Test case data for NPOT texture extraction tests.
+        /// </summary>
+        private static IEnumerable<TestCaseData> NpotTextureCases()
+        {
+            yield return new TestCaseData(100, 100, 2, 2, 4).SetName(
+                "NPOT.100x100.Grid2x2.Extracts4Sprites"
+            );
+            yield return new TestCaseData(100, 200, 2, 4, 8).SetName(
+                "NPOT.100x200.Grid2x4.Extracts8Sprites"
+            );
+            yield return new TestCaseData(150, 75, 3, 1, 3).SetName(
+                "NPOT.150x75.Grid3x1.Extracts3Sprites"
+            );
+            yield return new TestCaseData(127, 127, 1, 1, 1).SetName(
+                "NPOT.127x127Prime.Grid1x1.Extracts1Sprite"
+            );
+            yield return new TestCaseData(3, 3, 1, 1, 1).SetName(
+                "NPOT.3x3Minimal.Grid1x1.Extracts1Sprite"
+            );
+        }
+
+        /// <summary>
+        /// Tests extraction with different texture formats.
+        /// This verifies format compatibility.
+        /// </summary>
+        private static IEnumerable<TestCaseData> TextureFormatCases()
+        {
+            yield return new TestCaseData(TextureFormat.RGBA32).SetName("Format.RGBA32");
+            yield return new TestCaseData(TextureFormat.RGB24).SetName("Format.RGB24");
+            yield return new TestCaseData(TextureFormat.ARGB32).SetName("Format.ARGB32");
+        }
+
+        [SetUp]
+        public override void BaseSetUp()
+        {
+            base.BaseSetUp();
+            if (Application.isPlaying)
+            {
+                Assert.Ignore("AssetDatabase access requires edit mode.");
+            }
+
+            // The test name gives isolation without AssetDatabase overhead.
+            string testName = TestContext.CurrentContext.Test.Name;
+
+            testName = SanitizeTestName(testName);
+            _testOutputDir = Path.Combine(_sharedOutputDir, testName).SanitizePath();
+
+            EnsureDirectoryWithinBatch(_testOutputDir);
+
+            SpriteSheetExtractor.SuppressUserPrompts = true;
         }
 
         public override void CommonOneTimeSetUp()
@@ -859,28 +842,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         }
 
         /// <summary>
-        /// Test case data for NPOT texture extraction tests.
-        /// </summary>
-        private static IEnumerable<TestCaseData> NpotTextureCases()
-        {
-            yield return new TestCaseData(100, 100, 2, 2, 4).SetName(
-                "NPOT.100x100.Grid2x2.Extracts4Sprites"
-            );
-            yield return new TestCaseData(100, 200, 2, 4, 8).SetName(
-                "NPOT.100x200.Grid2x4.Extracts8Sprites"
-            );
-            yield return new TestCaseData(150, 75, 3, 1, 3).SetName(
-                "NPOT.150x75.Grid3x1.Extracts3Sprites"
-            );
-            yield return new TestCaseData(127, 127, 1, 1, 1).SetName(
-                "NPOT.127x127Prime.Grid1x1.Extracts1Sprite"
-            );
-            yield return new TestCaseData(3, 3, 1, 1, 1).SetName(
-                "NPOT.3x3Minimal.Grid1x1.Extracts1Sprite"
-            );
-        }
-
-        /// <summary>
         /// Tests that NPOT texture extraction works correctly with various non-power-of-two dimensions.
         /// This verifies handling of non-power-of-two dimensions and correct sprite sizing.
         /// </summary>
@@ -961,17 +922,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                     $"Extracted sprite height should be {expectedSpriteHeight}"
                 );
             });
-        }
-
-        /// <summary>
-        /// Tests extraction with different texture formats.
-        /// This verifies format compatibility.
-        /// </summary>
-        private static IEnumerable<TestCaseData> TextureFormatCases()
-        {
-            yield return new TestCaseData(TextureFormat.RGBA32).SetName("Format.RGBA32");
-            yield return new TestCaseData(TextureFormat.RGB24).SetName("Format.RGB24");
-            yield return new TestCaseData(TextureFormat.ARGB32).SetName("Format.ARGB32");
         }
 
         [Test]
@@ -1240,6 +1190,56 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 AssetDatabaseBatchHelper.IsCurrentlyBatching,
                 "Fixture-level batching should still be active after guard clause throws"
             );
+        }
+
+        /// <summary>
+        /// Creates a directory within a batch scope and ensures it is registered with the AssetDatabase.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// When fixture-level batching is active, AssetDatabase.Refresh() is ineffective because
+        /// StartAssetEditing() defers all refresh operations until StopAssetEditing() is called.
+        /// This method pauses the batch temporarily to allow the directory to be registered.
+        /// </para>
+        /// </remarks>
+        /// <param name="assetPath">The Unity relative path (e.g., "Assets/...") to the directory to create.</param>
+        /// <exception cref="AssertionException">Thrown if the directory cannot be verified via AssetDatabase.</exception>
+        private void EnsureDirectoryWithinBatch(string assetPath)
+        {
+            if (string.IsNullOrEmpty(assetPath))
+            {
+                throw new ArgumentNullException(nameof(assetPath));
+            }
+
+            // Pause fixture batching because StartAssetEditing defers refreshes and prevents folder registration.
+            using (AssetDatabaseBatchHelper.PauseBatch())
+            {
+                string fullPath = RelToFull(assetPath);
+                if (!Directory.Exists(fullPath))
+                {
+                    Directory.CreateDirectory(fullPath);
+                }
+
+                // A synchronous refresh works here only because the batch scope is paused above.
+                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+
+                bool isValidFolder = AssetDatabase.IsValidFolder(assetPath);
+                bool existsOnDisk = Directory.Exists(fullPath);
+
+                if (!isValidFolder)
+                {
+                    StringBuilder diagnostics = new StringBuilder();
+                    diagnostics.AppendLine($"Directory verification failed for: {assetPath}");
+                    diagnostics.AppendLine($"  - Directory.Exists(fullPath): {existsOnDisk}");
+                    diagnostics.AppendLine($"  - Full path: {fullPath}");
+                    diagnostics.AppendLine($"  - AssetDatabase.IsValidFolder: {isValidFolder}");
+                    diagnostics.AppendLine(
+                        $"  - IsCurrentlyBatching: {AssetDatabaseBatchHelper.IsCurrentlyBatching}"
+                    );
+
+                    Assert.Fail(diagnostics.ToString());
+                }
+            }
         }
     }
 #endif

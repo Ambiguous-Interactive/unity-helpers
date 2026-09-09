@@ -15,6 +15,42 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
     public static partial class IListExtensions
     {
+        private static (int leftEnd, int rightStart) SkaPartition<T, TComparer>(
+            T[] array,
+            int left,
+            int right,
+            T pivot,
+            TComparer comparer
+        )
+            where TComparer : IComparer<T>
+        {
+            int lt = left;
+            int i = left;
+            int gt = right;
+
+            while (i <= gt)
+            {
+                int compare = comparer.Compare(array[i], pivot);
+                if (compare < 0)
+                {
+                    SortSwap(array, i, lt);
+                    lt++;
+                    i++;
+                }
+                else if (0 < compare)
+                {
+                    SortSwap(array, i, gt);
+                    gt--;
+                }
+                else
+                {
+                    i++;
+                }
+            }
+
+            return (lt - 1, gt + 1);
+        }
+
         /// <summary>
         /// Sorts the list using Ska Sort, a branch-friendly dual-pivot quicksort inspired by Skarupke’s research.
         /// </summary>
@@ -118,42 +154,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             int d = left + step * 3;
             int e = right;
             return MedianOfFiveIndices(array, a, b, c, d, e, comparer);
-        }
-
-        private static (int leftEnd, int rightStart) SkaPartition<T, TComparer>(
-            T[] array,
-            int left,
-            int right,
-            T pivot,
-            TComparer comparer
-        )
-            where TComparer : IComparer<T>
-        {
-            int lt = left;
-            int i = left;
-            int gt = right;
-
-            while (i <= gt)
-            {
-                int compare = comparer.Compare(array[i], pivot);
-                if (compare < 0)
-                {
-                    SortSwap(array, i, lt);
-                    lt++;
-                    i++;
-                }
-                else if (0 < compare)
-                {
-                    SortSwap(array, i, gt);
-                    gt--;
-                }
-                else
-                {
-                    i++;
-                }
-            }
-
-            return (lt - 1, gt + 1);
         }
     }
 }

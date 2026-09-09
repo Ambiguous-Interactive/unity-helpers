@@ -39,16 +39,6 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// </remarks>
     internal readonly struct DisposalLease
     {
-        // Slot 0 is never handed out, so `default` reads as "not held" without a second field.
-        private readonly int _slot;
-        private readonly long _generation;
-
-        internal DisposalLease(int slot, long generation)
-        {
-            _slot = slot;
-            _generation = generation;
-        }
-
         /// <summary>
         /// True while this lease is still the current holder of its slot: not <c>default</c>, not
         /// yet claimed, and not superseded by a copy that claimed first.
@@ -71,6 +61,16 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => _slot;
+        }
+
+        // Slot 0 is never handed out, so `default` reads as "not held" without a second field.
+        private readonly int _slot;
+        private readonly long _generation;
+
+        internal DisposalLease(int slot, long generation)
+        {
+            _slot = slot;
+            _generation = generation;
         }
 
         /// <summary>

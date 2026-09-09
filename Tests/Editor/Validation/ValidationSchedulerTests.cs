@@ -25,6 +25,32 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     {
         private bool _sentinelEnabled;
 
+        private static ValidationRun EmptyRun()
+        {
+            return new ValidationRun(null, null, Never);
+        }
+
+        private static ValidationRun PendingRun()
+        {
+            return new ValidationRun(
+                new List<IValidationRule>(),
+                new List<ValidationTarget>
+                {
+                    new ValidationTarget(
+                        "00000000000000000000000000000001",
+                        "Assets/First.asset",
+                        typeof(ScriptableObject)
+                    ),
+                },
+                Never
+            );
+        }
+
+        private static Object Never(ValidationTarget target)
+        {
+            return null;
+        }
+
         [SetUp]
         public void EnableSentinel()
         {
@@ -307,38 +333,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             }
         }
 
-        private static ValidationRun EmptyRun()
-        {
-            return new ValidationRun(null, null, Never);
-        }
-
-        private static ValidationRun PendingRun()
-        {
-            return new ValidationRun(
-                new List<IValidationRule>(),
-                new List<ValidationTarget>
-                {
-                    new ValidationTarget(
-                        "00000000000000000000000000000001",
-                        "Assets/First.asset",
-                        typeof(ScriptableObject)
-                    ),
-                },
-                Never
-            );
-        }
-
-        private static Object Never(ValidationTarget target)
-        {
-            return null;
-        }
-
         private sealed class CallbackRule : IValidationRule
         {
-            public Func<bool> applies;
-            public Action validate;
             public string RuleId => nameof(CallbackRule);
             public string DisplayName => nameof(CallbackRule);
+
+            public Func<bool> applies;
+            public Action validate;
 
             public bool AppliesTo(in ValidationTarget target) => applies();
 
@@ -352,14 +353,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         /// <summary>Captures what was logged, and passes everything else through.</summary>
         private sealed class RecordingLogHandler : ILogHandler
         {
+            internal ILogHandler Inner { get; }
+
+            internal List<Exception> Exceptions { get; } = new List<Exception>();
+
             internal RecordingLogHandler(ILogHandler inner)
             {
                 Inner = inner;
             }
-
-            internal ILogHandler Inner { get; }
-
-            internal List<Exception> Exceptions { get; } = new List<Exception>();
 
             public void LogFormat(
                 LogType logType,

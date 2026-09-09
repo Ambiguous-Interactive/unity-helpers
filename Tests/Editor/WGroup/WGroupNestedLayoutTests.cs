@@ -24,31 +24,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
     {
         private UnityHelpersSettings.WGroupAutoIncludeConfiguration _previousConfiguration;
 
-        [SetUp]
-        public override void BaseSetUp()
-        {
-            base.BaseSetUp();
-            WGroupLayoutBuilder.ClearCache();
-
-            _previousConfiguration = UnityHelpersSettings.GetWGroupAutoIncludeConfiguration();
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
-                UnityHelpersSettings.WGroupAutoIncludeMode.None,
-                0
-            );
-        }
-
-        [TearDown]
-        public override void TearDown()
-        {
-            WGroupLayoutBuilder.ClearCache();
-
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
-                _previousConfiguration.Mode,
-                _previousConfiguration.RowCount
-            );
-            base.TearDown();
-        }
-
         /// <summary>
         /// Helper method to build a layout from a serialized object.
         /// </summary>
@@ -104,6 +79,31 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
             }
 
             return string.Join("\n", lines);
+        }
+
+        [SetUp]
+        public override void BaseSetUp()
+        {
+            base.BaseSetUp();
+            WGroupLayoutBuilder.ClearCache();
+
+            _previousConfiguration = UnityHelpersSettings.GetWGroupAutoIncludeConfiguration();
+            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+                UnityHelpersSettings.WGroupAutoIncludeMode.None,
+                0
+            );
+        }
+
+        [TearDown]
+        public override void TearDown()
+        {
+            WGroupLayoutBuilder.ClearCache();
+
+            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+                _previousConfiguration.Mode,
+                _previousConfiguration.RowCount
+            );
+            base.TearDown();
         }
 
         [Test]

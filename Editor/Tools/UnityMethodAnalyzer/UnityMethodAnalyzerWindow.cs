@@ -30,7 +30,78 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
     /// </summary>
     public sealed class UnityMethodAnalyzerWindow : EditorWindow
     {
+        private const float ToolbarHeight = 40f;
+        private const float FilterHeight = 50f;
+        private const float SummaryHeight = 30f;
+        private const float DetailPanelMinHeight = 150f;
+        private const float SplitterHeight = 4f;
+        private const float MinSourcePathsSectionHeight = 80f;
+        private const float MaxSourcePathsSectionHeight = 200f;
+        private const float NarrowLayoutThreshold = 700f;
+        private const float VeryNarrowLayoutThreshold = 500f;
+
         private static bool SuppressUserPrompts { get; set; }
+
+        private static readonly Color AnalyzeButtonColor = new(0.25f, 0.68f, 0.38f, 1f);
+        private static readonly Color CancelButtonColor = new(0.92f, 0.29f, 0.33f, 1f);
+        private static readonly Color DisabledButtonColor = new(0.5f, 0.5f, 0.5f, 1f);
+
+        private static readonly object MainThreadQueueLock = new();
+        private static readonly Queue<Action> MainThreadQueue = new();
+        private static bool _isUpdateSubscribed;
+
+        /// <summary>
+        /// Internal reference to the current analysis task for test synchronization.
+        /// Tests can await this task to know when the async analysis work is complete,
+        /// then call FlushMainThreadQueue() to process the completion callback.
+        /// </summary>
+        internal Task _analysisTask;
+
+        [SerializeField]
+        internal List<string> _sourcePaths = new();
+
+        internal bool _groupByFile = true;
+        internal bool _groupBySeverity;
+        internal bool _groupByCategory;
+
+        internal int _criticalCount;
+        internal int _highCount;
+        internal int _mediumCount;
+        internal int _lowCount;
+        internal int _infoCount;
+        internal int _totalCount;
+
+        internal MethodAnalyzer _analyzer;
+        internal bool _isAnalyzing;
+        internal float _analysisProgress;
+        internal string _statusMessage =
+            "Refresh compiler diagnostics, or recompile scripts to capture them.";
+        internal CancellationTokenSource _cancellationTokenSource;
+
+        /// <summary>
+        /// Internal TaskCompletionSource for tests to await analysis completion.
+        /// Set before StartAnalysis() to enable awaiting completion.
+        /// </summary>
+#pragma warning disable CS0649 // Field is never assigned to, and will always have its default value
+        internal TaskCompletionSource<bool> _analysisCompletionSource;
+        private IssueSeverity? _severityFilter;
+        private IssueCategory? _categoryFilter;
+        private string _searchFilter = string.Empty;
+
+        private float _detailPanelHeight = 200f;
+        private bool _isResizingDetailPanel;
+
+        [SerializeField]
+        private UnityMethodAnalyzerTreeViewState _treeViewState;
+
+        [SerializeField]
+        private bool _sourcePathsFoldout = true;
+
+        private Vector2 _sourcePathsScrollPosition;
+        private IssueTreeView _treeView;
+        private Vector2 _detailScrollPosition;
+
+        private AnalyzerIssue _selectedIssue;
 
         static UnityMethodAnalyzerWindow()
         {
@@ -42,6 +113,47 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 }
             }
             catch { }
+        }
+
+        [MenuItem("Tools/Wallstop Studios/Unity Helpers/Unity Method Analyzer")]
+        public static void ShowWindow()
+        {
+            UnityMethodAnalyzerWindow window = GetWindow<UnityMethodAnalyzerWindow>(
+                "Unity Method Analyzer"
+            );
+            window.minSize = new Vector2(450, 400);
+            window.Show();
+        }
+
+        /// <summary>
+        /// Forces processing of the main thread queue. This is useful in test scenarios
+        /// where EditorApplication.update may not be called reliably.
+        /// </summary>
+        internal static void FlushMainThreadQueue()
+        {
+            Action[] actionsToProcess;
+            lock (MainThreadQueueLock)
+            {
+                if (MainThreadQueue.Count == 0)
+                {
+                    return;
+                }
+
+                actionsToProcess = MainThreadQueue.ToArray();
+                MainThreadQueue.Clear();
+            }
+
+            foreach (Action action in actionsToProcess)
+            {
+                try
+                {
+                    action();
+                }
+                catch (Exception e)
+                {
+                    Debug.LogException(e);
+                }
+            }
         }
 
         private static bool IsInvokedByTestRunner()
@@ -61,84 +173,177 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
             return false;
         }
-
-        [SerializeField]
-        internal List<string> _sourcePaths = new();
-
-        [SerializeField]
-        private UnityMethodAnalyzerTreeViewState _treeViewState;
-
-        [SerializeField]
-        private bool _sourcePathsFoldout = true;
-
-        private Vector2 _sourcePathsScrollPosition;
-
-        internal MethodAnalyzer _analyzer;
-        private IssueTreeView _treeView;
-        private Vector2 _detailScrollPosition;
-
-        private AnalyzerIssue _selectedIssue;
-        internal bool _isAnalyzing;
-        internal float _analysisProgress;
-        internal string _statusMessage =
-            "Refresh compiler diagnostics, or recompile scripts to capture them.";
-        internal CancellationTokenSource _cancellationTokenSource;
-
-        /// <summary>
-        /// Internal TaskCompletionSource for tests to await analysis completion.
-        /// Set before StartAnalysis() to enable awaiting completion.
-        /// </summary>
-#pragma warning disable CS0649 // Field is never assigned to, and will always have its default value
-        internal TaskCompletionSource<bool> _analysisCompletionSource;
 #pragma warning restore CS0649 // Field is never assigned to, and will always have its default value
 
-        /// <summary>
-        /// Internal reference to the current analysis task for test synchronization.
-        /// Tests can await this task to know when the async analysis work is complete,
-        /// then call FlushMainThreadQueue() to process the completion callback.
-        /// </summary>
-        internal Task _analysisTask;
-
-        internal bool _groupByFile = true;
-        internal bool _groupBySeverity;
-        internal bool _groupByCategory;
-        private IssueSeverity? _severityFilter;
-        private IssueCategory? _categoryFilter;
-        private string _searchFilter = string.Empty;
-
-        internal int _criticalCount;
-        internal int _highCount;
-        internal int _mediumCount;
-        internal int _lowCount;
-        internal int _infoCount;
-        internal int _totalCount;
-
-        private const float ToolbarHeight = 40f;
-        private const float FilterHeight = 50f;
-        private const float SummaryHeight = 30f;
-        private const float DetailPanelMinHeight = 150f;
-        private const float SplitterHeight = 4f;
-        private const float MinSourcePathsSectionHeight = 80f;
-        private const float MaxSourcePathsSectionHeight = 200f;
-        private const float NarrowLayoutThreshold = 700f;
-        private const float VeryNarrowLayoutThreshold = 500f;
-
-        private float _detailPanelHeight = 200f;
-        private bool _isResizingDetailPanel;
-
-        [MenuItem("Tools/Wallstop Studios/Unity Helpers/Unity Method Analyzer")]
-        public static void ShowWindow()
+        private static string GetProjectRoot()
         {
-            UnityMethodAnalyzerWindow window = GetWindow<UnityMethodAnalyzerWindow>(
-                "Unity Method Analyzer"
-            );
-            window.minSize = new Vector2(450, 400);
-            window.Show();
+            return Path.GetDirectoryName(Application.dataPath) ?? Application.dataPath;
         }
 
-        private void OnEnable()
+        private static string GetSeverityDisplay(IssueSeverity severity)
         {
-            Initialize();
+            return severity switch
+            {
+                IssueSeverity.Critical => "🔴 Critical - Will definitely cause bugs",
+                IssueSeverity.High => "🟠 High - Very likely to cause bugs",
+                IssueSeverity.Medium => "🟡 Medium - May cause subtle bugs",
+                IssueSeverity.Low => "🟢 Low - Code smell or maintainability issue",
+                IssueSeverity.Info => "🔵 Info - Informational only",
+                _ => "Unknown",
+            };
+        }
+
+        private static string GetCategoryDisplay(IssueCategory category)
+        {
+            return category switch
+            {
+                IssueCategory.UnityLifecycle => "🎮 Unity Lifecycle",
+                IssueCategory.UnityInheritance => "🔷 Unity Inheritance",
+                IssueCategory.GeneralInheritance => "📦 General Inheritance",
+                _ => "Unknown",
+            };
+        }
+
+        /// <summary>
+        /// Enqueues an action to be executed on the main thread via EditorApplication.update.
+        /// This ensures async continuations are properly executed on the main thread in all scenarios,
+        /// including Unity Editor tests.
+        /// </summary>
+        private static void EnqueueOnMainThread(Action action)
+        {
+            if (action == null)
+            {
+                return;
+            }
+
+            lock (MainThreadQueueLock)
+            {
+                MainThreadQueue.Enqueue(action);
+                if (!_isUpdateSubscribed)
+                {
+                    EditorApplication.update += ProcessMainThreadQueue;
+                    _isUpdateSubscribed = true;
+                }
+            }
+        }
+
+        private static void ProcessMainThreadQueue()
+        {
+            Action[] actionsToProcess;
+            lock (MainThreadQueueLock)
+            {
+                if (MainThreadQueue.Count == 0)
+                {
+                    EditorApplication.update -= ProcessMainThreadQueue;
+                    _isUpdateSubscribed = false;
+                    return;
+                }
+
+                actionsToProcess = MainThreadQueue.ToArray();
+                MainThreadQueue.Clear();
+            }
+
+            foreach (Action action in actionsToProcess)
+            {
+                try
+                {
+                    action();
+                }
+                catch (Exception e)
+                {
+                    Debug.LogException(e);
+                }
+            }
+        }
+
+        private static string ConvertToAssetPath(string fullPath)
+        {
+            if (string.IsNullOrEmpty(fullPath))
+            {
+                return null;
+            }
+
+            string normalizedPath = fullPath.Replace('\\', '/');
+
+            string dataPath = Application.dataPath.Replace('\\', '/');
+            if (normalizedPath.StartsWith(dataPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return "Assets" + normalizedPath.Substring(dataPath.Length);
+            }
+
+            string projectRoot = Path.GetDirectoryName(Application.dataPath)?.Replace('\\', '/');
+            string packagesPath = projectRoot + "/Packages";
+
+            if (normalizedPath.StartsWith(packagesPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return "Packages" + normalizedPath.Substring(packagesPath.Length);
+            }
+
+            string packageCachePath = projectRoot + "/Library/PackageCache";
+            if (normalizedPath.StartsWith(packageCachePath, StringComparison.OrdinalIgnoreCase))
+            {
+                string afterCache = normalizedPath.Substring(packageCachePath.Length + 1);
+
+                int firstSlash = afterCache.IndexOf('/');
+                if (0 < firstSlash)
+                {
+                    string packageFolderName = afterCache.Substring(0, firstSlash);
+                    string pathInsidePackage = afterCache.Substring(firstSlash + 1);
+
+                    int atIndex = packageFolderName.IndexOf('@');
+                    string packageId =
+                        0 < atIndex ? packageFolderName.Substring(0, atIndex) : packageFolderName;
+                    return "Packages/" + packageId + "/" + pathInsidePackage;
+                }
+            }
+
+            const string packageCacheMarker = "Library/PackageCache/";
+            int cacheIndex = normalizedPath.IndexOf(
+                packageCacheMarker,
+                StringComparison.OrdinalIgnoreCase
+            );
+            if (0 <= cacheIndex)
+            {
+                string afterCache = normalizedPath.Substring(
+                    cacheIndex + packageCacheMarker.Length
+                );
+                int firstSlash = afterCache.IndexOf('/');
+                if (0 < firstSlash)
+                {
+                    string packageFolderName = afterCache.Substring(0, firstSlash);
+                    string pathInsidePackage = afterCache.Substring(firstSlash + 1);
+                    int atIndex = packageFolderName.IndexOf('@');
+                    string packageId =
+                        0 < atIndex ? packageFolderName.Substring(0, atIndex) : packageFolderName;
+                    return "Packages/" + packageId + "/" + pathInsidePackage;
+                }
+            }
+
+            int packagesIndex = normalizedPath.IndexOf(
+                "/Packages/",
+                StringComparison.OrdinalIgnoreCase
+            );
+            if (0 <= packagesIndex)
+            {
+                return normalizedPath.Substring(packagesIndex + 1);
+            }
+
+            string[] pathParts = normalizedPath.Split('/');
+            for (int i = 0; i < pathParts.Length; i++)
+            {
+                if (
+                    pathParts[i].Equals("Packages", StringComparison.OrdinalIgnoreCase)
+                    && i + 1 < pathParts.Length
+                )
+                {
+                    if (pathParts[i + 1].Contains('.'))
+                    {
+                        return string.Join("/", pathParts, i, pathParts.Length - i);
+                    }
+                }
+            }
+
+            return null;
         }
 
         /// <summary>
@@ -199,9 +404,169 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             }
         }
 
-        private static string GetProjectRoot()
+        internal void StartAnalysis()
         {
-            return Path.GetDirectoryName(Application.dataPath) ?? Application.dataPath;
+            if (_isAnalyzing)
+            {
+                return;
+            }
+
+            if (_analyzer == null)
+            {
+                _statusMessage = "Analyzer not initialized";
+                return;
+            }
+
+            _isAnalyzing = true;
+            _analysisProgress = 0f;
+            _statusMessage = "Analyzing...";
+            _selectedIssue = null;
+
+            _cancellationTokenSource?.Dispose();
+            _cancellationTokenSource = new CancellationTokenSource();
+
+            List<string> directories = new();
+            string rootPath = GetProjectRoot();
+
+            if (_sourcePaths != null)
+            {
+                foreach (string sourcePath in _sourcePaths)
+                {
+                    if (string.IsNullOrEmpty(sourcePath))
+                    {
+                        continue;
+                    }
+
+                    if (Directory.Exists(sourcePath))
+                    {
+                        directories.Add(sourcePath);
+                    }
+                }
+            }
+
+            if (directories.Count == 0)
+            {
+                _statusMessage = "No valid directories selected";
+                FinalizeAnalysis();
+                return;
+            }
+
+            Progress<float> progress = new(p =>
+            {
+                /*
+                    Guard against late progress updates after analysis has been reset.
+                    Progress<T> uses SynchronizationContext.Post() which can deliver callbacks
+                    after the analysis task completion callback has already run ResetAnalysisState().
+                */
+                if (_isAnalyzing)
+                {
+                    _analysisProgress = p;
+                }
+            });
+
+            CancellationToken token = _cancellationTokenSource.Token;
+
+            Task analysisTask = _analyzer.AnalyzeAsync(rootPath, directories, progress, token);
+            _analysisTask = analysisTask;
+
+            analysisTask.ContinueWith(
+                task =>
+                {
+                    EnqueueOnMainThread(() => HandleAnalysisCompletion(task));
+                },
+                CancellationToken.None,
+                TaskContinuationOptions.None,
+                TaskScheduler.Default
+            );
+        }
+
+        internal void CancelAnalysis()
+        {
+            CancellationTokenSource cts = _cancellationTokenSource;
+            if (cts == null)
+            {
+                return;
+            }
+
+            try
+            {
+                if (!cts.IsCancellationRequested)
+                {
+                    cts.Cancel();
+                }
+            }
+            catch (ObjectDisposedException)
+            {
+                /*
+                    CTS was already disposed, which means the analysis has completed
+                    or was already cancelled. Safe to ignore.
+                */
+            }
+
+            /*
+                Immediately reset state since the ContinueWith callback may not execute
+                promptly in certain scenarios. The HandleAnalysisCompletion will also
+                call FinalizeAnalysis, but calling it here ensures immediate responsiveness.
+                FinalizeAnalysis is idempotent via TrySetResult, so multiple calls are safe.
+            */
+            _statusMessage = "Analysis cancelled";
+            FinalizeAnalysis();
+        }
+
+        /// <summary>
+        /// Resets the analysis state and UI to allow new analysis.
+        /// Called after analysis completes, fails, or is cancelled.
+        /// </summary>
+        internal void ResetAnalysisState()
+        {
+            _isAnalyzing = false;
+            _analysisProgress = 0f;
+            Repaint();
+        }
+
+        internal void UpdateIssueCounts()
+        {
+            IReadOnlyList<AnalyzerIssue> issues = _analyzer.Issues;
+            _totalCount = issues.Count;
+
+            int criticalCount = 0;
+            int highCount = 0;
+            int mediumCount = 0;
+            int lowCount = 0;
+            int infoCount = 0;
+
+            foreach (AnalyzerIssue issue in issues)
+            {
+                switch (issue.Severity)
+                {
+                    case IssueSeverity.Critical:
+                        criticalCount++;
+                        break;
+                    case IssueSeverity.High:
+                        highCount++;
+                        break;
+                    case IssueSeverity.Medium:
+                        mediumCount++;
+                        break;
+                    case IssueSeverity.Low:
+                        lowCount++;
+                        break;
+                    case IssueSeverity.Info:
+                        infoCount++;
+                        break;
+                }
+            }
+
+            _criticalCount = criticalCount;
+            _highCount = highCount;
+            _mediumCount = mediumCount;
+            _lowCount = lowCount;
+            _infoCount = infoCount;
+        }
+
+        private void OnEnable()
+        {
+            Initialize();
         }
 
         private void OnGUI()
@@ -361,10 +726,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
             return sectionHeight + 4f;
         }
-
-        private static readonly Color AnalyzeButtonColor = new(0.25f, 0.68f, 0.38f, 1f);
-        private static readonly Color CancelButtonColor = new(0.92f, 0.29f, 0.33f, 1f);
-        private static readonly Color DisabledButtonColor = new(0.5f, 0.5f, 0.5f, 1f);
 
         private void DrawToolbar(bool isNarrowLayout)
         {
@@ -886,106 +1247,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             GUILayout.EndVertical();
         }
 
-        private static string GetSeverityDisplay(IssueSeverity severity)
-        {
-            return severity switch
-            {
-                IssueSeverity.Critical => "🔴 Critical - Will definitely cause bugs",
-                IssueSeverity.High => "🟠 High - Very likely to cause bugs",
-                IssueSeverity.Medium => "🟡 Medium - May cause subtle bugs",
-                IssueSeverity.Low => "🟢 Low - Code smell or maintainability issue",
-                IssueSeverity.Info => "🔵 Info - Informational only",
-                _ => "Unknown",
-            };
-        }
-
-        private static string GetCategoryDisplay(IssueCategory category)
-        {
-            return category switch
-            {
-                IssueCategory.UnityLifecycle => "🎮 Unity Lifecycle",
-                IssueCategory.UnityInheritance => "🔷 Unity Inheritance",
-                IssueCategory.GeneralInheritance => "📦 General Inheritance",
-                _ => "Unknown",
-            };
-        }
-
-        internal void StartAnalysis()
-        {
-            if (_isAnalyzing)
-            {
-                return;
-            }
-
-            if (_analyzer == null)
-            {
-                _statusMessage = "Analyzer not initialized";
-                return;
-            }
-
-            _isAnalyzing = true;
-            _analysisProgress = 0f;
-            _statusMessage = "Analyzing...";
-            _selectedIssue = null;
-
-            _cancellationTokenSource?.Dispose();
-            _cancellationTokenSource = new CancellationTokenSource();
-
-            List<string> directories = new();
-            string rootPath = GetProjectRoot();
-
-            if (_sourcePaths != null)
-            {
-                foreach (string sourcePath in _sourcePaths)
-                {
-                    if (string.IsNullOrEmpty(sourcePath))
-                    {
-                        continue;
-                    }
-
-                    if (Directory.Exists(sourcePath))
-                    {
-                        directories.Add(sourcePath);
-                    }
-                }
-            }
-
-            if (directories.Count == 0)
-            {
-                _statusMessage = "No valid directories selected";
-                FinalizeAnalysis();
-                return;
-            }
-
-            Progress<float> progress = new(p =>
-            {
-                /*
-                    Guard against late progress updates after analysis has been reset.
-                    Progress<T> uses SynchronizationContext.Post() which can deliver callbacks
-                    after the analysis task completion callback has already run ResetAnalysisState().
-                */
-                if (_isAnalyzing)
-                {
-                    _analysisProgress = p;
-                }
-            });
-
-            CancellationToken token = _cancellationTokenSource.Token;
-
-            Task analysisTask = _analyzer.AnalyzeAsync(rootPath, directories, progress, token);
-            _analysisTask = analysisTask;
-
-            analysisTask.ContinueWith(
-                task =>
-                {
-                    EnqueueOnMainThread(() => HandleAnalysisCompletion(task));
-                },
-                CancellationToken.None,
-                TaskContinuationOptions.None,
-                TaskScheduler.Default
-            );
-        }
-
         /// <summary>
         /// Handles the completion of the analysis task on the main thread.
         /// </summary>
@@ -1033,177 +1294,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             ResetAnalysisState();
 
             _analysisCompletionSource?.TrySetResult(true);
-        }
-
-        private static readonly object MainThreadQueueLock = new();
-        private static readonly Queue<Action> MainThreadQueue = new();
-        private static bool _isUpdateSubscribed;
-
-        /// <summary>
-        /// Enqueues an action to be executed on the main thread via EditorApplication.update.
-        /// This ensures async continuations are properly executed on the main thread in all scenarios,
-        /// including Unity Editor tests.
-        /// </summary>
-        private static void EnqueueOnMainThread(Action action)
-        {
-            if (action == null)
-            {
-                return;
-            }
-
-            lock (MainThreadQueueLock)
-            {
-                MainThreadQueue.Enqueue(action);
-                if (!_isUpdateSubscribed)
-                {
-                    EditorApplication.update += ProcessMainThreadQueue;
-                    _isUpdateSubscribed = true;
-                }
-            }
-        }
-
-        private static void ProcessMainThreadQueue()
-        {
-            Action[] actionsToProcess;
-            lock (MainThreadQueueLock)
-            {
-                if (MainThreadQueue.Count == 0)
-                {
-                    EditorApplication.update -= ProcessMainThreadQueue;
-                    _isUpdateSubscribed = false;
-                    return;
-                }
-
-                actionsToProcess = MainThreadQueue.ToArray();
-                MainThreadQueue.Clear();
-            }
-
-            foreach (Action action in actionsToProcess)
-            {
-                try
-                {
-                    action();
-                }
-                catch (Exception e)
-                {
-                    Debug.LogException(e);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Forces processing of the main thread queue. This is useful in test scenarios
-        /// where EditorApplication.update may not be called reliably.
-        /// </summary>
-        internal static void FlushMainThreadQueue()
-        {
-            Action[] actionsToProcess;
-            lock (MainThreadQueueLock)
-            {
-                if (MainThreadQueue.Count == 0)
-                {
-                    return;
-                }
-
-                actionsToProcess = MainThreadQueue.ToArray();
-                MainThreadQueue.Clear();
-            }
-
-            foreach (Action action in actionsToProcess)
-            {
-                try
-                {
-                    action();
-                }
-                catch (Exception e)
-                {
-                    Debug.LogException(e);
-                }
-            }
-        }
-
-        internal void CancelAnalysis()
-        {
-            CancellationTokenSource cts = _cancellationTokenSource;
-            if (cts == null)
-            {
-                return;
-            }
-
-            try
-            {
-                if (!cts.IsCancellationRequested)
-                {
-                    cts.Cancel();
-                }
-            }
-            catch (ObjectDisposedException)
-            {
-                /*
-                    CTS was already disposed, which means the analysis has completed
-                    or was already cancelled. Safe to ignore.
-                */
-            }
-
-            /*
-                Immediately reset state since the ContinueWith callback may not execute
-                promptly in certain scenarios. The HandleAnalysisCompletion will also
-                call FinalizeAnalysis, but calling it here ensures immediate responsiveness.
-                FinalizeAnalysis is idempotent via TrySetResult, so multiple calls are safe.
-            */
-            _statusMessage = "Analysis cancelled";
-            FinalizeAnalysis();
-        }
-
-        /// <summary>
-        /// Resets the analysis state and UI to allow new analysis.
-        /// Called after analysis completes, fails, or is cancelled.
-        /// </summary>
-        internal void ResetAnalysisState()
-        {
-            _isAnalyzing = false;
-            _analysisProgress = 0f;
-            Repaint();
-        }
-
-        internal void UpdateIssueCounts()
-        {
-            IReadOnlyList<AnalyzerIssue> issues = _analyzer.Issues;
-            _totalCount = issues.Count;
-
-            int criticalCount = 0;
-            int highCount = 0;
-            int mediumCount = 0;
-            int lowCount = 0;
-            int infoCount = 0;
-
-            foreach (AnalyzerIssue issue in issues)
-            {
-                switch (issue.Severity)
-                {
-                    case IssueSeverity.Critical:
-                        criticalCount++;
-                        break;
-                    case IssueSeverity.High:
-                        highCount++;
-                        break;
-                    case IssueSeverity.Medium:
-                        mediumCount++;
-                        break;
-                    case IssueSeverity.Low:
-                        lowCount++;
-                        break;
-                    case IssueSeverity.Info:
-                        infoCount++;
-                        break;
-                }
-            }
-
-            _criticalCount = criticalCount;
-            _highCount = highCount;
-            _mediumCount = mediumCount;
-            _lowCount = lowCount;
-            _infoCount = infoCount;
         }
 
         private void UpdateTreeViewGrouping()
@@ -1280,96 +1370,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             {
                 this.LogWarn($"Could not find file: {filePath}");
             }
-        }
-
-        private static string ConvertToAssetPath(string fullPath)
-        {
-            if (string.IsNullOrEmpty(fullPath))
-            {
-                return null;
-            }
-
-            string normalizedPath = fullPath.Replace('\\', '/');
-
-            string dataPath = Application.dataPath.Replace('\\', '/');
-            if (normalizedPath.StartsWith(dataPath, StringComparison.OrdinalIgnoreCase))
-            {
-                return "Assets" + normalizedPath.Substring(dataPath.Length);
-            }
-
-            string projectRoot = Path.GetDirectoryName(Application.dataPath)?.Replace('\\', '/');
-            string packagesPath = projectRoot + "/Packages";
-
-            if (normalizedPath.StartsWith(packagesPath, StringComparison.OrdinalIgnoreCase))
-            {
-                return "Packages" + normalizedPath.Substring(packagesPath.Length);
-            }
-
-            string packageCachePath = projectRoot + "/Library/PackageCache";
-            if (normalizedPath.StartsWith(packageCachePath, StringComparison.OrdinalIgnoreCase))
-            {
-                string afterCache = normalizedPath.Substring(packageCachePath.Length + 1);
-
-                int firstSlash = afterCache.IndexOf('/');
-                if (0 < firstSlash)
-                {
-                    string packageFolderName = afterCache.Substring(0, firstSlash);
-                    string pathInsidePackage = afterCache.Substring(firstSlash + 1);
-
-                    int atIndex = packageFolderName.IndexOf('@');
-                    string packageId =
-                        0 < atIndex ? packageFolderName.Substring(0, atIndex) : packageFolderName;
-                    return "Packages/" + packageId + "/" + pathInsidePackage;
-                }
-            }
-
-            const string packageCacheMarker = "Library/PackageCache/";
-            int cacheIndex = normalizedPath.IndexOf(
-                packageCacheMarker,
-                StringComparison.OrdinalIgnoreCase
-            );
-            if (0 <= cacheIndex)
-            {
-                string afterCache = normalizedPath.Substring(
-                    cacheIndex + packageCacheMarker.Length
-                );
-                int firstSlash = afterCache.IndexOf('/');
-                if (0 < firstSlash)
-                {
-                    string packageFolderName = afterCache.Substring(0, firstSlash);
-                    string pathInsidePackage = afterCache.Substring(firstSlash + 1);
-                    int atIndex = packageFolderName.IndexOf('@');
-                    string packageId =
-                        0 < atIndex ? packageFolderName.Substring(0, atIndex) : packageFolderName;
-                    return "Packages/" + packageId + "/" + pathInsidePackage;
-                }
-            }
-
-            int packagesIndex = normalizedPath.IndexOf(
-                "/Packages/",
-                StringComparison.OrdinalIgnoreCase
-            );
-            if (0 <= packagesIndex)
-            {
-                return normalizedPath.Substring(packagesIndex + 1);
-            }
-
-            string[] pathParts = normalizedPath.Split('/');
-            for (int i = 0; i < pathParts.Length; i++)
-            {
-                if (
-                    pathParts[i].Equals("Packages", StringComparison.OrdinalIgnoreCase)
-                    && i + 1 < pathParts.Length
-                )
-                {
-                    if (pathParts[i + 1].Contains('.'))
-                    {
-                        return string.Join("/", pathParts, i, pathParts.Length - i);
-                    }
-                }
-            }
-
-            return null;
         }
 
         private void RevealFileInExplorer(string filePath)

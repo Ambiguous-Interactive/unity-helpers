@@ -37,6 +37,174 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [TestFixture]
     public sealed class RootMarshalTests
     {
+        private static string MarshalHex<T>(T value)
+        {
+            Assert.IsTrue(
+                WProtoRootMarshalProvider.TryGet(out IWProtoFormatter<T> formatter),
+                "no root marshal is registered for " + typeof(T).FullName
+            );
+            return Encode(formatter, value);
+        }
+
+        private static string ContractHex<T>(T value)
+        {
+            return Encode(WProtoFormatterProvider.Get<T>(), value);
+        }
+
+        private static string Encode<T>(IWProtoFormatter<T> formatter, T value)
+        {
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new WProtoWriter(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+            Assert.AreEqual(buffer.Length, writer.Position, "Measure disagreed with Write");
+            return ToHex(buffer);
+        }
+
+        private static byte[] OracleBytes<T>(T value)
+        {
+            using (MemoryStream stream = new MemoryStream())
+            {
+                ProtoBuf.Serializer.Serialize(stream, value);
+                return stream.ToArray();
+            }
+        }
+
+        private static string ToHex(byte[] bytes)
+        {
+            StringBuilder builder = new StringBuilder(bytes.Length * 2);
+            foreach (byte current in bytes)
+            {
+                builder.Append(current.ToString("X2"));
+            }
+
+            return builder.ToString();
+        }
+
+        private static byte[] Parse(string hex)
+        {
+            byte[] bytes = new byte[hex.Length / 2];
+            for (int index = 0; index < bytes.Length; index++)
+            {
+                bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
+            }
+
+            return bytes;
+        }
+
+        private static void AssertDiagnostic(string id, string mustName, string source)
+        {
+            ImmutableArray<Diagnostic> diagnostics = Run(source);
+            Diagnostic match = diagnostics.FirstOrDefault(diagnostic => diagnostic.Id == id);
+
+            Assert.IsTrue(
+                match != null,
+                "expected "
+                    + id
+                    + ", saw: "
+                    + string.Join(
+                        "; ",
+                        diagnostics.Select(diagnostic =>
+                            diagnostic.Id + " " + diagnostic.GetMessage()
+                        )
+                    )
+            );
+            Assert.AreEqual(DiagnosticSeverity.Error, match.Severity);
+            Assert.IsTrue(
+                match.GetMessage().Contains(mustName, StringComparison.Ordinal),
+                "the message must name '" + mustName + "': " + match.GetMessage()
+            );
+        }
+
+        private static IReadOnlyList<string> Registrations(string body)
+        {
+            Compile(body, out Compilation updated);
+
+            SyntaxTree registrar = updated.SyntaxTrees.FirstOrDefault(tree =>
+                tree.FilePath.Contains("WProtoGeneratedRegistrar", StringComparison.Ordinal)
+            );
+
+            if (registrar == null)
+            {
+                return Array.Empty<string>();
+            }
+
+            return registrar
+                .GetText()
+                .ToString()
+                .Split('\n')
+                .Where(line => line.Contains(".Register(", StringComparison.Ordinal))
+                .Select(line => line.Trim())
+                .ToList();
+        }
+
+        private static ImmutableArray<Diagnostic> Run(string body)
+        {
+            return Compile(body, out Compilation _);
+        }
+
+        /// <summary>
+        /// Compiles the generator's own output and returns its errors.
+        /// </summary>
+        /// <remarks>
+        /// The generator reporting nothing is not the same as the consumer's build succeeding.
+        /// Emitted code that does not compile is the failure a developer actually hits.
+        /// </remarks>
+        private static ImmutableArray<Diagnostic> CompileGenerated(string body)
+        {
+            Compile(body, out Compilation generated);
+            return generated
+                .GetDiagnostics()
+                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+                .ToImmutableArray();
+        }
+
+        private static ImmutableArray<Diagnostic> Compile(string body, out Compilation updated)
+        {
+            List<string> assemblyAttributes = new List<string>();
+            List<string> rest = new List<string>();
+            foreach (string line in body.Split('\n'))
+            {
+                (
+                    line.TrimStart().StartsWith("[assembly:", StringComparison.Ordinal)
+                        ? assemblyAttributes
+                        : rest
+                ).Add(line);
+            }
+
+            string source =
+                "using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;\n"
+                + string.Join("\n", assemblyAttributes)
+                + "\nnamespace Consumer { using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto; "
+                + string.Join("\n", rest)
+                + " }";
+
+            List<MetadataReference> references = new List<MetadataReference>();
+            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
+                {
+                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
+                }
+            }
+
+            CSharpCompilation compilation = CSharpCompilation.Create(
+                "ConsumerAssembly",
+                new[] { CSharpSyntaxTree.ParseText(source) },
+                references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+            );
+
+            CSharpGeneratorDriver
+                .Create(new WProtoGenerator())
+                .RunGeneratorsAndUpdateCompilation(
+                    compilation,
+                    out updated,
+                    out ImmutableArray<Diagnostic> diagnostics
+                );
+
+            return diagnostics;
+        }
+
         /// <summary>
         /// A marshalled root writes the wrapper's fields, packed as this package writes every
         /// packable run.
@@ -762,181 +930,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
-        private static string MarshalHex<T>(T value)
-        {
-            Assert.IsTrue(
-                WProtoRootMarshalProvider.TryGet(out IWProtoFormatter<T> formatter),
-                "no root marshal is registered for " + typeof(T).FullName
-            );
-            return Encode(formatter, value);
-        }
-
-        private static string ContractHex<T>(T value)
-        {
-            return Encode(WProtoFormatterProvider.Get<T>(), value);
-        }
-
-        private static string Encode<T>(IWProtoFormatter<T> formatter, T value)
-        {
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new WProtoWriter(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-            Assert.AreEqual(buffer.Length, writer.Position, "Measure disagreed with Write");
-            return ToHex(buffer);
-        }
-
-        private static byte[] OracleBytes<T>(T value)
-        {
-            using (MemoryStream stream = new MemoryStream())
-            {
-                ProtoBuf.Serializer.Serialize(stream, value);
-                return stream.ToArray();
-            }
-        }
-
-        private static string ToHex(byte[] bytes)
-        {
-            StringBuilder builder = new StringBuilder(bytes.Length * 2);
-            foreach (byte current in bytes)
-            {
-                builder.Append(current.ToString("X2"));
-            }
-
-            return builder.ToString();
-        }
-
-        private static byte[] Parse(string hex)
-        {
-            byte[] bytes = new byte[hex.Length / 2];
-            for (int index = 0; index < bytes.Length; index++)
-            {
-                bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
-            }
-
-            return bytes;
-        }
-
-        private static void AssertDiagnostic(string id, string mustName, string source)
-        {
-            ImmutableArray<Diagnostic> diagnostics = Run(source);
-            Diagnostic match = diagnostics.FirstOrDefault(diagnostic => diagnostic.Id == id);
-
-            Assert.IsTrue(
-                match != null,
-                "expected "
-                    + id
-                    + ", saw: "
-                    + string.Join(
-                        "; ",
-                        diagnostics.Select(diagnostic =>
-                            diagnostic.Id + " " + diagnostic.GetMessage()
-                        )
-                    )
-            );
-            Assert.AreEqual(DiagnosticSeverity.Error, match.Severity);
-            Assert.IsTrue(
-                match.GetMessage().Contains(mustName, StringComparison.Ordinal),
-                "the message must name '" + mustName + "': " + match.GetMessage()
-            );
-        }
-
-        private static IReadOnlyList<string> Registrations(string body)
-        {
-            Compile(body, out Compilation updated);
-
-            SyntaxTree registrar = updated.SyntaxTrees.FirstOrDefault(tree =>
-                tree.FilePath.Contains("WProtoGeneratedRegistrar", StringComparison.Ordinal)
-            );
-
-            if (registrar == null)
-            {
-                return Array.Empty<string>();
-            }
-
-            return registrar
-                .GetText()
-                .ToString()
-                .Split('\n')
-                .Where(line => line.Contains(".Register(", StringComparison.Ordinal))
-                .Select(line => line.Trim())
-                .ToList();
-        }
-
-        private static ImmutableArray<Diagnostic> Run(string body)
-        {
-            return Compile(body, out Compilation _);
-        }
-
-        /// <summary>
-        /// Compiles the generator's own output and returns its errors.
-        /// </summary>
-        /// <remarks>
-        /// The generator reporting nothing is not the same as the consumer's build succeeding.
-        /// Emitted code that does not compile is the failure a developer actually hits.
-        /// </remarks>
-        private static ImmutableArray<Diagnostic> CompileGenerated(string body)
-        {
-            Compile(body, out Compilation generated);
-            return generated
-                .GetDiagnostics()
-                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-                .ToImmutableArray();
-        }
-
-        private static ImmutableArray<Diagnostic> Compile(string body, out Compilation updated)
-        {
-            List<string> assemblyAttributes = new List<string>();
-            List<string> rest = new List<string>();
-            foreach (string line in body.Split('\n'))
-            {
-                (
-                    line.TrimStart().StartsWith("[assembly:", StringComparison.Ordinal)
-                        ? assemblyAttributes
-                        : rest
-                ).Add(line);
-            }
-
-            string source =
-                "using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;\n"
-                + string.Join("\n", assemblyAttributes)
-                + "\nnamespace Consumer { using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto; "
-                + string.Join("\n", rest)
-                + " }";
-
-            List<MetadataReference> references = new List<MetadataReference>();
-            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
-                {
-                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
-                }
-            }
-
-            CSharpCompilation compilation = CSharpCompilation.Create(
-                "ConsumerAssembly",
-                new[] { CSharpSyntaxTree.ParseText(source) },
-                references,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-            );
-
-            CSharpGeneratorDriver
-                .Create(new WProtoGenerator())
-                .RunGeneratorsAndUpdateCompilation(
-                    compilation,
-                    out updated,
-                    out ImmutableArray<Diagnostic> diagnostics
-                );
-
-            return diagnostics;
-        }
-
         private sealed class ConditionalUnserviceableFormatter
             : IWProtoFormatter<Unserviceable>,
                 IWProtoConditionalFormatter
         {
-            private readonly bool _canServe;
-
             internal int MeasureCount { get; private set; }
+
+            private readonly bool _canServe;
 
             internal ConditionalUnserviceableFormatter(bool canServe)
             {

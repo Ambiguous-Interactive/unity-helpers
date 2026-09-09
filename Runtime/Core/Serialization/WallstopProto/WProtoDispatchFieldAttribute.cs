@@ -9,15 +9,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
     public sealed class WProtoDispatchFieldAttribute : Attribute
     {
-        /// <summary>Records a member or subtype field emitted on a contract.</summary>
-        public WProtoDispatchFieldAttribute(Type contract, int tag, string owner, Type subtype)
-        {
-            Contract = contract;
-            Tag = tag;
-            Owner = owner;
-            Subtype = subtype;
-        }
-
         /// <summary>The contract owning this field number.</summary>
         public Type Contract { get; }
 
@@ -29,5 +20,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
         /// <summary>The subtype, or null for an ordinary member.</summary>
         public Type Subtype { get; }
+
+        /// <summary>Records a member or subtype field emitted on a contract.</summary>
+        public WProtoDispatchFieldAttribute(Type contract, int tag, string owner, Type subtype)
+        {
+            Contract = contract;
+            Tag = tag;
+            Owner = owner;
+            Subtype = subtype;
+        }
     }
 }

@@ -25,6 +25,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
     public sealed class CleanupAllKnownTestFoldersTests : CommonTestBase
     {
         /// <summary>
+        /// Maximum number of frames to wait for AssetDatabase operations to complete.
+        /// </summary>
+        private const int MaxAssetDatabaseWaitFrames = 10;
+
+        private const string ResourcesRoot = "Assets/Resources";
+
+        /// <summary>
         /// Test folder patterns in Assets/Resources that should be cleaned up.
         /// IMPORTANT: Must match the patterns in CommonTestBase.CleanupAllKnownTestFolders().
         /// If you add/remove patterns there, update this list to match.
@@ -73,13 +80,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         };
 
         /// <summary>
-        /// Maximum number of frames to wait for AssetDatabase operations to complete.
-        /// </summary>
-        private const int MaxAssetDatabaseWaitFrames = 10;
-
-        private const string ResourcesRoot = "Assets/Resources";
-
-        /// <summary>
         /// Whether the <c>Assets/Resources</c> root already existed before this fixture ran.
         /// Captured in <see cref="CommonOneTimeSetUp"/> so <see cref="OneTimeTearDown"/> only
         /// removes the root when this fixture is the one that created it.
@@ -95,6 +95,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         /// Removing the root here when we created it restores the pre-fixture state.
         /// </remarks>
         private bool _resourcesRootExistedBeforeFixture;
+
+        private static void DeleteFolderCreatedByThisTest(string folderPath, bool existedBefore)
+        {
+            if (existedBefore || !AssetDatabase.IsValidFolder(folderPath))
+            {
+                return;
+            }
+
+            AssetDatabase.DeleteAsset(folderPath);
+        }
 
         public override void CommonOneTimeSetUp()
         {
@@ -126,173 +136,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             */
             RemoveResourcesRootIfCreatedByThisFixture();
             base.OneTimeTearDown();
-        }
-
-        /// <summary>
-        /// Deletes the <c>Assets/Resources</c> root only when this fixture created it and it has no
-        /// remaining contents. Safe against a pre-existing production <c>Assets/Resources</c> (it is
-        /// left untouched) and against leftover real assets (a non-empty root is left untouched).
-        /// </summary>
-        private void RemoveResourcesRootIfCreatedByThisFixture()
-        {
-            if (_resourcesRootExistedBeforeFixture)
-            {
-                return;
-            }
-
-            if (!AssetDatabase.IsValidFolder(ResourcesRoot))
-            {
-                return;
-            }
-
-            string[] subFolders = AssetDatabase.GetSubFolders(ResourcesRoot);
-            if (subFolders is { Length: > 0 })
-            {
-                return;
-            }
-
-            string[] containedAssets = AssetDatabase.FindAssets(
-                string.Empty,
-                new[] { ResourcesRoot }
-            );
-            if (containedAssets is { Length: > 0 })
-            {
-                return;
-            }
-
-            if (AssetDatabase.DeleteAsset(ResourcesRoot))
-            {
-                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
-            }
-        }
-
-        /*
-            Per-case cleanup would remove folders expected by later parameterized cases; clean up at fixture
-            boundaries.
-        */
-
-        /// <summary>
-        /// Creates folders and waits for AssetDatabase to fully recognize them.
-        /// This handles the asynchronous nature of AssetDatabase.Refresh().
-        /// </summary>
-        /// <param name="folderPaths">The folder paths to create.</param>
-        /// <returns>Coroutine that completes when folders are verified to exist.</returns>
-        private IEnumerator CreateAndWaitForFolders(params string[] folderPaths)
-        {
-            foreach (string folderPath in folderPaths)
-            {
-                EnsureFolderStatic(folderPath);
-            }
-
-            AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
-
-            for (int frame = 0; frame < MaxAssetDatabaseWaitFrames; frame++)
-            {
-                yield return null;
-
-                bool allValid = true;
-                foreach (string folderPath in folderPaths)
-                {
-                    if (!AssetDatabase.IsValidFolder(folderPath))
-                    {
-                        allValid = false;
-                        break;
-                    }
-                }
-
-                if (allValid)
-                {
-                    yield break;
-                }
-
-                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
-            }
-
-            foreach (string folderPath in folderPaths)
-            {
-                string projectRoot = Path.GetDirectoryName(Application.dataPath);
-                string absolutePath = !string.IsNullOrEmpty(projectRoot)
-                    ? Path.Combine(projectRoot, folderPath).SanitizePath()
-                    : folderPath;
-                bool existsOnDisk =
-                    !string.IsNullOrEmpty(projectRoot) && Directory.Exists(absolutePath);
-                bool existsInAssetDb = AssetDatabase.IsValidFolder(folderPath);
-
-                Assert.IsTrue(
-                    existsInAssetDb,
-                    $"Folder creation failed for '{folderPath}'. "
-                        + $"Exists on disk: {existsOnDisk}, "
-                        + $"Exists in AssetDatabase: {existsInAssetDb}, "
-                        + $"Absolute path: {absolutePath}"
-                );
-            }
-        }
-
-        /// <summary>
-        /// Runs cleanup and waits for AssetDatabase to fully process the deletions.
-        /// </summary>
-        /// <param name="foldersToVerify">Optional array of folder paths to verify are deleted.
-        /// If null or empty, method waits a fixed number of frames without verification.</param>
-        /// <returns>Coroutine that completes when cleanup is verified.</returns>
-        private IEnumerator CleanupAndWait(params string[] foldersToVerify)
-        {
-            // Refresh explicitly after the batch, avoiding a duplicate disposal refresh.
-            using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
-            {
-                CleanupAllKnownTestFolders();
-            }
-
-            AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
-
-            if (foldersToVerify == null || foldersToVerify.Length == 0)
-            {
-                for (int frame = 0; frame < MaxAssetDatabaseWaitFrames; frame++)
-                {
-                    yield return null;
-                }
-                yield break;
-            }
-
-            for (int frame = 0; frame < MaxAssetDatabaseWaitFrames; frame++)
-            {
-                yield return null;
-
-                bool allDeleted = true;
-                foreach (string folderPath in foldersToVerify)
-                {
-                    if (AssetDatabase.IsValidFolder(folderPath))
-                    {
-                        allDeleted = false;
-                        break;
-                    }
-                }
-
-                if (allDeleted)
-                {
-                    yield break;
-                }
-
-                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
-            }
-
-            foreach (string folderPath in foldersToVerify)
-            {
-                string projectRoot = Path.GetDirectoryName(Application.dataPath);
-                string absolutePath = !string.IsNullOrEmpty(projectRoot)
-                    ? Path.Combine(projectRoot, folderPath).SanitizePath()
-                    : folderPath;
-                bool existsOnDisk =
-                    !string.IsNullOrEmpty(projectRoot) && Directory.Exists(absolutePath);
-                bool existsInAssetDb = AssetDatabase.IsValidFolder(folderPath);
-
-                Assert.IsFalse(
-                    existsInAssetDb,
-                    $"Folder deletion failed for '{folderPath}'. "
-                        + $"Exists on disk: {existsOnDisk}, "
-                        + $"Exists in AssetDatabase: {existsInAssetDb}, "
-                        + $"Absolute path: {absolutePath}"
-                );
-            }
         }
 
         [UnityTest]
@@ -517,14 +360,171 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             Assert.Pass("UnityTest with IEnumerator is functioning correctly");
         }
 
-        private static void DeleteFolderCreatedByThisTest(string folderPath, bool existedBefore)
+        /// <summary>
+        /// Deletes the <c>Assets/Resources</c> root only when this fixture created it and it has no
+        /// remaining contents. Safe against a pre-existing production <c>Assets/Resources</c> (it is
+        /// left untouched) and against leftover real assets (a non-empty root is left untouched).
+        /// </summary>
+        private void RemoveResourcesRootIfCreatedByThisFixture()
         {
-            if (existedBefore || !AssetDatabase.IsValidFolder(folderPath))
+            if (_resourcesRootExistedBeforeFixture)
             {
                 return;
             }
 
-            AssetDatabase.DeleteAsset(folderPath);
+            if (!AssetDatabase.IsValidFolder(ResourcesRoot))
+            {
+                return;
+            }
+
+            string[] subFolders = AssetDatabase.GetSubFolders(ResourcesRoot);
+            if (subFolders is { Length: > 0 })
+            {
+                return;
+            }
+
+            string[] containedAssets = AssetDatabase.FindAssets(
+                string.Empty,
+                new[] { ResourcesRoot }
+            );
+            if (containedAssets is { Length: > 0 })
+            {
+                return;
+            }
+
+            if (AssetDatabase.DeleteAsset(ResourcesRoot))
+            {
+                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+            }
+        }
+
+        /*
+            Per-case cleanup would remove folders expected by later parameterized cases; clean up at fixture
+            boundaries.
+        */
+
+        /// <summary>
+        /// Creates folders and waits for AssetDatabase to fully recognize them.
+        /// This handles the asynchronous nature of AssetDatabase.Refresh().
+        /// </summary>
+        /// <param name="folderPaths">The folder paths to create.</param>
+        /// <returns>Coroutine that completes when folders are verified to exist.</returns>
+        private IEnumerator CreateAndWaitForFolders(params string[] folderPaths)
+        {
+            foreach (string folderPath in folderPaths)
+            {
+                EnsureFolderStatic(folderPath);
+            }
+
+            AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+
+            for (int frame = 0; frame < MaxAssetDatabaseWaitFrames; frame++)
+            {
+                yield return null;
+
+                bool allValid = true;
+                foreach (string folderPath in folderPaths)
+                {
+                    if (!AssetDatabase.IsValidFolder(folderPath))
+                    {
+                        allValid = false;
+                        break;
+                    }
+                }
+
+                if (allValid)
+                {
+                    yield break;
+                }
+
+                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+            }
+
+            foreach (string folderPath in folderPaths)
+            {
+                string projectRoot = Path.GetDirectoryName(Application.dataPath);
+                string absolutePath = !string.IsNullOrEmpty(projectRoot)
+                    ? Path.Combine(projectRoot, folderPath).SanitizePath()
+                    : folderPath;
+                bool existsOnDisk =
+                    !string.IsNullOrEmpty(projectRoot) && Directory.Exists(absolutePath);
+                bool existsInAssetDb = AssetDatabase.IsValidFolder(folderPath);
+
+                Assert.IsTrue(
+                    existsInAssetDb,
+                    $"Folder creation failed for '{folderPath}'. "
+                        + $"Exists on disk: {existsOnDisk}, "
+                        + $"Exists in AssetDatabase: {existsInAssetDb}, "
+                        + $"Absolute path: {absolutePath}"
+                );
+            }
+        }
+
+        /// <summary>
+        /// Runs cleanup and waits for AssetDatabase to fully process the deletions.
+        /// </summary>
+        /// <param name="foldersToVerify">Optional array of folder paths to verify are deleted.
+        /// If null or empty, method waits a fixed number of frames without verification.</param>
+        /// <returns>Coroutine that completes when cleanup is verified.</returns>
+        private IEnumerator CleanupAndWait(params string[] foldersToVerify)
+        {
+            // Refresh explicitly after the batch, avoiding a duplicate disposal refresh.
+            using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
+            {
+                CleanupAllKnownTestFolders();
+            }
+
+            AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+
+            if (foldersToVerify == null || foldersToVerify.Length == 0)
+            {
+                for (int frame = 0; frame < MaxAssetDatabaseWaitFrames; frame++)
+                {
+                    yield return null;
+                }
+                yield break;
+            }
+
+            for (int frame = 0; frame < MaxAssetDatabaseWaitFrames; frame++)
+            {
+                yield return null;
+
+                bool allDeleted = true;
+                foreach (string folderPath in foldersToVerify)
+                {
+                    if (AssetDatabase.IsValidFolder(folderPath))
+                    {
+                        allDeleted = false;
+                        break;
+                    }
+                }
+
+                if (allDeleted)
+                {
+                    yield break;
+                }
+
+                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+            }
+
+            foreach (string folderPath in foldersToVerify)
+            {
+                string projectRoot = Path.GetDirectoryName(Application.dataPath);
+                string absolutePath = !string.IsNullOrEmpty(projectRoot)
+                    ? Path.Combine(projectRoot, folderPath).SanitizePath()
+                    : folderPath;
+                bool existsOnDisk =
+                    !string.IsNullOrEmpty(projectRoot) && Directory.Exists(absolutePath);
+                bool existsInAssetDb = AssetDatabase.IsValidFolder(folderPath);
+
+                Assert.IsFalse(
+                    existsInAssetDb,
+                    $"Folder deletion failed for '{folderPath}'. "
+                        + $"Exists on disk: {existsOnDisk}, "
+                        + $"Exists in AssetDatabase: {existsInAssetDb}, "
+                        + $"Absolute path: {absolutePath}"
+                );
+            }
         }
     }
 

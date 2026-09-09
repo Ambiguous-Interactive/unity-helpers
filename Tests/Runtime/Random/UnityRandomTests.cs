@@ -26,7 +26,53 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             state => UnityEngine.Random.state = state
         );
 
-        protected override IRandom NewRandom() => new UnityRandom(DeterministicSeedInt);
+        private static void AssertSnapshotContinuation(
+            bool seeded,
+            int gaussianDraws,
+            Func<RandomState, RandomState> roundTrip
+        )
+        {
+            using RestorableGlobal<UnityEngine.Random.State>.Scope scope = EngineState.Borrow(
+                UnityEngine.Random.state
+            );
+            UnityRandom random = CreatePartiallyConsumedRandom(seeded, gaussianDraws);
+            RandomState snapshot = random.InternalState;
+            object[] expected = ReadMixedSequence(random);
+            UnityEngine.Random.InitState(-1);
+
+            UnityRandom restored = new(roundTrip(snapshot));
+            Assert.AreEqual(snapshot, restored.InternalState);
+            CollectionAssert.AreEqual(expected, ReadMixedSequence(restored));
+        }
+
+        private static UnityRandom CreatePartiallyConsumedRandom(bool seeded, int gaussianDraws)
+        {
+            UnityEngine.Random.InitState(4242);
+            UnityRandom random = new(seeded ? 4242 : null);
+            for (int i = 0; i < gaussianDraws; ++i)
+            {
+                random.NextGaussian();
+            }
+
+            random.NextBool();
+            random.NextByte();
+            return random;
+        }
+
+        private static object[] ReadMixedSequence(IRandom random)
+        {
+            object[] values = new object[6 * ComparedDraws];
+            for (int index = 0; index < values.Length; index += 6)
+            {
+                values[index] = random.NextGaussian();
+                values[index + 1] = random.NextBool();
+                values[index + 2] = random.NextByte();
+                values[index + 3] = random.NextUint();
+                values[index + 4] = random.NextUlong();
+                values[index + 5] = random.NextDouble();
+            }
+            return values;
+        }
 
         [TestCase(0, 32)]
         [TestCase(-1, 32)]
@@ -193,54 +239,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             CollectionAssert.AreEqual(expected, ReadMixedSequence(restored));
         }
 
-        private static void AssertSnapshotContinuation(
-            bool seeded,
-            int gaussianDraws,
-            Func<RandomState, RandomState> roundTrip
-        )
-        {
-            using RestorableGlobal<UnityEngine.Random.State>.Scope scope = EngineState.Borrow(
-                UnityEngine.Random.state
-            );
-            UnityRandom random = CreatePartiallyConsumedRandom(seeded, gaussianDraws);
-            RandomState snapshot = random.InternalState;
-            object[] expected = ReadMixedSequence(random);
-            UnityEngine.Random.InitState(-1);
-
-            UnityRandom restored = new(roundTrip(snapshot));
-            Assert.AreEqual(snapshot, restored.InternalState);
-            CollectionAssert.AreEqual(expected, ReadMixedSequence(restored));
-        }
-
-        private static UnityRandom CreatePartiallyConsumedRandom(bool seeded, int gaussianDraws)
-        {
-            UnityEngine.Random.InitState(4242);
-            UnityRandom random = new(seeded ? 4242 : null);
-            for (int i = 0; i < gaussianDraws; ++i)
-            {
-                random.NextGaussian();
-            }
-
-            random.NextBool();
-            random.NextByte();
-            return random;
-        }
-
-        private static object[] ReadMixedSequence(IRandom random)
-        {
-            object[] values = new object[6 * ComparedDraws];
-            for (int index = 0; index < values.Length; index += 6)
-            {
-                values[index] = random.NextGaussian();
-                values[index + 1] = random.NextBool();
-                values[index + 2] = random.NextByte();
-                values[index + 3] = random.NextUint();
-                values[index + 4] = random.NextUlong();
-                values[index + 5] = random.NextDouble();
-            }
-            return values;
-        }
-
         [Test]
         public void ASnapshotResumesTheStreamAfterOtherCodeHasMovedTheEngine()
         {
@@ -330,6 +328,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
 
             Assert.AreEqual(expected, legacy.NextUint());
         }
+
+        protected override IRandom NewRandom() => new UnityRandom(DeterministicSeedInt);
     }
 #pragma warning restore WUH005
 }

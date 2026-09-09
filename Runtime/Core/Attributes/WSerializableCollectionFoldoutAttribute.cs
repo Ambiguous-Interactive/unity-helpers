@@ -12,14 +12,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     [AttributeUsage(AttributeTargets.Field)]
     public sealed class WSerializableCollectionFoldoutAttribute : PropertyAttribute
     {
-        public WSerializableCollectionFoldoutAttribute(
-            WSerializableCollectionFoldoutBehavior behavior =
-                WSerializableCollectionFoldoutBehavior.StartCollapsed
-        )
-        {
-            Behavior = behavior;
-        }
-
         /// <summary>
         /// Requested default foldout behavior for the decorated collection field.
         /// </summary>
@@ -30,6 +22,14 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// </summary>
         public bool StartExpanded =>
             Behavior == WSerializableCollectionFoldoutBehavior.StartExpanded;
+
+        public WSerializableCollectionFoldoutAttribute(
+            WSerializableCollectionFoldoutBehavior behavior =
+                WSerializableCollectionFoldoutBehavior.StartCollapsed
+        )
+        {
+            Behavior = behavior;
+        }
     }
 
     /// <summary>

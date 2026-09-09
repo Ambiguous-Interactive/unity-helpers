@@ -79,6 +79,13 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
     /// </example>
     public readonly struct SemaphoreLease : IDisposable
     {
+        /// <summary>
+        /// True while this lease still owns a permit. False for a default lease, for a failed
+        /// <see cref="SemaphoreSlimExtensions.TryAcquire(SemaphoreSlim, TimeSpan, out SemaphoreLease)"/>,
+        /// after <see cref="Dispose"/>, and on every copy once any copy has released.
+        /// </summary>
+        public bool IsHeld => _lease.IsHeld;
+
         private readonly SemaphoreSlim _semaphore;
         private readonly DisposalLease _lease;
 
@@ -87,13 +94,6 @@ namespace WallstopStudios.UnityHelpers.Core.Threading
             _semaphore = semaphore;
             _lease = semaphore == null ? default : DisposalLeases.Acquire();
         }
-
-        /// <summary>
-        /// True while this lease still owns a permit. False for a default lease, for a failed
-        /// <see cref="SemaphoreSlimExtensions.TryAcquire(SemaphoreSlim, TimeSpan, out SemaphoreLease)"/>,
-        /// after <see cref="Dispose"/>, and on every copy once any copy has released.
-        /// </summary>
-        public bool IsHeld => _lease.IsHeld;
 
         /// <summary>
         /// Returns the permit. Safe to call more than once, and safe to call on more than one copy

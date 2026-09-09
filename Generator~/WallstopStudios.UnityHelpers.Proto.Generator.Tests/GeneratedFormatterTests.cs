@@ -21,6 +21,45 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [TestFixture]
     public sealed class GeneratedFormatterTests
     {
+        private static ChainContract BuildChain(int links)
+        {
+            ChainContract head = null;
+            for (int link = 1; link <= links; link++)
+            {
+                head = new ChainContract { Id = link, Next = head };
+            }
+
+            return head;
+        }
+
+        private static string Encode<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new WProtoWriter(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+
+            StringBuilder builder = new StringBuilder(writer.Position * 2);
+            foreach (byte current in writer.Written)
+            {
+                builder.Append(current.ToString("X2"));
+            }
+
+            return builder.ToString();
+        }
+
+        private static T RoundTrip<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new WProtoWriter(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+
+            WProtoReader reader = new WProtoReader(buffer);
+            Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
+            return restored;
+        }
+
         [Test]
         public void TheGeneratorRegistersEveryContractItEmitted()
         {
@@ -425,45 +464,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 Assert.IsTrue(formatter.Write(ref writer, value));
                 Assert.AreEqual(predicted, writer.Position);
             }
-        }
-
-        private static ChainContract BuildChain(int links)
-        {
-            ChainContract head = null;
-            for (int link = 1; link <= links; link++)
-            {
-                head = new ChainContract { Id = link, Next = head };
-            }
-
-            return head;
-        }
-
-        private static string Encode<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new WProtoWriter(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-
-            StringBuilder builder = new StringBuilder(writer.Position * 2);
-            foreach (byte current in writer.Written)
-            {
-                builder.Append(current.ToString("X2"));
-            }
-
-            return builder.ToString();
-        }
-
-        private static T RoundTrip<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new WProtoWriter(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-
-            WProtoReader reader = new WProtoReader(buffer);
-            Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
-            return restored;
         }
 
         [Test]

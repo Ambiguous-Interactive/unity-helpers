@@ -34,6 +34,13 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         private readonly Dictionary<Type, bool> _hasAssignmentsCache;
 #endif
 
+        private static readonly Type[] RelationalAttributeTypes =
+        {
+            typeof(ParentComponentAttribute),
+            typeof(ChildComponentAttribute),
+            typeof(SiblingComponentAttribute),
+        };
+
         /// <summary>
         /// Creates a new assigner using the active <c>AttributeMetadataCache.Instance</c>.
         /// </summary>
@@ -47,6 +54,22 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         {
             _metadataCache = metadataCache;
             _hasAssignmentsCache = new();
+        }
+
+        private static bool HasRelationalAttributesViaReflection(Type componentType)
+        {
+            Type current = componentType;
+            while (current != null && typeof(Component).IsAssignableFrom(current))
+            {
+                if (current.HasAnyFieldWithAttributes(RelationalAttributeTypes))
+                {
+                    return true;
+                }
+
+                current = current.BaseType;
+            }
+
+            return false;
         }
 
         /// <inheritdoc />
@@ -74,58 +97,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             _hasAssignmentsCache[componentType] = computed;
             return computed;
 #endif
-        }
-
-        // Racing factories compute the same metadata result.
-        private bool ComputeHasRelationalAssignments(Type componentType)
-        {
-            AttributeMetadataCache cache =
-                _metadataCache != null ? _metadataCache : AttributeMetadataCache.Instance;
-            if (cache == null)
-            {
-                return HasRelationalAttributesViaReflection(componentType);
-            }
-
-            Type current = componentType;
-            while (current != null && typeof(Component).IsAssignableFrom(current))
-            {
-                if (
-                    cache.TryGetRelationalFields(
-                        current,
-                        out AttributeMetadataCache.RelationalFieldMetadata[] fields
-                    )
-                    && 0 < fields.Length
-                )
-                {
-                    return true;
-                }
-                current = current.BaseType;
-            }
-
-            return HasRelationalAttributesViaReflection(componentType);
-        }
-
-        private static readonly Type[] RelationalAttributeTypes =
-        {
-            typeof(ParentComponentAttribute),
-            typeof(ChildComponentAttribute),
-            typeof(SiblingComponentAttribute),
-        };
-
-        private static bool HasRelationalAttributesViaReflection(Type componentType)
-        {
-            Type current = componentType;
-            while (current != null && typeof(Component).IsAssignableFrom(current))
-            {
-                if (current.HasAnyFieldWithAttributes(RelationalAttributeTypes))
-                {
-                    return true;
-                }
-
-                current = current.BaseType;
-            }
-
-            return false;
         }
 
         /// <inheritdoc />
@@ -181,6 +152,35 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             root.GetComponentsInChildren(includeInactiveChildren, components);
             Assign(components);
+        }
+
+        // Racing factories compute the same metadata result.
+        private bool ComputeHasRelationalAssignments(Type componentType)
+        {
+            AttributeMetadataCache cache =
+                _metadataCache != null ? _metadataCache : AttributeMetadataCache.Instance;
+            if (cache == null)
+            {
+                return HasRelationalAttributesViaReflection(componentType);
+            }
+
+            Type current = componentType;
+            while (current != null && typeof(Component).IsAssignableFrom(current))
+            {
+                if (
+                    cache.TryGetRelationalFields(
+                        current,
+                        out AttributeMetadataCache.RelationalFieldMetadata[] fields
+                    )
+                    && 0 < fields.Length
+                )
+                {
+                    return true;
+                }
+                current = current.BaseType;
+            }
+
+            return HasRelationalAttributesViaReflection(componentType);
         }
     }
 }

@@ -17,6 +17,24 @@ namespace WallstopStudios.UnityHelpers.Utils
     public readonly struct PoolStatistics : IEquatable<PoolStatistics>
     {
         /// <summary>
+        /// Equality operator.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool operator ==(PoolStatistics left, PoolStatistics right)
+        {
+            return left.Equals(right);
+        }
+
+        /// <summary>
+        /// Inequality operator.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool operator !=(PoolStatistics left, PoolStatistics right)
+        {
+            return !left.Equals(right);
+        }
+
+        /// <summary>
         /// The current number of items in the pool.
         /// </summary>
         public int CurrentSize { get; }
@@ -248,24 +266,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 IsLowFrequency,
                 IsUnused
             );
-        }
-
-        /// <summary>
-        /// Equality operator.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool operator ==(PoolStatistics left, PoolStatistics right)
-        {
-            return left.Equals(right);
-        }
-
-        /// <summary>
-        /// Inequality operator.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool operator !=(PoolStatistics left, PoolStatistics right)
-        {
-            return !left.Equals(right);
         }
 
         /// <inheritdoc />

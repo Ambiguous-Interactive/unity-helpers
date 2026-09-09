@@ -46,6 +46,129 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             test => test.RunSiblingHashSetScenario(),
         };
 
+        private static ScenarioResult ExecuteScenario(
+            string label,
+            Action relationalAction,
+            Action manualAction
+        )
+        {
+            if (relationalAction == null)
+            {
+                throw new ArgumentNullException(nameof(relationalAction));
+            }
+
+            if (manualAction == null)
+            {
+                throw new ArgumentNullException(nameof(manualAction));
+            }
+
+            Prewarm(relationalAction);
+            Prewarm(manualAction);
+
+            BenchmarkMetrics relationalMetrics = Measure(relationalAction);
+            BenchmarkMetrics manualMetrics = Measure(manualAction);
+
+            return new ScenarioResult(label, relationalMetrics, manualMetrics);
+        }
+
+        private static void Prewarm(Action action)
+        {
+            for (int i = 0; i < 10; ++i)
+            {
+                action();
+            }
+        }
+
+        private static BenchmarkMetrics Measure(Action action)
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+
+            Stopwatch stopwatch = Stopwatch.StartNew();
+
+            int iterations = 0;
+            do
+            {
+                for (int i = 0; i < NumIterations; ++i)
+                {
+                    action();
+                    ++iterations;
+                }
+            } while (stopwatch.Elapsed < BenchmarkDuration);
+
+            stopwatch.Stop();
+            double opsPerSecond = iterations / stopwatch.Elapsed.TotalSeconds;
+            return new BenchmarkMetrics(opsPerSecond, iterations, stopwatch.Elapsed);
+        }
+
+        private static string FormatOpsRow(ScenarioResult result)
+        {
+            string ratio =
+                0d < result.Manual.OpsPerSecond
+                    ? (result.Relational.OpsPerSecond / result.Manual.OpsPerSecond).ToString(
+                        "0.00",
+                        CultureInfo.InvariantCulture
+                    ) + "x"
+                    : "n/a";
+
+            return "    <tr><td align=\"left\">"
+                + result.Label
+                + "</td><td align=\"right\">"
+                + FormatOps(result.Relational.OpsPerSecond)
+                + "</td><td align=\"right\">"
+                + FormatOps(result.Manual.OpsPerSecond)
+                + "</td><td align=\"right\">"
+                + ratio
+                + "</td><td align=\"right\">"
+                + result.Relational.Iterations.ToString("N0", CultureInfo.InvariantCulture)
+                + "</td></tr>";
+        }
+
+        private static string FormatOps(double value)
+        {
+            if (1000d <= value)
+            {
+                return value.ToString("N0", CultureInfo.InvariantCulture);
+            }
+
+            if (100d <= value)
+            {
+                return value.ToString("N1", CultureInfo.InvariantCulture);
+            }
+
+            return value.ToString("0.00", CultureInfo.InvariantCulture);
+        }
+
+        private static void AddSiblingColliders(GameObject host, int count)
+        {
+            for (int i = 0; i < count; ++i)
+            {
+                host.AddComponent<BoxCollider>();
+            }
+        }
+
+        private static string GetOperatingSystemToken()
+        {
+            RuntimePlatform platform = Application.platform;
+            switch (platform)
+            {
+                case RuntimePlatform.WindowsEditor:
+                case RuntimePlatform.WindowsPlayer:
+                case RuntimePlatform.WindowsServer:
+                    return "WINDOWS";
+                case RuntimePlatform.OSXEditor:
+                case RuntimePlatform.OSXPlayer:
+                    return "MACOS";
+                case RuntimePlatform.LinuxEditor:
+                case RuntimePlatform.LinuxPlayer:
+                case RuntimePlatform.LinuxServer:
+                    return "LINUX";
+                default:
+                    return "OTHER";
+            }
+        }
+
         [Test]
         [Timeout(BenchmarkTimeoutMilliseconds)]
         public void Benchmark()
@@ -345,100 +468,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             return result;
         }
 
-        private static ScenarioResult ExecuteScenario(
-            string label,
-            Action relationalAction,
-            Action manualAction
-        )
-        {
-            if (relationalAction == null)
-            {
-                throw new ArgumentNullException(nameof(relationalAction));
-            }
-
-            if (manualAction == null)
-            {
-                throw new ArgumentNullException(nameof(manualAction));
-            }
-
-            Prewarm(relationalAction);
-            Prewarm(manualAction);
-
-            BenchmarkMetrics relationalMetrics = Measure(relationalAction);
-            BenchmarkMetrics manualMetrics = Measure(manualAction);
-
-            return new ScenarioResult(label, relationalMetrics, manualMetrics);
-        }
-
-        private static void Prewarm(Action action)
-        {
-            for (int i = 0; i < 10; ++i)
-            {
-                action();
-            }
-        }
-
-        private static BenchmarkMetrics Measure(Action action)
-        {
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
-
-            Stopwatch stopwatch = Stopwatch.StartNew();
-
-            int iterations = 0;
-            do
-            {
-                for (int i = 0; i < NumIterations; ++i)
-                {
-                    action();
-                    ++iterations;
-                }
-            } while (stopwatch.Elapsed < BenchmarkDuration);
-
-            stopwatch.Stop();
-            double opsPerSecond = iterations / stopwatch.Elapsed.TotalSeconds;
-            return new BenchmarkMetrics(opsPerSecond, iterations, stopwatch.Elapsed);
-        }
-
-        private static string FormatOpsRow(ScenarioResult result)
-        {
-            string ratio =
-                0d < result.Manual.OpsPerSecond
-                    ? (result.Relational.OpsPerSecond / result.Manual.OpsPerSecond).ToString(
-                        "0.00",
-                        CultureInfo.InvariantCulture
-                    ) + "x"
-                    : "n/a";
-
-            return "    <tr><td align=\"left\">"
-                + result.Label
-                + "</td><td align=\"right\">"
-                + FormatOps(result.Relational.OpsPerSecond)
-                + "</td><td align=\"right\">"
-                + FormatOps(result.Manual.OpsPerSecond)
-                + "</td><td align=\"right\">"
-                + ratio
-                + "</td><td align=\"right\">"
-                + result.Relational.Iterations.ToString("N0", CultureInfo.InvariantCulture)
-                + "</td></tr>";
-        }
-
-        private static string FormatOps(double value)
-        {
-            if (1000d <= value)
-            {
-                return value.ToString("N0", CultureInfo.InvariantCulture);
-            }
-
-            if (100d <= value)
-            {
-                return value.ToString("N1", CultureInfo.InvariantCulture);
-            }
-
-            return value.ToString("0.00", CultureInfo.InvariantCulture);
-        }
-
         private GameObject CreateGameObject(string name)
         {
             return Track(new GameObject(name));
@@ -454,37 +483,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             }
         }
 
-        private static void AddSiblingColliders(GameObject host, int count)
-        {
-            for (int i = 0; i < count; ++i)
-            {
-                host.AddComponent<BoxCollider>();
-            }
-        }
-
-        private static string GetOperatingSystemToken()
-        {
-            RuntimePlatform platform = Application.platform;
-            switch (platform)
-            {
-                case RuntimePlatform.WindowsEditor:
-                case RuntimePlatform.WindowsPlayer:
-                case RuntimePlatform.WindowsServer:
-                    return "WINDOWS";
-                case RuntimePlatform.OSXEditor:
-                case RuntimePlatform.OSXPlayer:
-                    return "MACOS";
-                case RuntimePlatform.LinuxEditor:
-                case RuntimePlatform.LinuxPlayer:
-                case RuntimePlatform.LinuxServer:
-                    return "LINUX";
-                default:
-                    return "OTHER";
-            }
-        }
-
         private readonly struct ScenarioResult
         {
+            public string Label { get; }
+
+            public BenchmarkMetrics Relational { get; }
+
+            public BenchmarkMetrics Manual { get; }
+
             public ScenarioResult(
                 string label,
                 BenchmarkMetrics relational,
@@ -495,28 +501,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 Relational = relational;
                 Manual = manual;
             }
-
-            public string Label { get; }
-
-            public BenchmarkMetrics Relational { get; }
-
-            public BenchmarkMetrics Manual { get; }
         }
 
         private readonly struct BenchmarkMetrics
         {
+            public double OpsPerSecond { get; }
+
+            public int Iterations { get; }
+
+            public TimeSpan Elapsed { get; }
+
             public BenchmarkMetrics(double opsPerSecond, int iterations, TimeSpan elapsed)
             {
                 OpsPerSecond = opsPerSecond;
                 Iterations = iterations;
                 Elapsed = elapsed;
             }
-
-            public double OpsPerSecond { get; }
-
-            public int Iterations { get; }
-
-            public TimeSpan Elapsed { get; }
         }
     }
 }

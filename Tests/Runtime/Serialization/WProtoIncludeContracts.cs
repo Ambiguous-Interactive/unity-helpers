@@ -145,15 +145,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [WProtoContract]
     public partial class WProtoPolyListSub : WProtoPolyListBase
     {
+        /// <summary>The subtype's own member.</summary>
+        [WProtoMember(1)]
+        public int SubOnly;
+
         /// <summary>Replaces the base constructor's seed, so the two are distinguishable.</summary>
         public WProtoPolyListSub()
         {
             Items = new List<int> { 5 };
         }
-
-        /// <summary>The subtype's own member.</summary>
-        [WProtoMember(1)]
-        public int SubOnly;
     }
 
     /// <summary>

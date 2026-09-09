@@ -37,9 +37,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     /// </remarks>
     public static class WallstopStudiosLogger
     {
-        public static readonly UnityLogTagFormatter LogInstance = new(
-            createDefaultDecorators: true
-        );
+        private const int LogsPerCacheClean = 5;
 
         private static bool ShouldLogOnMainThread =>
             UnityMainThreadGuard.IsInitialized
@@ -47,8 +45,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 : Equals(Thread.CurrentThread, UnityMainThread)
                     || (UnityMainThread == null && !Application.isPlaying);
 
+        public static readonly UnityLogTagFormatter LogInstance = new(
+            createDefaultDecorators: true
+        );
+
         private static Thread UnityMainThread;
-        private const int LogsPerCacheClean = 5;
 
         // Volatile integer access publishes worker changes without a separate synchronization barrier.
         private static int LoggingEnabled = 1;
@@ -67,17 +68,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         private static readonly Dictionary<Type, (string, Func<object, object>)[]> MetadataCache =
             new();
 #endif
-
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-        private static void InitializeMainThread()
-        {
-            UnityMainThread = Thread.CurrentThread;
-            UnityMainThreadGuard.Capture(UnityMainThread);
-            lock (DisabledLock)
-            {
-                Disabled.Clear();
-            }
-        }
 
         /// <summary>
         /// Globally enables logging for all Unity Objects.
@@ -188,16 +178,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             return values.ToJson();
-        }
-
-        [HideInCallstack]
-        private static string ValueFormat(object value)
-        {
-            if (value is Object obj)
-            {
-                return obj != null ? obj.name : "null";
-            }
-            return value?.ToString();
         }
 
         /// <summary>
@@ -445,6 +425,27 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     LogOffline(LogType.Error, localComponent, localMessage, localE);
                 }
             }
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void InitializeMainThread()
+        {
+            UnityMainThread = Thread.CurrentThread;
+            UnityMainThreadGuard.Capture(UnityMainThread);
+            lock (DisabledLock)
+            {
+                Disabled.Clear();
+            }
+        }
+
+        [HideInCallstack]
+        private static string ValueFormat(object value)
+        {
+            if (value is Object obj)
+            {
+                return obj != null ? obj.name : "null";
+            }
+            return value?.ToString();
         }
 
         [HideInCallstack]

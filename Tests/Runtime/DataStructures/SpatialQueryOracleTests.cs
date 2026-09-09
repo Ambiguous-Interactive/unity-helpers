@@ -19,6 +19,22 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     [NUnit.Framework.Category("Fast")]
     public sealed class SpatialQueryOracleTests
     {
+        /// <summary>
+        /// Five samples at distances 1, 4, 2, 5, 3 from the origin, deliberately out of insertion
+        /// order so a sort that kept insertion order would be caught.
+        /// </summary>
+        private static Sample[] Ladder()
+        {
+            return new[]
+            {
+                new Sample(new Vector3(2f, 0f, 0f), 20, 0),
+                new Sample(new Vector3(0f, 5f, 0f), 21, 1),
+                new Sample(new Vector3(1f, 0f, 0f), 22, 2),
+                new Sample(new Vector3(0f, 4f, 0f), 23, 3),
+                new Sample(new Vector3(0f, 3f, 0f), 24, 4),
+            };
+        }
+
         [Test]
         public void NearestTrimsToTheRequestedCountInDistanceOrder()
         {
@@ -120,22 +136,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     5f
                 )
             );
-        }
-
-        /// <summary>
-        /// Five samples at distances 1, 4, 2, 5, 3 from the origin, deliberately out of insertion
-        /// order so a sort that kept insertion order would be caught.
-        /// </summary>
-        private static Sample[] Ladder()
-        {
-            return new[]
-            {
-                new Sample(new Vector3(2f, 0f, 0f), 20, 0),
-                new Sample(new Vector3(0f, 5f, 0f), 21, 1),
-                new Sample(new Vector3(1f, 0f, 0f), 22, 2),
-                new Sample(new Vector3(0f, 4f, 0f), 23, 3),
-                new Sample(new Vector3(0f, 3f, 0f), 24, 4),
-            };
         }
     }
 }

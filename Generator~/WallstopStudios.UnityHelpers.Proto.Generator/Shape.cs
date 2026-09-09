@@ -22,6 +22,23 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private const string Proto =
             "global::WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto";
 
+        /// <summary>
+        /// Reports whether protobuf-net would accept this shape in a packed run.
+        /// </summary>
+        /// <remarks>
+        /// Only the fixed-width and varint wire types can be packed; a length-delimited value
+        /// carries its own length and a packed run of them could not be parsed at all. This decides
+        /// whether the generated reader grows the extra length-delimited case that accepts a packed
+        /// payload for a member this package always writes unpacked.
+        /// </remarks>
+        internal bool Packable =>
+            !NeverPacked
+            && (
+                WireType == Proto + ".WProtoWireType.Varint"
+                || WireType == Proto + ".WProtoWireType.Fixed32"
+                || WireType == Proto + ".WProtoWireType.Fixed64"
+            );
+
         /// <summary>The wire type constant a field of this shape carries in its key.</summary>
         internal string WireType;
 
@@ -96,71 +113,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         internal bool NeverPacked;
 
         /// <summary>
-        /// Reports whether protobuf-net would accept this shape in a packed run.
-        /// </summary>
-        /// <remarks>
-        /// Only the fixed-width and varint wire types can be packed; a length-delimited value
-        /// carries its own length and a packed run of them could not be parsed at all. This decides
-        /// whether the generated reader grows the extra length-delimited case that accepts a packed
-        /// payload for a member this package always writes unpacked.
-        /// </remarks>
-        internal bool Packable =>
-            !NeverPacked
-            && (
-                WireType == Proto + ".WProtoWireType.Varint"
-                || WireType == Proto + ".WProtoWireType.Fixed32"
-                || WireType == Proto + ".WProtoWireType.Fixed64"
-            );
-
-        /// <summary>
         /// Substitutes <paramref name="value"/> for the placeholder in <paramref name="fragment"/>.
         /// </summary>
         internal static string Fill(string fragment, string value)
         {
             return fragment == null ? null : fragment.Replace(Placeholder, value);
-        }
-
-        /// <summary>
-        /// Builds the write call for a value of this shape with <b>no field key</b>.
-        /// </summary>
-        /// <remarks>
-        /// The form a packed run needs: the key and length belong to the run, and the elements
-        /// inside it are bare values. Only ever valid for a <see cref="Packable"/> shape, which is
-        /// also the only kind that never writes its own tag.
-        /// </remarks>
-        internal string RawWriteCall(string value)
-        {
-            return "writer." + WriteMethod + "(" + Fill(WriteCast, value) + value + ")";
-        }
-
-        /// <summary>
-        /// Builds the write call for a value of this shape at <paramref name="tag"/>.
-        /// </summary>
-        internal string WriteCall(string value, int tag)
-        {
-            // Writing key, length, and payload together avoids re-measuring sub-messages and repeating hooks.
-            if (WritesOwnTag)
-            {
-                return "writer."
-                    + WriteMethod
-                    + "("
-                    + tag
-                    + ", "
-                    + Fill(WriteCast, value)
-                    + value
-                    + ")";
-            }
-
-            return "writer.TryWriteTag("
-                + tag
-                + ", "
-                + WireType
-                + ") && writer."
-                + WriteMethod
-                + "("
-                + Fill(WriteCast, value)
-                + value
-                + ")";
         }
 
         /// <summary>
@@ -451,6 +408,99 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         }
 
         /// <summary>
+        /// Reports whether <paramref name="type"/> carries <c>[WProtoContract]</c>.
+        /// </summary>
+        /// <remarks>
+        /// The attribute is matched by name rather than by symbol identity so a contract declared in
+        /// a referenced assembly counts too -- which is the whole point, since a consumer nesting one
+        /// of this package's contracts inside one of its own is the case the generator exists for.
+        /// </remarks>
+        internal static bool IsContract(ITypeSymbol type)
+        {
+            return FindContractAttribute(type) != null;
+        }
+
+        /// <summary>
+        /// Reports whether the contract on <paramref name="type"/> sets <c>IgnoreListHandling</c>,
+        /// which declares it a message even though it is also a collection.
+        /// </summary>
+        internal static bool IgnoresListHandling(ITypeSymbol type)
+        {
+            return ContractFlag(type, "IgnoreListHandling");
+        }
+
+        /// <summary>
+        /// Reports whether the contract on <paramref name="type"/> sets <c>SkipConstructor</c>,
+        /// which declares that no constructor the author wrote may run when reading one.
+        /// </summary>
+        /// <param name="type">The contract type.</param>
+        /// <returns><c>true</c> when the flag is set.</returns>
+        /// <remarks>
+        /// Load-bearing rather than an optimization. <c>DotNetRandom</c>'s parameterless constructor
+        /// seeds a live generator from a fresh <c>Guid</c>, and its after-deserialization hook
+        /// returns early when one already exists -- so a formatter that called it would hand back a
+        /// generator on a random stream instead of the saved one, silently, and only for a save the
+        /// player had already made.
+        /// </remarks>
+        internal static bool SkipsConstructor(ITypeSymbol type)
+        {
+            return ContractFlag(type, "SkipConstructor");
+        }
+
+        /// <summary>
+        /// Reports whether <paramref name="type"/> has a ZigZag encoding at all.
+        /// </summary>
+        /// <param name="type">The member's declared type, which may be a <c>Nullable{T}</c>.</param>
+        /// <remarks>
+        /// Only the signed integers: protobuf spells ZigZag <c>sint32</c> and <c>sint64</c>, and has
+        /// no such form for an unsigned value, a float, a string or a message. A repeated or map
+        /// member answers <c>false</c> here too, because the annotation names an element encoding
+        /// this generator does not yet emit -- and an annotation that is quietly dropped is a wire
+        /// format nobody chose.
+        /// </remarks>
+        internal static bool SupportsZigZag(ITypeSymbol type)
+        {
+            return Underlying(type).SpecialType
+                is SpecialType.System_SByte
+                    or SpecialType.System_Int16
+                    or SpecialType.System_Int32
+                    or SpecialType.System_Int64;
+        }
+
+        /// <summary>
+        /// The shape of a signed integer encoded as <c>sint32</c> or <c>sint64</c>.
+        /// </summary>
+        /// <param name="type">The value's type, with any <c>Nullable{T}</c> already unwrapped.</param>
+        /// <param name="qualified">Its fully qualified name.</param>
+        /// <remarks>
+        /// The presence test is the same <c>!= 0</c> the default encoding uses, and deliberately so:
+        /// ZigZag maps zero onto zero, so the field a default value would produce is the one that is
+        /// already omitted.
+        /// </remarks>
+        internal static Shape ZigZag(ITypeSymbol type, string qualified)
+        {
+            bool wide = type.SpecialType == SpecialType.System_Int64;
+            bool exact = wide || type.SpecialType == SpecialType.System_Int32;
+            string cast = wide ? "(long)" : "(int)";
+            string widened = exact ? Placeholder : cast + Placeholder;
+            return new Shape
+            {
+                WireType = Proto + ".WProtoWireType.Varint",
+                PresenceTest = Placeholder + " != 0",
+                SizeExpression =
+                    Proto
+                    + (wide ? ".WProtoSizes.ZigZag64Size(" : ".WProtoSizes.ZigZag32Size(")
+                    + widened
+                    + ")",
+                WriteMethod = wide ? "TryWriteZigZag64" : "TryWriteZigZag32",
+                ReadMethod = wide ? "TryReadZigZag64" : "TryReadZigZag32",
+                ReadLocalType = wide ? "long" : "int",
+                AssignExpression = exact ? Placeholder : "(" + qualified + ")" + Placeholder,
+                WriteCast = exact ? string.Empty : cast,
+            };
+        }
+
+        /// <summary>
         /// The built-in formatter serving one of the base-class-library value types, or
         /// <c>null</c> for everything else.
         /// </summary>
@@ -541,46 +591,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
         }
 
-        /// <summary>
-        /// Reports whether <paramref name="type"/> carries <c>[WProtoContract]</c>.
-        /// </summary>
-        /// <remarks>
-        /// The attribute is matched by name rather than by symbol identity so a contract declared in
-        /// a referenced assembly counts too -- which is the whole point, since a consumer nesting one
-        /// of this package's contracts inside one of its own is the case the generator exists for.
-        /// </remarks>
-        internal static bool IsContract(ITypeSymbol type)
-        {
-            return FindContractAttribute(type) != null;
-        }
-
-        /// <summary>
-        /// Reports whether the contract on <paramref name="type"/> sets <c>IgnoreListHandling</c>,
-        /// which declares it a message even though it is also a collection.
-        /// </summary>
-        internal static bool IgnoresListHandling(ITypeSymbol type)
-        {
-            return ContractFlag(type, "IgnoreListHandling");
-        }
-
-        /// <summary>
-        /// Reports whether the contract on <paramref name="type"/> sets <c>SkipConstructor</c>,
-        /// which declares that no constructor the author wrote may run when reading one.
-        /// </summary>
-        /// <param name="type">The contract type.</param>
-        /// <returns><c>true</c> when the flag is set.</returns>
-        /// <remarks>
-        /// Load-bearing rather than an optimization. <c>DotNetRandom</c>'s parameterless constructor
-        /// seeds a live generator from a fresh <c>Guid</c>, and its after-deserialization hook
-        /// returns early when one already exists -- so a formatter that called it would hand back a
-        /// generator on a random stream instead of the saved one, silently, and only for a save the
-        /// player had already made.
-        /// </remarks>
-        internal static bool SkipsConstructor(ITypeSymbol type)
-        {
-            return ContractFlag(type, "SkipConstructor");
-        }
-
         private static bool ContractFlag(ITypeSymbol type, string name)
         {
             AttributeData contract = FindContractAttribute(type);
@@ -638,59 +648,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             };
         }
 
-        /// <summary>
-        /// Reports whether <paramref name="type"/> has a ZigZag encoding at all.
-        /// </summary>
-        /// <param name="type">The member's declared type, which may be a <c>Nullable{T}</c>.</param>
-        /// <remarks>
-        /// Only the signed integers: protobuf spells ZigZag <c>sint32</c> and <c>sint64</c>, and has
-        /// no such form for an unsigned value, a float, a string or a message. A repeated or map
-        /// member answers <c>false</c> here too, because the annotation names an element encoding
-        /// this generator does not yet emit -- and an annotation that is quietly dropped is a wire
-        /// format nobody chose.
-        /// </remarks>
-        internal static bool SupportsZigZag(ITypeSymbol type)
-        {
-            return Underlying(type).SpecialType
-                is SpecialType.System_SByte
-                    or SpecialType.System_Int16
-                    or SpecialType.System_Int32
-                    or SpecialType.System_Int64;
-        }
-
-        /// <summary>
-        /// The shape of a signed integer encoded as <c>sint32</c> or <c>sint64</c>.
-        /// </summary>
-        /// <param name="type">The value's type, with any <c>Nullable{T}</c> already unwrapped.</param>
-        /// <param name="qualified">Its fully qualified name.</param>
-        /// <remarks>
-        /// The presence test is the same <c>!= 0</c> the default encoding uses, and deliberately so:
-        /// ZigZag maps zero onto zero, so the field a default value would produce is the one that is
-        /// already omitted.
-        /// </remarks>
-        internal static Shape ZigZag(ITypeSymbol type, string qualified)
-        {
-            bool wide = type.SpecialType == SpecialType.System_Int64;
-            bool exact = wide || type.SpecialType == SpecialType.System_Int32;
-            string cast = wide ? "(long)" : "(int)";
-            string widened = exact ? Placeholder : cast + Placeholder;
-            return new Shape
-            {
-                WireType = Proto + ".WProtoWireType.Varint",
-                PresenceTest = Placeholder + " != 0",
-                SizeExpression =
-                    Proto
-                    + (wide ? ".WProtoSizes.ZigZag64Size(" : ".WProtoSizes.ZigZag32Size(")
-                    + widened
-                    + ")",
-                WriteMethod = wide ? "TryWriteZigZag64" : "TryWriteZigZag32",
-                ReadMethod = wide ? "TryReadZigZag64" : "TryReadZigZag32",
-                ReadLocalType = wide ? "long" : "int",
-                AssignExpression = exact ? Placeholder : "(" + qualified + ")" + Placeholder,
-                WriteCast = exact ? string.Empty : cast,
-            };
-        }
-
         private static ITypeSymbol Underlying(ITypeSymbol type)
         {
             return
@@ -740,6 +697,49 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 AssignExpression = exact ? Placeholder : "(" + qualified + ")" + Placeholder,
                 WriteCast = exact ? string.Empty : "(uint)",
             };
+        }
+
+        /// <summary>
+        /// Builds the write call for a value of this shape with <b>no field key</b>.
+        /// </summary>
+        /// <remarks>
+        /// The form a packed run needs: the key and length belong to the run, and the elements
+        /// inside it are bare values. Only ever valid for a <see cref="Packable"/> shape, which is
+        /// also the only kind that never writes its own tag.
+        /// </remarks>
+        internal string RawWriteCall(string value)
+        {
+            return "writer." + WriteMethod + "(" + Fill(WriteCast, value) + value + ")";
+        }
+
+        /// <summary>
+        /// Builds the write call for a value of this shape at <paramref name="tag"/>.
+        /// </summary>
+        internal string WriteCall(string value, int tag)
+        {
+            // Writing key, length, and payload together avoids re-measuring sub-messages and repeating hooks.
+            if (WritesOwnTag)
+            {
+                return "writer."
+                    + WriteMethod
+                    + "("
+                    + tag
+                    + ", "
+                    + Fill(WriteCast, value)
+                    + value
+                    + ")";
+            }
+
+            return "writer.TryWriteTag("
+                + tag
+                + ", "
+                + WireType
+                + ") && writer."
+                + WriteMethod
+                + "("
+                + Fill(WriteCast, value)
+                + value
+                + ")";
         }
     }
 }

@@ -23,6 +23,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     public static partial class Helpers
     {
         /// <summary>
+        /// How many tags the lookup cache currently holds.
+        /// </summary>
+        internal static int TagCacheCount => ObjectsByTag.Count;
+
+        /// <summary>
         /// Finds and caches an instance of <typeparamref name="T"/> on a GameObject with the given tag.
         /// </summary>
         /// <param name="component">Context for logging.</param>
@@ -136,56 +141,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         public static void ClearTagCache()
         {
             ObjectsByTag.Clear();
-        }
-
-        /// <summary>
-        /// How many tags the lookup cache currently holds.
-        /// </summary>
-        internal static int TagCacheCount => ObjectsByTag.Count;
-
-        /// <summary>
-        /// Drops cached tag lookups whose object a scene unload destroyed.
-        /// </summary>
-        /// <param name="unloaded">
-        /// Unused; the signature is what <see cref="SceneManager.sceneUnloaded"/> requires.
-        /// </param>
-        /// <remarks>
-        /// The cache is keyed by tag and holds a strong reference to a scene object, so a tag that
-        /// is never asked for again roots that object -- and everything its managed fields reach --
-        /// for the life of the process. A destroyed entry is dropped on the next lookup of the same
-        /// tag, which is exactly the lookup that never comes.
-        /// </remarks>
-        internal static void DropDestroyedTagCacheEntries(Scene unloaded)
-        {
-            if (ObjectsByTag.Count == 0)
-            {
-                return;
-            }
-
-            using PooledResource<List<string>> staleResource = Buffers<string>.List.Get(
-                out List<string> stale
-            );
-            foreach (KeyValuePair<string, Object> entry in ObjectsByTag)
-            {
-                if (entry.Value == null)
-                {
-                    stale.Add(entry.Key);
-                }
-            }
-
-            foreach (string tag in stale)
-            {
-                _ = ObjectsByTag.Remove(tag);
-            }
-        }
-
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void RegisterTagCacheLifecycle()
-        {
-            // With domain reload disabled, remove only destroyed entries; reset hooks can run after a consumer seeds live values.
-            DropDestroyedTagCacheEntries(default);
-            SceneManager.sceneUnloaded -= DropDestroyedTagCacheEntries;
-            SceneManager.sceneUnloaded += DropDestroyedTagCacheEntries;
         }
 
         /// <summary>
@@ -450,17 +405,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         public static void EditorDestroyAllChildrenGameObjects(this GameObject gameObject) =>
             gameObject.InternalDestroyAllChildrenGameObjects(go => go.Destroy());
 
-        private static void InternalDestroyAllChildrenGameObjects(
-            this GameObject gameObject,
-            Action<GameObject> destroyFunction
-        )
-        {
-            for (int i = gameObject.transform.childCount - 1; 0 <= i; --i)
-            {
-                destroyFunction(gameObject.transform.GetChild(i).gameObject);
-            }
-        }
-
         /// <summary>
         /// Returns true if the GameObject represents a prefab asset or prefab stage content (Editor), or is not in a scene (Runtime).
         /// </summary>
@@ -568,6 +512,62 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
             }
 #endif
+        }
+
+        /// <summary>
+        /// Drops cached tag lookups whose object a scene unload destroyed.
+        /// </summary>
+        /// <param name="unloaded">
+        /// Unused; the signature is what <see cref="SceneManager.sceneUnloaded"/> requires.
+        /// </param>
+        /// <remarks>
+        /// The cache is keyed by tag and holds a strong reference to a scene object, so a tag that
+        /// is never asked for again roots that object -- and everything its managed fields reach --
+        /// for the life of the process. A destroyed entry is dropped on the next lookup of the same
+        /// tag, which is exactly the lookup that never comes.
+        /// </remarks>
+        internal static void DropDestroyedTagCacheEntries(Scene unloaded)
+        {
+            if (ObjectsByTag.Count == 0)
+            {
+                return;
+            }
+
+            using PooledResource<List<string>> staleResource = Buffers<string>.List.Get(
+                out List<string> stale
+            );
+            foreach (KeyValuePair<string, Object> entry in ObjectsByTag)
+            {
+                if (entry.Value == null)
+                {
+                    stale.Add(entry.Key);
+                }
+            }
+
+            foreach (string tag in stale)
+            {
+                _ = ObjectsByTag.Remove(tag);
+            }
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void RegisterTagCacheLifecycle()
+        {
+            // With domain reload disabled, remove only destroyed entries; reset hooks can run after a consumer seeds live values.
+            DropDestroyedTagCacheEntries(default);
+            SceneManager.sceneUnloaded -= DropDestroyedTagCacheEntries;
+            SceneManager.sceneUnloaded += DropDestroyedTagCacheEntries;
+        }
+
+        private static void InternalDestroyAllChildrenGameObjects(
+            this GameObject gameObject,
+            Action<GameObject> destroyFunction
+        )
+        {
+            for (int i = gameObject.transform.childCount - 1; 0 <= i; --i)
+            {
+                destroyFunction(gameObject.transform.GetChild(i).gameObject);
+            }
         }
     }
 }

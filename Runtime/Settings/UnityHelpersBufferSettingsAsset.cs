@@ -33,25 +33,6 @@ namespace WallstopStudios.UnityHelpers.Settings
         );
         internal const string UseLruEvictionPropertyName = nameof(_waitInstructionUseLruEviction);
 
-        [FormerlySerializedAs("applyOnLoad")]
-        [SerializeField]
-        private bool _applyOnLoad = true;
-
-        [FormerlySerializedAs("waitInstructionQuantizationStepSeconds")]
-        [SerializeField]
-        [Min(0f)]
-        private float _waitInstructionQuantizationStepSeconds;
-
-        [FormerlySerializedAs("waitInstructionMaxDistinctEntries")]
-        [SerializeField]
-        [Min(0)]
-        private int _waitInstructionMaxDistinctEntries =
-            Buffers.WaitInstructionDefaultMaxDistinctEntries;
-
-        [FormerlySerializedAs("waitInstructionUseLruEviction")]
-        [SerializeField]
-        private bool _waitInstructionUseLruEviction;
-
         /// <summary>
         /// Gets whether the defaults should be applied automatically on domain/runtime load.
         /// </summary>
@@ -74,6 +55,40 @@ namespace WallstopStudios.UnityHelpers.Settings
         /// </summary>
         public bool UseLruEviction => _waitInstructionUseLruEviction;
 
+        [FormerlySerializedAs("applyOnLoad")]
+        [SerializeField]
+        private bool _applyOnLoad = true;
+
+        [FormerlySerializedAs("waitInstructionQuantizationStepSeconds")]
+        [SerializeField]
+        [Min(0f)]
+        private float _waitInstructionQuantizationStepSeconds;
+
+        [FormerlySerializedAs("waitInstructionMaxDistinctEntries")]
+        [SerializeField]
+        [Min(0)]
+        private int _waitInstructionMaxDistinctEntries =
+            Buffers.WaitInstructionDefaultMaxDistinctEntries;
+
+        [FormerlySerializedAs("waitInstructionUseLruEviction")]
+        [SerializeField]
+        private bool _waitInstructionUseLruEviction;
+
+        private static float SanitizeQuantization(float step)
+        {
+            if (float.IsNaN(step) || float.IsInfinity(step) || step <= 0f)
+            {
+                return 0f;
+            }
+
+            return step;
+        }
+
+        private static int SanitizeMaxDistinctEntries(int value)
+        {
+            return value < 0 ? 0 : value;
+        }
+
         /// <summary>
         /// Applies the stored defaults to the Buffers wait-instruction caches.
         /// </summary>
@@ -93,21 +108,6 @@ namespace WallstopStudios.UnityHelpers.Settings
                 Buffers.WaitInstructionQuantizationStepSeconds;
             _waitInstructionMaxDistinctEntries = Buffers.WaitInstructionMaxDistinctEntries;
             _waitInstructionUseLruEviction = Buffers.WaitInstructionUseLruEviction;
-        }
-
-        private static float SanitizeQuantization(float step)
-        {
-            if (float.IsNaN(step) || float.IsInfinity(step) || step <= 0f)
-            {
-                return 0f;
-            }
-
-            return step;
-        }
-
-        private static int SanitizeMaxDistinctEntries(int value)
-        {
-            return value < 0 ? 0 : value;
         }
     }
 }

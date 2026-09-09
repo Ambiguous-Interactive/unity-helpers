@@ -45,18 +45,6 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </remarks>
         public const int DefaultMaxCachedTypeNames = 512;
 
-        private static readonly Cache<string, Type> SimplifiedTypeNameCache = CacheBuilder<
-            string,
-            Type
-        >
-            .NewBuilder()
-            .MaximumSize(DefaultMaxCachedTypeNames)
-            .InitialCapacity(16)
-            .Build();
-
-        private static int _maxCachedTypeNames = DefaultMaxCachedTypeNames;
-        private static readonly object CacheResizeLock = new();
-
         /// <summary>
         /// Gets or sets how many distinct type-name spellings the resolver retains. A value of 0 or
         /// less removes the bound.
@@ -75,6 +63,18 @@ namespace WallstopStudios.UnityHelpers.Utils
         }
 
         internal static int CachedTypeNameCountForTesting => SimplifiedTypeNameCache.Count;
+
+        private static readonly Cache<string, Type> SimplifiedTypeNameCache = CacheBuilder<
+            string,
+            Type
+        >
+            .NewBuilder()
+            .MaximumSize(DefaultMaxCachedTypeNames)
+            .InitialCapacity(16)
+            .Build();
+
+        private static int _maxCachedTypeNames = DefaultMaxCachedTypeNames;
+        private static readonly object CacheResizeLock = new();
 
         private static readonly Dictionary<string, Type> BuiltInTypeAliases = new(
             StringComparer.OrdinalIgnoreCase
@@ -441,6 +441,91 @@ namespace WallstopStudios.UnityHelpers.Utils
             SimplifiedTypeNameCache.Clear();
         }
 
+        /// <summary>
+        /// Gets a human-readable display name for a type.
+        /// </summary>
+        /// <param name="type">The type to get a display name for.</param>
+        /// <returns>
+        /// A simplified type name using C# syntax for generics.
+        /// </returns>
+        public static string GetDisplayName(Type type)
+        {
+            if (type == null)
+            {
+                return string.Empty;
+            }
+
+            foreach (KeyValuePair<string, Type> alias in BuiltInTypeAliases)
+            {
+                if (alias.Value == type)
+                {
+                    return alias.Key;
+                }
+            }
+
+            if (!type.IsGenericType)
+            {
+                return type.Name;
+            }
+
+            if (type.IsGenericTypeDefinition)
+            {
+                string name = type.Name;
+                int backtickIndex = name.IndexOf('`');
+                if (0 <= backtickIndex)
+                {
+                    name = name.Substring(0, backtickIndex);
+                }
+
+                Type[] args = type.GetGenericArguments();
+                if (args.Length == 1)
+                {
+                    return $"{name}<>";
+                }
+
+                using PooledResource<StringBuilder> sbLease = Buffers.StringBuilder.Get(
+                    out StringBuilder sb
+                );
+                sb.Append(name);
+                sb.Append('<');
+                for (int i = 1; i < args.Length; i++)
+                {
+                    sb.Append(',');
+                }
+
+                sb.Append('>');
+                return sb.ToString();
+            }
+            else
+            {
+                string name = type.Name;
+                int backtickIndex = name.IndexOf('`');
+                if (0 <= backtickIndex)
+                {
+                    name = name.Substring(0, backtickIndex);
+                }
+
+                Type[] args = type.GetGenericArguments();
+                using PooledResource<StringBuilder> sbLease = Buffers.StringBuilder.Get(
+                    out StringBuilder sb
+                );
+                sb.Append(name);
+                sb.Append('<');
+                for (int i = 0; i < args.Length; i++)
+                {
+                    if (0 < i)
+                    {
+                        sb.Append(", ");
+                    }
+
+                    sb.Append(GetDisplayName(args[i]));
+                }
+
+                sb.Append('>');
+                return sb.ToString();
+            }
+        }
+
         private static bool ContainsOpenTypeArguments(Type type)
         {
             if (!type.IsGenericType)
@@ -697,91 +782,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             return null;
-        }
-
-        /// <summary>
-        /// Gets a human-readable display name for a type.
-        /// </summary>
-        /// <param name="type">The type to get a display name for.</param>
-        /// <returns>
-        /// A simplified type name using C# syntax for generics.
-        /// </returns>
-        public static string GetDisplayName(Type type)
-        {
-            if (type == null)
-            {
-                return string.Empty;
-            }
-
-            foreach (KeyValuePair<string, Type> alias in BuiltInTypeAliases)
-            {
-                if (alias.Value == type)
-                {
-                    return alias.Key;
-                }
-            }
-
-            if (!type.IsGenericType)
-            {
-                return type.Name;
-            }
-
-            if (type.IsGenericTypeDefinition)
-            {
-                string name = type.Name;
-                int backtickIndex = name.IndexOf('`');
-                if (0 <= backtickIndex)
-                {
-                    name = name.Substring(0, backtickIndex);
-                }
-
-                Type[] args = type.GetGenericArguments();
-                if (args.Length == 1)
-                {
-                    return $"{name}<>";
-                }
-
-                using PooledResource<StringBuilder> sbLease = Buffers.StringBuilder.Get(
-                    out StringBuilder sb
-                );
-                sb.Append(name);
-                sb.Append('<');
-                for (int i = 1; i < args.Length; i++)
-                {
-                    sb.Append(',');
-                }
-
-                sb.Append('>');
-                return sb.ToString();
-            }
-            else
-            {
-                string name = type.Name;
-                int backtickIndex = name.IndexOf('`');
-                if (0 <= backtickIndex)
-                {
-                    name = name.Substring(0, backtickIndex);
-                }
-
-                Type[] args = type.GetGenericArguments();
-                using PooledResource<StringBuilder> sbLease = Buffers.StringBuilder.Get(
-                    out StringBuilder sb
-                );
-                sb.Append(name);
-                sb.Append('<');
-                for (int i = 0; i < args.Length; i++)
-                {
-                    if (0 < i)
-                    {
-                        sb.Append(", ");
-                    }
-
-                    sb.Append(GetDisplayName(args[i]));
-                }
-
-                sb.Append('>');
-                return sb.ToString();
-            }
         }
     }
 }

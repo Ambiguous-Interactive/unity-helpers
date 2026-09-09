@@ -85,6 +85,165 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
         }
 
+        private static IEnumerable<TestCaseData> FiniteExtremeCases()
+        {
+            string[] variants =
+            {
+                "Kd2Balanced",
+                "Kd2Unbalanced",
+                "Quad",
+                "QuadEntries",
+                "R2",
+                "Kd3Balanced",
+                "Kd3Unbalanced",
+                "Oct",
+                "R3",
+            };
+            int[] bucketSizes = { 1, 32 };
+            int[] signs = { -1, 1 };
+            foreach (string variant in variants)
+            {
+                int dimensions = IsThreeDimensional(variant) ? 3 : 2;
+                for (int axis = 0; axis < dimensions; ++axis)
+                {
+                    foreach (int bucketSize in bucketSizes)
+                    {
+                        foreach (int sign in signs)
+                        {
+                            for (int layout = 0; layout < 7; ++layout)
+                            {
+                                int boundaryCount =
+                                    variant == "Quad"
+                                    || variant == "QuadEntries"
+                                    || variant == "Oct"
+                                        ? 3
+                                        : 1;
+                                for (
+                                    int boundaryKind = 0;
+                                    boundaryKind < boundaryCount;
+                                    ++boundaryKind
+                                )
+                                {
+                                    yield return new TestCaseData(
+                                        variant,
+                                        axis,
+                                        bucketSize,
+                                        sign,
+                                        layout,
+                                        boundaryKind
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private static double OracleDistanceSquared(
+            Vector3 query,
+            Vector3 point,
+            Bounds bounds,
+            int dimensions,
+            bool box
+        )
+        {
+            double sum = 0d;
+            for (int axis = 0; axis < dimensions; ++axis)
+            {
+                double coordinate = point[axis];
+                if (box)
+                {
+                    coordinate = Math.Max(
+                        bounds.min[axis],
+                        Math.Min((double)query[axis], bounds.max[axis])
+                    );
+                }
+                double difference = (double)query[axis] - coordinate;
+                sum += difference * difference;
+            }
+            return sum;
+        }
+
+        private static bool IsThreeDimensional(string variant)
+        {
+            return variant == "Kd3Balanced"
+                || variant == "Kd3Unbalanced"
+                || variant == "Oct"
+                || variant == "R3";
+        }
+
+        private static object CreateTree(
+            string variant,
+            int[] source,
+            Vector3[] positions,
+            Bounds[] bounds,
+            int bucketSize,
+            Bounds? boundary = null
+        )
+        {
+            switch (variant)
+            {
+                case "Kd2Balanced":
+                case "Kd2Unbalanced":
+                    KdTree2D<int> kd2 = new(
+                        source,
+                        index => positions[index],
+                        bucketSize,
+                        variant == "Kd2Balanced"
+                    );
+                    CollectionAssert.AreEqual(source, kd2.elements, "Source snapshot");
+                    return kd2;
+                case "Quad":
+                    QuadTree2D<int> quad = new(
+                        source,
+                        index => positions[index],
+                        boundary,
+                        bucketSize: bucketSize
+                    );
+                    CollectionAssert.AreEqual(source, quad.elements, "Source snapshot");
+                    return quad;
+                case "QuadEntries":
+                    List<QuadTree2D<int>.Entry> entries = new();
+                    foreach (int index in source)
+                    {
+                        entries.Add(new QuadTree2D<int>.Entry(index, positions[index]));
+                    }
+                    QuadTree2D<int> directQuad = new(entries, boundary, bucketSize: bucketSize);
+                    CollectionAssert.AreEqual(source, directQuad.elements, "Source snapshot");
+                    return directQuad;
+                case "R2":
+                    RTree2D<int> r2 = new(source, index => bounds[index], bucketSize);
+                    CollectionAssert.AreEqual(source, r2.elements, "Source snapshot");
+                    return r2;
+                case "Kd3Balanced":
+                case "Kd3Unbalanced":
+                    KdTree3D<int> kd3 = new(
+                        source,
+                        index => positions[index],
+                        bucketSize,
+                        variant == "Kd3Balanced"
+                    );
+                    CollectionAssert.AreEqual(source, kd3.elements, "Source snapshot");
+                    return kd3;
+                case "Oct":
+                    OctTree3D<int> oct = new(
+                        source,
+                        index => positions[index],
+                        boundary,
+                        bucketSize: bucketSize
+                    );
+                    CollectionAssert.AreEqual(source, oct.elements, "Source snapshot");
+                    return oct;
+                case "R3":
+                    RTree3D<int> r3 = new(source, index => bounds[index], bucketSize);
+                    CollectionAssert.AreEqual(source, r3.elements, "Source snapshot");
+                    return r3;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(variant));
+            }
+        }
+
         [TestCaseSource(nameof(InvalidGeometryCases))]
         [Timeout(10000)]
         public void InvalidStoredGeometryPreservesFiniteSourceIdentities(
@@ -221,61 +380,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             CollectionAssert.AreEquivalent(new[] { Vector3.left, Vector3.right }, actual);
             tree.GetElementsInBounds(boundary, actual);
             CollectionAssert.AreEquivalent(new[] { Vector3.left, Vector3.right }, actual);
-        }
-
-        private static IEnumerable<TestCaseData> FiniteExtremeCases()
-        {
-            string[] variants =
-            {
-                "Kd2Balanced",
-                "Kd2Unbalanced",
-                "Quad",
-                "QuadEntries",
-                "R2",
-                "Kd3Balanced",
-                "Kd3Unbalanced",
-                "Oct",
-                "R3",
-            };
-            int[] bucketSizes = { 1, 32 };
-            int[] signs = { -1, 1 };
-            foreach (string variant in variants)
-            {
-                int dimensions = IsThreeDimensional(variant) ? 3 : 2;
-                for (int axis = 0; axis < dimensions; ++axis)
-                {
-                    foreach (int bucketSize in bucketSizes)
-                    {
-                        foreach (int sign in signs)
-                        {
-                            for (int layout = 0; layout < 7; ++layout)
-                            {
-                                int boundaryCount =
-                                    variant == "Quad"
-                                    || variant == "QuadEntries"
-                                    || variant == "Oct"
-                                        ? 3
-                                        : 1;
-                                for (
-                                    int boundaryKind = 0;
-                                    boundaryKind < boundaryCount;
-                                    ++boundaryKind
-                                )
-                                {
-                                    yield return new TestCaseData(
-                                        variant,
-                                        axis,
-                                        bucketSize,
-                                        sign,
-                                        layout,
-                                        boundaryKind
-                                    );
-                                }
-                            }
-                        }
-                    }
-                }
-            }
         }
 
         [TestCaseSource(nameof(FiniteExtremeCases))]
@@ -585,110 +689,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                         }
                     }
                 }
-            }
-        }
-
-        private static double OracleDistanceSquared(
-            Vector3 query,
-            Vector3 point,
-            Bounds bounds,
-            int dimensions,
-            bool box
-        )
-        {
-            double sum = 0d;
-            for (int axis = 0; axis < dimensions; ++axis)
-            {
-                double coordinate = point[axis];
-                if (box)
-                {
-                    coordinate = Math.Max(
-                        bounds.min[axis],
-                        Math.Min((double)query[axis], bounds.max[axis])
-                    );
-                }
-                double difference = (double)query[axis] - coordinate;
-                sum += difference * difference;
-            }
-            return sum;
-        }
-
-        private static bool IsThreeDimensional(string variant)
-        {
-            return variant == "Kd3Balanced"
-                || variant == "Kd3Unbalanced"
-                || variant == "Oct"
-                || variant == "R3";
-        }
-
-        private static object CreateTree(
-            string variant,
-            int[] source,
-            Vector3[] positions,
-            Bounds[] bounds,
-            int bucketSize,
-            Bounds? boundary = null
-        )
-        {
-            switch (variant)
-            {
-                case "Kd2Balanced":
-                case "Kd2Unbalanced":
-                    KdTree2D<int> kd2 = new(
-                        source,
-                        index => positions[index],
-                        bucketSize,
-                        variant == "Kd2Balanced"
-                    );
-                    CollectionAssert.AreEqual(source, kd2.elements, "Source snapshot");
-                    return kd2;
-                case "Quad":
-                    QuadTree2D<int> quad = new(
-                        source,
-                        index => positions[index],
-                        boundary,
-                        bucketSize: bucketSize
-                    );
-                    CollectionAssert.AreEqual(source, quad.elements, "Source snapshot");
-                    return quad;
-                case "QuadEntries":
-                    List<QuadTree2D<int>.Entry> entries = new();
-                    foreach (int index in source)
-                    {
-                        entries.Add(new QuadTree2D<int>.Entry(index, positions[index]));
-                    }
-                    QuadTree2D<int> directQuad = new(entries, boundary, bucketSize: bucketSize);
-                    CollectionAssert.AreEqual(source, directQuad.elements, "Source snapshot");
-                    return directQuad;
-                case "R2":
-                    RTree2D<int> r2 = new(source, index => bounds[index], bucketSize);
-                    CollectionAssert.AreEqual(source, r2.elements, "Source snapshot");
-                    return r2;
-                case "Kd3Balanced":
-                case "Kd3Unbalanced":
-                    KdTree3D<int> kd3 = new(
-                        source,
-                        index => positions[index],
-                        bucketSize,
-                        variant == "Kd3Balanced"
-                    );
-                    CollectionAssert.AreEqual(source, kd3.elements, "Source snapshot");
-                    return kd3;
-                case "Oct":
-                    OctTree3D<int> oct = new(
-                        source,
-                        index => positions[index],
-                        boundary,
-                        bucketSize: bucketSize
-                    );
-                    CollectionAssert.AreEqual(source, oct.elements, "Source snapshot");
-                    return oct;
-                case "R3":
-                    RTree3D<int> r3 = new(source, index => bounds[index], bucketSize);
-                    CollectionAssert.AreEqual(source, r3.elements, "Source snapshot");
-                    return r3;
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(variant));
             }
         }
     }

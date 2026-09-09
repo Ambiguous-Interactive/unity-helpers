@@ -29,8 +29,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
     [InitializeOnLoad]
     internal sealed class FailedTestsExporter : ScriptableObject, ICallbacks
     {
+        /// <summary>
+        ///     Gets the current singleton instance of the exporter, or <c>null</c> if
+        ///     the exporter is not initialized or is disabled.
+        /// </summary>
+        public static FailedTestsExporter Instance => _instance;
+
         private static FailedTestsExporter _instance;
         private static TestRunnerApi _api;
+
+        /// <summary>
+        ///     Gets the list of recorded test failures from the most recent test run.
+        /// </summary>
+        public IReadOnlyList<FailedTestInfo> Failures => _failures;
 
         [SerializeField]
         private List<FailedTestInfo> _failures = new();
@@ -38,6 +49,53 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         static FailedTestsExporter()
         {
             Initialize();
+        }
+
+        /// <summary>
+        ///     Checks whether the failed tests exporter is enabled in the project settings.
+        /// </summary>
+        /// <returns>
+        ///     <c>true</c> if the exporter is enabled; <c>false</c> if disabled or if
+        ///     settings are unavailable.
+        /// </returns>
+        public static bool IsEnabled()
+        {
+            return TryIsEnabled(out bool enabled) && enabled;
+        }
+
+        /// <summary>
+        ///     Re-initializes the exporter, allowing settings changes to take effect
+        ///     without requiring a full domain reload.
+        /// </summary>
+        internal static void Reinitialize()
+        {
+            Initialize();
+        }
+
+        /// <summary>
+        ///     Reads the exporter's enabled setting, distinguishing "switched off" from
+        ///     "settings could not be read yet".
+        /// </summary>
+        /// <param name="enabled">Receives the setting; <c>false</c> when it could not be read.</param>
+        /// <returns><c>false</c> when the settings object was not available.</returns>
+        /// <remarks>
+        ///     <see cref="IsEnabled"/> collapses both into <c>false</c>, which is the right answer
+        ///     for a caller asking whether to act and the wrong one for a caller deciding whether to
+        ///     ask again. Registration is the second kind: retrying a disabled feature forever is as
+        ///     wrong as giving up on one whose settings had simply not loaded.
+        /// </remarks>
+        internal static bool TryIsEnabled(out bool enabled)
+        {
+            try
+            {
+                enabled = UnityHelpersSettings.GetFailedTestsExporterEnabled();
+                return true;
+            }
+            catch (Exception)
+            {
+                enabled = false;
+                return false;
+            }
         }
 
         /// <summary>
@@ -69,53 +127,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         {
             CleanupPreviousInstance();
             RegisterCallbacks();
-        }
-
-        /// <summary>
-        ///     Re-initializes the exporter, allowing settings changes to take effect
-        ///     without requiring a full domain reload.
-        /// </summary>
-        internal static void Reinitialize()
-        {
-            Initialize();
-        }
-
-        /// <summary>
-        ///     Checks whether the failed tests exporter is enabled in the project settings.
-        /// </summary>
-        /// <returns>
-        ///     <c>true</c> if the exporter is enabled; <c>false</c> if disabled or if
-        ///     settings are unavailable.
-        /// </returns>
-        public static bool IsEnabled()
-        {
-            return TryIsEnabled(out bool enabled) && enabled;
-        }
-
-        /// <summary>
-        ///     Reads the exporter's enabled setting, distinguishing "switched off" from
-        ///     "settings could not be read yet".
-        /// </summary>
-        /// <param name="enabled">Receives the setting; <c>false</c> when it could not be read.</param>
-        /// <returns><c>false</c> when the settings object was not available.</returns>
-        /// <remarks>
-        ///     <see cref="IsEnabled"/> collapses both into <c>false</c>, which is the right answer
-        ///     for a caller asking whether to act and the wrong one for a caller deciding whether to
-        ///     ask again. Registration is the second kind: retrying a disabled feature forever is as
-        ///     wrong as giving up on one whose settings had simply not loaded.
-        /// </remarks>
-        internal static bool TryIsEnabled(out bool enabled)
-        {
-            try
-            {
-                enabled = UnityHelpersSettings.GetFailedTestsExporterEnabled();
-                return true;
-            }
-            catch (Exception)
-            {
-                enabled = false;
-                return false;
-            }
         }
 
         private static void ArmRetries()
@@ -204,70 +215,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                         + "assembly reload."
                 );
             }
-        }
-
-        /// <summary>
-        ///     Called by the Test Runner when a test run begins. Clears any previously
-        ///     recorded failures.
-        /// </summary>
-        /// <param name="testsToRun">The test tree that will be executed.</param>
-        void ICallbacks.RunStarted(ITestAdaptor testsToRun)
-        {
-            _failures.Clear();
-        }
-
-        /// <summary>
-        ///     Called by the Test Runner when a test run finishes. Writes any recorded
-        ///     failures to a file.
-        /// </summary>
-        /// <param name="result">The aggregate result of the test run.</param>
-        void ICallbacks.RunFinished(ITestResultAdaptor result)
-        {
-            if (_failures.Count == 0)
-            {
-                this.Log($"Test run completed with no failures.");
-                return;
-            }
-
-            string outputPath = WriteFailuresToFile();
-            if (outputPath == null)
-            {
-                return;
-            }
-
-            this.Log($"Wrote {_failures.Count} failure(s) to: {outputPath}");
-        }
-
-        /// <summary>
-        ///     Called by the Test Runner when an individual test begins. No action is taken.
-        /// </summary>
-        /// <param name="test">The test that is starting.</param>
-        void ICallbacks.TestStarted(ITestAdaptor test) { }
-
-        /// <summary>
-        ///     Called by the Test Runner when an individual test finishes. Records the
-        ///     test details if it failed.
-        /// </summary>
-        /// <param name="result">The result of the completed test.</param>
-        void ICallbacks.TestFinished(ITestResultAdaptor result)
-        {
-            if (result.TestStatus != TestStatus.Failed)
-            {
-                return;
-            }
-
-            if (result.HasChildren)
-            {
-                return;
-            }
-
-            _failures.Add(
-                new FailedTestInfo(
-                    result.FullName,
-                    result.Message ?? string.Empty,
-                    result.StackTrace ?? string.Empty
-                )
-            );
         }
 
         /// <summary>
@@ -398,15 +345,68 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         }
 
         /// <summary>
-        ///     Gets the list of recorded test failures from the most recent test run.
+        ///     Called by the Test Runner when a test run begins. Clears any previously
+        ///     recorded failures.
         /// </summary>
-        public IReadOnlyList<FailedTestInfo> Failures => _failures;
+        /// <param name="testsToRun">The test tree that will be executed.</param>
+        void ICallbacks.RunStarted(ITestAdaptor testsToRun)
+        {
+            _failures.Clear();
+        }
 
         /// <summary>
-        ///     Gets the current singleton instance of the exporter, or <c>null</c> if
-        ///     the exporter is not initialized or is disabled.
+        ///     Called by the Test Runner when a test run finishes. Writes any recorded
+        ///     failures to a file.
         /// </summary>
-        public static FailedTestsExporter Instance => _instance;
+        /// <param name="result">The aggregate result of the test run.</param>
+        void ICallbacks.RunFinished(ITestResultAdaptor result)
+        {
+            if (_failures.Count == 0)
+            {
+                this.Log($"Test run completed with no failures.");
+                return;
+            }
+
+            string outputPath = WriteFailuresToFile();
+            if (outputPath == null)
+            {
+                return;
+            }
+
+            this.Log($"Wrote {_failures.Count} failure(s) to: {outputPath}");
+        }
+
+        /// <summary>
+        ///     Called by the Test Runner when an individual test begins. No action is taken.
+        /// </summary>
+        /// <param name="test">The test that is starting.</param>
+        void ICallbacks.TestStarted(ITestAdaptor test) { }
+
+        /// <summary>
+        ///     Called by the Test Runner when an individual test finishes. Records the
+        ///     test details if it failed.
+        /// </summary>
+        /// <param name="result">The result of the completed test.</param>
+        void ICallbacks.TestFinished(ITestResultAdaptor result)
+        {
+            if (result.TestStatus != TestStatus.Failed)
+            {
+                return;
+            }
+
+            if (result.HasChildren)
+            {
+                return;
+            }
+
+            _failures.Add(
+                new FailedTestInfo(
+                    result.FullName,
+                    result.Message ?? string.Empty,
+                    result.StackTrace ?? string.Empty
+                )
+            );
+        }
 
         /// <summary>
         ///     Contains the details of a single failed test captured by the

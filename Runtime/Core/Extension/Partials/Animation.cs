@@ -21,6 +21,52 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         public const string SpriteBindingProperty = "m_Sprite";
 
         /// <summary>
+        /// Extracts every Sprite an AnimationClip references along with the curve binding that
+        /// supplies it, so a caller can tell which object each sprite is animated onto.
+        /// </summary>
+        /// <param name="clip">The AnimationClip to extract sprite frames from.</param>
+        /// <returns>
+        /// Each referenced sprite paired with its <see cref="EditorCurveBinding"/>, in binding then
+        /// keyframe order.
+        /// </returns>
+        /// <remarks>
+        /// Thread Safety: Must be called from Unity main thread. Editor-only.
+        /// Null Handling: Returns empty enumerable if clip is null.
+        /// Performance: O(n*m) where n is number of bindings and m is keyframes per binding.
+        /// Allocations: Allocates arrays for bindings and keyframes.
+        /// Unity Behavior: Only available in Unity Editor. Uses AnimationUtility.
+        /// Edge Cases: Only returns Sprite object references, ignores other object types. The same
+        /// sprite is yielded once per keyframe that references it.
+        /// </remarks>
+        public static IEnumerable<(
+            EditorCurveBinding binding,
+            Sprite sprite
+        )> GetSpriteFramesFromClip(this AnimationClip clip)
+        {
+            if (clip == null)
+            {
+                yield break;
+            }
+
+            foreach (
+                EditorCurveBinding binding in AnimationUtility.GetObjectReferenceCurveBindings(clip)
+            )
+            {
+                ObjectReferenceKeyframe[] keyframes = AnimationUtility.GetObjectReferenceCurve(
+                    clip,
+                    binding
+                );
+                foreach (ObjectReferenceKeyframe frame in keyframes)
+                {
+                    if (frame.value is Sprite sprite)
+                    {
+                        yield return (binding, sprite);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
         /// Extracts all Sprite objects referenced in an AnimationClip.
         /// </summary>
         /// <param name="clip">The AnimationClip to extract sprites from.</param>
@@ -98,52 +144,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
 
                 yield return sprite;
-            }
-        }
-
-        /// <summary>
-        /// Extracts every Sprite an AnimationClip references along with the curve binding that
-        /// supplies it, so a caller can tell which object each sprite is animated onto.
-        /// </summary>
-        /// <param name="clip">The AnimationClip to extract sprite frames from.</param>
-        /// <returns>
-        /// Each referenced sprite paired with its <see cref="EditorCurveBinding"/>, in binding then
-        /// keyframe order.
-        /// </returns>
-        /// <remarks>
-        /// Thread Safety: Must be called from Unity main thread. Editor-only.
-        /// Null Handling: Returns empty enumerable if clip is null.
-        /// Performance: O(n*m) where n is number of bindings and m is keyframes per binding.
-        /// Allocations: Allocates arrays for bindings and keyframes.
-        /// Unity Behavior: Only available in Unity Editor. Uses AnimationUtility.
-        /// Edge Cases: Only returns Sprite object references, ignores other object types. The same
-        /// sprite is yielded once per keyframe that references it.
-        /// </remarks>
-        public static IEnumerable<(
-            EditorCurveBinding binding,
-            Sprite sprite
-        )> GetSpriteFramesFromClip(this AnimationClip clip)
-        {
-            if (clip == null)
-            {
-                yield break;
-            }
-
-            foreach (
-                EditorCurveBinding binding in AnimationUtility.GetObjectReferenceCurveBindings(clip)
-            )
-            {
-                ObjectReferenceKeyframe[] keyframes = AnimationUtility.GetObjectReferenceCurve(
-                    clip,
-                    binding
-                );
-                foreach (ObjectReferenceKeyframe frame in keyframes)
-                {
-                    if (frame.value is Sprite sprite)
-                    {
-                        yield return (binding, sprite);
-                    }
-                }
             }
         }
 #endif

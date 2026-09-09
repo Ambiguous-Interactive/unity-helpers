@@ -43,6 +43,55 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             0x07,
         };
 
+        private static IEnumerable<TestCaseData> SparseSetPayloadCases()
+        {
+            yield return new TestCaseData(0, null, 1, Array.Empty<int>());
+            yield return new TestCaseData(0, Array.Empty<int>(), 1, Array.Empty<int>());
+            yield return new TestCaseData(-1, new[] { 3, 1, 3, 7 }, 8, new[] { 3, 1, 7 });
+            yield return new TestCaseData(8, new[] { 3, 1, 3, 7 }, 8, new[] { 3, 1, 7 });
+            yield return new TestCaseData(1, new[] { 0, 0, 0 }, 1, new[] { 0 });
+            yield return new TestCaseData(0, new[] { int.MaxValue }, 0, null);
+            yield return new TestCaseData(0, new[] { int.MaxValue - 1 }, 0, null);
+            yield return new TestCaseData(0, new[] { int.MinValue }, 0, null);
+            yield return new TestCaseData(0, new[] { 0, -1 }, 0, null);
+            yield return new TestCaseData(4, new[] { 1, 4, 2 }, 0, null);
+            yield return new TestCaseData(4, new[] { 1, -1, 2 }, 0, null);
+            yield return new TestCaseData(4, new[] { 1, int.MaxValue, 2 }, 0, null);
+            yield return new TestCaseData(0, new[] { 8 }, 0, null);
+            yield return new TestCaseData(9, Array.Empty<int>(), 0, null);
+        }
+
+        private static byte[] EncodeSparseSetPayload(int capacity, int[] elements)
+        {
+            SparseSetProtoWrapper wrapper = new SparseSetProtoWrapper
+            {
+                Capacity = capacity,
+                Elements = elements,
+            };
+            SparseSetProtoWrapper.WProtoFormatter formatter = SparseSetProtoWrapper
+                .WProtoFormatter
+                .Instance;
+            byte[] payload = new byte[formatter.Measure(wrapper)];
+            WProtoWriter writer = new WProtoWriter(payload);
+            Assert.IsTrue(formatter.Write(ref writer, wrapper));
+            return payload;
+        }
+
+        private static void AssertSparseSetContents(
+            SparseSet restored,
+            int expectedCapacity,
+            int[] expectedElements
+        )
+        {
+            Assert.IsTrue(restored != null);
+            Assert.AreEqual(expectedCapacity, restored.Capacity);
+            CollectionAssert.AreEqual(expectedElements, restored.ToArray());
+            foreach (int element in expectedElements)
+            {
+                Assert.IsTrue(restored.Contains(element));
+            }
+        }
+
         [TearDown]
         public void RestoreTheLimit()
         {
@@ -188,55 +237,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 expectedCapacity,
                 expectedElements
             );
-        }
-
-        private static IEnumerable<TestCaseData> SparseSetPayloadCases()
-        {
-            yield return new TestCaseData(0, null, 1, Array.Empty<int>());
-            yield return new TestCaseData(0, Array.Empty<int>(), 1, Array.Empty<int>());
-            yield return new TestCaseData(-1, new[] { 3, 1, 3, 7 }, 8, new[] { 3, 1, 7 });
-            yield return new TestCaseData(8, new[] { 3, 1, 3, 7 }, 8, new[] { 3, 1, 7 });
-            yield return new TestCaseData(1, new[] { 0, 0, 0 }, 1, new[] { 0 });
-            yield return new TestCaseData(0, new[] { int.MaxValue }, 0, null);
-            yield return new TestCaseData(0, new[] { int.MaxValue - 1 }, 0, null);
-            yield return new TestCaseData(0, new[] { int.MinValue }, 0, null);
-            yield return new TestCaseData(0, new[] { 0, -1 }, 0, null);
-            yield return new TestCaseData(4, new[] { 1, 4, 2 }, 0, null);
-            yield return new TestCaseData(4, new[] { 1, -1, 2 }, 0, null);
-            yield return new TestCaseData(4, new[] { 1, int.MaxValue, 2 }, 0, null);
-            yield return new TestCaseData(0, new[] { 8 }, 0, null);
-            yield return new TestCaseData(9, Array.Empty<int>(), 0, null);
-        }
-
-        private static byte[] EncodeSparseSetPayload(int capacity, int[] elements)
-        {
-            SparseSetProtoWrapper wrapper = new SparseSetProtoWrapper
-            {
-                Capacity = capacity,
-                Elements = elements,
-            };
-            SparseSetProtoWrapper.WProtoFormatter formatter = SparseSetProtoWrapper
-                .WProtoFormatter
-                .Instance;
-            byte[] payload = new byte[formatter.Measure(wrapper)];
-            WProtoWriter writer = new WProtoWriter(payload);
-            Assert.IsTrue(formatter.Write(ref writer, wrapper));
-            return payload;
-        }
-
-        private static void AssertSparseSetContents(
-            SparseSet restored,
-            int expectedCapacity,
-            int[] expectedElements
-        )
-        {
-            Assert.IsTrue(restored != null);
-            Assert.AreEqual(expectedCapacity, restored.Capacity);
-            CollectionAssert.AreEqual(expectedElements, restored.ToArray());
-            foreach (int element in expectedElements)
-            {
-                Assert.IsTrue(restored.Contains(element));
-            }
         }
 
         /// <remarks>

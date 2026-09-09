@@ -17,21 +17,16 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         // Reseed each test so a failing tree can be reproduced alone or within the fixture.
         private const uint RandomSeed = 0x5EED0304;
 
-        private IRandom _random = new PcgRandom(RandomSeed);
+        protected abstract bool IsBalanced { get; }
 
         private IRandom Random => _random;
+
+        private IRandom _random = new PcgRandom(RandomSeed);
 
         [SetUp]
         public void SeedKdTree3DRandom()
         {
             _random = new PcgRandom(RandomSeed);
-        }
-
-        protected abstract bool IsBalanced { get; }
-
-        protected override KdTree3D<Vector3> CreateTree(IEnumerable<Vector3> points)
-        {
-            return new KdTree3D<Vector3>(points, point => point, balanced: IsBalanced);
         }
 
         [Test]
@@ -306,6 +301,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 "Expected full dataset bounds to return all elements, but received {0}.",
                 results.Count
             );
+        }
+
+        protected override KdTree3D<Vector3> CreateTree(IEnumerable<Vector3> points)
+        {
+            return new KdTree3D<Vector3>(points, point => point, balanced: IsBalanced);
         }
     }
 }

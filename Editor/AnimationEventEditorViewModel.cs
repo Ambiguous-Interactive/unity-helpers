@@ -19,11 +19,6 @@ namespace WallstopStudios.UnityHelpers.Editor
     {
         private const float SwapTimeThreshold = 0.001f;
 
-        private readonly List<AnimationEventItem> _events = new();
-        private readonly List<AnimationEvent> _baseline = new();
-        private readonly List<ObjectReferenceKeyframe> _referenceCurve = new();
-        private readonly List<AnimationClip> _clipFilterBuffer = new();
-
         public AnimationClip CurrentClip { get; private set; }
 
         public IReadOnlyList<AnimationEventItem> Events => _events;
@@ -35,6 +30,16 @@ namespace WallstopStudios.UnityHelpers.Editor
         public bool FrameRateChanged { get; private set; }
 
         public int Count => _events.Count;
+
+        private readonly List<AnimationEventItem> _events = new();
+        private readonly List<AnimationEvent> _baseline = new();
+        private readonly List<ObjectReferenceKeyframe> _referenceCurve = new();
+        private readonly List<AnimationClip> _clipFilterBuffer = new();
+
+        private static bool AreTimesEquivalent(AnimationEventItem lhs, AnimationEventItem rhs)
+        {
+            return Mathf.Abs(lhs.animationEvent.time - rhs.animationEvent.time) < SwapTimeThreshold;
+        }
 
         public void LoadClip(AnimationClip clip)
         {
@@ -389,11 +394,6 @@ namespace WallstopStudios.UnityHelpers.Editor
         public void ResetFrameRateChanged()
         {
             FrameRateChanged = false;
-        }
-
-        private static bool AreTimesEquivalent(AnimationEventItem lhs, AnimationEventItem rhs)
-        {
-            return Mathf.Abs(lhs.animationEvent.time - rhs.animationEvent.time) < SwapTimeThreshold;
         }
 
         private void Swap(int lhsIndex, int rhsIndex)

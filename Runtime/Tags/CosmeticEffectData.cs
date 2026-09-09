@@ -107,37 +107,6 @@ namespace WallstopStudios.UnityHelpers.Tags
         }
 
         /// <summary>
-        /// Populates the provided set with the types of all currently attached <see cref="CosmeticEffectComponent"/>s.
-        /// </summary>
-        /// <param name="types">The set to populate. Will be cleared before adding types.</param>
-        /// <remarks>
-        /// Uses pooled lists for zero-allocation queries. Destroyed Unity objects are safely skipped.
-        /// </remarks>
-        private void GetCurrentCosmeticTypes(HashSet<Type> types)
-        {
-            types.Clear();
-            // Destroyed objects expose no components and must not throw from equality or hashing.
-            if (this == null)
-            {
-                return;
-            }
-
-            using PooledResource<List<CosmeticEffectComponent>> lease =
-                Buffers<CosmeticEffectComponent>.List.Get(
-                    out List<CosmeticEffectComponent> cosmetics
-                );
-            GetComponents(cosmetics);
-            foreach (CosmeticEffectComponent cosmetic in cosmetics)
-            {
-                if (cosmetic == null)
-                {
-                    continue;
-                }
-                types.Add(cosmetic.GetType());
-            }
-        }
-
-        /// <summary>
         /// Determines whether this instance is equal to another object.
         /// </summary>
         /// <param name="other">The object to compare with.</param>
@@ -230,6 +199,37 @@ namespace WallstopStudios.UnityHelpers.Tags
             }
 
             return Objects.HashCode(Helpers.NameHashCode(this), typeHash);
+        }
+
+        /// <summary>
+        /// Populates the provided set with the types of all currently attached <see cref="CosmeticEffectComponent"/>s.
+        /// </summary>
+        /// <param name="types">The set to populate. Will be cleared before adding types.</param>
+        /// <remarks>
+        /// Uses pooled lists for zero-allocation queries. Destroyed Unity objects are safely skipped.
+        /// </remarks>
+        private void GetCurrentCosmeticTypes(HashSet<Type> types)
+        {
+            types.Clear();
+            // Destroyed objects expose no components and must not throw from equality or hashing.
+            if (this == null)
+            {
+                return;
+            }
+
+            using PooledResource<List<CosmeticEffectComponent>> lease =
+                Buffers<CosmeticEffectComponent>.List.Get(
+                    out List<CosmeticEffectComponent> cosmetics
+                );
+            GetComponents(cosmetics);
+            foreach (CosmeticEffectComponent cosmetic in cosmetics)
+            {
+                if (cosmetic == null)
+                {
+                    continue;
+                }
+                types.Add(cosmetic.GetType());
+            }
         }
     }
 }

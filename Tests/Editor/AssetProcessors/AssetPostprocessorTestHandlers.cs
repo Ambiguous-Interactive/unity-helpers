@@ -42,20 +42,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         private const string TestAssemblyPrefix = "WallstopStudios.UnityHelpers.Tests";
 
         /// <summary>
-        /// Discovery cache, initialized lazily on first use and retained for the
-        /// lifetime of the app domain. Domain reloads (assembly rebuilds, play-mode
-        /// enter with reload enabled) reset the cache implicitly because the static
-        /// itself is re-initialized. Interactive authoring that adds a new
-        /// <see cref="DetectAssetChangedAttribute"/>-annotated handler without a
-        /// domain reload will not see the new handler until the next reload — this
-        /// is acceptable because the test runner always domain-reloads before
-        /// executing, so CI runs always see the full handler set.
-        /// </summary>
-        private static readonly Lazy<IReadOnlyList<HandlerEntry>> LazyEntries = new(
-            DiscoverHandlerEntries
-        );
-
-        /// <summary>
         /// The handler types this helper knows how to clear and observe for pollution.
         /// Discovered lazily from <see cref="TypeCache"/>; cached afterwards.
         /// </summary>
@@ -70,6 +56,70 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                     types.Add(entries[i].HandlerType);
                 }
                 return types;
+            }
+        }
+
+        /// <summary>
+        /// Discovery cache, initialized lazily on first use and retained for the
+        /// lifetime of the app domain. Domain reloads (assembly rebuilds, play-mode
+        /// enter with reload enabled) reset the cache implicitly because the static
+        /// itself is re-initialized. Interactive authoring that adds a new
+        /// <see cref="DetectAssetChangedAttribute"/>-annotated handler without a
+        /// domain reload will not see the new handler until the next reload — this
+        /// is acceptable because the test runner always domain-reloads before
+        /// executing, so CI runs always see the full handler set.
+        /// </summary>
+        private static readonly Lazy<IReadOnlyList<HandlerEntry>> LazyEntries = new(
+            DiscoverHandlerEntries
+        );
+
+        /// <summary>
+        /// Collects pollution diagnostics across every discovered handler, clears
+        /// all handlers, then fails with <see cref="Assert.Fail(string)"/> if any
+        /// pollution was observed. Mirrors the old per-fixture
+        /// <c>AssertAllHandlersCleanAndClear</c> but is exhaustive by construction.
+        ///
+        /// Order is load-bearing: reset ShouldThrow, then flush queued drains, then
+        /// snapshot pollution, then clear. Snapshotting BEFORE the flush would miss
+        /// pollution that a queued drain is about to write to the handlers — the
+        /// tripwire would observe "clean" state just before the drain re-populated
+        /// it, and the next test would fail for reasons unrelated to its own setup.
+        ///
+        /// <para><b>Canonical tripwire usage from per-test <c>SetUp</c>:</b></para>
+        /// Call this FIRST in a fixture's <c>SetUp</c>, BEFORE any asset mutation
+        /// or processor configuration. The rationale is attribution: asset
+        /// mutations scheduled later in the setup enqueue drains whose pollution,
+        /// if observed by a later-running tripwire, would be misattributed to the
+        /// prior fixture (it would look like leaked-in state when in reality the
+        /// current fixture produced it). Failing loudly up front keeps the
+        /// regression visible and pinned to its true source.
+        ///
+        /// This helper internally flushes, snapshots, then clears, so callers
+        /// never need a separate pre-flush call. Fixtures whose <c>SetUp</c>
+        /// goes on to mutate assets should, however, re-flush after those
+        /// mutations (e.g. via <see cref="FlushAndClearAll"/>) so the test body
+        /// runs against a freshly-cleared handler surface.
+        ///
+        /// <para><b>Visibility:</b> <see langword="public"/> because fixtures in sibling test
+        /// assemblies (Sprites, Windows, Utils) must call this through an assembly
+        /// reference — <see langword="internal"/> would invisibly break the cross-assembly
+        /// tripwire contract with a CS0122. All other members of this class stay
+        /// <see langword="internal"/> because they are only reached from within this
+        /// assembly.</para>
+        /// </summary>
+        public static void AssertCleanAndClearAll()
+        {
+            IReadOnlyList<HandlerEntry> entries = LazyEntries.Value;
+            ResetShouldThrowAll(entries);
+            AssetPostprocessorDeferral.FlushForTesting();
+            IReadOnlyList<string> pollutionErrors = DescribePollution();
+            ClearAllInternal(entries);
+            if (0 < pollutionErrors.Count)
+            {
+                Assert.Fail(
+                    "Test pollution detected from prior test. Handler state was not clean at test start:\n"
+                        + string.Join("\n", pollutionErrors)
+                );
             }
         }
 
@@ -97,50 +147,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             AssetPostprocessorDeferral.FlushForTesting();
 
             ClearAllInternal(entries);
-        }
-
-        private static void ResetShouldThrowAll(IReadOnlyList<HandlerEntry> entries)
-        {
-            /*
-                Reset throwing flags before draining, then clear recorded state after the drain has invoked
-                handlers.
-            */
-            for (int i = 0; i < entries.Count; i++)
-            {
-                HandlerEntry entry = entries[i];
-                try
-                {
-                    entry.ResetShouldThrowAction?.Invoke();
-                }
-                catch (Exception ex)
-                    when (ex is not OutOfMemoryException and not StackOverflowException)
-                {
-                    Debug.LogWarning(
-                        $"AssetPostprocessorTestHandlers.ResetShouldThrowAll: "
-                            + $"resetting {entry.HandlerType.FullName}.ShouldThrow threw: {ex.Message}"
-                    );
-                }
-            }
-        }
-
-        private static void ClearAllInternal(IReadOnlyList<HandlerEntry> entries)
-        {
-            for (int i = 0; i < entries.Count; i++)
-            {
-                HandlerEntry entry = entries[i];
-                try
-                {
-                    entry.ClearAction?.Invoke();
-                }
-                catch (Exception ex)
-                    when (ex is not OutOfMemoryException and not StackOverflowException)
-                {
-                    Debug.LogWarning(
-                        $"AssetPostprocessorTestHandlers.ClearAllInternal: "
-                            + $"{entry.HandlerType.FullName}.Clear() threw: {ex.Message}"
-                    );
-                }
-            }
         }
 
         /// <summary>
@@ -305,53 +311,47 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             return diagnostics;
         }
 
-        /// <summary>
-        /// Collects pollution diagnostics across every discovered handler, clears
-        /// all handlers, then fails with <see cref="Assert.Fail(string)"/> if any
-        /// pollution was observed. Mirrors the old per-fixture
-        /// <c>AssertAllHandlersCleanAndClear</c> but is exhaustive by construction.
-        ///
-        /// Order is load-bearing: reset ShouldThrow, then flush queued drains, then
-        /// snapshot pollution, then clear. Snapshotting BEFORE the flush would miss
-        /// pollution that a queued drain is about to write to the handlers — the
-        /// tripwire would observe "clean" state just before the drain re-populated
-        /// it, and the next test would fail for reasons unrelated to its own setup.
-        ///
-        /// <para><b>Canonical tripwire usage from per-test <c>SetUp</c>:</b></para>
-        /// Call this FIRST in a fixture's <c>SetUp</c>, BEFORE any asset mutation
-        /// or processor configuration. The rationale is attribution: asset
-        /// mutations scheduled later in the setup enqueue drains whose pollution,
-        /// if observed by a later-running tripwire, would be misattributed to the
-        /// prior fixture (it would look like leaked-in state when in reality the
-        /// current fixture produced it). Failing loudly up front keeps the
-        /// regression visible and pinned to its true source.
-        ///
-        /// This helper internally flushes, snapshots, then clears, so callers
-        /// never need a separate pre-flush call. Fixtures whose <c>SetUp</c>
-        /// goes on to mutate assets should, however, re-flush after those
-        /// mutations (e.g. via <see cref="FlushAndClearAll"/>) so the test body
-        /// runs against a freshly-cleared handler surface.
-        ///
-        /// <para><b>Visibility:</b> <see langword="public"/> because fixtures in sibling test
-        /// assemblies (Sprites, Windows, Utils) must call this through an assembly
-        /// reference — <see langword="internal"/> would invisibly break the cross-assembly
-        /// tripwire contract with a CS0122. All other members of this class stay
-        /// <see langword="internal"/> because they are only reached from within this
-        /// assembly.</para>
-        /// </summary>
-        public static void AssertCleanAndClearAll()
+        private static void ResetShouldThrowAll(IReadOnlyList<HandlerEntry> entries)
         {
-            IReadOnlyList<HandlerEntry> entries = LazyEntries.Value;
-            ResetShouldThrowAll(entries);
-            AssetPostprocessorDeferral.FlushForTesting();
-            IReadOnlyList<string> pollutionErrors = DescribePollution();
-            ClearAllInternal(entries);
-            if (0 < pollutionErrors.Count)
+            /*
+                Reset throwing flags before draining, then clear recorded state after the drain has invoked
+                handlers.
+            */
+            for (int i = 0; i < entries.Count; i++)
             {
-                Assert.Fail(
-                    "Test pollution detected from prior test. Handler state was not clean at test start:\n"
-                        + string.Join("\n", pollutionErrors)
-                );
+                HandlerEntry entry = entries[i];
+                try
+                {
+                    entry.ResetShouldThrowAction?.Invoke();
+                }
+                catch (Exception ex)
+                    when (ex is not OutOfMemoryException and not StackOverflowException)
+                {
+                    Debug.LogWarning(
+                        $"AssetPostprocessorTestHandlers.ResetShouldThrowAll: "
+                            + $"resetting {entry.HandlerType.FullName}.ShouldThrow threw: {ex.Message}"
+                    );
+                }
+            }
+        }
+
+        private static void ClearAllInternal(IReadOnlyList<HandlerEntry> entries)
+        {
+            for (int i = 0; i < entries.Count; i++)
+            {
+                HandlerEntry entry = entries[i];
+                try
+                {
+                    entry.ClearAction?.Invoke();
+                }
+                catch (Exception ex)
+                    when (ex is not OutOfMemoryException and not StackOverflowException)
+                {
+                    Debug.LogWarning(
+                        $"AssetPostprocessorTestHandlers.ClearAllInternal: "
+                            + $"{entry.HandlerType.FullName}.Clear() threw: {ex.Message}"
+                    );
+                }
             }
         }
 

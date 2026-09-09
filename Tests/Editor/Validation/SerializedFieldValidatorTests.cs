@@ -22,6 +22,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     [TestFixture]
     public sealed class SerializedFieldValidatorTests
     {
+        private static DroppedSerializedField Reported(
+            List<DroppedSerializedField> findings,
+            string fieldName
+        )
+        {
+            return findings.Single(finding => finding.FieldName == fieldName);
+        }
+
         [Test]
         public void EveryFrameworkGenericAskedForIsReported()
         {
@@ -194,14 +202,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
             Assert.IsFalse(UnitySerializationStandIns.TryGetStandIn(typeof(Type), out _));
             Assert.IsFalse(UnitySerializationStandIns.TryGetStandIn(null, out _));
-        }
-
-        private static DroppedSerializedField Reported(
-            List<DroppedSerializedField> findings,
-            string fieldName
-        )
-        {
-            return findings.Single(finding => finding.FieldName == fieldName);
         }
     }
 }

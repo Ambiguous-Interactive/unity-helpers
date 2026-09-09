@@ -66,6 +66,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             private const string ItemsPropertyName =
                 SerializableHashSetSerializedPropertyNames.Items;
 
+            private static void SetItemsField(SerializableHashSet<T> set, T[] items)
+            {
+                set._items = items;
+            }
+
             public override SerializableHashSet<T> Read(
                 ref Utf8JsonReader reader,
                 Type typeToConvert,
@@ -158,11 +163,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                 WJsonArray.Write(writer, value.SerializedItems, options);
                 writer.WriteEndObject();
             }
-
-            private static void SetItemsField(SerializableHashSet<T> set, T[] items)
-            {
-                set._items = items;
-            }
         }
 
         public sealed class SerializableSortedSetConverter<T>
@@ -171,6 +171,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
         {
             private const string ItemsPropertyName =
                 SerializableHashSetSerializedPropertyNames.Items;
+
+            private static void SetItemsField(SerializableSortedSet<T> set, T[] items)
+            {
+                set._items = items;
+            }
 
             public override SerializableSortedSet<T> Read(
                 ref Utf8JsonReader reader,
@@ -263,11 +268,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                 writer.WritePropertyName(ItemsPropertyName);
                 WJsonArray.Write(writer, value.SerializedItems, options);
                 writer.WriteEndObject();
-            }
-
-            private static void SetItemsField(SerializableSortedSet<T> set, T[] items)
-            {
-                set._items = items;
             }
         }
     }

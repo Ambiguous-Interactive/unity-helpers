@@ -12,10 +12,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes.Odin.ShowIf
     /// </summary>
     internal sealed class OdinShowIfPropertyTarget : SerializedScriptableObject
     {
+        public bool ComputedProperty => boolField && 0 < intField;
+
         public bool boolField;
         public int intField;
-
-        public bool ComputedProperty => boolField && 0 < intField;
 
         [WShowIf(nameof(ComputedProperty))]
         public int dependentField;

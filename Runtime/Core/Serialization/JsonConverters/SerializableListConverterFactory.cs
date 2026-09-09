@@ -32,6 +32,18 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
         public static readonly SerializableListConverterFactory Instance = new();
 
         /// <summary>
+        /// Creates a factory instance. Public because <see cref="SerializableList{T}"/> carries
+        /// <see cref="JsonConverterAttribute"/>, and the attribute path constructs the converter
+        /// itself rather than reading <see cref="Instance"/>.
+        /// </summary>
+        /// <example>
+        /// <code><![CDATA[
+        /// JsonConverterFactory factory = new SerializableListConverterFactory();
+        /// ]]></code>
+        /// </example>
+        public SerializableListConverterFactory() { }
+
+        /// <summary>
         /// Determines whether the supplied type is a <see cref="SerializableList{T}"/>.
         /// </summary>
         /// <param name="typeToConvert">Type the serializer is asking about.</param>
@@ -76,18 +88,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             Type converterType = typeof(SerializableListConverter<>).MakeGenericType(elementType);
             return (JsonConverter)Activator.CreateInstance(converterType);
         }
-
-        /// <summary>
-        /// Creates a factory instance. Public because <see cref="SerializableList{T}"/> carries
-        /// <see cref="JsonConverterAttribute"/>, and the attribute path constructs the converter
-        /// itself rather than reading <see cref="Instance"/>.
-        /// </summary>
-        /// <example>
-        /// <code><![CDATA[
-        /// JsonConverterFactory factory = new SerializableListConverterFactory();
-        /// ]]></code>
-        /// </example>
-        public SerializableListConverterFactory() { }
 
         public sealed class SerializableListConverter<T> : JsonConverter<SerializableList<T>>
         {

@@ -47,14 +47,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     [Serializable]
     public sealed class QuadTree2D<T> : ISpatialTree2D<T>
     {
-        private const int NumChildren = 4;
-
         /// <summary>
         /// Default bucket size for leaves before subdivision.
         /// </summary>
         public const int DefaultBucketSize = 12;
 
-        public readonly ImmutableArray<T> elements;
+        private const int NumChildren = 4;
 
         /// <summary>
         /// Gets the overall bounding box of the tree.
@@ -62,6 +60,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// <remarks>Bounds conservatively enclose finite entries. Float size or edges can be infinite
         /// when the enclosing span is not representable; queries still test the stored geometry.</remarks>
         public Bounds Boundary => _bounds;
+
+        public readonly ImmutableArray<T> elements;
 
         private readonly Bounds _bounds;
         private readonly Entry[] _entries;
@@ -241,117 +241,26 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _head = BuildNode(_bounds, 0, elementCount, bucketSize, scratch);
         }
 
-        private QuadTreeNode BuildNode(
-            Bounds boundary,
-            int startIndex,
-            int count,
-            int bucketSize,
-            int[] scratch
-        )
+        private static void SortChildrenByDistance(List<QuadTreeNode> nodes, Vector2 searchPosition)
         {
-            if (count <= 0)
+            for (int i = 1; i < nodes.Count; ++i)
             {
-                return QuadTreeNode.CreateLeaf(boundary, startIndex, 0);
-            }
-
-            if (count <= bucketSize)
-            {
-                return QuadTreeNode.CreateLeaf(boundary, startIndex, count);
-            }
-
-            Span<int> counts = stackalloc int[NumChildren];
-            Span<int> starts = stackalloc int[NumChildren];
-            Span<int> next = stackalloc int[NumChildren];
-
-            Span<int> source = _indices.AsSpan(startIndex, count);
-            Span<int> temp = scratch.AsSpan(0, count);
-
-            Vector3 boundaryCenter = boundary.center;
-            float centerX = boundaryCenter.x;
-            float centerY = boundaryCenter.y;
-
-            Entry[] entries = _entries;
-            for (int i = 0; i < count; ++i)
-            {
-                int entryIndex = source[i];
-                Vector2 position = entries[entryIndex].position;
-                bool east = centerX < position.x;
-                bool north = centerY <= position.y;
-                int quadrant = east
-                    ? north
-                        ? 1
-                        : 2
-                    : north
-                        ? 0
-                        : 3;
-                counts[quadrant]++;
-            }
-
-            int maxChildCount = 0;
-            int running = 0;
-            for (int q = 0; q < NumChildren; ++q)
-            {
-                starts[q] = running;
-                next[q] = running;
-                running += counts[q];
-                if (maxChildCount < counts[q])
+                QuadTreeNode value = nodes[i];
+                double valueDistance = GetSqrDistance(value, searchPosition);
+                int j = i - 1;
+                while (0 <= j && valueDistance < GetSqrDistance(nodes[j], searchPosition))
                 {
-                    maxChildCount = counts[q];
-                }
-            }
-
-            if (maxChildCount == count)
-            {
-                return QuadTreeNode.CreateLeaf(boundary, startIndex, count);
-            }
-
-            for (int i = 0; i < count; ++i)
-            {
-                int entryIndex = source[i];
-                Vector2 position = entries[entryIndex].position;
-                bool east = centerX < position.x;
-                bool north = centerY <= position.y;
-                int quadrant = east
-                    ? north
-                        ? 1
-                        : 2
-                    : north
-                        ? 0
-                        : 3;
-                int destination = next[quadrant]++;
-                temp[destination] = entryIndex;
-            }
-
-            temp.CopyTo(source);
-
-            QuadTreeNode[] children = new QuadTreeNode[NumChildren];
-            for (int q = 0; q < NumChildren; ++q)
-            {
-                int childCount = counts[q];
-                if (childCount <= 0)
-                {
-                    continue;
+                    nodes[j + 1] = nodes[j];
+                    --j;
                 }
 
-                int childStart = startIndex + starts[q];
-                Vector3 childMin = new(float.PositiveInfinity, float.PositiveInfinity, -0.5f);
-                Vector3 childMax = new(float.NegativeInfinity, float.NegativeInfinity, 0.5f);
-                int childEnd = childStart + childCount;
-                for (int index = childStart; index < childEnd; ++index)
-                {
-                    Vector3 position = entries[_indices[index]].position;
-                    childMin = Vector3.Min(childMin, position);
-                    childMax = Vector3.Max(childMax, position);
-                }
-                Bounds childBounds = SpatialQueryMath.CreateConservativeBounds(
-                    childMin,
-                    childMax,
-                    0.001f
-                );
-                children[q] = BuildNode(childBounds, childStart, childCount, bucketSize, scratch);
+                nodes[j + 1] = value;
             }
+        }
 
-            return QuadTreeNode.CreateInternal(boundary, children, startIndex, count);
+        private static double GetSqrDistance(QuadTreeNode node, Vector2 position)
+        {
+            return SpatialQueryMath.DistanceSquared((Vector2)node.boundary.center, position);
         }
 
         /// <summary>
@@ -700,26 +609,117 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return nearestNeighbors;
         }
 
-        private static void SortChildrenByDistance(List<QuadTreeNode> nodes, Vector2 searchPosition)
+        private QuadTreeNode BuildNode(
+            Bounds boundary,
+            int startIndex,
+            int count,
+            int bucketSize,
+            int[] scratch
+        )
         {
-            for (int i = 1; i < nodes.Count; ++i)
+            if (count <= 0)
             {
-                QuadTreeNode value = nodes[i];
-                double valueDistance = GetSqrDistance(value, searchPosition);
-                int j = i - 1;
-                while (0 <= j && valueDistance < GetSqrDistance(nodes[j], searchPosition))
+                return QuadTreeNode.CreateLeaf(boundary, startIndex, 0);
+            }
+
+            if (count <= bucketSize)
+            {
+                return QuadTreeNode.CreateLeaf(boundary, startIndex, count);
+            }
+
+            Span<int> counts = stackalloc int[NumChildren];
+            Span<int> starts = stackalloc int[NumChildren];
+            Span<int> next = stackalloc int[NumChildren];
+
+            Span<int> source = _indices.AsSpan(startIndex, count);
+            Span<int> temp = scratch.AsSpan(0, count);
+
+            Vector3 boundaryCenter = boundary.center;
+            float centerX = boundaryCenter.x;
+            float centerY = boundaryCenter.y;
+
+            Entry[] entries = _entries;
+            for (int i = 0; i < count; ++i)
+            {
+                int entryIndex = source[i];
+                Vector2 position = entries[entryIndex].position;
+                bool east = centerX < position.x;
+                bool north = centerY <= position.y;
+                int quadrant = east
+                    ? north
+                        ? 1
+                        : 2
+                    : north
+                        ? 0
+                        : 3;
+                counts[quadrant]++;
+            }
+
+            int maxChildCount = 0;
+            int running = 0;
+            for (int q = 0; q < NumChildren; ++q)
+            {
+                starts[q] = running;
+                next[q] = running;
+                running += counts[q];
+                if (maxChildCount < counts[q])
                 {
-                    nodes[j + 1] = nodes[j];
-                    --j;
+                    maxChildCount = counts[q];
+                }
+            }
+
+            if (maxChildCount == count)
+            {
+                return QuadTreeNode.CreateLeaf(boundary, startIndex, count);
+            }
+
+            for (int i = 0; i < count; ++i)
+            {
+                int entryIndex = source[i];
+                Vector2 position = entries[entryIndex].position;
+                bool east = centerX < position.x;
+                bool north = centerY <= position.y;
+                int quadrant = east
+                    ? north
+                        ? 1
+                        : 2
+                    : north
+                        ? 0
+                        : 3;
+                int destination = next[quadrant]++;
+                temp[destination] = entryIndex;
+            }
+
+            temp.CopyTo(source);
+
+            QuadTreeNode[] children = new QuadTreeNode[NumChildren];
+            for (int q = 0; q < NumChildren; ++q)
+            {
+                int childCount = counts[q];
+                if (childCount <= 0)
+                {
+                    continue;
                 }
 
-                nodes[j + 1] = value;
+                int childStart = startIndex + starts[q];
+                Vector3 childMin = new(float.PositiveInfinity, float.PositiveInfinity, -0.5f);
+                Vector3 childMax = new(float.NegativeInfinity, float.NegativeInfinity, 0.5f);
+                int childEnd = childStart + childCount;
+                for (int index = childStart; index < childEnd; ++index)
+                {
+                    Vector3 position = entries[_indices[index]].position;
+                    childMin = Vector3.Min(childMin, position);
+                    childMax = Vector3.Max(childMax, position);
+                }
+                Bounds childBounds = SpatialQueryMath.CreateConservativeBounds(
+                    childMin,
+                    childMax,
+                    0.001f
+                );
+                children[q] = BuildNode(childBounds, childStart, childCount, bucketSize, scratch);
             }
-        }
 
-        private static double GetSqrDistance(QuadTreeNode node, Vector2 position)
-        {
-            return SpatialQueryMath.DistanceSquared((Vector2)node.boundary.center, position);
+            return QuadTreeNode.CreateInternal(boundary, children, startIndex, count);
         }
 
         private sealed class NeighborComparer : IComparer<Neighbor>
@@ -765,10 +765,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         public sealed class QuadTreeNode
         {
             public readonly Bounds boundary;
+            public readonly bool isTerminal;
             internal readonly QuadTreeNode[] _children;
             internal readonly int _startIndex;
             internal readonly int _count;
-            public readonly bool isTerminal;
 
             private QuadTreeNode(
                 Bounds boundary,

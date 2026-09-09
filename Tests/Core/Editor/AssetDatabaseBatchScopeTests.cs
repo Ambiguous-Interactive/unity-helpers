@@ -42,6 +42,140 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
     [NUnit.Framework.Category("Editor")]
     public sealed class AssetDatabaseBatchScopeTests
     {
+        private const string EnsureFolderTestRoot = "Assets/__EnsureAssetFolderTests__";
+
+        private static IEnumerable<TestCaseData> DeeplyNestedScopeCases()
+        {
+            yield return new TestCaseData(10).SetName("NestedScope.Depth10.TracksCorrectly");
+            yield return new TestCaseData(15).SetName("NestedScope.Depth15.TracksCorrectly");
+            yield return new TestCaseData(20).SetName("NestedScope.Depth20.TracksCorrectly");
+            yield return new TestCaseData(50).SetName("NestedScope.Depth50.TracksCorrectly");
+            yield return new TestCaseData(100).SetName("NestedScope.Depth100.TracksCorrectly");
+        }
+
+        private static IEnumerable<TestCaseData> MixedRefreshOnDisposeCases()
+        {
+            yield return new TestCaseData(new[] { true, false, true }).SetName(
+                "MixedRefresh.TrueFalseTrue"
+            );
+            yield return new TestCaseData(new[] { false, true, false }).SetName(
+                "MixedRefresh.FalseTrueFalse"
+            );
+            yield return new TestCaseData(new[] { true, true, true, false, false }).SetName(
+                "MixedRefresh.ThreeTrueTwoFalse"
+            );
+            yield return new TestCaseData(new[] { false, false, false, true }).SetName(
+                "MixedRefresh.ThreeFalseOneTrue"
+            );
+            yield return new TestCaseData(new[] { true, false, true, false, true, false }).SetName(
+                "MixedRefresh.Alternating"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> AlternatingDepthPatternCases()
+        {
+            yield return new TestCaseData(new[] { 1, 2, 1, 3, 2, 4, 0 }).SetName(
+                "AlternatingDepth.UpDownPattern.TracksCorrectly"
+            );
+            yield return new TestCaseData(new[] { 5, 3, 4, 2, 1, 0 }).SetName(
+                "AlternatingDepth.DecreasingWithBumps.TracksCorrectly"
+            );
+            yield return new TestCaseData(new[] { 1, 1, 1, 2, 2, 0 }).SetName(
+                "AlternatingDepth.PlateausPattern.TracksCorrectly"
+            );
+            yield return new TestCaseData(new[] { 0, 5, 0, 10, 0 }).SetName(
+                "AlternatingDepth.SpikesPattern.TracksCorrectly"
+            );
+            yield return new TestCaseData(new[] { 1, 2, 3, 4, 5, 4, 3, 2, 1, 0 }).SetName(
+                "AlternatingDepth.PyramidPattern.TracksCorrectly"
+            );
+        }
+
+        private static void RunRapidCounterCycles(int cycleCount)
+        {
+            for (int i = 0; i < cycleCount; i++)
+            {
+                bool isOutermost = AssetDatabaseBatchHelper.IncrementBatchDepthWithUnityCall();
+                if (!isOutermost)
+                {
+                    Assert.Fail($"Cycle {i} should start from an outermost batch counter state.");
+                }
+
+                bool shouldCleanUpUnity =
+                    AssetDatabaseBatchHelper.DecrementBatchDepthWithUnityCleanup();
+                if (!shouldCleanUpUnity)
+                {
+                    Assert.Fail($"Cycle {i} should return to an outermost batch cleanup state.");
+                }
+            }
+
+            Assert.That(
+                AssetDatabaseBatchHelper.CurrentBatchDepth,
+                Is.EqualTo(0),
+                $"Depth should be 0 after {cycleCount} rapid cycles"
+            );
+            Assert.That(
+                AssetDatabaseBatchHelper.IsCurrentlyBatching,
+                Is.False,
+                "Should not be batching after extreme rapid cycles"
+            );
+            Assert.That(
+                AssetDatabaseBatchHelper.ActualUnityBatchDepth,
+                Is.EqualTo(0),
+                "Actual Unity batch depth should be 0 after extreme rapid cycles"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> OutOfOrderDisposalPatternCases()
+        {
+            yield return new TestCaseData(new[] { 0, 1, 2 }).SetName("OutOfOrder.FirstToLast");
+            yield return new TestCaseData(new[] { 2, 1, 0 }).SetName("OutOfOrder.LastToFirst");
+            yield return new TestCaseData(new[] { 1, 0, 2 }).SetName("OutOfOrder.MiddleFirstLast");
+            yield return new TestCaseData(new[] { 1, 2, 0 }).SetName("OutOfOrder.MiddleLastFirst");
+            yield return new TestCaseData(new[] { 0, 2, 1 }).SetName("OutOfOrder.FirstLastMiddle");
+            yield return new TestCaseData(new[] { 2, 0, 1 }).SetName("OutOfOrder.LastFirstMiddle");
+            yield return new TestCaseData(new[] { 0, 1, 2, 3, 4 }).SetName(
+                "OutOfOrder.FiveInOrder"
+            );
+            yield return new TestCaseData(new[] { 4, 3, 2, 1, 0 }).SetName(
+                "OutOfOrder.FiveReverse"
+            );
+            yield return new TestCaseData(new[] { 2, 0, 4, 1, 3 }).SetName(
+                "OutOfOrder.FiveScattered"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> MultipleExceptionScenarioCases()
+        {
+            yield return new TestCaseData(1, 3).SetName("Exception.AtDepth3.BaseDepth2");
+            yield return new TestCaseData(2, 4).SetName("Exception.AtDepth4.BaseDepth2");
+            yield return new TestCaseData(3, 5).SetName("Exception.AtDepth5.BaseDepth2");
+            yield return new TestCaseData(1, 1).SetName("Exception.AtDepth1.BaseDepth0");
+            yield return new TestCaseData(5, 10).SetName("Exception.AtDepth10.BaseDepth5");
+        }
+
+        private static void DeleteEnsureFolderTestRoot()
+        {
+            if (AssetDatabase.IsValidFolder(EnsureFolderTestRoot))
+            {
+                AssetDatabase.DeleteAsset(EnsureFolderTestRoot);
+            }
+        }
+
+        private static void DeleteDiskPathAndMeta(string absolutePath)
+        {
+            if (Directory.Exists(absolutePath))
+            {
+                Directory.Delete(absolutePath, recursive: true);
+            }
+
+            string metaPath = absolutePath + ".meta";
+            if (File.Exists(metaPath))
+            {
+                File.Delete(metaPath);
+            }
+        }
+
         /// <summary>
         ///     Called once before any tests in this fixture run.
         ///     Resets counters without calling Unity APIs to handle the case where
@@ -541,15 +675,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 Is.False,
                 "Should not be batching after all scopes disposed"
             );
-        }
-
-        private static IEnumerable<TestCaseData> DeeplyNestedScopeCases()
-        {
-            yield return new TestCaseData(10).SetName("NestedScope.Depth10.TracksCorrectly");
-            yield return new TestCaseData(15).SetName("NestedScope.Depth15.TracksCorrectly");
-            yield return new TestCaseData(20).SetName("NestedScope.Depth20.TracksCorrectly");
-            yield return new TestCaseData(50).SetName("NestedScope.Depth50.TracksCorrectly");
-            yield return new TestCaseData(100).SetName("NestedScope.Depth100.TracksCorrectly");
         }
 
         [Test]
@@ -1169,25 +1294,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             );
         }
 
-        private static IEnumerable<TestCaseData> MixedRefreshOnDisposeCases()
-        {
-            yield return new TestCaseData(new[] { true, false, true }).SetName(
-                "MixedRefresh.TrueFalseTrue"
-            );
-            yield return new TestCaseData(new[] { false, true, false }).SetName(
-                "MixedRefresh.FalseTrueFalse"
-            );
-            yield return new TestCaseData(new[] { true, true, true, false, false }).SetName(
-                "MixedRefresh.ThreeTrueTwoFalse"
-            );
-            yield return new TestCaseData(new[] { false, false, false, true }).SetName(
-                "MixedRefresh.ThreeFalseOneTrue"
-            );
-            yield return new TestCaseData(new[] { true, false, true, false, true, false }).SetName(
-                "MixedRefresh.Alternating"
-            );
-        }
-
         [Test]
         public void DisposingSameScopeTwiceDoesNotCauseNegativeDepth()
         {
@@ -1486,25 +1592,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             );
         }
 
-        private static IEnumerable<TestCaseData> AlternatingDepthPatternCases()
-        {
-            yield return new TestCaseData(new[] { 1, 2, 1, 3, 2, 4, 0 }).SetName(
-                "AlternatingDepth.UpDownPattern.TracksCorrectly"
-            );
-            yield return new TestCaseData(new[] { 5, 3, 4, 2, 1, 0 }).SetName(
-                "AlternatingDepth.DecreasingWithBumps.TracksCorrectly"
-            );
-            yield return new TestCaseData(new[] { 1, 1, 1, 2, 2, 0 }).SetName(
-                "AlternatingDepth.PlateausPattern.TracksCorrectly"
-            );
-            yield return new TestCaseData(new[] { 0, 5, 0, 10, 0 }).SetName(
-                "AlternatingDepth.SpikesPattern.TracksCorrectly"
-            );
-            yield return new TestCaseData(new[] { 1, 2, 3, 4, 5, 4, 3, 2, 1, 0 }).SetName(
-                "AlternatingDepth.PyramidPattern.TracksCorrectly"
-            );
-        }
-
         [Test]
         public void IsCurrentlyBatchingReturnsCorrectValueInBatch()
         {
@@ -1710,41 +1797,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             RunRapidCounterCycles(cycleCount);
         }
 
-        private static void RunRapidCounterCycles(int cycleCount)
-        {
-            for (int i = 0; i < cycleCount; i++)
-            {
-                bool isOutermost = AssetDatabaseBatchHelper.IncrementBatchDepthWithUnityCall();
-                if (!isOutermost)
-                {
-                    Assert.Fail($"Cycle {i} should start from an outermost batch counter state.");
-                }
-
-                bool shouldCleanUpUnity =
-                    AssetDatabaseBatchHelper.DecrementBatchDepthWithUnityCleanup();
-                if (!shouldCleanUpUnity)
-                {
-                    Assert.Fail($"Cycle {i} should return to an outermost batch cleanup state.");
-                }
-            }
-
-            Assert.That(
-                AssetDatabaseBatchHelper.CurrentBatchDepth,
-                Is.EqualTo(0),
-                $"Depth should be 0 after {cycleCount} rapid cycles"
-            );
-            Assert.That(
-                AssetDatabaseBatchHelper.IsCurrentlyBatching,
-                Is.False,
-                "Should not be batching after extreme rapid cycles"
-            );
-            Assert.That(
-                AssetDatabaseBatchHelper.ActualUnityBatchDepth,
-                Is.EqualTo(0),
-                "Actual Unity batch depth should be 0 after extreme rapid cycles"
-            );
-        }
-
         [Test]
         [TestCase(25, TestName = "ManyNestedMixed.Depth25")]
         [TestCase(50, TestName = "ManyNestedMixed.Depth50")]
@@ -1875,25 +1927,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             );
 
             LogAssert.NoUnexpectedReceived();
-        }
-
-        private static IEnumerable<TestCaseData> OutOfOrderDisposalPatternCases()
-        {
-            yield return new TestCaseData(new[] { 0, 1, 2 }).SetName("OutOfOrder.FirstToLast");
-            yield return new TestCaseData(new[] { 2, 1, 0 }).SetName("OutOfOrder.LastToFirst");
-            yield return new TestCaseData(new[] { 1, 0, 2 }).SetName("OutOfOrder.MiddleFirstLast");
-            yield return new TestCaseData(new[] { 1, 2, 0 }).SetName("OutOfOrder.MiddleLastFirst");
-            yield return new TestCaseData(new[] { 0, 2, 1 }).SetName("OutOfOrder.FirstLastMiddle");
-            yield return new TestCaseData(new[] { 2, 0, 1 }).SetName("OutOfOrder.LastFirstMiddle");
-            yield return new TestCaseData(new[] { 0, 1, 2, 3, 4 }).SetName(
-                "OutOfOrder.FiveInOrder"
-            );
-            yield return new TestCaseData(new[] { 4, 3, 2, 1, 0 }).SetName(
-                "OutOfOrder.FiveReverse"
-            );
-            yield return new TestCaseData(new[] { 2, 0, 4, 1, 3 }).SetName(
-                "OutOfOrder.FiveScattered"
-            );
         }
 
         [Test]
@@ -2043,15 +2076,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                 Is.EqualTo(0),
                 "Depth should be 0 after cleanup"
             );
-        }
-
-        private static IEnumerable<TestCaseData> MultipleExceptionScenarioCases()
-        {
-            yield return new TestCaseData(1, 3).SetName("Exception.AtDepth3.BaseDepth2");
-            yield return new TestCaseData(2, 4).SetName("Exception.AtDepth4.BaseDepth2");
-            yield return new TestCaseData(3, 5).SetName("Exception.AtDepth5.BaseDepth2");
-            yield return new TestCaseData(1, 1).SetName("Exception.AtDepth1.BaseDepth0");
-            yield return new TestCaseData(5, 10).SetName("Exception.AtDepth10.BaseDepth5");
         }
 
         [Test]
@@ -3263,30 +3287,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
                     Is.EqualTo(1),
                     "After pause when batching: ActualUnityBatchDepth should be 1"
                 );
-            }
-        }
-
-        private const string EnsureFolderTestRoot = "Assets/__EnsureAssetFolderTests__";
-
-        private static void DeleteEnsureFolderTestRoot()
-        {
-            if (AssetDatabase.IsValidFolder(EnsureFolderTestRoot))
-            {
-                AssetDatabase.DeleteAsset(EnsureFolderTestRoot);
-            }
-        }
-
-        private static void DeleteDiskPathAndMeta(string absolutePath)
-        {
-            if (Directory.Exists(absolutePath))
-            {
-                Directory.Delete(absolutePath, recursive: true);
-            }
-
-            string metaPath = absolutePath + ".meta";
-            if (File.Exists(metaPath))
-            {
-                File.Delete(metaPath);
             }
         }
 

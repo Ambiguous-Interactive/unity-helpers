@@ -21,6 +21,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
     [NUnit.Framework.Category("Fast")]
     public sealed class EditorCacheHelperColorComparerTests
     {
+        private static float NextUp(float value)
+        {
+            return value + Mathf.Max(Mathf.Abs(value), 1e-6f) * 4e-7f;
+        }
+
+        private static float NextDown(float value)
+        {
+            return value - Mathf.Max(Mathf.Abs(value), 1e-6f) * 4e-7f;
+        }
+
         /// <remarks>
         /// This exact pair is what broke the old comparer. The channels sit a couple of ULPs apart
         /// either side of 127.5, so <see cref="EditorCacheHelper.AreColorsEqual"/> - a float
@@ -112,16 +122,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
             cache[b] = 2;
             Assert.AreEqual(1, cache.Count);
             Assert.AreEqual(2, cache[a]);
-        }
-
-        private static float NextUp(float value)
-        {
-            return value + Mathf.Max(Mathf.Abs(value), 1e-6f) * 4e-7f;
-        }
-
-        private static float NextDown(float value)
-        {
-            return value - Mathf.Max(Mathf.Abs(value), 1e-6f) * 4e-7f;
         }
     }
 

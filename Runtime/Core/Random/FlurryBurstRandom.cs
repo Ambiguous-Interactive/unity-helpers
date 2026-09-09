@@ -167,6 +167,20 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             RestoreCommonState(internalState);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static uint Mix(ref ulong state)
+        {
+            unchecked
+            {
+                state += 0x9E3779B97F4A7C15UL;
+                ulong z = state;
+                z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL;
+                z = (z ^ (z >> 27)) * 0x94D049BB133111EBUL;
+                z ^= z >> 31;
+                return (uint)z;
+            }
+        }
+
         public override uint NextUint()
         {
             unchecked
@@ -286,20 +300,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
             _e = Mix(ref mixer);
             _f = Mix(ref mixer);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static uint Mix(ref ulong state)
-        {
-            unchecked
-            {
-                state += 0x9E3779B97F4A7C15UL;
-                ulong z = state;
-                z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL;
-                z = (z ^ (z >> 27)) * 0x94D049BB133111EBUL;
-                z ^= z >> 31;
-                return (uint)z;
-            }
         }
     }
 }

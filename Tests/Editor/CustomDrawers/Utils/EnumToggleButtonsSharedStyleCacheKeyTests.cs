@@ -14,6 +14,53 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.Utils
     [NUnit.Framework.Category("Fast")]
     public sealed class EnumToggleButtonsSharedStyleCacheKeyTests
     {
+        private static EnumToggleButtonsShared.ButtonStyleCacheKey BuildKey(int slot, Color color)
+        {
+            Color selectedBackground = slot == 0 ? color : Color.red;
+            Color selectedText = slot == 1 ? color : Color.green;
+            Color inactiveBackground = slot == 2 ? color : Color.blue;
+            Color inactiveText = slot == 3 ? color : Color.yellow;
+            return new EnumToggleButtonsShared.ButtonStyleCacheKey(
+                EnumToggleButtonsShared.ButtonSegment.Middle,
+                true,
+                selectedBackground,
+                selectedText,
+                inactiveBackground,
+                inactiveText
+            );
+        }
+
+        private static Color NextColor(System.Random random)
+        {
+            return new Color(
+                (float)random.NextDouble(),
+                (float)random.NextDouble(),
+                (float)random.NextDouble(),
+                (float)random.NextDouble()
+            );
+        }
+
+        private static Color Nudge(Color color, System.Random random)
+        {
+            float scale = (float)((random.NextDouble() - 0.5) * 4e-7);
+            return new Color(
+                color.r + (scale * color.r),
+                color.g + (scale * color.g),
+                color.b + (scale * color.b),
+                color.a + (scale * color.a)
+            );
+        }
+
+        private static float NextUp(float value)
+        {
+            return value + (Mathf.Max(Mathf.Abs(value), 1e-6f) * 4e-7f);
+        }
+
+        private static float NextDown(float value)
+        {
+            return value - (Mathf.Max(Mathf.Abs(value), 1e-6f) * 4e-7f);
+        }
+
         /// <remarks>
         /// The key used to compare colors with <c>Mathf.Approximately</c> while hashing the raw
         /// float channels. Approximate equality is not transitive and cannot back any hash, so the
@@ -203,53 +250,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers.Utils
 
             Assert.IsFalse(opaque.Equals(translucent));
             Assert.AreNotEqual(opaque.GetHashCode(), translucent.GetHashCode());
-        }
-
-        private static EnumToggleButtonsShared.ButtonStyleCacheKey BuildKey(int slot, Color color)
-        {
-            Color selectedBackground = slot == 0 ? color : Color.red;
-            Color selectedText = slot == 1 ? color : Color.green;
-            Color inactiveBackground = slot == 2 ? color : Color.blue;
-            Color inactiveText = slot == 3 ? color : Color.yellow;
-            return new EnumToggleButtonsShared.ButtonStyleCacheKey(
-                EnumToggleButtonsShared.ButtonSegment.Middle,
-                true,
-                selectedBackground,
-                selectedText,
-                inactiveBackground,
-                inactiveText
-            );
-        }
-
-        private static Color NextColor(System.Random random)
-        {
-            return new Color(
-                (float)random.NextDouble(),
-                (float)random.NextDouble(),
-                (float)random.NextDouble(),
-                (float)random.NextDouble()
-            );
-        }
-
-        private static Color Nudge(Color color, System.Random random)
-        {
-            float scale = (float)((random.NextDouble() - 0.5) * 4e-7);
-            return new Color(
-                color.r + (scale * color.r),
-                color.g + (scale * color.g),
-                color.b + (scale * color.b),
-                color.a + (scale * color.a)
-            );
-        }
-
-        private static float NextUp(float value)
-        {
-            return value + (Mathf.Max(Mathf.Abs(value), 1e-6f) * 4e-7f);
-        }
-
-        private static float NextDown(float value)
-        {
-            return value - (Mathf.Max(Mathf.Abs(value), 1e-6f) * 4e-7f);
         }
     }
 #endif

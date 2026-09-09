@@ -18,34 +18,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     /// </summary>
     public static class LineHelper
     {
-        private static float PerpendicularDistance(
-            Vector2 point,
-            Vector2 lineStart,
-            Vector2 lineEnd
-        )
-        {
-            float xDistance = lineEnd.x - lineStart.x;
-            float yDistance = lineEnd.y - lineStart.y;
-
-            if (Mathf.Approximately(xDistance, 0) && Mathf.Approximately(yDistance, 0))
-            {
-                return Vector2.Distance(point, lineStart);
-            }
-
-            float t =
-                ((point.x - lineStart.x) * xDistance + (point.y - lineStart.y) * yDistance)
-                / (xDistance * xDistance + yDistance * yDistance);
-
-            Vector2 closestPoint = t switch
-            {
-                < 0 => lineStart,
-                > 1 => lineEnd,
-                _ => new Vector2(lineStart.x + t * xDistance, lineStart.y + t * yDistance),
-            };
-
-            return Vector2.Distance(point, closestPoint);
-        }
-
         /*
             c# implementation of the Ramer-Douglas-Peucker-Algorithm by Craig Selbert slightly adapted for Unity Vector Types
             https://www.codeproject.com/Articles/18936/A-Csharp-Implementation-of-Douglas-Peucker-Line-Ap
@@ -112,6 +84,76 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 buffer.Add(points[pointIndex]);
             }
             return buffer;
+        }
+
+        /// <summary>
+        /// Fast Douglas–Peucker simplification using float epsilon.
+        /// </summary>
+        /// <param name="points">Input polyline points.</param>
+        /// <param name="epsilon">Maximum allowable deviation.</param>
+        /// <param name="buffer">Optional destination list (reused if provided).</param>
+        /// <returns>Output simplified points (in buffer if provided).</returns>
+        /// <example>
+        /// <code>
+        /// // Faster, good for on-frame simplification
+        /// var simplified = LineHelper.Simplify(rawPoints, epsilon: 0.1f);
+        /// </code>
+        /// </example>
+        public static List<Vector2> Simplify(
+            List<Vector2> points,
+            float epsilon,
+            List<Vector2> buffer = null
+        )
+        {
+            int pointCount = points?.Count ?? 0;
+            buffer ??= new List<Vector2>(pointCount);
+            buffer.Clear();
+            if (0 < pointCount && buffer.Capacity < pointCount)
+            {
+                buffer.Capacity = pointCount;
+            }
+            if (points == null)
+            {
+                return buffer;
+            }
+
+            if (pointCount < 3 || epsilon <= 0)
+            {
+                buffer.AddRange(points);
+                return buffer;
+            }
+
+            SimplifyRecursive(points, 0, pointCount - 1, epsilon, buffer);
+            buffer.Add(points[pointCount - 1]);
+            return buffer;
+        }
+
+        private static float PerpendicularDistance(
+            Vector2 point,
+            Vector2 lineStart,
+            Vector2 lineEnd
+        )
+        {
+            float xDistance = lineEnd.x - lineStart.x;
+            float yDistance = lineEnd.y - lineStart.y;
+
+            if (Mathf.Approximately(xDistance, 0) && Mathf.Approximately(yDistance, 0))
+            {
+                return Vector2.Distance(point, lineStart);
+            }
+
+            float t =
+                ((point.x - lineStart.x) * xDistance + (point.y - lineStart.y) * yDistance)
+                / (xDistance * xDistance + yDistance * yDistance);
+
+            Vector2 closestPoint = t switch
+            {
+                < 0 => lineStart,
+                > 1 => lineEnd,
+                _ => new Vector2(lineStart.x + t * xDistance, lineStart.y + t * yDistance),
+            };
+
+            return Vector2.Distance(point, closestPoint);
         }
 
         private static void DouglasPeuckerReductionRecursive(
@@ -186,48 +228,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 double height = area / bottom * 2.0;
                 return height;
             }
-        }
-
-        /// <summary>
-        /// Fast Douglas–Peucker simplification using float epsilon.
-        /// </summary>
-        /// <param name="points">Input polyline points.</param>
-        /// <param name="epsilon">Maximum allowable deviation.</param>
-        /// <param name="buffer">Optional destination list (reused if provided).</param>
-        /// <returns>Output simplified points (in buffer if provided).</returns>
-        /// <example>
-        /// <code>
-        /// // Faster, good for on-frame simplification
-        /// var simplified = LineHelper.Simplify(rawPoints, epsilon: 0.1f);
-        /// </code>
-        /// </example>
-        public static List<Vector2> Simplify(
-            List<Vector2> points,
-            float epsilon,
-            List<Vector2> buffer = null
-        )
-        {
-            int pointCount = points?.Count ?? 0;
-            buffer ??= new List<Vector2>(pointCount);
-            buffer.Clear();
-            if (0 < pointCount && buffer.Capacity < pointCount)
-            {
-                buffer.Capacity = pointCount;
-            }
-            if (points == null)
-            {
-                return buffer;
-            }
-
-            if (pointCount < 3 || epsilon <= 0)
-            {
-                buffer.AddRange(points);
-                return buffer;
-            }
-
-            SimplifyRecursive(points, 0, pointCount - 1, epsilon, buffer);
-            buffer.Add(points[pointCount - 1]);
-            return buffer;
         }
 
         private static void SimplifyRecursive(

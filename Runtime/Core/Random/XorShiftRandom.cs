@@ -73,20 +73,15 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [WProtoSubtype(typeof(AbstractRandom), 102)]
     public sealed partial class XorShiftRandom : AbstractRandom
     {
+        private const uint DefaultState = 2463534242U;
+
         public static XorShiftRandom Instance => ThreadLocalRandom<XorShiftRandom>.Instance;
 
         public override RandomState InternalState => BuildState(_state);
 
-        private const uint DefaultState = 2463534242U;
-
         [ProtoMember(6)]
         [WProtoMember(6)]
         private uint _state;
-
-        private static uint NormalizeState(uint state)
-        {
-            return state != 0 ? state : DefaultState;
-        }
 
         public XorShiftRandom()
             : this(Guid.NewGuid()) { }
@@ -108,9 +103,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             RestoreCommonState(internalState);
         }
 
-        protected override void OnAfterDeserialization()
+        private static uint NormalizeState(uint state)
         {
-            _state = NormalizeState(_state);
+            return state != 0 ? state : DefaultState;
         }
 
         public override uint NextUint()
@@ -124,6 +119,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         public override IRandom Copy()
         {
             return new XorShiftRandom(InternalState);
+        }
+
+        protected override void OnAfterDeserialization()
+        {
+            _state = NormalizeState(_state);
         }
     }
 }

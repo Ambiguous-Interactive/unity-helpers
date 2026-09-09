@@ -105,33 +105,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private const string RepeatedHelper =
             "global::WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoRepeated";
 
-        private CollectionForm(
-            CollectionSeeding seeding,
-            string accumulatorGeneric,
-            string addMethod,
-            string bulkAddMethod,
-            CollectionCommit commit,
-            string constructedGeneric,
-            string countMember,
-            CollectionReserve reserve,
-            bool walksByIndex = false
-        )
-        {
-            Seeding = seeding;
-            _accumulatorGeneric = accumulatorGeneric;
-            AddMethod = addMethod;
-            BulkAddMethod = bulkAddMethod;
-            Commit = commit;
-            _constructedGeneric = constructedGeneric;
-            CountMember = countMember;
-            _reserve = reserve;
-            WalksByIndex = walksByIndex;
-        }
-
-        private readonly string _accumulatorGeneric;
-        private readonly string _constructedGeneric;
-        private readonly CollectionReserve _reserve;
-
         /// <summary>How the finished accumulator becomes the member's value.</summary>
         internal CollectionCommit Commit { get; }
 
@@ -184,68 +157,31 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         internal bool WalksByIndex { get; }
 
-        /// <summary>
-        /// The type the read loop accumulates into.
-        /// </summary>
-        /// <param name="element">The fully qualified element type.</param>
-        /// <param name="declared">The member's fully qualified declared type.</param>
-        /// <returns>The accumulator's fully qualified type.</returns>
-        internal string AccumulatorType(string element, string declared)
+        private readonly string _accumulatorGeneric;
+        private readonly string _constructedGeneric;
+        private readonly CollectionReserve _reserve;
+
+        private CollectionForm(
+            CollectionSeeding seeding,
+            string accumulatorGeneric,
+            string addMethod,
+            string bulkAddMethod,
+            CollectionCommit commit,
+            string constructedGeneric,
+            string countMember,
+            CollectionReserve reserve,
+            bool walksByIndex = false
+        )
         {
-            return _accumulatorGeneric == null
-                ? declared
-                : _accumulatorGeneric + "<" + element + ">";
-        }
-
-        /// <summary>
-        /// The expression that turns a finished accumulator into the member's value.
-        /// </summary>
-        /// <param name="accumulator">The accumulator local.</param>
-        /// <param name="element">The fully qualified element type.</param>
-        /// <returns>The commit expression, or <c>null</c> when the commit is not an expression.</returns>
-        internal string CommitExpression(string accumulator, string element)
-        {
-            switch (Commit)
-            {
-                case CollectionCommit.Assign:
-                    return accumulator;
-
-                case CollectionCommit.ToArray:
-                    return accumulator + ".ToArray()";
-
-                case CollectionCommit.Construct:
-                    return "new " + _constructedGeneric + "<" + element + ">(" + accumulator + ")";
-
-                default:
-                    return null;
-            }
-        }
-
-        /// <summary>
-        /// The statement that sizes <paramref name="accumulator"/> for <paramref name="count"/> more
-        /// elements, or <c>null</c> when this form cannot be sized.
-        /// </summary>
-        /// <param name="accumulator">The accumulator local.</param>
-        /// <param name="count">The expression producing the element count.</param>
-        /// <returns>The statement, or <c>null</c>.</returns>
-        /// <remarks>
-        /// Emitted only where a count is actually known -- a packed run -- and always as a hint: the
-        /// read that follows produces the same collection whether or not this ran, so a form with no
-        /// answer here simply keeps growing as it did.
-        /// </remarks>
-        internal string ReserveStatement(string accumulator, string count)
-        {
-            switch (_reserve)
-            {
-                case CollectionReserve.Builder:
-                    return accumulator + ".Reserve(" + count + ");";
-
-                case CollectionReserve.List:
-                    return RepeatedHelper + ".Reserve(" + accumulator + ", " + count + ");";
-
-                default:
-                    return null;
-            }
+            Seeding = seeding;
+            _accumulatorGeneric = accumulatorGeneric;
+            AddMethod = addMethod;
+            BulkAddMethod = bulkAddMethod;
+            Commit = commit;
+            _constructedGeneric = constructedGeneric;
+            CountMember = countMember;
+            _reserve = reserve;
+            WalksByIndex = walksByIndex;
         }
 
         /// <summary>The statement that sizes a deferred read's pending list.</summary>
@@ -454,6 +390,70 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                         "Count",
                         CollectionReserve.None
                     );
+
+                default:
+                    return null;
+            }
+        }
+
+        /// <summary>
+        /// The type the read loop accumulates into.
+        /// </summary>
+        /// <param name="element">The fully qualified element type.</param>
+        /// <param name="declared">The member's fully qualified declared type.</param>
+        /// <returns>The accumulator's fully qualified type.</returns>
+        internal string AccumulatorType(string element, string declared)
+        {
+            return _accumulatorGeneric == null
+                ? declared
+                : _accumulatorGeneric + "<" + element + ">";
+        }
+
+        /// <summary>
+        /// The expression that turns a finished accumulator into the member's value.
+        /// </summary>
+        /// <param name="accumulator">The accumulator local.</param>
+        /// <param name="element">The fully qualified element type.</param>
+        /// <returns>The commit expression, or <c>null</c> when the commit is not an expression.</returns>
+        internal string CommitExpression(string accumulator, string element)
+        {
+            switch (Commit)
+            {
+                case CollectionCommit.Assign:
+                    return accumulator;
+
+                case CollectionCommit.ToArray:
+                    return accumulator + ".ToArray()";
+
+                case CollectionCommit.Construct:
+                    return "new " + _constructedGeneric + "<" + element + ">(" + accumulator + ")";
+
+                default:
+                    return null;
+            }
+        }
+
+        /// <summary>
+        /// The statement that sizes <paramref name="accumulator"/> for <paramref name="count"/> more
+        /// elements, or <c>null</c> when this form cannot be sized.
+        /// </summary>
+        /// <param name="accumulator">The accumulator local.</param>
+        /// <param name="count">The expression producing the element count.</param>
+        /// <returns>The statement, or <c>null</c>.</returns>
+        /// <remarks>
+        /// Emitted only where a count is actually known -- a packed run -- and always as a hint: the
+        /// read that follows produces the same collection whether or not this ran, so a form with no
+        /// answer here simply keeps growing as it did.
+        /// </remarks>
+        internal string ReserveStatement(string accumulator, string count)
+        {
+            switch (_reserve)
+            {
+                case CollectionReserve.Builder:
+                    return accumulator + ".Reserve(" + count + ");";
+
+                case CollectionReserve.List:
+                    return RepeatedHelper + ".Reserve(" + accumulator + ", " + count + ");";
 
                 default:
                     return null;

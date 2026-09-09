@@ -270,6 +270,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             /// <summary>The private member's name, so the test below carries no magic string.</summary>
             internal const string HealthFieldName = nameof(_health);
 
+            internal int Health => _health;
+
+            internal string Label => _label;
+
+            internal string DerivedLabel => _derivedLabel;
+
+            internal IReadOnlyList<string> HookLog => _hookLog;
+
             [WProtoMember(1, Name = "health")]
             private int _health;
 
@@ -288,14 +296,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 _health = health;
                 _label = label;
             }
-
-            internal int Health => _health;
-
-            internal string Label => _label;
-
-            internal string DerivedLabel => _derivedLabel;
-
-            internal IReadOnlyList<string> HookLog => _hookLog;
 
             [WProtoBeforeSerialization]
             private void OnBeforeSerialization()

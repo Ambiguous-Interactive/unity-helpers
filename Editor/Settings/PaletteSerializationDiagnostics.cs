@@ -33,6 +33,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         private const bool CommitDiagnosticsEnabled = false;
 #endif
 
+        private static readonly string[] PalettePropertyRoots =
+        {
+            UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColors,
+            UnityHelpersSettings.SerializedPropertyNames.WEnumToggleButtonsCustomColors,
+        };
+
         /// <summary>
         /// Reports the start of a dictionary CommitEntry operation.
         /// </summary>
@@ -223,36 +229,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             Debug.Log(message, serializedObject?.targetObject);
         }
 
-        private static bool IsUnityHelpersSettings(SerializedObject serializedObject)
-        {
-            if (serializedObject?.targetObject is UnityHelpersSettings)
-            {
-                return true;
-            }
-
-            Object[] targets = serializedObject?.targetObjects;
-            if (targets == null)
-            {
-                return false;
-            }
-
-            foreach (UnityEngine.Object targetsElement in targets)
-            {
-                if (targetsElement is UnityHelpersSettings)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static readonly string[] PalettePropertyRoots =
-        {
-            UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColors,
-            UnityHelpersSettings.SerializedPropertyNames.WEnumToggleButtonsCustomColors,
-        };
-
         internal static bool IsPaletteProperty(string propertyPath)
         {
             if (string.IsNullOrEmpty(propertyPath))
@@ -400,6 +376,30 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 $"{LogPrefix} Sort property={dictionaryProperty.propertyPath} before=[{beforeSequence}] snapshot=[{snapshotSequence}] after=[{afterSequence}]";
 
             Debug.Log(message, serializedObject?.targetObject);
+        }
+
+        private static bool IsUnityHelpersSettings(SerializedObject serializedObject)
+        {
+            if (serializedObject?.targetObject is UnityHelpersSettings)
+            {
+                return true;
+            }
+
+            Object[] targets = serializedObject?.targetObjects;
+            if (targets == null)
+            {
+                return false;
+            }
+
+            foreach (UnityEngine.Object targetsElement in targets)
+            {
+                if (targetsElement is UnityHelpersSettings)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static bool ShouldLog(

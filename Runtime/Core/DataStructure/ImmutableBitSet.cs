@@ -33,11 +33,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private const int BitsPerLongShift = 6;
         private const int BitsPerLongMask = 63;
 
-        [ProtoMember(1)]
-        private readonly ulong[] _bits;
+        public static bool operator ==(ImmutableBitSet left, ImmutableBitSet right)
+        {
+            return left.Equals(right);
+        }
 
-        [ProtoMember(2)]
-        private readonly int _capacity;
+        public static bool operator !=(ImmutableBitSet left, ImmutableBitSet right)
+        {
+            return !(left == right);
+        }
 
         /// <summary>
         /// Gets the current capacity (number of bits stored).
@@ -54,6 +58,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// Returns false for indices beyond capacity.
         /// </summary>
         public bool this[int index] => TryGet(index, out bool value) && value;
+
+        [ProtoMember(1)]
+        private readonly ulong[] _bits;
+
+        [ProtoMember(2)]
+        private readonly int _capacity;
 
         /// <summary>
         /// Constructs an immutable bit set with the specified capacity and bit data.
@@ -73,20 +83,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 capacity <= 0 ? 0
                 : deliverableBits < capacity ? (int)deliverableBits
                 : capacity;
-        }
-
-        /// <summary>
-        /// Gets a copy of the internal bits array for serialization purposes.
-        /// </summary>
-        internal ulong[] GetBitsArrayCopy()
-        {
-            if (_bits == null)
-            {
-                return Array.Empty<ulong>();
-            }
-            ulong[] copy = new ulong[_bits.Length];
-            Array.Copy(_bits, copy, _bits.Length);
-            return copy;
         }
 
         /// <summary>
@@ -328,18 +324,25 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return Objects.HashCode(_capacity, hash);
         }
 
-        public static bool operator ==(ImmutableBitSet left, ImmutableBitSet right)
+        /// <summary>
+        /// Gets a copy of the internal bits array for serialization purposes.
+        /// </summary>
+        internal ulong[] GetBitsArrayCopy()
         {
-            return left.Equals(right);
-        }
-
-        public static bool operator !=(ImmutableBitSet left, ImmutableBitSet right)
-        {
-            return !(left == right);
+            if (_bits == null)
+            {
+                return Array.Empty<ulong>();
+            }
+            ulong[] copy = new ulong[_bits.Length];
+            Array.Copy(_bits, copy, _bits.Length);
+            return copy;
         }
 
         public struct BitEnumerator : IEnumerator<bool>
         {
+            public bool Current => _current;
+            object IEnumerator.Current => Current;
+
             private readonly ImmutableBitSet _bitSet;
             private int _index;
             private bool _current;
@@ -361,9 +364,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 _current = false;
                 return false;
             }
-
-            public bool Current => _current;
-            object IEnumerator.Current => Current;
 
             public void Reset()
             {

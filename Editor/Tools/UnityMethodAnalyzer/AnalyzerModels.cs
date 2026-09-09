@@ -105,12 +105,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
         public bool IsSuppressed { get; set; }
 
         /// <summary>
-        /// Cached joined parameter types string for efficient comparison.
-        /// Lazily computed on first access to avoid allocations when not needed.
-        /// </summary>
-        private string _cachedParameterTypesString;
-
-        /// <summary>
         /// Gets the parameter types as a joined string for efficient comparison.
         /// This value is cached after first computation to avoid repeated allocations.
         /// </summary>
@@ -126,6 +120,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 return _cachedParameterTypesString ?? string.Empty;
             }
         }
+
+        /// <summary>
+        /// Cached joined parameter types string for efficient comparison.
+        /// Lazily computed on first access to avoid allocations when not needed.
+        /// </summary>
+        private string _cachedParameterTypesString;
 
         public AnalyzerMethodInfo()
         {

@@ -28,6 +28,108 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         private const int RepairSampleWidth = 160;
         private const int RepairSampleHeight = 160;
 
+        public static IEnumerable<TestCaseData> EdgeSplitRepairTestCases()
+        {
+            yield return new TestCaseData(100, 100, 25, "Donut").SetName(
+                "EdgeSplit.DonutSmall.ProducesAxisAlignedHull"
+            );
+
+            yield return new TestCaseData(200, 200, 50, "Donut").SetName(
+                "EdgeSplit.DonutLarge.ProducesAxisAlignedHull"
+            );
+
+            yield return new TestCaseData(100, 100, 0, "TriangleNotch").SetName(
+                "EdgeSplit.TriangleNotchSmall.HullCorrectness"
+            );
+
+            yield return new TestCaseData(200, 200, 0, "TriangleNotch").SetName(
+                "EdgeSplit.TriangleNotchLarge.HullCorrectness"
+            );
+
+            yield return new TestCaseData(50, 50, 0, "FilledRectangle").SetName(
+                "EdgeSplit.FilledRectangle.ProducesConvexHull"
+            );
+        }
+
+        private static List<Vector2> CreateVectorPointCloud(int width, int height)
+        {
+            List<Vector2> points = new(width * height);
+            for (int y = 0; y < height; ++y)
+            {
+                for (int x = 0; x < width; ++x)
+                {
+                    points.Add(new Vector2(x, y));
+                }
+            }
+
+            return points;
+        }
+
+        private static List<FastVector3Int> CreateGridPointCloud(int width, int height)
+        {
+            List<FastVector3Int> points = new(width * height);
+            for (int y = 0; y < height; ++y)
+            {
+                for (int x = 0; x < width; ++x)
+                {
+                    points.Add(new FastVector3Int(x, y, 0));
+                }
+            }
+
+            return points;
+        }
+
+        private static List<FastVector3Int> CreateConcaveGridSample(int width, int height)
+        {
+            // A triangular notch introduces diagonal edges that can exercise axis-corner repair.
+            List<FastVector3Int> points = new(width * height);
+
+            int notchSize = width / 3;
+
+            for (int y = 0; y < height; ++y)
+            {
+                for (int x = 0; x < width; ++x)
+                {
+                    bool inTriangle = x < notchSize && y < notchSize && (x + y) < notchSize;
+
+                    if (!inTriangle)
+                    {
+                        points.Add(new FastVector3Int(x, y, 0));
+                    }
+                }
+            }
+
+            return points;
+        }
+
+        private static List<FastVector3Int> CreateDonutSample(
+            int width,
+            int height,
+            int cavityMargin
+        )
+        {
+            List<FastVector3Int> points = new(width * height);
+            int cavityMinX = cavityMargin;
+            int cavityMaxX = width - cavityMargin - 1;
+            int cavityMinY = cavityMargin;
+            int cavityMaxY = height - cavityMargin - 1;
+
+            for (int y = 0; y < height; ++y)
+            {
+                for (int x = 0; x < width; ++x)
+                {
+                    bool inCavity =
+                        cavityMinX < x && x < cavityMaxX && cavityMinY < y && y < cavityMaxY;
+                    if (!inCavity)
+                    {
+                        points.Add(new FastVector3Int(x, y, 0));
+                    }
+                }
+            }
+
+            return points;
+        }
+
         [Test]
         public void BuildConcaveHullKnnVector2AllocationsStayBounded()
         {
@@ -194,108 +296,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 allocated,
                 LargeGridAllocationBudgetBytes,
                 $"Grid concave hull (>10k points) should stay within hull list allocations (measured {allocated} bytes)."
-            );
-        }
-
-        private static List<Vector2> CreateVectorPointCloud(int width, int height)
-        {
-            List<Vector2> points = new(width * height);
-            for (int y = 0; y < height; ++y)
-            {
-                for (int x = 0; x < width; ++x)
-                {
-                    points.Add(new Vector2(x, y));
-                }
-            }
-
-            return points;
-        }
-
-        private static List<FastVector3Int> CreateGridPointCloud(int width, int height)
-        {
-            List<FastVector3Int> points = new(width * height);
-            for (int y = 0; y < height; ++y)
-            {
-                for (int x = 0; x < width; ++x)
-                {
-                    points.Add(new FastVector3Int(x, y, 0));
-                }
-            }
-
-            return points;
-        }
-
-        private static List<FastVector3Int> CreateConcaveGridSample(int width, int height)
-        {
-            // A triangular notch introduces diagonal edges that can exercise axis-corner repair.
-            List<FastVector3Int> points = new(width * height);
-
-            int notchSize = width / 3;
-
-            for (int y = 0; y < height; ++y)
-            {
-                for (int x = 0; x < width; ++x)
-                {
-                    bool inTriangle = x < notchSize && y < notchSize && (x + y) < notchSize;
-
-                    if (!inTriangle)
-                    {
-                        points.Add(new FastVector3Int(x, y, 0));
-                    }
-                }
-            }
-
-            return points;
-        }
-
-        private static List<FastVector3Int> CreateDonutSample(
-            int width,
-            int height,
-            int cavityMargin
-        )
-        {
-            List<FastVector3Int> points = new(width * height);
-            int cavityMinX = cavityMargin;
-            int cavityMaxX = width - cavityMargin - 1;
-            int cavityMinY = cavityMargin;
-            int cavityMaxY = height - cavityMargin - 1;
-
-            for (int y = 0; y < height; ++y)
-            {
-                for (int x = 0; x < width; ++x)
-                {
-                    bool inCavity =
-                        cavityMinX < x && x < cavityMaxX && cavityMinY < y && y < cavityMaxY;
-                    if (!inCavity)
-                    {
-                        points.Add(new FastVector3Int(x, y, 0));
-                    }
-                }
-            }
-
-            return points;
-        }
-
-        public static IEnumerable<TestCaseData> EdgeSplitRepairTestCases()
-        {
-            yield return new TestCaseData(100, 100, 25, "Donut").SetName(
-                "EdgeSplit.DonutSmall.ProducesAxisAlignedHull"
-            );
-
-            yield return new TestCaseData(200, 200, 50, "Donut").SetName(
-                "EdgeSplit.DonutLarge.ProducesAxisAlignedHull"
-            );
-
-            yield return new TestCaseData(100, 100, 0, "TriangleNotch").SetName(
-                "EdgeSplit.TriangleNotchSmall.HullCorrectness"
-            );
-
-            yield return new TestCaseData(200, 200, 0, "TriangleNotch").SetName(
-                "EdgeSplit.TriangleNotchLarge.HullCorrectness"
-            );
-
-            yield return new TestCaseData(50, 50, 0, "FilledRectangle").SetName(
-                "EdgeSplit.FilledRectangle.ProducesConvexHull"
             );
         }
 

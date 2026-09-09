@@ -35,6 +35,16 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             return points;
         }
 
+        private static List<Vector3> ConvertToVector3(List<Vector2> points)
+        {
+            List<Vector3> result = new(points.Count);
+            foreach (Vector2 p in points)
+            {
+                result.Add(new Vector3(p.x, p.y, 0f));
+            }
+            return result;
+        }
+
         [Test]
         public void RandomBoundsOnSmallGridMatchAcrossTrees()
         {
@@ -211,16 +221,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     quad3D
                 );
             }
-        }
-
-        private static List<Vector3> ConvertToVector3(List<Vector2> points)
-        {
-            List<Vector3> result = new(points.Count);
-            foreach (Vector2 p in points)
-            {
-                result.Add(new Vector3(p.x, p.y, 0f));
-            }
-            return result;
         }
     }
 }

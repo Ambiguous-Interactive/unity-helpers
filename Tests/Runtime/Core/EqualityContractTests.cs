@@ -33,56 +33,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         private static readonly Guid SampleGuid = new("6f9619ff-8b86-4d11-b42d-00c04fc964ff");
         private static readonly Guid OtherGuid = new("2f9619ff-8b86-4d11-b42d-00c04fc964ff");
 
-        [TestCaseSource(nameof(Cases))]
-        public void EveryTypeObeysTheEqualityLaws(EqualityContractCase equalityCase)
-        {
-            equalityCase.AssertLaws();
-        }
-
-        [Test]
-        public void TheTableCoversEveryTypeThisFixtureIsResponsibleFor()
-        {
-            List<string> labels = new();
-            foreach (EqualityContractCase equalityCase in Cases())
-            {
-                labels.Add(equalityCase.Label);
-            }
-
-            // Assert coverage so a missing case cannot silently pass.
-            string[] expected =
-            {
-                nameof(Circle),
-                nameof(Sphere),
-                nameof(Line2D),
-                nameof(Line3D),
-                nameof(PoolFrequencyStatistics),
-                nameof(PoolStatistics),
-                "PoolStatisticsNotANumberRates",
-                nameof(SplitMix64),
-                nameof(AnimatedSpriteLayer),
-                "AnimatedSpriteLayerZeroInitialized",
-                nameof(ImmutableBitSet),
-                "ImmutableBitSetZeroInitialized",
-                nameof(FastVector2Int),
-                nameof(FastVector3Int),
-                nameof(WGuid),
-                nameof(SerializableType),
-                "SerializableTypeEmpty",
-                "SerializableNullableWithValue",
-                "SerializableNullableWithoutValue",
-                "SerializableValueTuplePair",
-                "SerializableValueTupleTriple",
-                nameof(RandomState),
-                nameof(Attribute),
-                "EffectStackKeyCustom",
-                "EffectStackKeyNone",
-            };
-            foreach (string label in expected)
-            {
-                CollectionAssert.Contains(labels, label);
-            }
-        }
-
         private static IEnumerable<EqualityContractCase> Cases()
         {
             yield return new EqualityContractCase<Circle>(
@@ -414,6 +364,56 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 isLowFrequency: false,
                 isUnused: false
             );
+        }
+
+        [TestCaseSource(nameof(Cases))]
+        public void EveryTypeObeysTheEqualityLaws(EqualityContractCase equalityCase)
+        {
+            equalityCase.AssertLaws();
+        }
+
+        [Test]
+        public void TheTableCoversEveryTypeThisFixtureIsResponsibleFor()
+        {
+            List<string> labels = new();
+            foreach (EqualityContractCase equalityCase in Cases())
+            {
+                labels.Add(equalityCase.Label);
+            }
+
+            // Assert coverage so a missing case cannot silently pass.
+            string[] expected =
+            {
+                nameof(Circle),
+                nameof(Sphere),
+                nameof(Line2D),
+                nameof(Line3D),
+                nameof(PoolFrequencyStatistics),
+                nameof(PoolStatistics),
+                "PoolStatisticsNotANumberRates",
+                nameof(SplitMix64),
+                nameof(AnimatedSpriteLayer),
+                "AnimatedSpriteLayerZeroInitialized",
+                nameof(ImmutableBitSet),
+                "ImmutableBitSetZeroInitialized",
+                nameof(FastVector2Int),
+                nameof(FastVector3Int),
+                nameof(WGuid),
+                nameof(SerializableType),
+                "SerializableTypeEmpty",
+                "SerializableNullableWithValue",
+                "SerializableNullableWithoutValue",
+                "SerializableValueTuplePair",
+                "SerializableValueTupleTriple",
+                nameof(RandomState),
+                nameof(Attribute),
+                "EffectStackKeyCustom",
+                "EffectStackKeyNone",
+            };
+            foreach (string label in expected)
+            {
+                CollectionAssert.Contains(labels, label);
+            }
         }
     }
 }

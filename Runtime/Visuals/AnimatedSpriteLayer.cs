@@ -14,6 +14,16 @@ namespace WallstopStudios.UnityHelpers.Visuals
     {
         public const float FrameRate = 12f;
 
+        public static bool operator ==(AnimatedSpriteLayer left, AnimatedSpriteLayer right)
+        {
+            return left.Equals(right);
+        }
+
+        public static bool operator !=(AnimatedSpriteLayer left, AnimatedSpriteLayer right)
+        {
+            return !left.Equals(right);
+        }
+
         public readonly Vector2[] perFramePixelOffsets;
         public readonly Sprite[] frames;
         public readonly float alpha;
@@ -44,57 +54,6 @@ namespace WallstopStudios.UnityHelpers.Visuals
                 worldSpaceOffsets,
                 alpha
             ) { }
-
-        public static bool operator ==(AnimatedSpriteLayer left, AnimatedSpriteLayer right)
-        {
-            return left.Equals(right);
-        }
-
-        public static bool operator !=(AnimatedSpriteLayer left, AnimatedSpriteLayer right)
-        {
-            return !left.Equals(right);
-        }
-
-        public bool Equals(AnimatedSpriteLayer other)
-        {
-            if (!alpha.Equals(other.alpha))
-            {
-                return false;
-            }
-
-            if (!perFramePixelOffsets.AsSpan().SequenceEqual(other.perFramePixelOffsets))
-            {
-                return false;
-            }
-
-            // Spans tolerate default null arrays; per-frame equality still needs Unity aliveness checks.
-            ReadOnlySpan<Sprite> ownFrames = frames.AsSpan();
-            ReadOnlySpan<Sprite> otherFrames = other.frames.AsSpan();
-            if (ownFrames.Length != otherFrames.Length)
-            {
-                return false;
-            }
-
-            for (int i = 0; i < ownFrames.Length; ++i)
-            {
-                if (ownFrames[i] != otherFrames[i])
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        public override bool Equals(object obj)
-        {
-            return obj is AnimatedSpriteLayer other && Equals(other);
-        }
-
-        public override int GetHashCode()
-        {
-            return Objects.HashCode(alpha, perFramePixelOffsets?.Length, frames?.Length);
-        }
 
         private static Sprite[] CreateFrameArray(IEnumerable<Sprite> sprites)
         {
@@ -216,6 +175,47 @@ namespace WallstopStudios.UnityHelpers.Visuals
             // Missing offsets intentionally default to zero, so unequal counts are valid.
 
             return result;
+        }
+
+        public bool Equals(AnimatedSpriteLayer other)
+        {
+            if (!alpha.Equals(other.alpha))
+            {
+                return false;
+            }
+
+            if (!perFramePixelOffsets.AsSpan().SequenceEqual(other.perFramePixelOffsets))
+            {
+                return false;
+            }
+
+            // Spans tolerate default null arrays; per-frame equality still needs Unity aliveness checks.
+            ReadOnlySpan<Sprite> ownFrames = frames.AsSpan();
+            ReadOnlySpan<Sprite> otherFrames = other.frames.AsSpan();
+            if (ownFrames.Length != otherFrames.Length)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < ownFrames.Length; ++i)
+            {
+                if (ownFrames[i] != otherFrames[i])
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is AnimatedSpriteLayer other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            return Objects.HashCode(alpha, perFramePixelOffsets?.Length, frames?.Length);
         }
     }
 }

@@ -12,11 +12,11 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     /// </summary>
     internal static class TestReentrantHandler
     {
+        public static int InvocationCount => _invocationCount;
+
         private static int _invocationCount;
         private static bool _triggerNestedChange;
         private static string _watchedPath;
-
-        public static int InvocationCount => _invocationCount;
 
         public static void Configure(string assetPath)
         {

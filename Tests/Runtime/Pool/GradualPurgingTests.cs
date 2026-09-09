@@ -21,11 +21,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         private float _currentTime;
         private bool _wasMemoryPressureEnabled;
 
-        private float TestTimeProvider()
-        {
-            return _currentTime;
-        }
-
         [SetUp]
         public void SetUp()
         {
@@ -850,11 +845,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
         }
 
+        private float TestTimeProvider()
+        {
+            return _currentTime;
+        }
+
         private sealed class TestPoolItem
         {
-            public int Id { get; }
-
             private static int _nextId;
+
+            public int Id { get; }
 
             public TestPoolItem()
             {

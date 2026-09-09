@@ -3954,21 +3954,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 #endif
 
-            private static void TrackDelegateStrategy<TMember>(
-                Delegate delegateInstance,
-                CapabilityKey<TMember> key
-            )
-            {
-                if (delegateInstance == null)
-                {
-                    return;
-                }
-
-                StrategyHolder holder = StrategyHolder.Create(key, delegateInstance.GetType());
-                DelegateStrategyTable.Remove(delegateInstance);
-                DelegateStrategyTable.Add(delegateInstance, holder);
-            }
-
             public static void ClearFieldGetterCache()
             {
 #if !SINGLE_THREADED
@@ -4119,528 +4104,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
                 strategy = ReflectionDelegateStrategy.Reflection;
                 return false;
-            }
-
-            private static Func<object, object> CreatePropertyGetter(
-                PropertyInfo property,
-                ReflectionDelegateStrategy strategy
-            )
-            {
-                if (strategy == ReflectionDelegateStrategy.Expressions)
-                {
-                    return CreateCompiledPropertyGetter(property);
-                }
-#if EMIT_DYNAMIC_IL
-                if (strategy == ReflectionDelegateStrategy.DynamicIl)
-                {
-                    return BuildPropertyGetterIL(property);
-                }
-#endif
-                if (strategy == ReflectionDelegateStrategy.Reflection)
-                {
-                    return CreateReflectionPropertyGetter(property);
-                }
-
-                return null;
-            }
-
-            private static Action<object, object> CreatePropertySetter(
-                PropertyInfo property,
-                ReflectionDelegateStrategy strategy
-            )
-            {
-                if (strategy == ReflectionDelegateStrategy.Expressions)
-                {
-                    return CreateCompiledPropertySetter(property);
-                }
-#if EMIT_DYNAMIC_IL
-                if (strategy == ReflectionDelegateStrategy.DynamicIl)
-                {
-                    return BuildPropertySetterIL(property);
-                }
-#endif
-                if (strategy == ReflectionDelegateStrategy.Reflection)
-                {
-                    return CreateReflectionPropertySetter(property);
-                }
-
-                return null;
-            }
-
-            private static Func<object, object> CreateReflectionPropertyGetter(
-                PropertyInfo property
-            )
-            {
-                if (property.GetMethod != null && property.GetMethod.IsStatic)
-                {
-                    return _ => property.GetValue(null);
-                }
-
-                return instance => property.GetValue(instance);
-            }
-
-            private static Action<object, object> CreateReflectionPropertySetter(
-                PropertyInfo property
-            )
-            {
-                if (property.SetMethod != null && property.SetMethod.IsStatic)
-                {
-                    return (_, value) => property.SetValue(null, value);
-                }
-
-                return (instance, value) => property.SetValue(instance, value);
-            }
-
-            private static bool TryGetOrCreateMethodInvoker(
-                MethodInfo method,
-                ReflectionDelegateStrategy strategy,
-                out Func<object, object[], object> invoker
-            )
-            {
-                invoker = null;
-
-                if (strategy == ReflectionDelegateStrategy.Expressions && !SupportsExpressions)
-                {
-                    return false;
-                }
-#if EMIT_DYNAMIC_IL
-                if (strategy == ReflectionDelegateStrategy.DynamicIl && !SupportsDynamicIl)
-                {
-                    return false;
-                }
-#else
-                if (strategy == ReflectionDelegateStrategy.DynamicIl)
-                {
-                    return false;
-                }
-#endif
-
-                CapabilityKey<MethodInfo> key = new(method, strategy);
-                if (TryGetMethodInvokerFromCache(key, out Func<object, object[], object> cached))
-                {
-                    invoker = cached;
-                    return true;
-                }
-
-                if (IsMethodInvokerStrategyUnavailable(key))
-                {
-                    return false;
-                }
-
-                Func<object, object[], object> candidate = CreateMethodInvoker(method, strategy);
-                if (candidate == null)
-                {
-                    MarkMethodInvokerStrategyUnavailable(key);
-                    return false;
-                }
-
-                Func<object, object[], object> resolved = AddOrGetMethodInvoker(key, candidate);
-                TrackDelegateStrategy(resolved, key);
-                invoker = resolved;
-                return true;
-            }
-
-            private static Func<object, object[], object> GetOrCreateReflectionMethodInvoker(
-                MethodInfo method
-            )
-            {
-                CapabilityKey<MethodInfo> key = new(method, ReflectionDelegateStrategy.Reflection);
-                if (TryGetMethodInvokerFromCache(key, out Func<object, object[], object> cached))
-                {
-                    return cached;
-                }
-
-                Func<object, object[], object> reflectionInvoker = CreateReflectionMethodInvoker(
-                    method
-                );
-                Func<object, object[], object> resolved = AddOrGetMethodInvoker(
-                    key,
-                    reflectionInvoker
-                );
-                TrackDelegateStrategy(resolved, key);
-                return resolved;
-            }
-
-            private static bool TryGetOrCreateStaticMethodInvoker(
-                MethodInfo method,
-                ReflectionDelegateStrategy strategy,
-                out Func<object[], object> invoker
-            )
-            {
-                if (strategy == ReflectionDelegateStrategy.Expressions && !SupportsExpressions)
-                {
-                    invoker = null;
-                    return false;
-                }
-#if EMIT_DYNAMIC_IL
-                if (strategy == ReflectionDelegateStrategy.DynamicIl && !SupportsDynamicIl)
-                {
-                    invoker = null;
-                    return false;
-                }
-#else
-                if (strategy == ReflectionDelegateStrategy.DynamicIl)
-                {
-                    invoker = null;
-                    return false;
-                }
-#endif
-
-                CapabilityKey<MethodInfo> key = new(method, strategy);
-                if (TryGetStaticMethodInvokerFromCache(key, out Func<object[], object> cached))
-                {
-                    invoker = cached;
-                    return true;
-                }
-
-                if (IsStaticMethodInvokerStrategyUnavailable(key))
-                {
-                    invoker = null;
-                    return false;
-                }
-
-                Func<object[], object> candidate = CreateStaticMethodInvoker(method, strategy);
-                if (candidate == null)
-                {
-                    MarkStaticMethodInvokerStrategyUnavailable(key);
-                    invoker = null;
-                    return false;
-                }
-
-                Func<object[], object> resolved = AddOrGetStaticMethodInvoker(key, candidate);
-                TrackDelegateStrategy(resolved, key);
-                invoker = resolved;
-                return true;
-            }
-
-            private static Func<object[], object> GetOrCreateReflectionStaticMethodInvoker(
-                MethodInfo method
-            )
-            {
-                CapabilityKey<MethodInfo> key = new(method, ReflectionDelegateStrategy.Reflection);
-                if (TryGetStaticMethodInvokerFromCache(key, out Func<object[], object> cached))
-                {
-                    return cached;
-                }
-
-                Func<object[], object> reflectionInvoker = CreateReflectionStaticMethodInvoker(
-                    method
-                );
-                Func<object[], object> resolved = AddOrGetStaticMethodInvoker(
-                    key,
-                    reflectionInvoker
-                );
-                TrackDelegateStrategy(resolved, key);
-                return resolved;
-            }
-
-            private static Func<object, object[], object> CreateMethodInvoker(
-                MethodInfo method,
-                ReflectionDelegateStrategy strategy
-            )
-            {
-                if (strategy == ReflectionDelegateStrategy.Expressions)
-                {
-                    return CreateCompiledMethodInvoker(method);
-                }
-#if EMIT_DYNAMIC_IL
-                if (strategy == ReflectionDelegateStrategy.DynamicIl)
-                {
-                    return BuildMethodInvokerIL(method);
-                }
-#endif
-                return null;
-            }
-
-            private static Func<object, object[], object> CreateReflectionMethodInvoker(
-                MethodInfo method
-            )
-            {
-                return (instance, args) => method.Invoke(instance, args);
-            }
-
-            private static Func<object[], object> CreateStaticMethodInvoker(
-                MethodInfo method,
-                ReflectionDelegateStrategy strategy
-            )
-            {
-                if (strategy == ReflectionDelegateStrategy.Expressions)
-                {
-                    return CreateCompiledStaticMethodInvoker(method);
-                }
-#if EMIT_DYNAMIC_IL
-                if (strategy == ReflectionDelegateStrategy.DynamicIl)
-                {
-                    return BuildStaticMethodInvokerIL(method);
-                }
-#endif
-                return null;
-            }
-
-            private static Func<object[], object> CreateReflectionStaticMethodInvoker(
-                MethodInfo method
-            )
-            {
-                return args => method.Invoke(null, args);
-            }
-
-            private static Func<object[], object> CreateConstructorInvoker(
-                ConstructorInfo ctor,
-                ReflectionDelegateStrategy strategy
-            )
-            {
-                if (strategy == ReflectionDelegateStrategy.Expressions)
-                {
-                    if (SupportsExpressions)
-                    {
-                        Func<object[], object> invoker = CreateCompiledConstructor(ctor);
-                        if (invoker != null)
-                        {
-                            return invoker;
-                        }
-                    }
-                }
-#if EMIT_DYNAMIC_IL
-                if (strategy == ReflectionDelegateStrategy.DynamicIl && SupportsDynamicIl)
-                {
-                    return BuildConstructorIL(ctor);
-                }
-#endif
-                if (strategy == ReflectionDelegateStrategy.Reflection)
-                {
-                    return args => ctor.Invoke(args);
-                }
-
-                return null;
-            }
-
-            private static Func<object[], object> CreateReflectionConstructorInvoker(
-                ConstructorInfo ctor
-            )
-            {
-                return args => ctor.Invoke(args);
-            }
-
-            private static Func<object> CreateParameterlessConstructor(
-                ConstructorInfo ctor,
-                ReflectionDelegateStrategy strategy
-            )
-            {
-                if (strategy == ReflectionDelegateStrategy.Expressions)
-                {
-                    if (SupportsExpressions)
-                    {
-                        Func<object> creator = CreateCompiledParameterlessConstructor(ctor);
-                        if (creator != null)
-                        {
-                            return creator;
-                        }
-                    }
-                }
-#if EMIT_DYNAMIC_IL
-                if (strategy == ReflectionDelegateStrategy.DynamicIl && SupportsDynamicIl)
-                {
-                    return BuildParameterlessConstructorIL(ctor);
-                }
-#endif
-                if (strategy == ReflectionDelegateStrategy.Reflection)
-                {
-                    return () => ctor.Invoke(null);
-                }
-
-                return null;
-            }
-
-            private static Func<T> CreateTypedParameterlessConstructor<T>(
-                ConstructorInfo ctor,
-                ReflectionDelegateStrategy strategy
-            )
-            {
-                if (strategy == ReflectionDelegateStrategy.Expressions)
-                {
-                    if (SupportsExpressions)
-                    {
-                        Func<T> creator = CreateCompiledParameterlessConstructor<T>(ctor);
-                        if (creator != null)
-                        {
-                            return creator;
-                        }
-                    }
-                }
-#if EMIT_DYNAMIC_IL
-                if (strategy == ReflectionDelegateStrategy.DynamicIl && SupportsDynamicIl)
-                {
-                    return BuildTypedParameterlessConstructorIL<T>(ctor);
-                }
-#endif
-                if (strategy == ReflectionDelegateStrategy.Reflection)
-                {
-                    return () => (T)ctor.Invoke(null);
-                }
-
-                return null;
-            }
-
-            private static Func<TInstance, TValue> BuildTypedPropertyGetter<TInstance, TValue>(
-                PropertyInfo property
-            )
-            {
-                if (property == null)
-                {
-                    throw new ArgumentNullException(nameof(property));
-                }
-
-                MethodInfo getMethod =
-                    property.GetGetMethod(true)
-                    ?? throw new ArgumentException(
-                        $"Property {property?.Name} has no getter",
-                        nameof(property)
-                    );
-
-                Func<TInstance, TValue> getter = null;
-                if (SupportsExpressions)
-                {
-                    getter = CreateCompiledTypedPropertyGetter<TInstance, TValue>(
-                        property,
-                        getMethod
-                    );
-                }
-#if EMIT_DYNAMIC_IL
-                if (
-                    getter == null
-                    && SupportsDynamicIl
-                    && CanInlineReturnConversion(property.PropertyType, typeof(TValue))
-                )
-                {
-                    getter = BuildTypedPropertyGetterIL<TInstance, TValue>(property, getMethod);
-                }
-#endif
-                if (getter != null)
-                {
-                    return getter;
-                }
-
-                if (getMethod.IsStatic)
-                {
-                    return _ => (TValue)property.GetValue(null);
-                }
-
-                return instance => (TValue)property.GetValue(instance);
-            }
-
-            private static Action<TInstance, TValue> BuildTypedPropertySetter<TInstance, TValue>(
-                PropertyInfo property
-            )
-            {
-                if (property == null)
-                {
-                    throw new ArgumentNullException(nameof(property));
-                }
-
-                MethodInfo setMethod =
-                    property.GetSetMethod(true)
-                    ?? throw new ArgumentException(
-                        $"Property {property?.Name} has no setter",
-                        nameof(property)
-                    );
-
-                Action<TInstance, TValue> setter = null;
-                if (SupportsExpressions)
-                {
-                    setter = CreateCompiledTypedPropertySetter<TInstance, TValue>(
-                        property,
-                        setMethod
-                    );
-                }
-#if EMIT_DYNAMIC_IL
-                if (
-                    setter == null
-                    && SupportsDynamicIl
-                    && CanInlineAssignment(typeof(TValue), property.PropertyType)
-                )
-                {
-                    setter = BuildTypedPropertySetterIL<TInstance, TValue>(property, setMethod);
-                }
-#endif
-                if (setter != null)
-                {
-                    return setter;
-                }
-
-                if (setMethod.IsStatic)
-                {
-                    return (_, value) => property.SetValue(null, value);
-                }
-
-                return (instance, value) => property.SetValue(instance, value);
-            }
-
-            private static Func<TValue> BuildTypedStaticPropertyGetter<TValue>(
-                PropertyInfo property
-            )
-            {
-                if (property == null)
-                {
-                    throw new ArgumentNullException(nameof(property));
-                }
-
-                MethodInfo getMethod =
-                    property.GetGetMethod(true)
-                    ?? throw new ArgumentException(
-                        $"Property {property?.Name} has no getter",
-                        nameof(property)
-                    );
-
-                Func<TValue> getter = null;
-                if (SupportsExpressions)
-                {
-                    getter = CreateCompiledTypedStaticPropertyGetter<TValue>(property, getMethod);
-                }
-#if EMIT_DYNAMIC_IL
-                if (
-                    getter == null
-                    && SupportsDynamicIl
-                    && CanInlineReturnConversion(property.PropertyType, typeof(TValue))
-                )
-                {
-                    getter = BuildTypedStaticPropertyGetterIL<TValue>(property, getMethod);
-                }
-#endif
-                return getter ?? (() => (TValue)property.GetValue(null));
-            }
-
-            private static Action<TValue> BuildTypedStaticPropertySetter<TValue>(
-                PropertyInfo property
-            )
-            {
-                if (property == null)
-                {
-                    throw new ArgumentNullException(nameof(property));
-                }
-
-                MethodInfo setMethod =
-                    property.GetSetMethod(true)
-                    ?? throw new ArgumentException(
-                        $"Property {property?.Name} has no setter",
-                        nameof(property)
-                    );
-
-                Action<TValue> setter = null;
-                if (SupportsExpressions)
-                {
-                    setter = CreateCompiledTypedStaticPropertySetter<TValue>(property, setMethod);
-                }
-#if EMIT_DYNAMIC_IL
-                if (
-                    setter == null
-                    && SupportsDynamicIl
-                    && CanInlineAssignment(typeof(TValue), property.PropertyType)
-                )
-                {
-                    setter = BuildTypedStaticPropertySetterIL<TValue>(property, setMethod);
-                }
-#endif
-                return setter ?? (value => property.SetValue(null, value));
             }
 
             public static Func<TReturn> GetStaticMethodInvokerTyped<TReturn>(MethodInfo method)
@@ -5181,17 +4644,554 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 #endif
             }
 
+            private static void TrackDelegateStrategy<TMember>(
+                Delegate delegateInstance,
+                CapabilityKey<TMember> key
+            )
+            {
+                if (delegateInstance == null)
+                {
+                    return;
+                }
+
+                StrategyHolder holder = StrategyHolder.Create(key, delegateInstance.GetType());
+                DelegateStrategyTable.Remove(delegateInstance);
+                DelegateStrategyTable.Add(delegateInstance, holder);
+            }
+
+            private static Func<object, object> CreatePropertyGetter(
+                PropertyInfo property,
+                ReflectionDelegateStrategy strategy
+            )
+            {
+                if (strategy == ReflectionDelegateStrategy.Expressions)
+                {
+                    return CreateCompiledPropertyGetter(property);
+                }
+#if EMIT_DYNAMIC_IL
+                if (strategy == ReflectionDelegateStrategy.DynamicIl)
+                {
+                    return BuildPropertyGetterIL(property);
+                }
+#endif
+                if (strategy == ReflectionDelegateStrategy.Reflection)
+                {
+                    return CreateReflectionPropertyGetter(property);
+                }
+
+                return null;
+            }
+
+            private static Action<object, object> CreatePropertySetter(
+                PropertyInfo property,
+                ReflectionDelegateStrategy strategy
+            )
+            {
+                if (strategy == ReflectionDelegateStrategy.Expressions)
+                {
+                    return CreateCompiledPropertySetter(property);
+                }
+#if EMIT_DYNAMIC_IL
+                if (strategy == ReflectionDelegateStrategy.DynamicIl)
+                {
+                    return BuildPropertySetterIL(property);
+                }
+#endif
+                if (strategy == ReflectionDelegateStrategy.Reflection)
+                {
+                    return CreateReflectionPropertySetter(property);
+                }
+
+                return null;
+            }
+
+            private static Func<object, object> CreateReflectionPropertyGetter(
+                PropertyInfo property
+            )
+            {
+                if (property.GetMethod != null && property.GetMethod.IsStatic)
+                {
+                    return _ => property.GetValue(null);
+                }
+
+                return instance => property.GetValue(instance);
+            }
+
+            private static Action<object, object> CreateReflectionPropertySetter(
+                PropertyInfo property
+            )
+            {
+                if (property.SetMethod != null && property.SetMethod.IsStatic)
+                {
+                    return (_, value) => property.SetValue(null, value);
+                }
+
+                return (instance, value) => property.SetValue(instance, value);
+            }
+
+            private static bool TryGetOrCreateMethodInvoker(
+                MethodInfo method,
+                ReflectionDelegateStrategy strategy,
+                out Func<object, object[], object> invoker
+            )
+            {
+                invoker = null;
+
+                if (strategy == ReflectionDelegateStrategy.Expressions && !SupportsExpressions)
+                {
+                    return false;
+                }
+#if EMIT_DYNAMIC_IL
+                if (strategy == ReflectionDelegateStrategy.DynamicIl && !SupportsDynamicIl)
+                {
+                    return false;
+                }
+#else
+                if (strategy == ReflectionDelegateStrategy.DynamicIl)
+                {
+                    return false;
+                }
+#endif
+
+                CapabilityKey<MethodInfo> key = new(method, strategy);
+                if (TryGetMethodInvokerFromCache(key, out Func<object, object[], object> cached))
+                {
+                    invoker = cached;
+                    return true;
+                }
+
+                if (IsMethodInvokerStrategyUnavailable(key))
+                {
+                    return false;
+                }
+
+                Func<object, object[], object> candidate = CreateMethodInvoker(method, strategy);
+                if (candidate == null)
+                {
+                    MarkMethodInvokerStrategyUnavailable(key);
+                    return false;
+                }
+
+                Func<object, object[], object> resolved = AddOrGetMethodInvoker(key, candidate);
+                TrackDelegateStrategy(resolved, key);
+                invoker = resolved;
+                return true;
+            }
+
+            private static Func<object, object[], object> GetOrCreateReflectionMethodInvoker(
+                MethodInfo method
+            )
+            {
+                CapabilityKey<MethodInfo> key = new(method, ReflectionDelegateStrategy.Reflection);
+                if (TryGetMethodInvokerFromCache(key, out Func<object, object[], object> cached))
+                {
+                    return cached;
+                }
+
+                Func<object, object[], object> reflectionInvoker = CreateReflectionMethodInvoker(
+                    method
+                );
+                Func<object, object[], object> resolved = AddOrGetMethodInvoker(
+                    key,
+                    reflectionInvoker
+                );
+                TrackDelegateStrategy(resolved, key);
+                return resolved;
+            }
+
+            private static bool TryGetOrCreateStaticMethodInvoker(
+                MethodInfo method,
+                ReflectionDelegateStrategy strategy,
+                out Func<object[], object> invoker
+            )
+            {
+                if (strategy == ReflectionDelegateStrategy.Expressions && !SupportsExpressions)
+                {
+                    invoker = null;
+                    return false;
+                }
+#if EMIT_DYNAMIC_IL
+                if (strategy == ReflectionDelegateStrategy.DynamicIl && !SupportsDynamicIl)
+                {
+                    invoker = null;
+                    return false;
+                }
+#else
+                if (strategy == ReflectionDelegateStrategy.DynamicIl)
+                {
+                    invoker = null;
+                    return false;
+                }
+#endif
+
+                CapabilityKey<MethodInfo> key = new(method, strategy);
+                if (TryGetStaticMethodInvokerFromCache(key, out Func<object[], object> cached))
+                {
+                    invoker = cached;
+                    return true;
+                }
+
+                if (IsStaticMethodInvokerStrategyUnavailable(key))
+                {
+                    invoker = null;
+                    return false;
+                }
+
+                Func<object[], object> candidate = CreateStaticMethodInvoker(method, strategy);
+                if (candidate == null)
+                {
+                    MarkStaticMethodInvokerStrategyUnavailable(key);
+                    invoker = null;
+                    return false;
+                }
+
+                Func<object[], object> resolved = AddOrGetStaticMethodInvoker(key, candidate);
+                TrackDelegateStrategy(resolved, key);
+                invoker = resolved;
+                return true;
+            }
+
+            private static Func<object[], object> GetOrCreateReflectionStaticMethodInvoker(
+                MethodInfo method
+            )
+            {
+                CapabilityKey<MethodInfo> key = new(method, ReflectionDelegateStrategy.Reflection);
+                if (TryGetStaticMethodInvokerFromCache(key, out Func<object[], object> cached))
+                {
+                    return cached;
+                }
+
+                Func<object[], object> reflectionInvoker = CreateReflectionStaticMethodInvoker(
+                    method
+                );
+                Func<object[], object> resolved = AddOrGetStaticMethodInvoker(
+                    key,
+                    reflectionInvoker
+                );
+                TrackDelegateStrategy(resolved, key);
+                return resolved;
+            }
+
+            private static Func<object, object[], object> CreateMethodInvoker(
+                MethodInfo method,
+                ReflectionDelegateStrategy strategy
+            )
+            {
+                if (strategy == ReflectionDelegateStrategy.Expressions)
+                {
+                    return CreateCompiledMethodInvoker(method);
+                }
+#if EMIT_DYNAMIC_IL
+                if (strategy == ReflectionDelegateStrategy.DynamicIl)
+                {
+                    return BuildMethodInvokerIL(method);
+                }
+#endif
+                return null;
+            }
+
+            private static Func<object, object[], object> CreateReflectionMethodInvoker(
+                MethodInfo method
+            )
+            {
+                return (instance, args) => method.Invoke(instance, args);
+            }
+
+            private static Func<object[], object> CreateStaticMethodInvoker(
+                MethodInfo method,
+                ReflectionDelegateStrategy strategy
+            )
+            {
+                if (strategy == ReflectionDelegateStrategy.Expressions)
+                {
+                    return CreateCompiledStaticMethodInvoker(method);
+                }
+#if EMIT_DYNAMIC_IL
+                if (strategy == ReflectionDelegateStrategy.DynamicIl)
+                {
+                    return BuildStaticMethodInvokerIL(method);
+                }
+#endif
+                return null;
+            }
+
+            private static Func<object[], object> CreateReflectionStaticMethodInvoker(
+                MethodInfo method
+            )
+            {
+                return args => method.Invoke(null, args);
+            }
+
+            private static Func<object[], object> CreateConstructorInvoker(
+                ConstructorInfo ctor,
+                ReflectionDelegateStrategy strategy
+            )
+            {
+                if (strategy == ReflectionDelegateStrategy.Expressions)
+                {
+                    if (SupportsExpressions)
+                    {
+                        Func<object[], object> invoker = CreateCompiledConstructor(ctor);
+                        if (invoker != null)
+                        {
+                            return invoker;
+                        }
+                    }
+                }
+#if EMIT_DYNAMIC_IL
+                if (strategy == ReflectionDelegateStrategy.DynamicIl && SupportsDynamicIl)
+                {
+                    return BuildConstructorIL(ctor);
+                }
+#endif
+                if (strategy == ReflectionDelegateStrategy.Reflection)
+                {
+                    return args => ctor.Invoke(args);
+                }
+
+                return null;
+            }
+
+            private static Func<object[], object> CreateReflectionConstructorInvoker(
+                ConstructorInfo ctor
+            )
+            {
+                return args => ctor.Invoke(args);
+            }
+
+            private static Func<object> CreateParameterlessConstructor(
+                ConstructorInfo ctor,
+                ReflectionDelegateStrategy strategy
+            )
+            {
+                if (strategy == ReflectionDelegateStrategy.Expressions)
+                {
+                    if (SupportsExpressions)
+                    {
+                        Func<object> creator = CreateCompiledParameterlessConstructor(ctor);
+                        if (creator != null)
+                        {
+                            return creator;
+                        }
+                    }
+                }
+#if EMIT_DYNAMIC_IL
+                if (strategy == ReflectionDelegateStrategy.DynamicIl && SupportsDynamicIl)
+                {
+                    return BuildParameterlessConstructorIL(ctor);
+                }
+#endif
+                if (strategy == ReflectionDelegateStrategy.Reflection)
+                {
+                    return () => ctor.Invoke(null);
+                }
+
+                return null;
+            }
+
+            private static Func<T> CreateTypedParameterlessConstructor<T>(
+                ConstructorInfo ctor,
+                ReflectionDelegateStrategy strategy
+            )
+            {
+                if (strategy == ReflectionDelegateStrategy.Expressions)
+                {
+                    if (SupportsExpressions)
+                    {
+                        Func<T> creator = CreateCompiledParameterlessConstructor<T>(ctor);
+                        if (creator != null)
+                        {
+                            return creator;
+                        }
+                    }
+                }
+#if EMIT_DYNAMIC_IL
+                if (strategy == ReflectionDelegateStrategy.DynamicIl && SupportsDynamicIl)
+                {
+                    return BuildTypedParameterlessConstructorIL<T>(ctor);
+                }
+#endif
+                if (strategy == ReflectionDelegateStrategy.Reflection)
+                {
+                    return () => (T)ctor.Invoke(null);
+                }
+
+                return null;
+            }
+
+            private static Func<TInstance, TValue> BuildTypedPropertyGetter<TInstance, TValue>(
+                PropertyInfo property
+            )
+            {
+                if (property == null)
+                {
+                    throw new ArgumentNullException(nameof(property));
+                }
+
+                MethodInfo getMethod =
+                    property.GetGetMethod(true)
+                    ?? throw new ArgumentException(
+                        $"Property {property?.Name} has no getter",
+                        nameof(property)
+                    );
+
+                Func<TInstance, TValue> getter = null;
+                if (SupportsExpressions)
+                {
+                    getter = CreateCompiledTypedPropertyGetter<TInstance, TValue>(
+                        property,
+                        getMethod
+                    );
+                }
+#if EMIT_DYNAMIC_IL
+                if (
+                    getter == null
+                    && SupportsDynamicIl
+                    && CanInlineReturnConversion(property.PropertyType, typeof(TValue))
+                )
+                {
+                    getter = BuildTypedPropertyGetterIL<TInstance, TValue>(property, getMethod);
+                }
+#endif
+                if (getter != null)
+                {
+                    return getter;
+                }
+
+                if (getMethod.IsStatic)
+                {
+                    return _ => (TValue)property.GetValue(null);
+                }
+
+                return instance => (TValue)property.GetValue(instance);
+            }
+
+            private static Action<TInstance, TValue> BuildTypedPropertySetter<TInstance, TValue>(
+                PropertyInfo property
+            )
+            {
+                if (property == null)
+                {
+                    throw new ArgumentNullException(nameof(property));
+                }
+
+                MethodInfo setMethod =
+                    property.GetSetMethod(true)
+                    ?? throw new ArgumentException(
+                        $"Property {property?.Name} has no setter",
+                        nameof(property)
+                    );
+
+                Action<TInstance, TValue> setter = null;
+                if (SupportsExpressions)
+                {
+                    setter = CreateCompiledTypedPropertySetter<TInstance, TValue>(
+                        property,
+                        setMethod
+                    );
+                }
+#if EMIT_DYNAMIC_IL
+                if (
+                    setter == null
+                    && SupportsDynamicIl
+                    && CanInlineAssignment(typeof(TValue), property.PropertyType)
+                )
+                {
+                    setter = BuildTypedPropertySetterIL<TInstance, TValue>(property, setMethod);
+                }
+#endif
+                if (setter != null)
+                {
+                    return setter;
+                }
+
+                if (setMethod.IsStatic)
+                {
+                    return (_, value) => property.SetValue(null, value);
+                }
+
+                return (instance, value) => property.SetValue(instance, value);
+            }
+
+            private static Func<TValue> BuildTypedStaticPropertyGetter<TValue>(
+                PropertyInfo property
+            )
+            {
+                if (property == null)
+                {
+                    throw new ArgumentNullException(nameof(property));
+                }
+
+                MethodInfo getMethod =
+                    property.GetGetMethod(true)
+                    ?? throw new ArgumentException(
+                        $"Property {property?.Name} has no getter",
+                        nameof(property)
+                    );
+
+                Func<TValue> getter = null;
+                if (SupportsExpressions)
+                {
+                    getter = CreateCompiledTypedStaticPropertyGetter<TValue>(property, getMethod);
+                }
+#if EMIT_DYNAMIC_IL
+                if (
+                    getter == null
+                    && SupportsDynamicIl
+                    && CanInlineReturnConversion(property.PropertyType, typeof(TValue))
+                )
+                {
+                    getter = BuildTypedStaticPropertyGetterIL<TValue>(property, getMethod);
+                }
+#endif
+                return getter ?? (() => (TValue)property.GetValue(null));
+            }
+
+            private static Action<TValue> BuildTypedStaticPropertySetter<TValue>(
+                PropertyInfo property
+            )
+            {
+                if (property == null)
+                {
+                    throw new ArgumentNullException(nameof(property));
+                }
+
+                MethodInfo setMethod =
+                    property.GetSetMethod(true)
+                    ?? throw new ArgumentException(
+                        $"Property {property?.Name} has no setter",
+                        nameof(property)
+                    );
+
+                Action<TValue> setter = null;
+                if (SupportsExpressions)
+                {
+                    setter = CreateCompiledTypedStaticPropertySetter<TValue>(property, setMethod);
+                }
+#if EMIT_DYNAMIC_IL
+                if (
+                    setter == null
+                    && SupportsDynamicIl
+                    && CanInlineAssignment(typeof(TValue), property.PropertyType)
+                )
+                {
+                    setter = BuildTypedStaticPropertySetterIL<TValue>(property, setMethod);
+                }
+#endif
+                return setter ?? (value => property.SetValue(null, value));
+            }
+
             private readonly struct CapabilityKey<T> : IEquatable<CapabilityKey<T>>
             {
+                internal T Member { get; }
+
+                internal ReflectionDelegateStrategy Strategy { get; }
+
                 internal CapabilityKey(T member, ReflectionDelegateStrategy strategy)
                 {
                     Member = member;
                     Strategy = strategy;
                 }
-
-                internal T Member { get; }
-
-                internal ReflectionDelegateStrategy Strategy { get; }
 
                 public bool Equals(CapabilityKey<T> other)
                 {
@@ -5217,6 +5217,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             private sealed class StrategyHolder
             {
+                private static readonly object NullMemberKey = new();
+
+                internal ReflectionDelegateStrategy Strategy { get; }
+
+                internal object MemberKey { get; }
+
+                internal Type DelegateType { get; }
+
                 internal StrategyHolder(
                     ReflectionDelegateStrategy strategy,
                     object memberKey,
@@ -5228,12 +5236,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     DelegateType = delegateType;
                 }
 
-                internal ReflectionDelegateStrategy Strategy { get; }
-
-                internal object MemberKey { get; }
-
-                internal Type DelegateType { get; }
-
                 internal static StrategyHolder Create<TMember>(
                     CapabilityKey<TMember> key,
                     Type delegateType
@@ -5242,8 +5244,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     object memberKey = key.Member is null ? NullMemberKey : key.Member;
                     return new StrategyHolder(key.Strategy, memberKey, delegateType);
                 }
-
-                private static readonly object NullMemberKey = new();
             }
         }
     }

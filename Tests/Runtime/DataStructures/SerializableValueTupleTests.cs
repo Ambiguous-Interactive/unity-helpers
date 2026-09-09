@@ -26,6 +26,17 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     [NUnit.Framework.Category("Fast")]
     public sealed class SerializableValueTupleTests : CommonTestBase
     {
+        private static string ToHex(byte[] bytes)
+        {
+            System.Text.StringBuilder builder = new System.Text.StringBuilder(bytes.Length * 2);
+            foreach (byte value in bytes)
+            {
+                builder.Append(value.ToString("X2"));
+            }
+
+            return builder.ToString();
+        }
+
         /*
             JSON converter factories construct generic closures reflectively, which IL2CPP may not generate.
             JSON equivalence is therefore outside this fixture contract.
@@ -175,17 +186,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 new SerializableValueTuple<int, float>(8, 1.5f).GetHashCode()
             );
             Assert.AreEqual("(7, 1.5)", pair.ToString());
-        }
-
-        private static string ToHex(byte[] bytes)
-        {
-            System.Text.StringBuilder builder = new System.Text.StringBuilder(bytes.Length * 2);
-            foreach (byte value in bytes)
-            {
-                builder.Append(value.ToString("X2"));
-            }
-
-            return builder.ToString();
         }
 
         private SerializableValueTupleAsset CreateAsset()

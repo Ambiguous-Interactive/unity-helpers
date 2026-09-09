@@ -26,6 +26,45 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     /// </remarks>
     public readonly struct ValidationFinding : IEquatable<ValidationFinding>
     {
+        /// <summary>The reporting rule's stable identifier.</summary>
+        public string RuleId { get; }
+
+        /// <summary>How much the finding should interrupt a reader.</summary>
+        public ValidationSeverity Severity { get; }
+
+        /// <summary>The GUID of the asset the finding belongs to.</summary>
+        public string AssetGuid { get; }
+
+        /// <summary>The asset's project-relative path as of the run that found it.</summary>
+        public string AssetPath { get; }
+
+        /// <summary>What tells this finding apart from the rule's others on the same asset.</summary>
+        public string Discriminator { get; }
+
+        /// <summary>The human-readable description.</summary>
+        public string Message { get; }
+
+        /// <summary>
+        /// The finding's identity across runs: rule, asset GUID, and discriminator.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Path and message are deliberately excluded, so moving an asset or rewording a rule does
+        /// not present an old finding as a new one.
+        /// </para>
+        /// <para>
+        /// Built once in the constructor rather than on every read. It is read four times per
+        /// rendered list row, once per <see cref="GetHashCode"/>, once per suppression test and
+        /// once per report line, and each of those was a fresh string. The fallback keeps
+        /// <c>default(ValidationFinding).Id</c> answering exactly what concatenating three nulls
+        /// always answered.
+        /// </para>
+        /// </remarks>
+        public string Id => _id ?? RuleId + "|" + AssetGuid + "|" + Discriminator;
+
+        internal string SourceFingerprint { get; }
+        internal ValidationSeverity OriginalSeverity { get; }
+
         private readonly Object _target;
         private readonly string _id;
 
@@ -86,45 +125,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             Message = message;
             _id = ruleId + "|" + assetGuid + "|" + discriminator;
         }
-
-        internal string SourceFingerprint { get; }
-        internal ValidationSeverity OriginalSeverity { get; }
-
-        /// <summary>The reporting rule's stable identifier.</summary>
-        public string RuleId { get; }
-
-        /// <summary>How much the finding should interrupt a reader.</summary>
-        public ValidationSeverity Severity { get; }
-
-        /// <summary>The GUID of the asset the finding belongs to.</summary>
-        public string AssetGuid { get; }
-
-        /// <summary>The asset's project-relative path as of the run that found it.</summary>
-        public string AssetPath { get; }
-
-        /// <summary>What tells this finding apart from the rule's others on the same asset.</summary>
-        public string Discriminator { get; }
-
-        /// <summary>The human-readable description.</summary>
-        public string Message { get; }
-
-        /// <summary>
-        /// The finding's identity across runs: rule, asset GUID, and discriminator.
-        /// </summary>
-        /// <remarks>
-        /// <para>
-        /// Path and message are deliberately excluded, so moving an asset or rewording a rule does
-        /// not present an old finding as a new one.
-        /// </para>
-        /// <para>
-        /// Built once in the constructor rather than on every read. It is read four times per
-        /// rendered list row, once per <see cref="GetHashCode"/>, once per suppression test and
-        /// once per report line, and each of those was a fresh string. The fallback keeps
-        /// <c>default(ValidationFinding).Id</c> answering exactly what concatenating three nulls
-        /// always answered.
-        /// </para>
-        /// </remarks>
-        public string Id => _id ?? RuleId + "|" + AssetGuid + "|" + Discriminator;
 
         /// <summary>
         /// Resolves the object at fault, when Unity still has it.

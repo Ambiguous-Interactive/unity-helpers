@@ -21,51 +21,6 @@ namespace WallstopStudios.UnityHelpers.Tags
     [AutoLoadSingleton(RuntimeInitializeLoadType.BeforeSceneLoad)]
     public sealed class AttributeMetadataCache : ScriptableObjectSingleton<AttributeMetadataCache>
     {
-        [Header("Initialization")]
-        [Tooltip(
-            "If enabled, pre-warms RelationalComponent reflection caches at runtime before the first scene loads. Useful to avoid first-use stalls on IL2CPP or slow devices."
-        )]
-        [SerializeField]
-        private bool _prewarmRelationalOnLoad = false;
-
-        [SerializeField]
-        private string[] _allAttributeNames = Array.Empty<string>();
-
-        [NonSerialized]
-        private string[] _computedAllAttributeNames;
-
-        [NonSerialized]
-        private bool _computedAllAttributeNamesIncludesTests;
-
-        [SerializeField]
-        private TypeFieldMetadata[] _typeMetadata = Array.Empty<TypeFieldMetadata>();
-
-        [SerializeField]
-        internal RelationalTypeMetadata[] _relationalTypeMetadata =
-            Array.Empty<RelationalTypeMetadata>();
-
-        [SerializeField]
-        private AutoLoadSingletonEntry[] _autoLoadSingletons =
-            Array.Empty<AutoLoadSingletonEntry>();
-
-        internal string[] SerializedAttributeNames => _allAttributeNames ?? Array.Empty<string>();
-
-        internal TypeFieldMetadata[] SerializedTypeMetadata =>
-            _typeMetadata ?? Array.Empty<TypeFieldMetadata>();
-
-        internal RelationalTypeMetadata[] SerializedRelationalTypeMetadata =>
-            _relationalTypeMetadata ?? Array.Empty<RelationalTypeMetadata>();
-
-        internal AutoLoadSingletonEntry[] SerializedAutoLoadSingletons =>
-            _autoLoadSingletons ?? Array.Empty<AutoLoadSingletonEntry>();
-
-        private readonly object _lookupLock = new();
-
-        private Dictionary<Type, string[]> _typeFieldsLookup;
-        private Dictionary<Type, RelationalFieldMetadata[]> _relationalFieldsLookup;
-        private Dictionary<Type, ResolvedRelationalFieldMetadata[]> _resolvedRelationalFieldsLookup;
-        private Dictionary<ElementTypeKey, Type> _elementTypeLookup;
-
         private static readonly object _typeResolutionLock = new();
         private static readonly Dictionary<string, Type> _resolvedTypeCache = new(
             StringComparer.Ordinal
@@ -121,6 +76,51 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// </summary>
         /// <remarks>Entries are sorted for determinism and safe to iterate without additional allocation.</remarks>
         public AutoLoadSingletonEntry[] AutoLoadSingletons => SerializedAutoLoadSingletons;
+
+        internal string[] SerializedAttributeNames => _allAttributeNames ?? Array.Empty<string>();
+
+        internal TypeFieldMetadata[] SerializedTypeMetadata =>
+            _typeMetadata ?? Array.Empty<TypeFieldMetadata>();
+
+        internal RelationalTypeMetadata[] SerializedRelationalTypeMetadata =>
+            _relationalTypeMetadata ?? Array.Empty<RelationalTypeMetadata>();
+
+        internal AutoLoadSingletonEntry[] SerializedAutoLoadSingletons =>
+            _autoLoadSingletons ?? Array.Empty<AutoLoadSingletonEntry>();
+
+        [SerializeField]
+        internal RelationalTypeMetadata[] _relationalTypeMetadata =
+            Array.Empty<RelationalTypeMetadata>();
+
+        [Header("Initialization")]
+        [Tooltip(
+            "If enabled, pre-warms RelationalComponent reflection caches at runtime before the first scene loads. Useful to avoid first-use stalls on IL2CPP or slow devices."
+        )]
+        [SerializeField]
+        private bool _prewarmRelationalOnLoad = false;
+
+        [SerializeField]
+        private string[] _allAttributeNames = Array.Empty<string>();
+
+        [NonSerialized]
+        private string[] _computedAllAttributeNames;
+
+        [NonSerialized]
+        private bool _computedAllAttributeNamesIncludesTests;
+
+        [SerializeField]
+        private TypeFieldMetadata[] _typeMetadata = Array.Empty<TypeFieldMetadata>();
+
+        [SerializeField]
+        private AutoLoadSingletonEntry[] _autoLoadSingletons =
+            Array.Empty<AutoLoadSingletonEntry>();
+
+        private readonly object _lookupLock = new();
+
+        private Dictionary<Type, string[]> _typeFieldsLookup;
+        private Dictionary<Type, RelationalFieldMetadata[]> _relationalFieldsLookup;
+        private Dictionary<Type, ResolvedRelationalFieldMetadata[]> _resolvedRelationalFieldsLookup;
+        private Dictionary<ElementTypeKey, Type> _elementTypeLookup;
 
         private void OnEnable()
         {
@@ -277,6 +277,53 @@ namespace WallstopStudios.UnityHelpers.Tags
         }
 #endif
 
+        private static bool TryResolveType(string typeName, out Type type)
+        {
+            if (string.IsNullOrWhiteSpace(typeName))
+            {
+                type = null;
+                return false;
+            }
+
+            lock (_typeResolutionLock)
+            {
+                if (_resolvedTypeCache.TryGetValue(typeName, out type))
+                {
+                    return type != null;
+                }
+
+                Type resolved = ReflectionHelpers.TryResolveType(typeName);
+                _resolvedTypeCache[typeName] = resolved;
+                type = resolved;
+                return resolved != null;
+            }
+        }
+
+        private static void LogMissingType(string typeName, string context)
+        {
+            if (string.IsNullOrWhiteSpace(typeName) || string.IsNullOrWhiteSpace(context))
+            {
+                return;
+            }
+
+            string key = string.Concat(context, ":", typeName);
+            lock (_missingTypeLock)
+            {
+                if (!_loggedMissingTypeKeys.Add(key))
+                {
+                    return;
+                }
+            }
+
+            Debug.LogWarning(
+                string.Format(
+                    "AttributeMetadataCache: Unable to resolve {0} type '{1}'. The cached entry will be ignored. Regenerate the cache to refresh the metadata.",
+                    context,
+                    typeName
+                )
+            );
+        }
+
         /// <summary>
         /// Attempts to retrieve attribute field names for a given component type.
         /// </summary>
@@ -393,104 +440,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             );
         }
 
-        private static bool TryResolveType(string typeName, out Type type)
-        {
-            if (string.IsNullOrWhiteSpace(typeName))
-            {
-                type = null;
-                return false;
-            }
-
-            lock (_typeResolutionLock)
-            {
-                if (_resolvedTypeCache.TryGetValue(typeName, out type))
-                {
-                    return type != null;
-                }
-
-                Type resolved = ReflectionHelpers.TryResolveType(typeName);
-                _resolvedTypeCache[typeName] = resolved;
-                type = resolved;
-                return resolved != null;
-            }
-        }
-
-        private static void LogMissingType(string typeName, string context)
-        {
-            if (string.IsNullOrWhiteSpace(typeName) || string.IsNullOrWhiteSpace(context))
-            {
-                return;
-            }
-
-            string key = string.Concat(context, ":", typeName);
-            lock (_missingTypeLock)
-            {
-                if (!_loggedMissingTypeKeys.Add(key))
-                {
-                    return;
-                }
-            }
-
-            Debug.LogWarning(
-                string.Format(
-                    "AttributeMetadataCache: Unable to resolve {0} type '{1}'. The cached entry will be ignored. Regenerate the cache to refresh the metadata.",
-                    context,
-                    typeName
-                )
-            );
-        }
-
 #if UNITY_EDITOR
-        /// <summary>
-        /// Sets all serialized metadata fields and rebuilds internal lookups when the normalized data changes.
-        /// </summary>
-        /// <param name="allAttributeNames">All attribute names discovered.</param>
-        /// <param name="typeMetadata">Attribute field metadata per component type.</param>
-        /// <param name="relationalTypeMetadata">Relational field metadata per component type.</param>
-        /// <param name="autoLoadSingletons">Auto-load singleton entries.</param>
-        /// <returns><c>true</c> when the serialized cache changed; otherwise, <c>false</c>.</returns>
-        public bool SetMetadata(
-            string[] allAttributeNames,
-            TypeFieldMetadata[] typeMetadata,
-            RelationalTypeMetadata[] relationalTypeMetadata,
-            AutoLoadSingletonEntry[] autoLoadSingletons
-        )
-        {
-            string[] normalizedAttributeNames = SortAttributeNames(allAttributeNames);
-            TypeFieldMetadata[] normalizedTypeMetadata = SortTypeMetadata(typeMetadata);
-            RelationalTypeMetadata[] normalizedRelationalMetadata = SortRelationalTypeMetadata(
-                relationalTypeMetadata
-            );
-            AutoLoadSingletonEntry[] normalizedAutoLoad = SortAutoLoadSingletonEntries(
-                autoLoadSingletons
-            );
-
-            if (
-                StringArraysEqual(_allAttributeNames, normalizedAttributeNames)
-                && TypeMetadataArraysEqual(_typeMetadata, normalizedTypeMetadata)
-                && RelationalMetadataArraysEqual(
-                    _relationalTypeMetadata,
-                    normalizedRelationalMetadata
-                )
-                && AutoLoadSingletonEntriesEqual(_autoLoadSingletons, normalizedAutoLoad)
-            )
-            {
-                return false;
-            }
-
-            _allAttributeNames = normalizedAttributeNames;
-            _typeMetadata = normalizedTypeMetadata;
-            _relationalTypeMetadata = normalizedRelationalMetadata;
-            _autoLoadSingletons = normalizedAutoLoad;
-            _computedAllAttributeNames = null;
-            _computedAllAttributeNamesIncludesTests = false;
-            _typeFieldsLookup = null;
-            _relationalFieldsLookup = null;
-            _resolvedRelationalFieldsLookup = null;
-            _elementTypeLookup = null;
-            UnityEditor.EditorUtility.SetDirty(this);
-            return true;
-        }
 
         private static string[] SortAttributeNames(string[] attributeNames)
         {
@@ -929,6 +879,57 @@ namespace WallstopStudios.UnityHelpers.Tags
             result.Sort((left, right) => string.CompareOrdinal(left.typeName, right.typeName));
             return result.ToArray();
         }
+
+        /// <summary>
+        /// Sets all serialized metadata fields and rebuilds internal lookups when the normalized data changes.
+        /// </summary>
+        /// <param name="allAttributeNames">All attribute names discovered.</param>
+        /// <param name="typeMetadata">Attribute field metadata per component type.</param>
+        /// <param name="relationalTypeMetadata">Relational field metadata per component type.</param>
+        /// <param name="autoLoadSingletons">Auto-load singleton entries.</param>
+        /// <returns><c>true</c> when the serialized cache changed; otherwise, <c>false</c>.</returns>
+        public bool SetMetadata(
+            string[] allAttributeNames,
+            TypeFieldMetadata[] typeMetadata,
+            RelationalTypeMetadata[] relationalTypeMetadata,
+            AutoLoadSingletonEntry[] autoLoadSingletons
+        )
+        {
+            string[] normalizedAttributeNames = SortAttributeNames(allAttributeNames);
+            TypeFieldMetadata[] normalizedTypeMetadata = SortTypeMetadata(typeMetadata);
+            RelationalTypeMetadata[] normalizedRelationalMetadata = SortRelationalTypeMetadata(
+                relationalTypeMetadata
+            );
+            AutoLoadSingletonEntry[] normalizedAutoLoad = SortAutoLoadSingletonEntries(
+                autoLoadSingletons
+            );
+
+            if (
+                StringArraysEqual(_allAttributeNames, normalizedAttributeNames)
+                && TypeMetadataArraysEqual(_typeMetadata, normalizedTypeMetadata)
+                && RelationalMetadataArraysEqual(
+                    _relationalTypeMetadata,
+                    normalizedRelationalMetadata
+                )
+                && AutoLoadSingletonEntriesEqual(_autoLoadSingletons, normalizedAutoLoad)
+            )
+            {
+                return false;
+            }
+
+            _allAttributeNames = normalizedAttributeNames;
+            _typeMetadata = normalizedTypeMetadata;
+            _relationalTypeMetadata = normalizedRelationalMetadata;
+            _autoLoadSingletons = normalizedAutoLoad;
+            _computedAllAttributeNames = null;
+            _computedAllAttributeNamesIncludesTests = false;
+            _typeFieldsLookup = null;
+            _relationalFieldsLookup = null;
+            _resolvedRelationalFieldsLookup = null;
+            _elementTypeLookup = null;
+            UnityEditor.EditorUtility.SetDirty(this);
+            return true;
+        }
 #endif
 
         /// <summary>
@@ -1082,29 +1083,6 @@ namespace WallstopStudios.UnityHelpers.Tags
         public readonly struct ResolvedRelationalFieldMetadata
         {
             /// <summary>
-            /// Creates a resolved relational metadata entry.
-            /// </summary>
-            /// <param name="fieldName">The relational field name on the component.</param>
-            /// <param name="attributeKind">Relationship classification.</param>
-            /// <param name="fieldKind">Collection shape of the field.</param>
-            /// <param name="elementType">Resolved element type (or field type for singles).</param>
-            /// <param name="isInterface">Whether the element type is an interface.</param>
-            public ResolvedRelationalFieldMetadata(
-                string fieldName,
-                RelationalAttributeKind attributeKind,
-                FieldKind fieldKind,
-                Type elementType,
-                bool isInterface
-            )
-            {
-                FieldName = fieldName;
-                AttributeKind = attributeKind;
-                FieldKind = fieldKind;
-                ElementType = elementType;
-                IsInterface = isInterface;
-            }
-
-            /// <summary>
             /// The name of the relational field.
             /// </summary>
             public string FieldName { get; }
@@ -1128,6 +1106,29 @@ namespace WallstopStudios.UnityHelpers.Tags
             /// Indicates if the element type is an interface.
             /// </summary>
             public bool IsInterface { get; }
+
+            /// <summary>
+            /// Creates a resolved relational metadata entry.
+            /// </summary>
+            /// <param name="fieldName">The relational field name on the component.</param>
+            /// <param name="attributeKind">Relationship classification.</param>
+            /// <param name="fieldKind">Collection shape of the field.</param>
+            /// <param name="elementType">Resolved element type (or field type for singles).</param>
+            /// <param name="isInterface">Whether the element type is an interface.</param>
+            public ResolvedRelationalFieldMetadata(
+                string fieldName,
+                RelationalAttributeKind attributeKind,
+                FieldKind fieldKind,
+                Type elementType,
+                bool isInterface
+            )
+            {
+                FieldName = fieldName;
+                AttributeKind = attributeKind;
+                FieldKind = fieldKind;
+                ElementType = elementType;
+                IsInterface = isInterface;
+            }
         }
 
         /// <summary>

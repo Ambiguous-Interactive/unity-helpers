@@ -48,14 +48,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
             ImmutableArray.Create(UnityHelpersDiagnostics.GetComponentComparedAgainstNull);
 
-        /// <inheritdoc />
-        public override void Initialize(AnalysisContext context)
-        {
-            context.EnableConcurrentExecution();
-            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
-            context.RegisterCompilationStartAction(OnCompilationStart);
-        }
-
         private static void OnCompilationStart(CompilationStartAnalysisContext context)
         {
             INamedTypeSymbol component = context.Compilation.GetTypeByMetadataName(
@@ -77,6 +69,14 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             );
             context.RegisterOperationAction(searches.OnComparison, OperationKind.BinaryOperator);
             context.RegisterOperationAction(searches.OnNullPattern, OperationKind.IsPattern);
+        }
+
+        /// <inheritdoc />
+        public override void Initialize(AnalysisContext context)
+        {
+            context.EnableConcurrentExecution();
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+            context.RegisterCompilationStartAction(OnCompilationStart);
         }
 
         /// <summary>
@@ -114,58 +114,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 _gameObject = gameObject;
                 _unityObject = unityObject;
                 _systemType = systemType;
-            }
-
-            /// <summary>
-            /// Reports <c>GetComponent(...) == null</c> and <c>!= null</c> in either operand order.
-            /// </summary>
-            /// <param name="context">The operation being analyzed.</param>
-            /// <remarks>
-            /// <c>UnityEngine.Object</c> overloads both operators, so the comparison arrives as a
-            /// user-defined <see cref="IBinaryOperation"/> whose operands carry the conversion to
-            /// <c>UnityEngine.Object</c> -- the null literal included, which is why the conversions
-            /// come off before either side is examined.
-            /// </remarks>
-            internal void OnComparison(OperationAnalysisContext context)
-            {
-                IBinaryOperation operation = (IBinaryOperation)context.Operation;
-                if (
-                    operation.OperatorKind != BinaryOperatorKind.Equals
-                    && operation.OperatorKind != BinaryOperatorKind.NotEquals
-                )
-                {
-                    return;
-                }
-
-                IOperation left = WithoutConversions(operation.LeftOperand);
-                IOperation right = WithoutConversions(operation.RightOperand);
-                if (IsNull(left))
-                {
-                    Report(context, operation, right);
-                }
-                else if (IsNull(right))
-                {
-                    Report(context, operation, left);
-                }
-            }
-
-            /// <summary>
-            /// Reports <c>GetComponent(...) is null</c> and <c>is not null</c>.
-            /// </summary>
-            /// <param name="context">The operation being analyzed.</param>
-            /// <remarks>
-            /// A type pattern is not a null test, so there is nothing about it to correct here and
-            /// it is not reported -- the same line <see cref="UnityObjectNullAnalyzer"/> draws.
-            /// </remarks>
-            internal void OnNullPattern(OperationAnalysisContext context)
-            {
-                IIsPatternOperation operation = (IIsPatternOperation)context.Operation;
-                if (!IsNullPattern(operation.Pattern))
-                {
-                    return;
-                }
-
-                Report(context, operation, WithoutConversions(operation.Value));
             }
 
             private static bool IsNullPattern(IPatternOperation pattern)
@@ -253,6 +201,58 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 }
 
                 return null;
+            }
+
+            /// <summary>
+            /// Reports <c>GetComponent(...) == null</c> and <c>!= null</c> in either operand order.
+            /// </summary>
+            /// <param name="context">The operation being analyzed.</param>
+            /// <remarks>
+            /// <c>UnityEngine.Object</c> overloads both operators, so the comparison arrives as a
+            /// user-defined <see cref="IBinaryOperation"/> whose operands carry the conversion to
+            /// <c>UnityEngine.Object</c> -- the null literal included, which is why the conversions
+            /// come off before either side is examined.
+            /// </remarks>
+            internal void OnComparison(OperationAnalysisContext context)
+            {
+                IBinaryOperation operation = (IBinaryOperation)context.Operation;
+                if (
+                    operation.OperatorKind != BinaryOperatorKind.Equals
+                    && operation.OperatorKind != BinaryOperatorKind.NotEquals
+                )
+                {
+                    return;
+                }
+
+                IOperation left = WithoutConversions(operation.LeftOperand);
+                IOperation right = WithoutConversions(operation.RightOperand);
+                if (IsNull(left))
+                {
+                    Report(context, operation, right);
+                }
+                else if (IsNull(right))
+                {
+                    Report(context, operation, left);
+                }
+            }
+
+            /// <summary>
+            /// Reports <c>GetComponent(...) is null</c> and <c>is not null</c>.
+            /// </summary>
+            /// <param name="context">The operation being analyzed.</param>
+            /// <remarks>
+            /// A type pattern is not a null test, so there is nothing about it to correct here and
+            /// it is not reported -- the same line <see cref="UnityObjectNullAnalyzer"/> draws.
+            /// </remarks>
+            internal void OnNullPattern(OperationAnalysisContext context)
+            {
+                IIsPatternOperation operation = (IIsPatternOperation)context.Operation;
+                if (!IsNullPattern(operation.Pattern))
+                {
+                    return;
+                }
+
+                Report(context, operation, WithoutConversions(operation.Value));
             }
 
             private void Report(

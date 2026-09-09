@@ -13,13 +13,13 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     /// </summary>
     internal sealed class TestDetailedSignatureHandler : ScriptableObject
     {
-        private static TestDetectableAsset[] _lastCreatedAssets =
-            Array.Empty<TestDetectableAsset>();
-        private static string[] _lastDeletedPaths = Array.Empty<string>();
-
         public static TestDetectableAsset[] LastCreatedAssets => _lastCreatedAssets;
 
         public static string[] LastDeletedPaths => _lastDeletedPaths;
+
+        private static TestDetectableAsset[] _lastCreatedAssets =
+            Array.Empty<TestDetectableAsset>();
+        private static string[] _lastDeletedPaths = Array.Empty<string>();
 
         public static void Clear()
         {

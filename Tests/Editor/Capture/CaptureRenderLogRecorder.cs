@@ -32,14 +32,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
         /// </summary>
         internal const string CursorRectWithoutView = "AddCursorRect called outside";
 
-        private readonly List<string> _errors = new();
-        private bool _disposed;
-
-        internal CaptureRenderLogRecorder()
-        {
-            Application.logMessageReceived += Record;
-        }
-
         internal List<string> Errors => _errors;
 
         /// <summary>
@@ -73,6 +65,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
 
                 return string.Join(" | ", _errors.ToArray());
             }
+        }
+
+        private readonly List<string> _errors = new();
+        private bool _disposed;
+
+        internal CaptureRenderLogRecorder()
+        {
+            Application.logMessageReceived += Record;
         }
 
         public void Dispose()

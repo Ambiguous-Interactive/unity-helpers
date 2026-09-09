@@ -14,6 +14,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     [NUnit.Framework.Category("Fast")]
     public sealed class RandomExtensionEdgeCaseTests
     {
+        private static IEnumerable<TestCaseData> QuaternionSampleData()
+        {
+            yield return new TestCaseData(new[] { 1f, 1f, 1f }).SetName("Quaternion AllOnes");
+            yield return new TestCaseData(new[] { 0f, 1f, 0f }).SetName("Quaternion ZeroAndOne");
+            yield return new TestCaseData(new[] { float.NaN, float.NaN, float.NaN }).SetName(
+                "Quaternion AllNaN"
+            );
+            yield return new TestCaseData(new[] { -5f, 2f, 0.25f }).SetName(
+                "Quaternion OutOfRangeValues"
+            );
+        }
+
         [Test]
         public void NextVector3OnSphereFallsBackWhenGeneratorStuckAtPositiveOne()
         {
@@ -73,18 +85,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                     + rotation.w * rotation.w
             );
             Assert.That(magnitude, Is.EqualTo(1f).Within(1e-3f));
-        }
-
-        private static IEnumerable<TestCaseData> QuaternionSampleData()
-        {
-            yield return new TestCaseData(new[] { 1f, 1f, 1f }).SetName("Quaternion AllOnes");
-            yield return new TestCaseData(new[] { 0f, 1f, 0f }).SetName("Quaternion ZeroAndOne");
-            yield return new TestCaseData(new[] { float.NaN, float.NaN, float.NaN }).SetName(
-                "Quaternion AllNaN"
-            );
-            yield return new TestCaseData(new[] { -5f, 2f, 0.25f }).SetName(
-                "Quaternion OutOfRangeValues"
-            );
         }
     }
 }

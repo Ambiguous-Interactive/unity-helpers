@@ -17,20 +17,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         // Reseed each test so a failing tree can be reproduced alone or within the fixture.
         private const uint RandomSeed = 0x5EED0203;
 
-        private IRandom _random = new PcgRandom(RandomSeed);
-
         private IRandom Random => _random;
 
-        [SetUp]
-        public void SeedRTree2DRandom()
-        {
-            _random = new PcgRandom(RandomSeed);
-        }
-
-        protected override RTree2D<Vector2> CreateTree(IEnumerable<Vector2> points)
-        {
-            return new RTree2D<Vector2>(points, CreatePointBounds);
-        }
+        private IRandom _random = new PcgRandom(RandomSeed);
 
         private static Bounds CreatePointBounds(Vector2 point)
         {
@@ -39,11 +28,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 new Vector3(point.x, point.y, 0f),
                 new Vector3(pointBoundsSize, pointBoundsSize, pointBoundsSize)
             );
-        }
-
-        private RTree2D<Bounds> CreateBoundsTree(IEnumerable<Bounds> bounds)
-        {
-            return new RTree2D<Bounds>(bounds, b => b);
         }
 
         private static List<Bounds> QueryBounds(RTree2D<Bounds> tree, Bounds bounds)
@@ -63,6 +47,17 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             List<Bounds> results = new();
             tree.GetElementsInRange(position, range, results, minimumRange);
             return results;
+        }
+
+        private static Bounds ZeroSizeBounds(Vector2 point)
+        {
+            return new Bounds(new Vector3(point.x, point.y, 0f), Vector3.zero);
+        }
+
+        [SetUp]
+        public void SeedRTree2DRandom()
+        {
+            _random = new PcgRandom(RandomSeed);
         }
 
         [Test]
@@ -886,9 +881,14 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             CollectionAssert.AreEquivalent(new[] { new Vector2(0.5f, 0.5f) }, results);
         }
 
-        private static Bounds ZeroSizeBounds(Vector2 point)
+        protected override RTree2D<Vector2> CreateTree(IEnumerable<Vector2> points)
         {
-            return new Bounds(new Vector3(point.x, point.y, 0f), Vector3.zero);
+            return new RTree2D<Vector2>(points, CreatePointBounds);
+        }
+
+        private RTree2D<Bounds> CreateBoundsTree(IEnumerable<Bounds> bounds)
+        {
+            return new RTree2D<Bounds>(bounds, b => b);
         }
     }
 }

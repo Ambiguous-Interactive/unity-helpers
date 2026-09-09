@@ -24,6 +24,41 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [NUnit.Framework.Category("Serialization")]
     public sealed class WProtoGeneratedFormatterTests
     {
+        private static string Encode(WProtoGeneratedContract value)
+        {
+            IWProtoFormatter<WProtoGeneratedContract> formatter =
+                WProtoFormatterProvider.Get<WProtoGeneratedContract>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+            Assert.AreEqual(
+                buffer.Length,
+                writer.Position,
+                "Measure must predict Write exactly, or every enclosing message is corrupt"
+            );
+
+            StringBuilder builder = new(writer.Position * 2);
+            foreach (byte current in writer.Written)
+            {
+                builder.Append(current.ToString("X2"));
+            }
+
+            return builder.ToString();
+        }
+
+        private static WProtoGeneratedContract RoundTrip(WProtoGeneratedContract value)
+        {
+            IWProtoFormatter<WProtoGeneratedContract> formatter =
+                WProtoFormatterProvider.Get<WProtoGeneratedContract>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+
+            WProtoReader reader = new(buffer);
+            Assert.IsTrue(formatter.TryRead(ref reader, out WProtoGeneratedContract restored));
+            return restored;
+        }
+
         [Test]
         public void TheGeneratedFormatterRegistersItselfWithoutAnyoneAskingForIt()
         {
@@ -103,41 +138,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     .TryRead(ref reader, out WProtoGeneratedContract value)
             );
             Assert.IsTrue(value == null);
-        }
-
-        private static string Encode(WProtoGeneratedContract value)
-        {
-            IWProtoFormatter<WProtoGeneratedContract> formatter =
-                WProtoFormatterProvider.Get<WProtoGeneratedContract>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-            Assert.AreEqual(
-                buffer.Length,
-                writer.Position,
-                "Measure must predict Write exactly, or every enclosing message is corrupt"
-            );
-
-            StringBuilder builder = new(writer.Position * 2);
-            foreach (byte current in writer.Written)
-            {
-                builder.Append(current.ToString("X2"));
-            }
-
-            return builder.ToString();
-        }
-
-        private static WProtoGeneratedContract RoundTrip(WProtoGeneratedContract value)
-        {
-            IWProtoFormatter<WProtoGeneratedContract> formatter =
-                WProtoFormatterProvider.Get<WProtoGeneratedContract>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-
-            WProtoReader reader = new(buffer);
-            Assert.IsTrue(formatter.TryRead(ref reader, out WProtoGeneratedContract restored));
-            return restored;
         }
     }
 }

@@ -21,6 +21,175 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     [NUnit.Framework.Category("Fast")]
     public sealed class UnityExtensionsVector2HullTests : CommonTestBase
     {
+        private static IEnumerable<TestCaseData> Vector2AxisCornerCases()
+        {
+            yield return new TestCaseData(
+                "Vector2Staircase",
+                CreateVector2List((0, 0), (0, 3), (1, 3), (1, 2), (2, 2), (2, 1), (3, 1), (3, 0)),
+                4,
+                8,
+                200f,
+                new[] { new Vector2(1, 2), new Vector2(2, 1) }
+            ).SetName("ConcaveHullVector2PreservesStaircaseCorners");
+
+            yield return new TestCaseData(
+                "Vector2Horseshoe",
+                CreateVector2List((0, 0), (0, 5), (1, 5), (1, 1), (4, 1), (4, 5), (5, 5), (5, 0)),
+                5,
+                8,
+                200f,
+                new[] { new Vector2(1, 1), new Vector2(4, 1) }
+            ).SetName("ConcaveHullVector2PreservesHorseshoeCorners");
+
+            yield return new TestCaseData(
+                "Vector2StraightFallback",
+                CreateVector2List(
+                    (0, 0),
+                    (0, 5),
+                    (5, 5),
+                    (5, 0),
+                    (1, 5),
+                    (4, 5),
+                    (4, 0),
+                    (1, 0),
+                    (5, 1),
+                    (0, 1),
+                    (1, 1),
+                    (4, 1)
+                ),
+                5,
+                8,
+                220f,
+                new[] { new Vector2(1, 1), new Vector2(4, 1) }
+            ).SetName("ConcaveHullVector2RecoversAxisCornersWithStraightFallback");
+        }
+
+        private static bool HasSelfIntersection(IList<Vector2> polygon)
+        {
+            if (polygon == null || polygon.Count < 4)
+            {
+                return false;
+            }
+
+            int count = polygon.Count;
+            for (int i = 0; i < count; ++i)
+            {
+                Vector2 a1 = polygon[i];
+                Vector2 a2 = polygon[(i + 1) % count];
+                for (int j = i + 2; j < count; ++j)
+                {
+                    if (j == i || (j + 1) % count == i)
+                    {
+                        continue;
+                    }
+                    Vector2 b1 = polygon[j];
+                    Vector2 b2 = polygon[(j + 1) % count];
+                    if (Intersects(a1, a2, b1, b2))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static bool Intersects(Vector2 a1, Vector2 a2, Vector2 b1, Vector2 b2)
+        {
+            float d = (a2.x - a1.x) * (b2.y - b1.y) - (a2.y - a1.y) * (b2.x - b1.x);
+            if (Mathf.Approximately(d, 0f))
+            {
+                return false;
+            }
+
+            float u = ((b1.x - a1.x) * (b2.y - b1.y) - (b1.y - a1.y) * (b2.x - b1.x)) / d;
+            float v = ((b1.x - a1.x) * (a2.y - a1.y) - (b1.y - a1.y) * (a2.x - a1.x)) / d;
+            return 0f < u && u < 1f && 0f < v && v < 1f;
+        }
+
+        private static float ComputeSignedArea(IList<Vector2> polygon)
+        {
+            if (polygon == null || polygon.Count < 3)
+            {
+                return 0f;
+            }
+
+            float area = 0f;
+            for (int i = 0; i < polygon.Count; ++i)
+            {
+                Vector2 current = polygon[i];
+                Vector2 next = polygon[(i + 1) % polygon.Count];
+                area += current.x * next.y - next.x * current.y;
+            }
+
+            return area * 0.5f;
+        }
+
+        private static List<Vector2> AddJitter(IEnumerable<Vector2> points, float maxDeviation)
+        {
+            IRandom random = new PcgRandom(1337);
+            List<Vector2> jittered = new();
+            foreach (Vector2 point in points)
+            {
+                float deviation = (float)(random.NextDouble() - 0.5) * maxDeviation;
+                jittered.Add(new Vector2(point.x, point.y + deviation));
+            }
+
+            return jittered;
+        }
+
+        private static bool ContainsApprox(
+            IEnumerable<Vector2> collection,
+            Vector2 target,
+            float epsilon = 0.05f
+        )
+        {
+            foreach (Vector2 candidate in collection)
+            {
+                if (Vector2.Distance(candidate, target) <= epsilon)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static List<Vector2> CreateVector2List(params (int x, int y)[] coords)
+        {
+            List<Vector2> list = new(coords.Length);
+            foreach ((int x, int y) in coords)
+            {
+                list.Add(new Vector2(x, y));
+            }
+            return list;
+        }
+
+        private static void AssertRequiredVectorCorners(
+            string label,
+            IEnumerable<Vector2> required,
+            IReadOnlyCollection<Vector2> hull
+        )
+        {
+            foreach (Vector2 vertex in required)
+            {
+                Assert.IsTrue(hull.Contains(vertex), $"{label}: hull should contain {vertex}.");
+            }
+        }
+
+        private static List<FastVector3Int> ConvertVector2CollectionToFast(
+            IEnumerable<Vector2> points
+        )
+        {
+            return points
+                .Select(point => new FastVector3Int(
+                    (int)Mathf.Round(point.x),
+                    (int)Mathf.Round(point.y),
+                    0
+                ))
+                .ToList();
+        }
+
         [Test]
         public void BuildConvexHullVector2IncludesColinearPointsWhenRequested()
         {
@@ -208,49 +377,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 outer.IsConvexHullInsideConvexHull(inner),
                 "Adding a point outside should invalidate inside condition."
             );
-        }
-
-        private static IEnumerable<TestCaseData> Vector2AxisCornerCases()
-        {
-            yield return new TestCaseData(
-                "Vector2Staircase",
-                CreateVector2List((0, 0), (0, 3), (1, 3), (1, 2), (2, 2), (2, 1), (3, 1), (3, 0)),
-                4,
-                8,
-                200f,
-                new[] { new Vector2(1, 2), new Vector2(2, 1) }
-            ).SetName("ConcaveHullVector2PreservesStaircaseCorners");
-
-            yield return new TestCaseData(
-                "Vector2Horseshoe",
-                CreateVector2List((0, 0), (0, 5), (1, 5), (1, 1), (4, 1), (4, 5), (5, 5), (5, 0)),
-                5,
-                8,
-                200f,
-                new[] { new Vector2(1, 1), new Vector2(4, 1) }
-            ).SetName("ConcaveHullVector2PreservesHorseshoeCorners");
-
-            yield return new TestCaseData(
-                "Vector2StraightFallback",
-                CreateVector2List(
-                    (0, 0),
-                    (0, 5),
-                    (5, 5),
-                    (5, 0),
-                    (1, 5),
-                    (4, 5),
-                    (4, 0),
-                    (1, 0),
-                    (5, 1),
-                    (0, 1),
-                    (1, 1),
-                    (4, 1)
-                ),
-                5,
-                8,
-                220f,
-                new[] { new Vector2(1, 1), new Vector2(4, 1) }
-            ).SetName("ConcaveHullVector2RecoversAxisCornersWithStraightFallback");
         }
 
         [TestCaseSource(nameof(Vector2AxisCornerCases))]
@@ -654,132 +780,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             List<Vector2> hull = circle.BuildConvexHull(includeColinearPoints: false);
             float area = ComputeSignedArea(hull);
             Assert.Greater(area, 0f, "Convex hull should use counter-clockwise winding.");
-        }
-
-        private static bool HasSelfIntersection(IList<Vector2> polygon)
-        {
-            if (polygon == null || polygon.Count < 4)
-            {
-                return false;
-            }
-
-            int count = polygon.Count;
-            for (int i = 0; i < count; ++i)
-            {
-                Vector2 a1 = polygon[i];
-                Vector2 a2 = polygon[(i + 1) % count];
-                for (int j = i + 2; j < count; ++j)
-                {
-                    if (j == i || (j + 1) % count == i)
-                    {
-                        continue;
-                    }
-                    Vector2 b1 = polygon[j];
-                    Vector2 b2 = polygon[(j + 1) % count];
-                    if (Intersects(a1, a2, b1, b2))
-                    {
-                        return true;
-                    }
-                }
-            }
-
-            return false;
-        }
-
-        private static bool Intersects(Vector2 a1, Vector2 a2, Vector2 b1, Vector2 b2)
-        {
-            float d = (a2.x - a1.x) * (b2.y - b1.y) - (a2.y - a1.y) * (b2.x - b1.x);
-            if (Mathf.Approximately(d, 0f))
-            {
-                return false;
-            }
-
-            float u = ((b1.x - a1.x) * (b2.y - b1.y) - (b1.y - a1.y) * (b2.x - b1.x)) / d;
-            float v = ((b1.x - a1.x) * (a2.y - a1.y) - (b1.y - a1.y) * (a2.x - a1.x)) / d;
-            return 0f < u && u < 1f && 0f < v && v < 1f;
-        }
-
-        private static float ComputeSignedArea(IList<Vector2> polygon)
-        {
-            if (polygon == null || polygon.Count < 3)
-            {
-                return 0f;
-            }
-
-            float area = 0f;
-            for (int i = 0; i < polygon.Count; ++i)
-            {
-                Vector2 current = polygon[i];
-                Vector2 next = polygon[(i + 1) % polygon.Count];
-                area += current.x * next.y - next.x * current.y;
-            }
-
-            return area * 0.5f;
-        }
-
-        private static List<Vector2> AddJitter(IEnumerable<Vector2> points, float maxDeviation)
-        {
-            IRandom random = new PcgRandom(1337);
-            List<Vector2> jittered = new();
-            foreach (Vector2 point in points)
-            {
-                float deviation = (float)(random.NextDouble() - 0.5) * maxDeviation;
-                jittered.Add(new Vector2(point.x, point.y + deviation));
-            }
-
-            return jittered;
-        }
-
-        private static bool ContainsApprox(
-            IEnumerable<Vector2> collection,
-            Vector2 target,
-            float epsilon = 0.05f
-        )
-        {
-            foreach (Vector2 candidate in collection)
-            {
-                if (Vector2.Distance(candidate, target) <= epsilon)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static List<Vector2> CreateVector2List(params (int x, int y)[] coords)
-        {
-            List<Vector2> list = new(coords.Length);
-            foreach ((int x, int y) in coords)
-            {
-                list.Add(new Vector2(x, y));
-            }
-            return list;
-        }
-
-        private static void AssertRequiredVectorCorners(
-            string label,
-            IEnumerable<Vector2> required,
-            IReadOnlyCollection<Vector2> hull
-        )
-        {
-            foreach (Vector2 vertex in required)
-            {
-                Assert.IsTrue(hull.Contains(vertex), $"{label}: hull should contain {vertex}.");
-            }
-        }
-
-        private static List<FastVector3Int> ConvertVector2CollectionToFast(
-            IEnumerable<Vector2> points
-        )
-        {
-            return points
-                .Select(point => new FastVector3Int(
-                    (int)Mathf.Round(point.x),
-                    (int)Mathf.Round(point.y),
-                    0
-                ))
-                .ToList();
         }
     }
 }

@@ -9,8 +9,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags.Helpers
 
     public sealed class RecordingEffectBehavior : EffectBehavior
     {
-        private static readonly HashSet<long> InstanceIds = new();
-
         public static List<EffectBehaviorContext> ApplyContexts { get; } = new();
 
         public static List<EffectBehaviorContext> TickContexts { get; } = new();
@@ -29,6 +27,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags.Helpers
 
         public static int InstanceCount => InstanceIds.Count;
 
+        private static readonly HashSet<long> InstanceIds = new();
+
         public static void ResetForTests()
         {
             ApplyCount = 0;
@@ -40,11 +40,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags.Helpers
             TickContexts.Clear();
             PeriodicInvocations.Clear();
             RemoveContexts.Clear();
-        }
-
-        private void OnEnable()
-        {
-            _ = InstanceIds.Add(this.GetUnityObjectId());
         }
 
         public override void OnApply(EffectBehaviorContext context)
@@ -74,8 +69,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags.Helpers
             RemoveContexts.Add(context);
         }
 
+        private void OnEnable()
+        {
+            _ = InstanceIds.Add(this.GetUnityObjectId());
+        }
+
         public readonly struct PeriodicInvocation
         {
+            public EffectBehaviorContext Context { get; }
+
+            public PeriodicEffectTickContext TickContext { get; }
+
             public PeriodicInvocation(
                 EffectBehaviorContext context,
                 PeriodicEffectTickContext tickContext
@@ -84,10 +88,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags.Helpers
                 Context = context;
                 TickContext = tickContext;
             }
-
-            public EffectBehaviorContext Context { get; }
-
-            public PeriodicEffectTickContext TickContext { get; }
         }
     }
 }

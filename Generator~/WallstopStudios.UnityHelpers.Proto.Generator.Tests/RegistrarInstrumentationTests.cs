@@ -30,66 +30,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             + "[WProtoMember(1)] public int Value; "
             + "} }";
 
-        [Test]
-        public void ProductionRegistrarOmitsTestOnlyTimingSurface()
-        {
-            Compilation generated = Generate(includeTests: false, out string registrarSource);
-
-            StringAssert.Contains("#if UNITY_INCLUDE_TESTS", registrarSource);
-            AssertGeneratedCompilationSucceeded(generated);
-
-            // REFLECTION REQUIRED: the registrar exists only in the synthetic assembly emitted by this test.
-            Assembly assembly = EmitAndLoad(generated);
-            Type registrar = assembly.GetType(RegistrarName, throwOnError: true);
-            const BindingFlags StaticInternal = BindingFlags.Static | BindingFlags.NonPublic;
-            Assert.IsTrue(
-                registrar.GetProperty("FirstRegistrationElapsedTimestampTicks", StaticInternal)
-                    == null
-            );
-            Assert.IsTrue(
-                registrar.GetProperty("HasRecordedFirstRegistration", StaticInternal) == null
-            );
-        }
-
-        [Test]
-        public void TestRegistrarRecordsOnlyItsFirstInvocation()
-        {
-            Compilation generated = Generate(includeTests: true, out string registrarSource);
-
-            StringAssert.Contains(
-                "internal static class WProtoGeneratedRegistrar",
-                registrarSource
-            );
-            StringAssert.Contains("FirstRegistrationElapsedTimestampTicks", registrarSource);
-            StringAssert.Contains("HasRecordedFirstRegistration", registrarSource);
-
-            // REFLECTION REQUIRED: the registrar exists only in the synthetic assembly emitted by this test.
-            Assembly assembly = EmitAndLoad(generated);
-            Type registrar = assembly.GetType(RegistrarName, throwOnError: true);
-            const BindingFlags StaticInternal = BindingFlags.Static | BindingFlags.NonPublic;
-            MethodInfo register = registrar.GetMethod("Register", StaticInternal);
-            PropertyInfo hasRecorded = registrar.GetProperty(
-                "HasRecordedFirstRegistration",
-                StaticInternal
-            );
-            PropertyInfo elapsedTicks = registrar.GetProperty(
-                "FirstRegistrationElapsedTimestampTicks",
-                StaticInternal
-            );
-
-            Assert.IsTrue((bool)hasRecorded.GetValue(null));
-            long firstElapsed = (long)elapsedTicks.GetValue(null);
-            Assert.GreaterOrEqual(firstElapsed, 0);
-
-            register.Invoke(null, null);
-            long afterSecondInvocation = (long)elapsedTicks.GetValue(null);
-            register.Invoke(null, null);
-            long afterThirdInvocation = (long)elapsedTicks.GetValue(null);
-
-            Assert.AreEqual(firstElapsed, afterSecondInvocation);
-            Assert.AreEqual(firstElapsed, afterThirdInvocation);
-        }
-
         private static Compilation Generate(bool includeTests, out string registrarSource)
         {
             CSharpParseOptions parseOptions = CSharpParseOptions.Default.WithLanguageVersion(
@@ -163,6 +103,66 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 )
             );
             return Assembly.Load(assemblyBytes.ToArray());
+        }
+
+        [Test]
+        public void ProductionRegistrarOmitsTestOnlyTimingSurface()
+        {
+            Compilation generated = Generate(includeTests: false, out string registrarSource);
+
+            StringAssert.Contains("#if UNITY_INCLUDE_TESTS", registrarSource);
+            AssertGeneratedCompilationSucceeded(generated);
+
+            // REFLECTION REQUIRED: the registrar exists only in the synthetic assembly emitted by this test.
+            Assembly assembly = EmitAndLoad(generated);
+            Type registrar = assembly.GetType(RegistrarName, throwOnError: true);
+            const BindingFlags StaticInternal = BindingFlags.Static | BindingFlags.NonPublic;
+            Assert.IsTrue(
+                registrar.GetProperty("FirstRegistrationElapsedTimestampTicks", StaticInternal)
+                    == null
+            );
+            Assert.IsTrue(
+                registrar.GetProperty("HasRecordedFirstRegistration", StaticInternal) == null
+            );
+        }
+
+        [Test]
+        public void TestRegistrarRecordsOnlyItsFirstInvocation()
+        {
+            Compilation generated = Generate(includeTests: true, out string registrarSource);
+
+            StringAssert.Contains(
+                "internal static class WProtoGeneratedRegistrar",
+                registrarSource
+            );
+            StringAssert.Contains("FirstRegistrationElapsedTimestampTicks", registrarSource);
+            StringAssert.Contains("HasRecordedFirstRegistration", registrarSource);
+
+            // REFLECTION REQUIRED: the registrar exists only in the synthetic assembly emitted by this test.
+            Assembly assembly = EmitAndLoad(generated);
+            Type registrar = assembly.GetType(RegistrarName, throwOnError: true);
+            const BindingFlags StaticInternal = BindingFlags.Static | BindingFlags.NonPublic;
+            MethodInfo register = registrar.GetMethod("Register", StaticInternal);
+            PropertyInfo hasRecorded = registrar.GetProperty(
+                "HasRecordedFirstRegistration",
+                StaticInternal
+            );
+            PropertyInfo elapsedTicks = registrar.GetProperty(
+                "FirstRegistrationElapsedTimestampTicks",
+                StaticInternal
+            );
+
+            Assert.IsTrue((bool)hasRecorded.GetValue(null));
+            long firstElapsed = (long)elapsedTicks.GetValue(null);
+            Assert.GreaterOrEqual(firstElapsed, 0);
+
+            register.Invoke(null, null);
+            long afterSecondInvocation = (long)elapsedTicks.GetValue(null);
+            register.Invoke(null, null);
+            long afterThirdInvocation = (long)elapsedTicks.GetValue(null);
+
+            Assert.AreEqual(firstElapsed, afterSecondInvocation);
+            Assert.AreEqual(firstElapsed, afterThirdInvocation);
         }
     }
 }

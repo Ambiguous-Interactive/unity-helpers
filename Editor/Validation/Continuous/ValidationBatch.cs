@@ -37,11 +37,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     /// </remarks>
     public static class ValidationBatch
     {
-        /// <summary>
-        /// The assembly every Unity test assembly references and no shipped assembly does.
-        /// </summary>
-        private const string NUnitAssemblyName = "nunit.framework";
-
         /// <summary>The argument naming where the JSON report is written.</summary>
         public const string OutputArgument = "-validationOutput";
 
@@ -53,6 +48,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         /// <summary>The argument naming a folder to restrict the run to; repeatable.</summary>
         public const string FolderArgument = "-validationFolder";
+
+        /// <summary>
+        /// The assembly every Unity test assembly references and no shipped assembly does.
+        /// </summary>
+        private const string NUnitAssemblyName = "nunit.framework";
 
         /// <summary>
         /// Validates the project and exits with 0 when nothing blocking stands.
@@ -105,44 +105,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
             bool blocking = ValidationReport.HasBlockingResults(run, suppressions, threshold);
             return new Result(run, suppressions, json, problems, blocking || 0 < problems.Count);
-        }
-
-        private static bool IsTestAssembly(
-            System.Reflection.Assembly assembly,
-            Dictionary<System.Reflection.Assembly, bool> known
-        )
-        {
-            if (assembly == null)
-            {
-                return false;
-            }
-
-            if (known.TryGetValue(assembly, out bool answered))
-            {
-                return answered;
-            }
-
-            bool references = false;
-            try
-            {
-                foreach (
-                    System.Reflection.AssemblyName referenced in assembly.GetReferencedAssemblies()
-                )
-                {
-                    if (string.Equals(referenced.Name, NUnitAssemblyName, StringComparison.Ordinal))
-                    {
-                        references = true;
-                        break;
-                    }
-                }
-            }
-            catch (Exception)
-            {
-                references = false;
-            }
-
-            known[assembly] = references;
-            return references;
         }
 
         /// <summary>
@@ -345,46 +307,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             return problems;
         }
 
-        private static ValidationSuppressions ReadSuppressions(string path, List<string> problems)
-        {
-            if (string.IsNullOrEmpty(path))
-            {
-                return ValidationSuppressions.Empty;
-            }
-
-            try
-            {
-                return ValidationSuppressions.Parse(File.ReadAllText(path));
-            }
-            catch (Exception exception)
-            {
-                // An explicitly named unreadable suppression file must make the gate fail.
-                problems?.Add(path + " could not be read: " + exception.Message);
-                return ValidationSuppressions.Empty;
-            }
-        }
-
-        private static bool TryWrite(string path, string contents, out string failure)
-        {
-            try
-            {
-                string directory = Path.GetDirectoryName(Path.GetFullPath(path));
-                if (!string.IsNullOrEmpty(directory))
-                {
-                    Directory.CreateDirectory(directory);
-                }
-
-                File.WriteAllText(path, contents);
-                failure = null;
-                return true;
-            }
-            catch (Exception exception)
-            {
-                failure = path + " could not be written: " + exception.Message;
-                return false;
-            }
-        }
-
         /// <summary>
         /// Reads a severity name, accepting any casing.
         /// </summary>
@@ -453,32 +375,87 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             return values;
         }
 
+        private static bool IsTestAssembly(
+            System.Reflection.Assembly assembly,
+            Dictionary<System.Reflection.Assembly, bool> known
+        )
+        {
+            if (assembly == null)
+            {
+                return false;
+            }
+
+            if (known.TryGetValue(assembly, out bool answered))
+            {
+                return answered;
+            }
+
+            bool references = false;
+            try
+            {
+                foreach (
+                    System.Reflection.AssemblyName referenced in assembly.GetReferencedAssemblies()
+                )
+                {
+                    if (string.Equals(referenced.Name, NUnitAssemblyName, StringComparison.Ordinal))
+                    {
+                        references = true;
+                        break;
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                references = false;
+            }
+
+            known[assembly] = references;
+            return references;
+        }
+
+        private static ValidationSuppressions ReadSuppressions(string path, List<string> problems)
+        {
+            if (string.IsNullOrEmpty(path))
+            {
+                return ValidationSuppressions.Empty;
+            }
+
+            try
+            {
+                return ValidationSuppressions.Parse(File.ReadAllText(path));
+            }
+            catch (Exception exception)
+            {
+                // An explicitly named unreadable suppression file must make the gate fail.
+                problems?.Add(path + " could not be read: " + exception.Message);
+                return ValidationSuppressions.Empty;
+            }
+        }
+
+        private static bool TryWrite(string path, string contents, out string failure)
+        {
+            try
+            {
+                string directory = Path.GetDirectoryName(Path.GetFullPath(path));
+                if (!string.IsNullOrEmpty(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                File.WriteAllText(path, contents);
+                failure = null;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                failure = path + " could not be written: " + exception.Message;
+                return false;
+            }
+        }
+
         /// <summary>What a headless validation run decided.</summary>
         public sealed class Result
         {
-            /// <summary>
-            /// Initializes a new instance of the <see cref="Result"/> class.
-            /// </summary>
-            /// <param name="run">The finished run.</param>
-            /// <param name="suppressions">What the project silences.</param>
-            /// <param name="json">The rendered report.</param>
-            /// <param name="problems">Anything that went wrong outside a rule.</param>
-            /// <param name="failed">Whether the caller should exit non-zero.</param>
-            public Result(
-                ValidationRun run,
-                ValidationSuppressions suppressions,
-                string json,
-                IReadOnlyList<string> problems,
-                bool failed
-            )
-            {
-                Run = run;
-                Suppressions = suppressions;
-                Json = json;
-                Problems = problems ?? Array.Empty<string>();
-                Failed = failed;
-            }
-
             /// <summary>The finished run.</summary>
             public ValidationRun Run { get; }
 
@@ -527,6 +504,29 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
                     return text;
                 }
+            }
+
+            /// <summary>
+            /// Initializes a new instance of the <see cref="Result"/> class.
+            /// </summary>
+            /// <param name="run">The finished run.</param>
+            /// <param name="suppressions">What the project silences.</param>
+            /// <param name="json">The rendered report.</param>
+            /// <param name="problems">Anything that went wrong outside a rule.</param>
+            /// <param name="failed">Whether the caller should exit non-zero.</param>
+            public Result(
+                ValidationRun run,
+                ValidationSuppressions suppressions,
+                string json,
+                IReadOnlyList<string> problems,
+                bool failed
+            )
+            {
+                Run = run;
+                Suppressions = suppressions;
+                Json = json;
+                Problems = problems ?? Array.Empty<string>();
+                Failed = failed;
             }
         }
     }

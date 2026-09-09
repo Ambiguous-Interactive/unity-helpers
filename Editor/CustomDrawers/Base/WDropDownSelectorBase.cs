@@ -28,6 +28,16 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
         private const float NoResultsVerticalPadding = 6f;
         private const float NoResultsHorizontalPadding = 6f;
 
+        /// <summary>
+        /// Gets the total number of options available.
+        /// </summary>
+        protected abstract int OptionCount { get; }
+
+        /// <summary>
+        /// Gets the undo action name for selection changes.
+        /// </summary>
+        protected virtual string UndoActionName => "Change DropDown Selection";
+
         private readonly VisualElement _searchRow;
         private readonly TextField _searchField;
         private readonly Button _clearButton;
@@ -56,98 +66,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
         private int _suggestionOptionIndex;
         private int _currentFilteredCount;
         private bool _buffersInitialized;
-
-        /// <summary>
-        /// Gets the total number of options available.
-        /// </summary>
-        protected abstract int OptionCount { get; }
-
-        /// <summary>
-        /// Gets the display label for the option at the specified index.
-        /// </summary>
-        /// <param name="optionIndex">The index of the option.</param>
-        /// <returns>The display label string.</returns>
-        protected abstract string GetDisplayLabel(int optionIndex);
-
-        /// <summary>
-        /// Gets the normalized display label for the option at the specified index.
-        /// Applies a fallback of "(Option N)" when the raw label is null or empty,
-        /// ensuring consistent behavior across rendering, search, and suggestion logic.
-        /// </summary>
-        /// <param name="optionIndex">The index of the option.</param>
-        /// <returns>The normalized display label, never null or empty.</returns>
-        protected string GetNormalizedDisplayLabel(int optionIndex)
-        {
-            string label = GetDisplayLabel(optionIndex);
-            if (string.IsNullOrEmpty(label))
-            {
-                return DropDownShared.GetFallbackOptionLabel(optionIndex);
-            }
-            return label;
-        }
-
-        /// <summary>
-        /// Gets the tooltip for the option at the specified index.
-        /// Return null or empty string if no tooltip is needed.
-        /// </summary>
-        /// <param name="optionIndex">The index of the option.</param>
-        /// <returns>The tooltip string, or null/empty for no tooltip.</returns>
-        protected virtual string GetTooltip(int optionIndex) => string.Empty;
-
-        /// <summary>
-        /// Gets the index of the currently selected option from the property.
-        /// Returns -1 if no valid selection.
-        /// </summary>
-        /// <param name="property">The serialized property.</param>
-        /// <returns>The selected option index, or -1 if none.</returns>
-        protected abstract int GetCurrentSelectionIndex(SerializedProperty property);
-
-        /// <summary>
-        /// Applies the selection at the specified option index to the property.
-        /// </summary>
-        /// <param name="property">The serialized property.</param>
-        /// <param name="optionIndex">The index of the option to apply.</param>
-        protected abstract void ApplySelectionToProperty(
-            SerializedProperty property,
-            int optionIndex
-        );
-
-        /// <summary>
-        /// Gets the value to set via SetValueWithoutNotify after selection.
-        /// </summary>
-        /// <param name="optionIndex">The index of the selected option.</param>
-        /// <returns>The value to set on the field.</returns>
-        protected abstract TValue GetValueForOption(int optionIndex);
-
-        /// <summary>
-        /// Gets the default value when no selection is available.
-        /// </summary>
-        /// <returns>The default value.</returns>
-        protected abstract TValue GetDefaultValue();
-
-        /// <summary>
-        /// Checks if the option at the specified index matches the search term.
-        /// Default implementation performs case-insensitive prefix match on the display label.
-        /// </summary>
-        /// <param name="optionIndex">The index of the option.</param>
-        /// <param name="searchTerm">The search term to match.</param>
-        /// <returns>True if the option matches the search.</returns>
-        protected virtual bool MatchesSearch(int optionIndex, string searchTerm)
-        {
-            string label = GetNormalizedDisplayLabel(optionIndex);
-            return label.StartsWith(searchTerm, StringComparison.OrdinalIgnoreCase);
-        }
-
-        /// <summary>
-        /// Gets the undo action name for selection changes.
-        /// </summary>
-        protected virtual string UndoActionName => "Change DropDown Selection";
-
-        private static VisualElement CreateInputElement(out VisualElement element)
-        {
-            element = new VisualElement();
-            return element;
-        }
 
         protected WDropDownSelectorBase()
             : base(string.Empty, CreateInputElement(out VisualElement baseInput))
@@ -326,13 +244,28 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
             RegisterCallback<DetachFromPanelEvent>(_ => Undo.undoRedoPerformed -= OnUndoRedo);
         }
 
-        /// <summary>
-        /// Initializes search visibility based on option count. Must be called by derived classes
-        /// after their options have been set, since OptionCount is accessed during this call.
-        /// </summary>
-        protected void InitializeSearchVisibility()
+        private static VisualElement CreateInputElement(out VisualElement element)
         {
-            ApplySearchVisibility(ShouldShowSearch(_lastResolvedPageSize));
+            element = new VisualElement();
+            return element;
+        }
+
+        private static int CalculatePageCount(int pageSize, int filteredCount)
+        {
+            if (filteredCount <= 0)
+            {
+                return 1;
+            }
+
+            return (filteredCount + pageSize - 1) / pageSize;
+        }
+
+        /// <summary>
+        /// Gets a cached pagination label. Delegates to <see cref="EditorCacheHelper.GetPaginationLabel"/>.
+        /// </summary>
+        private static string GetPaginationLabel(int page, int totalPages)
+        {
+            return EditorCacheHelper.GetPaginationLabel(page, totalPages);
         }
 
         /// <summary>
@@ -364,6 +297,119 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
             _boundObject = null;
             _propertyPath = string.Empty;
             UpdateLabel(string.Empty, string.Empty);
+        }
+
+        /// <summary>
+        /// Gets the display label for the option at the specified index.
+        /// </summary>
+        /// <param name="optionIndex">The index of the option.</param>
+        /// <returns>The display label string.</returns>
+        protected abstract string GetDisplayLabel(int optionIndex);
+
+        /// <summary>
+        /// Gets the normalized display label for the option at the specified index.
+        /// Applies a fallback of "(Option N)" when the raw label is null or empty,
+        /// ensuring consistent behavior across rendering, search, and suggestion logic.
+        /// </summary>
+        /// <param name="optionIndex">The index of the option.</param>
+        /// <returns>The normalized display label, never null or empty.</returns>
+        protected string GetNormalizedDisplayLabel(int optionIndex)
+        {
+            string label = GetDisplayLabel(optionIndex);
+            if (string.IsNullOrEmpty(label))
+            {
+                return DropDownShared.GetFallbackOptionLabel(optionIndex);
+            }
+            return label;
+        }
+
+        /// <summary>
+        /// Gets the tooltip for the option at the specified index.
+        /// Return null or empty string if no tooltip is needed.
+        /// </summary>
+        /// <param name="optionIndex">The index of the option.</param>
+        /// <returns>The tooltip string, or null/empty for no tooltip.</returns>
+        protected virtual string GetTooltip(int optionIndex) => string.Empty;
+
+        /// <summary>
+        /// Gets the index of the currently selected option from the property.
+        /// Returns -1 if no valid selection.
+        /// </summary>
+        /// <param name="property">The serialized property.</param>
+        /// <returns>The selected option index, or -1 if none.</returns>
+        protected abstract int GetCurrentSelectionIndex(SerializedProperty property);
+
+        /// <summary>
+        /// Applies the selection at the specified option index to the property.
+        /// </summary>
+        /// <param name="property">The serialized property.</param>
+        /// <param name="optionIndex">The index of the option to apply.</param>
+        protected abstract void ApplySelectionToProperty(
+            SerializedProperty property,
+            int optionIndex
+        );
+
+        /// <summary>
+        /// Gets the value to set via SetValueWithoutNotify after selection.
+        /// </summary>
+        /// <param name="optionIndex">The index of the selected option.</param>
+        /// <returns>The value to set on the field.</returns>
+        protected abstract TValue GetValueForOption(int optionIndex);
+
+        /// <summary>
+        /// Gets the default value when no selection is available.
+        /// </summary>
+        /// <returns>The default value.</returns>
+        protected abstract TValue GetDefaultValue();
+
+        /// <summary>
+        /// Checks if the option at the specified index matches the search term.
+        /// Default implementation performs case-insensitive prefix match on the display label.
+        /// </summary>
+        /// <param name="optionIndex">The index of the option.</param>
+        /// <param name="searchTerm">The search term to match.</param>
+        /// <returns>True if the option matches the search.</returns>
+        protected virtual bool MatchesSearch(int optionIndex, string searchTerm)
+        {
+            string label = GetNormalizedDisplayLabel(optionIndex);
+            return label.StartsWith(searchTerm, StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Initializes search visibility based on option count. Must be called by derived classes
+        /// after their options have been set, since OptionCount is accessed during this call.
+        /// </summary>
+        protected void InitializeSearchVisibility()
+        {
+            ApplySearchVisibility(ShouldShowSearch(_lastResolvedPageSize));
+        }
+
+        internal void ApplySelection(int optionIndex)
+        {
+            if (_boundObject == null || string.IsNullOrEmpty(_propertyPath))
+            {
+                return;
+            }
+
+            if (optionIndex < 0 || OptionCount <= optionIndex)
+            {
+                return;
+            }
+
+            SerializedObject serializedObject = _boundObject;
+            Undo.RecordObjects(serializedObject.targetObjects, UndoActionName);
+            serializedObject.Update();
+
+            SerializedProperty property = serializedObject.FindProperty(_propertyPath);
+            if (property == null)
+            {
+                return;
+            }
+
+            ApplySelectionToProperty(property, optionIndex);
+            SetValueWithoutNotify(GetValueForOption(optionIndex));
+            serializedObject.ApplyModifiedProperties();
+            UpdateFromProperty();
         }
 
         private void UpdateLabel(string labelText, string labelTooltip)
@@ -889,52 +935,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
             }
 
             return -1;
-        }
-
-        internal void ApplySelection(int optionIndex)
-        {
-            if (_boundObject == null || string.IsNullOrEmpty(_propertyPath))
-            {
-                return;
-            }
-
-            if (optionIndex < 0 || OptionCount <= optionIndex)
-            {
-                return;
-            }
-
-            SerializedObject serializedObject = _boundObject;
-            Undo.RecordObjects(serializedObject.targetObjects, UndoActionName);
-            serializedObject.Update();
-
-            SerializedProperty property = serializedObject.FindProperty(_propertyPath);
-            if (property == null)
-            {
-                return;
-            }
-
-            ApplySelectionToProperty(property, optionIndex);
-            SetValueWithoutNotify(GetValueForOption(optionIndex));
-            serializedObject.ApplyModifiedProperties();
-            UpdateFromProperty();
-        }
-
-        private static int CalculatePageCount(int pageSize, int filteredCount)
-        {
-            if (filteredCount <= 0)
-            {
-                return 1;
-            }
-
-            return (filteredCount + pageSize - 1) / pageSize;
-        }
-
-        /// <summary>
-        /// Gets a cached pagination label. Delegates to <see cref="EditorCacheHelper.GetPaginationLabel"/>.
-        /// </summary>
-        private static string GetPaginationLabel(int page, int totalPages)
-        {
-            return EditorCacheHelper.GetPaginationLabel(page, totalPages);
         }
     }
 #endif

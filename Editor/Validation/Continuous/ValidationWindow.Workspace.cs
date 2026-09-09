@@ -31,6 +31,55 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         private Button _dryRun;
         private VisualElement _settingsContent;
 
+        private static string RuleCategory(IValidationRule rule, bool authored)
+        {
+            if (authored)
+                return "Project Rules";
+            if (rule.RuleId.IndexOf("script", StringComparison.OrdinalIgnoreCase) != -1)
+                return "GameObjects & Scripts";
+            if (
+                rule.RuleId.IndexOf("required", StringComparison.OrdinalIgnoreCase) != -1
+                || rule.RuleId.IndexOf("dictionary", StringComparison.OrdinalIgnoreCase) != -1
+            )
+                return "References & Fields";
+            if (rule.RuleId.IndexOf("name", StringComparison.OrdinalIgnoreCase) != -1)
+                return "Naming";
+            if (rule.RuleId.IndexOf("setting", StringComparison.OrdinalIgnoreCase) != -1)
+                return "Settings & Build";
+            return "Assets & Import";
+        }
+
+        private static void RefreshFixValueField(TextField field, string fix)
+        {
+            bool rename = fix == ValidationWorkspaceSettings.RenameToPatternFix;
+            field.EnableInClassList(
+                "dx-hidden",
+                !rename && fix != ValidationWorkspaceSettings.SetImportMaxSizeFix
+            );
+            field.label = rename ? "Name pattern" : "Maximum texture size";
+            field.tooltip = rename
+                ? "Use {name} for the asset's current name."
+                : "Maximum imported texture dimension in pixels.";
+        }
+
+        private static DropdownField Choice(
+            VisualElement parent,
+            string label,
+            IReadOnlyList<string> choices,
+            string current,
+            Action<string> changed
+        )
+        {
+            List<string> values = new List<string>(choices.Count);
+            for (int index = 0; index < choices.Count; index++)
+                values.Add(choices[index]);
+            int selected = values.IndexOf(current);
+            DropdownField field = new DropdownField(label, values, Math.Max(0, selected));
+            field.RegisterValueChangedCallback(value => changed(value.newValue));
+            parent.Add(field);
+            return field;
+        }
+
         private VisualElement CreateNavigation(VisualElement root)
         {
             _views.Clear();
@@ -230,24 +279,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 AddLabel(_rulesTable, "No rules match.", "sentinel-empty");
         }
 
-        private static string RuleCategory(IValidationRule rule, bool authored)
-        {
-            if (authored)
-                return "Project Rules";
-            if (rule.RuleId.IndexOf("script", StringComparison.OrdinalIgnoreCase) != -1)
-                return "GameObjects & Scripts";
-            if (
-                rule.RuleId.IndexOf("required", StringComparison.OrdinalIgnoreCase) != -1
-                || rule.RuleId.IndexOf("dictionary", StringComparison.OrdinalIgnoreCase) != -1
-            )
-                return "References & Fields";
-            if (rule.RuleId.IndexOf("name", StringComparison.OrdinalIgnoreCase) != -1)
-                return "Naming";
-            if (rule.RuleId.IndexOf("setting", StringComparison.OrdinalIgnoreCase) != -1)
-                return "Settings & Build";
-            return "Assets & Import";
-        }
-
         private void CreateBuilderView(VisualElement parent)
         {
             VisualElement page = Page(parent, "Builder");
@@ -341,19 +372,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             _dryFindings = new ScrollView();
             _dryFindings.AddToClassList("dx-grow");
             preview.Add(_dryFindings);
-        }
-
-        private static void RefreshFixValueField(TextField field, string fix)
-        {
-            bool rename = fix == ValidationWorkspaceSettings.RenameToPatternFix;
-            field.EnableInClassList(
-                "dx-hidden",
-                !rename && fix != ValidationWorkspaceSettings.SetImportMaxSizeFix
-            );
-            field.label = rename ? "Name pattern" : "Maximum texture size";
-            field.tooltip = rename
-                ? "Use {name} for the asset's current name."
-                : "Maximum imported texture dimension in pixels.";
         }
 
         private void AddCondition()
@@ -662,24 +680,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     }
                 );
             }
-        }
-
-        private static DropdownField Choice(
-            VisualElement parent,
-            string label,
-            IReadOnlyList<string> choices,
-            string current,
-            Action<string> changed
-        )
-        {
-            List<string> values = new List<string>(choices.Count);
-            for (int index = 0; index < choices.Count; index++)
-                values.Add(choices[index]);
-            int selected = values.IndexOf(current);
-            DropdownField field = new DropdownField(label, values, Math.Max(0, selected));
-            field.RegisterValueChangedCallback(value => changed(value.newValue));
-            parent.Add(field);
-            return field;
         }
     }
 #endif

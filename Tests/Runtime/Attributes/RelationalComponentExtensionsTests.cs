@@ -15,6 +15,29 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
     [NUnit.Framework.Category("Fast")]
     public sealed class RelationalComponentExtensionsTests : RelationalExactBindingTestBase
     {
+        private static void AssertAssignmentMatchesDirectQueries(RelationalComponentTester tester)
+        {
+            Rigidbody parent = tester.transform.parent.GetComponentInParent<Rigidbody>(true);
+            BoxCollider sibling = tester.GetComponent<BoxCollider>();
+            CapsuleCollider child = null;
+            foreach (
+                CapsuleCollider candidate in tester.GetComponentsInChildren<CapsuleCollider>(true)
+            )
+            {
+                if (candidate.transform != tester.transform)
+                {
+                    child = candidate;
+                    break;
+                }
+            }
+
+            tester.AssignRelationalComponents();
+
+            Assert.AreSame(parent, tester.parentBody);
+            Assert.AreSame(sibling, tester.siblingCollider);
+            Assert.AreSame(child, tester.childCollider);
+        }
+
         [Test]
         public void ExactTypeAssignmentMatchesDirectQueriesAcrossShapesAndCacheStates(
             [Values(1, 4)] int depth,
@@ -83,29 +106,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             otherChild.transform.SetAsFirstSibling();
             AssertAssignmentMatchesDirectQueries(tester);
             Assert.AreSame(otherChild.GetComponent<CapsuleCollider>(), tester.childCollider);
-        }
-
-        private static void AssertAssignmentMatchesDirectQueries(RelationalComponentTester tester)
-        {
-            Rigidbody parent = tester.transform.parent.GetComponentInParent<Rigidbody>(true);
-            BoxCollider sibling = tester.GetComponent<BoxCollider>();
-            CapsuleCollider child = null;
-            foreach (
-                CapsuleCollider candidate in tester.GetComponentsInChildren<CapsuleCollider>(true)
-            )
-            {
-                if (candidate.transform != tester.transform)
-                {
-                    child = candidate;
-                    break;
-                }
-            }
-
-            tester.AssignRelationalComponents();
-
-            Assert.AreSame(parent, tester.parentBody);
-            Assert.AreSame(sibling, tester.siblingCollider);
-            Assert.AreSame(child, tester.childCollider);
         }
 
         [Test]

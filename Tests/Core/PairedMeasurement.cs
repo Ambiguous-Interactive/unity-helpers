@@ -16,6 +16,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     /// </remarks>
     public readonly struct PairedMeasurement : IEquatable<PairedMeasurement>
     {
+        public static bool operator ==(PairedMeasurement left, PairedMeasurement right)
+        {
+            return left.Equals(right);
+        }
+
+        public static bool operator !=(PairedMeasurement left, PairedMeasurement right)
+        {
+            return !left.Equals(right);
+        }
+
         /// <summary>
         /// A measurement that could not be taken. Every field is zero and
         /// <see cref="IsUsable"/> is false.
@@ -37,6 +47,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         /// <summary>How many raw cycles each side contributed.</summary>
         public int Cycles { get; }
 
+        /// <summary>Whether a comparison was actually taken.</summary>
+        public bool IsUsable => 0 < Cycles && 0 < Ratio;
+
+        /// <summary>The larger of the two sides' spreads, which is the one that bounds the result.</summary>
+        public double WorstSpread =>
+            ReferenceSpread < SubjectSpread ? SubjectSpread : ReferenceSpread;
+
         public PairedMeasurement(
             double ratio,
             double referenceSpread,
@@ -49,13 +66,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             SubjectSpread = subjectSpread;
             Cycles = cycles;
         }
-
-        /// <summary>Whether a comparison was actually taken.</summary>
-        public bool IsUsable => 0 < Cycles && 0 < Ratio;
-
-        /// <summary>The larger of the two sides' spreads, which is the one that bounds the result.</summary>
-        public double WorstSpread =>
-            ReferenceSpread < SubjectSpread ? SubjectSpread : ReferenceSpread;
 
         /// <summary>
         /// Whether both sides held still enough for the ratio to mean anything. An unusable
@@ -96,16 +106,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 hash = (hash * 397) ^ Cycles;
                 return hash;
             }
-        }
-
-        public static bool operator ==(PairedMeasurement left, PairedMeasurement right)
-        {
-            return left.Equals(right);
-        }
-
-        public static bool operator !=(PairedMeasurement left, PairedMeasurement right)
-        {
-            return !left.Equals(right);
         }
     }
 }

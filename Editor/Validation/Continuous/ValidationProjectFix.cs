@@ -202,46 +202,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
         }
 
-        private static bool Equal(byte[] first, byte[] second)
-        {
-            if (first.Length != second.Length)
-                return false;
-            for (int index = 0; index < first.Length; index++)
-                if (first[index] != second[index])
-                    return false;
-            return true;
-        }
-
-        private static Action Rename(
-            ValidationWorkspaceSettings.RuleDefinition rule,
-            ValidationFinding finding
-        )
-        {
-            string oldName = Path.GetFileNameWithoutExtension(finding.AssetPath);
-            string name = (rule.fixValue ?? string.Empty).Replace("{name}", oldName);
-            if (
-                string.IsNullOrWhiteSpace(name)
-                || name.IndexOfAny(Path.GetInvalidFileNameChars()) != -1
-                || name.Contains("/")
-                || name.Contains("\\")
-            )
-                throw new InvalidOperationException(
-                    "Enter a valid asset name pattern; {name} expands to its current name."
-                );
-            string error = AssetDatabase.RenameAsset(finding.AssetPath, name);
-            if (!string.IsNullOrEmpty(error))
-                throw new IOException(error);
-            string renamed = AssetDatabase.GUIDToAssetPath(finding.AssetGuid);
-            return () =>
-            {
-                if (AssetDatabase.GUIDToAssetPath(finding.AssetGuid) != renamed)
-                    throw new InvalidOperationException("The asset moved since this fix.");
-                string failure = AssetDatabase.RenameAsset(renamed, oldName);
-                if (!string.IsNullOrEmpty(failure))
-                    throw new IOException(failure);
-            };
-        }
-
         internal static Object VerifySource(
             ValidationWorkspaceSettings.RuleDefinition rule,
             ValidationFinding finding,
@@ -280,6 +240,46 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     "The object no longer matches this rule. Validate again."
                 );
             return source;
+        }
+
+        private static bool Equal(byte[] first, byte[] second)
+        {
+            if (first.Length != second.Length)
+                return false;
+            for (int index = 0; index < first.Length; index++)
+                if (first[index] != second[index])
+                    return false;
+            return true;
+        }
+
+        private static Action Rename(
+            ValidationWorkspaceSettings.RuleDefinition rule,
+            ValidationFinding finding
+        )
+        {
+            string oldName = Path.GetFileNameWithoutExtension(finding.AssetPath);
+            string name = (rule.fixValue ?? string.Empty).Replace("{name}", oldName);
+            if (
+                string.IsNullOrWhiteSpace(name)
+                || name.IndexOfAny(Path.GetInvalidFileNameChars()) != -1
+                || name.Contains("/")
+                || name.Contains("\\")
+            )
+                throw new InvalidOperationException(
+                    "Enter a valid asset name pattern; {name} expands to its current name."
+                );
+            string error = AssetDatabase.RenameAsset(finding.AssetPath, name);
+            if (!string.IsNullOrEmpty(error))
+                throw new IOException(error);
+            string renamed = AssetDatabase.GUIDToAssetPath(finding.AssetGuid);
+            return () =>
+            {
+                if (AssetDatabase.GUIDToAssetPath(finding.AssetGuid) != renamed)
+                    throw new InvalidOperationException("The asset moved since this fix.");
+                string failure = AssetDatabase.RenameAsset(renamed, oldName);
+                if (!string.IsNullOrEmpty(failure))
+                    throw new IOException(failure);
+            };
         }
 
         private static bool SameFingerprint(

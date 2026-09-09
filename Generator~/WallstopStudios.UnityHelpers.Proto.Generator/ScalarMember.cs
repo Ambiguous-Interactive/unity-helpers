@@ -12,33 +12,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     /// </summary>
     internal sealed class ScalarMember : Member
     {
-        private readonly Shape _shape;
-        private readonly string _presence;
-        private readonly string _value;
-        private readonly string _assign;
-        private readonly string _declared;
-        private readonly bool _nullable;
-
-        private ScalarMember(
-            string name,
-            int tag,
-            Shape shape,
-            string presence,
-            string value,
-            string assign,
-            string declared,
-            bool nullable
-        )
-            : base(name, tag)
-        {
-            _shape = shape;
-            _presence = presence;
-            _value = value;
-            _assign = assign;
-            _declared = declared;
-            _nullable = nullable;
-        }
-
         private string Local => ReadLocal;
 
         private string SeenFlag => "seen" + Tag;
@@ -92,6 +65,33 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     ? none
                     : "(" + SeedGuard + " ? " + seed + " : " + none + ")";
             }
+        }
+
+        private readonly Shape _shape;
+        private readonly string _presence;
+        private readonly string _value;
+        private readonly string _assign;
+        private readonly string _declared;
+        private readonly bool _nullable;
+
+        private ScalarMember(
+            string name,
+            int tag,
+            Shape shape,
+            string presence,
+            string value,
+            string assign,
+            string declared,
+            bool nullable
+        )
+            : base(name, tag)
+        {
+            _shape = shape;
+            _presence = presence;
+            _value = value;
+            _assign = assign;
+            _declared = declared;
+            _nullable = nullable;
         }
 
         /// <summary>

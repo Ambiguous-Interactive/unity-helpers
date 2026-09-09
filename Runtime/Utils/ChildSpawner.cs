@@ -87,6 +87,15 @@ namespace WallstopStudios.UnityHelpers.Utils
         }
 #endif
 
+        /// <summary>
+        /// Removes Unity's default "(Clone)" suffix from instantiated prefab names.
+        /// </summary>
+        /// <param name="child">The instantiated child whose name should be cleaned.</param>
+        private static void CleanName(GameObject child)
+        {
+            child.name = child.name.Replace("(Clone)", string.Empty);
+        }
+
         private void Awake()
         {
             if (_spawnMethod.HasFlagNoAlloc(ChildSpawnMethod.Awake))
@@ -259,15 +268,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                     }
                 }
             }
-        }
-
-        /// <summary>
-        /// Removes Unity's default "(Clone)" suffix from instantiated prefab names.
-        /// </summary>
-        /// <param name="child">The instantiated child whose name should be cleaned.</param>
-        private static void CleanName(GameObject child)
-        {
-            child.name = child.name.Replace("(Clone)", string.Empty);
         }
 
         /// <summary>

@@ -327,6 +327,55 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             ).SetName("ClipGen.Extreme.120fps.FullOffset");
         }
 
+        /*
+            SetObjectReferenceCurve consumes the full array length, so excess pooled capacity would add trailing
+            null keys.
+        */
+
+        private static IEnumerable<TestCaseData> KeyframeCountVerificationCases()
+        {
+            yield return new TestCaseData(1).SetName("ArrayPoolFix.Keyframes.SingleFrame");
+            yield return new TestCaseData(2).SetName("ArrayPoolFix.Keyframes.TwoFrames");
+            yield return new TestCaseData(3).SetName("ArrayPoolFix.Keyframes.ThreeFrames");
+            yield return new TestCaseData(4).SetName("ArrayPoolFix.Keyframes.FourFrames");
+            yield return new TestCaseData(5).SetName("ArrayPoolFix.Keyframes.FiveFrames");
+            yield return new TestCaseData(7).SetName("ArrayPoolFix.Keyframes.SevenFrames");
+            yield return new TestCaseData(8).SetName("ArrayPoolFix.Keyframes.EightFrames");
+            yield return new TestCaseData(9).SetName("ArrayPoolFix.Keyframes.NineFrames");
+            yield return new TestCaseData(15).SetName("ArrayPoolFix.Keyframes.FifteenFrames");
+            yield return new TestCaseData(16).SetName("ArrayPoolFix.Keyframes.SixteenFrames");
+            yield return new TestCaseData(17).SetName("ArrayPoolFix.Keyframes.SeventeenFrames");
+            yield return new TestCaseData(31).SetName("ArrayPoolFix.Keyframes.ThirtyOneFrames");
+            yield return new TestCaseData(32).SetName("ArrayPoolFix.Keyframes.ThirtyTwoFrames");
+            yield return new TestCaseData(33).SetName("ArrayPoolFix.Keyframes.ThirtyThreeFrames");
+        }
+
+        private static IEnumerable<TestCaseData> AnimationDurationVerificationCases()
+        {
+            yield return new TestCaseData(12f, 1, 0f).SetName("ArrayPoolFix.Duration.12fps.1Frame");
+            yield return new TestCaseData(12f, 2, 1f / 12f).SetName(
+                "ArrayPoolFix.Duration.12fps.2Frames"
+            );
+            yield return new TestCaseData(12f, 5, 4f / 12f).SetName(
+                "ArrayPoolFix.Duration.12fps.5Frames"
+            );
+            yield return new TestCaseData(24f, 4, 3f / 24f).SetName(
+                "ArrayPoolFix.Duration.24fps.4Frames"
+            );
+            yield return new TestCaseData(30f, 6, 5f / 30f).SetName(
+                "ArrayPoolFix.Duration.30fps.6Frames"
+            );
+            yield return new TestCaseData(60f, 10, 9f / 60f).SetName(
+                "ArrayPoolFix.Duration.60fps.10Frames"
+            );
+            yield return new TestCaseData(12f, 17, 16f / 12f).SetName(
+                "ArrayPoolFix.Duration.12fps.17Frames"
+            );
+            yield return new TestCaseData(12f, 33, 32f / 12f).SetName(
+                "ArrayPoolFix.Duration.12fps.33Frames"
+            );
+        }
+
         [TestCaseSource(nameof(FramerateModeEnumValuesCases))]
         public void FramerateModeHasCorrectExplicitValue(FramerateMode mode, int expectedValue)
         {
@@ -908,29 +957,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             }
         }
 
-        /*
-            SetObjectReferenceCurve consumes the full array length, so excess pooled capacity would add trailing
-            null keys.
-        */
-
-        private static IEnumerable<TestCaseData> KeyframeCountVerificationCases()
-        {
-            yield return new TestCaseData(1).SetName("ArrayPoolFix.Keyframes.SingleFrame");
-            yield return new TestCaseData(2).SetName("ArrayPoolFix.Keyframes.TwoFrames");
-            yield return new TestCaseData(3).SetName("ArrayPoolFix.Keyframes.ThreeFrames");
-            yield return new TestCaseData(4).SetName("ArrayPoolFix.Keyframes.FourFrames");
-            yield return new TestCaseData(5).SetName("ArrayPoolFix.Keyframes.FiveFrames");
-            yield return new TestCaseData(7).SetName("ArrayPoolFix.Keyframes.SevenFrames");
-            yield return new TestCaseData(8).SetName("ArrayPoolFix.Keyframes.EightFrames");
-            yield return new TestCaseData(9).SetName("ArrayPoolFix.Keyframes.NineFrames");
-            yield return new TestCaseData(15).SetName("ArrayPoolFix.Keyframes.FifteenFrames");
-            yield return new TestCaseData(16).SetName("ArrayPoolFix.Keyframes.SixteenFrames");
-            yield return new TestCaseData(17).SetName("ArrayPoolFix.Keyframes.SeventeenFrames");
-            yield return new TestCaseData(31).SetName("ArrayPoolFix.Keyframes.ThirtyOneFrames");
-            yield return new TestCaseData(32).SetName("ArrayPoolFix.Keyframes.ThirtyTwoFrames");
-            yield return new TestCaseData(33).SetName("ArrayPoolFix.Keyframes.ThirtyThreeFrames");
-        }
-
         [TestCaseSource(nameof(KeyframeCountVerificationCases))]
         public void CreateAnimationClipHasExactKeyframeCountNoTrailingNulls(int frameCount)
         {
@@ -991,32 +1017,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                     $"Keyframe {i} should have a non-null sprite reference"
                 );
             }
-        }
-
-        private static IEnumerable<TestCaseData> AnimationDurationVerificationCases()
-        {
-            yield return new TestCaseData(12f, 1, 0f).SetName("ArrayPoolFix.Duration.12fps.1Frame");
-            yield return new TestCaseData(12f, 2, 1f / 12f).SetName(
-                "ArrayPoolFix.Duration.12fps.2Frames"
-            );
-            yield return new TestCaseData(12f, 5, 4f / 12f).SetName(
-                "ArrayPoolFix.Duration.12fps.5Frames"
-            );
-            yield return new TestCaseData(24f, 4, 3f / 24f).SetName(
-                "ArrayPoolFix.Duration.24fps.4Frames"
-            );
-            yield return new TestCaseData(30f, 6, 5f / 30f).SetName(
-                "ArrayPoolFix.Duration.30fps.6Frames"
-            );
-            yield return new TestCaseData(60f, 10, 9f / 60f).SetName(
-                "ArrayPoolFix.Duration.60fps.10Frames"
-            );
-            yield return new TestCaseData(12f, 17, 16f / 12f).SetName(
-                "ArrayPoolFix.Duration.12fps.17Frames"
-            );
-            yield return new TestCaseData(12f, 33, 32f / 12f).SetName(
-                "ArrayPoolFix.Duration.12fps.33Frames"
-            );
         }
 
         [TestCaseSource(nameof(AnimationDurationVerificationCases))]

@@ -57,30 +57,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             _serializedSettings = null;
         }
 
-        private void OnWButtonColorKeysChanged(HashSet<string> changedKeys)
-        {
-            _wbuttonEventCount++;
-            if (changedKeys != null)
-            {
-                foreach (string key in changedKeys)
-                {
-                    _receivedWButtonKeys.Add(key);
-                }
-            }
-        }
-
-        private void OnWEnumToggleButtonsColorKeysChanged(HashSet<string> changedKeys)
-        {
-            _wenumEventCount++;
-            if (changedKeys != null)
-            {
-                foreach (string key in changedKeys)
-                {
-                    _receivedWEnumKeys.Add(key);
-                }
-            }
-        }
-
         [Test]
         public void CaptureCurrentStateCapturesExistingWButtonColors()
         {
@@ -627,6 +603,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
 
             buttonColorProp.colorValue = originalColor;
             _serializedSettings.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private void OnWButtonColorKeysChanged(HashSet<string> changedKeys)
+        {
+            _wbuttonEventCount++;
+            if (changedKeys != null)
+            {
+                foreach (string key in changedKeys)
+                {
+                    _receivedWButtonKeys.Add(key);
+                }
+            }
+        }
+
+        private void OnWEnumToggleButtonsColorKeysChanged(HashSet<string> changedKeys)
+        {
+            _wenumEventCount++;
+            if (changedKeys != null)
+            {
+                foreach (string key in changedKeys)
+                {
+                    _receivedWEnumKeys.Add(key);
+                }
+            }
         }
     }
 }

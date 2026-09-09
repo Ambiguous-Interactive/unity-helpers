@@ -14,20 +14,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     [NUnit.Framework.Category("Fast")]
     public sealed class SpriteRendererSyncTests : CommonTestBase
     {
-        private Texture2D CreateTexture(int w, int h)
-        {
-            Texture2D t = Track(new Texture2D(w, h, TextureFormat.RGBA32, false, false));
-            t.SetPixels(new Color[w * h]);
-            t.Apply(false, false);
-            return t;
-        }
-
-        private Sprite CreateSprite(int w = 4, int h = 4)
-        {
-            Texture2D t = CreateTexture(w, h);
-            return Track(Sprite.Create(t, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f));
-        }
-
         [UnityTest]
         public IEnumerator MirrorsPropertiesFromTarget()
         {
@@ -134,6 +120,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             yield return null;
 
             Assert.AreEqual(10, follower.sortingOrder);
+        }
+
+        private Texture2D CreateTexture(int w, int h)
+        {
+            Texture2D t = Track(new Texture2D(w, h, TextureFormat.RGBA32, false, false));
+            t.SetPixels(new Color[w * h]);
+            t.Apply(false, false);
+            return t;
+        }
+
+        private Sprite CreateSprite(int w = 4, int h = 4)
+        {
+            Texture2D t = CreateTexture(w, h);
+            return Track(Sprite.Create(t, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f));
         }
     }
 }

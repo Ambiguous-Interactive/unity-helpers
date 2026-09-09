@@ -23,6 +23,363 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
     [NUnit.Framework.Category("Integration")]
     public sealed class UnityHelpersSettingsTests
     {
+        private static (Color Button, Color Text) GetPaletteEntryColors(
+            SerializedProperty dictionaryProperty,
+            string key,
+            string buttonField,
+            string textField
+        )
+        {
+            (SerializedProperty keys, SerializedProperty values) = GetDictionaryArrays(
+                dictionaryProperty
+            );
+            int index = FindDictionaryIndex(keys, key);
+            Assert.GreaterOrEqual(index, 0, $"Palette entry '{key}' was not found.");
+
+            SerializedProperty valueProperty = values.GetArrayElementAtIndex(index);
+            return (
+                valueProperty.FindPropertyRelative(buttonField).colorValue,
+                valueProperty.FindPropertyRelative(textField).colorValue
+            );
+        }
+
+        private static (SerializedProperty Keys, SerializedProperty Values) GetDictionaryArrays(
+            SerializedProperty dictionaryProperty
+        )
+        {
+            SerializedProperty keys = dictionaryProperty.FindPropertyRelative(
+                SerializableDictionarySerializedPropertyNames.Keys
+            );
+            SerializedProperty values = dictionaryProperty.FindPropertyRelative(
+                SerializableDictionarySerializedPropertyNames.Values
+            );
+            return (keys, values);
+        }
+
+        private static void AssertColorsApproximately(
+            Color expected,
+            Color actual,
+            float tolerance = 0.01f
+        )
+        {
+            Assert.That(Mathf.Abs(expected.r - actual.r), Is.LessThanOrEqualTo(tolerance));
+            Assert.That(Mathf.Abs(expected.g - actual.g), Is.LessThanOrEqualTo(tolerance));
+            Assert.That(Mathf.Abs(expected.b - actual.b), Is.LessThanOrEqualTo(tolerance));
+            Assert.That(Mathf.Abs(expected.a - actual.a), Is.LessThanOrEqualTo(tolerance));
+        }
+
+        private static void SetPaletteEntryFlag(
+            SerializedProperty dictionaryProperty,
+            string key,
+            bool hasTextColor
+        )
+        {
+            (SerializedProperty keys, SerializedProperty values) = GetDictionaryArrays(
+                dictionaryProperty
+            );
+            int index = FindDictionaryIndex(keys, key);
+            Assert.GreaterOrEqual(index, 0, $"Palette entry '{key}' was not found.");
+            values
+                .GetArrayElementAtIndex(index)
+                .FindPropertyRelative(
+                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorHasText
+                )
+                .boolValue = hasTextColor;
+        }
+
+        private static bool GetPaletteEntryFlag(SerializedProperty dictionaryProperty, string key)
+        {
+            (SerializedProperty keys, SerializedProperty values) = GetDictionaryArrays(
+                dictionaryProperty
+            );
+            int index = FindDictionaryIndex(keys, key);
+            Assert.GreaterOrEqual(index, 0, $"Palette entry '{key}' was not found.");
+            return values
+                .GetArrayElementAtIndex(index)
+                .FindPropertyRelative(
+                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorHasText
+                )
+                .boolValue;
+        }
+
+        private static PaletteEntrySnapshot CapturePaletteEntrySnapshot(
+            SerializedProperty dictionaryProperty,
+            string key,
+            string buttonField,
+            string textField
+        )
+        {
+            (SerializedProperty keys, SerializedProperty values) = GetDictionaryArrays(
+                dictionaryProperty
+            );
+            int index = FindDictionaryIndex(keys, key);
+            if (index < 0)
+            {
+                return new PaletteEntrySnapshot(false, default, default);
+            }
+
+            SerializedProperty valueProperty = values.GetArrayElementAtIndex(index);
+            Color button =
+                valueProperty.FindPropertyRelative(buttonField)?.colorValue ?? Color.clear;
+            Color text = valueProperty.FindPropertyRelative(textField)?.colorValue ?? Color.clear;
+            return new PaletteEntrySnapshot(true, button, text);
+        }
+
+        private static PaletteDictionarySnapshot CapturePaletteDictionarySnapshot(
+            SerializedProperty dictionaryProperty,
+            string buttonField,
+            string textField
+        )
+        {
+            (SerializedProperty keysProperty, SerializedProperty valuesProperty) =
+                GetDictionaryArrays(dictionaryProperty);
+            if (keysProperty == null || valuesProperty == null)
+            {
+                return new PaletteDictionarySnapshot(Array.Empty<PaletteDictionaryEntrySnapshot>());
+            }
+
+            List<PaletteDictionaryEntrySnapshot> entries = new(keysProperty.arraySize);
+            for (int index = 0; index < keysProperty.arraySize; index++)
+            {
+                SerializedProperty keyProperty = keysProperty.GetArrayElementAtIndex(index);
+                SerializedProperty valueProperty = valuesProperty.GetArrayElementAtIndex(index);
+                string key = keyProperty.stringValue;
+                Color button =
+                    valueProperty.FindPropertyRelative(buttonField)?.colorValue ?? Color.clear;
+                Color text =
+                    valueProperty.FindPropertyRelative(textField)?.colorValue ?? Color.clear;
+                entries.Add(new PaletteDictionaryEntrySnapshot(key, button, text));
+            }
+
+            return new PaletteDictionarySnapshot(entries);
+        }
+
+        private static void RestorePaletteEntry(
+            SerializedProperty dictionaryProperty,
+            string key,
+            PaletteEntrySnapshot snapshot,
+            string buttonField,
+            string textField
+        )
+        {
+            if (snapshot.Exists)
+            {
+                SetPaletteEntryColors(
+                    dictionaryProperty,
+                    key,
+                    snapshot.Button,
+                    snapshot.Text,
+                    buttonField,
+                    textField
+                );
+            }
+            else
+            {
+                RemovePaletteEntry(dictionaryProperty, key);
+            }
+        }
+
+        private static void RestorePaletteDictionary(
+            SerializedProperty dictionaryProperty,
+            PaletteDictionarySnapshot snapshot,
+            string buttonField,
+            string textField
+        )
+        {
+            IReadOnlyList<PaletteDictionaryEntrySnapshot> entries =
+                snapshot?.Entries ?? Array.Empty<PaletteDictionaryEntrySnapshot>();
+            OverwritePaletteDictionary(dictionaryProperty, entries, buttonField, textField);
+        }
+
+        private static void OverwritePaletteDictionary(
+            SerializedProperty dictionaryProperty,
+            IReadOnlyList<PaletteDictionaryEntrySnapshot> entries,
+            string buttonField,
+            string textField
+        )
+        {
+            (SerializedProperty keysProperty, SerializedProperty valuesProperty) =
+                GetDictionaryArrays(dictionaryProperty);
+            if (keysProperty == null || valuesProperty == null)
+            {
+                return;
+            }
+
+            keysProperty.ClearArray();
+            valuesProperty.ClearArray();
+
+            if (entries == null || entries.Count == 0)
+            {
+                return;
+            }
+
+            keysProperty.arraySize = entries.Count;
+            valuesProperty.arraySize = entries.Count;
+
+            for (int index = 0; index < entries.Count; index++)
+            {
+                PaletteDictionaryEntrySnapshot entry = entries[index];
+                SerializedProperty keyProperty = keysProperty.GetArrayElementAtIndex(index);
+                keyProperty.stringValue = entry.Key ?? string.Empty;
+
+                SerializedProperty valueProperty = valuesProperty.GetArrayElementAtIndex(index);
+                SerializedProperty backgroundProperty = valueProperty.FindPropertyRelative(
+                    buttonField
+                );
+                if (backgroundProperty != null)
+                {
+                    backgroundProperty.colorValue = entry.Button;
+                }
+
+                SerializedProperty textProperty = valueProperty.FindPropertyRelative(textField);
+                if (textProperty != null)
+                {
+                    textProperty.colorValue = entry.Text;
+                }
+            }
+        }
+
+        private static void SetPaletteEntryColors(
+            SerializedProperty dictionaryProperty,
+            string key,
+            Color buttonColor,
+            Color textColor,
+            string buttonField,
+            string textField
+        )
+        {
+            (SerializedProperty keys, SerializedProperty values) = GetDictionaryArrays(
+                dictionaryProperty
+            );
+            int index = FindDictionaryIndex(keys, key);
+            if (index < 0)
+            {
+                index = keys.arraySize;
+                keys.InsertArrayElementAtIndex(index);
+                values.InsertArrayElementAtIndex(index);
+                keys.GetArrayElementAtIndex(index).stringValue = key;
+            }
+
+            SerializedProperty valueProperty = values.GetArrayElementAtIndex(index);
+            valueProperty.FindPropertyRelative(buttonField).colorValue = buttonColor;
+            valueProperty.FindPropertyRelative(textField).colorValue = textColor;
+        }
+
+        private static string[] ExtractDictionaryKeys(SerializedProperty keysProperty)
+        {
+            if (keysProperty == null)
+            {
+                return Array.Empty<string>();
+            }
+
+            int count = Mathf.Max(0, keysProperty.arraySize);
+            string[] keys = new string[count];
+            for (int index = 0; index < count; index++)
+            {
+                keys[index] = keysProperty.GetArrayElementAtIndex(index).stringValue;
+            }
+
+            return keys;
+        }
+
+        private static void RemovePaletteEntry(SerializedProperty dictionaryProperty, string key)
+        {
+            (SerializedProperty keys, SerializedProperty values) = GetDictionaryArrays(
+                dictionaryProperty
+            );
+            int index = FindDictionaryIndex(keys, key);
+            if (index < 0)
+            {
+                return;
+            }
+
+            keys.DeleteArrayElementAtIndex(index);
+            values.DeleteArrayElementAtIndex(index);
+        }
+
+        private static int FindDictionaryIndex(SerializedProperty keysProperty, string targetKey)
+        {
+            for (int index = 0; index < keysProperty.arraySize; index++)
+            {
+                SerializedProperty keyProperty = keysProperty.GetArrayElementAtIndex(index);
+                if (
+                    string.Equals(
+                        keyProperty.stringValue,
+                        targetKey,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
+                {
+                    return index;
+                }
+            }
+
+            return -1;
+        }
+
+        private static HashSet<string> CloneSkipSet(HashSet<string> source)
+        {
+            return source != null
+                ? new HashSet<string>(source, StringComparer.OrdinalIgnoreCase)
+                : null;
+        }
+
+        private static bool ColorsApproximatelyEqual(Color a, Color b, float tolerance = 0.01f)
+        {
+            return Mathf.Abs(a.r - b.r) <= tolerance
+                && Mathf.Abs(a.g - b.g) <= tolerance
+                && Mathf.Abs(a.b - b.b) <= tolerance
+                && Mathf.Abs(a.a - b.a) <= tolerance;
+        }
+
+        private static SerializedPropertyType GetExpectedPropertyType(Type type)
+        {
+            if (type == typeof(bool))
+            {
+                return SerializedPropertyType.Boolean;
+            }
+            if (type == typeof(float))
+            {
+                return SerializedPropertyType.Float;
+            }
+            if (type == typeof(int))
+            {
+                return SerializedPropertyType.Integer;
+            }
+            if (type == typeof(string))
+            {
+                return SerializedPropertyType.String;
+            }
+            return SerializedPropertyType.Generic;
+        }
+
+        /// <summary>
+        /// Helper method to get available relative properties for diagnostic messages.
+        /// </summary>
+        private static string GetAvailableRelativeProperties(SerializedProperty property)
+        {
+            List<string> propertyNames = new();
+            SerializedProperty iterator = property.Copy();
+            SerializedProperty endProperty = property.GetEndProperty();
+
+            if (iterator.NextVisible(true))
+            {
+                do
+                {
+                    if (SerializedProperty.EqualContents(iterator, endProperty))
+                    {
+                        break;
+                    }
+
+                    propertyNames.Add(iterator.name);
+                } while (iterator.NextVisible(false));
+            }
+
+            return 0 < propertyNames.Count
+                ? string.Join(", ", propertyNames)
+                : "(no visible properties found)";
+        }
+
         [Test]
         public void SaveSettingsPropagatesRegexConfiguration()
         {
@@ -1224,18 +1581,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             }
         }
 
-        private static void AssertColorsApproximately(
-            Color expected,
-            Color actual,
-            float tolerance = 0.01f
-        )
-        {
-            Assert.That(Mathf.Abs(expected.r - actual.r), Is.LessThanOrEqualTo(tolerance));
-            Assert.That(Mathf.Abs(expected.g - actual.g), Is.LessThanOrEqualTo(tolerance));
-            Assert.That(Mathf.Abs(expected.b - actual.b), Is.LessThanOrEqualTo(tolerance));
-            Assert.That(Mathf.Abs(expected.a - actual.a), Is.LessThanOrEqualTo(tolerance));
-        }
-
         /// <summary>
         /// Covers the colours the old sentinel could not tell from "unset": it asked
         /// maxColorComponent &lt;= 0f, which is true of every zero-RGB colour whatever its alpha, so
@@ -1432,303 +1777,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 );
                 serialized.ApplyModifiedPropertiesWithoutUndo();
             }
-        }
-
-        private static void SetPaletteEntryFlag(
-            SerializedProperty dictionaryProperty,
-            string key,
-            bool hasTextColor
-        )
-        {
-            (SerializedProperty keys, SerializedProperty values) = GetDictionaryArrays(
-                dictionaryProperty
-            );
-            int index = FindDictionaryIndex(keys, key);
-            Assert.GreaterOrEqual(index, 0, $"Palette entry '{key}' was not found.");
-            values
-                .GetArrayElementAtIndex(index)
-                .FindPropertyRelative(
-                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorHasText
-                )
-                .boolValue = hasTextColor;
-        }
-
-        private static bool GetPaletteEntryFlag(SerializedProperty dictionaryProperty, string key)
-        {
-            (SerializedProperty keys, SerializedProperty values) = GetDictionaryArrays(
-                dictionaryProperty
-            );
-            int index = FindDictionaryIndex(keys, key);
-            Assert.GreaterOrEqual(index, 0, $"Palette entry '{key}' was not found.");
-            return values
-                .GetArrayElementAtIndex(index)
-                .FindPropertyRelative(
-                    UnityHelpersSettings.SerializedPropertyNames.WButtonCustomColorHasText
-                )
-                .boolValue;
-        }
-
-        private static PaletteEntrySnapshot CapturePaletteEntrySnapshot(
-            SerializedProperty dictionaryProperty,
-            string key,
-            string buttonField,
-            string textField
-        )
-        {
-            (SerializedProperty keys, SerializedProperty values) = GetDictionaryArrays(
-                dictionaryProperty
-            );
-            int index = FindDictionaryIndex(keys, key);
-            if (index < 0)
-            {
-                return new PaletteEntrySnapshot(false, default, default);
-            }
-
-            SerializedProperty valueProperty = values.GetArrayElementAtIndex(index);
-            Color button =
-                valueProperty.FindPropertyRelative(buttonField)?.colorValue ?? Color.clear;
-            Color text = valueProperty.FindPropertyRelative(textField)?.colorValue ?? Color.clear;
-            return new PaletteEntrySnapshot(true, button, text);
-        }
-
-        private static PaletteDictionarySnapshot CapturePaletteDictionarySnapshot(
-            SerializedProperty dictionaryProperty,
-            string buttonField,
-            string textField
-        )
-        {
-            (SerializedProperty keysProperty, SerializedProperty valuesProperty) =
-                GetDictionaryArrays(dictionaryProperty);
-            if (keysProperty == null || valuesProperty == null)
-            {
-                return new PaletteDictionarySnapshot(Array.Empty<PaletteDictionaryEntrySnapshot>());
-            }
-
-            List<PaletteDictionaryEntrySnapshot> entries = new(keysProperty.arraySize);
-            for (int index = 0; index < keysProperty.arraySize; index++)
-            {
-                SerializedProperty keyProperty = keysProperty.GetArrayElementAtIndex(index);
-                SerializedProperty valueProperty = valuesProperty.GetArrayElementAtIndex(index);
-                string key = keyProperty.stringValue;
-                Color button =
-                    valueProperty.FindPropertyRelative(buttonField)?.colorValue ?? Color.clear;
-                Color text =
-                    valueProperty.FindPropertyRelative(textField)?.colorValue ?? Color.clear;
-                entries.Add(new PaletteDictionaryEntrySnapshot(key, button, text));
-            }
-
-            return new PaletteDictionarySnapshot(entries);
-        }
-
-        private static void RestorePaletteEntry(
-            SerializedProperty dictionaryProperty,
-            string key,
-            PaletteEntrySnapshot snapshot,
-            string buttonField,
-            string textField
-        )
-        {
-            if (snapshot.Exists)
-            {
-                SetPaletteEntryColors(
-                    dictionaryProperty,
-                    key,
-                    snapshot.Button,
-                    snapshot.Text,
-                    buttonField,
-                    textField
-                );
-            }
-            else
-            {
-                RemovePaletteEntry(dictionaryProperty, key);
-            }
-        }
-
-        private static void RestorePaletteDictionary(
-            SerializedProperty dictionaryProperty,
-            PaletteDictionarySnapshot snapshot,
-            string buttonField,
-            string textField
-        )
-        {
-            IReadOnlyList<PaletteDictionaryEntrySnapshot> entries =
-                snapshot?.Entries ?? Array.Empty<PaletteDictionaryEntrySnapshot>();
-            OverwritePaletteDictionary(dictionaryProperty, entries, buttonField, textField);
-        }
-
-        private static void OverwritePaletteDictionary(
-            SerializedProperty dictionaryProperty,
-            IReadOnlyList<PaletteDictionaryEntrySnapshot> entries,
-            string buttonField,
-            string textField
-        )
-        {
-            (SerializedProperty keysProperty, SerializedProperty valuesProperty) =
-                GetDictionaryArrays(dictionaryProperty);
-            if (keysProperty == null || valuesProperty == null)
-            {
-                return;
-            }
-
-            keysProperty.ClearArray();
-            valuesProperty.ClearArray();
-
-            if (entries == null || entries.Count == 0)
-            {
-                return;
-            }
-
-            keysProperty.arraySize = entries.Count;
-            valuesProperty.arraySize = entries.Count;
-
-            for (int index = 0; index < entries.Count; index++)
-            {
-                PaletteDictionaryEntrySnapshot entry = entries[index];
-                SerializedProperty keyProperty = keysProperty.GetArrayElementAtIndex(index);
-                keyProperty.stringValue = entry.Key ?? string.Empty;
-
-                SerializedProperty valueProperty = valuesProperty.GetArrayElementAtIndex(index);
-                SerializedProperty backgroundProperty = valueProperty.FindPropertyRelative(
-                    buttonField
-                );
-                if (backgroundProperty != null)
-                {
-                    backgroundProperty.colorValue = entry.Button;
-                }
-
-                SerializedProperty textProperty = valueProperty.FindPropertyRelative(textField);
-                if (textProperty != null)
-                {
-                    textProperty.colorValue = entry.Text;
-                }
-            }
-        }
-
-        private static void SetPaletteEntryColors(
-            SerializedProperty dictionaryProperty,
-            string key,
-            Color buttonColor,
-            Color textColor,
-            string buttonField,
-            string textField
-        )
-        {
-            (SerializedProperty keys, SerializedProperty values) = GetDictionaryArrays(
-                dictionaryProperty
-            );
-            int index = FindDictionaryIndex(keys, key);
-            if (index < 0)
-            {
-                index = keys.arraySize;
-                keys.InsertArrayElementAtIndex(index);
-                values.InsertArrayElementAtIndex(index);
-                keys.GetArrayElementAtIndex(index).stringValue = key;
-            }
-
-            SerializedProperty valueProperty = values.GetArrayElementAtIndex(index);
-            valueProperty.FindPropertyRelative(buttonField).colorValue = buttonColor;
-            valueProperty.FindPropertyRelative(textField).colorValue = textColor;
-        }
-
-        private static string[] ExtractDictionaryKeys(SerializedProperty keysProperty)
-        {
-            if (keysProperty == null)
-            {
-                return Array.Empty<string>();
-            }
-
-            int count = Mathf.Max(0, keysProperty.arraySize);
-            string[] keys = new string[count];
-            for (int index = 0; index < count; index++)
-            {
-                keys[index] = keysProperty.GetArrayElementAtIndex(index).stringValue;
-            }
-
-            return keys;
-        }
-
-        private static (Color Button, Color Text) GetPaletteEntryColors(
-            SerializedProperty dictionaryProperty,
-            string key,
-            string buttonField,
-            string textField
-        )
-        {
-            (SerializedProperty keys, SerializedProperty values) = GetDictionaryArrays(
-                dictionaryProperty
-            );
-            int index = FindDictionaryIndex(keys, key);
-            Assert.GreaterOrEqual(index, 0, $"Palette entry '{key}' was not found.");
-
-            SerializedProperty valueProperty = values.GetArrayElementAtIndex(index);
-            return (
-                valueProperty.FindPropertyRelative(buttonField).colorValue,
-                valueProperty.FindPropertyRelative(textField).colorValue
-            );
-        }
-
-        private static void RemovePaletteEntry(SerializedProperty dictionaryProperty, string key)
-        {
-            (SerializedProperty keys, SerializedProperty values) = GetDictionaryArrays(
-                dictionaryProperty
-            );
-            int index = FindDictionaryIndex(keys, key);
-            if (index < 0)
-            {
-                return;
-            }
-
-            keys.DeleteArrayElementAtIndex(index);
-            values.DeleteArrayElementAtIndex(index);
-        }
-
-        private static (SerializedProperty Keys, SerializedProperty Values) GetDictionaryArrays(
-            SerializedProperty dictionaryProperty
-        )
-        {
-            SerializedProperty keys = dictionaryProperty.FindPropertyRelative(
-                SerializableDictionarySerializedPropertyNames.Keys
-            );
-            SerializedProperty values = dictionaryProperty.FindPropertyRelative(
-                SerializableDictionarySerializedPropertyNames.Values
-            );
-            return (keys, values);
-        }
-
-        private static int FindDictionaryIndex(SerializedProperty keysProperty, string targetKey)
-        {
-            for (int index = 0; index < keysProperty.arraySize; index++)
-            {
-                SerializedProperty keyProperty = keysProperty.GetArrayElementAtIndex(index);
-                if (
-                    string.Equals(
-                        keyProperty.stringValue,
-                        targetKey,
-                        StringComparison.OrdinalIgnoreCase
-                    )
-                )
-                {
-                    return index;
-                }
-            }
-
-            return -1;
-        }
-
-        private static HashSet<string> CloneSkipSet(HashSet<string> source)
-        {
-            return source != null
-                ? new HashSet<string>(source, StringComparer.OrdinalIgnoreCase)
-                : null;
-        }
-
-        private static bool ColorsApproximatelyEqual(Color a, Color b, float tolerance = 0.01f)
-        {
-            return Mathf.Abs(a.r - b.r) <= tolerance
-                && Mathf.Abs(a.g - b.g) <= tolerance
-                && Mathf.Abs(a.b - b.b) <= tolerance
-                && Mathf.Abs(a.a - b.a) <= tolerance;
         }
 
         [Test]
@@ -2249,27 +2297,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 property.propertyType,
                 $"Field '{fieldName}' should be of type {expectedFieldType.Name} (SerializedPropertyType.{expectedPropertyType})."
             );
-        }
-
-        private static SerializedPropertyType GetExpectedPropertyType(Type type)
-        {
-            if (type == typeof(bool))
-            {
-                return SerializedPropertyType.Boolean;
-            }
-            if (type == typeof(float))
-            {
-                return SerializedPropertyType.Float;
-            }
-            if (type == typeof(int))
-            {
-                return SerializedPropertyType.Integer;
-            }
-            if (type == typeof(string))
-            {
-                return SerializedPropertyType.String;
-            }
-            return SerializedPropertyType.Generic;
         }
 
         /// <summary>
@@ -3163,69 +3190,42 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
             );
         }
 
-        /// <summary>
-        /// Helper method to get available relative properties for diagnostic messages.
-        /// </summary>
-        private static string GetAvailableRelativeProperties(SerializedProperty property)
-        {
-            List<string> propertyNames = new();
-            SerializedProperty iterator = property.Copy();
-            SerializedProperty endProperty = property.GetEndProperty();
-
-            if (iterator.NextVisible(true))
-            {
-                do
-                {
-                    if (SerializedProperty.EqualContents(iterator, endProperty))
-                    {
-                        break;
-                    }
-
-                    propertyNames.Add(iterator.name);
-                } while (iterator.NextVisible(false));
-            }
-
-            return 0 < propertyNames.Count
-                ? string.Join(", ", propertyNames)
-                : "(no visible properties found)";
-        }
-
         private readonly struct PaletteEntrySnapshot
         {
+            public bool Exists { get; }
+            public Color Button { get; }
+            public Color Text { get; }
+
             public PaletteEntrySnapshot(bool exists, Color button, Color text)
             {
                 Exists = exists;
                 Button = button;
                 Text = text;
             }
-
-            public bool Exists { get; }
-            public Color Button { get; }
-            public Color Text { get; }
         }
 
         private sealed class PaletteDictionarySnapshot
         {
+            public IReadOnlyList<PaletteDictionaryEntrySnapshot> Entries { get; }
+
             public PaletteDictionarySnapshot(IReadOnlyList<PaletteDictionaryEntrySnapshot> entries)
             {
                 Entries = entries ?? Array.Empty<PaletteDictionaryEntrySnapshot>();
             }
-
-            public IReadOnlyList<PaletteDictionaryEntrySnapshot> Entries { get; }
         }
 
         private readonly struct PaletteDictionaryEntrySnapshot
         {
+            public string Key { get; }
+            public Color Button { get; }
+            public Color Text { get; }
+
             public PaletteDictionaryEntrySnapshot(string key, Color button, Color text)
             {
                 Key = key;
                 Button = button;
                 Text = text;
             }
-
-            public string Key { get; }
-            public Color Button { get; }
-            public Color Text { get; }
         }
     }
 }

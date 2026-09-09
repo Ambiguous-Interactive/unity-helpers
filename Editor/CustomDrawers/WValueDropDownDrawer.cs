@@ -35,9 +35,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             DropDownShared.EmptySearchHorizontalPadding;
         private const float EmptySearchExtraPadding = DropDownShared.EmptySearchExtraPadding;
         private const string EmptyResultsMessage = DropDownShared.EmptyResultsMessage;
-        private static readonly GUIContent EmptyResultsContent = DropDownShared.EmptyResultsContent;
-        private static float s_cachedOptionControlHeight = -1f;
-        private static float s_cachedOptionRowHeight = -1f;
 
         /// <summary>
         /// The number of property paths whose display labels are retained.
@@ -60,6 +57,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         /// across scene changes and play sessions.
         /// </remarks>
         private const int MaxFormattedOptionCacheEntries = 2048;
+        private static readonly GUIContent EmptyResultsContent = DropDownShared.EmptyResultsContent;
+        private static float s_cachedOptionControlHeight = -1f;
+        private static float s_cachedOptionRowHeight = -1f;
 
         private static readonly Cache<string, DisplayLabelsCache> DisplayLabelsCaches =
             CacheBuilder<string, DisplayLabelsCache>
@@ -78,156 +78,89 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             .Build();
         private static readonly GUIContent ReusableDropDownButtonContent = new();
 
+        internal static void ApplyOption(SerializedProperty property, object selectedOption)
+        {
+            switch (property.propertyType)
+            {
+                case SerializedPropertyType.Integer:
+                    ApplyInteger(property, selectedOption);
+                    break;
+                case SerializedPropertyType.Float:
+                    ApplyFloat(property, selectedOption);
+                    break;
+                case SerializedPropertyType.String:
+                    ApplyString(property, selectedOption);
+                    break;
+                case SerializedPropertyType.Enum:
+                    ApplyEnum(property, selectedOption);
+                    break;
+                case SerializedPropertyType.Boolean:
+                    ApplyBoolean(property, selectedOption);
+                    break;
+                case SerializedPropertyType.Character:
+                    ApplyCharacter(property, selectedOption);
+                    break;
+                case SerializedPropertyType.ObjectReference:
+                    ApplyObjectReference(property, selectedOption);
+                    break;
+                case SerializedPropertyType.Vector2:
+                    ApplyVector2(property, selectedOption);
+                    break;
+                case SerializedPropertyType.Vector3:
+                    ApplyVector3(property, selectedOption);
+                    break;
+                case SerializedPropertyType.Vector4:
+                    ApplyVector4(property, selectedOption);
+                    break;
+                case SerializedPropertyType.Vector2Int:
+                    ApplyVector2Int(property, selectedOption);
+                    break;
+                case SerializedPropertyType.Vector3Int:
+                    ApplyVector3Int(property, selectedOption);
+                    break;
+                case SerializedPropertyType.Color:
+                    ApplyColor(property, selectedOption);
+                    break;
+                case SerializedPropertyType.Rect:
+                    ApplyRect(property, selectedOption);
+                    break;
+                case SerializedPropertyType.RectInt:
+                    ApplyRectInt(property, selectedOption);
+                    break;
+                case SerializedPropertyType.Bounds:
+                    ApplyBounds(property, selectedOption);
+                    break;
+                case SerializedPropertyType.BoundsInt:
+                    ApplyBoundsInt(property, selectedOption);
+                    break;
+                case SerializedPropertyType.Quaternion:
+                    ApplyQuaternion(property, selectedOption);
+                    break;
+                case SerializedPropertyType.AnimationCurve:
+                    ApplyAnimationCurve(property, selectedOption);
+                    break;
+                case SerializedPropertyType.Hash128:
+                    ApplyHash128(property, selectedOption);
+                    break;
+                case SerializedPropertyType.Generic:
+                    if (IsSerializableTypeProperty(property))
+                    {
+                        ApplySerializableType(property, selectedOption);
+                    }
+                    else
+                    {
+                        ApplyGenericProperty(property, selectedOption);
+                    }
+                    break;
+                default:
+                    ApplyGenericProperty(property, selectedOption);
+                    break;
+            }
+        }
+
         private static string GetPaginationLabel(int page, int totalPages)
         {
             return DropDownShared.GetPaginationLabel(page, totalPages);
-        }
-
-        public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
-        {
-            return EditorGUIUtility.singleLineHeight;
-        }
-
-        public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
-        {
-            if (attribute is not WValueDropDownAttribute dropdownAttribute)
-            {
-                EditorGUI.PropertyField(position, property, label);
-                return;
-            }
-
-            UnityEngine.Object context = property.serializedObject?.targetObject;
-            object[] options = dropdownAttribute.GetOptions(context) ?? Array.Empty<object>();
-            int pageSize = Mathf.Max(1, UnityHelpersSettings.GetStringInListPageLimit());
-
-            if (options.Length == 0)
-            {
-                EditorGUI.HelpBox(
-                    position,
-                    "No options available for WValueDropDown.",
-                    MessageType.Info
-                );
-                return;
-            }
-
-            if (!IsSupportedProperty(property, dropdownAttribute))
-            {
-                string typeMismatchMessage = GetTypeMismatchMessage(property, dropdownAttribute);
-                EditorGUI.HelpBox(position, typeMismatchMessage, MessageType.Error);
-                return;
-            }
-
-            if (pageSize < options.Length)
-            {
-                DrawPopupDropDown(position, property, label, options, pageSize, dropdownAttribute);
-                return;
-            }
-
-            EditorGUI.BeginProperty(position, label, property);
-            Rect fieldRect = EditorGUI.PrefixLabel(position, label);
-            bool previousMixed = EditorGUI.showMixedValue;
-            EditorGUI.showMixedValue = property.hasMultipleDifferentValues;
-
-            string displayValue = ResolveDisplayValue(
-                property,
-                options,
-                dropdownAttribute,
-                out string tooltip
-            );
-            ReusableDropDownButtonContent.text = displayValue;
-            ReusableDropDownButtonContent.tooltip = tooltip;
-
-            if (
-                EditorGUI.DropdownButton(
-                    fieldRect,
-                    ReusableDropDownButtonContent,
-                    FocusType.Keyboard
-                )
-            )
-            {
-                string cacheKey = property.propertyPath;
-                string[] displayLabels = GetOrCreateDisplayLabels(cacheKey, options);
-                int currentIndex = ResolveSelectedIndex(
-                    property,
-                    dropdownAttribute.ValueType,
-                    options
-                );
-
-                SerializedObject serializedObject = property.serializedObject;
-                string propertyPath = property.propertyPath;
-
-                GenericMenu menu = new();
-                for (int i = 0; i < options.Length; i++)
-                {
-                    int capturedIndex = i;
-                    bool isSelected = i == currentIndex && !property.hasMultipleDifferentValues;
-                    menu.AddItem(
-                        new GUIContent(displayLabels[i]),
-                        isSelected,
-                        () =>
-                        {
-                            serializedObject.Update();
-                            SerializedProperty prop = serializedObject.FindProperty(propertyPath);
-                            if (prop == null)
-                            {
-                                return;
-                            }
-
-                            Undo.RecordObjects(
-                                serializedObject.targetObjects,
-                                "Change ValueDropDown Selection"
-                            );
-                            ApplyOption(prop, options[capturedIndex]);
-                            serializedObject.ApplyModifiedProperties();
-                        }
-                    );
-                }
-                menu.DropDown(fieldRect);
-            }
-
-            EditorGUI.showMixedValue = previousMixed;
-            EditorGUI.EndProperty();
-        }
-
-        /// <inheritdoc/>
-        public override VisualElement CreatePropertyGUI(SerializedProperty property)
-        {
-            if (attribute is not WValueDropDownAttribute dropdownAttribute)
-            {
-                PropertyField fallback = new(property) { label = property.displayName };
-                return fallback;
-            }
-
-            UnityEngine.Object context = property.serializedObject?.targetObject;
-            object[] options = dropdownAttribute.GetOptions(context) ?? Array.Empty<object>();
-            int pageSize = Mathf.Max(1, UnityHelpersSettings.GetStringInListPageLimit());
-
-            if (options.Length == 0)
-            {
-                return new HelpBox(
-                    "No options available for WValueDropDown.",
-                    HelpBoxMessageType.Info
-                );
-            }
-
-            if (!IsSupportedProperty(property, dropdownAttribute))
-            {
-                return new HelpBox(
-                    GetTypeMismatchMessage(property, dropdownAttribute),
-                    HelpBoxMessageType.Error
-                );
-            }
-
-            if (pageSize < options.Length)
-            {
-                WValueDropDownPopupSelectorElement popupElement = new(options, dropdownAttribute);
-                popupElement.BindProperty(property, property.displayName);
-                return popupElement;
-            }
-
-            WValueDropDownSelector selector = new(options, dropdownAttribute);
-            selector.BindProperty(property, property.displayName);
-            return selector;
         }
 
         private static bool IsSupportedProperty(
@@ -1031,86 +964,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             return formatted;
         }
 
-        internal static void ApplyOption(SerializedProperty property, object selectedOption)
-        {
-            switch (property.propertyType)
-            {
-                case SerializedPropertyType.Integer:
-                    ApplyInteger(property, selectedOption);
-                    break;
-                case SerializedPropertyType.Float:
-                    ApplyFloat(property, selectedOption);
-                    break;
-                case SerializedPropertyType.String:
-                    ApplyString(property, selectedOption);
-                    break;
-                case SerializedPropertyType.Enum:
-                    ApplyEnum(property, selectedOption);
-                    break;
-                case SerializedPropertyType.Boolean:
-                    ApplyBoolean(property, selectedOption);
-                    break;
-                case SerializedPropertyType.Character:
-                    ApplyCharacter(property, selectedOption);
-                    break;
-                case SerializedPropertyType.ObjectReference:
-                    ApplyObjectReference(property, selectedOption);
-                    break;
-                case SerializedPropertyType.Vector2:
-                    ApplyVector2(property, selectedOption);
-                    break;
-                case SerializedPropertyType.Vector3:
-                    ApplyVector3(property, selectedOption);
-                    break;
-                case SerializedPropertyType.Vector4:
-                    ApplyVector4(property, selectedOption);
-                    break;
-                case SerializedPropertyType.Vector2Int:
-                    ApplyVector2Int(property, selectedOption);
-                    break;
-                case SerializedPropertyType.Vector3Int:
-                    ApplyVector3Int(property, selectedOption);
-                    break;
-                case SerializedPropertyType.Color:
-                    ApplyColor(property, selectedOption);
-                    break;
-                case SerializedPropertyType.Rect:
-                    ApplyRect(property, selectedOption);
-                    break;
-                case SerializedPropertyType.RectInt:
-                    ApplyRectInt(property, selectedOption);
-                    break;
-                case SerializedPropertyType.Bounds:
-                    ApplyBounds(property, selectedOption);
-                    break;
-                case SerializedPropertyType.BoundsInt:
-                    ApplyBoundsInt(property, selectedOption);
-                    break;
-                case SerializedPropertyType.Quaternion:
-                    ApplyQuaternion(property, selectedOption);
-                    break;
-                case SerializedPropertyType.AnimationCurve:
-                    ApplyAnimationCurve(property, selectedOption);
-                    break;
-                case SerializedPropertyType.Hash128:
-                    ApplyHash128(property, selectedOption);
-                    break;
-                case SerializedPropertyType.Generic:
-                    if (IsSerializableTypeProperty(property))
-                    {
-                        ApplySerializableType(property, selectedOption);
-                    }
-                    else
-                    {
-                        ApplyGenericProperty(property, selectedOption);
-                    }
-                    break;
-                default:
-                    ApplyGenericProperty(property, selectedOption);
-                    break;
-            }
-        }
-
         private static void ApplyBoolean(SerializedProperty property, object selectedOption)
         {
             if (selectedOption is bool boolValue)
@@ -1690,6 +1543,153 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             };
         }
 
+        public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
+        {
+            return EditorGUIUtility.singleLineHeight;
+        }
+
+        public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+        {
+            if (attribute is not WValueDropDownAttribute dropdownAttribute)
+            {
+                EditorGUI.PropertyField(position, property, label);
+                return;
+            }
+
+            UnityEngine.Object context = property.serializedObject?.targetObject;
+            object[] options = dropdownAttribute.GetOptions(context) ?? Array.Empty<object>();
+            int pageSize = Mathf.Max(1, UnityHelpersSettings.GetStringInListPageLimit());
+
+            if (options.Length == 0)
+            {
+                EditorGUI.HelpBox(
+                    position,
+                    "No options available for WValueDropDown.",
+                    MessageType.Info
+                );
+                return;
+            }
+
+            if (!IsSupportedProperty(property, dropdownAttribute))
+            {
+                string typeMismatchMessage = GetTypeMismatchMessage(property, dropdownAttribute);
+                EditorGUI.HelpBox(position, typeMismatchMessage, MessageType.Error);
+                return;
+            }
+
+            if (pageSize < options.Length)
+            {
+                DrawPopupDropDown(position, property, label, options, pageSize, dropdownAttribute);
+                return;
+            }
+
+            EditorGUI.BeginProperty(position, label, property);
+            Rect fieldRect = EditorGUI.PrefixLabel(position, label);
+            bool previousMixed = EditorGUI.showMixedValue;
+            EditorGUI.showMixedValue = property.hasMultipleDifferentValues;
+
+            string displayValue = ResolveDisplayValue(
+                property,
+                options,
+                dropdownAttribute,
+                out string tooltip
+            );
+            ReusableDropDownButtonContent.text = displayValue;
+            ReusableDropDownButtonContent.tooltip = tooltip;
+
+            if (
+                EditorGUI.DropdownButton(
+                    fieldRect,
+                    ReusableDropDownButtonContent,
+                    FocusType.Keyboard
+                )
+            )
+            {
+                string cacheKey = property.propertyPath;
+                string[] displayLabels = GetOrCreateDisplayLabels(cacheKey, options);
+                int currentIndex = ResolveSelectedIndex(
+                    property,
+                    dropdownAttribute.ValueType,
+                    options
+                );
+
+                SerializedObject serializedObject = property.serializedObject;
+                string propertyPath = property.propertyPath;
+
+                GenericMenu menu = new();
+                for (int i = 0; i < options.Length; i++)
+                {
+                    int capturedIndex = i;
+                    bool isSelected = i == currentIndex && !property.hasMultipleDifferentValues;
+                    menu.AddItem(
+                        new GUIContent(displayLabels[i]),
+                        isSelected,
+                        () =>
+                        {
+                            serializedObject.Update();
+                            SerializedProperty prop = serializedObject.FindProperty(propertyPath);
+                            if (prop == null)
+                            {
+                                return;
+                            }
+
+                            Undo.RecordObjects(
+                                serializedObject.targetObjects,
+                                "Change ValueDropDown Selection"
+                            );
+                            ApplyOption(prop, options[capturedIndex]);
+                            serializedObject.ApplyModifiedProperties();
+                        }
+                    );
+                }
+                menu.DropDown(fieldRect);
+            }
+
+            EditorGUI.showMixedValue = previousMixed;
+            EditorGUI.EndProperty();
+        }
+
+        /// <inheritdoc/>
+        public override VisualElement CreatePropertyGUI(SerializedProperty property)
+        {
+            if (attribute is not WValueDropDownAttribute dropdownAttribute)
+            {
+                PropertyField fallback = new(property) { label = property.displayName };
+                return fallback;
+            }
+
+            UnityEngine.Object context = property.serializedObject?.targetObject;
+            object[] options = dropdownAttribute.GetOptions(context) ?? Array.Empty<object>();
+            int pageSize = Mathf.Max(1, UnityHelpersSettings.GetStringInListPageLimit());
+
+            if (options.Length == 0)
+            {
+                return new HelpBox(
+                    "No options available for WValueDropDown.",
+                    HelpBoxMessageType.Info
+                );
+            }
+
+            if (!IsSupportedProperty(property, dropdownAttribute))
+            {
+                return new HelpBox(
+                    GetTypeMismatchMessage(property, dropdownAttribute),
+                    HelpBoxMessageType.Error
+                );
+            }
+
+            if (pageSize < options.Length)
+            {
+                WValueDropDownPopupSelectorElement popupElement = new(options, dropdownAttribute);
+                popupElement.BindProperty(property, property.displayName);
+                return popupElement;
+            }
+
+            WValueDropDownSelector selector = new(options, dropdownAttribute);
+            selector.BindProperty(property, property.displayName);
+            return selector;
+        }
+
         private sealed class DisplayLabelsCache
         {
             public object[] sourceOptions;
@@ -1698,6 +1698,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private sealed class WValueDropDownPopupSelectorElement : WDropDownPopupSelectorBase<string>
         {
+            protected override int OptionCount => _options.Length;
+
             private readonly object[] _options;
             private readonly WValueDropDownAttribute _attribute;
 
@@ -1709,8 +1711,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 _options = options ?? Array.Empty<object>();
                 _attribute = attribute;
             }
-
-            protected override int OptionCount => _options.Length;
 
             protected override string GetDisplayValue(SerializedProperty property)
             {
@@ -1772,6 +1772,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private sealed class WValueDropDownSelector : WDropDownSelectorBase<string>
         {
+            protected override int OptionCount => _options.Length;
+
+            protected override string UndoActionName => "Change Value DropDown";
+
             private readonly object[] _options;
             private readonly WValueDropDownAttribute _attribute;
 
@@ -1781,8 +1785,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 _attribute = attribute;
                 InitializeSearchVisibility();
             }
-
-            protected override int OptionCount => _options.Length;
 
             protected override string GetDisplayLabel(int optionIndex)
             {
@@ -1812,8 +1814,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             protected override string GetDefaultValue() => string.Empty;
-
-            protected override string UndoActionName => "Change Value DropDown";
         }
 
         internal static class TestHooks
@@ -1837,6 +1837,22 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             /// Gets the bound the formatted option cache evicts at, for testing.
             /// </summary>
             public static int MaxFormattedOptionCacheCount => MaxFormattedOptionCacheEntries;
+
+            public static int OptionButtonMarginVertical =>
+                PopupStyles.OptionButton.margin?.vertical ?? 0;
+
+            public static float OptionFooterPadding => OptionBottomPadding;
+
+            public static float PaginationButtonHeight =>
+                PopupStyles.PaginationButtonLeft.fixedHeight;
+
+            public static float PopupWidthValue => PopupWidth;
+
+            public static float EmptySearchHorizontalPaddingValue => EmptySearchHorizontalPadding;
+
+            public static string EmptyResultsMessageValue => EmptyResultsMessage;
+
+            public static float EmptySearchExtraPaddingValue => EmptySearchExtraPadding;
 
             /// <summary>
             /// Reads the cached display labels for a property path, populating them when absent.
@@ -1877,22 +1893,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             {
                 return WValueDropDownDrawer.GetOptionControlHeight();
             }
-
-            public static int OptionButtonMarginVertical =>
-                PopupStyles.OptionButton.margin?.vertical ?? 0;
-
-            public static float OptionFooterPadding => OptionBottomPadding;
-
-            public static float PaginationButtonHeight =>
-                PopupStyles.PaginationButtonLeft.fixedHeight;
-
-            public static float PopupWidthValue => PopupWidth;
-
-            public static float EmptySearchHorizontalPaddingValue => EmptySearchHorizontalPadding;
-
-            public static string EmptyResultsMessageValue => EmptyResultsMessage;
-
-            public static float EmptySearchExtraPaddingValue => EmptySearchExtraPadding;
 
             public static float CalculateEmptySearchHeight()
             {
@@ -1940,13 +1940,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static class PopupStyles
         {
-            // Create GUIStyles during rendering because EditorStyles may be unavailable during static initialization.
-            private static GUIStyle _optionButton;
-            private static GUIStyle _selectedOptionButton;
-            private static GUIStyle _paginationButtonLeft;
-            private static GUIStyle _paginationButtonRight;
-            private static GUIStyle _paginationLabel;
-
             public static GUIStyle OptionButton =>
                 _optionButton ??= new GUIStyle("Button")
                 {
@@ -1977,6 +1970,13 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     alignment = TextAnchor.MiddleCenter,
                     padding = new RectOffset(0, 0, 0, 0),
                 };
+
+            // Create GUIStyles during rendering because EditorStyles may be unavailable during static initialization.
+            private static GUIStyle _optionButton;
+            private static GUIStyle _selectedOptionButton;
+            private static GUIStyle _paginationButtonLeft;
+            private static GUIStyle _paginationButtonRight;
+            private static GUIStyle _paginationLabel;
         }
     }
 #endif

@@ -19,6 +19,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
         /// </summary>
         private const float DarkenFloor = 0.25f;
 
+        private static float Distance(Color first, Color second)
+        {
+            return Mathf.Abs(first.r - second.r)
+                + Mathf.Abs(first.g - second.g)
+                + Mathf.Abs(first.b - second.b);
+        }
+
+        private static void AssertInGamut(Color color, string context)
+        {
+            Assert.IsFalse(float.IsNaN(color.r), $"{context}: red was NaN.");
+            Assert.IsFalse(float.IsNaN(color.g), $"{context}: green was NaN.");
+            Assert.IsFalse(float.IsNaN(color.b), $"{context}: blue was NaN.");
+            Assert.GreaterOrEqual(color.r, 0f, $"{context}: red below 0.");
+            Assert.GreaterOrEqual(color.g, 0f, $"{context}: green below 0.");
+            Assert.GreaterOrEqual(color.b, 0f, $"{context}: blue below 0.");
+            Assert.LessOrEqual(color.r, 1f, $"{context}: red above 1.");
+            Assert.LessOrEqual(color.g, 1f, $"{context}: green above 1.");
+            Assert.LessOrEqual(color.b, 1f, $"{context}: blue above 1.");
+        }
+
         /// <remarks>
         /// The darkened colour is written straight into a 1x1 RGBA texture that becomes the button
         /// background, so a channel outside [0, 1] is not a rounding curiosity - it is a colour the
@@ -165,13 +185,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             }
         }
 
-        private static float Distance(Color first, Color second)
-        {
-            return Mathf.Abs(first.r - second.r)
-                + Mathf.Abs(first.g - second.g)
-                + Mathf.Abs(first.b - second.b);
-        }
-
         [Test]
         public void SuggestPaletteColorIsOpaqueAndInGamutForAnyIndex()
         {
@@ -215,19 +228,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                     }
                 }
             }
-        }
-
-        private static void AssertInGamut(Color color, string context)
-        {
-            Assert.IsFalse(float.IsNaN(color.r), $"{context}: red was NaN.");
-            Assert.IsFalse(float.IsNaN(color.g), $"{context}: green was NaN.");
-            Assert.IsFalse(float.IsNaN(color.b), $"{context}: blue was NaN.");
-            Assert.GreaterOrEqual(color.r, 0f, $"{context}: red below 0.");
-            Assert.GreaterOrEqual(color.g, 0f, $"{context}: green below 0.");
-            Assert.GreaterOrEqual(color.b, 0f, $"{context}: blue below 0.");
-            Assert.LessOrEqual(color.r, 1f, $"{context}: red above 1.");
-            Assert.LessOrEqual(color.g, 1f, $"{context}: green above 1.");
-            Assert.LessOrEqual(color.b, 1f, $"{context}: blue above 1.");
         }
     }
 }

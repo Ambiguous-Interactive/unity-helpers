@@ -19,6 +19,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     [NUnit.Framework.Category("Integration")]
     public sealed class JsonSerializationPerformanceTests
     {
+        private const int Iterations = 10_000;
+
         private static SmallMsg MakeSmall(int i) => new() { Id = i, Name = "Name_" + i };
 
         private static MediumMsg MakeMedium(int i, int len) =>
@@ -37,165 +39,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 Blob = MakeBytes(blobSize, seed: i),
                 Nested = MakeMedium(i, nestedLen),
             };
-
-        private const int Iterations = 10_000;
-
-        [Test, Timeout(0)]
-        public void CompareSerializeSmallMediumLarge()
-        {
-            UnityEngine.Debug.Log(
-                "| Payload | Pooled-Normal (ms, KB) | Pooled-Fast (ms, KB) | Classic (ms, KB) | Fast/Classic | Size (bytes) |"
-            );
-            UnityEngine.Debug.Log(
-                "| ------- | ---------------------:| --------------------:| ---------------:| -----------:| ------------:|"
-            );
-
-            RunSerializeBenchmark("Small", () => MakeSmall(123), out int smallSize);
-            RunSerializeBenchmark("Medium", () => MakeMedium(123, 16), out int medSize);
-            RunSerializeBenchmark("Large", () => MakeLarge(123, 8 * 1024, 64), out int largeSize);
-        }
-
-        [Test, Timeout(0)]
-        public void CompareDeserializeSmallMediumLarge()
-        {
-            UnityEngine.Debug.Log(
-                "| Payload | Pooled-Normal (ms, KB) | Pooled-Fast (ms, KB) | Pooled-FastPOCO (ms, KB) | Classic (ms, KB) | FPOCO/Classic |"
-            );
-            UnityEngine.Debug.Log(
-                "| ------- | ---------------------:| -------------------:| ------------------------:| ---------------:| -------------:|"
-            );
-
-            RunDeserializeBenchmark("Small", MakeSmall(123));
-            RunDeserializeBenchmark("Medium", MakeMedium(123, 16));
-            RunDeserializeBenchmark("Large", MakeLarge(123, 8 * 1024, 64));
-        }
-
-        [Test, Timeout(0)]
-        public void BenchmarkStringifyVsSerialize()
-        {
-            UnityEngine.Debug.Log("| Payload | JsonStringify (ms) | JsonSerialize (ms) | Ratio |");
-            UnityEngine.Debug.Log("| ------- | ------------------:| ------------------:| -----:|");
-
-            RunStringifyVsSerializeBenchmark("Small", MakeSmall(123));
-            RunStringifyVsSerializeBenchmark("Medium", MakeMedium(123, 16));
-            RunStringifyVsSerializeBenchmark("Large", MakeLarge(123, 8 * 1024, 64));
-        }
-
-        [Test, Timeout(0)]
-        public void BenchmarkLargeCollectionSerialization()
-        {
-            MediumMsg msg = MakeMedium(999, 50_000);
-
-            JsonSerializerOptions normal = SerializerAlias.CreateNormalJsonOptions();
-            JsonSerializerOptions fast = SerializerAlias.CreateFastJsonOptions();
-            byte[] buffer = null;
-
-            Stopwatch sw = Stopwatch.StartNew();
-            int sizeHint = (msg.Values?.Length ?? 0) * 12 + 2048;
-            for (int i = 0; i < 100; ++i)
-            {
-                _ = SerializerAlias.JsonSerialize(msg, normal, sizeHint, ref buffer);
-            }
-            sw.Stop();
-            long normalMs = sw.ElapsedMilliseconds;
-
-            sw.Restart();
-            for (int i = 0; i < 100; ++i)
-            {
-                _ = SerializerAlias.JsonSerialize(msg, fast, sizeHint, ref buffer);
-            }
-            sw.Stop();
-            long fastMs = sw.ElapsedMilliseconds;
-
-            sw.Restart();
-            for (int i = 0; i < 100; ++i)
-            {
-                _ = JsonSerializer.SerializeToUtf8Bytes(msg);
-            }
-            sw.Stop();
-            long classicMs = sw.ElapsedMilliseconds;
-
-            double fastVsClassic =
-                0 < classicMs ? (double)classicMs / fastMs : double.PositiveInfinity;
-            UnityEngine.Debug.Log(
-                $"Large collection (50k ints): Normal={normalMs}ms, Fast={fastMs}ms, Classic={classicMs}ms, Fast/Classic={fastVsClassic:0.00}x"
-            );
-            Assert.Pass($"Performance baseline: {fastMs}ms");
-        }
-
-        [Test]
-        public void ReadingAnArrayAllocatesOnlyTheReturnedArray()
-        {
-            const int elementCount = 128;
-            const int iterations = 20;
-            byte[] data = JsonSerializer.SerializeToUtf8Bytes(MakeIntArray(elementCount, 17));
-            JsonSerializerOptions options = SerializerAlias.CreateFastJsonOptions();
-            int[] result = null;
-
-            long returnedArrayAllocation = GCAssert.MeasureAllocatedBytes(
-                () => result = new int[elementCount],
-                measuredIterations: iterations
-            );
-            long readAllocation = GCAssert.MeasureAllocatedBytes(
-                () => result = ReadIntArray(data, options),
-                measuredIterations: iterations
-            );
-
-            Assert.AreEqual(elementCount, result.Length);
-            Assert.LessOrEqual(
-                readAllocation,
-                returnedArrayAllocation + 128,
-                $"Reading allocated {readAllocation} bytes; the returned arrays allocated "
-                    + $"{returnedArrayAllocation} bytes."
-            );
-        }
-
-        [Test, Timeout(0)]
-        public void BenchmarkDeeplyNestedObjectSerialization()
-        {
-            MediumMsg root = MakeMedium(0, 10);
-            MediumMsg current = root;
-
-            for (int i = 1; i < 100; ++i)
-            {
-                _ = MakeMedium(i, 10);
-            }
-
-            JsonSerializerOptions normal = SerializerAlias.CreateNormalJsonOptions();
-            JsonSerializerOptions fast = SerializerAlias.CreateFastJsonOptions();
-            byte[] buffer = null;
-
-            Stopwatch sw = Stopwatch.StartNew();
-            for (int i = 0; i < 1000; ++i)
-            {
-                _ = SerializerAlias.JsonSerialize(root, normal, ref buffer);
-            }
-            sw.Stop();
-            long normalMs = sw.ElapsedMilliseconds;
-
-            sw.Restart();
-            for (int i = 0; i < 1000; ++i)
-            {
-                _ = SerializerAlias.JsonSerialize(root, fast, ref buffer);
-            }
-            sw.Stop();
-            long fastMs = sw.ElapsedMilliseconds;
-
-            sw.Restart();
-            for (int i = 0; i < 1000; ++i)
-            {
-                _ = JsonSerializer.SerializeToUtf8Bytes(root);
-            }
-            sw.Stop();
-            long classicMs = sw.ElapsedMilliseconds;
-
-            double fastVsClassic =
-                0 < classicMs ? (double)classicMs / fastMs : double.PositiveInfinity;
-            UnityEngine.Debug.Log(
-                $"Complex object: Normal={normalMs}ms, Fast={fastMs}ms, Classic={classicMs}ms, Fast/Classic={fastVsClassic:0.00}x (1000 iters)"
-            );
-            Assert.Pass($"Performance baseline: {fastMs}ms");
-        }
 
         private static void RunSerializeBenchmark<T>(
             string label,
@@ -421,6 +264,163 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 b[i] = (byte)(x >> 24);
             }
             return b;
+        }
+
+        [Test, Timeout(0)]
+        public void CompareSerializeSmallMediumLarge()
+        {
+            UnityEngine.Debug.Log(
+                "| Payload | Pooled-Normal (ms, KB) | Pooled-Fast (ms, KB) | Classic (ms, KB) | Fast/Classic | Size (bytes) |"
+            );
+            UnityEngine.Debug.Log(
+                "| ------- | ---------------------:| --------------------:| ---------------:| -----------:| ------------:|"
+            );
+
+            RunSerializeBenchmark("Small", () => MakeSmall(123), out int smallSize);
+            RunSerializeBenchmark("Medium", () => MakeMedium(123, 16), out int medSize);
+            RunSerializeBenchmark("Large", () => MakeLarge(123, 8 * 1024, 64), out int largeSize);
+        }
+
+        [Test, Timeout(0)]
+        public void CompareDeserializeSmallMediumLarge()
+        {
+            UnityEngine.Debug.Log(
+                "| Payload | Pooled-Normal (ms, KB) | Pooled-Fast (ms, KB) | Pooled-FastPOCO (ms, KB) | Classic (ms, KB) | FPOCO/Classic |"
+            );
+            UnityEngine.Debug.Log(
+                "| ------- | ---------------------:| -------------------:| ------------------------:| ---------------:| -------------:|"
+            );
+
+            RunDeserializeBenchmark("Small", MakeSmall(123));
+            RunDeserializeBenchmark("Medium", MakeMedium(123, 16));
+            RunDeserializeBenchmark("Large", MakeLarge(123, 8 * 1024, 64));
+        }
+
+        [Test, Timeout(0)]
+        public void BenchmarkStringifyVsSerialize()
+        {
+            UnityEngine.Debug.Log("| Payload | JsonStringify (ms) | JsonSerialize (ms) | Ratio |");
+            UnityEngine.Debug.Log("| ------- | ------------------:| ------------------:| -----:|");
+
+            RunStringifyVsSerializeBenchmark("Small", MakeSmall(123));
+            RunStringifyVsSerializeBenchmark("Medium", MakeMedium(123, 16));
+            RunStringifyVsSerializeBenchmark("Large", MakeLarge(123, 8 * 1024, 64));
+        }
+
+        [Test, Timeout(0)]
+        public void BenchmarkLargeCollectionSerialization()
+        {
+            MediumMsg msg = MakeMedium(999, 50_000);
+
+            JsonSerializerOptions normal = SerializerAlias.CreateNormalJsonOptions();
+            JsonSerializerOptions fast = SerializerAlias.CreateFastJsonOptions();
+            byte[] buffer = null;
+
+            Stopwatch sw = Stopwatch.StartNew();
+            int sizeHint = (msg.Values?.Length ?? 0) * 12 + 2048;
+            for (int i = 0; i < 100; ++i)
+            {
+                _ = SerializerAlias.JsonSerialize(msg, normal, sizeHint, ref buffer);
+            }
+            sw.Stop();
+            long normalMs = sw.ElapsedMilliseconds;
+
+            sw.Restart();
+            for (int i = 0; i < 100; ++i)
+            {
+                _ = SerializerAlias.JsonSerialize(msg, fast, sizeHint, ref buffer);
+            }
+            sw.Stop();
+            long fastMs = sw.ElapsedMilliseconds;
+
+            sw.Restart();
+            for (int i = 0; i < 100; ++i)
+            {
+                _ = JsonSerializer.SerializeToUtf8Bytes(msg);
+            }
+            sw.Stop();
+            long classicMs = sw.ElapsedMilliseconds;
+
+            double fastVsClassic =
+                0 < classicMs ? (double)classicMs / fastMs : double.PositiveInfinity;
+            UnityEngine.Debug.Log(
+                $"Large collection (50k ints): Normal={normalMs}ms, Fast={fastMs}ms, Classic={classicMs}ms, Fast/Classic={fastVsClassic:0.00}x"
+            );
+            Assert.Pass($"Performance baseline: {fastMs}ms");
+        }
+
+        [Test]
+        public void ReadingAnArrayAllocatesOnlyTheReturnedArray()
+        {
+            const int elementCount = 128;
+            const int iterations = 20;
+            byte[] data = JsonSerializer.SerializeToUtf8Bytes(MakeIntArray(elementCount, 17));
+            JsonSerializerOptions options = SerializerAlias.CreateFastJsonOptions();
+            int[] result = null;
+
+            long returnedArrayAllocation = GCAssert.MeasureAllocatedBytes(
+                () => result = new int[elementCount],
+                measuredIterations: iterations
+            );
+            long readAllocation = GCAssert.MeasureAllocatedBytes(
+                () => result = ReadIntArray(data, options),
+                measuredIterations: iterations
+            );
+
+            Assert.AreEqual(elementCount, result.Length);
+            Assert.LessOrEqual(
+                readAllocation,
+                returnedArrayAllocation + 128,
+                $"Reading allocated {readAllocation} bytes; the returned arrays allocated "
+                    + $"{returnedArrayAllocation} bytes."
+            );
+        }
+
+        [Test, Timeout(0)]
+        public void BenchmarkDeeplyNestedObjectSerialization()
+        {
+            MediumMsg root = MakeMedium(0, 10);
+            MediumMsg current = root;
+
+            for (int i = 1; i < 100; ++i)
+            {
+                _ = MakeMedium(i, 10);
+            }
+
+            JsonSerializerOptions normal = SerializerAlias.CreateNormalJsonOptions();
+            JsonSerializerOptions fast = SerializerAlias.CreateFastJsonOptions();
+            byte[] buffer = null;
+
+            Stopwatch sw = Stopwatch.StartNew();
+            for (int i = 0; i < 1000; ++i)
+            {
+                _ = SerializerAlias.JsonSerialize(root, normal, ref buffer);
+            }
+            sw.Stop();
+            long normalMs = sw.ElapsedMilliseconds;
+
+            sw.Restart();
+            for (int i = 0; i < 1000; ++i)
+            {
+                _ = SerializerAlias.JsonSerialize(root, fast, ref buffer);
+            }
+            sw.Stop();
+            long fastMs = sw.ElapsedMilliseconds;
+
+            sw.Restart();
+            for (int i = 0; i < 1000; ++i)
+            {
+                _ = JsonSerializer.SerializeToUtf8Bytes(root);
+            }
+            sw.Stop();
+            long classicMs = sw.ElapsedMilliseconds;
+
+            double fastVsClassic =
+                0 < classicMs ? (double)classicMs / fastMs : double.PositiveInfinity;
+            UnityEngine.Debug.Log(
+                $"Complex object: Normal={normalMs}ms, Fast={fastMs}ms, Classic={classicMs}ms, Fast/Classic={fastVsClassic:0.00}x (1000 iters)"
+            );
+            Assert.Pass($"Performance baseline: {fastMs}ms");
         }
 
         private sealed class SmallMsg

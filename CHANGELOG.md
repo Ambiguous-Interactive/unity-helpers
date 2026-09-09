@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Enforce one member ordering across the codebase: const, events, delegates, static properties, static fields, properties, fields, constructors, static methods, methods, each tier ordered public → protected → internal → private including const, with nested types last. `npm run lint:nested-type-placement` enforces it at 100% across 2224 files and `--fix` reorders what it can, never crossing an `#if` boundary or a directive ([#672](https://github.com/Ambiguous-Interactive/unity-helpers/issues/672)).
 - Add a JesseSort adaptation with linear monotone-input handling and contiguous pile storage, credited to Jesse Lew. See [JesseSort](./docs/performance/ilist-sorting-performance.md#jessesort) ([#747](https://github.com/Ambiguous-Interactive/unity-helpers/issues/747)).
 - Add runtime-length exclusion arrays to `NextEnumExcept` for interface and concrete generators. See [Random Generators](./docs/features/utilities/random-generators.md#collection-operations) ([#742](https://github.com/Ambiguous-Interactive/unity-helpers/issues/742)).
 - Add `BitOps`, a public home for popcount, trailing zero count, floor log2, highest-bit isolation, power-of-two detection and power-of-two ceiling; the private copies in `BitSet`, `ImmutableBitSet`, the sorters and the sprite/enum tools now call it. See [Helper Utilities](./docs/features/utilities/helper-utilities.md#bit-manipulation-bitops) ([#742](https://github.com/Ambiguous-Interactive/unity-helpers/issues/742)).

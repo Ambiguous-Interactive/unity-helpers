@@ -78,6 +78,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             return new Vector2(Mathf.Sin(radians), Mathf.Cos(radians));
         }
 
+        private static IEnumerable<Direction> CreateEnumerable(params Direction[] directions)
+        {
+            foreach (Direction direction in directions)
+            {
+                yield return direction;
+            }
+        }
+
         [Test]
         public void DirectionConstantsMatchDefinedCounts()
         {
@@ -396,14 +404,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Direction original = (Direction)((1 << 8) | (int)Direction.South);
             Direction recombined = original.Split().Combine();
             Assert.AreEqual(Direction.South, recombined);
-        }
-
-        private static IEnumerable<Direction> CreateEnumerable(params Direction[] directions)
-        {
-            foreach (Direction direction in directions)
-            {
-                yield return direction;
-            }
         }
     }
 }

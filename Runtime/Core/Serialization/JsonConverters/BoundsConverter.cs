@@ -17,53 +17,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
 
         private BoundsConverter() { }
 
-        public override Bounds Read(
-            ref Utf8JsonReader reader,
-            Type typeToConvert,
-            JsonSerializerOptions options
-        )
-        {
-            if (reader.TokenType != JsonTokenType.StartObject)
-            {
-                throw new JsonException($"Invalid token type {reader.TokenType}");
-            }
-
-            Vector3 center = default;
-            Vector3 size = default;
-            bool haveCenter = false;
-            bool haveSize = false;
-
-            while (reader.Read())
-            {
-                if (reader.TokenType == JsonTokenType.EndObject)
-                {
-                    return new Bounds(haveCenter ? center : default, haveSize ? size : default);
-                }
-
-                if (reader.TokenType == JsonTokenType.PropertyName)
-                {
-                    if (reader.ValueTextEquals("center"))
-                    {
-                        reader.Read();
-                        center = ReadVector3Strict(ref reader);
-                        haveCenter = true;
-                    }
-                    else if (reader.ValueTextEquals("size"))
-                    {
-                        reader.Read();
-                        size = ReadVector3Strict(ref reader);
-                        haveSize = true;
-                    }
-                    else
-                    {
-                        throw new JsonException("Unknown property for Bounds");
-                    }
-                }
-            }
-
-            throw new JsonException("Incomplete JSON for Bounds");
-        }
-
         private static Vector3 ReadVector3Strict(ref Utf8JsonReader reader)
         {
             if (reader.TokenType != JsonTokenType.StartObject)
@@ -116,6 +69,53 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             }
 
             throw new JsonException("Incomplete JSON for Vector3");
+        }
+
+        public override Bounds Read(
+            ref Utf8JsonReader reader,
+            Type typeToConvert,
+            JsonSerializerOptions options
+        )
+        {
+            if (reader.TokenType != JsonTokenType.StartObject)
+            {
+                throw new JsonException($"Invalid token type {reader.TokenType}");
+            }
+
+            Vector3 center = default;
+            Vector3 size = default;
+            bool haveCenter = false;
+            bool haveSize = false;
+
+            while (reader.Read())
+            {
+                if (reader.TokenType == JsonTokenType.EndObject)
+                {
+                    return new Bounds(haveCenter ? center : default, haveSize ? size : default);
+                }
+
+                if (reader.TokenType == JsonTokenType.PropertyName)
+                {
+                    if (reader.ValueTextEquals("center"))
+                    {
+                        reader.Read();
+                        center = ReadVector3Strict(ref reader);
+                        haveCenter = true;
+                    }
+                    else if (reader.ValueTextEquals("size"))
+                    {
+                        reader.Read();
+                        size = ReadVector3Strict(ref reader);
+                        haveSize = true;
+                    }
+                    else
+                    {
+                        throw new JsonException("Unknown property for Bounds");
+                    }
+                }
+            }
+
+            throw new JsonException("Incomplete JSON for Bounds");
         }
 
         public override void Write(

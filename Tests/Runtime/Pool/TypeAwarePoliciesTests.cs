@@ -20,6 +20,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
     {
         private bool _wasMemoryPressureEnabled;
 
+        private static IEnumerable<TestCaseData> ArrayTypeTestCases()
+        {
+            yield return new TestCaseData(typeof(int[])).SetName("IntArrayReceivesBuiltInDefaults");
+            yield return new TestCaseData(typeof(string[])).SetName(
+                "StringArrayReceivesBuiltInDefaults"
+            );
+            yield return new TestCaseData(typeof(int[,])).SetName(
+                "MultidimensionalArrayReceivesBuiltInDefaults"
+            );
+            yield return new TestCaseData(typeof(int[][])).SetName(
+                "JaggedArrayReceivesBuiltInDefaults"
+            );
+            yield return new TestCaseData(typeof(byte[])).SetName(
+                "ByteArrayReceivesBuiltInDefaults"
+            );
+        }
+
         [SetUp]
         public void SetUp()
         {
@@ -65,23 +82,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             PoolPurgeSettings.ReinitializeBuiltInDefaults();
             Assert.IsTrue(PoolPurgeSettings.BuiltInDefaultsInitialized);
-        }
-
-        private static IEnumerable<TestCaseData> ArrayTypeTestCases()
-        {
-            yield return new TestCaseData(typeof(int[])).SetName("IntArrayReceivesBuiltInDefaults");
-            yield return new TestCaseData(typeof(string[])).SetName(
-                "StringArrayReceivesBuiltInDefaults"
-            );
-            yield return new TestCaseData(typeof(int[,])).SetName(
-                "MultidimensionalArrayReceivesBuiltInDefaults"
-            );
-            yield return new TestCaseData(typeof(int[][])).SetName(
-                "JaggedArrayReceivesBuiltInDefaults"
-            );
-            yield return new TestCaseData(typeof(byte[])).SetName(
-                "ByteArrayReceivesBuiltInDefaults"
-            );
         }
 
         [Test]

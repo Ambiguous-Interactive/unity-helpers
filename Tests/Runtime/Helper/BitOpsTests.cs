@@ -176,6 +176,52 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             }
         }
 
+        private static ulong RandomUlong()
+        {
+            return ((ulong)(uint)Rng.Next() << 32) | (uint)Rng.Next();
+        }
+
+        private static int ReferencePopCount(ulong value)
+        {
+            int count = 0;
+            while (value != 0)
+            {
+                value &= value - 1;
+                ++count;
+            }
+
+            return count;
+        }
+
+        private static int ReferenceTrailingZeroCount(uint value)
+        {
+            if (value == 0)
+            {
+                return UlongBits / 2;
+            }
+
+            int count = 0;
+            while ((value & 1) == 0)
+            {
+                ++count;
+                value >>= 1;
+            }
+
+            return count;
+        }
+
+        private static int ReferenceLog2(uint value)
+        {
+            int result = 0;
+            while (1 < value)
+            {
+                value >>= 1;
+                ++result;
+            }
+
+            return result;
+        }
+
         [TestCaseSource(nameof(PopCountUlongCases))]
         public void PopCountUlongReturnsExpectedCount(ulong value, int expected)
         {
@@ -371,52 +417,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.Throws<ArgumentOutOfRangeException>(() =>
                 BitOps.NextPowerOfTwo(UlongHighestBit + 1UL)
             );
-        }
-
-        private static ulong RandomUlong()
-        {
-            return ((ulong)(uint)Rng.Next() << 32) | (uint)Rng.Next();
-        }
-
-        private static int ReferencePopCount(ulong value)
-        {
-            int count = 0;
-            while (value != 0)
-            {
-                value &= value - 1;
-                ++count;
-            }
-
-            return count;
-        }
-
-        private static int ReferenceTrailingZeroCount(uint value)
-        {
-            if (value == 0)
-            {
-                return UlongBits / 2;
-            }
-
-            int count = 0;
-            while ((value & 1) == 0)
-            {
-                ++count;
-                value >>= 1;
-            }
-
-            return count;
-        }
-
-        private static int ReferenceLog2(uint value)
-        {
-            int result = 0;
-            while (1 < value)
-            {
-                value >>= 1;
-                ++result;
-            }
-
-            return result;
         }
     }
 }

@@ -17,13 +17,6 @@ namespace WallstopStudios.UnityHelpers.Utils
     [DisallowMultipleComponent]
     public sealed class CircleLineRenderer : MonoBehaviour
     {
-        public float minLineWidth = 0.005f;
-        public float maxLineWidth = 0.02f;
-        public int numSegments = 4;
-        public int baseSegments = 4;
-        public float updateRateSeconds = 0.1f;
-        public Color color = Color.grey;
-
         // Bound inspector-driven vertex allocation to keep periodic rendering from exhausting memory.
         private const int MaxRenderSegments = 4096;
 
@@ -32,6 +25,13 @@ namespace WallstopStudios.UnityHelpers.Utils
             get => _offset;
             set => transform.localPosition = _offset = value;
         }
+
+        public float minLineWidth = 0.005f;
+        public float maxLineWidth = 0.02f;
+        public int numSegments = 4;
+        public int baseSegments = 4;
+        public float updateRateSeconds = 0.1f;
+        public Color color = Color.grey;
 
         [SiblingComponent]
         private CircleCollider2D _collider;

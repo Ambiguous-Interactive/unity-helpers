@@ -11,10 +11,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
     /// </summary>
     public abstract class RelationalInheritanceMissingBase : MonoBehaviour
     {
-        [SiblingComponent]
-        private Rigidbody2D _required;
-
         /// <summary>The unsatisfiable sibling, which must stay null.</summary>
         public Rigidbody2D Required => _required;
+
+        [SiblingComponent]
+        private Rigidbody2D _required;
     }
 }

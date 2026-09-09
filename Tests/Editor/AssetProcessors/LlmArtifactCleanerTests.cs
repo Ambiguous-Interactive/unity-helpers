@@ -21,72 +21,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         private const string PackagePrefix = "Packages/com.wallstop-studios.unity-helpers/";
         private const string AssetsRoot = "Assets/__LlmArtifactCleanerTests__";
 
-        [SetUp]
-        public override void BaseSetUp()
-        {
-            // Check inherited handler pollution before base setup changes its attribution.
-            AssetPostprocessorTestHandlers.AssertCleanAndClearAll();
-            LlmArtifactCleaner.ResetForTesting();
-            base.BaseSetUp();
-            EnsureFolder(AssetsRoot);
-        }
-
-        [TearDown]
-        public override void TearDown()
-        {
-            CleanupTrackedFoldersAndAssets();
-            AssetDatabaseBatchHelper.RefreshIfNotBatching();
-            base.TearDown();
-            // Every asset op above scheduled a drain that would otherwise leak forward.
-            AssetPostprocessorDeferral.FlushForTesting();
-            LlmArtifactCleaner.ResetForTesting();
-        }
-
-        [Test]
-        public void DeletesLlmArtifactsInsidePackage()
-        {
-            string assetPath = PackagePrefix + "_llm_cleaner_test.txt";
-            string absolutePath = Path.Combine(Environment.CurrentDirectory, assetPath);
-            File.WriteAllText(absolutePath, "temp");
-            TrackAssetPath(assetPath);
-
-            Assert.IsTrue(LlmArtifactCleaner.ShouldDelete(assetPath));
-
-            // Manually invoke deletion logic since OnPostprocessAllAssets timing is unreliable in tests
-            LlmArtifactCleaner.DeleteBlockedAssets(new[] { assetPath });
-            AssetDatabaseBatchHelper.RefreshIfNotBatching(
-                ImportAssetOptions.ForceSynchronousImport
-            );
-
-            Assert.IsTrue(string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(assetPath)));
-            Assert.IsFalse(File.Exists(absolutePath));
-            Assert.IsFalse(File.Exists(absolutePath + ".meta"));
-        }
-
-        [Test]
-        public void LeavesAssetsOutsidePackageUntouched()
-        {
-            string folderPath = AssetsRoot + "/Keep";
-            EnsureFolder(folderPath);
-            string assetPath = folderPath + "/_llm_keep.txt";
-            string absolutePath = Path.Combine(Environment.CurrentDirectory, assetPath);
-            File.WriteAllText(absolutePath, "keep");
-            TrackFolder(folderPath);
-            TrackAssetPath(assetPath);
-
-            AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceSynchronousImport);
-            AssetDatabaseBatchHelper.RefreshIfNotBatching(
-                ImportAssetOptions.ForceSynchronousImport
-            );
-
-            Assert.IsFalse(LlmArtifactCleaner.ShouldDelete(assetPath));
-            string guid = AssetDatabase.AssetPathToGUID(assetPath);
-            Assert.IsFalse(string.IsNullOrEmpty(guid));
-            TextAsset textAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(assetPath);
-            Assert.IsTrue(textAsset != null);
-            Assert.AreEqual("keep", textAsset.text);
-        }
-
         private static IEnumerable<TestCaseData> ShouldDeletePositiveCases()
         {
             yield return new TestCaseData(PackagePrefix + "_llm_artifact.cs").SetName(
@@ -188,14 +122,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             yield return new TestCaseData(PackagePrefix + "folder/a_llm_b/file.cs").SetName(
                 "ShouldDelete.InFolderName.SingleUnderscoreBoundary"
             );
-        }
-
-        [Test]
-        [TestCaseSource(nameof(ShouldDeletePositiveCases))]
-        public void ShouldDeleteReturnsTrueForLlmArtifactsInsidePackage(string assetPath)
-        {
-            bool result = LlmArtifactCleaner.ShouldDelete(assetPath);
-            Assert.IsTrue(result, $"Expected ShouldDelete to return true for path: {assetPath}");
         }
 
         private static IEnumerable<TestCaseData> ShouldDeleteNegativeCases()
@@ -302,27 +228,11 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             );
         }
 
-        [Test]
-        [TestCaseSource(nameof(ShouldDeleteNegativeCases))]
-        public void ShouldDeleteReturnsFalseForNonTargetedPaths(string assetPath)
-        {
-            bool result = LlmArtifactCleaner.ShouldDelete(assetPath);
-            Assert.IsFalse(result, $"Expected ShouldDelete to return false for path: {assetPath}");
-        }
-
         private static IEnumerable<TestCaseData> NullAndInvalidPathCases()
         {
             yield return new TestCaseData(null).SetName(
                 "ShouldNotDelete.NullPath.ReturnsGracefully"
             );
-        }
-
-        [Test]
-        [TestCaseSource(nameof(NullAndInvalidPathCases))]
-        public void ShouldDeleteHandlesNullPathGracefully(string assetPath)
-        {
-            bool result = LlmArtifactCleaner.ShouldDelete(assetPath);
-            Assert.IsFalse(result, "Expected ShouldDelete to return false for null path");
         }
 
         private static IEnumerable<TestCaseData> DeleteBlockedAssetsEdgeCases()
@@ -345,6 +255,129 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             yield return new TestCaseData(new object[] { new[] { null, "", "   " } }).SetName(
                 "DeleteBlockedAssets.ArrayWithMixedInvalid.DoesNotThrow"
             );
+        }
+
+        private static IEnumerable<TestCaseData> MovedAssetScenarioCases()
+        {
+            yield return new TestCaseData(
+                "Assets/_llm_temp.cs",
+                PackagePrefix + "_llm_temp.cs",
+                true
+            ).SetName("MovedAsset.IntoPackage.LlmPrefixed.ShouldDelete");
+
+            yield return new TestCaseData(
+                PackagePrefix + "_llm_temp.cs",
+                "Assets/_llm_temp.cs",
+                false
+            ).SetName("MovedAsset.OutOfPackage.LlmPrefixed.ShouldNotDelete");
+
+            yield return new TestCaseData(
+                "Assets/Regular.cs",
+                PackagePrefix + "Regular.cs",
+                false
+            ).SetName("MovedAsset.IntoPackage.RegularFile.ShouldNotDelete");
+
+            yield return new TestCaseData(
+                PackagePrefix + "Runtime/_llm_file.cs",
+                PackagePrefix + "Editor/_llm_file.cs",
+                true
+            ).SetName("MovedAsset.WithinPackage.LlmPrefixed.ShouldDelete");
+
+            yield return new TestCaseData(
+                PackagePrefix + "Runtime/Regular.cs",
+                PackagePrefix + "Editor/Regular.cs",
+                false
+            ).SetName("MovedAsset.WithinPackage.RegularFile.ShouldNotDelete");
+        }
+
+        [SetUp]
+        public override void BaseSetUp()
+        {
+            // Check inherited handler pollution before base setup changes its attribution.
+            AssetPostprocessorTestHandlers.AssertCleanAndClearAll();
+            LlmArtifactCleaner.ResetForTesting();
+            base.BaseSetUp();
+            EnsureFolder(AssetsRoot);
+        }
+
+        [TearDown]
+        public override void TearDown()
+        {
+            CleanupTrackedFoldersAndAssets();
+            AssetDatabaseBatchHelper.RefreshIfNotBatching();
+            base.TearDown();
+            // Every asset op above scheduled a drain that would otherwise leak forward.
+            AssetPostprocessorDeferral.FlushForTesting();
+            LlmArtifactCleaner.ResetForTesting();
+        }
+
+        [Test]
+        public void DeletesLlmArtifactsInsidePackage()
+        {
+            string assetPath = PackagePrefix + "_llm_cleaner_test.txt";
+            string absolutePath = Path.Combine(Environment.CurrentDirectory, assetPath);
+            File.WriteAllText(absolutePath, "temp");
+            TrackAssetPath(assetPath);
+
+            Assert.IsTrue(LlmArtifactCleaner.ShouldDelete(assetPath));
+
+            // Manually invoke deletion logic since OnPostprocessAllAssets timing is unreliable in tests
+            LlmArtifactCleaner.DeleteBlockedAssets(new[] { assetPath });
+            AssetDatabaseBatchHelper.RefreshIfNotBatching(
+                ImportAssetOptions.ForceSynchronousImport
+            );
+
+            Assert.IsTrue(string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(assetPath)));
+            Assert.IsFalse(File.Exists(absolutePath));
+            Assert.IsFalse(File.Exists(absolutePath + ".meta"));
+        }
+
+        [Test]
+        public void LeavesAssetsOutsidePackageUntouched()
+        {
+            string folderPath = AssetsRoot + "/Keep";
+            EnsureFolder(folderPath);
+            string assetPath = folderPath + "/_llm_keep.txt";
+            string absolutePath = Path.Combine(Environment.CurrentDirectory, assetPath);
+            File.WriteAllText(absolutePath, "keep");
+            TrackFolder(folderPath);
+            TrackAssetPath(assetPath);
+
+            AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceSynchronousImport);
+            AssetDatabaseBatchHelper.RefreshIfNotBatching(
+                ImportAssetOptions.ForceSynchronousImport
+            );
+
+            Assert.IsFalse(LlmArtifactCleaner.ShouldDelete(assetPath));
+            string guid = AssetDatabase.AssetPathToGUID(assetPath);
+            Assert.IsFalse(string.IsNullOrEmpty(guid));
+            TextAsset textAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(assetPath);
+            Assert.IsTrue(textAsset != null);
+            Assert.AreEqual("keep", textAsset.text);
+        }
+
+        [Test]
+        [TestCaseSource(nameof(ShouldDeletePositiveCases))]
+        public void ShouldDeleteReturnsTrueForLlmArtifactsInsidePackage(string assetPath)
+        {
+            bool result = LlmArtifactCleaner.ShouldDelete(assetPath);
+            Assert.IsTrue(result, $"Expected ShouldDelete to return true for path: {assetPath}");
+        }
+
+        [Test]
+        [TestCaseSource(nameof(ShouldDeleteNegativeCases))]
+        public void ShouldDeleteReturnsFalseForNonTargetedPaths(string assetPath)
+        {
+            bool result = LlmArtifactCleaner.ShouldDelete(assetPath);
+            Assert.IsFalse(result, $"Expected ShouldDelete to return false for path: {assetPath}");
+        }
+
+        [Test]
+        [TestCaseSource(nameof(NullAndInvalidPathCases))]
+        public void ShouldDeleteHandlesNullPathGracefully(string assetPath)
+        {
+            bool result = LlmArtifactCleaner.ShouldDelete(assetPath);
+            Assert.IsFalse(result, "Expected ShouldDelete to return false for null path");
         }
 
         [Test]
@@ -418,39 +451,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 LlmArtifactCleaner.PendingDeletionCountForTesting,
                 "Pending queue should be empty after reentrant deletes drain."
             );
-        }
-
-        private static IEnumerable<TestCaseData> MovedAssetScenarioCases()
-        {
-            yield return new TestCaseData(
-                "Assets/_llm_temp.cs",
-                PackagePrefix + "_llm_temp.cs",
-                true
-            ).SetName("MovedAsset.IntoPackage.LlmPrefixed.ShouldDelete");
-
-            yield return new TestCaseData(
-                PackagePrefix + "_llm_temp.cs",
-                "Assets/_llm_temp.cs",
-                false
-            ).SetName("MovedAsset.OutOfPackage.LlmPrefixed.ShouldNotDelete");
-
-            yield return new TestCaseData(
-                "Assets/Regular.cs",
-                PackagePrefix + "Regular.cs",
-                false
-            ).SetName("MovedAsset.IntoPackage.RegularFile.ShouldNotDelete");
-
-            yield return new TestCaseData(
-                PackagePrefix + "Runtime/_llm_file.cs",
-                PackagePrefix + "Editor/_llm_file.cs",
-                true
-            ).SetName("MovedAsset.WithinPackage.LlmPrefixed.ShouldDelete");
-
-            yield return new TestCaseData(
-                PackagePrefix + "Runtime/Regular.cs",
-                PackagePrefix + "Editor/Regular.cs",
-                false
-            ).SetName("MovedAsset.WithinPackage.RegularFile.ShouldNotDelete");
         }
 
         [Test]

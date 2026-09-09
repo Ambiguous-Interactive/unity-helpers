@@ -30,6 +30,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
     {
         private const string Root = "Assets/Temp/SpriteSettingsApplierWindowTests";
 
+        private static string RelToFull(string rel)
+        {
+            return Path.Combine(
+                    Application.dataPath.Substring(
+                        0,
+                        Application.dataPath.Length - "Assets".Length
+                    ),
+                    rel
+                )
+                .SanitizePath();
+        }
+
         public override void CommonOneTimeSetUp()
         {
             base.CommonOneTimeSetUp();
@@ -227,18 +239,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             t.SetPixels(pix);
             t.Apply();
             File.WriteAllBytes(RelToFull(relPath), t.EncodeToPNG());
-        }
-
-        private static string RelToFull(string rel)
-        {
-            return Path.Combine(
-                    Application.dataPath.Substring(
-                        0,
-                        Application.dataPath.Length - "Assets".Length
-                    ),
-                    rel
-                )
-                .SanitizePath();
         }
     }
 #endif

@@ -22,8 +22,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     /// </remarks>
     public sealed class StandInRing<T> : ICollection<T>
     {
-        private readonly List<T> _items = new List<T>();
-
         /// <summary>The capacity carried in the wrapper and dropped by the member encoding.</summary>
         public int Capacity { get; set; }
 
@@ -32,6 +30,20 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
         /// <inheritdoc />
         public bool IsReadOnly => false;
+
+        /// <summary>How many times <see cref="OnBeforeSerialize"/> has run.</summary>
+        /// <remarks>
+        /// The real collections stage their serialized array in a callback, so the marshal has to
+        /// run it once -- from Measure, per <c>IWProtoFormatter&lt;T&gt;</c>'s hook contract -- and
+        /// not again from Write. A count is the only way to tell "ran once" from "ran twice with an
+        /// idempotent body", and twice is what leaks a rental in a hook that pools.
+        /// </remarks>
+        public int StageCount { get; private set; }
+
+        /// <summary>The staged elements, or <c>null</c> before staging.</summary>
+        internal T[] Staged { get; private set; }
+
+        private readonly List<T> _items = new List<T>();
 
         /// <inheritdoc />
         public void Add(T item)
@@ -69,25 +81,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             return _items.GetEnumerator();
         }
 
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
-
-        internal T[] ToArray()
-        {
-            return 0 < _items.Count ? _items.ToArray() : null;
-        }
-
-        /// <summary>How many times <see cref="OnBeforeSerialize"/> has run.</summary>
-        /// <remarks>
-        /// The real collections stage their serialized array in a callback, so the marshal has to
-        /// run it once -- from Measure, per <c>IWProtoFormatter&lt;T&gt;</c>'s hook contract -- and
-        /// not again from Write. A count is the only way to tell "ran once" from "ran twice with an
-        /// idempotent body", and twice is what leaks a rental in a hook that pools.
-        /// </remarks>
-        public int StageCount { get; private set; }
-
         /// <summary>Stages the elements the wrapper is written from.</summary>
         public void OnBeforeSerialize()
         {
@@ -95,8 +88,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Staged = ToArray();
         }
 
-        /// <summary>The staged elements, or <c>null</c> before staging.</summary>
-        internal T[] Staged { get; private set; }
+        internal T[] ToArray()
+        {
+            return 0 < _items.Count ? _items.ToArray() : null;
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
     }
 
     /// <summary>The wire shape a <see cref="StandInRing{T}"/> root is written as.</summary>
@@ -122,6 +122,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         : IWProtoFormatter<StandInRing<T>>,
             IWProtoConditionalFormatter
     {
+        private static StandInRingWrapper<T> Wrap(StandInRing<T> value)
+        {
+            return new StandInRingWrapper<T> { Items = value.Staged, Capacity = value.Capacity };
+        }
+
         /// <inheritdoc />
         public bool CanServe()
         {
@@ -166,11 +171,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             return true;
         }
-
-        private static StandInRingWrapper<T> Wrap(StandInRing<T> value)
-        {
-            return new StandInRingWrapper<T> { Items = value.Staged, Capacity = value.Capacity };
-        }
     }
 
     /// <summary>Stands in for the one non-generic marshal the package ships, <c>SparseSet</c>.</summary>
@@ -194,6 +194,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     /// <summary>Writes a <see cref="StandInBag"/> root as its wrapper.</summary>
     public sealed class StandInBagMarshalFormatter : IWProtoFormatter<StandInBag>
     {
+        private static StandInBagWrapper Wrap(StandInBag value)
+        {
+            return new StandInBagWrapper
+            {
+                Elements = 0 < value.Elements.Count ? value.Elements.ToArray() : null,
+            };
+        }
+
         /// <inheritdoc />
         public int Measure(in StandInBag value)
         {
@@ -227,14 +235,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
 
             return true;
-        }
-
-        private static StandInBagWrapper Wrap(StandInBag value)
-        {
-            return new StandInBagWrapper
-            {
-                Elements = 0 < value.Elements.Count ? value.Elements.ToArray() : null,
-            };
         }
     }
 

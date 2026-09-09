@@ -14,6 +14,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     {
         internal static readonly WProtoReadLimits Default = new WProtoReadLimits();
 
+        /// <summary>Maximum encoded bytes in a root or nested reader region.</summary>
+        public int MaximumMessageBytes { get; }
+
+        /// <summary>Maximum bytes in a length-delimited field, including unknown and packed fields.</summary>
+        public int MaximumLengthDelimitedBytes { get; }
+
+        /// <summary>Maximum tags in one reader region, including duplicate and unknown tags.</summary>
+        public int MaximumFieldCount { get; }
+
+        /// <summary>Maximum packed scalar elements across all runs and nested regions in one read.</summary>
+        public int MaximumPackedElementCount { get; }
+
+        /// <summary>Maximum combined sub-message and group depth, never above 64.</summary>
+        public int MaximumNestingDepth { get; }
+
         /// <summary>Creates default wire limits with nesting bounded to 64.</summary>
         public WProtoReadLimits()
             : this(int.MaxValue, int.MaxValue, int.MaxValue, WProtoReader.MaxNestingDepth) { }
@@ -62,20 +77,5 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 : WProtoReader.MaxNestingDepth < maximumNestingDepth ? WProtoReader.MaxNestingDepth
                 : maximumNestingDepth;
         }
-
-        /// <summary>Maximum encoded bytes in a root or nested reader region.</summary>
-        public int MaximumMessageBytes { get; }
-
-        /// <summary>Maximum bytes in a length-delimited field, including unknown and packed fields.</summary>
-        public int MaximumLengthDelimitedBytes { get; }
-
-        /// <summary>Maximum tags in one reader region, including duplicate and unknown tags.</summary>
-        public int MaximumFieldCount { get; }
-
-        /// <summary>Maximum packed scalar elements across all runs and nested regions in one read.</summary>
-        public int MaximumPackedElementCount { get; }
-
-        /// <summary>Maximum combined sub-message and group depth, never above 64.</summary>
-        public int MaximumNestingDepth { get; }
     }
 }

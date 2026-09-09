@@ -47,6 +47,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
         /// <summary>The <c>docs/images</c> folder, relative to the package root.</summary>
         private const string DocumentationImageFolder = "docs/images";
 
+        /// <summary>
+        /// Throwaway, but still editable.
+        /// </summary>
+        /// <remarks>
+        /// <c>HideFlags.HideAndDontSave</c> is 61 and includes <c>NotEditable</c> (measured), and
+        /// Unity draws a <c>NotEditable</c> object's inspector greyed out. A capture host wants the
+        /// hiding and the not-saving, and emphatically not the third thing: every field in every
+        /// generated screenshot came out looking disabled, which is not what a reader gets.
+        /// </remarks>
+        private const HideFlags CaptureHostFlags =
+            HideFlags.HideAndDontSave & ~HideFlags.NotEditable;
+
         internal static List<DocumentationImage> BuildImages()
         {
             List<DocumentationImage> images = new(13)
@@ -196,30 +208,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
             }
         }
 
-        private static DocumentationImage Single(string relativePath, Type targetType)
-        {
-            return new DocumentationImage(
-                relativePath,
-                new[] { targetType },
-                InspectorColumnWidth,
-                InspectorLabelWidth,
-                StandardCanvasWidth,
-                TallCanvasHeight
-            );
-        }
-
-        /// <summary>
-        /// Throwaway, but still editable.
-        /// </summary>
-        /// <remarks>
-        /// <c>HideFlags.HideAndDontSave</c> is 61 and includes <c>NotEditable</c> (measured), and
-        /// Unity draws a <c>NotEditable</c> object's inspector greyed out. A capture host wants the
-        /// hiding and the not-saving, and emphatically not the third thing: every field in every
-        /// generated screenshot came out looking disabled, which is not what a reader gets.
-        /// </remarks>
-        private const HideFlags CaptureHostFlags =
-            HideFlags.HideAndDontSave & ~HideFlags.NotEditable;
-
         internal static Object CreateTarget(Type targetType, List<Object> owned)
         {
             if (typeof(ScriptableObject).IsAssignableFrom(targetType))
@@ -242,6 +230,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
             }
 
             return component;
+        }
+
+        private static DocumentationImage Single(string relativePath, Type targetType)
+        {
+            return new DocumentationImage(
+                relativePath,
+                new[] { targetType },
+                InspectorColumnWidth,
+                InspectorLabelWidth,
+                StandardCanvasWidth,
+                TallCanvasHeight
+            );
         }
 
         private static string ObjectNamesFor(Type targetType)

@@ -119,6 +119,34 @@ namespace WallstopStudios.UnityHelpers.Tags
         public string HumanReadableDescription => BuildDescription();
 
         /// <summary>
+        /// Gets whether this effect is <see cref="ModifierDurationType.Instant"/> yet carries
+        /// periodic or behaviour data. Instant effects return no handle, so neither can ever run.
+        /// </summary>
+        internal bool IsInstantWithHandleData =>
+            durationType == ModifierDurationType.Instant
+            && ((periodicEffects is { Count: > 0 }) || (behaviors is { Count: > 0 }));
+
+        /// <summary>
+        /// Gets whether <see cref="cosmeticEffects"/> holds an unassigned entry. Those entries
+        /// cannot be instanced, so they are skipped every time the effect is applied.
+        /// </summary>
+        internal bool HasUnassignedCosmeticEffect
+        {
+            get
+            {
+                foreach (CosmeticEffectData cosmeticEffect in cosmeticEffects)
+                {
+                    if (cosmeticEffect == null)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
+
+        /// <summary>
         /// The list of attribute modifications to apply when this effect is activated.
         /// Each modification specifies an attribute name, action type, and value.
         /// </summary>
@@ -180,101 +208,6 @@ namespace WallstopStudios.UnityHelpers.Tags
         [JsonIgnore]
         public List<EffectBehavior> behaviors = new();
 
-        [NonSerialized]
-        private bool _instantWithHandleDataReported;
-
-        [NonSerialized]
-        private bool _unassignedCosmeticReported;
-
-        /// <summary>
-        /// Gets whether this effect is <see cref="ModifierDurationType.Instant"/> yet carries
-        /// periodic or behaviour data. Instant effects return no handle, so neither can ever run.
-        /// </summary>
-        internal bool IsInstantWithHandleData =>
-            durationType == ModifierDurationType.Instant
-            && ((periodicEffects is { Count: > 0 }) || (behaviors is { Count: > 0 }));
-
-        /// <summary>
-        /// Returns <c>true</c> the first time it is called on a misconfigured effect, and
-        /// <c>false</c> forever after.
-        /// </summary>
-        /// <remarks>
-        /// The condition is a static property of the asset, so reporting it on the per-application
-        /// path made a single authoring mistake cost a diagnostic on every hit, every tick, for the
-        /// whole session. Editing the effect re-arms the report through
-        /// <see cref="OnValidate"/>.
-        /// </remarks>
-        internal bool ShouldReportInstantWithHandleData()
-        {
-            if (_instantWithHandleDataReported || !IsInstantWithHandleData)
-            {
-                return false;
-            }
-
-            _instantWithHandleDataReported = true;
-            return true;
-        }
-
-        /// <summary>
-        /// Gets whether <see cref="cosmeticEffects"/> holds an unassigned entry. Those entries
-        /// cannot be instanced, so they are skipped every time the effect is applied.
-        /// </summary>
-        internal bool HasUnassignedCosmeticEffect
-        {
-            get
-            {
-                foreach (CosmeticEffectData cosmeticEffect in cosmeticEffects)
-                {
-                    if (cosmeticEffect == null)
-                    {
-                        return true;
-                    }
-                }
-
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Returns <c>true</c> the first time it is called on an effect holding an unassigned
-        /// cosmetic entry, and <c>false</c> forever after.
-        /// </summary>
-        /// <remarks>
-        /// Same shape as <see cref="ShouldReportInstantWithHandleData"/>: a static property of the
-        /// asset, previously reported once per unassigned entry per application.
-        /// </remarks>
-        internal bool ShouldReportUnassignedCosmeticEffect()
-        {
-            if (_unassignedCosmeticReported || !HasUnassignedCosmeticEffect)
-            {
-                return false;
-            }
-
-            _unassignedCosmeticReported = true;
-            return true;
-        }
-
-        private void OnValidate()
-        {
-            _instantWithHandleDataReported = false;
-            _unassignedCosmeticReported = false;
-            if (IsInstantWithHandleData)
-            {
-                this.LogWarn(
-                    $"Effect {name} defines periodic or behaviour data but is Instant. These features require a Duration or Infinite effect.",
-                    stackTrace: false
-                );
-            }
-
-            if (HasUnassignedCosmeticEffect)
-            {
-                this.LogWarn(
-                    $"Effect {name} has an unassigned CosmeticEffectData entry, which cannot be instanced and is skipped.",
-                    stackTrace: false
-                );
-            }
-        }
-
         /// <summary>
         /// Determines how this effect groups stacks for stacking decisions.
         /// </summary>
@@ -296,6 +229,174 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// </summary>
         [Min(0)]
         public int maximumStacks;
+
+        [NonSerialized]
+        private bool _instantWithHandleDataReported;
+
+        [NonSerialized]
+        private bool _unassignedCosmeticReported;
+
+        private static bool PeriodicEffectsEqual(
+            List<PeriodicEffectDefinition> left,
+            List<PeriodicEffectDefinition> right
+        )
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return true;
+            }
+
+            if (left == null || right == null)
+            {
+                return false;
+            }
+
+            if (left.Count != right.Count)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < left.Count; ++i)
+            {
+                if (!PeriodicEffectEqual(left[i], right[i]))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        // Deserialization creates fresh definitions, so equality must compare their contents.
+        private static bool PeriodicEffectEqual(
+            PeriodicEffectDefinition left,
+            PeriodicEffectDefinition right
+        )
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return true;
+            }
+
+            if (left == null || right == null)
+            {
+                return false;
+            }
+
+            if (!string.Equals(left.name, right.name, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (!left.initialDelay.Equals(right.initialDelay))
+            {
+                return false;
+            }
+
+            if (!left.interval.Equals(right.interval))
+            {
+                return false;
+            }
+
+            if (left.maxTicks != right.maxTicks)
+            {
+                return false;
+            }
+
+            return ModificationsEqual(left.modifications, right.modifications);
+        }
+
+        private static bool ModificationsEqual(
+            List<AttributeModification> left,
+            List<AttributeModification> right
+        )
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return true;
+            }
+
+            if (left == null || right == null)
+            {
+                return false;
+            }
+
+            if (left.Count != right.Count)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < left.Count; ++i)
+            {
+                if (left[i] != right[i])
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        // Behaviour subclasses own arbitrary asset state, so only identity equality is supported.
+        private static bool BehaviorsEqual(List<EffectBehavior> left, List<EffectBehavior> right)
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return true;
+            }
+
+            if (left == null || right == null)
+            {
+                return false;
+            }
+
+            if (left.Count != right.Count)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < left.Count; ++i)
+            {
+                if (!ReferenceEquals(left[i], right[i]))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static int PeriodicEffectsHashCode(List<PeriodicEffectDefinition> definitions)
+        {
+            if (definitions == null)
+            {
+                return 0;
+            }
+
+            int hash = 0;
+            foreach (PeriodicEffectDefinition definition in definitions)
+            {
+                hash = Objects.HashCode(hash, PeriodicEffectHashCode(definition));
+            }
+
+            return hash;
+        }
+
+        private static int PeriodicEffectHashCode(PeriodicEffectDefinition definition)
+        {
+            if (definition == null)
+            {
+                return 0;
+            }
+
+            return Objects.HashCode(
+                definition.name,
+                definition.initialDelay,
+                definition.interval,
+                definition.maxTicks,
+                Objects.EnumerableHashCode(definition.modifications)
+            );
+        }
 
         /// <summary>
         /// Determines whether this effect applies the specified tag.
@@ -472,134 +573,6 @@ namespace WallstopStudios.UnityHelpers.Tags
                 duration,
                 tags = effectTags,
             }.ToJson();
-        }
-
-        private string[] BuildCosmeticEffectNames()
-        {
-            if (cosmeticEffects == null || cosmeticEffects.Count == 0)
-            {
-                return Array.Empty<string>();
-            }
-
-            using PooledResource<List<string>> namesLease = Buffers<string>.List.Get(
-                out List<string> names
-            );
-            {
-                foreach (CosmeticEffectData effect in cosmeticEffects)
-                {
-                    if (effect == null)
-                    {
-                        continue;
-                    }
-
-                    string effectName = effect.name;
-                    if (effectName.Length == 0)
-                    {
-                        continue;
-                    }
-
-                    names.Add(effectName);
-                }
-
-                if (names.Count == 0)
-                {
-                    return Array.Empty<string>();
-                }
-
-                return names.ToArray();
-            }
-        }
-
-        private string BuildDescription()
-        {
-            if (modifications == null)
-            {
-                return nameof(AttributeEffect);
-            }
-
-            using PooledResource<StringBuilder> stringBuilderBuffer = Buffers.StringBuilder.Get(
-                out StringBuilder descriptionBuilder
-            );
-            for (int i = 0; i < modifications.Count; ++i)
-            {
-                AttributeModification modification = modifications[i];
-                switch (modification.action)
-                {
-                    case ModificationAction.Addition:
-                    {
-                        if (modification.value < 0)
-                        {
-                            _ = descriptionBuilder.Append(modification.value);
-                            _ = descriptionBuilder.Append(' ');
-                        }
-                        else if (modification.value == 0)
-                        {
-                            continue;
-                        }
-                        else
-                        {
-                            _ = descriptionBuilder.AppendFormat("+{0} ", modification.value);
-                        }
-
-                        break;
-                    }
-                    case ModificationAction.Multiplication:
-                    {
-                        if (modification.value < 1)
-                        {
-                            _ = descriptionBuilder.AppendFormat(
-                                "-{0}% ",
-                                (1 - modification.value) * 100
-                            );
-                        }
-                        // ReSharper disable once CompareOfFloatsByEqualityOperator
-                        else if (modification.value == 1)
-                        {
-                            continue;
-                        }
-                        else
-                        {
-                            _ = descriptionBuilder.AppendFormat(
-                                "+{0}% ",
-                                (modification.value - 1) * 100
-                            );
-                        }
-
-                        break;
-                    }
-                    case ModificationAction.Override:
-                    {
-                        _ = descriptionBuilder.AppendFormat("{0} ", modification.value);
-                        break;
-                    }
-                    default:
-                    {
-                        throw new InvalidEnumArgumentException(
-                            nameof(modification.value),
-                            (int)modification.value,
-                            typeof(ModificationAction)
-                        );
-                    }
-                }
-
-                _ = descriptionBuilder.Append(modification.attribute.ToPascalCase(" "));
-                if (i < modifications.Count - 1)
-                {
-                    _ = descriptionBuilder.Append(", ");
-                }
-            }
-
-            return descriptionBuilder.ToString();
-        }
-
-        internal EffectStackKey GetStackKey()
-        {
-            if (stackGroup == EffectStackGroup.CustomKey && !string.IsNullOrEmpty(stackGroupKey))
-            {
-                return EffectStackKey.CreateCustom(stackGroupKey);
-            }
-
-            return EffectStackKey.CreateReference(this);
         }
 
         /// <summary>
@@ -808,166 +781,193 @@ namespace WallstopStudios.UnityHelpers.Tags
             );
         }
 
-        private static bool PeriodicEffectsEqual(
-            List<PeriodicEffectDefinition> left,
-            List<PeriodicEffectDefinition> right
-        )
+        /// <summary>
+        /// Returns <c>true</c> the first time it is called on a misconfigured effect, and
+        /// <c>false</c> forever after.
+        /// </summary>
+        /// <remarks>
+        /// The condition is a static property of the asset, so reporting it on the per-application
+        /// path made a single authoring mistake cost a diagnostic on every hit, every tick, for the
+        /// whole session. Editing the effect re-arms the report through
+        /// <see cref="OnValidate"/>.
+        /// </remarks>
+        internal bool ShouldReportInstantWithHandleData()
         {
-            if (ReferenceEquals(left, right))
-            {
-                return true;
-            }
-
-            if (left == null || right == null)
+            if (_instantWithHandleDataReported || !IsInstantWithHandleData)
             {
                 return false;
             }
 
-            if (left.Count != right.Count)
-            {
-                return false;
-            }
-
-            for (int i = 0; i < left.Count; ++i)
-            {
-                if (!PeriodicEffectEqual(left[i], right[i]))
-                {
-                    return false;
-                }
-            }
-
+            _instantWithHandleDataReported = true;
             return true;
         }
 
-        // Deserialization creates fresh definitions, so equality must compare their contents.
-        private static bool PeriodicEffectEqual(
-            PeriodicEffectDefinition left,
-            PeriodicEffectDefinition right
-        )
+        /// <summary>
+        /// Returns <c>true</c> the first time it is called on an effect holding an unassigned
+        /// cosmetic entry, and <c>false</c> forever after.
+        /// </summary>
+        /// <remarks>
+        /// Same shape as <see cref="ShouldReportInstantWithHandleData"/>: a static property of the
+        /// asset, previously reported once per unassigned entry per application.
+        /// </remarks>
+        internal bool ShouldReportUnassignedCosmeticEffect()
         {
-            if (ReferenceEquals(left, right))
-            {
-                return true;
-            }
-
-            if (left == null || right == null)
+            if (_unassignedCosmeticReported || !HasUnassignedCosmeticEffect)
             {
                 return false;
             }
 
-            if (!string.Equals(left.name, right.name, StringComparison.Ordinal))
-            {
-                return false;
-            }
-
-            if (!left.initialDelay.Equals(right.initialDelay))
-            {
-                return false;
-            }
-
-            if (!left.interval.Equals(right.interval))
-            {
-                return false;
-            }
-
-            if (left.maxTicks != right.maxTicks)
-            {
-                return false;
-            }
-
-            return ModificationsEqual(left.modifications, right.modifications);
-        }
-
-        private static bool ModificationsEqual(
-            List<AttributeModification> left,
-            List<AttributeModification> right
-        )
-        {
-            if (ReferenceEquals(left, right))
-            {
-                return true;
-            }
-
-            if (left == null || right == null)
-            {
-                return false;
-            }
-
-            if (left.Count != right.Count)
-            {
-                return false;
-            }
-
-            for (int i = 0; i < left.Count; ++i)
-            {
-                if (left[i] != right[i])
-                {
-                    return false;
-                }
-            }
-
+            _unassignedCosmeticReported = true;
             return true;
         }
 
-        // Behaviour subclasses own arbitrary asset state, so only identity equality is supported.
-        private static bool BehaviorsEqual(List<EffectBehavior> left, List<EffectBehavior> right)
+        internal EffectStackKey GetStackKey()
         {
-            if (ReferenceEquals(left, right))
+            if (stackGroup == EffectStackGroup.CustomKey && !string.IsNullOrEmpty(stackGroupKey))
             {
-                return true;
+                return EffectStackKey.CreateCustom(stackGroupKey);
             }
 
-            if (left == null || right == null)
-            {
-                return false;
-            }
-
-            if (left.Count != right.Count)
-            {
-                return false;
-            }
-
-            for (int i = 0; i < left.Count; ++i)
-            {
-                if (!ReferenceEquals(left[i], right[i]))
-                {
-                    return false;
-                }
-            }
-
-            return true;
+            return EffectStackKey.CreateReference(this);
         }
 
-        private static int PeriodicEffectsHashCode(List<PeriodicEffectDefinition> definitions)
+        private void OnValidate()
         {
-            if (definitions == null)
+            _instantWithHandleDataReported = false;
+            _unassignedCosmeticReported = false;
+            if (IsInstantWithHandleData)
             {
-                return 0;
+                this.LogWarn(
+                    $"Effect {name} defines periodic or behaviour data but is Instant. These features require a Duration or Infinite effect.",
+                    stackTrace: false
+                );
             }
 
-            int hash = 0;
-            foreach (PeriodicEffectDefinition definition in definitions)
+            if (HasUnassignedCosmeticEffect)
             {
-                hash = Objects.HashCode(hash, PeriodicEffectHashCode(definition));
+                this.LogWarn(
+                    $"Effect {name} has an unassigned CosmeticEffectData entry, which cannot be instanced and is skipped.",
+                    stackTrace: false
+                );
             }
-
-            return hash;
         }
 
-        private static int PeriodicEffectHashCode(PeriodicEffectDefinition definition)
+        private string[] BuildCosmeticEffectNames()
         {
-            if (definition == null)
+            if (cosmeticEffects == null || cosmeticEffects.Count == 0)
             {
-                return 0;
+                return Array.Empty<string>();
             }
 
-            return Objects.HashCode(
-                definition.name,
-                definition.initialDelay,
-                definition.interval,
-                definition.maxTicks,
-                Objects.EnumerableHashCode(definition.modifications)
+            using PooledResource<List<string>> namesLease = Buffers<string>.List.Get(
+                out List<string> names
             );
+            {
+                foreach (CosmeticEffectData effect in cosmeticEffects)
+                {
+                    if (effect == null)
+                    {
+                        continue;
+                    }
+
+                    string effectName = effect.name;
+                    if (effectName.Length == 0)
+                    {
+                        continue;
+                    }
+
+                    names.Add(effectName);
+                }
+
+                if (names.Count == 0)
+                {
+                    return Array.Empty<string>();
+                }
+
+                return names.ToArray();
+            }
+        }
+
+        private string BuildDescription()
+        {
+            if (modifications == null)
+            {
+                return nameof(AttributeEffect);
+            }
+
+            using PooledResource<StringBuilder> stringBuilderBuffer = Buffers.StringBuilder.Get(
+                out StringBuilder descriptionBuilder
+            );
+            for (int i = 0; i < modifications.Count; ++i)
+            {
+                AttributeModification modification = modifications[i];
+                switch (modification.action)
+                {
+                    case ModificationAction.Addition:
+                    {
+                        if (modification.value < 0)
+                        {
+                            _ = descriptionBuilder.Append(modification.value);
+                            _ = descriptionBuilder.Append(' ');
+                        }
+                        else if (modification.value == 0)
+                        {
+                            continue;
+                        }
+                        else
+                        {
+                            _ = descriptionBuilder.AppendFormat("+{0} ", modification.value);
+                        }
+
+                        break;
+                    }
+                    case ModificationAction.Multiplication:
+                    {
+                        if (modification.value < 1)
+                        {
+                            _ = descriptionBuilder.AppendFormat(
+                                "-{0}% ",
+                                (1 - modification.value) * 100
+                            );
+                        }
+                        // ReSharper disable once CompareOfFloatsByEqualityOperator
+                        else if (modification.value == 1)
+                        {
+                            continue;
+                        }
+                        else
+                        {
+                            _ = descriptionBuilder.AppendFormat(
+                                "+{0}% ",
+                                (modification.value - 1) * 100
+                            );
+                        }
+
+                        break;
+                    }
+                    case ModificationAction.Override:
+                    {
+                        _ = descriptionBuilder.AppendFormat("{0} ", modification.value);
+                        break;
+                    }
+                    default:
+                    {
+                        throw new InvalidEnumArgumentException(
+                            nameof(modification.value),
+                            (int)modification.value,
+                            typeof(ModificationAction)
+                        );
+                    }
+                }
+
+                _ = descriptionBuilder.Append(modification.attribute.ToPascalCase(" "));
+                if (i < modifications.Count - 1)
+                {
+                    _ = descriptionBuilder.Append(", ");
+                }
+            }
+
+            return descriptionBuilder.ToString();
         }
     }
 }

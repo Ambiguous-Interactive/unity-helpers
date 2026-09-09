@@ -41,9 +41,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             separates the two populations; this sits in the middle of that band.
         */
         private const int MinimumBitPlaneRank = 160;
+        private const int IntSeed = 0x1BADC0DE;
 
         private static readonly Guid Seed = new("00010203-0405-0607-0809-0a0b0c0d0e0f");
-        private const int IntSeed = 0x1BADC0DE;
 
         /*
             Only explicitly weak generators may retain linear output planes; assert each exemption against its
@@ -97,29 +97,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             return new KeyValuePair<string, Func<IRandom>>(name, factory);
         }
 
-        [Test]
-        [TestCaseSource(nameof(EveryGenerator))]
-        public void GeneratorsRatedGoodOrBetterHaveNoLinearOutputBit(
-            string name,
-            Func<IRandom> factory
-        )
-        {
-            IRandom random = factory();
-            RandomGeneratorMetadata metadata = RandomGeneratorMetadataRegistry.Snapshot(random);
-            // Unknown ratings remain gated so missing metadata cannot create an exemption.
-            bool exempt = (int)RandomQuality.Good < (int)metadata.Quality;
-            if (exempt)
-            {
-                Assert.Pass(
-                    $"{name} is rated {metadata.QualityLabel}; the quality gate covers Good and better."
-                );
-                return;
-            }
-
-            AssertNoLinearPlane(name, metadata.QualityLabel, factory(), false);
-            AssertNoLinearPlane(name, metadata.QualityLabel, factory(), true);
-        }
-
         private static void AssertNoLinearPlane(
             string name,
             string qualityLabel,
@@ -139,45 +116,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                         + "independent rows. Every future value of that bit is predictable from that many "
                         + "observations. Either return a scrambled half of the word, or lower the rating "
                         + "and document the weakness."
-                );
-            }
-        }
-
-        [Test]
-        public void KnownLinearGeneratorsAreStillLinearAndStillRatedBelowGood()
-        {
-            Dictionary<string, Func<IRandom>> factories = new(StringComparer.Ordinal);
-            foreach (KeyValuePair<string, Func<IRandom>> entry in Factories())
-            {
-                factories[entry.Key] = entry.Value;
-            }
-
-            foreach (string name in KnownLinearGenerators)
-            {
-                Assert.IsTrue(factories.TryGetValue(name, out Func<IRandom> factory), name);
-
-                RandomGeneratorMetadata metadata = RandomGeneratorMetadataRegistry.Snapshot(
-                    factory()
-                );
-                Assert.Greater(
-                    (int)metadata.Quality,
-                    (int)RandomQuality.Good,
-                    $"{name} has a linear output bit, so it must stay rated below Good. Ratings are "
-                        + "ordered best-first, so a larger value is a weaker rating."
-                );
-
-                int[] ranks = MeasureBitPlaneRanks(factory(), false);
-                int worst = int.MaxValue;
-                foreach (int rank in ranks)
-                {
-                    worst = Math.Min(worst, rank);
-                }
-
-                Assert.Less(
-                    worst,
-                    MinimumBitPlaneRank,
-                    $"{name} no longer has a linear output bit (worst plane rank {worst}). If that is "
-                        + "deliberate, remove it from the known-linear list and raise its quality rating."
                 );
             }
         }
@@ -265,6 +203,68 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             }
 
             return rank;
+        }
+
+        [Test]
+        [TestCaseSource(nameof(EveryGenerator))]
+        public void GeneratorsRatedGoodOrBetterHaveNoLinearOutputBit(
+            string name,
+            Func<IRandom> factory
+        )
+        {
+            IRandom random = factory();
+            RandomGeneratorMetadata metadata = RandomGeneratorMetadataRegistry.Snapshot(random);
+            // Unknown ratings remain gated so missing metadata cannot create an exemption.
+            bool exempt = (int)RandomQuality.Good < (int)metadata.Quality;
+            if (exempt)
+            {
+                Assert.Pass(
+                    $"{name} is rated {metadata.QualityLabel}; the quality gate covers Good and better."
+                );
+                return;
+            }
+
+            AssertNoLinearPlane(name, metadata.QualityLabel, factory(), false);
+            AssertNoLinearPlane(name, metadata.QualityLabel, factory(), true);
+        }
+
+        [Test]
+        public void KnownLinearGeneratorsAreStillLinearAndStillRatedBelowGood()
+        {
+            Dictionary<string, Func<IRandom>> factories = new(StringComparer.Ordinal);
+            foreach (KeyValuePair<string, Func<IRandom>> entry in Factories())
+            {
+                factories[entry.Key] = entry.Value;
+            }
+
+            foreach (string name in KnownLinearGenerators)
+            {
+                Assert.IsTrue(factories.TryGetValue(name, out Func<IRandom> factory), name);
+
+                RandomGeneratorMetadata metadata = RandomGeneratorMetadataRegistry.Snapshot(
+                    factory()
+                );
+                Assert.Greater(
+                    (int)metadata.Quality,
+                    (int)RandomQuality.Good,
+                    $"{name} has a linear output bit, so it must stay rated below Good. Ratings are "
+                        + "ordered best-first, so a larger value is a weaker rating."
+                );
+
+                int[] ranks = MeasureBitPlaneRanks(factory(), false);
+                int worst = int.MaxValue;
+                foreach (int rank in ranks)
+                {
+                    worst = Math.Min(worst, rank);
+                }
+
+                Assert.Less(
+                    worst,
+                    MinimumBitPlaneRank,
+                    $"{name} no longer has a linear output bit (worst plane rank {worst}). If that is "
+                        + "deliberate, remove it from the known-linear list and raise its quality rating."
+                );
+            }
         }
     }
 }

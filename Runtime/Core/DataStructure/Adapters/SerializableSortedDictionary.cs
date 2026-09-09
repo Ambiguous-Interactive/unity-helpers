@@ -70,6 +70,49 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         private const string KeysSerializationName = "Keys";
         private const string ValuesSerializationName = "Values";
 
+        private static readonly bool RequiresBoxedValues =
+            IsCollectionUnityRefusesToNest(typeof(TValueCache))
+            && !IsCollectionUnityRefusesToNest(NestedElementType(typeof(TValueCache)));
+
+        public int Count => _dictionary.Count;
+
+        public bool IsReadOnly => ((IDictionary<TKey, TValue>)_dictionary).IsReadOnly;
+
+        public ICollection<TKey> Keys => _dictionary.Keys;
+
+        public ICollection<TValue> Values => _dictionary.Values;
+
+        /// <summary>
+        /// Gets or sets the value associated with the provided key while preserving sorted order.
+        /// </summary>
+        /// <param name="key">The key to access.</param>
+        /// <returns>The stored value.</returns>
+        /// <exception cref="KeyNotFoundException">Thrown when the key is absent.</exception>
+        /// <example>
+        /// <code><![CDATA[
+        /// SerializableSortedDictionary<string, int> scoreboard = new SerializableSortedDictionary<string, int>(StringComparer.Ordinal);
+        /// scoreboard["Alice"] = 1200;
+        /// int score = scoreboard["Alice"];
+        /// ]]></code>
+        /// </example>
+        public TValue this[TKey key]
+        {
+            get
+            {
+                if (_dictionary.TryGetValue(key, out TValue value))
+                {
+                    return value;
+                }
+
+                throw new KeyNotFoundException($"No value is stored under {key}.");
+            }
+            set
+            {
+                _dictionary[key] = value;
+                MarkSerializationCacheDirty();
+            }
+        }
+
         internal bool HasDuplicatesOrNulls => _hasDuplicatesOrNulls;
 
         internal bool PreserveSerializedEntries => _preserveSerializedEntries;
@@ -79,6 +122,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         internal TValueCache[] SerializedValues => _values;
 
         internal bool SerializationArraysDirty => _arraysDirty;
+
+        bool ISerializableDictionaryBoxedValues.UsesBoxedValues => RequiresBoxedValues;
+
+        IEnumerable<TKey> IReadOnlyDictionary<TKey, TValue>.Keys => _dictionary.Keys;
+
+        IEnumerable<TValue> IReadOnlyDictionary<TKey, TValue>.Values => _dictionary.Values;
 
         [SerializeField]
         [ProtoMember(1, OverwriteList = true)]
@@ -100,34 +149,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         [ProtoIgnore]
         [JsonIgnore]
         protected internal SerializableDictionary.Cache<TValueCache>[] _boxedValues;
-
-        private static readonly bool RequiresBoxedValues =
-            IsCollectionUnityRefusesToNest(typeof(TValueCache))
-            && !IsCollectionUnityRefusesToNest(NestedElementType(typeof(TValueCache)));
-
-        bool ISerializableDictionaryBoxedValues.UsesBoxedValues => RequiresBoxedValues;
-
-        private static bool IsCollectionUnityRefusesToNest(Type type)
-        {
-            return type != null
-                && (
-                    type.IsArray
-                    || (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(List<>))
-                );
-        }
-
-        private static Type NestedElementType(Type collectionType)
-        {
-            if (collectionType.IsArray)
-            {
-                return collectionType.GetElementType();
-            }
-
-            Type[] arguments = collectionType.IsGenericType
-                ? collectionType.GetGenericArguments()
-                : Array.Empty<Type>();
-            return arguments.Length == 1 ? arguments[0] : null;
-        }
 
         [ProtoIgnore]
         [JsonIgnore]
@@ -183,51 +204,45 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             OnAfterDeserialize();
         }
 
-        protected abstract TValue GetValue(TValueCache[] cache, int index);
-
-        protected abstract void SetValue(TValueCache[] cache, int index, TValue value);
-
-        public int Count => _dictionary.Count;
-
-        public bool IsReadOnly => ((IDictionary<TKey, TValue>)_dictionary).IsReadOnly;
-
-        public ICollection<TKey> Keys => _dictionary.Keys;
-
-        IEnumerable<TKey> IReadOnlyDictionary<TKey, TValue>.Keys => _dictionary.Keys;
-
-        public ICollection<TValue> Values => _dictionary.Values;
-
-        IEnumerable<TValue> IReadOnlyDictionary<TKey, TValue>.Values => _dictionary.Values;
-
-        /// <summary>
-        /// Gets or sets the value associated with the provided key while preserving sorted order.
-        /// </summary>
-        /// <param name="key">The key to access.</param>
-        /// <returns>The stored value.</returns>
-        /// <exception cref="KeyNotFoundException">Thrown when the key is absent.</exception>
-        /// <example>
-        /// <code><![CDATA[
-        /// SerializableSortedDictionary<string, int> scoreboard = new SerializableSortedDictionary<string, int>(StringComparer.Ordinal);
-        /// scoreboard["Alice"] = 1200;
-        /// int score = scoreboard["Alice"];
-        /// ]]></code>
-        /// </example>
-        public TValue this[TKey key]
+        private static bool IsCollectionUnityRefusesToNest(Type type)
         {
-            get
-            {
-                if (_dictionary.TryGetValue(key, out TValue value))
-                {
-                    return value;
-                }
+            return type != null
+                && (
+                    type.IsArray
+                    || (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(List<>))
+                );
+        }
 
-                throw new KeyNotFoundException($"No value is stored under {key}.");
-            }
-            set
+        private static Type NestedElementType(Type collectionType)
+        {
+            if (collectionType.IsArray)
             {
-                _dictionary[key] = value;
-                MarkSerializationCacheDirty();
+                return collectionType.GetElementType();
             }
+
+            Type[] arguments = collectionType.IsGenericType
+                ? collectionType.GetGenericArguments()
+                : Array.Empty<Type>();
+            return arguments.Length == 1 ? arguments[0] : null;
+        }
+
+        private static bool TypeSupportsNullReferences(Type type)
+        {
+            return type != null
+                && (!type.IsValueType || typeof(UnityEngine.Object).IsAssignableFrom(type));
+        }
+
+        private static void LogNullReferenceSkip(string component, int index)
+        {
+#if UNITY_EDITOR
+            if (!EditorShouldLog())
+            {
+                return;
+            }
+#endif
+            Debug.LogWarning(
+                $"SerializableSortedDictionary<{typeof(TKey).FullName}, {typeof(TValue).FullName}> skipped serialized entry at index {index} because the {component} reference was null."
+            );
         }
 
         /// <summary>
@@ -721,6 +736,76 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             MirrorValuesToBoxedCache();
         }
 
+        /// <summary>
+        /// Rehydrates the sorted dictionary from the serialized key/value arrays after Unity or ProtoBuf deserialization.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The serialized arrays represent the user-defined order of entries as they appear in the Unity inspector.
+        /// This order is preserved across domain reloads and serialization cycles. The internal
+        /// <see cref="SortedDictionary{TKey,TValue}"/> maintains sorted iteration order for efficient lookups,
+        /// but the serialized arrays always reflect the user's intended order.
+        /// </para>
+        /// </remarks>
+        /// <example>
+        /// <code>
+        /// sortedDictionary.OnAfterDeserialize();
+        /// TValue value = sortedDictionary[key];
+        /// </code>
+        /// </example>
+        public void OnAfterDeserialize()
+        {
+            RehydrateValuesFromBoxedCache();
+
+            bool keysAndValuesPresent =
+                _keys != null && _values != null && _keys.Length == _values.Length;
+
+            if (!keysAndValuesPresent)
+            {
+                _keys = null;
+                _values = null;
+                _boxedValues = null;
+                _preserveSerializedEntries = false;
+                _arraysDirty = true;
+                return;
+            }
+
+            _dictionary.Clear();
+            bool hasDuplicateKeys = false;
+            bool encounteredNullReference = false;
+            bool keySupportsNullCheck = TypeSupportsNullReferences(typeof(TKey));
+            int length = _keys.Length;
+            for (int index = 0; index < length; index++)
+            {
+                TKey key = _keys[index];
+                TValue value = GetValue(_values, index);
+
+                if (keySupportsNullCheck && ReferenceEquals(key, null))
+                {
+                    encounteredNullReference = true;
+                    LogNullReferenceSkip("key", index);
+                    continue;
+                }
+
+                if (!hasDuplicateKeys && _dictionary.ContainsKey(key))
+                {
+                    hasDuplicateKeys = true;
+                }
+
+                _dictionary[key] = value;
+            }
+
+            // Preserve Inspector order across reloads; only runtime mutations invalidate it.
+            _preserveSerializedEntries = true;
+            _arraysDirty = false;
+
+            _hasDuplicatesOrNulls = hasDuplicateKeys || encounteredNullReference;
+        }
+
+        protected abstract TValue GetValue(TValueCache[] cache, int index);
+
+        protected abstract void SetValue(TValueCache[] cache, int index, TValue value);
+
         private void RehydrateValuesFromBoxedCache()
         {
             if (!RequiresBoxedValues || _boxedValues == null)
@@ -901,91 +986,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             }
         }
 
-        /// <summary>
-        /// Rehydrates the sorted dictionary from the serialized key/value arrays after Unity or ProtoBuf deserialization.
-        /// </summary>
-        /// <remarks>
-        /// <para>
-        /// The serialized arrays represent the user-defined order of entries as they appear in the Unity inspector.
-        /// This order is preserved across domain reloads and serialization cycles. The internal
-        /// <see cref="SortedDictionary{TKey,TValue}"/> maintains sorted iteration order for efficient lookups,
-        /// but the serialized arrays always reflect the user's intended order.
-        /// </para>
-        /// </remarks>
-        /// <example>
-        /// <code>
-        /// sortedDictionary.OnAfterDeserialize();
-        /// TValue value = sortedDictionary[key];
-        /// </code>
-        /// </example>
-        public void OnAfterDeserialize()
-        {
-            RehydrateValuesFromBoxedCache();
-
-            bool keysAndValuesPresent =
-                _keys != null && _values != null && _keys.Length == _values.Length;
-
-            if (!keysAndValuesPresent)
-            {
-                _keys = null;
-                _values = null;
-                _boxedValues = null;
-                _preserveSerializedEntries = false;
-                _arraysDirty = true;
-                return;
-            }
-
-            _dictionary.Clear();
-            bool hasDuplicateKeys = false;
-            bool encounteredNullReference = false;
-            bool keySupportsNullCheck = TypeSupportsNullReferences(typeof(TKey));
-            int length = _keys.Length;
-            for (int index = 0; index < length; index++)
-            {
-                TKey key = _keys[index];
-                TValue value = GetValue(_values, index);
-
-                if (keySupportsNullCheck && ReferenceEquals(key, null))
-                {
-                    encounteredNullReference = true;
-                    LogNullReferenceSkip("key", index);
-                    continue;
-                }
-
-                if (!hasDuplicateKeys && _dictionary.ContainsKey(key))
-                {
-                    hasDuplicateKeys = true;
-                }
-
-                _dictionary[key] = value;
-            }
-
-            // Preserve Inspector order across reloads; only runtime mutations invalidate it.
-            _preserveSerializedEntries = true;
-            _arraysDirty = false;
-
-            _hasDuplicatesOrNulls = hasDuplicateKeys || encounteredNullReference;
-        }
-
-        private static bool TypeSupportsNullReferences(Type type)
-        {
-            return type != null
-                && (!type.IsValueType || typeof(UnityEngine.Object).IsAssignableFrom(type));
-        }
-
-        private static void LogNullReferenceSkip(string component, int index)
-        {
-#if UNITY_EDITOR
-            if (!EditorShouldLog())
-            {
-                return;
-            }
-#endif
-            Debug.LogWarning(
-                $"SerializableSortedDictionary<{typeof(TKey).FullName}, {typeof(TValue).FullName}> skipped serialized entry at index {index} because the {component} reference was null."
-            );
-        }
-
 #if UNITY_EDITOR
         private static bool EditorShouldLog()
         {
@@ -1000,30 +1000,39 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         }
 #endif
 
-        [ProtoBeforeSerialization]
-        protected internal void OnProtoBeforeSerialization()
-        {
-            OnBeforeSerialize();
-        }
+        /// <summary>
+        /// Indicates whether the non-generic <see cref="IDictionary"/> wrapper has a fixed size.
+        /// </summary>
+        public bool IsFixedSize => ((IDictionary)_dictionary).IsFixedSize;
 
-        [ProtoAfterSerialization]
-        protected internal void OnProtoAfterSerialization()
+        /// <summary>
+        /// Indicates whether access to the dictionary is synchronized.
+        /// </summary>
+        public bool IsSynchronized => ((IDictionary)_dictionary).IsSynchronized;
+
+        /// <summary>
+        /// Provides an object that callers can lock on when coordinating access from multiple threads.
+        /// </summary>
+        public object SyncRoot => ((IDictionary)_dictionary).SyncRoot;
+
+        /// <summary>
+        /// Gets or sets entries through the non-generic <see cref="IDictionary"/> interface.
+        /// </summary>
+        /// <param name="key">The boxed key.</param>
+        /// <returns>The boxed value.</returns>
+        public object this[object key]
         {
-            if (_preserveSerializedEntries)
+            get => ((IDictionary)_dictionary)[key];
+            set
             {
-                return;
+                ((IDictionary)_dictionary)[key] = value;
+                MarkSerializationCacheDirty();
             }
-
-            _keys = null;
-            _values = null;
-            _boxedValues = null;
         }
 
-        [ProtoAfterDeserialization]
-        protected internal void OnProtoAfterDeserialization()
-        {
-            OnAfterDeserialize();
-        }
+        ICollection IDictionary.Keys => _dictionary.Keys;
+
+        ICollection IDictionary.Values => _dictionary.Values;
 
         /// <summary>
         /// Writes the serialized representation of the dictionary into a <see cref="SerializationInfo"/> instance.
@@ -1048,13 +1057,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// <param name="sender">Reserved for future use.</param>
         public void OnDeserialization(object sender) { }
 
-        private void MarkSerializationCacheDirty()
-        {
-            _preserveSerializedEntries = false;
-            _arraysDirty = true;
-            // Retain serialized keys and values as the ordering source for the next sync.
-        }
-
         /// <summary>
         /// Returns a struct enumerator that iterates over entries in sorted order without allocations.
         /// </summary>
@@ -1071,20 +1073,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         public Enumerator GetEnumerator()
         {
             return new Enumerator(_dictionary.GetEnumerator());
-        }
-
-        /// <inheritdoc />
-        IEnumerator<KeyValuePair<TKey, TValue>> IEnumerable<
-            KeyValuePair<TKey, TValue>
-        >.GetEnumerator()
-        {
-            return _dictionary.GetEnumerator();
-        }
-
-        /// <inheritdoc />
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return _dictionary.GetEnumerator();
         }
 
         /// <summary>
@@ -1162,40 +1150,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         }
 
         /// <summary>
-        /// Indicates whether the non-generic <see cref="IDictionary"/> wrapper has a fixed size.
-        /// </summary>
-        public bool IsFixedSize => ((IDictionary)_dictionary).IsFixedSize;
-
-        ICollection IDictionary.Keys => _dictionary.Keys;
-
-        ICollection IDictionary.Values => _dictionary.Values;
-
-        /// <summary>
-        /// Indicates whether access to the dictionary is synchronized.
-        /// </summary>
-        public bool IsSynchronized => ((IDictionary)_dictionary).IsSynchronized;
-
-        /// <summary>
-        /// Provides an object that callers can lock on when coordinating access from multiple threads.
-        /// </summary>
-        public object SyncRoot => ((IDictionary)_dictionary).SyncRoot;
-
-        /// <summary>
-        /// Gets or sets entries through the non-generic <see cref="IDictionary"/> interface.
-        /// </summary>
-        /// <param name="key">The boxed key.</param>
-        /// <returns>The boxed value.</returns>
-        public object this[object key]
-        {
-            get => ((IDictionary)_dictionary)[key];
-            set
-            {
-                ((IDictionary)_dictionary)[key] = value;
-                MarkSerializationCacheDirty();
-            }
-        }
-
-        /// <summary>
         /// Adds a boxed entry via the non-generic interface.
         /// </summary>
         /// <param name="key">The boxed key.</param>
@@ -1223,12 +1177,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             return ((IDictionary)_dictionary).Contains(key);
         }
 
-        /// <inheritdoc />
-        IDictionaryEnumerator IDictionary.GetEnumerator()
-        {
-            return _dictionary.GetEnumerator();
-        }
-
         /// <summary>
         /// Removes a boxed entry and invalidates the serialized cache when the element existed.
         /// </summary>
@@ -1254,21 +1202,73 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             ((IDictionary)_dictionary).CopyTo(array, index);
         }
 
+        [ProtoBeforeSerialization]
+        protected internal void OnProtoBeforeSerialization()
+        {
+            OnBeforeSerialize();
+        }
+
+        [ProtoAfterSerialization]
+        protected internal void OnProtoAfterSerialization()
+        {
+            if (_preserveSerializedEntries)
+            {
+                return;
+            }
+
+            _keys = null;
+            _values = null;
+            _boxedValues = null;
+        }
+
+        [ProtoAfterDeserialization]
+        protected internal void OnProtoAfterDeserialization()
+        {
+            OnAfterDeserialize();
+        }
+
+        private void MarkSerializationCacheDirty()
+        {
+            _preserveSerializedEntries = false;
+            _arraysDirty = true;
+            // Retain serialized keys and values as the ordering source for the next sync.
+        }
+
+        /// <inheritdoc />
+        IEnumerator<KeyValuePair<TKey, TValue>> IEnumerable<
+            KeyValuePair<TKey, TValue>
+        >.GetEnumerator()
+        {
+            return _dictionary.GetEnumerator();
+        }
+
+        /// <inheritdoc />
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return _dictionary.GetEnumerator();
+        }
+
+        /// <inheritdoc />
+        IDictionaryEnumerator IDictionary.GetEnumerator()
+        {
+            return _dictionary.GetEnumerator();
+        }
+
         /// <summary>
         /// Allocation-free enumerator returned by <see cref="GetEnumerator()"/>.
         /// </summary>
         public struct Enumerator : IEnumerator<KeyValuePair<TKey, TValue>>
         {
+            public KeyValuePair<TKey, TValue> Current => _enumerator.Current;
+
+            object IEnumerator.Current => _enumerator.Current;
+
             private SortedDictionary<TKey, TValue>.Enumerator _enumerator;
 
             internal Enumerator(SortedDictionary<TKey, TValue>.Enumerator enumerator)
             {
                 _enumerator = enumerator;
             }
-
-            public KeyValuePair<TKey, TValue> Current => _enumerator.Current;
-
-            object IEnumerator.Current => _enumerator.Current;
 
             /// <summary>
             /// Advances the enumerator to the next entry.

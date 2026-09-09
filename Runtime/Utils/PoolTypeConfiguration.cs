@@ -30,6 +30,139 @@ namespace WallstopStudios.UnityHelpers.Utils
     public sealed class PoolTypeConfiguration
     {
         /// <summary>
+        /// Gets or sets the full type name including assembly.
+        /// </summary>
+        public string TypeName
+        {
+            get => _typeName ?? string.Empty;
+            set => _typeName = value ?? string.Empty;
+        }
+
+        /// <summary>
+        /// Gets or sets whether intelligent purging is enabled for this type.
+        /// </summary>
+        public bool Enabled
+        {
+            get => _enabled;
+            set => _enabled = value;
+        }
+
+        /// <summary>
+        /// Gets or sets the idle timeout in seconds.
+        /// </summary>
+        public float IdleTimeoutSeconds
+        {
+            get => _idleTimeoutSeconds;
+            set => _idleTimeoutSeconds = value < 0f ? 0f : value;
+        }
+
+        /// <summary>
+        /// Gets or sets the minimum retain count.
+        /// </summary>
+        public int MinRetainCount
+        {
+            get => _minRetainCount;
+            set => _minRetainCount = value < 0 ? 0 : value;
+        }
+
+        /// <summary>
+        /// Gets or sets the warm retain count for active pools.
+        /// </summary>
+        public int WarmRetainCount
+        {
+            get => _warmRetainCount;
+            set => _warmRetainCount = value < 0 ? 0 : value;
+        }
+
+        /// <summary>
+        /// Gets or sets the maximum pool size.
+        /// </summary>
+        public int MaxPoolSize
+        {
+            get => _maxPoolSize;
+            set => _maxPoolSize = value < 0 ? 0 : value;
+        }
+
+        /// <summary>
+        /// Gets or sets the buffer multiplier.
+        /// </summary>
+        public float BufferMultiplier
+        {
+            get => _bufferMultiplier;
+            set => _bufferMultiplier = value < 1f ? 1f : value;
+        }
+
+        /// <summary>
+        /// Gets or sets the rolling window duration in seconds.
+        /// </summary>
+        public float RollingWindowSeconds
+        {
+            get => _rollingWindowSeconds;
+            set => _rollingWindowSeconds = value < 1f ? 1f : value;
+        }
+
+        /// <summary>
+        /// Gets or sets the hysteresis duration in seconds.
+        /// </summary>
+        public float HysteresisSeconds
+        {
+            get => _hysteresisSeconds;
+            set => _hysteresisSeconds = value < 0f ? 0f : value;
+        }
+
+        /// <summary>
+        /// Gets or sets the spike threshold multiplier.
+        /// </summary>
+        public float SpikeThresholdMultiplier
+        {
+            get => _spikeThresholdMultiplier;
+            set => _spikeThresholdMultiplier = value < 1f ? 1f : value;
+        }
+
+        /// <summary>
+        /// Gets the resolved <see cref="Type"/> for this configuration.
+        /// The result is cached for performance.
+        /// </summary>
+        /// <remarks>
+        /// Uses <see cref="PoolTypeResolver"/> for type resolution, which supports
+        /// simplified generic syntax like <c>List&lt;int&gt;</c> and open generics like <c>List&lt;&gt;</c>.
+        /// </remarks>
+        public Type ResolvedType
+        {
+            get
+            {
+                string currentTypeName = TypeName;
+                if (
+                    !_resolvedTypeCached
+                    || !string.Equals(_cachedTypeName, currentTypeName, StringComparison.Ordinal)
+                )
+                {
+                    _resolvedType = PoolTypeResolver.ResolveType(currentTypeName);
+                    _cachedTypeName = currentTypeName;
+                    _resolvedTypeCached = true;
+                }
+
+                return _resolvedType;
+            }
+        }
+
+        /// <summary>
+        /// Gets whether the configured type is an open generic type definition.
+        /// </summary>
+        /// <remarks>
+        /// An open generic type definition is a type like <c>List&lt;&gt;</c> that can match
+        /// any closed generic type like <c>List&lt;int&gt;</c>, <c>List&lt;string&gt;</c>, etc.
+        /// </remarks>
+        public bool IsOpenGeneric
+        {
+            get
+            {
+                Type type = ResolvedType;
+                return type != null && type.IsGenericTypeDefinition;
+            }
+        }
+
+        /// <summary>
         /// Type name in any supported format.
         /// </summary>
         /// <remarks>
@@ -151,95 +284,9 @@ namespace WallstopStudios.UnityHelpers.Utils
         internal float _spikeThresholdMultiplier =
             PoolPurgeSettings.DefaultSpikeThresholdMultiplier;
 
-        /// <summary>
-        /// Gets or sets the full type name including assembly.
-        /// </summary>
-        public string TypeName
-        {
-            get => _typeName ?? string.Empty;
-            set => _typeName = value ?? string.Empty;
-        }
-
-        /// <summary>
-        /// Gets or sets whether intelligent purging is enabled for this type.
-        /// </summary>
-        public bool Enabled
-        {
-            get => _enabled;
-            set => _enabled = value;
-        }
-
-        /// <summary>
-        /// Gets or sets the idle timeout in seconds.
-        /// </summary>
-        public float IdleTimeoutSeconds
-        {
-            get => _idleTimeoutSeconds;
-            set => _idleTimeoutSeconds = value < 0f ? 0f : value;
-        }
-
-        /// <summary>
-        /// Gets or sets the minimum retain count.
-        /// </summary>
-        public int MinRetainCount
-        {
-            get => _minRetainCount;
-            set => _minRetainCount = value < 0 ? 0 : value;
-        }
-
-        /// <summary>
-        /// Gets or sets the warm retain count for active pools.
-        /// </summary>
-        public int WarmRetainCount
-        {
-            get => _warmRetainCount;
-            set => _warmRetainCount = value < 0 ? 0 : value;
-        }
-
-        /// <summary>
-        /// Gets or sets the maximum pool size.
-        /// </summary>
-        public int MaxPoolSize
-        {
-            get => _maxPoolSize;
-            set => _maxPoolSize = value < 0 ? 0 : value;
-        }
-
-        /// <summary>
-        /// Gets or sets the buffer multiplier.
-        /// </summary>
-        public float BufferMultiplier
-        {
-            get => _bufferMultiplier;
-            set => _bufferMultiplier = value < 1f ? 1f : value;
-        }
-
-        /// <summary>
-        /// Gets or sets the rolling window duration in seconds.
-        /// </summary>
-        public float RollingWindowSeconds
-        {
-            get => _rollingWindowSeconds;
-            set => _rollingWindowSeconds = value < 1f ? 1f : value;
-        }
-
-        /// <summary>
-        /// Gets or sets the hysteresis duration in seconds.
-        /// </summary>
-        public float HysteresisSeconds
-        {
-            get => _hysteresisSeconds;
-            set => _hysteresisSeconds = value < 0f ? 0f : value;
-        }
-
-        /// <summary>
-        /// Gets or sets the spike threshold multiplier.
-        /// </summary>
-        public float SpikeThresholdMultiplier
-        {
-            get => _spikeThresholdMultiplier;
-            set => _spikeThresholdMultiplier = value < 1f ? 1f : value;
-        }
+        private Type _resolvedType;
+        private bool _resolvedTypeCached;
+        private string _cachedTypeName;
 
         /// <summary>
         /// Creates a new pool type configuration with default values.
@@ -262,53 +309,6 @@ namespace WallstopStudios.UnityHelpers.Utils
         public PoolTypeConfiguration(Type type)
         {
             TypeName = type?.AssemblyQualifiedName ?? string.Empty;
-        }
-
-        private Type _resolvedType;
-        private bool _resolvedTypeCached;
-        private string _cachedTypeName;
-
-        /// <summary>
-        /// Gets the resolved <see cref="Type"/> for this configuration.
-        /// The result is cached for performance.
-        /// </summary>
-        /// <remarks>
-        /// Uses <see cref="PoolTypeResolver"/> for type resolution, which supports
-        /// simplified generic syntax like <c>List&lt;int&gt;</c> and open generics like <c>List&lt;&gt;</c>.
-        /// </remarks>
-        public Type ResolvedType
-        {
-            get
-            {
-                string currentTypeName = TypeName;
-                if (
-                    !_resolvedTypeCached
-                    || !string.Equals(_cachedTypeName, currentTypeName, StringComparison.Ordinal)
-                )
-                {
-                    _resolvedType = PoolTypeResolver.ResolveType(currentTypeName);
-                    _cachedTypeName = currentTypeName;
-                    _resolvedTypeCached = true;
-                }
-
-                return _resolvedType;
-            }
-        }
-
-        /// <summary>
-        /// Gets whether the configured type is an open generic type definition.
-        /// </summary>
-        /// <remarks>
-        /// An open generic type definition is a type like <c>List&lt;&gt;</c> that can match
-        /// any closed generic type like <c>List&lt;int&gt;</c>, <c>List&lt;string&gt;</c>, etc.
-        /// </remarks>
-        public bool IsOpenGeneric
-        {
-            get
-            {
-                Type type = ResolvedType;
-                return type != null && type.IsGenericTypeDefinition;
-            }
         }
 
         /// <summary>

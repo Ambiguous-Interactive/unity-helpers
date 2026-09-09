@@ -24,6 +24,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     [TestFixture]
     public sealed class MonoScriptBindingValidatorTests
     {
+        private const string EditorFolder = "/Editor/";
+
+        private string _packageRoot;
+
         [SetUp]
         public void ResolvePackageRoot()
         {
@@ -166,9 +170,5 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
             return findings;
         }
-
-        private const string EditorFolder = "/Editor/";
-
-        private string _packageRoot;
     }
 }

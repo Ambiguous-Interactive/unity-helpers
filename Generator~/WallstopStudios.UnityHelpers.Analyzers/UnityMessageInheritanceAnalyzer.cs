@@ -19,6 +19,27 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
             ImmutableArray.Create(UnityHelpersDiagnostics.HiddenUnityCallback);
 
+        private static bool SameParameters(IMethodSymbol first, IMethodSymbol second)
+        {
+            if (first.Parameters.Length != second.Parameters.Length)
+            {
+                return false;
+            }
+            for (int index = 0; index < first.Parameters.Length; index++)
+            {
+                IParameterSymbol left = first.Parameters[index];
+                IParameterSymbol right = second.Parameters[index];
+                if (
+                    left.RefKind != right.RefKind
+                    || !SymbolEqualityComparer.Default.Equals(left.Type, right.Type)
+                )
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         /// <summary>
         /// Registers semantic callback inheritance analysis.
         /// </summary>
@@ -124,27 +145,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                     SymbolKind.Method
                 );
             });
-        }
-
-        private static bool SameParameters(IMethodSymbol first, IMethodSymbol second)
-        {
-            if (first.Parameters.Length != second.Parameters.Length)
-            {
-                return false;
-            }
-            for (int index = 0; index < first.Parameters.Length; index++)
-            {
-                IParameterSymbol left = first.Parameters[index];
-                IParameterSymbol right = second.Parameters[index];
-                if (
-                    left.RefKind != right.RefKind
-                    || !SymbolEqualityComparer.Default.Equals(left.Type, right.Type)
-                )
-                {
-                    return false;
-                }
-            }
-            return true;
         }
     }
 }

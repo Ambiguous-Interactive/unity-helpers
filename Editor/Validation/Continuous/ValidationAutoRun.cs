@@ -42,20 +42,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         public const string EnabledPreferenceKey =
             "WallstopStudios.UnityHelpers.Validation.AutoRun";
 
-        private static readonly Action DrainAction = Drain;
-        private static readonly EditorApplication.CallbackFunction RetryAction = Retry;
-        private static readonly HashSet<string> Pending = new HashSet<string>(
-            StringComparer.Ordinal
-        );
-
-        private static readonly Dictionary<string, int> TriggerSources = new Dictionary<
-            string,
-            int
-        >(StringComparer.Ordinal);
-
-        private static bool _enabled = EditorPrefs.GetBool(EnabledPreferenceKey, false);
-        private static bool _pruneDeleted;
-
         /// <summary>
         /// Whether an import re-checks the assets it touched. Persisted per user.
         /// </summary>
@@ -87,6 +73,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         public static int PendingCount => Pending.Count;
 
         internal static bool IsActive => _enabled && ValidationPreferences.Enabled;
+
+        private static readonly Action DrainAction = Drain;
+        private static readonly EditorApplication.CallbackFunction RetryAction = Retry;
+        private static readonly HashSet<string> Pending = new HashSet<string>(
+            StringComparer.Ordinal
+        );
+
+        private static readonly Dictionary<string, int> TriggerSources = new Dictionary<
+            string,
+            int
+        >(StringComparer.Ordinal);
+
+        private static bool _enabled = EditorPrefs.GetBool(EnabledPreferenceKey, false);
+        private static bool _pruneDeleted;
 
         internal static void ClearPending()
         {
@@ -140,6 +140,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
 
             AssetPostprocessorDeferral.Schedule(DrainAction);
+        }
+
+        internal static void CompleteRunForTesting(ValidationRun run)
+        {
+            CompleteRun(run);
+        }
+
+        internal static void ClearPendingForTesting()
+        {
+            Pending.Clear();
+            TriggerSources.Clear();
         }
 
         private static void Retry()
@@ -271,17 +282,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     + "."
                     + queueStatus
             );
-        }
-
-        internal static void CompleteRunForTesting(ValidationRun run)
-        {
-            CompleteRun(run);
-        }
-
-        internal static void ClearPendingForTesting()
-        {
-            Pending.Clear();
-            TriggerSources.Clear();
         }
 
         private static void Prune()

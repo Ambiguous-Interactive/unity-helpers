@@ -28,6 +28,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         private string _tempFolder;
         private string _tempFolderAbsolute;
 
+        private static IEnumerable<TestCaseData> ConfigPathTestCases()
+        {
+            yield return new TestCaseData(
+                "Assets/Sprites",
+                "Assets/Sprites/.animation-creator.json"
+            ).SetName("ConfigPath.Normal.AssetsSprites");
+            yield return new TestCaseData(
+                "Assets/Art/Characters",
+                "Assets/Art/Characters/.animation-creator.json"
+            ).SetName("ConfigPath.Normal.NestedFolder");
+            yield return new TestCaseData(
+                "Assets/Folder/",
+                "Assets/Folder/.animation-creator.json"
+            ).SetName("ConfigPath.Edge.TrailingSlash");
+            yield return new TestCaseData(
+                "Assets/Folder\\",
+                "Assets/Folder/.animation-creator.json"
+            ).SetName("ConfigPath.Edge.TrailingBackslash");
+            yield return new TestCaseData("", "").SetName("ConfigPath.Edge.EmptyPath");
+            yield return new TestCaseData(null, "").SetName("ConfigPath.Edge.NullPath");
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -60,28 +82,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 }
                 catch { }
             }
-        }
-
-        private static IEnumerable<TestCaseData> ConfigPathTestCases()
-        {
-            yield return new TestCaseData(
-                "Assets/Sprites",
-                "Assets/Sprites/.animation-creator.json"
-            ).SetName("ConfigPath.Normal.AssetsSprites");
-            yield return new TestCaseData(
-                "Assets/Art/Characters",
-                "Assets/Art/Characters/.animation-creator.json"
-            ).SetName("ConfigPath.Normal.NestedFolder");
-            yield return new TestCaseData(
-                "Assets/Folder/",
-                "Assets/Folder/.animation-creator.json"
-            ).SetName("ConfigPath.Edge.TrailingSlash");
-            yield return new TestCaseData(
-                "Assets/Folder\\",
-                "Assets/Folder/.animation-creator.json"
-            ).SetName("ConfigPath.Edge.TrailingBackslash");
-            yield return new TestCaseData("", "").SetName("ConfigPath.Edge.EmptyPath");
-            yield return new TestCaseData(null, "").SetName("ConfigPath.Edge.NullPath");
         }
 
         [TestCaseSource(nameof(ConfigPathTestCases))]

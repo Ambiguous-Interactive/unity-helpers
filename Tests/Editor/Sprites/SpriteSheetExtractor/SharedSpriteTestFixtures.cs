@@ -36,43 +36,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         private const string StaticAssetsDir =
             "Packages/com.wallstop-studios.unity-helpers/Tests/Editor/TestAssets/Sprites";
 
-        private static readonly object Lock = new();
-        private static int _referenceCount;
-        private static bool _fixturesCreated;
-
-        private static Texture2D _cached2x2Texture;
-        private static Texture2D _cached4x4Texture;
-        private static Texture2D _cached8x8Texture;
-        private static Texture2D _cachedSingleTexture;
-        private static Texture2D _cachedWideTexture;
-        private static Texture2D _cachedTallTexture;
-        private static Texture2D _cachedOddTexture;
-        private static Texture2D _cachedLarge512Texture;
-        private static Texture2D _cachedNpot100x200Texture;
-        private static Texture2D _cachedNpot150x75Texture;
-        private static Texture2D _cachedPrime127Texture;
-        private static Texture2D _cachedSmall16x16Texture;
-        private static Texture2D _cachedBoundary256Texture;
-
-        private static TextureImporter _cached2x2Importer;
-        private static TextureImporter _cached4x4Importer;
-        private static TextureImporter _cached8x8Importer;
-        private static TextureImporter _cachedSingleImporter;
-        private static TextureImporter _cachedWideImporter;
-        private static TextureImporter _cachedTallImporter;
-        private static TextureImporter _cachedOddImporter;
-        private static TextureImporter _cachedLarge512Importer;
-        private static TextureImporter _cachedNpot100x200Importer;
-        private static TextureImporter _cachedNpot150x75Importer;
-        private static TextureImporter _cachedPrime127Importer;
-        private static TextureImporter _cachedSmall16x16Importer;
-        private static TextureImporter _cachedBoundary256Importer;
-
-        private static Object _cachedDirectoryObject;
-
-        private static readonly ConcurrentDictionary<string, DynamicFixture> DynamicFixtures =
-            new();
-
         private const string DynamicAssetsDir = "Assets/Temp/DynamicSpriteFixtures";
 
         /// <summary>
@@ -345,6 +308,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 }
             }
         }
+
+        private static readonly object Lock = new();
+        private static int _referenceCount;
+        private static bool _fixturesCreated;
+
+        private static Texture2D _cached2x2Texture;
+        private static Texture2D _cached4x4Texture;
+        private static Texture2D _cached8x8Texture;
+        private static Texture2D _cachedSingleTexture;
+        private static Texture2D _cachedWideTexture;
+        private static Texture2D _cachedTallTexture;
+        private static Texture2D _cachedOddTexture;
+        private static Texture2D _cachedLarge512Texture;
+        private static Texture2D _cachedNpot100x200Texture;
+        private static Texture2D _cachedNpot150x75Texture;
+        private static Texture2D _cachedPrime127Texture;
+        private static Texture2D _cachedSmall16x16Texture;
+        private static Texture2D _cachedBoundary256Texture;
+
+        private static TextureImporter _cached2x2Importer;
+        private static TextureImporter _cached4x4Importer;
+        private static TextureImporter _cached8x8Importer;
+        private static TextureImporter _cachedSingleImporter;
+        private static TextureImporter _cachedWideImporter;
+        private static TextureImporter _cachedTallImporter;
+        private static TextureImporter _cachedOddImporter;
+        private static TextureImporter _cachedLarge512Importer;
+        private static TextureImporter _cachedNpot100x200Importer;
+        private static TextureImporter _cachedNpot150x75Importer;
+        private static TextureImporter _cachedPrime127Importer;
+        private static TextureImporter _cachedSmall16x16Importer;
+        private static TextureImporter _cachedBoundary256Importer;
+
+        private static Object _cachedDirectoryObject;
+
+        private static readonly ConcurrentDictionary<string, DynamicFixture> DynamicFixtures =
+            new();
 
         /// <summary>
         /// Acquires a reference to the shared fixtures. Verifies and sets up paths if this is the first call.

@@ -90,14 +90,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             .KeyComparer(StringComparer.Ordinal)
             .Build();
 
-        /// <summary>
-        /// Gets a cached pagination label. Delegates to <see cref="EditorCacheHelper.GetPaginationLabel"/>.
-        /// </summary>
-        private static string GetPaginationLabel(int page, int totalPages)
-        {
-            return EditorCacheHelper.GetPaginationLabel(page, totalPages);
-        }
-
         private WDropDownPopupData _data;
         private VisualElement _root;
         private TextField _searchField;
@@ -341,6 +333,14 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             Show(screenRect, data);
         }
 
+        /// <summary>
+        /// Gets a cached pagination label. Delegates to <see cref="EditorCacheHelper.GetPaginationLabel"/>.
+        /// </summary>
+        private static string GetPaginationLabel(int page, int totalPages)
+        {
+            return EditorCacheHelper.GetPaginationLabel(page, totalPages);
+        }
+
         private static int ResolveCurrentIndex(SerializedProperty property, string[] options)
         {
             if (property.propertyType == SerializedPropertyType.String)
@@ -359,6 +359,16 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             return -1;
+        }
+
+        private static void OnOptionMouseEnter(MouseEnterEvent evt, Button button)
+        {
+            button.AddToClassList(WDropDownStyleLoader.ClassNames.OptionHover);
+        }
+
+        private static void OnOptionMouseLeave(MouseLeaveEvent evt, Button button)
+        {
+            button.RemoveFromClassList(WDropDownStyleLoader.ClassNames.OptionHover);
         }
 
         private Vector2 CalculateInitialWindowSize(int totalOptions, int pageSize)
@@ -954,16 +964,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             {
                 SelectOption(optionIndex);
             }
-        }
-
-        private static void OnOptionMouseEnter(MouseEnterEvent evt, Button button)
-        {
-            button.AddToClassList(WDropDownStyleLoader.ClassNames.OptionHover);
-        }
-
-        private static void OnOptionMouseLeave(MouseLeaveEvent evt, Button button)
-        {
-            button.RemoveFromClassList(WDropDownStyleLoader.ClassNames.OptionHover);
         }
 
         private void UpdateNoResults()

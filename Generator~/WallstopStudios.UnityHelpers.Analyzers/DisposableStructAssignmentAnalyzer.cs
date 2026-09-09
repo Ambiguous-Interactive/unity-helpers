@@ -36,21 +36,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
             ImmutableArray.Create(UnityHelpersDiagnostics.DisposableStructDisposeAssigns);
 
-        /// <inheritdoc />
-        public override void Initialize(AnalysisContext context)
-        {
-            context.EnableConcurrentExecution();
-            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
-            context.RegisterOperationAction(
-                AnalyzeAssignment,
-                OperationKind.SimpleAssignment,
-                OperationKind.CompoundAssignment,
-                OperationKind.CoalesceAssignment,
-                OperationKind.Increment,
-                OperationKind.Decrement
-            );
-        }
-
         private static void AnalyzeAssignment(OperationAnalysisContext context)
         {
             if (!IsDisposeOfADisposableStruct(context.ContainingSymbol, context.Compilation))
@@ -234,6 +219,21 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             }
 
             return null;
+        }
+
+        /// <inheritdoc />
+        public override void Initialize(AnalysisContext context)
+        {
+            context.EnableConcurrentExecution();
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+            context.RegisterOperationAction(
+                AnalyzeAssignment,
+                OperationKind.SimpleAssignment,
+                OperationKind.CompoundAssignment,
+                OperationKind.CoalesceAssignment,
+                OperationKind.Increment,
+                OperationKind.Decrement
+            );
         }
     }
 }

@@ -16,6 +16,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
     [NUnit.Framework.Category("Fast")]
     public sealed class RelationalComponentInitializerTests
     {
+        private static bool CacheContainsField(string cache, FieldInfo field)
+        {
+            return cache == "FieldGetterCache"
+                ? ReflectionHelpers.IsFieldGetterCached(field)
+                : ReflectionHelpers.IsFieldSetterCached(field);
+        }
+
         // The runner reuses static caches between runs; reset them so prewarm assertions start cold.
         [SetUp]
         public void ClearWarmedCaches()
@@ -26,13 +33,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             SiblingComponentExtensions.ClearCachedFieldMetadata();
             ChildComponentExtensions.ClearCachedFieldMetadata();
             ParentComponentExtensions.ClearCachedFieldMetadata();
-        }
-
-        private static bool CacheContainsField(string cache, FieldInfo field)
-        {
-            return cache == "FieldGetterCache"
-                ? ReflectionHelpers.IsFieldGetterCached(field)
-                : ReflectionHelpers.IsFieldSetterCached(field);
         }
 
         [Test]

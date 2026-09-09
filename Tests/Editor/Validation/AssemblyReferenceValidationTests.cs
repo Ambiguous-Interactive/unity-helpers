@@ -27,6 +27,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     [Category("Validation")]
     public sealed class AssemblyReferenceValidationTests
     {
+        private const string UnityIncludeTestsDefine = "UNITY_INCLUDE_TESTS";
+
         private static readonly string[] ProductionAssemblyNames =
         {
             "WallstopStudios.UnityHelpers",
@@ -39,7 +41,351 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             "Editor/AssemblyInfo.cs",
         };
 
-        private const string UnityIncludeTestsDefine = "UNITY_INCLUDE_TESTS";
+        private static List<string> DiscoverTestAssemblyNames()
+        {
+            List<string> names = new();
+
+            foreach (TestAsmdefDescriptor asmdef in DiscoverTestAsmdefs())
+            {
+                names.Add(asmdef.AssemblyName);
+            }
+
+            return names;
+        }
+
+        /// <summary>
+        /// The discovered asmdefs that can actually hold a test.
+        /// </summary>
+        private static List<string> DiscoverTestHostingAssemblyNames()
+        {
+            List<string> names = new();
+
+            foreach (TestAsmdefDescriptor asmdef in DiscoverTestAsmdefs())
+            {
+                if (asmdef.HostsTests)
+                {
+                    names.Add(asmdef.AssemblyName);
+                }
+            }
+
+            return names;
+        }
+
+        private static List<TestAsmdefDescriptor> DiscoverTestAsmdefs()
+        {
+            List<TestAsmdefDescriptor> descriptors = new();
+
+            string packagePath = GetPackagePath();
+            if (string.IsNullOrEmpty(packagePath))
+            {
+                return descriptors;
+            }
+
+            string testsPath = Path.Combine(packagePath, "Tests");
+            if (!Directory.Exists(testsPath))
+            {
+                return descriptors;
+            }
+
+            string[] asmdefFiles = Directory.GetFiles(
+                testsPath,
+                "*.asmdef",
+                SearchOption.AllDirectories
+            );
+
+            foreach (string asmdefPath in asmdefFiles)
+            {
+                string asmdefContent = File.ReadAllText(asmdefPath);
+                string assemblyName = ExtractAssemblyNameFromAsmdef(asmdefContent);
+                if (!string.IsNullOrEmpty(assemblyName))
+                {
+                    descriptors.Add(
+                        new TestAsmdefDescriptor(
+                            assemblyName,
+                            ExtractDefineConstraintsFromAsmdef(asmdefContent),
+                            AsmdefReferencesTestFramework(asmdefContent)
+                        )
+                    );
+                }
+            }
+
+            return descriptors;
+        }
+
+        private static Assembly GetLoadedAssembly(string assemblyName)
+        {
+            Assembly[] loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
+            foreach (Assembly assembly in loadedAssemblies)
+            {
+                if (assembly.GetName().Name == assemblyName)
+                {
+                    return assembly;
+                }
+            }
+
+            return null;
+        }
+
+        private static bool ShouldSkipWhenUnloaded(IReadOnlyList<string> defineConstraints)
+        {
+            foreach (string defineConstraint in defineConstraints)
+            {
+                if (string.IsNullOrWhiteSpace(defineConstraint))
+                {
+                    continue;
+                }
+
+                if (defineConstraint.Trim() == UnityIncludeTestsDefine)
+                {
+                    continue;
+                }
+
+                return true;
+            }
+
+            return false;
+        }
+
+        private static HashSet<string> ParseInternalsVisibleToEntries(string content)
+        {
+            HashSet<string> entries = new();
+            string singleLine = content.Replace("\r", " ").Replace("\n", " ");
+            int searchStart = 0;
+
+            while (searchStart < singleLine.Length)
+            {
+                int ivtIndex = singleLine.IndexOf("InternalsVisibleTo", searchStart);
+                if (ivtIndex < 0)
+                {
+                    break;
+                }
+
+                int startQuote = singleLine.IndexOf('"', ivtIndex);
+                if (startQuote < 0)
+                {
+                    break;
+                }
+
+                int endQuote = singleLine.IndexOf('"', startQuote + 1);
+                if (endQuote < 0)
+                {
+                    break;
+                }
+
+                string assemblyName = singleLine.Substring(
+                    startQuote + 1,
+                    endQuote - startQuote - 1
+                );
+                entries.Add(assemblyName);
+                searchStart = endQuote + 1;
+            }
+
+            return entries;
+        }
+
+        private static string ExtractAssemblyNameFromAsmdef(string content)
+        {
+            return ExtractJsonStringValue(content, "name");
+        }
+
+        private static string ExtractRootNamespaceFromAsmdef(string content)
+        {
+            return ExtractJsonStringValue(content, "rootNamespace");
+        }
+
+        private static string[] ExtractDefineConstraintsFromAsmdef(string content)
+        {
+            return ExtractJsonStringArrayValue(content, "defineConstraints");
+        }
+
+        private static bool AsmdefReferencesTestFramework(string content)
+        {
+            foreach (string reference in ExtractJsonStringArrayValue(content, "references"))
+            {
+                if (reference.Contains("TestRunner"))
+                {
+                    return true;
+                }
+            }
+
+            foreach (
+                string reference in ExtractJsonStringArrayValue(content, "precompiledReferences")
+            )
+            {
+                if (reference.StartsWith("nunit.framework", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static string ExtractJsonStringValue(string content, string key)
+        {
+            string[] lines = content.Split('\n');
+            string quotedKey = "\"" + key + "\"";
+            foreach (string line in lines)
+            {
+                string trimmed = line.Trim();
+                if (!trimmed.StartsWith(quotedKey))
+                {
+                    continue;
+                }
+
+                int colonIndex = trimmed.IndexOf(':');
+                if (colonIndex < 0)
+                {
+                    continue;
+                }
+
+                string afterColon = trimmed.Substring(colonIndex + 1);
+                int startQuote = afterColon.IndexOf('"');
+                if (startQuote < 0)
+                {
+                    continue;
+                }
+
+                int endQuote = afterColon.IndexOf('"', startQuote + 1);
+                if (endQuote < 0)
+                {
+                    continue;
+                }
+
+                return afterColon.Substring(startQuote + 1, endQuote - startQuote - 1);
+            }
+
+            return null;
+        }
+
+        private static string[] ExtractJsonStringArrayValue(string content, string key)
+        {
+            string quotedKey = "\"" + key + "\"";
+            int keyIndex = content.IndexOf(quotedKey, StringComparison.Ordinal);
+            if (keyIndex < 0)
+            {
+                return Array.Empty<string>();
+            }
+
+            int colonIndex = content.IndexOf(':', keyIndex + quotedKey.Length);
+            if (colonIndex < 0)
+            {
+                return Array.Empty<string>();
+            }
+
+            int arrayStartIndex = content.IndexOf('[', colonIndex + 1);
+            if (arrayStartIndex < 0)
+            {
+                return Array.Empty<string>();
+            }
+
+            int arrayEndIndex = content.IndexOf(']', arrayStartIndex + 1);
+            if (arrayEndIndex < 0)
+            {
+                return Array.Empty<string>();
+            }
+
+            string arrayContent = content.Substring(
+                arrayStartIndex + 1,
+                arrayEndIndex - arrayStartIndex - 1
+            );
+            List<string> values = new();
+            int searchStart = 0;
+            while (searchStart < arrayContent.Length)
+            {
+                int startQuote = arrayContent.IndexOf('"', searchStart);
+                if (startQuote < 0)
+                {
+                    break;
+                }
+
+                int endQuote = arrayContent.IndexOf('"', startQuote + 1);
+                if (endQuote < 0)
+                {
+                    break;
+                }
+
+                values.Add(arrayContent.Substring(startQuote + 1, endQuote - startQuote - 1));
+                searchStart = endQuote + 1;
+            }
+
+            return values.ToArray();
+        }
+
+        private static string GetPackagePath()
+        {
+            string[] guids = AssetDatabase.FindAssets("package t:TextAsset");
+            foreach (string guid in guids)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                if (
+                    path.EndsWith("package.json")
+                    && path.Contains("com.wallstop-studios.unity-helpers")
+                    && !path.Contains("/node_modules/")
+                    && !path.Contains("\\node_modules\\")
+                )
+                {
+                    return Path.GetDirectoryName(path);
+                }
+            }
+
+            Assembly thisAssembly = typeof(AssemblyReferenceValidationTests).Assembly;
+            string assemblyLocation = thisAssembly.Location;
+            if (!string.IsNullOrEmpty(assemblyLocation))
+            {
+                string current = Path.GetDirectoryName(assemblyLocation);
+                for (int i = 0; i < 10 && !string.IsNullOrEmpty(current); i++)
+                {
+                    if (File.Exists(Path.Combine(current, "package.json")))
+                    {
+                        return current;
+                    }
+
+                    current = Path.GetDirectoryName(current);
+                }
+            }
+
+            string dataPath = Application.dataPath;
+            string projectRoot = Path.GetDirectoryName(dataPath);
+
+            string[] possiblePaths =
+            {
+                Path.Combine(projectRoot, "Packages", "com.wallstop-studios.unity-helpers"),
+                Path.Combine(dataPath, "..", "Packages", "com.wallstop-studios.unity-helpers"),
+            };
+
+            foreach (string possiblePath in possiblePaths)
+            {
+                string normalized = Path.GetFullPath(possiblePath);
+                if (
+                    Directory.Exists(normalized)
+                    && File.Exists(Path.Combine(normalized, "package.json"))
+                )
+                {
+                    return normalized;
+                }
+            }
+
+            string scriptPath = GetScriptFilePath();
+            if (!string.IsNullOrEmpty(scriptPath))
+            {
+                const int levelsToPackageRoot = 3;
+                string currentDir = Path.GetDirectoryName(scriptPath);
+                for (int i = 0; i < levelsToPackageRoot; i++)
+                {
+                    currentDir = Path.Combine(currentDir, "..");
+                }
+                string packageRoot = Path.GetFullPath(currentDir);
+                if (File.Exists(Path.Combine(packageRoot, "package.json")))
+                {
+                    return packageRoot;
+                }
+            }
+
+            return null;
+        }
+
+        private static string GetScriptFilePath([CallerFilePath] string path = "") => path;
 
         /// <summary>
         /// Verifies all production assemblies can be loaded.
@@ -880,365 +1226,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assert.Pass("Namespace analysis complete");
         }
 
-        private static List<string> DiscoverTestAssemblyNames()
-        {
-            List<string> names = new();
-
-            foreach (TestAsmdefDescriptor asmdef in DiscoverTestAsmdefs())
-            {
-                names.Add(asmdef.AssemblyName);
-            }
-
-            return names;
-        }
-
-        /// <summary>
-        /// The discovered asmdefs that can actually hold a test.
-        /// </summary>
-        private static List<string> DiscoverTestHostingAssemblyNames()
-        {
-            List<string> names = new();
-
-            foreach (TestAsmdefDescriptor asmdef in DiscoverTestAsmdefs())
-            {
-                if (asmdef.HostsTests)
-                {
-                    names.Add(asmdef.AssemblyName);
-                }
-            }
-
-            return names;
-        }
-
-        private static List<TestAsmdefDescriptor> DiscoverTestAsmdefs()
-        {
-            List<TestAsmdefDescriptor> descriptors = new();
-
-            string packagePath = GetPackagePath();
-            if (string.IsNullOrEmpty(packagePath))
-            {
-                return descriptors;
-            }
-
-            string testsPath = Path.Combine(packagePath, "Tests");
-            if (!Directory.Exists(testsPath))
-            {
-                return descriptors;
-            }
-
-            string[] asmdefFiles = Directory.GetFiles(
-                testsPath,
-                "*.asmdef",
-                SearchOption.AllDirectories
-            );
-
-            foreach (string asmdefPath in asmdefFiles)
-            {
-                string asmdefContent = File.ReadAllText(asmdefPath);
-                string assemblyName = ExtractAssemblyNameFromAsmdef(asmdefContent);
-                if (!string.IsNullOrEmpty(assemblyName))
-                {
-                    descriptors.Add(
-                        new TestAsmdefDescriptor(
-                            assemblyName,
-                            ExtractDefineConstraintsFromAsmdef(asmdefContent),
-                            AsmdefReferencesTestFramework(asmdefContent)
-                        )
-                    );
-                }
-            }
-
-            return descriptors;
-        }
-
-        private static Assembly GetLoadedAssembly(string assemblyName)
-        {
-            Assembly[] loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
-            foreach (Assembly assembly in loadedAssemblies)
-            {
-                if (assembly.GetName().Name == assemblyName)
-                {
-                    return assembly;
-                }
-            }
-
-            return null;
-        }
-
-        private static bool ShouldSkipWhenUnloaded(IReadOnlyList<string> defineConstraints)
-        {
-            foreach (string defineConstraint in defineConstraints)
-            {
-                if (string.IsNullOrWhiteSpace(defineConstraint))
-                {
-                    continue;
-                }
-
-                if (defineConstraint.Trim() == UnityIncludeTestsDefine)
-                {
-                    continue;
-                }
-
-                return true;
-            }
-
-            return false;
-        }
-
-        private static HashSet<string> ParseInternalsVisibleToEntries(string content)
-        {
-            HashSet<string> entries = new();
-            string singleLine = content.Replace("\r", " ").Replace("\n", " ");
-            int searchStart = 0;
-
-            while (searchStart < singleLine.Length)
-            {
-                int ivtIndex = singleLine.IndexOf("InternalsVisibleTo", searchStart);
-                if (ivtIndex < 0)
-                {
-                    break;
-                }
-
-                int startQuote = singleLine.IndexOf('"', ivtIndex);
-                if (startQuote < 0)
-                {
-                    break;
-                }
-
-                int endQuote = singleLine.IndexOf('"', startQuote + 1);
-                if (endQuote < 0)
-                {
-                    break;
-                }
-
-                string assemblyName = singleLine.Substring(
-                    startQuote + 1,
-                    endQuote - startQuote - 1
-                );
-                entries.Add(assemblyName);
-                searchStart = endQuote + 1;
-            }
-
-            return entries;
-        }
-
-        private static string ExtractAssemblyNameFromAsmdef(string content)
-        {
-            return ExtractJsonStringValue(content, "name");
-        }
-
-        private static string ExtractRootNamespaceFromAsmdef(string content)
-        {
-            return ExtractJsonStringValue(content, "rootNamespace");
-        }
-
-        private static string[] ExtractDefineConstraintsFromAsmdef(string content)
-        {
-            return ExtractJsonStringArrayValue(content, "defineConstraints");
-        }
-
-        private static bool AsmdefReferencesTestFramework(string content)
-        {
-            foreach (string reference in ExtractJsonStringArrayValue(content, "references"))
-            {
-                if (reference.Contains("TestRunner"))
-                {
-                    return true;
-                }
-            }
-
-            foreach (
-                string reference in ExtractJsonStringArrayValue(content, "precompiledReferences")
-            )
-            {
-                if (reference.StartsWith("nunit.framework", StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static string ExtractJsonStringValue(string content, string key)
-        {
-            string[] lines = content.Split('\n');
-            string quotedKey = "\"" + key + "\"";
-            foreach (string line in lines)
-            {
-                string trimmed = line.Trim();
-                if (!trimmed.StartsWith(quotedKey))
-                {
-                    continue;
-                }
-
-                int colonIndex = trimmed.IndexOf(':');
-                if (colonIndex < 0)
-                {
-                    continue;
-                }
-
-                string afterColon = trimmed.Substring(colonIndex + 1);
-                int startQuote = afterColon.IndexOf('"');
-                if (startQuote < 0)
-                {
-                    continue;
-                }
-
-                int endQuote = afterColon.IndexOf('"', startQuote + 1);
-                if (endQuote < 0)
-                {
-                    continue;
-                }
-
-                return afterColon.Substring(startQuote + 1, endQuote - startQuote - 1);
-            }
-
-            return null;
-        }
-
-        private static string[] ExtractJsonStringArrayValue(string content, string key)
-        {
-            string quotedKey = "\"" + key + "\"";
-            int keyIndex = content.IndexOf(quotedKey, StringComparison.Ordinal);
-            if (keyIndex < 0)
-            {
-                return Array.Empty<string>();
-            }
-
-            int colonIndex = content.IndexOf(':', keyIndex + quotedKey.Length);
-            if (colonIndex < 0)
-            {
-                return Array.Empty<string>();
-            }
-
-            int arrayStartIndex = content.IndexOf('[', colonIndex + 1);
-            if (arrayStartIndex < 0)
-            {
-                return Array.Empty<string>();
-            }
-
-            int arrayEndIndex = content.IndexOf(']', arrayStartIndex + 1);
-            if (arrayEndIndex < 0)
-            {
-                return Array.Empty<string>();
-            }
-
-            string arrayContent = content.Substring(
-                arrayStartIndex + 1,
-                arrayEndIndex - arrayStartIndex - 1
-            );
-            List<string> values = new();
-            int searchStart = 0;
-            while (searchStart < arrayContent.Length)
-            {
-                int startQuote = arrayContent.IndexOf('"', searchStart);
-                if (startQuote < 0)
-                {
-                    break;
-                }
-
-                int endQuote = arrayContent.IndexOf('"', startQuote + 1);
-                if (endQuote < 0)
-                {
-                    break;
-                }
-
-                values.Add(arrayContent.Substring(startQuote + 1, endQuote - startQuote - 1));
-                searchStart = endQuote + 1;
-            }
-
-            return values.ToArray();
-        }
-
-        private static string GetPackagePath()
-        {
-            string[] guids = AssetDatabase.FindAssets("package t:TextAsset");
-            foreach (string guid in guids)
-            {
-                string path = AssetDatabase.GUIDToAssetPath(guid);
-                if (
-                    path.EndsWith("package.json")
-                    && path.Contains("com.wallstop-studios.unity-helpers")
-                    && !path.Contains("/node_modules/")
-                    && !path.Contains("\\node_modules\\")
-                )
-                {
-                    return Path.GetDirectoryName(path);
-                }
-            }
-
-            Assembly thisAssembly = typeof(AssemblyReferenceValidationTests).Assembly;
-            string assemblyLocation = thisAssembly.Location;
-            if (!string.IsNullOrEmpty(assemblyLocation))
-            {
-                string current = Path.GetDirectoryName(assemblyLocation);
-                for (int i = 0; i < 10 && !string.IsNullOrEmpty(current); i++)
-                {
-                    if (File.Exists(Path.Combine(current, "package.json")))
-                    {
-                        return current;
-                    }
-
-                    current = Path.GetDirectoryName(current);
-                }
-            }
-
-            string dataPath = Application.dataPath;
-            string projectRoot = Path.GetDirectoryName(dataPath);
-
-            string[] possiblePaths =
-            {
-                Path.Combine(projectRoot, "Packages", "com.wallstop-studios.unity-helpers"),
-                Path.Combine(dataPath, "..", "Packages", "com.wallstop-studios.unity-helpers"),
-            };
-
-            foreach (string possiblePath in possiblePaths)
-            {
-                string normalized = Path.GetFullPath(possiblePath);
-                if (
-                    Directory.Exists(normalized)
-                    && File.Exists(Path.Combine(normalized, "package.json"))
-                )
-                {
-                    return normalized;
-                }
-            }
-
-            string scriptPath = GetScriptFilePath();
-            if (!string.IsNullOrEmpty(scriptPath))
-            {
-                const int levelsToPackageRoot = 3;
-                string currentDir = Path.GetDirectoryName(scriptPath);
-                for (int i = 0; i < levelsToPackageRoot; i++)
-                {
-                    currentDir = Path.Combine(currentDir, "..");
-                }
-                string packageRoot = Path.GetFullPath(currentDir);
-                if (File.Exists(Path.Combine(packageRoot, "package.json")))
-                {
-                    return packageRoot;
-                }
-            }
-
-            return null;
-        }
-
-        private static string GetScriptFilePath([CallerFilePath] string path = "") => path;
-
         private sealed class TestAsmdefDescriptor
         {
-            public TestAsmdefDescriptor(
-                string assemblyName,
-                string[] defineConstraints,
-                bool hostsTests
-            )
-            {
-                AssemblyName = assemblyName;
-                DefineConstraints = defineConstraints;
-                HostsTests = hostsTests;
-            }
-
             public string AssemblyName { get; }
 
             public string[] DefineConstraints { get; }
@@ -1257,6 +1246,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             public bool HostsTests { get; }
 
             public bool IsOptionalWhenUnloaded => ShouldSkipWhenUnloaded(DefineConstraints);
+
+            public TestAsmdefDescriptor(
+                string assemblyName,
+                string[] defineConstraints,
+                bool hostsTests
+            )
+            {
+                AssemblyName = assemblyName;
+                DefineConstraints = defineConstraints;
+                HostsTests = hostsTests;
+            }
         }
     }
 

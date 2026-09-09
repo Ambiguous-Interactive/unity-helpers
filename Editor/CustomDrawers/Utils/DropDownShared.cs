@@ -69,11 +69,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         public const string EmptyResultsMessage = "No results match the current search.";
 
         /// <summary>
-        /// Reusable GUIContent for empty search results message.
-        /// </summary>
-        public static readonly GUIContent EmptyResultsContent = new(EmptyResultsMessage);
-
-        /// <summary>
         /// The number of distinct option values whose formatted label is retained.
         /// </summary>
         /// <remarks>
@@ -83,25 +78,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// present so a single popup never evicts its own entries.
         /// </remarks>
         private const int MaxFormattedOptionCacheEntries = 2048;
-
-        private static readonly Cache<object, string> FormattedOptionCache = CacheBuilder<
-            object,
-            string
-        >
-            .NewBuilder()
-            .MaximumSize(MaxFormattedOptionCacheEntries)
-            .InitialCapacity(16)
-            .Build();
-        private static readonly Dictionary<Type, string[]> EnumDisplayNameCache = new();
-        private static readonly Dictionary<int, string> FallbackOptionLabelCache = new();
-
-        private static float s_cachedOptionControlHeight = -1f;
-        private static float s_cachedOptionRowHeight = -1f;
-        private static GUIStyle s_optionButton;
-        private static GUIStyle s_selectedOptionButton;
-        private static GUIStyle s_paginationButtonLeft;
-        private static GUIStyle s_paginationButtonRight;
-        private static GUIStyle s_paginationLabel;
 
         /// <summary>
         /// Gets the cached style for option buttons.
@@ -162,6 +138,30 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
                 return s_paginationLabel;
             }
         }
+
+        /// <summary>
+        /// Reusable GUIContent for empty search results message.
+        /// </summary>
+        public static readonly GUIContent EmptyResultsContent = new(EmptyResultsMessage);
+
+        private static readonly Cache<object, string> FormattedOptionCache = CacheBuilder<
+            object,
+            string
+        >
+            .NewBuilder()
+            .MaximumSize(MaxFormattedOptionCacheEntries)
+            .InitialCapacity(16)
+            .Build();
+        private static readonly Dictionary<Type, string[]> EnumDisplayNameCache = new();
+        private static readonly Dictionary<int, string> FallbackOptionLabelCache = new();
+
+        private static float s_cachedOptionControlHeight = -1f;
+        private static float s_cachedOptionRowHeight = -1f;
+        private static GUIStyle s_optionButton;
+        private static GUIStyle s_selectedOptionButton;
+        private static GUIStyle s_paginationButtonLeft;
+        private static GUIStyle s_paginationButtonRight;
+        private static GUIStyle s_paginationLabel;
 
         /// <summary>
         /// Returns a cached string representation of an integer value.
@@ -550,6 +550,22 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
             FormattedOptionCache.Clear();
         }
 
+        /// <summary>
+        /// Returns a fallback display label for an option at the given index.
+        /// Used when the option's raw display label is null or empty.
+        /// </summary>
+        /// <param name="optionIndex">The index of the option.</param>
+        /// <returns>A fallback label in the format "(Option N)".</returns>
+        public static string GetFallbackOptionLabel(int optionIndex)
+        {
+            if (!FallbackOptionLabelCache.TryGetValue(optionIndex, out string cached))
+            {
+                cached = $"(Option {optionIndex})";
+                FallbackOptionLabelCache[optionIndex] = cached;
+            }
+            return cached;
+        }
+
         private static void EnsureStylesInitialized()
         {
             if (s_optionButton != null)
@@ -579,22 +595,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
                 alignment = TextAnchor.MiddleCenter,
                 padding = new RectOffset(0, 0, 0, 0),
             };
-        }
-
-        /// <summary>
-        /// Returns a fallback display label for an option at the given index.
-        /// Used when the option's raw display label is null or empty.
-        /// </summary>
-        /// <param name="optionIndex">The index of the option.</param>
-        /// <returns>A fallback label in the format "(Option N)".</returns>
-        public static string GetFallbackOptionLabel(int optionIndex)
-        {
-            if (!FallbackOptionLabelCache.TryGetValue(optionIndex, out string cached))
-            {
-                cached = $"(Option {optionIndex})";
-                FallbackOptionLabelCache[optionIndex] = cached;
-            }
-            return cached;
         }
 
         /// <summary>

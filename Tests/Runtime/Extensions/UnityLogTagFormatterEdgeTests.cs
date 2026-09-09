@@ -19,6 +19,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     [SuppressMessage("ReSharper", "AccessToModifiedClosure")]
     public sealed class UnityLogTagFormatterEdgeTests : CommonTestBase
     {
+        private static void ExpectLogContaining(string value)
+        {
+            LogAssert.Expect(LogType.Log, new Regex(Regex.Escape(value)));
+        }
+
         [TestCase(true)]
         [TestCase(false)]
         public void UnknownTagFallsBack(bool pretty)
@@ -459,11 +464,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                     worker.Join();
                 }
             }
-        }
-
-        private static void ExpectLogContaining(string value)
-        {
-            LogAssert.Expect(LogType.Log, new Regex(Regex.Escape(value)));
         }
     }
 }

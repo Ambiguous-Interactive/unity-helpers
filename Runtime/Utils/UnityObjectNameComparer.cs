@@ -28,51 +28,6 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private UnityObjectNameComparer() { }
 
-        /// <summary>
-        /// Compares two Objects by name, then by asset path, then by instance id.
-        /// </summary>
-        /// <param name="x">The left Object.</param>
-        /// <param name="y">The right Object.</param>
-        /// <returns>A negative value when <paramref name="x"/> orders first, positive when it orders last, zero when neither does.</returns>
-        public int Compare(T x, T y)
-        {
-            // The Unity Object constraint ensures destroyed instances are rejected before reading their names.
-            if (x == y)
-            {
-                return 0;
-            }
-
-            if (y == null)
-            {
-                return 1;
-            }
-
-            if (x == null)
-            {
-                return -1;
-            }
-
-            int comparison = CompareNatural(x.name, y.name);
-            if (comparison != 0)
-            {
-                return comparison;
-            }
-
-#if UNITY_EDITOR
-            comparison = string.Compare(
-                AssetDatabase.GetAssetOrScenePath(x),
-                AssetDatabase.GetAssetOrScenePath(y),
-                StringComparison.OrdinalIgnoreCase
-            );
-#endif
-            if (comparison == 0)
-            {
-                return x.GetUnityObjectId().CompareTo(y.GetUnityObjectId());
-            }
-
-            return comparison;
-        }
-
         private static int CompareNatural(string nameA, string nameB)
         {
             int digitsA = TrailingDigitRunStart(nameA);
@@ -136,6 +91,51 @@ namespace WallstopStudios.UnityHelpers.Utils
         private static bool IsAsciiDigit(char character)
         {
             return character is >= '0' and <= '9';
+        }
+
+        /// <summary>
+        /// Compares two Objects by name, then by asset path, then by instance id.
+        /// </summary>
+        /// <param name="x">The left Object.</param>
+        /// <param name="y">The right Object.</param>
+        /// <returns>A negative value when <paramref name="x"/> orders first, positive when it orders last, zero when neither does.</returns>
+        public int Compare(T x, T y)
+        {
+            // The Unity Object constraint ensures destroyed instances are rejected before reading their names.
+            if (x == y)
+            {
+                return 0;
+            }
+
+            if (y == null)
+            {
+                return 1;
+            }
+
+            if (x == null)
+            {
+                return -1;
+            }
+
+            int comparison = CompareNatural(x.name, y.name);
+            if (comparison != 0)
+            {
+                return comparison;
+            }
+
+#if UNITY_EDITOR
+            comparison = string.Compare(
+                AssetDatabase.GetAssetOrScenePath(x),
+                AssetDatabase.GetAssetOrScenePath(y),
+                StringComparison.OrdinalIgnoreCase
+            );
+#endif
+            if (comparison == 0)
+            {
+                return x.GetUnityObjectId().CompareTo(y.GetUnityObjectId());
+            }
+
+            return comparison;
         }
     }
 }

@@ -14,6 +14,18 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         internal Vector3 _initialLocalPosition;
 
+        internal static Vector3 CalculateLocalPosition(
+            Vector3 initialLocalPosition,
+            float time,
+            float speed,
+            float width,
+            float height
+        )
+        {
+            return initialLocalPosition
+                + new Vector3(Mathf.Cos(time * speed) * width, Mathf.Sin(time * speed) * height);
+        }
+
         private void Awake()
         {
             _initialLocalPosition = transform.localPosition;
@@ -29,18 +41,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 width,
                 height
             );
-        }
-
-        internal static Vector3 CalculateLocalPosition(
-            Vector3 initialLocalPosition,
-            float time,
-            float speed,
-            float width,
-            float height
-        )
-        {
-            return initialLocalPosition
-                + new Vector3(Mathf.Cos(time * speed) * width, Mathf.Sin(time * speed) * height);
         }
     }
 }

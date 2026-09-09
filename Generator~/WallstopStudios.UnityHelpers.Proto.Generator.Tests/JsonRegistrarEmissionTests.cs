@@ -30,27 +30,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private const string Consumer =
             "namespace Consumer { public sealed class Holder { public global::WallstopStudios.UnityHelpers.Proto.Generator.Tests.ProbeBox<int> Box; } }";
 
-        [Test]
-        public void AClosureInAnAssemblyThatCanSeeSystemTextJsonIsRegistered()
-        {
-            string registrar = Emit(Consumer, withSystemTextJson: true);
-
-            Assert.IsNotNull(registrar, "No JSON registrar was emitted");
-            StringAssert.Contains("WJsonConverterRegistry.TryRegister", registrar);
-            StringAssert.Contains("ProbeBox<int>", registrar);
-            StringAssert.Contains("ProbeBoxConverter<int>", registrar);
-        }
-
-        [Test]
-        public void AnAssemblyThatCannotSeeSystemTextJsonGetsNoRegistrarAtAll()
-        {
-            /*
-             * The disabled branch must emit no file because even a converter type reference would fail
-             * compilation.
-             */
-            Assert.IsNull(Emit(Consumer, withSystemTextJson: false));
-        }
-
         private static string Emit(string body, bool withSystemTextJson)
         {
             List<MetadataReference> references = new List<MetadataReference>();
@@ -89,6 +68,27 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
 
             return emitted?.ToString();
+        }
+
+        [Test]
+        public void AClosureInAnAssemblyThatCanSeeSystemTextJsonIsRegistered()
+        {
+            string registrar = Emit(Consumer, withSystemTextJson: true);
+
+            Assert.IsNotNull(registrar, "No JSON registrar was emitted");
+            StringAssert.Contains("WJsonConverterRegistry.TryRegister", registrar);
+            StringAssert.Contains("ProbeBox<int>", registrar);
+            StringAssert.Contains("ProbeBoxConverter<int>", registrar);
+        }
+
+        [Test]
+        public void AnAssemblyThatCannotSeeSystemTextJsonGetsNoRegistrarAtAll()
+        {
+            /*
+             * The disabled branch must emit no file because even a converter type reference would fail
+             * compilation.
+             */
+            Assert.IsNull(Emit(Consumer, withSystemTextJson: false));
         }
     }
 }

@@ -28,6 +28,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
     [NUnit.Framework.Category("Integration")]
     public sealed class WShowIfOdinDrawerTests : CommonTestBase
     {
+        private (bool success, bool shouldShow) EvaluateCondition(
+            ScriptableObject target,
+            string conditionField,
+            WShowIfAttribute attribute
+        )
+        {
+            object conditionValue = WShowIfOdinDrawer.GetConditionValueForTest(
+                target,
+                attribute.conditionField
+            );
+
+            bool success = ShowIfConditionEvaluator.TryEvaluateCondition(
+                conditionValue,
+                attribute,
+                out bool shouldShow
+            );
+
+            return (success, shouldShow);
+        }
+
         [Test]
         public void BoolConditionTrueShowsField()
         {
@@ -1365,26 +1385,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
                 Is.True,
                 "Unknown comparison should fall back to Equal and match"
             );
-        }
-
-        private (bool success, bool shouldShow) EvaluateCondition(
-            ScriptableObject target,
-            string conditionField,
-            WShowIfAttribute attribute
-        )
-        {
-            object conditionValue = WShowIfOdinDrawer.GetConditionValueForTest(
-                target,
-                attribute.conditionField
-            );
-
-            bool success = ShowIfConditionEvaluator.TryEvaluateCondition(
-                conditionValue,
-                attribute,
-                out bool shouldShow
-            );
-
-            return (success, shouldShow);
         }
     }
 #endif

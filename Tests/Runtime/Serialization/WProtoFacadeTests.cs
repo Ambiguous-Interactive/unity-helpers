@@ -38,6 +38,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [NUnit.Framework.Category("Serialization")]
     public sealed class WProtoFacadeTests
     {
+        private static void AssertServedAndIdentical<T>(T value)
+        {
+            Assert.IsTrue(WProtoFacade.TrySerialize(value, out byte[] mine), typeof(T).Name);
+
+            using MemoryStream stream = new();
+            ProtoBuf.Serializer.Serialize(stream, value);
+            CollectionAssert.AreEqual(stream.ToArray(), mine, typeof(T).Name);
+        }
+
         [Test]
         [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void APortedTypeIsServedAndMatchesProtobufNetByteForByte()
@@ -279,15 +288,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             }
         }
 
-        private static void AssertServedAndIdentical<T>(T value)
-        {
-            Assert.IsTrue(WProtoFacade.TrySerialize(value, out byte[] mine), typeof(T).Name);
-
-            using MemoryStream stream = new();
-            ProtoBuf.Serializer.Serialize(stream, value);
-            CollectionAssert.AreEqual(stream.ToArray(), mine, typeof(T).Name);
-        }
-
         private sealed class UnportedThing
         {
             public int Value;
@@ -452,9 +452,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         [WProtoNotSerialized]
         private sealed class UndeclaredRandom : AbstractRandom
         {
-            private uint _state = 1;
-
             public override RandomState InternalState => new RandomState(_state);
+
+            private uint _state = 1;
 
             public override uint NextUint()
             {

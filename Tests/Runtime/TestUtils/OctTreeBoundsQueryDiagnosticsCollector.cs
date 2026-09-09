@@ -13,10 +13,60 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
     public sealed class OctTreeBoundsQueryDiagnosticsCollector
         : OctTree3D<Vector3>.IOctTreeBoundsQueryLogger
     {
-        private readonly List<OctTree3D<Vector3>.BoundsQueryNodeTrace> _nodes = new();
-        private readonly List<PointEvaluationRecord> _points = new();
-        private readonly List<BulkAppendRecord> _bulkAppends = new();
-        private readonly List<ChildPruneRecord> _childPrunes = new();
+        private static (List<Vector3> missing, List<Vector3> extra) ComputeDifferences(
+            ICollection<Vector3> expected,
+            ICollection<Vector3> actual,
+            int maxItems
+        )
+        {
+            Dictionary<Vector3, int> left = new();
+            foreach (Vector3 v in expected)
+            {
+                left[v] = left.TryGetValue(v, out int seen) ? seen + 1 : 1;
+            }
+
+            Dictionary<Vector3, int> right = new();
+            foreach (Vector3 v in actual)
+            {
+                right[v] = right.TryGetValue(v, out int seen) ? seen + 1 : 1;
+            }
+
+            HashSet<Vector3> keys = new(left.Keys);
+            keys.UnionWith(right.Keys);
+
+            List<Vector3> missing = new();
+            List<Vector3> extra = new();
+
+            foreach (Vector3 key in keys)
+            {
+                int lc = left.TryGetValue(key, out int leftCount) ? leftCount : 0;
+                int rc = right.TryGetValue(key, out int rightCount) ? rightCount : 0;
+                if (rc < lc)
+                {
+                    int diff = Math.Min(maxItems - missing.Count, lc - rc);
+                    for (int i = 0; i < diff; ++i)
+                    {
+                        missing.Add(key);
+                    }
+                }
+                else if (lc < rc)
+                {
+                    int diff = Math.Min(maxItems - extra.Count, rc - lc);
+                    for (int i = 0; i < diff; ++i)
+                    {
+                        extra.Add(key);
+                    }
+                }
+                if (maxItems <= missing.Count && maxItems <= extra.Count)
+                {
+                    break;
+                }
+            }
+
+            missing.Sort(CompareVector);
+            extra.Sort(CompareVector);
+            return (missing, extra);
+        }
 
         public Bounds ClosedQuery { get; private set; }
 
@@ -33,6 +83,91 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
         public IReadOnlyList<BulkAppendRecord> BulkAppends => _bulkAppends;
 
         public IReadOnlyList<ChildPruneRecord> ChildPrunes => _childPrunes;
+
+        private readonly List<OctTree3D<Vector3>.BoundsQueryNodeTrace> _nodes = new();
+        private readonly List<PointEvaluationRecord> _points = new();
+        private readonly List<BulkAppendRecord> _bulkAppends = new();
+        private readonly List<ChildPruneRecord> _childPrunes = new();
+
+        private static string FormatVectorList(List<Vector3> items)
+        {
+            if (items.Count == 0)
+            {
+                return "[]";
+            }
+
+            return "[" + string.Join(", ", items.Select(FormatVector)) + "]";
+        }
+
+        private static int CompareVector(Vector3 a, Vector3 b)
+        {
+            int x = a.x.CompareTo(b.x);
+            if (x != 0)
+            {
+                return x;
+            }
+
+            int y = a.y.CompareTo(b.y);
+            if (y != 0)
+            {
+                return y;
+            }
+
+            return a.z.CompareTo(b.z);
+        }
+
+        private static string FormatBox(BoundingBox3D box)
+        {
+            return $"min={FormatVector(box.min)} max={FormatVector(box.max)}";
+        }
+
+        private static string FormatBounds(Bounds bounds)
+        {
+            return $"min={FormatVector(bounds.min)} max={FormatVector(bounds.max)}";
+        }
+
+        private static string FormatVector(Vector3 v)
+        {
+            return $"({v.x:0.###}, {v.y:0.###}, {v.z:0.###})";
+        }
+
+        private static string FormatReasonSummary(
+            IEnumerable<OctTree3D<Vector3>.NodePruneReason> reasons
+        )
+        {
+            Dictionary<OctTree3D<Vector3>.NodePruneReason, int> counts = new();
+            foreach (OctTree3D<Vector3>.NodePruneReason reason in reasons)
+            {
+                counts[reason] = counts.TryGetValue(reason, out int seen) ? seen + 1 : 1;
+            }
+
+            if (counts.Count == 0)
+            {
+                return "none";
+            }
+
+            return string.Join(", ", counts.Select(pair => $"{pair.Key}: {pair.Value}"));
+        }
+
+        private static string FormatVisitSummary(
+            IEnumerable<OctTree3D<Vector3>.BoundsQueryNodeTrace> traces
+        )
+        {
+            Dictionary<OctTree3D<Vector3>.NodeVisitKind, int> counts = new();
+            foreach (OctTree3D<Vector3>.BoundsQueryNodeTrace trace in traces)
+            {
+                counts[trace.VisitKind] = counts.TryGetValue(trace.VisitKind, out int seen)
+                    ? seen + 1
+                    : 1;
+            }
+
+            if (counts.Count == 0)
+            {
+                return "none";
+            }
+
+            return string.Join(", ", counts.Select(pair => $"{pair.Key}: {pair.Value}"));
+        }
 
         public void OnQueryInitialized(
             Bounds closedQuery,
@@ -157,143 +292,14 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
             return builder.ToString();
         }
 
-        private static string FormatVectorList(List<Vector3> items)
-        {
-            if (items.Count == 0)
-            {
-                return "[]";
-            }
-
-            return "[" + string.Join(", ", items.Select(FormatVector)) + "]";
-        }
-
-        private static (List<Vector3> missing, List<Vector3> extra) ComputeDifferences(
-            ICollection<Vector3> expected,
-            ICollection<Vector3> actual,
-            int maxItems
-        )
-        {
-            Dictionary<Vector3, int> left = new();
-            foreach (Vector3 v in expected)
-            {
-                left[v] = left.TryGetValue(v, out int seen) ? seen + 1 : 1;
-            }
-
-            Dictionary<Vector3, int> right = new();
-            foreach (Vector3 v in actual)
-            {
-                right[v] = right.TryGetValue(v, out int seen) ? seen + 1 : 1;
-            }
-
-            HashSet<Vector3> keys = new(left.Keys);
-            keys.UnionWith(right.Keys);
-
-            List<Vector3> missing = new();
-            List<Vector3> extra = new();
-
-            foreach (Vector3 key in keys)
-            {
-                int lc = left.TryGetValue(key, out int leftCount) ? leftCount : 0;
-                int rc = right.TryGetValue(key, out int rightCount) ? rightCount : 0;
-                if (rc < lc)
-                {
-                    int diff = Math.Min(maxItems - missing.Count, lc - rc);
-                    for (int i = 0; i < diff; ++i)
-                    {
-                        missing.Add(key);
-                    }
-                }
-                else if (lc < rc)
-                {
-                    int diff = Math.Min(maxItems - extra.Count, rc - lc);
-                    for (int i = 0; i < diff; ++i)
-                    {
-                        extra.Add(key);
-                    }
-                }
-                if (maxItems <= missing.Count && maxItems <= extra.Count)
-                {
-                    break;
-                }
-            }
-
-            missing.Sort(CompareVector);
-            extra.Sort(CompareVector);
-            return (missing, extra);
-        }
-
-        private static int CompareVector(Vector3 a, Vector3 b)
-        {
-            int x = a.x.CompareTo(b.x);
-            if (x != 0)
-            {
-                return x;
-            }
-
-            int y = a.y.CompareTo(b.y);
-            if (y != 0)
-            {
-                return y;
-            }
-
-            return a.z.CompareTo(b.z);
-        }
-
-        private static string FormatBox(BoundingBox3D box)
-        {
-            return $"min={FormatVector(box.min)} max={FormatVector(box.max)}";
-        }
-
-        private static string FormatBounds(Bounds bounds)
-        {
-            return $"min={FormatVector(bounds.min)} max={FormatVector(bounds.max)}";
-        }
-
-        private static string FormatVector(Vector3 v)
-        {
-            return $"({v.x:0.###}, {v.y:0.###}, {v.z:0.###})";
-        }
-
-        private static string FormatReasonSummary(
-            IEnumerable<OctTree3D<Vector3>.NodePruneReason> reasons
-        )
-        {
-            Dictionary<OctTree3D<Vector3>.NodePruneReason, int> counts = new();
-            foreach (OctTree3D<Vector3>.NodePruneReason reason in reasons)
-            {
-                counts[reason] = counts.TryGetValue(reason, out int seen) ? seen + 1 : 1;
-            }
-
-            if (counts.Count == 0)
-            {
-                return "none";
-            }
-
-            return string.Join(", ", counts.Select(pair => $"{pair.Key}: {pair.Value}"));
-        }
-
-        private static string FormatVisitSummary(
-            IEnumerable<OctTree3D<Vector3>.BoundsQueryNodeTrace> traces
-        )
-        {
-            Dictionary<OctTree3D<Vector3>.NodeVisitKind, int> counts = new();
-            foreach (OctTree3D<Vector3>.BoundsQueryNodeTrace trace in traces)
-            {
-                counts[trace.VisitKind] = counts.TryGetValue(trace.VisitKind, out int seen)
-                    ? seen + 1
-                    : 1;
-            }
-
-            if (counts.Count == 0)
-            {
-                return "none";
-            }
-
-            return string.Join(", ", counts.Select(pair => $"{pair.Key}: {pair.Value}"));
-        }
-
         public readonly struct PointEvaluationRecord
         {
+            public Vector3 Position { get; }
+
+            public bool Included { get; }
+
+            public OctTree3D<Vector3>.NodeVisitKind VisitKind { get; }
+
             internal PointEvaluationRecord(
                 Vector3 position,
                 bool included,
@@ -304,16 +310,16 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
                 Included = included;
                 VisitKind = visitKind;
             }
-
-            public Vector3 Position { get; }
-
-            public bool Included { get; }
-
-            public OctTree3D<Vector3>.NodeVisitKind VisitKind { get; }
         }
 
         public readonly struct BulkAppendRecord
         {
+            public OctTree3D<Vector3>.BoundsQueryNodeTrace Trace { get; }
+
+            public int AppendedCount { get; }
+
+            public bool ViaClosedContainment { get; }
+
             internal BulkAppendRecord(
                 OctTree3D<Vector3>.BoundsQueryNodeTrace trace,
                 int appendedCount,
@@ -324,16 +330,14 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
                 AppendedCount = appendedCount;
                 ViaClosedContainment = viaClosedContainment;
             }
-
-            public OctTree3D<Vector3>.BoundsQueryNodeTrace Trace { get; }
-
-            public int AppendedCount { get; }
-
-            public bool ViaClosedContainment { get; }
         }
 
         public readonly struct ChildPruneRecord
         {
+            public BoundingBox3D Bounds { get; }
+
+            public OctTree3D<Vector3>.NodePruneReason Reason { get; }
+
             internal ChildPruneRecord(
                 BoundingBox3D bounds,
                 OctTree3D<Vector3>.NodePruneReason reason
@@ -342,10 +346,6 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
                 Bounds = bounds;
                 Reason = reason;
             }
-
-            public BoundingBox3D Bounds { get; }
-
-            public OctTree3D<Vector3>.NodePruneReason Reason { get; }
         }
     }
 }

@@ -1,6 +1,28 @@
 #!/usr/bin/env node
 /**
- * A nested type is declared at the END of its containing type, never between other members.
+ * One member ordering, enforced at 100% (#672), plus the nested-type placement rule it extends
+ * (#575): a nested type is declared at the END of its containing type, never between members.
+ *
+ * The member ordering is the owner's, from #672. Every tier below is ordered public → protected →
+ * internal → private, including const:
+ *
+ *   1. const
+ *   2. static properties
+ *   3. static fields
+ *   4. properties
+ *   5. fields
+ *   6. constructors
+ *   7. static methods
+ *   8. methods
+ *
+ * Two deliberate details the issue records so an implementer does not "fix" them back: static
+ * properties come before static fields and properties before fields (the reverse of StyleCop's
+ * SA1201 default), and const takes the accessibility ordering too. Nested types are resolved to
+ * stay LAST (issue option 1): this gate already enforces that, 1918 files were clean under it, and
+ * moving nested types first would invert a shipped rule and every file it swept. The order does
+ * not name events or delegates; rather than leave 41 members in 67 files unenforceable, they take
+ * one tier of their own immediately after const -- declared surface (an event handler, a delegate
+ * shape) reads like the consts it accompanies, and every other choice measured moved more code.
  *
  * The rule is the owner's, from review on #574: "Please place class/struct definitions at the end
  * of the file, or in their own file, do not intersperse with code." A reader scrolling a type for
@@ -8,31 +30,32 @@
  * middle of a body reads as the start of a new file's worth of content. Recorded in
  * .llm/context.md (rule 6) and create-csharp-file (rule 5b); this is what stops it decaying (#575).
  *
- * Only the five declarations that OPEN A BODY are types for this purpose -- class, struct,
- * interface, record and enum. A `delegate` is a nested type too, but it is a single statement with
- * no body, so it cannot be the wall of content the rule is about.
- *
- * This tokenizes rather than greps, because the interesting words are not always declarations:
+ * Both rules tokenize rather than grep, because the interesting words are not always declarations:
  *   * `where T : class` and `where T : struct` are constraints, not nested types.
  *   * `record` is contextual and is a perfectly good field or parameter name.
  *   * `[Attr(new[] { 1, 2 })]` puts a brace before the member's own body brace.
  *   * a field initializer -- `private int[] _a = { 1, 2 };` -- does the same.
+ *   * `private (int X, int Y) _point;` opens a tuple type, not a parameter list, so a member whose
+ *     declaration prefix breaks at `(` is only a method when the token before the paren is an
+ *     identifier (or `>` of a generic, or `operator`).
  * Parameter lists, attribute sections and bracketed types are skipped as balanced spans, and
  * comments and string literals are masked to spaces first so a brace inside either cannot count.
  *
- * A member that does not sit wholly inside ONE conditional region is reported but never
- * rewritten. A member inside `#if UNITY_EDITOR` is compiled only there, so moving it past the
- * `#endif` changes which build sees it -- and a slice that carries an unbalanced `#if` lands the
- * directive mid-line, where C# refuses it outright. Two files in the #575 sweep hit exactly that.
- * Members are reordered only when every one of them opens and closes in the same region, which
- * leaves a conditional wholly inside a member (the common `#if UNITY_EDITOR` inside a method) free
- * to move with it.
+ * The ordering comparison resets at a conditional boundary: members on opposite sides of an
+ * `#if`/`#else` pair are never compared, because the compiler sees at most one of them. A member
+ * that does not sit wholly inside ONE conditional region is reported but never rewritten. A member
+ * inside `#if UNITY_EDITOR` is compiled only there, so moving it past the `#endif` changes which
+ * build sees it -- and a slice that carries an unbalanced `#if` lands the directive mid-line, where
+ * C# refuses it outright. Two files in the #575 sweep hit exactly that. Members are reordered only
+ * when every one of them opens and closes in the same region, which leaves a conditional wholly
+ * inside a member (the common `#if UNITY_EDITOR` inside a method) free to move with it.
  *
- * `--fix` moves each nested type to the end of its containing type body. The rewrite is a
- * PERMUTATION of exact source slices: every member carries its own leading trivia (doc comment,
- * attributes) and its trailing same-line comment, the slices tile the body with no gaps, and the
- * rewritten file is asserted to have the same length as the original before it is written. A fix
- * that changes a byte of anything other than order is a bug, and the length check is what says so.
+ * `--fix` reorders members into the canonical order and moves each nested type to the end of its
+ * containing type body. The rewrite is a PERMUTATION of exact source slices: every member carries
+ * its own leading trivia (doc comment, attributes) and its trailing same-line comment, the slices
+ * tile the body with no gaps, and the rewritten file is asserted to have the same length as the
+ * original before it is written. A fix that changes a byte of anything other than order is a bug,
+ * and the length check is what says so.
  *
  * Exit codes: 0 = clean (or every violation fixed), 1 = at least one violation remains.
  */
@@ -129,31 +152,90 @@ function maskNoise(text) {
       (char === "@" && next === "$" && text[index + 2] === '"');
     const interpolated = char === "$" && next === '"';
     if (char === '"' || verbatim || interpolated || interpolatedVerbatim) {
-      const quote = text.indexOf('"', index);
       const raw = verbatim || interpolatedVerbatim;
+      const hasHoles = interpolated || interpolatedVerbatim;
+      const quote = text.indexOf('"', index);
       let cursor = quote + 1;
+      // Interpolated strings carry C# code inside `{...}` holes, and that code can hold nested
+      // strings -- `"{(x == null ? "(null)" : $"\"{y}\"")}"` -- whose quotes would otherwise end
+      // the outer string early and leak braces into the balance. Track hole depth: inside a hole,
+      // strings (plain, char, and nested interpolated) are skipped whole, `{` deepens and `}`
+      // surfaces; outside one, `\\` escapes, `{{` is a literal brace, and the closing quote ends
+      // the string.
+      let holeDepth = 0;
       while (cursor < text.length) {
-        if (raw) {
-          if (text[cursor] === '"') {
-            if (text[cursor + 1] === '"') {
+        const c = text[cursor];
+        if (holeDepth === 0) {
+          if (raw) {
+            if (c === '"' && text[cursor + 1] === '"') {
               cursor += 2;
               continue;
             }
+          } else if (c === "\\") {
+            cursor += 2;
+            continue;
+          }
+          if (c === '"') {
+            break;
+          }
+          if (hasHoles && c === "{") {
+            if (text[cursor + 1] === "{") {
+              cursor += 2;
+              continue;
+            }
+            holeDepth += 1;
+            cursor += 1;
+            continue;
+          }
+          if (!raw && c === "\n") {
             break;
           }
           cursor += 1;
           continue;
         }
-        if (text[cursor] === "\\") {
-          cursor += 2;
+        if (c === "'") {
+          let nested = cursor + 1;
+          while (nested < text.length && text[nested] !== "'" && text[nested] !== "\n") {
+            nested += text[nested] === "\\" ? 2 : 1;
+          }
+          cursor = nested + 1;
           continue;
         }
-        if (text[cursor] === '"' || text[cursor] === "\n") {
+        if (c === '"') {
+          let nested = cursor + 1;
+          while (nested < text.length) {
+            if (!raw && text[nested] === "\\") {
+              nested += 2;
+              continue;
+            }
+            if (raw && text[nested] === '"' && text[nested + 1] === '"') {
+              nested += 2;
+              continue;
+            }
+            if (text[nested] === '"' || text[nested] === "\n") {
+              break;
+            }
+            nested += 1;
+          }
+          cursor = nested + 1;
+          continue;
+        }
+        if (c === "{") {
+          holeDepth += 1;
+          cursor += 1;
+          continue;
+        }
+        if (c === "}") {
+          holeDepth -= 1;
+          cursor += 1;
+          continue;
+        }
+        if (c === "\n") {
           break;
         }
         cursor += 1;
       }
-      blank(index, cursor + 1);
+      blank(index, Math.min(cursor + 1, text.length));
       index = cursor + 1;
       continue;
     }
@@ -290,29 +372,57 @@ function membersOf(text, masked, bodyStart, bodyEnd) {
       if (close < 0) {
         return null;
       }
-      let after = close;
+      // Extend through an expression tail: a body-opening brace is not always the end of the
+      // statement. `} = 5;` (accessor initializer), `}.ToImmutableHashSet();` (object-initializer
+      // chain), `});` (initializer inside a call argument) all continue past the brace. A member
+      // declared next can never begin with one of these characters, so they always mean "the
+      // statement goes on": scan to the terminating `;` at bracket depth zero.
+      let tailCursor = close;
+      for (let guard = 0; guard < 8; guard += 1) {
+        let after = tailCursor;
+        while (after < bodyEnd && /\s/.test(masked[after])) {
+          after += 1;
+        }
+        const char = masked[after];
+        if (char === ";") {
+          tailCursor = after + 1;
+          break;
+        }
+        if (!".)+=,?:]".includes(char) || char === undefined) {
+          break;
+        }
+        let depth = 0;
+        let scan = after;
+        let reached = false;
+        while (scan < bodyEnd) {
+          const c = masked[scan];
+          if (c === "(" || c === "[" || c === "{") {
+            const inner = skipBalanced(masked, scan);
+            if (inner < 0) {
+              return null;
+            }
+            scan = inner;
+            continue;
+          }
+          if (c === ";" && depth === 0) {
+            tailCursor = scan + 1;
+            reached = true;
+            break;
+          }
+          scan += 1;
+        }
+        if (!reached) {
+          return null;
+        }
+      }
+      let after = tailCursor;
       while (after < bodyEnd && /\s/.test(masked[after])) {
         after += 1;
       }
       if (masked[after] === ";") {
         end = after + 1;
-      } else if (masked[after] === "=") {
-        // `public int Count { get; } = 5;` -- the accessor block is not the end of the member.
-        let tail = after;
-        while (tail < bodyEnd && masked[tail] !== ";") {
-          if (masked[tail] === "{" || masked[tail] === "(" || masked[tail] === "[") {
-            const inner = skipBalanced(masked, tail);
-            if (inner < 0) {
-              return null;
-            }
-            tail = inner;
-            continue;
-          }
-          tail += 1;
-        }
-        end = Math.min(tail + 1, bodyEnd);
       } else {
-        end = close;
+        end = tailCursor;
       }
     } else {
       // No terminator before the body closes. That is a preprocessor line, an attribute on the
@@ -359,6 +469,248 @@ function membersOf(text, masked, bodyStart, bodyEnd) {
     });
   }
   return members;
+}
+
+/**
+ * The #672 member ordering. Each tier is ordered public → protected → internal → private, including
+ * const; `none` is the absence of an access modifier (a static constructor, an implicitly-local
+ * member) and sorts after every named access within its tier.
+ */
+const ORDER_TIERS = Object.freeze([
+  "const",
+  "event",
+  "delegate",
+  "static property",
+  "static field",
+  "property",
+  "field",
+  "constructor",
+  "static method",
+  "method"
+]);
+const TIER_RANK = new Map(ORDER_TIERS.map((tier, index) => [tier, index]));
+const ACCESS_RANK = Object.freeze({ public: 0, protected: 1, internal: 2, private: 3, none: 4 });
+
+const MODIFIER_KEYWORDS = new Set([
+  "public",
+  "protected",
+  "internal",
+  "private",
+  "static",
+  "readonly",
+  "const",
+  "volatile",
+  "new",
+  "virtual",
+  "override",
+  "abstract",
+  "sealed",
+  "unsafe",
+  "extern",
+  "async",
+  "partial",
+  "required",
+  "file",
+  "ref",
+  "event"
+]);
+
+/**
+ * Scans a member's declaration prefix: everything from the first token through the character that
+ * opens its body or terminates its header. Balanced `[...]` spans (attributes, an indexer's
+ * parameter brackets) are skipped whole. Returns the trimmed prefix and the break character, or
+ * null when a span never closes (the member is reported through the placement rules instead).
+ */
+function declarationPrefix(masked, start, end) {
+  let scan = start;
+  while (scan < end) {
+    const char = masked[scan];
+    if (char === "{" || char === "(" || char === "=" || char === ";") {
+      return { prefix: masked.slice(start, scan).trim(), breakChar: char };
+    }
+    if (char === "[") {
+      const close = skipBalanced(masked, scan);
+      if (close < 0) {
+        return null;
+      }
+      scan = close;
+      continue;
+    }
+    scan += 1;
+  }
+  return { prefix: masked.slice(start, end).trim(), breakChar: "" };
+}
+
+/**
+ * True when `=` at `index` starts a field initializer rather than being part of `==`, `=>`,
+ * `+=`, `<=` or `>=`.
+ */
+function isPlainEquals(masked, index) {
+  const previous = masked[index - 1];
+  if (previous && "=!<>=+-*/%&|^?:".includes(previous)) {
+    return false;
+  }
+  return masked[index + 1] !== "=" && masked[index + 1] !== ">";
+}
+
+/**
+ * Property or field? Both end in `;` and can both carry an initializer, so the first body-opening
+ * token decides: an accessor list `{` or an arrow `=>` makes a property, a real `=` initializer or
+ * a bare `;` makes a field. A method never reaches here (it broke at `(`), and an expression-bodied
+ * method's `(` always precedes its arrow.
+ */
+function accessorKind(masked, start, end) {
+  for (let scan = start; scan < end; scan += 1) {
+    const char = masked[scan];
+    if (char === "[") {
+      const close = skipBalanced(masked, scan);
+      if (close < 0) {
+        return null;
+      }
+      scan = close - 1;
+      continue;
+    }
+    if (char === "=") {
+      if (masked[scan + 1] === ">") {
+        return "property";
+      }
+      if (isPlainEquals(masked, scan)) {
+        return "field";
+      }
+      continue;
+    }
+    if (char === "{") {
+      return "property";
+    }
+    if (char === ";") {
+      return "field";
+    }
+  }
+  return "field";
+}
+
+/** The identifier (or `~Identifier`) immediately before the member's opening paren, if any. */
+function callableNameBefore(masked, parenIndex) {
+  let cursor = parenIndex - 1;
+  while (0 <= cursor && /\s/.test(masked[cursor])) {
+    cursor -= 1;
+  }
+  if (0 <= cursor && masked[cursor] === ">") {
+    return ">";
+  }
+  let end = cursor + 1;
+  while (0 <= cursor && /[A-Za-z0-9_]/.test(masked[cursor])) {
+    cursor -= 1;
+  }
+  if (0 <= cursor && masked[cursor] === "~") {
+    cursor -= 1;
+  }
+  const name = masked.slice(cursor + 1, end);
+  return /^[A-Za-z_]\w*$/.test(name) && !MODIFIER_KEYWORDS.has(name) ? name : null;
+}
+
+/**
+ * Classifies one non-type member into its ordering tier and access, exempt, or unclassifiable.
+ * `typeName` is the containing type's name; a declaration prefix whose last identifier is that
+ * name (or `~` + that name) is a constructor.
+ */
+function classifyMember(masked, member, typeName) {
+  const prefix = declarationPrefix(masked, member.headerStart, member.end);
+  if (prefix === null) {
+    return { unclassifiable: true };
+  }
+  const access = /\bpublic\b/.test(prefix.prefix)
+    ? "public"
+    : /\bprotected\b/.test(prefix.prefix)
+      ? "protected"
+      : /\binternal\b/.test(prefix.prefix)
+        ? "internal"
+        : /\bprivate\b/.test(prefix.prefix)
+          ? "private"
+          : "none";
+  const isStatic = /\bstatic\b/.test(prefix.prefix);
+  const isConst = /\bconst\b/.test(prefix.prefix);
+
+  if (/\bevent\b/.test(prefix.prefix)) {
+    return { tier: "event", access };
+  }
+  if (/\bdelegate\b/.test(prefix.prefix)) {
+    return { tier: "delegate", access };
+  }
+
+  if (isConst) {
+    return { tier: "const", access };
+  }
+
+  if (prefix.breakChar === "(") {
+    if (/(\boperator\b|\bimplicit\b|\bexplicit\b)/.test(prefix.prefix)) {
+      return { tier: isStatic ? "static method" : "method", access };
+    }
+    // Find the paren that terminated the prefix: the first top-level `(` after the header.
+    let paren = -1;
+    for (let scan = member.headerStart; scan < member.end; scan += 1) {
+      if (masked[scan] === "(") {
+        paren = scan;
+        break;
+      }
+      if (masked[scan] === "[") {
+        const close = skipBalanced(masked, scan);
+        if (close < 0) {
+          break;
+        }
+        scan = close - 1;
+        continue;
+      }
+    }
+    const callable = 0 <= paren ? callableNameBefore(masked, paren) : null;
+    if (callable === null) {
+      // A type-position paren: a tuple-typed member. Property or field, per its accessor.
+      const kind = accessorKind(masked, member.headerStart, member.end);
+      return kind === null
+        ? { unclassifiable: true }
+        : {
+            tier:
+              kind === "property"
+                ? isStatic
+                  ? "static property"
+                  : "property"
+                : isStatic
+                  ? "static field"
+                  : "field",
+            access
+          };
+    }
+    const lastIdent = /~?[A-Za-z_]\w*\s*$/.exec(prefix.prefix)?.[0]?.trim();
+    if (lastIdent !== null && (lastIdent === typeName || lastIdent === `~${typeName}`)) {
+      return { tier: "constructor", access };
+    }
+    return { tier: isStatic ? "static method" : "method", access };
+  }
+
+  if (prefix.breakChar === "{") {
+    return { tier: isStatic ? "static property" : "property", access };
+  }
+
+  const kind = accessorKind(masked, member.headerStart, member.end);
+  if (kind === null) {
+    return { unclassifiable: true };
+  }
+  if (kind === "property") {
+    return { tier: isStatic ? "static property" : "property", access };
+  }
+  return { tier: isStatic ? "static field" : "field", access };
+}
+
+/** The ordering rank used for both comparison and the stable reordering. */
+function memberRank(masked, member, typeName) {
+  const classified = classifyMember(masked, member, typeName);
+  if (classified.exempt || classified.unclassifiable) {
+    return classified;
+  }
+  return {
+    ...classified,
+    rank: TIER_RANK.get(classified.tier) * 8 + ACCESS_RANK[classified.access]
+  };
 }
 
 /** Every type body in a file, outermost first. Nested types are bodies too, so this does not
@@ -415,7 +767,88 @@ function lineOf(text, index) {
   return line;
 }
 
-/** Every violation in one file, plus the rewrite that removes them. */
+/** The member's declaring identifier, for the violation message. */
+function memberName(masked, member) {
+  const prefix = declarationPrefix(masked, member.headerStart, member.end);
+  if (prefix === null) {
+    return null;
+  }
+  if (prefix.breakChar === "(") {
+    // The name sits before the paren -- unless a tuple type opened it
+    // (`private (int X, int Y) _point;`), in which case it sits after the span.
+    let paren = -1;
+    for (let scan = member.headerStart; scan < member.end; scan += 1) {
+      if (masked[scan] === "(") {
+        paren = scan;
+        break;
+      }
+      if (masked[scan] === "[") {
+        const inner = skipBalanced(masked, scan);
+        if (inner < 0) {
+          return null;
+        }
+        scan = inner - 1;
+        continue;
+      }
+    }
+    if (0 <= paren && callableNameBefore(masked, paren) !== null) {
+      return /~?[A-Za-z_]\w*\s*$/.exec(prefix.prefix)?.[0]?.trim() ?? null;
+    }
+    let scan = 0 <= paren ? skipBalanced(masked, paren) : member.headerStart;
+    if (scan < 0) {
+      return null;
+    }
+    while (scan < member.end && /\s/.test(masked[scan])) {
+      scan += 1;
+    }
+    const after = /^[A-Za-z_]\w*/.exec(masked.slice(scan, member.end));
+    return after === null ? null : after[0];
+  }
+  const last = /~?[A-Za-z_]\w*\s*$/.exec(prefix.prefix);
+  return last === null ? null : last[0].trim();
+}
+
+/**
+/**
+ * If a member's slice opens with full directive lines (`#if`, `#endif`, `#pragma`, ... -- the
+ * leading trivia `membersOf` fused onto it), returns the index just past the last such line, so
+ * the fixer can hold the directives in place while the member itself reorders. Otherwise 0.
+ */
+function directivePrefixEnd(text, start, end) {
+  let cursor = start;
+  let last = 0;
+  while (cursor < end) {
+    let scan = cursor;
+    while (
+      scan < end &&
+      (text[scan] === " " || text[scan] === "\t" || text[scan] === "\r" || text[scan] === "\n")
+    ) {
+      scan += 1;
+    }
+    if (scan < end && text[scan] === "#") {
+      const newline = text.indexOf("\n", scan);
+      if (newline < 0 || end <= newline) {
+        return last;
+      }
+      cursor = newline + 1;
+      last = cursor;
+      continue;
+    }
+    break;
+  }
+  return last;
+}
+
+/**
+ * Every violation in one file, plus the rewrite that removes them.
+ *
+ * Two rules produce violations here: the #672 member ordering and the #575 nested-type placement.
+ * When every member of a body sits in one conditional region and classifies cleanly, one edit
+ * reorders the whole body (members stable-sorted into the canonical tiers, nested types appended
+ * after them). Otherwise the ordering is still compared -- with the baseline reset at every
+ * conditional boundary, so members on opposite sides of an `#if` are never compared -- and the
+ * nested types fall back to the targeted move that keeps every `#if` member in place.
+ */
 function analyzeFile(text) {
   const masked = maskNoise(text);
   const keys = regionKeys(text);
@@ -431,14 +864,160 @@ function analyzeFile(text) {
     if (members === null) {
       continue;
     }
+
+    // --- #672 member ordering -------------------------------------------------------------
+    const orderedMembers = members.filter((member) => !member.isType && !member.trailing);
+    let orderingOffenders = [];
+    let unclassifiable = 0;
+
+    let previousRank = -1;
+    let previousRegion = null;
+    let previousTier = null;
+    let previousAccess = null;
+    for (const member of orderedMembers) {
+      const classified = memberRank(masked, member, body.name);
+      if (classified.unclassifiable) {
+        unclassifiable += 1;
+        continue;
+      }
+      const region = keys[member.headerStart];
+      if (region !== previousRegion) {
+        previousRank = -1;
+        previousRegion = region;
+      }
+      if (0 <= previousRank && classified.rank < previousRank) {
+        violations.push({
+          line: lineOf(text, member.headerStart),
+          kind: classified.tier,
+          access: classified.access,
+          name: memberName(masked, member),
+          container: body.name,
+          after: previousTier,
+          afterAccess: previousAccess
+        });
+        orderingOffenders.push({ member, rank: classified.rank });
+      }
+      // Adjacent comparison: each member is judged against the one before it, which is what the
+      // violation message claims. A scrambled body reports each adjacent descent; the fix
+      // reorders the body once.
+      previousRank = classified.rank;
+      previousTier = classified.tier;
+      previousAccess = classified.access;
+    }
+    if (unclassifiable !== 0) {
+      violations.push({
+        line: lineOf(text, body.start),
+        kind: "unclassified member",
+        name: null,
+        container: body.name
+      });
+    }
+
+    const hasTypeOffenders = (() => {
+      const lastNonType = members.reduce(
+        (found, member, index) => (member.isType || member.trailing ? found : index),
+        -1
+      );
+      return members.some((member, index) => member.isType && index < lastNonType);
+    })();
+    if (orderingOffenders.length === 0 && !hasTypeOffenders) {
+      continue;
+    }
+
+    if (0 < orderingOffenders.length) {
+      if (edits.some((edit) => edit.start <= body.start && body.end <= edit.end)) {
+        continue;
+      }
+      // Reorder the body in RUNS. A run is a maximal stretch of classifiable non-type members
+      // between barriers; everything else -- a nested type, a trailing `#endif`, a `#pragma
+      // warning restore`, a member that straddles an `#if` boundary -- is a barrier that keeps
+      // its exact position, because moving it changes which build compiles it or the scope of
+      // what it scopes. Directives fused into a member's leading trivia are split into their own
+      // barrier chunk first, so the member itself can still sort within its side of the
+      // conditional. Each run stable-sorts into the canonical tiers, the permutation never
+      // crosses a directive line, and the pieces still tile the body byte for byte.
+      let changed = false;
+      const pieces = [];
+      let run = [];
+      const flushRun = () => {
+        if (1 < run.length) {
+          const sorted = [...run]
+            .map((member, index) => ({
+              member,
+              index,
+              rank: memberRank(masked, member, body.name).rank
+            }))
+            .sort((a, b) => a.rank - b.rank || a.index - b.index)
+            .map((entry) => entry.member);
+          if (sorted.some((member, index) => member !== run[index])) {
+            changed = true;
+          }
+          pieces.push(...sorted);
+        } else {
+          pieces.push(...run);
+        }
+        run = [];
+      };
+      for (const member of members) {
+        const directiveEnd = directivePrefixEnd(text, member.start, member.end);
+        if (0 < directiveEnd) {
+          const stripped = text.slice(member.start, directiveEnd);
+          const last = 0 < run.length ? run[run.length - 1] : pieces[pieces.length - 1];
+          // A `#pragma warning restore` closes a disable that wraps the PREVIOUS member; fold it
+          // back into that member so the pair travels as one unit and the member after it can
+          // still sort. Any other directive is a barrier that stays exactly where it is.
+          const closesWrappedMember =
+            /^\s*#pragma\s+warning\s+restore\b/.test(stripped) &&
+            last !== undefined &&
+            !("raw" in last) &&
+            /#pragma\s+warning\s+disable\b/.test(text.slice(last.start, last.end));
+          if (closesWrappedMember) {
+            last.end = directiveEnd;
+          } else {
+            flushRun();
+            pieces.push({ raw: stripped });
+          }
+        }
+        const start = 0 < directiveEnd ? directiveEnd : member.start;
+        const slice = text.slice(start, member.end);
+        const movable =
+          !member.isType &&
+          !member.trailing &&
+          slice.trim().length !== 0 &&
+          !/^[ \t]*#/.test(slice) &&
+          keys[start] === keys[Math.max(member.end - 1, 0)] &&
+          !memberRank(masked, member, body.name).unclassifiable;
+        if (movable) {
+          run.push({ ...member, start });
+        } else {
+          flushRun();
+          if (start < member.end) {
+            pieces.push({ ...member, start });
+          }
+        }
+      }
+      flushRun();
+      if (changed) {
+        edits.push({
+          start: body.start,
+          end: body.end,
+          replacement: pieces
+            .map((piece) => ("raw" in piece ? piece.raw : text.slice(piece.start, piece.end)))
+            .join("")
+        });
+      }
+      continue;
+    }
+
+    // --- #575 nested-type placement (targeted fallback) -----------------------------------
+    if (!hasTypeOffenders) {
+      continue;
+    }
     const lastNonType = members.reduce(
       (found, member, index) => (member.isType || member.trailing ? found : index),
       -1
     );
     const offenders = members.filter((member, index) => member.isType && index < lastNonType);
-    if (offenders.length === 0) {
-      continue;
-    }
     for (const offender of offenders) {
       violations.push({
         line: lineOf(text, offender.headerStart),
@@ -576,6 +1155,24 @@ function main(argv) {
     }
 
     for (const violation of result.violations) {
+      if (violation.kind === "unclassified member") {
+        remaining.push(
+          `${relative}:${violation.line}: a member of '${violation.container}' defeats the ` +
+            `declaration parser and cannot be classified for the member ordering; classify it ` +
+            `by hand or extend the parser, and never let a file pass on a silent skip`
+        );
+        continue;
+      }
+      if (ORDER_TIERS.includes(violation.kind)) {
+        const described = (tier, access) =>
+          access === null || access === "none" ? tier : `${access} ${tier}`;
+        remaining.push(
+          `${relative}:${violation.line}: ${described(violation.kind, violation.access)} ` +
+            `'${violation.name}' is declared after a ${described(violation.after, violation.afterAccess)} ` +
+            `in '${violation.container}' (#672)`
+        );
+        continue;
+      }
       remaining.push(
         `${relative}:${violation.line}: nested ${violation.kind} '${violation.name}' is declared ` +
           `between members of '${violation.container}'`
@@ -591,8 +1188,11 @@ function main(argv) {
   }
   if (0 < remaining.length) {
     console.error(
-      `[nested-type-placement] ${remaining.length} nested type(s) are declared between members. ` +
-        "Move each to the end of its containing type, or into its own file (issue #575)."
+      `[nested-type-placement] ${remaining.length} member-placement violation(s). ` +
+        "Reorder members into the #672 ordering (const, static properties, static fields, " +
+        "properties, fields, constructors, static methods, methods; each tier public → " +
+        "protected → internal → private) and move nested types to the end of their containing " +
+        "type (issue #575)."
     );
     for (const entry of remaining) {
       console.error(`  ${entry}`);
@@ -605,7 +1205,19 @@ function main(argv) {
   return 0;
 }
 
-module.exports = { maskNoise, regionKeys, membersOf, typeBodies, analyzeFile, applyEdits };
+module.exports = {
+  ORDER_TIERS,
+  maskNoise,
+  regionKeys,
+  membersOf,
+  typeBodies,
+  analyzeFile,
+  applyEdits,
+  declarationPrefix,
+  accessorKind,
+  classifyMember,
+  memberRank
+};
 
 if (require.main === module) {
   process.exit(main(process.argv.slice(2)));

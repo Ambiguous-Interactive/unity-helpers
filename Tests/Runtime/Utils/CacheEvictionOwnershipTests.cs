@@ -14,6 +14,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     [NUnit.Framework.Category("Fast")]
     public sealed class CacheEvictionOwnershipTests
     {
+        private static Cache<TKey, TValue> CreateCache<TKey, TValue>(
+            int maximumSize,
+            Action<TKey, TValue> onEvicted
+        )
+        {
+            CacheBuilder<TKey, TValue> builder = CacheBuilder<TKey, TValue>
+                .NewBuilder()
+                .MaximumSize(maximumSize)
+                .InitialCapacity(1)
+                .TransferOwnershipOnRemoval();
+            if (onEvicted != null)
+            {
+                builder = builder.OnEviction((key, value, _) => onEvicted(key, value));
+            }
+            return builder.Build();
+        }
+
         [Test]
         public void ABoundEvictionReleasesTheLeastRecentlyUsedEntry()
         {
@@ -340,23 +357,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 Assert.IsTrue(Task.WaitAll(new[] { set, dispose }, TimeSpan.FromSeconds(5)));
                 Assert.AreEqual(0, cache.Count);
             }
-        }
-
-        private static Cache<TKey, TValue> CreateCache<TKey, TValue>(
-            int maximumSize,
-            Action<TKey, TValue> onEvicted
-        )
-        {
-            CacheBuilder<TKey, TValue> builder = CacheBuilder<TKey, TValue>
-                .NewBuilder()
-                .MaximumSize(maximumSize)
-                .InitialCapacity(1)
-                .TransferOwnershipOnRemoval();
-            if (onEvicted != null)
-            {
-                builder = builder.OnEviction((key, value, _) => onEvicted(key, value));
-            }
-            return builder.Build();
         }
 
         private sealed class EqualResource

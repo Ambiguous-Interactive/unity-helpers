@@ -18,6 +18,105 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         private static readonly DateTime StartedUtc = new(2026, 9, 2, 10, 0, 0, DateTimeKind.Utc);
         private static readonly DateTime FinishedUtc = new(2026, 9, 2, 10, 1, 30, DateTimeKind.Utc);
 
+        private static TestRunResultNode BuildTwoAssemblyTree()
+        {
+            TestRunResultNode root = new() { fullName = "Root" };
+
+            TestRunResultNode first = new()
+            {
+                fullName = "First.Tests.dll",
+                durationSeconds = 1.5d,
+                assemblyBuiltUtc = new DateTime(2026, 9, 1, 8, 30, 0, DateTimeKind.Utc),
+            };
+            root.children.Add(first);
+            TestRunResultNode firstSuite = new() { fullName = "First.Suite" };
+            first.children.Add(firstSuite);
+            firstSuite.children.Add(
+                new TestRunResultNode
+                {
+                    fullName = "First.Suite.PassingCase",
+                    status = TestStatus.Passed,
+                }
+            );
+            firstSuite.children.Add(
+                new TestRunResultNode
+                {
+                    fullName = "First.Suite.AlsoPassing",
+                    status = TestStatus.Passed,
+                }
+            );
+            firstSuite.children.Add(
+                new TestRunResultNode
+                {
+                    fullName = "First.Suite.SkippedCase",
+                    status = TestStatus.Skipped,
+                }
+            );
+            firstSuite.children.Add(
+                new TestRunResultNode
+                {
+                    fullName = "First.Suite.FailingCase",
+                    status = TestStatus.Failed,
+                    message = "Expected true but was false",
+                    stackTrace = "at First.Suite.FailingCase () [0x0] in /repo/Tests/First.cs:42",
+                }
+            );
+
+            TestRunResultNode second = new()
+            {
+                fullName = "Second.Tests.dll",
+                durationSeconds = 0.25d,
+            };
+            root.children.Add(second);
+            second.children.Add(
+                new TestRunResultNode
+                {
+                    fullName = "Second.Suite.PassingCase",
+                    status = TestStatus.Passed,
+                }
+            );
+            second.children.Add(
+                new TestRunResultNode
+                {
+                    fullName = "Second.Suite.Unknown",
+                    status = TestStatus.Inconclusive,
+                }
+            );
+            second.children.Add(
+                new TestRunResultNode
+                {
+                    fullName = "Second.Suite.OtherFailure",
+                    status = TestStatus.Failed,
+                }
+            );
+
+            return root;
+        }
+
+        private static string FirstLineOf(string content)
+        {
+            return LinesOf(content)[0];
+        }
+
+        private static string[] LinesOf(string content)
+        {
+            List<string> lines = new();
+            foreach (
+                string line in content.Split(
+                    new[] { TestRunSummaryFormatter.LineSeparator },
+                    StringSplitOptions.None
+                )
+            )
+            {
+                if (0 < line.Length)
+                {
+                    lines.Add(line);
+                }
+            }
+
+            return lines.ToArray();
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -511,105 +610,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             );
 
             StringAssert.Contains("started=2026-09-02T10:00:00.000Z", line);
-        }
-
-        private static TestRunResultNode BuildTwoAssemblyTree()
-        {
-            TestRunResultNode root = new() { fullName = "Root" };
-
-            TestRunResultNode first = new()
-            {
-                fullName = "First.Tests.dll",
-                durationSeconds = 1.5d,
-                assemblyBuiltUtc = new DateTime(2026, 9, 1, 8, 30, 0, DateTimeKind.Utc),
-            };
-            root.children.Add(first);
-            TestRunResultNode firstSuite = new() { fullName = "First.Suite" };
-            first.children.Add(firstSuite);
-            firstSuite.children.Add(
-                new TestRunResultNode
-                {
-                    fullName = "First.Suite.PassingCase",
-                    status = TestStatus.Passed,
-                }
-            );
-            firstSuite.children.Add(
-                new TestRunResultNode
-                {
-                    fullName = "First.Suite.AlsoPassing",
-                    status = TestStatus.Passed,
-                }
-            );
-            firstSuite.children.Add(
-                new TestRunResultNode
-                {
-                    fullName = "First.Suite.SkippedCase",
-                    status = TestStatus.Skipped,
-                }
-            );
-            firstSuite.children.Add(
-                new TestRunResultNode
-                {
-                    fullName = "First.Suite.FailingCase",
-                    status = TestStatus.Failed,
-                    message = "Expected true but was false",
-                    stackTrace = "at First.Suite.FailingCase () [0x0] in /repo/Tests/First.cs:42",
-                }
-            );
-
-            TestRunResultNode second = new()
-            {
-                fullName = "Second.Tests.dll",
-                durationSeconds = 0.25d,
-            };
-            root.children.Add(second);
-            second.children.Add(
-                new TestRunResultNode
-                {
-                    fullName = "Second.Suite.PassingCase",
-                    status = TestStatus.Passed,
-                }
-            );
-            second.children.Add(
-                new TestRunResultNode
-                {
-                    fullName = "Second.Suite.Unknown",
-                    status = TestStatus.Inconclusive,
-                }
-            );
-            second.children.Add(
-                new TestRunResultNode
-                {
-                    fullName = "Second.Suite.OtherFailure",
-                    status = TestStatus.Failed,
-                }
-            );
-
-            return root;
-        }
-
-        private static string FirstLineOf(string content)
-        {
-            return LinesOf(content)[0];
-        }
-
-        private static string[] LinesOf(string content)
-        {
-            List<string> lines = new();
-            foreach (
-                string line in content.Split(
-                    new[] { TestRunSummaryFormatter.LineSeparator },
-                    StringSplitOptions.None
-                )
-            )
-            {
-                if (0 < line.Length)
-                {
-                    lines.Add(line);
-                }
-            }
-
-            return lines.ToArray();
         }
     }
 }

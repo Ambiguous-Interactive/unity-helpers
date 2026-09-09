@@ -49,6 +49,34 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     /// </example>
     public sealed class TextureResizerWizard : ScriptableWizard
     {
+        private static (int width, int height) ComputeFinalSize(
+            int startWidth,
+            int startHeight,
+            int passes,
+            int pixelsPerUnit,
+            float widthMultiplier,
+            float heightMultiplier
+        )
+        {
+            int w = startWidth;
+            int h = startHeight;
+            for (int i = 0; i < passes; ++i)
+            {
+                int extraWidth = (int)Math.Round(w / (pixelsPerUnit * widthMultiplier));
+                int extraHeight = (int)Math.Round(h / (pixelsPerUnit * heightMultiplier));
+
+                if (extraWidth == 0 && extraHeight == 0)
+                {
+                    break;
+                }
+
+                w += extraWidth;
+                h += extraHeight;
+            }
+
+            return (w, h);
+        }
+
         public List<Texture2D> textures = new();
 
         [FormerlySerializedAs("animationSources")]
@@ -78,6 +106,36 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         public static void ResizeTextures()
         {
             _ = DisplayWizard<TextureResizerWizard>("Texture Resizer", "Resize");
+        }
+
+        private static string ToFullPath(string assetPath)
+        {
+            string projectRoot = Application.dataPath.Substring(
+                0,
+                Application.dataPath.Length - "Assets".Length
+            );
+            return Path.Combine(projectRoot, assetPath).SanitizePath();
+        }
+
+        private static void EnsureDirectory(string assetPath)
+        {
+            // Adopt existing filesystem folders through AssetDatabase to avoid numbered duplicate directories.
+            if (AssetDatabaseBatchHelper.EnsureAssetParentFolder(assetPath))
+            {
+                return;
+            }
+
+            // Outside Assets, ensure the physical output directory exists even when registration is unavailable.
+            string dirAsset = Path.GetDirectoryName(assetPath)?.SanitizePath();
+            if (string.IsNullOrEmpty(dirAsset))
+            {
+                return;
+            }
+            string fullDir = ToFullPath(dirAsset);
+            if (!Directory.Exists(fullDir))
+            {
+                _ = Directory.CreateDirectory(fullDir);
+            }
         }
 
         internal void OnWizardCreate()
@@ -368,64 +426,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             this.Log(
                 $"Summary: processed={processed}, resized={(dryRun ? "planned:" : string.Empty)}{resized}, skippedExt={skippedWrongExt}, skippedNoChange={skippedZeroDelta}, errors={errors}"
             );
-        }
-
-        private static (int width, int height) ComputeFinalSize(
-            int startWidth,
-            int startHeight,
-            int passes,
-            int pixelsPerUnit,
-            float widthMultiplier,
-            float heightMultiplier
-        )
-        {
-            int w = startWidth;
-            int h = startHeight;
-            for (int i = 0; i < passes; ++i)
-            {
-                int extraWidth = (int)Math.Round(w / (pixelsPerUnit * widthMultiplier));
-                int extraHeight = (int)Math.Round(h / (pixelsPerUnit * heightMultiplier));
-
-                if (extraWidth == 0 && extraHeight == 0)
-                {
-                    break;
-                }
-
-                w += extraWidth;
-                h += extraHeight;
-            }
-
-            return (w, h);
-        }
-
-        private static string ToFullPath(string assetPath)
-        {
-            string projectRoot = Application.dataPath.Substring(
-                0,
-                Application.dataPath.Length - "Assets".Length
-            );
-            return Path.Combine(projectRoot, assetPath).SanitizePath();
-        }
-
-        private static void EnsureDirectory(string assetPath)
-        {
-            // Adopt existing filesystem folders through AssetDatabase to avoid numbered duplicate directories.
-            if (AssetDatabaseBatchHelper.EnsureAssetParentFolder(assetPath))
-            {
-                return;
-            }
-
-            // Outside Assets, ensure the physical output directory exists even when registration is unavailable.
-            string dirAsset = Path.GetDirectoryName(assetPath)?.SanitizePath();
-            if (string.IsNullOrEmpty(dirAsset))
-            {
-                return;
-            }
-            string fullDir = ToFullPath(dirAsset);
-            if (!Directory.Exists(fullDir))
-            {
-                _ = Directory.CreateDirectory(fullDir);
-            }
         }
 
         public enum ResizeAlgorithm

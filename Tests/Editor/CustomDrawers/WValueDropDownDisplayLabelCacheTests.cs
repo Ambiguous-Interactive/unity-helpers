@@ -23,6 +23,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
     [NUnit.Framework.Category("Fast")]
     public sealed class WValueDropDownDisplayLabelCacheTests
     {
+        private static string PropertyPath(int index)
+        {
+            return "probe." + index.ToString(CultureInfo.InvariantCulture);
+        }
+
         [SetUp]
         public void SetUp()
         {
@@ -87,11 +92,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 options
             );
             CollectionAssert.AreEqual(before, after);
-        }
-
-        private static string PropertyPath(int index)
-        {
-            return "probe." + index.ToString(CultureInfo.InvariantCulture);
         }
     }
 #endif

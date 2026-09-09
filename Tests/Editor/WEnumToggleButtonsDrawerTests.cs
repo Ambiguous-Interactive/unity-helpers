@@ -24,6 +24,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor
     [NUnit.Framework.Category("Integration")]
     public sealed class WEnumToggleButtonsDrawerTests : CommonTestBase
     {
+        private static void AssertColorApproximately(Color expected, Color actual)
+        {
+            const float Tolerance = 0.0001f;
+            Assert.AreEqual(expected.r, actual.r, Tolerance, "Unexpected red channel.");
+            Assert.AreEqual(expected.g, actual.g, Tolerance, "Unexpected green channel.");
+            Assert.AreEqual(expected.b, actual.b, Tolerance, "Unexpected blue channel.");
+            Assert.AreEqual(expected.a, actual.a, Tolerance, "Unexpected alpha channel.");
+        }
+
+        private static void ConfigureDrawer(
+            WEnumToggleButtonsDrawer drawer,
+            FieldInfo fieldInfo,
+            WEnumToggleButtonsAttribute toggleAttribute
+        )
+        {
+            PropertyDrawerTestHelper.ConfigureDrawer(drawer, fieldInfo, toggleAttribute);
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -296,24 +314,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor
                 0.0001f,
                 "Padding scope disposal should restore the baseline width estimate."
             );
-        }
-
-        private static void AssertColorApproximately(Color expected, Color actual)
-        {
-            const float Tolerance = 0.0001f;
-            Assert.AreEqual(expected.r, actual.r, Tolerance, "Unexpected red channel.");
-            Assert.AreEqual(expected.g, actual.g, Tolerance, "Unexpected green channel.");
-            Assert.AreEqual(expected.b, actual.b, Tolerance, "Unexpected blue channel.");
-            Assert.AreEqual(expected.a, actual.a, Tolerance, "Unexpected alpha channel.");
-        }
-
-        private static void ConfigureDrawer(
-            WEnumToggleButtonsDrawer drawer,
-            FieldInfo fieldInfo,
-            WEnumToggleButtonsAttribute toggleAttribute
-        )
-        {
-            PropertyDrawerTestHelper.ConfigureDrawer(drawer, fieldInfo, toggleAttribute);
         }
     }
 #endif

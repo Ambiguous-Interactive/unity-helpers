@@ -11,11 +11,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags.Helpers
         public static int AppliedCount { get; private set; }
         public static int RemovedCount { get; private set; }
 
-        public bool requireInstance;
-        public bool cleansSelf;
-
         public override bool RequiresInstance => requireInstance;
         public override bool CleansUpSelf => cleansSelf;
+
+        public bool requireInstance;
+        public bool cleansSelf;
 
         public static void ResetCounters()
         {

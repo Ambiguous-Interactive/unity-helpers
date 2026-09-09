@@ -36,84 +36,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
 
         private AnimationCurveConverter() { }
 
-        public override AnimationCurve Read(
-            ref Utf8JsonReader reader,
-            Type typeToConvert,
-            JsonSerializerOptions options
-        )
-        {
-            if (reader.TokenType != JsonTokenType.StartObject)
-            {
-                throw new JsonException($"Invalid token type {reader.TokenType}");
-            }
-
-            Keyframe[] keys = null;
-            WrapMode pre = WrapMode.ClampForever;
-            WrapMode post = WrapMode.ClampForever;
-            bool havePre = false;
-            bool havePost = false;
-
-            while (reader.Read())
-            {
-                if (reader.TokenType == JsonTokenType.EndObject)
-                {
-                    AnimationCurve curve = new(keys ?? Array.Empty<Keyframe>())
-                    {
-                        preWrapMode = havePre ? pre : WrapMode.ClampForever,
-                        postWrapMode = havePost ? post : WrapMode.ClampForever,
-                    };
-                    return curve;
-                }
-
-                if (reader.TokenType == JsonTokenType.PropertyName)
-                {
-                    if (reader.ValueTextEquals("keys"))
-                    {
-                        reader.Read();
-                        if (reader.TokenType != JsonTokenType.StartArray)
-                        {
-                            throw new JsonException("keys must be an array");
-                        }
-                        JsonArrayAccumulator<Keyframe> accumulator = default;
-                        try
-                        {
-                            while (reader.Read())
-                            {
-                                if (reader.TokenType == JsonTokenType.EndArray)
-                                {
-                                    break;
-                                }
-                                accumulator.Add(ReadKeyframe(ref reader));
-                            }
-                            keys = accumulator.Finish();
-                        }
-                        finally
-                        {
-                            accumulator.Dispose();
-                        }
-                    }
-                    else if (reader.ValueTextEquals("preWrapMode"))
-                    {
-                        reader.Read();
-                        pre = JsonSerializer.Deserialize<WrapMode>(ref reader, options);
-                        havePre = true;
-                    }
-                    else if (reader.ValueTextEquals("postWrapMode"))
-                    {
-                        reader.Read();
-                        post = JsonSerializer.Deserialize<WrapMode>(ref reader, options);
-                        havePost = true;
-                    }
-                    else
-                    {
-                        throw new JsonException("Unknown property for AnimationCurve");
-                    }
-                }
-            }
-
-            throw new JsonException("Incomplete JSON for AnimationCurve");
-        }
-
         private static Keyframe ReadKeyframe(ref Utf8JsonReader reader)
         {
             if (reader.TokenType != JsonTokenType.StartObject)
@@ -214,6 +136,84 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                 }
             }
             throw new JsonException("Incomplete JSON for Keyframe");
+        }
+
+        public override AnimationCurve Read(
+            ref Utf8JsonReader reader,
+            Type typeToConvert,
+            JsonSerializerOptions options
+        )
+        {
+            if (reader.TokenType != JsonTokenType.StartObject)
+            {
+                throw new JsonException($"Invalid token type {reader.TokenType}");
+            }
+
+            Keyframe[] keys = null;
+            WrapMode pre = WrapMode.ClampForever;
+            WrapMode post = WrapMode.ClampForever;
+            bool havePre = false;
+            bool havePost = false;
+
+            while (reader.Read())
+            {
+                if (reader.TokenType == JsonTokenType.EndObject)
+                {
+                    AnimationCurve curve = new(keys ?? Array.Empty<Keyframe>())
+                    {
+                        preWrapMode = havePre ? pre : WrapMode.ClampForever,
+                        postWrapMode = havePost ? post : WrapMode.ClampForever,
+                    };
+                    return curve;
+                }
+
+                if (reader.TokenType == JsonTokenType.PropertyName)
+                {
+                    if (reader.ValueTextEquals("keys"))
+                    {
+                        reader.Read();
+                        if (reader.TokenType != JsonTokenType.StartArray)
+                        {
+                            throw new JsonException("keys must be an array");
+                        }
+                        JsonArrayAccumulator<Keyframe> accumulator = default;
+                        try
+                        {
+                            while (reader.Read())
+                            {
+                                if (reader.TokenType == JsonTokenType.EndArray)
+                                {
+                                    break;
+                                }
+                                accumulator.Add(ReadKeyframe(ref reader));
+                            }
+                            keys = accumulator.Finish();
+                        }
+                        finally
+                        {
+                            accumulator.Dispose();
+                        }
+                    }
+                    else if (reader.ValueTextEquals("preWrapMode"))
+                    {
+                        reader.Read();
+                        pre = JsonSerializer.Deserialize<WrapMode>(ref reader, options);
+                        havePre = true;
+                    }
+                    else if (reader.ValueTextEquals("postWrapMode"))
+                    {
+                        reader.Read();
+                        post = JsonSerializer.Deserialize<WrapMode>(ref reader, options);
+                        havePost = true;
+                    }
+                    else
+                    {
+                        throw new JsonException("Unknown property for AnimationCurve");
+                    }
+                }
+            }
+
+            throw new JsonException("Incomplete JSON for AnimationCurve");
         }
 
         public override void Write(

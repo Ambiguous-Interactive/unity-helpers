@@ -77,6 +77,396 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             );
         }
 
+        /// <summary>
+        /// Every generator, built the ordinary way, so one case cannot quietly drop out.
+        /// </summary>
+        private static IEnumerable<TestCaseData> EveryGenerator()
+        {
+            Guid seed = Guid.Parse("12345678-1234-1234-1234-123456789012");
+            yield return Named("Restored", "DotNetRandom", new DotNetRandom(seed));
+            yield return Named("Restored", "PcgRandom", new PcgRandom(seed));
+            yield return Named("Restored", "XorShiftRandom", new XorShiftRandom(12345));
+            yield return Named("Restored", "WyRandom", new WyRandom(seed));
+            yield return Named("Restored", "XoroShiroRandom", new XoroShiroRandom(seed));
+            yield return Named("Restored", "SystemRandom", new SystemRandom(12345));
+            yield return Named(
+                "Restored",
+                "LinearCongruentialGenerator",
+                new LinearCongruentialGenerator(12345)
+            );
+            yield return Named("Restored", "SquirrelRandom", new SquirrelRandom(12345));
+            yield return Named("Restored", "RomuDuo", new RomuDuo(seed));
+            yield return Named("Restored", "SplitMix64", new SplitMix64(seed));
+            yield return Named("Restored", "IllusionFlow", new IllusionFlow(seed));
+            yield return Named("Restored", "FlurryBurstRandom", new FlurryBurstRandom(seed));
+            yield return Named("Restored", "PhotonSpinRandom", new PhotonSpinRandom(seed));
+            yield return Named("Restored", "StormDropRandom", new StormDropRandom(12345u));
+            yield return Named("Restored", "BlastCircuitRandom", new BlastCircuitRandom(seed));
+            yield return Named("Restored", "WaveSplatRandom", new WaveSplatRandom(0xC0FFEEUL));
+            yield return Named("Restored", "WDoomRandom", new WDoomRandom(seedIndex: 7));
+            yield return Named("Restored", nameof(Sfc64Random), new Sfc64Random(seed));
+            yield return Named(
+                "Restored",
+                nameof(Xoshiro128StarStar),
+                new Xoshiro128StarStar(seed)
+            );
+            yield return Named(
+                "Restored",
+                nameof(Xoshiro256StarStar),
+                new Xoshiro256StarStar(seed)
+            );
+        }
+
+        /// <summary>
+        /// Every generator a caller can seed so that its ENTIRE serialized state is its type's
+        /// default, which is the one state protobuf writes nothing about.
+        /// </summary>
+        /// <remarks>
+        /// Seed zero is the most ordinary seed there is, so this is not a corner reachable only
+        /// by a crafted payload -- <c>new SquirrelRandom(0)</c> is a line a game writes.
+        /// </remarks>
+        private static IEnumerable<TestCaseData> EveryAllDefaultGenerator()
+        {
+            yield return Named(
+                "AllDefault",
+                "BlastCircuitRandom",
+                new BlastCircuitRandom(0UL, 0UL, 0UL, 0UL)
+            );
+            yield return Named(
+                "AllDefault",
+                "FlurryBurstRandom",
+                new FlurryBurstRandom(default(RandomState))
+            );
+            yield return Named(
+                "AllDefault",
+                "LinearCongruentialGenerator",
+                new LinearCongruentialGenerator(0)
+            );
+            yield return Named("AllDefault", "SplitMix64", new SplitMix64(0UL));
+            yield return Named("AllDefault", "SquirrelRandom", new SquirrelRandom(0));
+            yield return Named("AllDefault", "WaveSplatRandom", new WaveSplatRandom(0UL));
+            yield return Named("AllDefault", "WDoomRandom", new WDoomRandom(seedIndex: 0));
+            yield return Named("AllDefault", "WyRandom", new WyRandom(0UL));
+        }
+
+        /// <summary>Names one case, uniquely across both sources.</summary>
+        /// <remarks>
+        /// <c>SetName</c> replaces the WHOLE test name, so the suite has to be part of it or the
+        /// two sources both produce a case called <c>WyRandom</c> and a failure report cannot say
+        /// which one it came from. The overload that keeps the method name is absent from the
+        /// NUnit that Unity 2021.3 ships.
+        /// </remarks>
+        private static TestCaseData Named(string suite, string name, IRandom random)
+        {
+            return new TestCaseData(random).SetName(suite + "-" + name);
+        }
+
+        private static IRandom ProtobufNetRoundTrip(IRandom random)
+        {
+            using MemoryStream written = new();
+            ProtoBuf.Serializer.Serialize(written, (AbstractRandom)random);
+            using MemoryStream read = new(written.ToArray());
+            return ProtoBuf.Serializer.Deserialize<AbstractRandom>(read);
+        }
+
+        private static IEnumerable<TestCaseData> EveryMixedContinuation()
+        {
+            return MixedContinuationCases(nameof(MixedContinuationSurvivesEveryRestorePath));
+        }
+
+        private static IEnumerable<TestCaseData> EveryMixedJsonContinuation()
+        {
+            return MixedContinuationCases(nameof(MixedContinuationSurvivesJsonRestore));
+        }
+
+        private static IEnumerable<TestCaseData> MixedContinuationCases(string testName)
+        {
+            foreach (bool primeCaches in new[] { false, true })
+            {
+                foreach (TestCaseData generator in EveryGenerator())
+                {
+                    yield return new TestCaseData(generator.Arguments[0], primeCaches).SetName(
+                        testName + "-" + generator.TestName + "-" + primeCaches
+                    );
+                }
+            }
+        }
+
+        private static RandomState PrepareMixedContinuation(IRandom random, bool primeCaches)
+        {
+            if (primeCaches)
+            {
+                PrimeCommonReservoirs(random);
+            }
+
+            RandomState saved = random.InternalState;
+            Assert.AreEqual(primeCaches, saved.Gaussian.HasValue);
+            Assert.AreEqual(primeCaches && random is not SystemRandom ? 31 : 0, saved.BitCount);
+            Assert.AreEqual(primeCaches ? 3 : 0, saved.ByteCount);
+            return saved;
+        }
+
+        private static void PrimeCommonReservoirs(IRandom random)
+        {
+            random.NextBool();
+            random.NextByte();
+            random.NextGaussian();
+        }
+
+        private static IRandom RestoreFromState(IRandom random, RandomState saved)
+        {
+            return random switch
+            {
+                DotNetRandom _ => new DotNetRandom(saved),
+                PcgRandom _ => new PcgRandom(saved),
+                XorShiftRandom _ => new XorShiftRandom(saved),
+                WyRandom _ => new WyRandom(saved),
+                XoroShiroRandom _ => new XoroShiroRandom(saved),
+                SystemRandom _ => new SystemRandom(saved),
+                LinearCongruentialGenerator _ => new LinearCongruentialGenerator(saved),
+                SquirrelRandom _ => new SquirrelRandom(saved),
+                RomuDuo _ => new RomuDuo(saved),
+                SplitMix64 _ => new SplitMix64(saved),
+                IllusionFlow _ => new IllusionFlow(saved),
+                FlurryBurstRandom _ => new FlurryBurstRandom(saved),
+                PhotonSpinRandom _ => new PhotonSpinRandom(saved),
+                StormDropRandom _ => new StormDropRandom(saved),
+                BlastCircuitRandom _ => new BlastCircuitRandom(saved),
+                WaveSplatRandom _ => new WaveSplatRandom(saved),
+                WDoomRandom _ => new WDoomRandom(saved),
+                Xoshiro128StarStar _ => new Xoshiro128StarStar(saved),
+                Xoshiro256StarStar _ => new Xoshiro256StarStar(saved),
+                Sfc64Random _ => new Sfc64Random(saved),
+                _ => throw new ArgumentException(
+                    "The generator needs a direct state constructor.",
+                    nameof(random)
+                ),
+            };
+        }
+
+        private static void AssertMixedContinuation(IRandom random, IRandom[] restored)
+        {
+            for (int round = 0; round < 64; ++round)
+            {
+                bool expectedBool = random.NextBool();
+                byte expectedByte = random.NextByte();
+                long expectedGaussian = BitConverter.DoubleToInt64Bits(random.NextGaussian());
+                uint expectedUint = random.NextUint();
+                ulong expectedUlong = random.NextUlong();
+                RandomState expectedState = random.InternalState;
+                foreach (IRandom restoredRandom in restored)
+                {
+                    bool actualBool = restoredRandom.NextBool();
+                    byte actualByte = restoredRandom.NextByte();
+                    long actualGaussian = BitConverter.DoubleToInt64Bits(
+                        restoredRandom.NextGaussian()
+                    );
+                    uint actualUint = restoredRandom.NextUint();
+                    ulong actualUlong = restoredRandom.NextUlong();
+                    if (
+                        expectedBool != actualBool
+                        || expectedByte != actualByte
+                        || expectedGaussian != actualGaussian
+                        || expectedUint != actualUint
+                        || expectedUlong != actualUlong
+                        || !expectedState.Equals(restoredRandom.InternalState)
+                    )
+                    {
+                        Assert.Fail(
+                            $"Restore {Array.IndexOf(restored, restoredRandom)} diverged at mixed round {round}."
+                        );
+                    }
+                }
+            }
+        }
+
+        private static IEnumerable<TestCaseData> EveryGeneratorRepairedAfterDeserialization()
+        {
+            yield return EmptySubtype("DotNetRandom", 100, true);
+            yield return EmptySubtype("PcgRandom", 101, true);
+            yield return EmptySubtype("XorShiftRandom", 102, true);
+            yield return EmptySubtype("XoroShiroRandom", 104, true);
+            yield return EmptySubtype("SystemRandom", 106, true);
+            yield return EmptySubtype("RomuDuo", 109, true);
+            yield return EmptySubtype("PhotonSpinRandom", 113, true);
+            yield return EmptySubtype("StormDropRandom", 114, true);
+        }
+
+        private static TestCaseData EmptySubtype(
+            string name,
+            int includeTag,
+            bool expectVariedOutput
+        )
+        {
+            byte[] payload = new byte[WProtoSizes.TagSize(includeTag) + 1];
+            WProtoWriter writer = new(payload);
+            if (
+                !writer.TryWriteTag(includeTag, WProtoWireType.LengthDelimited)
+                || !writer.TryWriteLengthPrefix(0)
+            )
+            {
+                throw new InvalidOperationException($"Could not build the {name} test payload.");
+            }
+
+            return new TestCaseData(payload, expectVariedOutput).SetName(name);
+        }
+
+        private static byte[] BuildMalformedSystemRandomPayload(int inext, int inextp)
+        {
+            IReadOnlyList<byte> seedPayload = new SystemRandom(0).InternalState.PayloadBytes;
+            byte[] nested = new byte[1024];
+            WProtoWriter nestedWriter = new(nested);
+            Assert.IsTrue(nestedWriter.TryWriteTag(6, WProtoWireType.Varint));
+            Assert.IsTrue(nestedWriter.TryWriteInt32(inext));
+            Assert.IsTrue(nestedWriter.TryWriteTag(7, WProtoWireType.Varint));
+            Assert.IsTrue(nestedWriter.TryWriteInt32(inextp));
+            Assert.IsTrue(
+                nestedWriter.TryBeginLengthDelimited(8, false, out WProtoLengthToken token)
+            );
+            for (int offset = 0; offset < seedPayload.Count; offset += sizeof(int))
+            {
+                int seedValue = unchecked(
+                    seedPayload[offset]
+                    | (seedPayload[offset + 1] << 8)
+                    | (seedPayload[offset + 2] << 16)
+                    | (seedPayload[offset + 3] << 24)
+                );
+                Assert.IsTrue(nestedWriter.TryWriteInt32(seedValue));
+            }
+            Assert.IsTrue(nestedWriter.TryCloseLengthDelimited(token));
+
+            return WrapSubtypePayload(106, nestedWriter.Written);
+        }
+
+        private static byte[] BuildMalformedCommonReservoirPayload(int bitCount, int byteCount)
+        {
+            byte[] payload = new byte[64];
+            WProtoWriter writer = new(payload);
+            /*
+                protobuf-net must learn the concrete subtype before it can apply base members; if a base member
+                arrives first, it correctly refuses to instantiate AbstractRandom.
+            */
+            Assert.IsTrue(writer.TryWriteTag(102, WProtoWireType.LengthDelimited));
+            Assert.IsTrue(writer.TryWriteLengthPrefix(0));
+            Assert.IsTrue(writer.TryWriteTag(2, WProtoWireType.Varint));
+            Assert.IsTrue(writer.TryWriteVarint32(uint.MaxValue));
+            Assert.IsTrue(writer.TryWriteTag(3, WProtoWireType.Varint));
+            Assert.IsTrue(writer.TryWriteInt32(bitCount));
+            Assert.IsTrue(writer.TryWriteTag(4, WProtoWireType.Varint));
+            Assert.IsTrue(writer.TryWriteVarint32(uint.MaxValue));
+            Assert.IsTrue(writer.TryWriteTag(5, WProtoWireType.Varint));
+            Assert.IsTrue(writer.TryWriteInt32(byteCount));
+            return writer.Written.ToArray();
+        }
+
+        private static byte[] BuildExcessiveDotNetReplayPayload()
+        {
+            byte[] nested = new byte[16];
+            WProtoWriter nestedWriter = new(nested);
+            Assert.IsTrue(nestedWriter.TryWriteTag(6, WProtoWireType.Varint));
+            Assert.IsTrue(nestedWriter.TryWriteVarint64(ulong.MaxValue));
+
+            return WrapSubtypePayload(100, nestedWriter.Written);
+        }
+
+        private static byte[] BuildAmplifiedDotNetSnapshotPayload()
+        {
+            byte[] snapshot = new byte[12];
+            snapshot[0] = 0xFF;
+            snapshot[1] = 0xFF;
+            snapshot[2] = 0xFF;
+            snapshot[3] = 0x7F;
+
+            byte[] nested = new byte[32];
+            WProtoWriter nestedWriter = new(nested);
+            Assert.IsTrue(nestedWriter.TryWriteTag(8, WProtoWireType.LengthDelimited));
+            Assert.IsTrue(nestedWriter.TryWriteLengthPrefix(snapshot.Length));
+            Assert.IsTrue(nestedWriter.TryWriteRaw(snapshot));
+
+            return WrapSubtypePayload(100, nestedWriter.Written);
+        }
+
+        private static byte[] WrapSubtypePayload(int includeTag, ReadOnlySpan<byte> nested)
+        {
+            byte[] payload = new byte[nested.Length + 16];
+            WProtoWriter writer = new(payload);
+            Assert.IsTrue(writer.TryWriteTag(includeTag, WProtoWireType.LengthDelimited));
+            Assert.IsTrue(writer.TryWriteLengthPrefix(nested.Length));
+            Assert.IsTrue(writer.TryWriteRaw(nested));
+            return writer.Written.ToArray();
+        }
+
+        private static void AssertReadersDrawMatchingSafeStreams(
+            byte[] payload,
+            ulong? expectedState1 = null,
+            ulong? expectedState2 = null,
+            bool expectVariedOutput = false
+        )
+        {
+            AbstractRandom wallstopProto = Serializer.ProtoDeserialize<AbstractRandom>(payload);
+            using MemoryStream read = new(payload);
+            AbstractRandom protobufNet = ProtoBuf.Serializer.Deserialize<AbstractRandom>(read);
+
+            if (expectedState1.HasValue)
+            {
+                Assert.AreEqual(expectedState1.Value, wallstopProto.InternalState.State1);
+                Assert.AreEqual(expectedState1.Value, protobufNet.InternalState.State1);
+            }
+            if (expectedState2.HasValue)
+            {
+                Assert.AreEqual(expectedState2.Value, wallstopProto.InternalState.State2);
+                Assert.AreEqual(expectedState2.Value, protobufNet.InternalState.State2);
+            }
+
+            uint[] expected = Draw(protobufNet);
+            CollectionAssert.AreEqual(expected, Draw(wallstopProto));
+            if (expectVariedOutput)
+            {
+                Assert.Greater(
+                    new HashSet<uint>(expected).Count,
+                    1,
+                    "a dead stream repeats one value"
+                );
+            }
+        }
+
+        private static IRandom RoundTrip(IRandom random)
+        {
+            return Serializer.ProtoDeserialize<IRandom>(Serializer.ProtoSerialize<IRandom>(random));
+        }
+
+        private static void AssertCommonReservoirsWereRepaired(IRandom random)
+        {
+            Assert.AreEqual(0, random.InternalState.BitCount);
+            Assert.AreEqual(0U, random.InternalState.BitBuffer);
+            Assert.AreEqual(0, random.InternalState.ByteCount);
+            Assert.AreEqual(0U, random.InternalState.ByteBuffer);
+        }
+
+        private static byte[] DrawCommonValues(IRandom random)
+        {
+            byte[] drawn = new byte[32];
+            for (int i = 0; i < drawn.Length; i += 2)
+            {
+                drawn[i] = random.NextBool() ? (byte)1 : (byte)0;
+                drawn[i + 1] = random.NextByte();
+            }
+
+            Assert.Greater(new HashSet<byte>(drawn).Count, 2, "common draws are not varied");
+            return drawn;
+        }
+
+        private static uint[] Draw(IRandom random)
+        {
+            uint[] drawn = new uint[32];
+            for (int i = 0; i < drawn.Length; ++i)
+            {
+                drawn[i] = random.NextUint();
+            }
+
+            return drawn;
+        }
+
         [Test]
         public void DotNetRandomSerializesAndDeserializes()
         {
@@ -570,121 +960,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             Assert.AreEqual(deserialized2.InternalState, deserialized3.InternalState);
         }
 
-        /// <summary>
-        /// Every generator, built the ordinary way, so one case cannot quietly drop out.
-        /// </summary>
-        private static IEnumerable<TestCaseData> EveryGenerator()
-        {
-            Guid seed = Guid.Parse("12345678-1234-1234-1234-123456789012");
-            yield return Named("Restored", "DotNetRandom", new DotNetRandom(seed));
-            yield return Named("Restored", "PcgRandom", new PcgRandom(seed));
-            yield return Named("Restored", "XorShiftRandom", new XorShiftRandom(12345));
-            yield return Named("Restored", "WyRandom", new WyRandom(seed));
-            yield return Named("Restored", "XoroShiroRandom", new XoroShiroRandom(seed));
-            yield return Named("Restored", "SystemRandom", new SystemRandom(12345));
-            yield return Named(
-                "Restored",
-                "LinearCongruentialGenerator",
-                new LinearCongruentialGenerator(12345)
-            );
-            yield return Named("Restored", "SquirrelRandom", new SquirrelRandom(12345));
-            yield return Named("Restored", "RomuDuo", new RomuDuo(seed));
-            yield return Named("Restored", "SplitMix64", new SplitMix64(seed));
-            yield return Named("Restored", "IllusionFlow", new IllusionFlow(seed));
-            yield return Named("Restored", "FlurryBurstRandom", new FlurryBurstRandom(seed));
-            yield return Named("Restored", "PhotonSpinRandom", new PhotonSpinRandom(seed));
-            yield return Named("Restored", "StormDropRandom", new StormDropRandom(12345u));
-            yield return Named("Restored", "BlastCircuitRandom", new BlastCircuitRandom(seed));
-            yield return Named("Restored", "WaveSplatRandom", new WaveSplatRandom(0xC0FFEEUL));
-            yield return Named("Restored", "WDoomRandom", new WDoomRandom(seedIndex: 7));
-            yield return Named("Restored", nameof(Sfc64Random), new Sfc64Random(seed));
-            yield return Named(
-                "Restored",
-                nameof(Xoshiro128StarStar),
-                new Xoshiro128StarStar(seed)
-            );
-            yield return Named(
-                "Restored",
-                nameof(Xoshiro256StarStar),
-                new Xoshiro256StarStar(seed)
-            );
-        }
-
-        /// <summary>
-        /// Every generator a caller can seed so that its ENTIRE serialized state is its type's
-        /// default, which is the one state protobuf writes nothing about.
-        /// </summary>
-        /// <remarks>
-        /// Seed zero is the most ordinary seed there is, so this is not a corner reachable only
-        /// by a crafted payload -- <c>new SquirrelRandom(0)</c> is a line a game writes.
-        /// </remarks>
-        private static IEnumerable<TestCaseData> EveryAllDefaultGenerator()
-        {
-            yield return Named(
-                "AllDefault",
-                "BlastCircuitRandom",
-                new BlastCircuitRandom(0UL, 0UL, 0UL, 0UL)
-            );
-            yield return Named(
-                "AllDefault",
-                "FlurryBurstRandom",
-                new FlurryBurstRandom(default(RandomState))
-            );
-            yield return Named(
-                "AllDefault",
-                "LinearCongruentialGenerator",
-                new LinearCongruentialGenerator(0)
-            );
-            yield return Named("AllDefault", "SplitMix64", new SplitMix64(0UL));
-            yield return Named("AllDefault", "SquirrelRandom", new SquirrelRandom(0));
-            yield return Named("AllDefault", "WaveSplatRandom", new WaveSplatRandom(0UL));
-            yield return Named("AllDefault", "WDoomRandom", new WDoomRandom(seedIndex: 0));
-            yield return Named("AllDefault", "WyRandom", new WyRandom(0UL));
-        }
-
-        /// <summary>Names one case, uniquely across both sources.</summary>
-        /// <remarks>
-        /// <c>SetName</c> replaces the WHOLE test name, so the suite has to be part of it or the
-        /// two sources both produce a case called <c>WyRandom</c> and a failure report cannot say
-        /// which one it came from. The overload that keeps the method name is absent from the
-        /// NUnit that Unity 2021.3 ships.
-        /// </remarks>
-        private static TestCaseData Named(string suite, string name, IRandom random)
-        {
-            return new TestCaseData(random).SetName(suite + "-" + name);
-        }
-
-        private static IRandom ProtobufNetRoundTrip(IRandom random)
-        {
-            using MemoryStream written = new();
-            ProtoBuf.Serializer.Serialize(written, (AbstractRandom)random);
-            using MemoryStream read = new(written.ToArray());
-            return ProtoBuf.Serializer.Deserialize<AbstractRandom>(read);
-        }
-
-        private static IEnumerable<TestCaseData> EveryMixedContinuation()
-        {
-            return MixedContinuationCases(nameof(MixedContinuationSurvivesEveryRestorePath));
-        }
-
-        private static IEnumerable<TestCaseData> EveryMixedJsonContinuation()
-        {
-            return MixedContinuationCases(nameof(MixedContinuationSurvivesJsonRestore));
-        }
-
-        private static IEnumerable<TestCaseData> MixedContinuationCases(string testName)
-        {
-            foreach (bool primeCaches in new[] { false, true })
-            {
-                foreach (TestCaseData generator in EveryGenerator())
-                {
-                    yield return new TestCaseData(generator.Arguments[0], primeCaches).SetName(
-                        testName + "-" + generator.TestName + "-" + primeCaches
-                    );
-                }
-            }
-        }
-
         [TestCaseSource(nameof(EveryMixedContinuation))]
         public void MixedContinuationSurvivesEveryRestorePath(IRandom random, bool primeCaches)
         {
@@ -715,20 +990,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             AssertMixedContinuation(random, new[] { restored });
         }
 
-        private static RandomState PrepareMixedContinuation(IRandom random, bool primeCaches)
-        {
-            if (primeCaches)
-            {
-                PrimeCommonReservoirs(random);
-            }
-
-            RandomState saved = random.InternalState;
-            Assert.AreEqual(primeCaches, saved.Gaussian.HasValue);
-            Assert.AreEqual(primeCaches && random is not SystemRandom ? 31 : 0, saved.BitCount);
-            Assert.AreEqual(primeCaches ? 3 : 0, saved.ByteCount);
-            return saved;
-        }
-
         [Test]
         public void MixedContinuationDetectsADiscardedByteReservoir()
         {
@@ -746,111 +1007,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             IRandom[] damaged = { new PcgRandom(missingBytes) };
 
             Assert.Throws<AssertionException>(() => AssertMixedContinuation(random, damaged));
-        }
-
-        private static void PrimeCommonReservoirs(IRandom random)
-        {
-            random.NextBool();
-            random.NextByte();
-            random.NextGaussian();
-        }
-
-        private static IRandom RestoreFromState(IRandom random, RandomState saved)
-        {
-            return random switch
-            {
-                DotNetRandom _ => new DotNetRandom(saved),
-                PcgRandom _ => new PcgRandom(saved),
-                XorShiftRandom _ => new XorShiftRandom(saved),
-                WyRandom _ => new WyRandom(saved),
-                XoroShiroRandom _ => new XoroShiroRandom(saved),
-                SystemRandom _ => new SystemRandom(saved),
-                LinearCongruentialGenerator _ => new LinearCongruentialGenerator(saved),
-                SquirrelRandom _ => new SquirrelRandom(saved),
-                RomuDuo _ => new RomuDuo(saved),
-                SplitMix64 _ => new SplitMix64(saved),
-                IllusionFlow _ => new IllusionFlow(saved),
-                FlurryBurstRandom _ => new FlurryBurstRandom(saved),
-                PhotonSpinRandom _ => new PhotonSpinRandom(saved),
-                StormDropRandom _ => new StormDropRandom(saved),
-                BlastCircuitRandom _ => new BlastCircuitRandom(saved),
-                WaveSplatRandom _ => new WaveSplatRandom(saved),
-                WDoomRandom _ => new WDoomRandom(saved),
-                Xoshiro128StarStar _ => new Xoshiro128StarStar(saved),
-                Xoshiro256StarStar _ => new Xoshiro256StarStar(saved),
-                Sfc64Random _ => new Sfc64Random(saved),
-                _ => throw new ArgumentException(
-                    "The generator needs a direct state constructor.",
-                    nameof(random)
-                ),
-            };
-        }
-
-        private static void AssertMixedContinuation(IRandom random, IRandom[] restored)
-        {
-            for (int round = 0; round < 64; ++round)
-            {
-                bool expectedBool = random.NextBool();
-                byte expectedByte = random.NextByte();
-                long expectedGaussian = BitConverter.DoubleToInt64Bits(random.NextGaussian());
-                uint expectedUint = random.NextUint();
-                ulong expectedUlong = random.NextUlong();
-                RandomState expectedState = random.InternalState;
-                foreach (IRandom restoredRandom in restored)
-                {
-                    bool actualBool = restoredRandom.NextBool();
-                    byte actualByte = restoredRandom.NextByte();
-                    long actualGaussian = BitConverter.DoubleToInt64Bits(
-                        restoredRandom.NextGaussian()
-                    );
-                    uint actualUint = restoredRandom.NextUint();
-                    ulong actualUlong = restoredRandom.NextUlong();
-                    if (
-                        expectedBool != actualBool
-                        || expectedByte != actualByte
-                        || expectedGaussian != actualGaussian
-                        || expectedUint != actualUint
-                        || expectedUlong != actualUlong
-                        || !expectedState.Equals(restoredRandom.InternalState)
-                    )
-                    {
-                        Assert.Fail(
-                            $"Restore {Array.IndexOf(restored, restoredRandom)} diverged at mixed round {round}."
-                        );
-                    }
-                }
-            }
-        }
-
-        private static IEnumerable<TestCaseData> EveryGeneratorRepairedAfterDeserialization()
-        {
-            yield return EmptySubtype("DotNetRandom", 100, true);
-            yield return EmptySubtype("PcgRandom", 101, true);
-            yield return EmptySubtype("XorShiftRandom", 102, true);
-            yield return EmptySubtype("XoroShiroRandom", 104, true);
-            yield return EmptySubtype("SystemRandom", 106, true);
-            yield return EmptySubtype("RomuDuo", 109, true);
-            yield return EmptySubtype("PhotonSpinRandom", 113, true);
-            yield return EmptySubtype("StormDropRandom", 114, true);
-        }
-
-        private static TestCaseData EmptySubtype(
-            string name,
-            int includeTag,
-            bool expectVariedOutput
-        )
-        {
-            byte[] payload = new byte[WProtoSizes.TagSize(includeTag) + 1];
-            WProtoWriter writer = new(payload);
-            if (
-                !writer.TryWriteTag(includeTag, WProtoWireType.LengthDelimited)
-                || !writer.TryWriteLengthPrefix(0)
-            )
-            {
-                throw new InvalidOperationException($"Could not build the {name} test payload.");
-            }
-
-            return new TestCaseData(payload, expectVariedOutput).SetName(name);
         }
 
         [TestCaseSource(nameof(EveryGeneratorRepairedAfterDeserialization))]
@@ -998,162 +1154,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                 1,
                 "a dead stream repeats one value"
             );
-        }
-
-        private static byte[] BuildMalformedSystemRandomPayload(int inext, int inextp)
-        {
-            IReadOnlyList<byte> seedPayload = new SystemRandom(0).InternalState.PayloadBytes;
-            byte[] nested = new byte[1024];
-            WProtoWriter nestedWriter = new(nested);
-            Assert.IsTrue(nestedWriter.TryWriteTag(6, WProtoWireType.Varint));
-            Assert.IsTrue(nestedWriter.TryWriteInt32(inext));
-            Assert.IsTrue(nestedWriter.TryWriteTag(7, WProtoWireType.Varint));
-            Assert.IsTrue(nestedWriter.TryWriteInt32(inextp));
-            Assert.IsTrue(
-                nestedWriter.TryBeginLengthDelimited(8, false, out WProtoLengthToken token)
-            );
-            for (int offset = 0; offset < seedPayload.Count; offset += sizeof(int))
-            {
-                int seedValue = unchecked(
-                    seedPayload[offset]
-                    | (seedPayload[offset + 1] << 8)
-                    | (seedPayload[offset + 2] << 16)
-                    | (seedPayload[offset + 3] << 24)
-                );
-                Assert.IsTrue(nestedWriter.TryWriteInt32(seedValue));
-            }
-            Assert.IsTrue(nestedWriter.TryCloseLengthDelimited(token));
-
-            return WrapSubtypePayload(106, nestedWriter.Written);
-        }
-
-        private static byte[] BuildMalformedCommonReservoirPayload(int bitCount, int byteCount)
-        {
-            byte[] payload = new byte[64];
-            WProtoWriter writer = new(payload);
-            /*
-                protobuf-net must learn the concrete subtype before it can apply base members; if a base member
-                arrives first, it correctly refuses to instantiate AbstractRandom.
-            */
-            Assert.IsTrue(writer.TryWriteTag(102, WProtoWireType.LengthDelimited));
-            Assert.IsTrue(writer.TryWriteLengthPrefix(0));
-            Assert.IsTrue(writer.TryWriteTag(2, WProtoWireType.Varint));
-            Assert.IsTrue(writer.TryWriteVarint32(uint.MaxValue));
-            Assert.IsTrue(writer.TryWriteTag(3, WProtoWireType.Varint));
-            Assert.IsTrue(writer.TryWriteInt32(bitCount));
-            Assert.IsTrue(writer.TryWriteTag(4, WProtoWireType.Varint));
-            Assert.IsTrue(writer.TryWriteVarint32(uint.MaxValue));
-            Assert.IsTrue(writer.TryWriteTag(5, WProtoWireType.Varint));
-            Assert.IsTrue(writer.TryWriteInt32(byteCount));
-            return writer.Written.ToArray();
-        }
-
-        private static byte[] BuildExcessiveDotNetReplayPayload()
-        {
-            byte[] nested = new byte[16];
-            WProtoWriter nestedWriter = new(nested);
-            Assert.IsTrue(nestedWriter.TryWriteTag(6, WProtoWireType.Varint));
-            Assert.IsTrue(nestedWriter.TryWriteVarint64(ulong.MaxValue));
-
-            return WrapSubtypePayload(100, nestedWriter.Written);
-        }
-
-        private static byte[] BuildAmplifiedDotNetSnapshotPayload()
-        {
-            byte[] snapshot = new byte[12];
-            snapshot[0] = 0xFF;
-            snapshot[1] = 0xFF;
-            snapshot[2] = 0xFF;
-            snapshot[3] = 0x7F;
-
-            byte[] nested = new byte[32];
-            WProtoWriter nestedWriter = new(nested);
-            Assert.IsTrue(nestedWriter.TryWriteTag(8, WProtoWireType.LengthDelimited));
-            Assert.IsTrue(nestedWriter.TryWriteLengthPrefix(snapshot.Length));
-            Assert.IsTrue(nestedWriter.TryWriteRaw(snapshot));
-
-            return WrapSubtypePayload(100, nestedWriter.Written);
-        }
-
-        private static byte[] WrapSubtypePayload(int includeTag, ReadOnlySpan<byte> nested)
-        {
-            byte[] payload = new byte[nested.Length + 16];
-            WProtoWriter writer = new(payload);
-            Assert.IsTrue(writer.TryWriteTag(includeTag, WProtoWireType.LengthDelimited));
-            Assert.IsTrue(writer.TryWriteLengthPrefix(nested.Length));
-            Assert.IsTrue(writer.TryWriteRaw(nested));
-            return writer.Written.ToArray();
-        }
-
-        private static void AssertReadersDrawMatchingSafeStreams(
-            byte[] payload,
-            ulong? expectedState1 = null,
-            ulong? expectedState2 = null,
-            bool expectVariedOutput = false
-        )
-        {
-            AbstractRandom wallstopProto = Serializer.ProtoDeserialize<AbstractRandom>(payload);
-            using MemoryStream read = new(payload);
-            AbstractRandom protobufNet = ProtoBuf.Serializer.Deserialize<AbstractRandom>(read);
-
-            if (expectedState1.HasValue)
-            {
-                Assert.AreEqual(expectedState1.Value, wallstopProto.InternalState.State1);
-                Assert.AreEqual(expectedState1.Value, protobufNet.InternalState.State1);
-            }
-            if (expectedState2.HasValue)
-            {
-                Assert.AreEqual(expectedState2.Value, wallstopProto.InternalState.State2);
-                Assert.AreEqual(expectedState2.Value, protobufNet.InternalState.State2);
-            }
-
-            uint[] expected = Draw(protobufNet);
-            CollectionAssert.AreEqual(expected, Draw(wallstopProto));
-            if (expectVariedOutput)
-            {
-                Assert.Greater(
-                    new HashSet<uint>(expected).Count,
-                    1,
-                    "a dead stream repeats one value"
-                );
-            }
-        }
-
-        private static IRandom RoundTrip(IRandom random)
-        {
-            return Serializer.ProtoDeserialize<IRandom>(Serializer.ProtoSerialize<IRandom>(random));
-        }
-
-        private static void AssertCommonReservoirsWereRepaired(IRandom random)
-        {
-            Assert.AreEqual(0, random.InternalState.BitCount);
-            Assert.AreEqual(0U, random.InternalState.BitBuffer);
-            Assert.AreEqual(0, random.InternalState.ByteCount);
-            Assert.AreEqual(0U, random.InternalState.ByteBuffer);
-        }
-
-        private static byte[] DrawCommonValues(IRandom random)
-        {
-            byte[] drawn = new byte[32];
-            for (int i = 0; i < drawn.Length; i += 2)
-            {
-                drawn[i] = random.NextBool() ? (byte)1 : (byte)0;
-                drawn[i + 1] = random.NextByte();
-            }
-
-            Assert.Greater(new HashSet<byte>(drawn).Count, 2, "common draws are not varied");
-            return drawn;
-        }
-
-        private static uint[] Draw(IRandom random)
-        {
-            uint[] drawn = new uint[32];
-            for (int i = 0; i < drawn.Length; ++i)
-            {
-                drawn[i] = random.NextUint();
-            }
-
-            return drawn;
         }
     }
 }

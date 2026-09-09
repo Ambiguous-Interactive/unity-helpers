@@ -143,58 +143,6 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </summary>
         public const int DefaultLargeObjectWarmRetainCount = 1;
 
-        private static int _globalEnabled = 0;
-        private static int _purgeOnLowMemory = 1;
-        private static int _purgeOnAppBackground = 1;
-        private static int _purgeOnSceneUnload = 1;
-        private static int _lifecycleHooksRegistered;
-        private static float _defaultIdleTimeoutSeconds = DefaultIdleTimeoutSeconds;
-        private static int _defaultMinRetainCount = DefaultMinRetainCount;
-        private static int _defaultWarmRetainCount = DefaultWarmRetainCount;
-        private static float _defaultBufferMultiplier = DefaultBufferMultiplier;
-        private static float _defaultRollingWindowSeconds = DefaultRollingWindowSeconds;
-        private static float _defaultHysteresisSeconds = DefaultHysteresisSeconds;
-        private static float _defaultSpikeThresholdMultiplier = DefaultSpikeThresholdMultiplier;
-        private static int _defaultMaxPurgesPerOperation = DefaultMaxPurgesPerOperation;
-        private static int _defaultMaxPoolSize = DefaultMaxPoolSize;
-        private static int _largeObjectThresholdBytes = DefaultLargeObjectThresholdBytes;
-        private static float _largeObjectBufferMultiplier = DefaultLargeObjectBufferMultiplier;
-        private static float _largeObjectIdleTimeoutMultiplier =
-            DefaultLargeObjectIdleTimeoutMultiplier;
-        private static int _largeObjectWarmRetainCount = DefaultLargeObjectWarmRetainCount;
-        private static int _sizeAwarePoliciesEnabled = 1;
-
-        private static readonly object ConfigLock = new object();
-        private static readonly Dictionary<Type, PoolPurgeTypeOptions> TypeConfigurations =
-            new Dictionary<Type, PoolPurgeTypeOptions>();
-        private static readonly Dictionary<Type, PoolPurgeTypeOptions> GenericTypeConfigurations =
-            new Dictionary<Type, PoolPurgeTypeOptions>();
-        private static readonly HashSet<Type> DisabledTypes = new HashSet<Type>();
-
-        // Settings-based per-type configurations (lower priority than programmatic API)
-        private static readonly Dictionary<Type, PoolPurgeTypeOptions> SettingsTypeConfigurations =
-            new Dictionary<Type, PoolPurgeTypeOptions>();
-        private static readonly Dictionary<
-            Type,
-            PoolPurgeTypeOptions
-        > SettingsGenericTypeConfigurations = new Dictionary<Type, PoolPurgeTypeOptions>();
-        private static readonly HashSet<Type> SettingsDisabledTypes = new HashSet<Type>();
-
-        // Built-in type-aware defaults (lowest priority - applied before user configuration)
-        private static readonly Dictionary<Type, PoolPurgeTypeOptions> BuiltInTypeConfigurations =
-            new Dictionary<Type, PoolPurgeTypeOptions>();
-        private static readonly Dictionary<
-            Type,
-            PoolPurgeTypeOptions
-        > BuiltInGenericTypeConfigurations = new Dictionary<Type, PoolPurgeTypeOptions>();
-        private static int _builtInDefaultsInitialized;
-
-        private static readonly Dictionary<
-            Type,
-            (bool HasAttribute, bool Enabled, PoolPurgeTypeOptions Options)
-        > AttributeCache =
-            new Dictionary<Type, (bool HasAttribute, bool Enabled, PoolPurgeTypeOptions Options)>();
-
         /// <summary>
         /// Gets or sets whether intelligent pool purging is globally enabled.
         /// Default is <c>false</c> (disabled). Enable via Unity Editor settings or by setting this property.
@@ -468,6 +416,64 @@ namespace WallstopStudios.UnityHelpers.Utils
         }
 
         /// <summary>
+        /// Gets whether built-in type-aware defaults have been initialized.
+        /// </summary>
+        internal static bool BuiltInDefaultsInitialized =>
+            Volatile.Read(ref _builtInDefaultsInitialized) != 0;
+
+        private static int _globalEnabled = 0;
+        private static int _purgeOnLowMemory = 1;
+        private static int _purgeOnAppBackground = 1;
+        private static int _purgeOnSceneUnload = 1;
+        private static int _lifecycleHooksRegistered;
+        private static float _defaultIdleTimeoutSeconds = DefaultIdleTimeoutSeconds;
+        private static int _defaultMinRetainCount = DefaultMinRetainCount;
+        private static int _defaultWarmRetainCount = DefaultWarmRetainCount;
+        private static float _defaultBufferMultiplier = DefaultBufferMultiplier;
+        private static float _defaultRollingWindowSeconds = DefaultRollingWindowSeconds;
+        private static float _defaultHysteresisSeconds = DefaultHysteresisSeconds;
+        private static float _defaultSpikeThresholdMultiplier = DefaultSpikeThresholdMultiplier;
+        private static int _defaultMaxPurgesPerOperation = DefaultMaxPurgesPerOperation;
+        private static int _defaultMaxPoolSize = DefaultMaxPoolSize;
+        private static int _largeObjectThresholdBytes = DefaultLargeObjectThresholdBytes;
+        private static float _largeObjectBufferMultiplier = DefaultLargeObjectBufferMultiplier;
+        private static float _largeObjectIdleTimeoutMultiplier =
+            DefaultLargeObjectIdleTimeoutMultiplier;
+        private static int _largeObjectWarmRetainCount = DefaultLargeObjectWarmRetainCount;
+        private static int _sizeAwarePoliciesEnabled = 1;
+
+        private static readonly object ConfigLock = new object();
+        private static readonly Dictionary<Type, PoolPurgeTypeOptions> TypeConfigurations =
+            new Dictionary<Type, PoolPurgeTypeOptions>();
+        private static readonly Dictionary<Type, PoolPurgeTypeOptions> GenericTypeConfigurations =
+            new Dictionary<Type, PoolPurgeTypeOptions>();
+        private static readonly HashSet<Type> DisabledTypes = new HashSet<Type>();
+
+        // Settings-based per-type configurations (lower priority than programmatic API)
+        private static readonly Dictionary<Type, PoolPurgeTypeOptions> SettingsTypeConfigurations =
+            new Dictionary<Type, PoolPurgeTypeOptions>();
+        private static readonly Dictionary<
+            Type,
+            PoolPurgeTypeOptions
+        > SettingsGenericTypeConfigurations = new Dictionary<Type, PoolPurgeTypeOptions>();
+        private static readonly HashSet<Type> SettingsDisabledTypes = new HashSet<Type>();
+
+        // Built-in type-aware defaults (lowest priority - applied before user configuration)
+        private static readonly Dictionary<Type, PoolPurgeTypeOptions> BuiltInTypeConfigurations =
+            new Dictionary<Type, PoolPurgeTypeOptions>();
+        private static readonly Dictionary<
+            Type,
+            PoolPurgeTypeOptions
+        > BuiltInGenericTypeConfigurations = new Dictionary<Type, PoolPurgeTypeOptions>();
+        private static int _builtInDefaultsInitialized;
+
+        private static readonly Dictionary<
+            Type,
+            (bool HasAttribute, bool Enabled, PoolPurgeTypeOptions Options)
+        > AttributeCache =
+            new Dictionary<Type, (bool HasAttribute, bool Enabled, PoolPurgeTypeOptions Options)>();
+
+        /// <summary>
         /// Configures intelligent purging options for a specific type.
         /// </summary>
         /// <typeparam name="T">The type to configure.</typeparam>
@@ -622,151 +628,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 SettingsDisabledTypes.Clear();
             }
         }
-
-        /// <summary>
-        /// Clears all built-in type-aware default configurations and resets the initialization flag.
-        /// This is primarily used for testing.
-        /// </summary>
-        internal static void ClearBuiltInTypeConfigurations()
-        {
-            lock (ConfigLock)
-            {
-                BuiltInTypeConfigurations.Clear();
-                BuiltInGenericTypeConfigurations.Clear();
-            }
-
-            Volatile.Write(ref _builtInDefaultsInitialized, 0);
-        }
-
-        /// <summary>
-        /// Ensures the built-in type-aware defaults are initialized.
-        /// This method is called automatically when getting effective options.
-        /// </summary>
-        /// <remarks>
-        /// <para>
-        /// Built-in defaults provide sensible out-of-box behavior for common types:
-        /// <list type="bullet">
-        ///   <item><description>Arrays: Purge more aggressively (1.5x buffer, 3 minute idle timeout)</description></item>
-        ///   <item><description>StringBuilder: Short-lived temporaries (2 minute idle timeout, 1 min retain)</description></item>
-        ///   <item><description>List&lt;&gt;: Common collections kept warm (2x buffer, 2 min retain)</description></item>
-        ///   <item><description>Dictionary&lt;,&gt;: Common collections kept warm (2x buffer, 2 min retain)</description></item>
-        ///   <item><description>HashSet&lt;&gt;: Common collections kept warm (2x buffer, 2 min retain)</description></item>
-        ///   <item><description>Queue&lt;&gt;, Stack&lt;&gt;: Common collections kept warm</description></item>
-        /// </list>
-        /// </para>
-        /// <para>
-        /// These defaults have the lowest priority and are overridden by any user configuration.
-        /// </para>
-        /// </remarks>
-        private static void EnsureBuiltInDefaultsInitialized()
-        {
-            if (Volatile.Read(ref _builtInDefaultsInitialized) != 0)
-            {
-                return;
-            }
-
-            lock (ConfigLock)
-            {
-                if (Volatile.Read(ref _builtInDefaultsInitialized) != 0)
-                {
-                    return;
-                }
-
-                InitializeBuiltInDefaults();
-                Volatile.Write(ref _builtInDefaultsInitialized, 1);
-            }
-        }
-
-        /// <summary>
-        /// Initializes the built-in type-aware defaults for common types.
-        /// This method is called once during lazy initialization.
-        /// </summary>
-        private static void InitializeBuiltInDefaults()
-        {
-            // Arrays have larger memory footprints, so their default policy purges more aggressively.
-            BuiltInTypeConfigurations[typeof(Array)] = new PoolPurgeTypeOptions
-            {
-                BufferMultiplier = 1.5f,
-                IdleTimeoutSeconds = 180f, // 3 minutes
-            };
-
-            BuiltInTypeConfigurations[typeof(StringBuilder)] = new PoolPurgeTypeOptions
-            {
-                IdleTimeoutSeconds = 120f, // 2 minutes
-                MinRetainCount = 1,
-            };
-
-            // Keep common collection types warm to avoid repeated allocation.
-            BuiltInGenericTypeConfigurations[typeof(List<>)] = new PoolPurgeTypeOptions
-            {
-                MinRetainCount = 2,
-                BufferMultiplier = 2.0f,
-            };
-
-            // Dictionary<,> - common, keep warm for performance
-            BuiltInGenericTypeConfigurations[typeof(Dictionary<,>)] = new PoolPurgeTypeOptions
-            {
-                MinRetainCount = 2,
-                BufferMultiplier = 2.0f,
-            };
-
-            // HashSet<> - common, keep warm for performance
-            BuiltInGenericTypeConfigurations[typeof(HashSet<>)] = new PoolPurgeTypeOptions
-            {
-                MinRetainCount = 2,
-                BufferMultiplier = 2.0f,
-            };
-
-            BuiltInGenericTypeConfigurations[typeof(Queue<>)] = new PoolPurgeTypeOptions
-            {
-                MinRetainCount = 1,
-                BufferMultiplier = 1.5f,
-            };
-
-            BuiltInGenericTypeConfigurations[typeof(Stack<>)] = new PoolPurgeTypeOptions
-            {
-                MinRetainCount = 1,
-                BufferMultiplier = 1.5f,
-            };
-
-            // Less common collection types can be purged more aggressively.
-            BuiltInGenericTypeConfigurations[typeof(LinkedList<>)] = new PoolPurgeTypeOptions
-            {
-                MinRetainCount = 1,
-                BufferMultiplier = 1.5f,
-                IdleTimeoutSeconds = 180f, // 3 minutes
-            };
-
-            // Less common collection types can be purged more aggressively.
-            BuiltInGenericTypeConfigurations[typeof(SortedDictionary<,>)] = new PoolPurgeTypeOptions
-            {
-                MinRetainCount = 1,
-                BufferMultiplier = 1.5f,
-            };
-
-            // Less common collection types can be purged more aggressively.
-            BuiltInGenericTypeConfigurations[typeof(SortedSet<>)] = new PoolPurgeTypeOptions
-            {
-                MinRetainCount = 1,
-                BufferMultiplier = 1.5f,
-            };
-        }
-
-        /// <summary>
-        /// Forces re-initialization of built-in type-aware defaults.
-        /// This is primarily used for testing.
-        /// </summary>
-        internal static void ReinitializeBuiltInDefaults()
-        {
-            ClearBuiltInTypeConfigurations();
-            EnsureBuiltInDefaultsInitialized();
-        }
-
-        /// <summary>
-        /// Gets whether built-in type-aware defaults have been initialized.
-        /// </summary>
-        internal static bool BuiltInDefaultsInitialized =>
-            Volatile.Read(ref _builtInDefaultsInitialized) != 0;
 
         /// <summary>
         /// Configures settings-based per-type options.
@@ -1188,27 +1049,6 @@ namespace WallstopStudios.UnityHelpers.Utils
         }
 
         /// <summary>
-        /// Gets the global default effective options with no type-specific configuration.
-        /// </summary>
-        /// <returns>The global default purge configuration.</returns>
-        private static PoolPurgeEffectiveOptions GetGlobalDefaultEffectiveOptions()
-        {
-            return new PoolPurgeEffectiveOptions(
-                enabled: GlobalEnabled,
-                idleTimeoutSeconds: DefaultGlobalIdleTimeoutSeconds,
-                minRetainCount: DefaultGlobalMinRetainCount,
-                warmRetainCount: DefaultGlobalWarmRetainCount,
-                bufferMultiplier: DefaultGlobalBufferMultiplier,
-                rollingWindowSeconds: DefaultGlobalRollingWindowSeconds,
-                hysteresisSeconds: DefaultGlobalHysteresisSeconds,
-                spikeThresholdMultiplier: DefaultGlobalSpikeThresholdMultiplier,
-                maxPurgesPerOperation: DefaultGlobalMaxPurgesPerOperation,
-                maxPoolSize: DefaultGlobalMaxPoolSize,
-                source: PoolPurgeConfigurationSource.GlobalDefaults
-            );
-        }
-
-        /// <summary>
         /// Checks if intelligent purging is enabled for a specific type.
         /// </summary>
         /// <typeparam name="T">The type to check.</typeparam>
@@ -1352,6 +1192,234 @@ namespace WallstopStudios.UnityHelpers.Utils
             return LargeObjectThresholdBytes <= estimatedSize;
         }
 
+        /// <summary>
+        /// Purges all registered pools.
+        /// </summary>
+        /// <param name="respectHysteresis">
+        /// If <c>true</c>, pools in their hysteresis period (after a usage spike) will skip purging.
+        /// If <c>false</c>, all pools are purged regardless of hysteresis state (emergency purge).
+        /// </param>
+        /// <param name="reason">The reason for purging (used in callbacks and statistics).</param>
+        /// <returns>The total number of items purged across all pools.</returns>
+        public static int PurgeAllPools(bool respectHysteresis, PurgeReason reason)
+        {
+            return GlobalPoolRegistry.PurgeAll(respectHysteresis, reason);
+        }
+
+        /// <summary>
+        /// Purges all registered pools with the <see cref="PurgeReason.Explicit"/> reason.
+        /// </summary>
+        /// <returns>The total number of items purged across all pools.</returns>
+        public static int PurgeAllPools()
+        {
+            return PurgeAllPools(respectHysteresis: true, reason: PurgeReason.Explicit);
+        }
+
+        /// <summary>
+        /// Clears all built-in type-aware default configurations and resets the initialization flag.
+        /// This is primarily used for testing.
+        /// </summary>
+        internal static void ClearBuiltInTypeConfigurations()
+        {
+            lock (ConfigLock)
+            {
+                BuiltInTypeConfigurations.Clear();
+                BuiltInGenericTypeConfigurations.Clear();
+            }
+
+            Volatile.Write(ref _builtInDefaultsInitialized, 0);
+        }
+
+        /// <summary>
+        /// Forces re-initialization of built-in type-aware defaults.
+        /// This is primarily used for testing.
+        /// </summary>
+        internal static void ReinitializeBuiltInDefaults()
+        {
+            ClearBuiltInTypeConfigurations();
+            EnsureBuiltInDefaultsInitialized();
+        }
+
+        /// <summary>
+        /// Registers application lifecycle hooks for automatic pool purging.
+        /// This method is automatically called during runtime initialization via <see cref="RuntimeInitializeLoadType.AfterAssembliesLoaded"/>.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This method registers handlers for the following Unity events:
+        /// <list type="bullet">
+        ///   <item><description><see cref="Application.lowMemory"/> - Triggers emergency purge when the system is low on memory</description></item>
+        ///   <item><description><see cref="Application.focusChanged"/> - Triggers purge when the app loses focus (backgrounds on mobile)</description></item>
+        ///   <item><description><see cref="SceneManager.sceneUnloaded"/> - Triggers purge when a scene is unloaded</description></item>
+        /// </list>
+        /// </para>
+        /// <para>
+        /// The method is idempotent - calling it multiple times has no additional effect.
+        /// </para>
+        /// </remarks>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
+        internal static void RegisterLifecycleHooks()
+        {
+            if (Interlocked.Exchange(ref _lifecycleHooksRegistered, 1) != 0)
+            {
+                return;
+            }
+
+            Application.lowMemory += OnLowMemory;
+            Application.focusChanged += OnFocusChanged;
+            SceneManager.sceneUnloaded += OnSceneUnloaded;
+        }
+
+        /// <summary>
+        /// Unregisters application lifecycle hooks. Primarily used for testing.
+        /// </summary>
+        internal static void UnregisterLifecycleHooks()
+        {
+            if (Interlocked.Exchange(ref _lifecycleHooksRegistered, 0) == 0)
+            {
+                return;
+            }
+
+            Application.lowMemory -= OnLowMemory;
+            Application.focusChanged -= OnFocusChanged;
+            SceneManager.sceneUnloaded -= OnSceneUnloaded;
+        }
+
+        /// <summary>
+        /// Ensures the built-in type-aware defaults are initialized.
+        /// This method is called automatically when getting effective options.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Built-in defaults provide sensible out-of-box behavior for common types:
+        /// <list type="bullet">
+        ///   <item><description>Arrays: Purge more aggressively (1.5x buffer, 3 minute idle timeout)</description></item>
+        ///   <item><description>StringBuilder: Short-lived temporaries (2 minute idle timeout, 1 min retain)</description></item>
+        ///   <item><description>List&lt;&gt;: Common collections kept warm (2x buffer, 2 min retain)</description></item>
+        ///   <item><description>Dictionary&lt;,&gt;: Common collections kept warm (2x buffer, 2 min retain)</description></item>
+        ///   <item><description>HashSet&lt;&gt;: Common collections kept warm (2x buffer, 2 min retain)</description></item>
+        ///   <item><description>Queue&lt;&gt;, Stack&lt;&gt;: Common collections kept warm</description></item>
+        /// </list>
+        /// </para>
+        /// <para>
+        /// These defaults have the lowest priority and are overridden by any user configuration.
+        /// </para>
+        /// </remarks>
+        private static void EnsureBuiltInDefaultsInitialized()
+        {
+            if (Volatile.Read(ref _builtInDefaultsInitialized) != 0)
+            {
+                return;
+            }
+
+            lock (ConfigLock)
+            {
+                if (Volatile.Read(ref _builtInDefaultsInitialized) != 0)
+                {
+                    return;
+                }
+
+                InitializeBuiltInDefaults();
+                Volatile.Write(ref _builtInDefaultsInitialized, 1);
+            }
+        }
+
+        /// <summary>
+        /// Initializes the built-in type-aware defaults for common types.
+        /// This method is called once during lazy initialization.
+        /// </summary>
+        private static void InitializeBuiltInDefaults()
+        {
+            // Arrays have larger memory footprints, so their default policy purges more aggressively.
+            BuiltInTypeConfigurations[typeof(Array)] = new PoolPurgeTypeOptions
+            {
+                BufferMultiplier = 1.5f,
+                IdleTimeoutSeconds = 180f, // 3 minutes
+            };
+
+            BuiltInTypeConfigurations[typeof(StringBuilder)] = new PoolPurgeTypeOptions
+            {
+                IdleTimeoutSeconds = 120f, // 2 minutes
+                MinRetainCount = 1,
+            };
+
+            // Keep common collection types warm to avoid repeated allocation.
+            BuiltInGenericTypeConfigurations[typeof(List<>)] = new PoolPurgeTypeOptions
+            {
+                MinRetainCount = 2,
+                BufferMultiplier = 2.0f,
+            };
+
+            // Dictionary<,> - common, keep warm for performance
+            BuiltInGenericTypeConfigurations[typeof(Dictionary<,>)] = new PoolPurgeTypeOptions
+            {
+                MinRetainCount = 2,
+                BufferMultiplier = 2.0f,
+            };
+
+            // HashSet<> - common, keep warm for performance
+            BuiltInGenericTypeConfigurations[typeof(HashSet<>)] = new PoolPurgeTypeOptions
+            {
+                MinRetainCount = 2,
+                BufferMultiplier = 2.0f,
+            };
+
+            BuiltInGenericTypeConfigurations[typeof(Queue<>)] = new PoolPurgeTypeOptions
+            {
+                MinRetainCount = 1,
+                BufferMultiplier = 1.5f,
+            };
+
+            BuiltInGenericTypeConfigurations[typeof(Stack<>)] = new PoolPurgeTypeOptions
+            {
+                MinRetainCount = 1,
+                BufferMultiplier = 1.5f,
+            };
+
+            // Less common collection types can be purged more aggressively.
+            BuiltInGenericTypeConfigurations[typeof(LinkedList<>)] = new PoolPurgeTypeOptions
+            {
+                MinRetainCount = 1,
+                BufferMultiplier = 1.5f,
+                IdleTimeoutSeconds = 180f, // 3 minutes
+            };
+
+            // Less common collection types can be purged more aggressively.
+            BuiltInGenericTypeConfigurations[typeof(SortedDictionary<,>)] = new PoolPurgeTypeOptions
+            {
+                MinRetainCount = 1,
+                BufferMultiplier = 1.5f,
+            };
+
+            // Less common collection types can be purged more aggressively.
+            BuiltInGenericTypeConfigurations[typeof(SortedSet<>)] = new PoolPurgeTypeOptions
+            {
+                MinRetainCount = 1,
+                BufferMultiplier = 1.5f,
+            };
+        }
+
+        /// <summary>
+        /// Gets the global default effective options with no type-specific configuration.
+        /// </summary>
+        /// <returns>The global default purge configuration.</returns>
+        private static PoolPurgeEffectiveOptions GetGlobalDefaultEffectiveOptions()
+        {
+            return new PoolPurgeEffectiveOptions(
+                enabled: GlobalEnabled,
+                idleTimeoutSeconds: DefaultGlobalIdleTimeoutSeconds,
+                minRetainCount: DefaultGlobalMinRetainCount,
+                warmRetainCount: DefaultGlobalWarmRetainCount,
+                bufferMultiplier: DefaultGlobalBufferMultiplier,
+                rollingWindowSeconds: DefaultGlobalRollingWindowSeconds,
+                hysteresisSeconds: DefaultGlobalHysteresisSeconds,
+                spikeThresholdMultiplier: DefaultGlobalSpikeThresholdMultiplier,
+                maxPurgesPerOperation: DefaultGlobalMaxPurgesPerOperation,
+                maxPoolSize: DefaultGlobalMaxPoolSize,
+                source: PoolPurgeConfigurationSource.GlobalDefaults
+            );
+        }
+
         private static PoolPurgeEffectiveOptions BuildEffectiveOptions(
             PoolPurgeTypeOptions options,
             PoolPurgeConfigurationSource source
@@ -1441,51 +1509,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             return hasAttribute;
         }
 
-        /// <summary>
-        /// Registers application lifecycle hooks for automatic pool purging.
-        /// This method is automatically called during runtime initialization via <see cref="RuntimeInitializeLoadType.AfterAssembliesLoaded"/>.
-        /// </summary>
-        /// <remarks>
-        /// <para>
-        /// This method registers handlers for the following Unity events:
-        /// <list type="bullet">
-        ///   <item><description><see cref="Application.lowMemory"/> - Triggers emergency purge when the system is low on memory</description></item>
-        ///   <item><description><see cref="Application.focusChanged"/> - Triggers purge when the app loses focus (backgrounds on mobile)</description></item>
-        ///   <item><description><see cref="SceneManager.sceneUnloaded"/> - Triggers purge when a scene is unloaded</description></item>
-        /// </list>
-        /// </para>
-        /// <para>
-        /// The method is idempotent - calling it multiple times has no additional effect.
-        /// </para>
-        /// </remarks>
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-        internal static void RegisterLifecycleHooks()
-        {
-            if (Interlocked.Exchange(ref _lifecycleHooksRegistered, 1) != 0)
-            {
-                return;
-            }
-
-            Application.lowMemory += OnLowMemory;
-            Application.focusChanged += OnFocusChanged;
-            SceneManager.sceneUnloaded += OnSceneUnloaded;
-        }
-
-        /// <summary>
-        /// Unregisters application lifecycle hooks. Primarily used for testing.
-        /// </summary>
-        internal static void UnregisterLifecycleHooks()
-        {
-            if (Interlocked.Exchange(ref _lifecycleHooksRegistered, 0) == 0)
-            {
-                return;
-            }
-
-            Application.lowMemory -= OnLowMemory;
-            Application.focusChanged -= OnFocusChanged;
-            SceneManager.sceneUnloaded -= OnSceneUnloaded;
-        }
-
         private static void OnLowMemory()
         {
             if (!PurgeOnLowMemory)
@@ -1541,29 +1564,6 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             PurgeAllPools(respectHysteresis: true, reason: PurgeReason.SceneUnloaded);
         }
-
-        /// <summary>
-        /// Purges all registered pools.
-        /// </summary>
-        /// <param name="respectHysteresis">
-        /// If <c>true</c>, pools in their hysteresis period (after a usage spike) will skip purging.
-        /// If <c>false</c>, all pools are purged regardless of hysteresis state (emergency purge).
-        /// </param>
-        /// <param name="reason">The reason for purging (used in callbacks and statistics).</param>
-        /// <returns>The total number of items purged across all pools.</returns>
-        public static int PurgeAllPools(bool respectHysteresis, PurgeReason reason)
-        {
-            return GlobalPoolRegistry.PurgeAll(respectHysteresis, reason);
-        }
-
-        /// <summary>
-        /// Purges all registered pools with the <see cref="PurgeReason.Explicit"/> reason.
-        /// </summary>
-        /// <returns>The total number of items purged across all pools.</returns>
-        public static int PurgeAllPools()
-        {
-            return PurgeAllPools(respectHysteresis: true, reason: PurgeReason.Explicit);
-        }
     }
 
     /// <summary>
@@ -1593,21 +1593,6 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// Default interval in seconds between automatic budget enforcement checks.
         /// </summary>
         public const float DefaultBudgetEnforcementIntervalSeconds = 30f;
-
-        private static readonly object RegistryLock = new object();
-        private static readonly List<WeakReference<IPurgeable>> RegisteredPools =
-            new List<WeakReference<IPurgeable>>();
-        private static readonly List<IPoolStatistics> BudgetEnforcementPools =
-            new List<IPoolStatistics>();
-
-        private static long _globalMaxPooledItems = DefaultGlobalMaxPooledItems;
-        private static int _budgetEnforcementEnabled = 1;
-        private static float _budgetEnforcementIntervalSeconds =
-            DefaultBudgetEnforcementIntervalSeconds;
-        private static float _lastBudgetEnforcementTime;
-
-        private static readonly System.Diagnostics.Stopwatch RegistryStopwatch =
-            System.Diagnostics.Stopwatch.StartNew();
 
         /// <summary>
         /// Gets or sets the global maximum number of pooled items across all pools.
@@ -1693,6 +1678,21 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
         }
+
+        private static readonly object RegistryLock = new object();
+        private static readonly List<WeakReference<IPurgeable>> RegisteredPools =
+            new List<WeakReference<IPurgeable>>();
+        private static readonly List<IPoolStatistics> BudgetEnforcementPools =
+            new List<IPoolStatistics>();
+
+        private static long _globalMaxPooledItems = DefaultGlobalMaxPooledItems;
+        private static int _budgetEnforcementEnabled = 1;
+        private static float _budgetEnforcementIntervalSeconds =
+            DefaultBudgetEnforcementIntervalSeconds;
+        private static float _lastBudgetEnforcementTime;
+
+        private static readonly System.Diagnostics.Stopwatch RegistryStopwatch =
+            System.Diagnostics.Stopwatch.StartNew();
 
         /// <summary>
         /// Registers a pool with the global registry.

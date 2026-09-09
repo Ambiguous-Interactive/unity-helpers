@@ -411,6 +411,8 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
         /// </summary>
         internal readonly struct Sample : IEquatable<Sample>
         {
+            internal Vector2 Position2D => new(position.x, position.y);
+
             internal readonly Vector3 position;
             internal readonly int value;
             internal readonly int insertionIndex;
@@ -421,8 +423,6 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
                 this.value = value;
                 this.insertionIndex = insertionIndex;
             }
-
-            internal Vector2 Position2D => new(position.x, position.y);
 
             public bool Equals(Sample other)
             {

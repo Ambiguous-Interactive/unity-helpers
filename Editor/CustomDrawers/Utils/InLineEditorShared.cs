@@ -103,6 +103,32 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         private const int MaxEditorCacheSize = 500;
 
         /// <summary>
+        /// Cache for Unity Editor instances, keyed by object instance ID.
+        /// Uses <see cref="Cache{TKey,TValue}"/> with LRU eviction and eviction callback
+        /// to properly destroy Editor instances when they are evicted from the cache.
+        /// Lazy-initialized to prevent Unity Editor hangs during static initialization.
+        /// </summary>
+        private static Cache<long, Editor> EditorCache =>
+            _editorCache ??= CacheBuilder<long, Editor>
+                .NewBuilder()
+                .MaximumSize(MaxEditorCacheSize)
+                .OnEviction(OnEditorEvicted)
+                .Build();
+
+        /// <summary>
+        /// Reusable GUIContent for ping button to avoid allocations.
+        /// </summary>
+        public static readonly GUIContent PingButtonContent = new GUIContent(
+            "Ping",
+            "Ping object in the Project window"
+        );
+
+        /// <summary>
+        /// Reusable GUIContent for header labels to avoid allocations.
+        /// </summary>
+        public static readonly GUIContent ReusableHeaderContent = new GUIContent();
+
+        /// <summary>
         /// Cache for foldout expansion states, keyed by a unique foldout identifier.
         /// Limited to <see cref="MaxFoldoutStatesCacheSize"/> entries to prevent unbounded memory growth.
         /// </summary>
@@ -127,47 +153,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// which can cause deadlocks during Unity's "Open Project: Open Scene" phase.
         /// </summary>
         private static Cache<long, Editor> _editorCache;
-
-        /// <summary>
-        /// Cache for Unity Editor instances, keyed by object instance ID.
-        /// Uses <see cref="Cache{TKey,TValue}"/> with LRU eviction and eviction callback
-        /// to properly destroy Editor instances when they are evicted from the cache.
-        /// Lazy-initialized to prevent Unity Editor hangs during static initialization.
-        /// </summary>
-        private static Cache<long, Editor> EditorCache =>
-            _editorCache ??= CacheBuilder<long, Editor>
-                .NewBuilder()
-                .MaximumSize(MaxEditorCacheSize)
-                .OnEviction(OnEditorEvicted)
-                .Build();
-
-        /// <summary>
-        /// Callback invoked when an Editor is evicted from the cache.
-        /// Properly destroys the Editor instance to prevent memory leaks.
-        /// </summary>
-        /// <param name="key">The instance ID of the evicted editor.</param>
-        /// <param name="editor">The Editor instance being evicted.</param>
-        /// <param name="reason">The reason for eviction.</param>
-        private static void OnEditorEvicted(long key, Editor editor, EvictionReason reason)
-        {
-            if (editor != null)
-            {
-                Object.DestroyImmediate(editor);
-            }
-        }
-
-        /// <summary>
-        /// Reusable GUIContent for ping button to avoid allocations.
-        /// </summary>
-        public static readonly GUIContent PingButtonContent = new GUIContent(
-            "Ping",
-            "Ping object in the Project window"
-        );
-
-        /// <summary>
-        /// Reusable GUIContent for header labels to avoid allocations.
-        /// </summary>
-        public static readonly GUIContent ReusableHeaderContent = new GUIContent();
 
         /// <summary>
         /// Resolves the effective mode for an inline editor attribute.
@@ -680,6 +665,21 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         internal static int GetScrollPositionCacheCountForTesting()
         {
             return ScrollPositions.Count;
+        }
+
+        /// <summary>
+        /// Callback invoked when an Editor is evicted from the cache.
+        /// Properly destroys the Editor instance to prevent memory leaks.
+        /// </summary>
+        /// <param name="key">The instance ID of the evicted editor.</param>
+        /// <param name="editor">The Editor instance being evicted.</param>
+        /// <param name="reason">The reason for eviction.</param>
+        private static void OnEditorEvicted(long key, Editor editor, EvictionReason reason)
+        {
+            if (editor != null)
+            {
+                Object.DestroyImmediate(editor);
+            }
         }
     }
 

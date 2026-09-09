@@ -14,6 +14,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
     [NUnit.Framework.Category("Fast")]
     public sealed class AnimatedSpriteLayerTests : CommonTestBase
     {
+        private static IEnumerable<Sprite> YieldSprites(params Sprite[] sprites)
+        {
+            foreach (Sprite sprite in sprites)
+            {
+                yield return sprite;
+            }
+        }
+
         [Test]
         public void ConstructingFromEnumerablePreservesFrameOrder()
         {
@@ -256,14 +264,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             AnimatedSpriteLayer right = new((IEnumerable<Sprite>)null);
             Assert.IsTrue(left.Equals(right));
             Assert.IsTrue(left == right);
-        }
-
-        private static IEnumerable<Sprite> YieldSprites(params Sprite[] sprites)
-        {
-            foreach (Sprite sprite in sprites)
-            {
-                yield return sprite;
-            }
         }
     }
 }

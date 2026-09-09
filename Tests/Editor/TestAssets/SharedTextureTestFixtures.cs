@@ -37,158 +37,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
             "Packages/com.wallstop-studios.unity-helpers/Tests/Editor/TestAssets/Textures";
         private const string DynamicAssetsDir = "Assets/Temp/DynamicTextureFixtures";
 
-        private static readonly object Lock = new();
-        private static int _referenceCount;
-        private static bool _fixturesVerified;
-
-        private static Texture2D _cached300x100;
-        private static Texture2D _cached128x128;
-        private static Texture2D _cached256x256;
-        private static Texture2D _cached64x64;
-        private static Texture2D _cached384x10;
-        private static Texture2D _cached512x512;
-
-        private static Texture2D _cached1x1;
-        private static Texture2D _cached2x2;
-        private static Texture2D _cached32x32;
-        private static Texture2D _cached1024x1024;
-        private static Texture2D _cached2048x2048;
-        private static Texture2D _cached4096x4096;
-        private static Texture2D _cached257x64;
-        private static Texture2D _cached255x255;
-        private static Texture2D _cached513x400;
-        private static Texture2D _cached511x511;
-        private static Texture2D _cached1x512;
-        private static Texture2D _cached512x1;
-        private static Texture2D _cached100x200;
-        private static Texture2D _cached400x240;
-        private static Texture2D _cached450x254;
-
-        private static TextureImporter _cached300x100Importer;
-        private static TextureImporter _cached128x128Importer;
-        private static TextureImporter _cached256x256Importer;
-        private static TextureImporter _cached64x64Importer;
-        private static TextureImporter _cached384x10Importer;
-        private static TextureImporter _cached512x512Importer;
-
-        private static TextureImporter _cached1x1Importer;
-        private static TextureImporter _cached2x2Importer;
-        private static TextureImporter _cached32x32Importer;
-        private static TextureImporter _cached1024x1024Importer;
-        private static TextureImporter _cached2048x2048Importer;
-        private static TextureImporter _cached4096x4096Importer;
-        private static TextureImporter _cached257x64Importer;
-        private static TextureImporter _cached255x255Importer;
-        private static TextureImporter _cached513x400Importer;
-        private static TextureImporter _cached511x511Importer;
-        private static TextureImporter _cached1x512Importer;
-        private static TextureImporter _cached512x1Importer;
-        private static TextureImporter _cached100x200Importer;
-        private static TextureImporter _cached400x240Importer;
-        private static TextureImporter _cached450x254Importer;
-
-        private static readonly ConcurrentDictionary<
-            string,
-            DynamicTextureFixture
-        > DynamicFixtures = new();
-
-        private static readonly ConcurrentDictionary<
-            string,
-            DynamicTextureFixture
-        > DimensionFixtures = new();
-
-        /// <summary>
-        /// Common power-of-two texture dimensions for general testing.
-        /// Includes: 1x1, 2x2, 4x4, 8x8, 16x16, 32x32, 64x64, 128x128, 256x256, 512x512.
-        /// </summary>
-        public static readonly IReadOnlyList<(int width, int height)> CommonPowerOfTwoDimensions =
-            new[]
-            {
-                (1, 1),
-                (2, 2),
-                (4, 4),
-                (8, 8),
-                (16, 16),
-                (32, 32),
-                (64, 64),
-                (128, 128),
-                (256, 256),
-                (512, 512),
-            };
-
-        /// <summary>
-        /// Common non-power-of-two texture dimensions for NPOT testing.
-        /// Includes: 3x3, 100x200, 150x75, 127x127, 255x255, 257x64, 300x100, 384x10.
-        /// </summary>
-        public static readonly IReadOnlyList<(
-            int width,
-            int height
-        )> CommonNonPowerOfTwoDimensions = new[]
-        {
-            (3, 3),
-            (100, 100),
-            (100, 200),
-            (150, 75),
-            (127, 127),
-            (255, 255),
-            (257, 64),
-            (300, 100),
-            (384, 10),
-        };
-
-        /// <summary>
-        /// Common extreme aspect ratio texture dimensions for edge case testing.
-        /// Includes: 1x512, 512x1, 4x2, 2x4, 1x64, 64x1.
-        /// </summary>
-        public static readonly IReadOnlyList<(int width, int height)> CommonExtremeAspectRatios =
-            new[] { (1, 512), (512, 1), (4, 2), (2, 4), (1, 64), (64, 1) };
-
-        /// <summary>
-        /// Common small texture dimensions frequently used in tests.
-        /// Includes: 2x2, 3x3, 4x4, 8x8, 16x16, 32x32, 64x64.
-        /// </summary>
-        public static readonly IReadOnlyList<(int width, int height)> CommonSmallDimensions = new[]
-        {
-            (2, 2),
-            (3, 3),
-            (4, 4),
-            (8, 8),
-            (16, 16),
-            (32, 32),
-            (64, 64),
-        };
-
-        /// <summary>
-        /// All commonly used texture dimensions combined for comprehensive test coverage.
-        /// Suitable for use with <see cref="PrecreateDimensionsForTests"/>.
-        /// </summary>
-        public static readonly IReadOnlyList<(int width, int height)> AllCommonDimensions = new[]
-        {
-            (1, 1),
-            (2, 2),
-            (4, 4),
-            (8, 8),
-            (16, 16),
-            (32, 32),
-            (64, 64),
-            (128, 128),
-            (256, 256),
-            (512, 512),
-            (3, 3),
-            (100, 100),
-            (100, 200),
-            (150, 75),
-            (127, 127),
-            (255, 255),
-            (257, 64),
-            (300, 100),
-            (384, 10),
-            (1, 512),
-            (512, 1),
-            (4, 2),
-            (2, 4),
-        };
-
         /// <summary>
         /// Path to the shared 300x100 magenta texture fixture (non-POT wide texture).
         /// </summary>
@@ -565,6 +413,158 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
                 }
             }
         }
+
+        /// <summary>
+        /// Common power-of-two texture dimensions for general testing.
+        /// Includes: 1x1, 2x2, 4x4, 8x8, 16x16, 32x32, 64x64, 128x128, 256x256, 512x512.
+        /// </summary>
+        public static readonly IReadOnlyList<(int width, int height)> CommonPowerOfTwoDimensions =
+            new[]
+            {
+                (1, 1),
+                (2, 2),
+                (4, 4),
+                (8, 8),
+                (16, 16),
+                (32, 32),
+                (64, 64),
+                (128, 128),
+                (256, 256),
+                (512, 512),
+            };
+
+        /// <summary>
+        /// Common non-power-of-two texture dimensions for NPOT testing.
+        /// Includes: 3x3, 100x200, 150x75, 127x127, 255x255, 257x64, 300x100, 384x10.
+        /// </summary>
+        public static readonly IReadOnlyList<(
+            int width,
+            int height
+        )> CommonNonPowerOfTwoDimensions = new[]
+        {
+            (3, 3),
+            (100, 100),
+            (100, 200),
+            (150, 75),
+            (127, 127),
+            (255, 255),
+            (257, 64),
+            (300, 100),
+            (384, 10),
+        };
+
+        /// <summary>
+        /// Common extreme aspect ratio texture dimensions for edge case testing.
+        /// Includes: 1x512, 512x1, 4x2, 2x4, 1x64, 64x1.
+        /// </summary>
+        public static readonly IReadOnlyList<(int width, int height)> CommonExtremeAspectRatios =
+            new[] { (1, 512), (512, 1), (4, 2), (2, 4), (1, 64), (64, 1) };
+
+        /// <summary>
+        /// Common small texture dimensions frequently used in tests.
+        /// Includes: 2x2, 3x3, 4x4, 8x8, 16x16, 32x32, 64x64.
+        /// </summary>
+        public static readonly IReadOnlyList<(int width, int height)> CommonSmallDimensions = new[]
+        {
+            (2, 2),
+            (3, 3),
+            (4, 4),
+            (8, 8),
+            (16, 16),
+            (32, 32),
+            (64, 64),
+        };
+
+        /// <summary>
+        /// All commonly used texture dimensions combined for comprehensive test coverage.
+        /// Suitable for use with <see cref="PrecreateDimensionsForTests"/>.
+        /// </summary>
+        public static readonly IReadOnlyList<(int width, int height)> AllCommonDimensions = new[]
+        {
+            (1, 1),
+            (2, 2),
+            (4, 4),
+            (8, 8),
+            (16, 16),
+            (32, 32),
+            (64, 64),
+            (128, 128),
+            (256, 256),
+            (512, 512),
+            (3, 3),
+            (100, 100),
+            (100, 200),
+            (150, 75),
+            (127, 127),
+            (255, 255),
+            (257, 64),
+            (300, 100),
+            (384, 10),
+            (1, 512),
+            (512, 1),
+            (4, 2),
+            (2, 4),
+        };
+
+        private static readonly object Lock = new();
+        private static int _referenceCount;
+        private static bool _fixturesVerified;
+
+        private static Texture2D _cached300x100;
+        private static Texture2D _cached128x128;
+        private static Texture2D _cached256x256;
+        private static Texture2D _cached64x64;
+        private static Texture2D _cached384x10;
+        private static Texture2D _cached512x512;
+
+        private static Texture2D _cached1x1;
+        private static Texture2D _cached2x2;
+        private static Texture2D _cached32x32;
+        private static Texture2D _cached1024x1024;
+        private static Texture2D _cached2048x2048;
+        private static Texture2D _cached4096x4096;
+        private static Texture2D _cached257x64;
+        private static Texture2D _cached255x255;
+        private static Texture2D _cached513x400;
+        private static Texture2D _cached511x511;
+        private static Texture2D _cached1x512;
+        private static Texture2D _cached512x1;
+        private static Texture2D _cached100x200;
+        private static Texture2D _cached400x240;
+        private static Texture2D _cached450x254;
+
+        private static TextureImporter _cached300x100Importer;
+        private static TextureImporter _cached128x128Importer;
+        private static TextureImporter _cached256x256Importer;
+        private static TextureImporter _cached64x64Importer;
+        private static TextureImporter _cached384x10Importer;
+        private static TextureImporter _cached512x512Importer;
+
+        private static TextureImporter _cached1x1Importer;
+        private static TextureImporter _cached2x2Importer;
+        private static TextureImporter _cached32x32Importer;
+        private static TextureImporter _cached1024x1024Importer;
+        private static TextureImporter _cached2048x2048Importer;
+        private static TextureImporter _cached4096x4096Importer;
+        private static TextureImporter _cached257x64Importer;
+        private static TextureImporter _cached255x255Importer;
+        private static TextureImporter _cached513x400Importer;
+        private static TextureImporter _cached511x511Importer;
+        private static TextureImporter _cached1x512Importer;
+        private static TextureImporter _cached512x1Importer;
+        private static TextureImporter _cached100x200Importer;
+        private static TextureImporter _cached400x240Importer;
+        private static TextureImporter _cached450x254Importer;
+
+        private static readonly ConcurrentDictionary<
+            string,
+            DynamicTextureFixture
+        > DynamicFixtures = new();
+
+        private static readonly ConcurrentDictionary<
+            string,
+            DynamicTextureFixture
+        > DimensionFixtures = new();
 
         /// <summary>
         /// Acquires a reference to the shared fixtures. Verifies assets if this is the first call.

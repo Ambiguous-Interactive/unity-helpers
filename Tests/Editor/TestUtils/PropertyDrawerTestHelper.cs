@@ -16,6 +16,63 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
     /// </summary>
     internal static class PropertyDrawerTestHelper
     {
+        /// <summary>
+        ///     Finds the first public instance field on a type that has the specified attribute.
+        /// </summary>
+        /// <typeparam name="TAttribute">The attribute type to search for.</typeparam>
+        /// <param name="hostType">The type to search.</param>
+        /// <returns>
+        ///     A tuple containing the FieldInfo and the attribute instance, or (null, null) if not found.
+        /// </returns>
+        public static (
+            FieldInfo field,
+            TAttribute attribute
+        ) FindFirstFieldWithAttribute<TAttribute>(Type hostType)
+            where TAttribute : Attribute
+        {
+            if (hostType == null)
+            {
+                return (null, null);
+            }
+
+            FieldInfo[] fields = hostType.GetFields(BindingFlags.Instance | BindingFlags.Public);
+
+            foreach (FieldInfo field in fields)
+            {
+                TAttribute attr = (TAttribute)
+                    Attribute.GetCustomAttribute(field, typeof(TAttribute));
+                if (attr != null)
+                {
+                    return (field, attr);
+                }
+            }
+
+            return (null, null);
+        }
+
+        /// <summary>
+        ///     Finds the first public instance field on a type that has the specified attribute,
+        ///     with assertion on failure.
+        /// </summary>
+        /// <typeparam name="TAttribute">The attribute type to search for.</typeparam>
+        /// <param name="hostType">The type to search.</param>
+        /// <returns>A tuple containing the FieldInfo and the attribute instance.</returns>
+        /// <exception cref="AssertionException">Thrown if no field with the attribute is found.</exception>
+        public static (
+            FieldInfo field,
+            TAttribute attribute
+        ) FindFirstFieldWithAttributeOrFail<TAttribute>(Type hostType)
+            where TAttribute : Attribute
+        {
+            (FieldInfo field, TAttribute attribute) result =
+                FindFirstFieldWithAttribute<TAttribute>(hostType);
+            Assert.IsTrue(
+                result.field != null,
+                $"No field with {typeof(TAttribute).Name} found on {hostType?.FullName ?? "null"}"
+            );
+            return result;
+        }
+
         private static readonly FieldInfo FieldInfoField = typeof(PropertyDrawer).GetField(
             "m_FieldInfo",
             BindingFlags.Instance | BindingFlags.NonPublic
@@ -136,63 +193,6 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
             );
 
             return field?.GetCustomAttribute<T>();
-        }
-
-        /// <summary>
-        ///     Finds the first public instance field on a type that has the specified attribute.
-        /// </summary>
-        /// <typeparam name="TAttribute">The attribute type to search for.</typeparam>
-        /// <param name="hostType">The type to search.</param>
-        /// <returns>
-        ///     A tuple containing the FieldInfo and the attribute instance, or (null, null) if not found.
-        /// </returns>
-        public static (
-            FieldInfo field,
-            TAttribute attribute
-        ) FindFirstFieldWithAttribute<TAttribute>(Type hostType)
-            where TAttribute : Attribute
-        {
-            if (hostType == null)
-            {
-                return (null, null);
-            }
-
-            FieldInfo[] fields = hostType.GetFields(BindingFlags.Instance | BindingFlags.Public);
-
-            foreach (FieldInfo field in fields)
-            {
-                TAttribute attr = (TAttribute)
-                    Attribute.GetCustomAttribute(field, typeof(TAttribute));
-                if (attr != null)
-                {
-                    return (field, attr);
-                }
-            }
-
-            return (null, null);
-        }
-
-        /// <summary>
-        ///     Finds the first public instance field on a type that has the specified attribute,
-        ///     with assertion on failure.
-        /// </summary>
-        /// <typeparam name="TAttribute">The attribute type to search for.</typeparam>
-        /// <param name="hostType">The type to search.</param>
-        /// <returns>A tuple containing the FieldInfo and the attribute instance.</returns>
-        /// <exception cref="AssertionException">Thrown if no field with the attribute is found.</exception>
-        public static (
-            FieldInfo field,
-            TAttribute attribute
-        ) FindFirstFieldWithAttributeOrFail<TAttribute>(Type hostType)
-            where TAttribute : Attribute
-        {
-            (FieldInfo field, TAttribute attribute) result =
-                FindFirstFieldWithAttribute<TAttribute>(hostType);
-            Assert.IsTrue(
-                result.field != null,
-                $"No field with {typeof(TAttribute).Name} found on {hostType?.FullName ?? "null"}"
-            );
-            return result;
         }
     }
 }

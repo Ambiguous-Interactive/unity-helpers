@@ -122,14 +122,6 @@ namespace WallstopStudios.UnityHelpers.Tags
             return AllAttributeNames;
         }
 
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-        private static void ClearCache()
-        {
-            AllAttributeNames = null;
-            AttributeFields.Clear();
-            OptimizedAttributeFields.Clear();
-        }
-
         /// <summary>
         /// Extension method to check if a Unity Object has a specific tag.
         /// </summary>
@@ -1006,6 +998,14 @@ namespace WallstopStudios.UnityHelpers.Tags
                     }
                 }
             );
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void ClearCache()
+        {
+            AllAttributeNames = null;
+            AttributeFields.Clear();
+            OptimizedAttributeFields.Clear();
         }
     }
 }

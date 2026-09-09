@@ -137,6 +137,94 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
               }
               " + NUnitAssertionStubs;
 
+        private static string[] Messages(ImmutableArray<Diagnostic> reported)
+        {
+            return reported.Select(diagnostic => diagnostic.ToString()).ToArray();
+        }
+
+        private static Diagnostic Single(string body)
+        {
+            ImmutableArray<Diagnostic> reported = Analyze(body);
+            Assert.AreEqual(1, reported.Length, "Expected exactly one diagnostic");
+            return reported[0];
+        }
+
+        private static ImmutableArray<Diagnostic> Analyze(string body)
+        {
+            return Analyze(body, UnityStubs, ReportDiagnostic.Default);
+        }
+
+        /// <summary>
+        /// Compiles <paramref name="body"/> against <paramref name="stubs"/> and runs the analyzer
+        /// over it.
+        /// </summary>
+        /// <param name="body">Members of a static class in namespace <c>Consumer</c>.</param>
+        /// <param name="stubs">The world the fixture is compiled against.</param>
+        /// <param name="reportedAs">
+        /// What the compilation says about both diagnostics -- <see cref="ReportDiagnostic.Default"/>
+        /// for a consumer who configures nothing, or anything else for the ruleset /
+        /// <c>.editorconfig</c> entry they would write, expressed as the option Roslyn resolves both
+        /// of them to.
+        /// </param>
+        /// <returns>Everything the analyzer reported.</returns>
+        private static ImmutableArray<Diagnostic> Analyze(
+            string body,
+            string stubs,
+            ReportDiagnostic reportedAs
+        )
+        {
+            string source =
+                "namespace Consumer { using UnityEngine; public static class Subject { "
+                + body
+                + " } }\n"
+                + stubs;
+
+            List<MetadataReference> references = new List<MetadataReference>();
+            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
+                {
+                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
+                }
+            }
+
+            CSharpCompilation compilation = CSharpCompilation.Create(
+                "ConsumerAssembly",
+                new[]
+                {
+                    CSharpSyntaxTree.ParseText(
+                        source,
+                        new CSharpParseOptions(LanguageVersion.CSharp9)
+                    ),
+                },
+                references,
+                new CSharpCompilationOptions(
+                    OutputKind.DynamicallyLinkedLibrary
+                ).WithSpecificDiagnosticOptions(
+                    ImmutableDictionary<string, ReportDiagnostic>
+                        .Empty.Add(NullPropagationId, reportedAs)
+                        .Add(NullAssertionId, reportedAs)
+                )
+            );
+
+            ImmutableArray<Diagnostic> compileErrors = compilation
+                .GetDiagnostics()
+                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+                .ToImmutableArray();
+            Assert.IsEmpty(
+                compileErrors.Select(diagnostic => diagnostic.ToString()).ToArray(),
+                "The fixture must compile"
+            );
+
+            return compilation
+                .WithAnalyzers(
+                    ImmutableArray.Create<DiagnosticAnalyzer>(new UnityObjectNullAnalyzer())
+                )
+                .GetAnalyzerDiagnosticsAsync()
+                .GetAwaiter()
+                .GetResult();
+        }
+
         [TestCase(
             "a field through ?.",
             @"private static GameObject Cached;
@@ -486,11 +574,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
             );
         }
 
-        private static string[] Messages(ImmutableArray<Diagnostic> reported)
-        {
-            return reported.Select(diagnostic => diagnostic.ToString()).ToArray();
-        }
-
         [TestCase("bool gone = probe is null;", "is null")]
         [TestCase("bool alive = probe is not null;", "is not null")]
         public void ANullPatternOnAUnityObjectIsReported(string body, string writtenOperator)
@@ -521,89 +604,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                     "static string text; static int? count; static void M() { bool a = text is null; bool b = count is null; }"
                 )
             );
-        }
-
-        private static Diagnostic Single(string body)
-        {
-            ImmutableArray<Diagnostic> reported = Analyze(body);
-            Assert.AreEqual(1, reported.Length, "Expected exactly one diagnostic");
-            return reported[0];
-        }
-
-        private static ImmutableArray<Diagnostic> Analyze(string body)
-        {
-            return Analyze(body, UnityStubs, ReportDiagnostic.Default);
-        }
-
-        /// <summary>
-        /// Compiles <paramref name="body"/> against <paramref name="stubs"/> and runs the analyzer
-        /// over it.
-        /// </summary>
-        /// <param name="body">Members of a static class in namespace <c>Consumer</c>.</param>
-        /// <param name="stubs">The world the fixture is compiled against.</param>
-        /// <param name="reportedAs">
-        /// What the compilation says about both diagnostics -- <see cref="ReportDiagnostic.Default"/>
-        /// for a consumer who configures nothing, or anything else for the ruleset /
-        /// <c>.editorconfig</c> entry they would write, expressed as the option Roslyn resolves both
-        /// of them to.
-        /// </param>
-        /// <returns>Everything the analyzer reported.</returns>
-        private static ImmutableArray<Diagnostic> Analyze(
-            string body,
-            string stubs,
-            ReportDiagnostic reportedAs
-        )
-        {
-            string source =
-                "namespace Consumer { using UnityEngine; public static class Subject { "
-                + body
-                + " } }\n"
-                + stubs;
-
-            List<MetadataReference> references = new List<MetadataReference>();
-            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
-                {
-                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
-                }
-            }
-
-            CSharpCompilation compilation = CSharpCompilation.Create(
-                "ConsumerAssembly",
-                new[]
-                {
-                    CSharpSyntaxTree.ParseText(
-                        source,
-                        new CSharpParseOptions(LanguageVersion.CSharp9)
-                    ),
-                },
-                references,
-                new CSharpCompilationOptions(
-                    OutputKind.DynamicallyLinkedLibrary
-                ).WithSpecificDiagnosticOptions(
-                    ImmutableDictionary<string, ReportDiagnostic>
-                        .Empty.Add(NullPropagationId, reportedAs)
-                        .Add(NullAssertionId, reportedAs)
-                )
-            );
-
-            ImmutableArray<Diagnostic> compileErrors = compilation
-                .GetDiagnostics()
-                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-                .ToImmutableArray();
-            Assert.IsEmpty(
-                compileErrors.Select(diagnostic => diagnostic.ToString()).ToArray(),
-                "The fixture must compile"
-            );
-
-            return compilation
-                .WithAnalyzers(
-                    ImmutableArray.Create<DiagnosticAnalyzer>(new UnityObjectNullAnalyzer())
-                )
-                .GetAnalyzerDiagnosticsAsync()
-                .GetAwaiter()
-                .GetResult();
         }
     }
 }

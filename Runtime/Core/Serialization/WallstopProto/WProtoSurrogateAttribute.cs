@@ -55,6 +55,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     public sealed class WProtoSurrogateAttribute : Attribute
     {
         /// <summary>
+        /// The type that appears on contracts and has no wire shape of its own.
+        /// </summary>
+        public Type RealType { get; }
+
+        /// <summary>The <c>[WProtoContract]</c> whose members define the bytes.</summary>
+        public Type SurrogateType { get; }
+
+        /// <summary>
         /// Initializes the attribute with the pair it maps.
         /// </summary>
         /// <param name="realType">
@@ -68,13 +76,5 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             RealType = realType;
             SurrogateType = surrogateType;
         }
-
-        /// <summary>
-        /// The type that appears on contracts and has no wire shape of its own.
-        /// </summary>
-        public Type RealType { get; }
-
-        /// <summary>The <c>[WProtoContract]</c> whose members define the bytes.</summary>
-        public Type SurrogateType { get; }
     }
 }

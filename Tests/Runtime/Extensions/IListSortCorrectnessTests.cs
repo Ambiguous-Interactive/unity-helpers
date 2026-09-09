@@ -25,6 +25,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         private const int ExhaustiveDomainCaseCount = 9054;
         private const int ReducedDomainCaseCount = 518;
 
+        private static IEnumerable<TestCaseData> SortAlgorithmCases
+        {
+            get
+            {
+                foreach (SortAlgorithm algorithm in EveryAlgorithm())
+                {
+                    yield return new TestCaseData(algorithm).SetName($"Exhaustive.{algorithm}");
+                }
+            }
+        }
+
+        private static IEnumerable<TestCaseData> SortAlgorithmBackingCases
+        {
+            get
+            {
+                foreach (SortAlgorithm algorithm in EveryAlgorithm())
+                {
+                    for (int backing = 0; backing < BackingNames.Length; ++backing)
+                    {
+                        yield return new TestCaseData(algorithm, backing).SetName(
+                            $"Backing.{algorithm}.{BackingNames[backing].Replace("<T>", string.Empty).Replace("[]", "Array")}"
+                        );
+                    }
+                }
+            }
+        }
+
         /*
             Stability expectations follow the SortAlgorithm API contract and the algorithm table in
             docs/performance/ilist-sorting-performance.md.
@@ -111,31 +138,64 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             ("nearlySorted", static (index, _) => index % 16 == 0 ? index + 5 : index),
         };
 
-        private static IEnumerable<TestCaseData> SortAlgorithmCases
+        internal static IList<SortProbe> CreateBacking(int backing, int[] keys)
         {
-            get
+            SortProbe[] probes = new SortProbe[keys.Length];
+            for (int i = 0; i < keys.Length; ++i)
             {
-                foreach (SortAlgorithm algorithm in EveryAlgorithm())
+                probes[i] = new SortProbe(keys[i], i);
+            }
+
+            switch (backing)
+            {
+                case 0:
                 {
-                    yield return new TestCaseData(algorithm).SetName($"Exhaustive.{algorithm}");
+                    return probes;
+                }
+                case 1:
+                {
+                    return new List<SortProbe>(probes);
+                }
+                case 2:
+                {
+                    SerializableList<SortProbe> serializable = new();
+                    serializable.AddRange(probes);
+                    return serializable;
+                }
+                case 3:
+                {
+                    IndexerOnlyList<SortProbe> indexed = new();
+                    indexed.AddRange(probes);
+                    return indexed;
+                }
+                default:
+                {
+                    NodeChainList<SortProbe> chained = new();
+                    chained.AddRange(probes);
+                    return chained;
                 }
             }
         }
 
-        private static IEnumerable<TestCaseData> SortAlgorithmBackingCases
+        internal static string Describe(int[] keys)
         {
-            get
+            if (32 < keys.Length)
             {
-                foreach (SortAlgorithm algorithm in EveryAlgorithm())
-                {
-                    for (int backing = 0; backing < BackingNames.Length; ++backing)
-                    {
-                        yield return new TestCaseData(algorithm, backing).SetName(
-                            $"Backing.{algorithm}.{BackingNames[backing].Replace("<T>", string.Empty).Replace("[]", "Array")}"
-                        );
-                    }
-                }
+                return "length " + keys.Length;
             }
+
+            StringBuilder builder = new("[");
+            for (int i = 0; i < keys.Length; ++i)
+            {
+                if (0 < i)
+                {
+                    builder.Append(',');
+                }
+
+                builder.Append(keys[i]);
+            }
+
+            return builder.Append(']').ToString();
         }
 
         private static IEnumerable<SortAlgorithm> EveryAlgorithm()
@@ -150,6 +210,89 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 }
 
                 yield return algorithm;
+            }
+        }
+
+        private static bool PromisedStabilityFor(SortAlgorithm algorithm)
+        {
+            Assert.That(
+                PromisedStability.TryGetValue(algorithm, out bool stable),
+                Is.True,
+                $"{algorithm} has no documented stability promise to verify against"
+            );
+            return stable;
+        }
+
+        private static IEnumerable<int> SizesFor(int backing)
+        {
+            foreach (int size in ShapeSizes)
+            {
+                if (backing == BackingNames.Length - 1 && ChainedBackingMaximumSize < size)
+                {
+                    continue;
+                }
+
+                yield return size;
+            }
+        }
+
+        private static void AuditEverySequence(SortAudit audit, int alphabet, int maximumLength)
+        {
+            for (int length = 0; length <= maximumLength; ++length)
+            {
+                int[] keys = new int[length];
+                while (true)
+                {
+                    audit.Run(keys, "sequence");
+
+                    int index = length - 1;
+                    while (0 <= index)
+                    {
+                        keys[index]++;
+                        if (keys[index] < alphabet)
+                        {
+                            break;
+                        }
+
+                        keys[index] = 0;
+                        index--;
+                    }
+
+                    if (index < 0)
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+
+        private static void AuditEveryPermutation(SortAudit audit, int maximumLength)
+        {
+            for (int length = 0; length <= maximumLength; ++length)
+            {
+                int[] keys = new int[length];
+                for (int i = 0; i < length; ++i)
+                {
+                    keys[i] = i;
+                }
+
+                AuditPermutationsFrom(audit, keys, 0);
+            }
+        }
+
+        private static void AuditPermutationsFrom(SortAudit audit, int[] keys, int start)
+        {
+            if (start == keys.Length)
+            {
+                audit.Run(keys, "permutation");
+                return;
+            }
+
+            for (int i = start; i < keys.Length; ++i)
+            {
+                (keys[start], keys[i]) = (keys[i], keys[start]);
+                AuditPermutationsFrom(audit, keys, start + 1);
+                (keys[start], keys[i]) = (keys[i], keys[start]);
             }
         }
 
@@ -275,149 +418,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 $"{algorithm} over {BackingNames[backing]} enumerated the wrong domain"
             );
             Assert.That(audit.Failure, Is.Null, audit.Failure);
-        }
-
-        private static bool PromisedStabilityFor(SortAlgorithm algorithm)
-        {
-            Assert.That(
-                PromisedStability.TryGetValue(algorithm, out bool stable),
-                Is.True,
-                $"{algorithm} has no documented stability promise to verify against"
-            );
-            return stable;
-        }
-
-        private static IEnumerable<int> SizesFor(int backing)
-        {
-            foreach (int size in ShapeSizes)
-            {
-                if (backing == BackingNames.Length - 1 && ChainedBackingMaximumSize < size)
-                {
-                    continue;
-                }
-
-                yield return size;
-            }
-        }
-
-        private static void AuditEverySequence(SortAudit audit, int alphabet, int maximumLength)
-        {
-            for (int length = 0; length <= maximumLength; ++length)
-            {
-                int[] keys = new int[length];
-                while (true)
-                {
-                    audit.Run(keys, "sequence");
-
-                    int index = length - 1;
-                    while (0 <= index)
-                    {
-                        keys[index]++;
-                        if (keys[index] < alphabet)
-                        {
-                            break;
-                        }
-
-                        keys[index] = 0;
-                        index--;
-                    }
-
-                    if (index < 0)
-                    {
-                        break;
-                    }
-                }
-            }
-        }
-
-        private static void AuditEveryPermutation(SortAudit audit, int maximumLength)
-        {
-            for (int length = 0; length <= maximumLength; ++length)
-            {
-                int[] keys = new int[length];
-                for (int i = 0; i < length; ++i)
-                {
-                    keys[i] = i;
-                }
-
-                AuditPermutationsFrom(audit, keys, 0);
-            }
-        }
-
-        private static void AuditPermutationsFrom(SortAudit audit, int[] keys, int start)
-        {
-            if (start == keys.Length)
-            {
-                audit.Run(keys, "permutation");
-                return;
-            }
-
-            for (int i = start; i < keys.Length; ++i)
-            {
-                (keys[start], keys[i]) = (keys[i], keys[start]);
-                AuditPermutationsFrom(audit, keys, start + 1);
-                (keys[start], keys[i]) = (keys[i], keys[start]);
-            }
-        }
-
-        internal static IList<SortProbe> CreateBacking(int backing, int[] keys)
-        {
-            SortProbe[] probes = new SortProbe[keys.Length];
-            for (int i = 0; i < keys.Length; ++i)
-            {
-                probes[i] = new SortProbe(keys[i], i);
-            }
-
-            switch (backing)
-            {
-                case 0:
-                {
-                    return probes;
-                }
-                case 1:
-                {
-                    return new List<SortProbe>(probes);
-                }
-                case 2:
-                {
-                    SerializableList<SortProbe> serializable = new();
-                    serializable.AddRange(probes);
-                    return serializable;
-                }
-                case 3:
-                {
-                    IndexerOnlyList<SortProbe> indexed = new();
-                    indexed.AddRange(probes);
-                    return indexed;
-                }
-                default:
-                {
-                    NodeChainList<SortProbe> chained = new();
-                    chained.AddRange(probes);
-                    return chained;
-                }
-            }
-        }
-
-        internal static string Describe(int[] keys)
-        {
-            if (32 < keys.Length)
-            {
-                return "length " + keys.Length;
-            }
-
-            StringBuilder builder = new("[");
-            for (int i = 0; i < keys.Length; ++i)
-            {
-                if (0 < i)
-                {
-                    builder.Append(',');
-                }
-
-                builder.Append(keys[i]);
-            }
-
-            return builder.Append(']').ToString();
         }
 
         /// <summary>An element carrying its original position so a sort can be audited.</summary>

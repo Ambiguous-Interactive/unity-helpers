@@ -28,21 +28,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
         private bool _wasMemoryPressureEnabled;
 
-        [SetUp]
-        public void SetUp()
-        {
-            PoolPurgeSettings.ResetToDefaults();
-            _wasMemoryPressureEnabled = MemoryPressureMonitor.Enabled;
-            MemoryPressureMonitor.Enabled = false;
-        }
-
-        [TearDown]
-        public void TearDown()
-        {
-            PoolPurgeSettings.ResetToDefaults();
-            MemoryPressureMonitor.Enabled = _wasMemoryPressureEnabled;
-        }
-
         private static long MeasureRentReturnCycles(
             WallstopGenericPool<List<int>> pool,
             int warmupIterations,
@@ -187,6 +172,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 DefaultBudgetMs,
                 0.001f
             ).SetName("Trigger.Periodic.ShortInterval.CompletesWithinBudget");
+        }
+
+        [SetUp]
+        public void SetUp()
+        {
+            PoolPurgeSettings.ResetToDefaults();
+            _wasMemoryPressureEnabled = MemoryPressureMonitor.Enabled;
+            MemoryPressureMonitor.Enabled = false;
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            PoolPurgeSettings.ResetToDefaults();
+            MemoryPressureMonitor.Enabled = _wasMemoryPressureEnabled;
         }
 
         [Test]

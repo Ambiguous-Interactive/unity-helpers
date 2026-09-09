@@ -19,6 +19,38 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
     public sealed class WNotNullPropertyDrawer : PropertyDrawer
     {
         /// <summary>
+        /// Checks if the property value is null.
+        /// </summary>
+        /// <param name="property">The property to check.</param>
+        /// <returns>True if the property value is null.</returns>
+        internal static bool IsPropertyNull(SerializedProperty property)
+        {
+            return ValidationShared.IsPropertyNull(property);
+        }
+
+        /// <summary>
+        /// Draws a validation HelpBox for the property if it is null.
+        /// Call this from custom editors for array/list properties that won't have
+        /// their PropertyDrawer invoked at the array level.
+        /// </summary>
+        /// <returns>True if a HelpBox was drawn, false otherwise.</returns>
+        internal static bool DrawValidationHelpBoxIfNeeded(
+            SerializedProperty property,
+            WNotNullAttribute notNullAttribute
+        )
+        {
+            return ValidationShared.DrawNotNullHelpBoxIfNeeded(property, notNullAttribute);
+        }
+
+        /// <summary>
+        /// Clears the height cache. Useful for tests or when font settings change.
+        /// </summary>
+        internal static void ClearHeightCache()
+        {
+            ValidationShared.ClearHeightCache();
+        }
+
+        /// <summary>
         /// Gets the total property height including the help box when the field is null.
         /// </summary>
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
@@ -103,16 +135,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             return container;
         }
 
-        /// <summary>
-        /// Checks if the property value is null.
-        /// </summary>
-        /// <param name="property">The property to check.</param>
-        /// <returns>True if the property value is null.</returns>
-        internal static bool IsPropertyNull(SerializedProperty property)
-        {
-            return ValidationShared.IsPropertyNull(property);
-        }
-
         private string GetMessage(SerializedProperty property)
         {
             WNotNullAttribute notNullAttribute = attribute as WNotNullAttribute;
@@ -129,28 +151,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         {
             WNotNullAttribute notNullAttribute = attribute as WNotNullAttribute;
             return ValidationShared.GetHelpBoxMessageType(notNullAttribute);
-        }
-
-        /// <summary>
-        /// Draws a validation HelpBox for the property if it is null.
-        /// Call this from custom editors for array/list properties that won't have
-        /// their PropertyDrawer invoked at the array level.
-        /// </summary>
-        /// <returns>True if a HelpBox was drawn, false otherwise.</returns>
-        internal static bool DrawValidationHelpBoxIfNeeded(
-            SerializedProperty property,
-            WNotNullAttribute notNullAttribute
-        )
-        {
-            return ValidationShared.DrawNotNullHelpBoxIfNeeded(property, notNullAttribute);
-        }
-
-        /// <summary>
-        /// Clears the height cache. Useful for tests or when font settings change.
-        /// </summary>
-        internal static void ClearHeightCache()
-        {
-            ValidationShared.ClearHeightCache();
         }
     }
 #endif

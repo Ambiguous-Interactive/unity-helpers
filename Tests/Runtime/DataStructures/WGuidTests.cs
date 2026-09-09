@@ -17,6 +17,17 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     {
         private const string NonVersionFourGuid = "00000000-0000-1000-8000-000000000000";
 
+        private static WGuid CreateLegacyWGuid(string value)
+        {
+            Guid legacyGuid = Guid.Parse(value);
+            byte[] bytes = legacyGuid.ToByteArray();
+            long low = unchecked((long)BinaryPrimitives.ReadUInt64LittleEndian(bytes.AsSpan(0, 8)));
+            long high = unchecked(
+                (long)BinaryPrimitives.ReadUInt64LittleEndian(bytes.AsSpan(8, 8))
+            );
+            return WGuid.CreateUnchecked(low, high);
+        }
+
         [Test]
         public void DefaultValueIsEmpty()
         {
@@ -291,17 +302,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         {
             byte[] bytes = Encoding.ASCII.GetBytes("too_short");
             Assert.Throws<ArgumentOutOfRangeException>(() => _ = new WGuid(bytes));
-        }
-
-        private static WGuid CreateLegacyWGuid(string value)
-        {
-            Guid legacyGuid = Guid.Parse(value);
-            byte[] bytes = legacyGuid.ToByteArray();
-            long low = unchecked((long)BinaryPrimitives.ReadUInt64LittleEndian(bytes.AsSpan(0, 8)));
-            long high = unchecked(
-                (long)BinaryPrimitives.ReadUInt64LittleEndian(bytes.AsSpan(8, 8))
-            );
-            return WGuid.CreateUnchecked(low, high);
         }
     }
 }

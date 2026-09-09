@@ -23,20 +23,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
     [NUnit.Framework.Category("Integration")]
     public sealed class WButtonIntegrationTests : BatchedEditorTestBase
     {
-        [SetUp]
-        public override void BaseSetUp()
-        {
-            base.BaseSetUp();
-            ClearWButtonCaches();
-        }
-
-        [TearDown]
-        public override void TearDown()
-        {
-            ClearWButtonCaches();
-            base.TearDown();
-        }
-
         private static void ClearWButtonCaches()
         {
             WButtonGUI.ClearGroupDataForTesting();
@@ -68,6 +54,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                     "^(System\\.)?InvalidOperationException: " + Regex.Escape(exceptionMessage)
                 )
             );
+        }
+
+        [SetUp]
+        public override void BaseSetUp()
+        {
+            base.BaseSetUp();
+            ClearWButtonCaches();
+        }
+
+        [TearDown]
+        public override void TearDown()
+        {
+            ClearWButtonCaches();
+            base.TearDown();
         }
 
         [Test]

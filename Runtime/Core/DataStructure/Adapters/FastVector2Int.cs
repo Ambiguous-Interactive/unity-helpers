@@ -41,70 +41,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             IUnderlyingValueProvider
     {
         /// <summary>
-        /// Represents the origin vector <c>(0, 0)</c>, useful as a default value without reallocation.
-        /// </summary>
-        /// <example>
-        /// <code>
-        /// FastVector2Int startCell = FastVector2Int.zero;
-        /// </code>
-        /// </example>
-        public static readonly FastVector2Int zero = new(0, 0);
-
-        [ProtoMember(1)]
-        [JsonIgnore]
-        public readonly int x;
-
-        [ProtoMember(2)]
-        [JsonIgnore]
-        public readonly int y;
-
-        // The hash is derived; legacy field 3 is intentionally omitted.
-        private readonly int _hash;
-
-        // A default struct stores zero, which must represent the origin hash without depending on static initialization order.
-        private static readonly int OriginHash = Objects.HashCode(0, 0);
-
-        /// <summary>
-        /// Initializes a new fast vector with integer components and a cached hash.
-        /// </summary>
-        /// <param name="x">The X component.</param>
-        /// <param name="y">The Y component.</param>
-        /// <example>
-        /// <code>
-        /// FastVector2Int waypoint = new FastVector2Int(12, -3);
-        /// </code>
-        /// </example>
-        [JsonConstructor]
-        public FastVector2Int(int x, int y)
-        {
-            this.x = x;
-            this.y = y;
-            _hash = Objects.HashCode(x, y);
-        }
-
-        /// <summary>
-        /// Gets the stored X component.
-        /// </summary>
-        /// <example>
-        /// <code>
-        /// int column = waypoint.X;
-        /// </code>
-        /// </example>
-        [JsonPropertyName("x")]
-        public int X => x;
-
-        /// <summary>
-        /// Gets the stored Y component.
-        /// </summary>
-        /// <example>
-        /// <code>
-        /// int row = waypoint.Y;
-        /// </code>
-        /// </example>
-        [JsonPropertyName("y")]
-        public int Y => y;
-
-        /// <summary>
         /// Determines whether two fast vectors are equal by comparing their components.
         /// </summary>
         /// <param name="lhs">The left-hand vector.</param>
@@ -136,6 +72,70 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         public static bool operator !=(FastVector2Int lhs, FastVector2Int rhs)
         {
             return !lhs.Equals(rhs);
+        }
+
+        /// <summary>
+        /// Represents the origin vector <c>(0, 0)</c>, useful as a default value without reallocation.
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// FastVector2Int startCell = FastVector2Int.zero;
+        /// </code>
+        /// </example>
+        public static readonly FastVector2Int zero = new(0, 0);
+
+        // A default struct stores zero, which must represent the origin hash without depending on static initialization order.
+        private static readonly int OriginHash = Objects.HashCode(0, 0);
+
+        /// <summary>
+        /// Gets the stored X component.
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// int column = waypoint.X;
+        /// </code>
+        /// </example>
+        [JsonPropertyName("x")]
+        public int X => x;
+
+        /// <summary>
+        /// Gets the stored Y component.
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// int row = waypoint.Y;
+        /// </code>
+        /// </example>
+        [JsonPropertyName("y")]
+        public int Y => y;
+
+        [ProtoMember(1)]
+        [JsonIgnore]
+        public readonly int x;
+
+        [ProtoMember(2)]
+        [JsonIgnore]
+        public readonly int y;
+
+        // The hash is derived; legacy field 3 is intentionally omitted.
+        private readonly int _hash;
+
+        /// <summary>
+        /// Initializes a new fast vector with integer components and a cached hash.
+        /// </summary>
+        /// <param name="x">The X component.</param>
+        /// <param name="y">The Y component.</param>
+        /// <example>
+        /// <code>
+        /// FastVector2Int waypoint = new FastVector2Int(12, -3);
+        /// </code>
+        /// </example>
+        [JsonConstructor]
+        public FastVector2Int(int x, int y)
+        {
+            this.x = x;
+            this.y = y;
+            _hash = Objects.HashCode(x, y);
         }
 
         /// <summary>
@@ -417,12 +417,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             return obj is FastVector2Int vector && Equals(vector);
         }
 
-        bool IUnderlyingValueProvider.TryGetUnderlyingValue(out object value)
-        {
-            value = (Vector2Int)this;
-            return true;
-        }
-
         /// <summary>
         /// Returns the cached hash code so this vector can be used as a deterministic key in dictionaries and sets.
         /// </summary>
@@ -522,6 +516,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         public Vector3 AsVector3()
         {
             return new Vector3(x, y);
+        }
+
+        bool IUnderlyingValueProvider.TryGetUnderlyingValue(out object value)
+        {
+            value = (Vector2Int)this;
+            return true;
         }
     }
 }

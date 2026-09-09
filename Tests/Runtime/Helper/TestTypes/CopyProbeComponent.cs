@@ -8,18 +8,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
     internal sealed class CopyProbeComponent : MonoBehaviour
     {
-        public int PublicValue;
-
-        [SerializeField]
-        private string _serializedValue;
         public Vector3 AutomaticProperty { get; private set; }
-
-        [SerializeField]
-        private List<int> _values = new();
 
         public IReadOnlyList<int> Values => _values;
 
         public string SerializedValue => _serializedValue;
+
+        public int PublicValue;
+
+        [SerializeField]
+        private string _serializedValue;
+
+        [SerializeField]
+        private List<int> _values = new();
 
         public void Configure(int value, string serialized, Vector3 vector)
         {

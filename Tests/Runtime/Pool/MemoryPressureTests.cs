@@ -20,11 +20,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
     {
         private float _currentTime;
 
-        private float TestTimeProvider()
-        {
-            return _currentTime;
-        }
-
         [SetUp]
         public void SetUp()
         {
@@ -1192,11 +1187,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             Assert.IsEmpty(exceptions, "Concurrent property reads and writes should not throw");
         }
 
+        private float TestTimeProvider()
+        {
+            return _currentTime;
+        }
+
         private sealed class TestPoolItem
         {
-            public int Id { get; }
-
             private static int _nextId;
+
+            public int Id { get; }
 
             public TestPoolItem()
             {

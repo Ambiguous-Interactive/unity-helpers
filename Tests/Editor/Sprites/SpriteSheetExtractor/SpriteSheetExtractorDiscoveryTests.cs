@@ -52,6 +52,130 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         /// </remarks>
         protected override string SharedDir => SharedSpriteTestFixtures.GetSharedDirectory();
 
+        private static IEnumerable<TestCaseData> ExtractionModeCases()
+        {
+            yield return new TestCaseData(SpriteSheetExtractor.ExtractionMode.FromMetadata).SetName(
+                "ExtractionMode.FromMetadata"
+            );
+            yield return new TestCaseData(SpriteSheetExtractor.ExtractionMode.GridBased).SetName(
+                "ExtractionMode.GridBased"
+            );
+            yield return new TestCaseData(SpriteSheetExtractor.ExtractionMode.PaddedGrid).SetName(
+                "ExtractionMode.PaddedGrid"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> EntryWithPartialOverridesCases()
+        {
+            yield return new TestCaseData(true, false, false, false).SetName(
+                "PartialOverrides.ExtractionModeOnly"
+            );
+            yield return new TestCaseData(false, true, false, false).SetName(
+                "PartialOverrides.GridSizeModeOnly"
+            );
+            yield return new TestCaseData(false, false, true, true).SetName(
+                "PartialOverrides.GridDimensionsOnly"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> DiscoveryVariousAspectRatiosCases()
+        {
+            yield return new TestCaseData("wide", 8).SetName("Discovery.WideAspectRatio");
+            yield return new TestCaseData("tall", 8).SetName("Discovery.TallAspectRatio");
+            yield return new TestCaseData("odd", 9).SetName("Discovery.OddDimensions");
+        }
+
+        private static IEnumerable<TestCaseData> SelectAllVariousSheetTypesCases()
+        {
+            yield return new TestCaseData("2x2", 4).SetName("SelectAll.2x2Sheet");
+            yield return new TestCaseData("4x4", 16).SetName("SelectAll.4x4Sheet");
+            yield return new TestCaseData("8x8", 64).SetName("SelectAll.8x8Sheet");
+        }
+
+        private static IEnumerable<TestCaseData> SortModeTestCases()
+        {
+            yield return new TestCaseData(SpriteSheetExtractor.SortMode.ByPositionTopLeft).SetName(
+                "SortMode.ByPositionTopLeft"
+            );
+            yield return new TestCaseData(
+                SpriteSheetExtractor.SortMode.ByPositionBottomLeft
+            ).SetName("SortMode.ByPositionBottomLeft");
+        }
+
+        private static IEnumerable<TestCaseData> PreviewTextureSizeCases()
+        {
+            yield return new TestCaseData(32, 32).SetName("PreviewTexture.32x32");
+            yield return new TestCaseData(64, 64).SetName("PreviewTexture.64x64");
+            yield return new TestCaseData(128, 128).SetName("PreviewTexture.128x128");
+            yield return new TestCaseData(16, 16).SetName("PreviewTexture.16x16");
+        }
+
+        private static IEnumerable<TestCaseData> OddDimensionCases()
+        {
+            yield return new TestCaseData(33, 33).SetName("PreviewTexture.Odd.33x33");
+            yield return new TestCaseData(65, 65).SetName("PreviewTexture.Odd.65x65");
+            yield return new TestCaseData(127, 127).SetName("PreviewTexture.Odd.127x127");
+        }
+
+        private static IEnumerable<TestCaseData> AspectRatioCases()
+        {
+            yield return new TestCaseData(128, 64).SetName("PreviewTexture.Aspect.2to1");
+            yield return new TestCaseData(64, 128).SetName("PreviewTexture.Aspect.1to2");
+            yield return new TestCaseData(256, 64).SetName("PreviewTexture.Aspect.4to1");
+        }
+
+        private static IEnumerable<TestCaseData> PreviewDimensionCases()
+        {
+            yield return new TestCaseData(SpriteSheetExtractor.PreviewSizeMode.Size24, 24).SetName(
+                "PreviewDimension.Size24"
+            );
+            yield return new TestCaseData(SpriteSheetExtractor.PreviewSizeMode.Size32, 32).SetName(
+                "PreviewDimension.Size32"
+            );
+            yield return new TestCaseData(SpriteSheetExtractor.PreviewSizeMode.Size64, 64).SetName(
+                "PreviewDimension.Size64"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> DuplicateRectHandlingCases()
+        {
+            yield return new TestCaseData(true).SetName("DuplicateRects.WithRegeneration");
+            yield return new TestCaseData(false).SetName("DuplicateRects.WithoutRegeneration");
+        }
+
+        private static IEnumerable<TestCaseData> SettingsToggleCases()
+        {
+            yield return new TestCaseData(true, false).SetName("SettingsToggle.GlobalToOverride");
+            yield return new TestCaseData(false, true).SetName("SettingsToggle.OverrideToGlobal");
+        }
+
+        private static IEnumerable<TestCaseData> SlicingButtonVisibilityCases()
+        {
+            yield return new TestCaseData(
+                SpriteSheetExtractor.ExtractionMode.GridBased,
+                true
+            ).SetName("SlicingButton.GridBased.Visible");
+            yield return new TestCaseData(
+                SpriteSheetExtractor.ExtractionMode.PaddedGrid,
+                true
+            ).SetName("SlicingButton.PaddedGrid.Visible");
+            yield return new TestCaseData(
+                SpriteSheetExtractor.ExtractionMode.FromMetadata,
+                false
+            ).SetName("SlicingButton.FromMetadata.Hidden");
+            yield return new TestCaseData(
+                SpriteSheetExtractor.ExtractionMode.AlphaDetection,
+                false
+            ).SetName("SlicingButton.AlphaDetection.Hidden");
+        }
+
+        private static IEnumerable<TestCaseData> AsymmetricNPOTCases()
+        {
+            yield return new TestCaseData(100, 200).SetName("NPOT.100x200");
+            yield return new TestCaseData(150, 75).SetName("NPOT.150x75");
+            yield return new TestCaseData(300, 100).SetName("NPOT.300x100");
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -109,26 +233,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             SharedSpriteTestFixtures.ReleaseFixtures();
             CleanupDeferredAssetsAndFolders();
             base.OneTimeTearDown();
-        }
-
-        private void AssertAllSpritesHaveSelection(
-            SpriteSheetExtractor.SpriteSheetEntry entry,
-            bool expectedSelection,
-            string testContext
-        )
-        {
-            Assert.IsTrue(
-                entry != null,
-                $"[{testContext}] Entry should not be null when checking selection state"
-            );
-            for (int i = 0; i < entry._sprites.Count; i++)
-            {
-                Assert.That(
-                    entry._sprites[i]._isSelected,
-                    Is.EqualTo(expectedSelection),
-                    $"[{testContext}] Sprite {i} ('{entry._sprites[i]._originalName}') should have selection={expectedSelection}"
-                );
-            }
         }
 
         [Test]
@@ -268,19 +372,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 }
             }
             Assert.IsTrue(found, "Should find shared_4x4");
-        }
-
-        private static IEnumerable<TestCaseData> ExtractionModeCases()
-        {
-            yield return new TestCaseData(SpriteSheetExtractor.ExtractionMode.FromMetadata).SetName(
-                "ExtractionMode.FromMetadata"
-            );
-            yield return new TestCaseData(SpriteSheetExtractor.ExtractionMode.GridBased).SetName(
-                "ExtractionMode.GridBased"
-            );
-            yield return new TestCaseData(SpriteSheetExtractor.ExtractionMode.PaddedGrid).SetName(
-                "ExtractionMode.PaddedGrid"
-            );
         }
 
         [Test]
@@ -503,19 +594,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             }
         }
 
-        private static IEnumerable<TestCaseData> EntryWithPartialOverridesCases()
-        {
-            yield return new TestCaseData(true, false, false, false).SetName(
-                "PartialOverrides.ExtractionModeOnly"
-            );
-            yield return new TestCaseData(false, true, false, false).SetName(
-                "PartialOverrides.GridSizeModeOnly"
-            );
-            yield return new TestCaseData(false, false, true, true).SetName(
-                "PartialOverrides.GridDimensionsOnly"
-            );
-        }
-
         [Test]
         [TestCaseSource(nameof(EntryWithPartialOverridesCases))]
         public void EntryWithPartialOverridesUsesGlobalForNullFields(
@@ -672,13 +750,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Assert.That(entry._sprites.Count, Is.Not.EqualTo(globalCount));
         }
 
-        private static IEnumerable<TestCaseData> DiscoveryVariousAspectRatiosCases()
-        {
-            yield return new TestCaseData("wide", 8).SetName("Discovery.WideAspectRatio");
-            yield return new TestCaseData("tall", 8).SetName("Discovery.TallAspectRatio");
-            yield return new TestCaseData("odd", 9).SetName("Discovery.OddDimensions");
-        }
-
         [Test]
         [TestCaseSource(nameof(DiscoveryVariousAspectRatiosCases))]
         public void DiscoveryFindsSpriteSheetWithVariousAspectRatiosAndDimensions(
@@ -709,13 +780,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 Is.EqualTo(expectedSpriteCount),
                 $"{sheetType} sheet should have {expectedSpriteCount} sprites"
             );
-        }
-
-        private static IEnumerable<TestCaseData> SelectAllVariousSheetTypesCases()
-        {
-            yield return new TestCaseData("2x2", 4).SetName("SelectAll.2x2Sheet");
-            yield return new TestCaseData("4x4", 16).SetName("SelectAll.4x4Sheet");
-            yield return new TestCaseData("8x8", 64).SetName("SelectAll.8x8Sheet");
         }
 
         [Test]
@@ -1178,16 +1242,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Assert.IsTrue(foundSecond, "Should find sheet in second directory");
         }
 
-        private static IEnumerable<TestCaseData> SortModeTestCases()
-        {
-            yield return new TestCaseData(SpriteSheetExtractor.SortMode.ByPositionTopLeft).SetName(
-                "SortMode.ByPositionTopLeft"
-            );
-            yield return new TestCaseData(
-                SpriteSheetExtractor.SortMode.ByPositionBottomLeft
-            ).SetName("SortMode.ByPositionBottomLeft");
-        }
-
         [Test]
         [TestCaseSource(nameof(SortModeTestCases))]
         public void SortModeWorksWithExtractionModes(SpriteSheetExtractor.SortMode sortMode)
@@ -1277,14 +1331,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             }
         }
 
-        private static IEnumerable<TestCaseData> PreviewTextureSizeCases()
-        {
-            yield return new TestCaseData(32, 32).SetName("PreviewTexture.32x32");
-            yield return new TestCaseData(64, 64).SetName("PreviewTexture.64x64");
-            yield return new TestCaseData(128, 128).SetName("PreviewTexture.128x128");
-            yield return new TestCaseData(16, 16).SetName("PreviewTexture.16x16");
-        }
-
         [Test]
         [TestCaseSource(nameof(PreviewTextureSizeCases))]
         public void PreviewTextureGenerationWorksWithVariousSizes(int width, int height)
@@ -1313,13 +1359,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Assert.Greater(entry._sprites.Count, 0);
         }
 
-        private static IEnumerable<TestCaseData> OddDimensionCases()
-        {
-            yield return new TestCaseData(33, 33).SetName("PreviewTexture.Odd.33x33");
-            yield return new TestCaseData(65, 65).SetName("PreviewTexture.Odd.65x65");
-            yield return new TestCaseData(127, 127).SetName("PreviewTexture.Odd.127x127");
-        }
-
         [Test]
         [TestCaseSource(nameof(OddDimensionCases))]
         public void PreviewTextureGenerationWorksWithOddDimensions(int width, int height)
@@ -1345,13 +1384,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             }
 
             Assert.IsTrue(entry != null);
-        }
-
-        private static IEnumerable<TestCaseData> AspectRatioCases()
-        {
-            yield return new TestCaseData(128, 64).SetName("PreviewTexture.Aspect.2to1");
-            yield return new TestCaseData(64, 128).SetName("PreviewTexture.Aspect.1to2");
-            yield return new TestCaseData(256, 64).SetName("PreviewTexture.Aspect.4to1");
         }
 
         [Test]
@@ -1419,19 +1451,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
             Assert.IsTrue(entry != null);
             Assert.AreEqual(16, entry._sprites.Count);
-        }
-
-        private static IEnumerable<TestCaseData> PreviewDimensionCases()
-        {
-            yield return new TestCaseData(SpriteSheetExtractor.PreviewSizeMode.Size24, 24).SetName(
-                "PreviewDimension.Size24"
-            );
-            yield return new TestCaseData(SpriteSheetExtractor.PreviewSizeMode.Size32, 32).SetName(
-                "PreviewDimension.Size32"
-            );
-            yield return new TestCaseData(SpriteSheetExtractor.PreviewSizeMode.Size64, 64).SetName(
-                "PreviewDimension.Size64"
-            );
         }
 
         [Test]
@@ -1656,12 +1675,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Assert.DoesNotThrow(() => extractor.SchedulePreviewRegeneration(entry));
         }
 
-        private static IEnumerable<TestCaseData> DuplicateRectHandlingCases()
-        {
-            yield return new TestCaseData(true).SetName("DuplicateRects.WithRegeneration");
-            yield return new TestCaseData(false).SetName("DuplicateRects.WithoutRegeneration");
-        }
-
         [Test]
         [TestCaseSource(nameof(DuplicateRectHandlingCases))]
         public void SchedulePreviewRegenerationSpritesWithDuplicateRectsAreHandled(bool regenerate)
@@ -1827,12 +1840,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Assert.AreEqual(4, entry._sprites.Count, "Should have 4 sprites from 2x2 grid");
         }
 
-        private static IEnumerable<TestCaseData> SettingsToggleCases()
-        {
-            yield return new TestCaseData(true, false).SetName("SettingsToggle.GlobalToOverride");
-            yield return new TestCaseData(false, true).SetName("SettingsToggle.OverrideToGlobal");
-        }
-
         [Test]
         [TestCaseSource(nameof(SettingsToggleCases))]
         public void PreviewRegenerationAfterSettingsToggleProducesCorrectSpriteCount(
@@ -1886,26 +1893,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             extractor.GenerateAllPreviewTexturesInBatch(extractor._discoveredSheets);
 
             Assert.Greater(entry._sprites.Count, 0);
-        }
-
-        private static IEnumerable<TestCaseData> SlicingButtonVisibilityCases()
-        {
-            yield return new TestCaseData(
-                SpriteSheetExtractor.ExtractionMode.GridBased,
-                true
-            ).SetName("SlicingButton.GridBased.Visible");
-            yield return new TestCaseData(
-                SpriteSheetExtractor.ExtractionMode.PaddedGrid,
-                true
-            ).SetName("SlicingButton.PaddedGrid.Visible");
-            yield return new TestCaseData(
-                SpriteSheetExtractor.ExtractionMode.FromMetadata,
-                false
-            ).SetName("SlicingButton.FromMetadata.Hidden");
-            yield return new TestCaseData(
-                SpriteSheetExtractor.ExtractionMode.AlphaDetection,
-                false
-            ).SetName("SlicingButton.AlphaDetection.Hidden");
         }
 
         [Test]
@@ -2052,13 +2039,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Assert.AreEqual(256, entry._sprites.Count);
         }
 
-        private static IEnumerable<TestCaseData> AsymmetricNPOTCases()
-        {
-            yield return new TestCaseData(100, 200).SetName("NPOT.100x200");
-            yield return new TestCaseData(150, 75).SetName("NPOT.150x75");
-            yield return new TestCaseData(300, 100).SetName("NPOT.300x100");
-        }
-
         [Test]
         [TestCaseSource(nameof(AsymmetricNPOTCases))]
         public void PreviewGenerationWithAsymmetricNPOTDimensionsWorksCorrectly(
@@ -2160,6 +2140,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 Is.EqualTo(SpriteImportMode.Single),
                 "Single mode sprite should have Single import mode"
             );
+        }
+
+        private void AssertAllSpritesHaveSelection(
+            SpriteSheetExtractor.SpriteSheetEntry entry,
+            bool expectedSelection,
+            string testContext
+        )
+        {
+            Assert.IsTrue(
+                entry != null,
+                $"[{testContext}] Entry should not be null when checking selection state"
+            );
+            for (int i = 0; i < entry._sprites.Count; i++)
+            {
+                Assert.That(
+                    entry._sprites[i]._isSelected,
+                    Is.EqualTo(expectedSelection),
+                    $"[{testContext}] Sprite {i} ('{entry._sprites[i]._originalName}') should have selection={expectedSelection}"
+                );
+            }
         }
     }
 #endif

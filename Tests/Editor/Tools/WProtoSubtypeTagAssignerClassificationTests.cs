@@ -62,6 +62,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         private const string SecondOwnerAssembly =
             "WallstopStudios.UnityHelpers.Acceptance.Sibling";
 
+        private static Dictionary<string, string> ReadAcceptanceSources(string directory)
+        {
+            Dictionary<string, string> files = new Dictionary<string, string>(
+                StringComparer.Ordinal
+            );
+            foreach (
+                string path in Directory.EnumerateFiles(
+                    directory,
+                    "*.cs",
+                    SearchOption.AllDirectories
+                )
+            )
+            {
+                files.Add(path, File.ReadAllText(path));
+            }
+            return files;
+        }
+
         [Test]
         public void NativeSiblingOwnersRefuseAssignmentAndThePlayerBuildGate()
         {
@@ -103,24 +121,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             );
             StringAssert.Contains(FirstOwnerAssembly, refusal.Message);
             StringAssert.Contains(SecondOwnerAssembly, refusal.Message);
-        }
-
-        private static Dictionary<string, string> ReadAcceptanceSources(string directory)
-        {
-            Dictionary<string, string> files = new Dictionary<string, string>(
-                StringComparer.Ordinal
-            );
-            foreach (
-                string path in Directory.EnumerateFiles(
-                    directory,
-                    "*.cs",
-                    SearchOption.AllDirectories
-                )
-            )
-            {
-                files.Add(path, File.ReadAllText(path));
-            }
-            return files;
         }
 
         /// <summary>

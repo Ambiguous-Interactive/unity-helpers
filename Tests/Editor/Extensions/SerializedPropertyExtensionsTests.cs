@@ -37,14 +37,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             base.TearDown();
         }
 
-        private SerializedObject CreateSo(out SerializedPropertyExtensionsTestContainer container)
-        {
-            container = Track(
-                ScriptableObject.CreateInstance<SerializedPropertyExtensionsTestContainer>()
-            );
-            return new SerializedObject(container);
-        }
-
         [Test]
         public void GetEnclosingObjectSimpleFieldReturnsOwnerAndFieldInfo()
         {
@@ -173,6 +165,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.NotNull(field);
             Assert.AreEqual("privateString", field.Name);
             Assert.AreEqual(typeof(string), field.FieldType);
+        }
+
+        private SerializedObject CreateSo(out SerializedPropertyExtensionsTestContainer container)
+        {
+            container = Track(
+                ScriptableObject.CreateInstance<SerializedPropertyExtensionsTestContainer>()
+            );
+            return new SerializedObject(container);
         }
     }
 #endif

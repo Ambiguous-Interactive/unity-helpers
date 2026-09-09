@@ -19,17 +19,15 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         // Reseed each test so a failing tree can be reproduced alone or within the fixture.
         private const uint RandomSeed = 0x5EED0301;
 
-        private IRandom _random = new PcgRandom(RandomSeed);
-
         private IRandom Random => _random;
+
+        private IRandom _random = new PcgRandom(RandomSeed);
 
         [SetUp]
         public void SeedSpatialTree3DRandom()
         {
             _random = new PcgRandom(RandomSeed);
         }
-
-        protected abstract TTree CreateTree(IEnumerable<Vector3> points);
 
         [Test]
         public void SimpleWithinSphere()
@@ -323,38 +321,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             CollectionAssert.AreEquivalent(points, results);
         }
 
-        private Vector3 GetRandomPointInSphere(Vector3 center, float radius)
-        {
-            float radiusSquared = radius * radius;
-
-            while (true)
-            {
-                Vector3 offset = new(
-                    Random.NextFloat(-radius, radius),
-                    Random.NextFloat(-radius, radius),
-                    Random.NextFloat(-radius, radius)
-                );
-
-                if (radiusSquared < offset.sqrMagnitude)
-                {
-                    continue;
-                }
-
-                Vector3 point = center + offset;
-
-                /*
-                    Adding and subtracting the center can lengthen the offset by a few ULPs; validate the
-                    rounded point with the same predicate as the tree.
-                */
-                if (radiusSquared < (point - center).sqrMagnitude)
-                {
-                    continue;
-                }
-
-                return point;
-            }
-        }
-
         [Test]
         public void GetElementsInRangeWithEmptyTreeReturnsEmpty()
         {
@@ -633,6 +599,40 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 results
             );
             Assert.IsEmpty(results);
+        }
+
+        protected abstract TTree CreateTree(IEnumerable<Vector3> points);
+
+        private Vector3 GetRandomPointInSphere(Vector3 center, float radius)
+        {
+            float radiusSquared = radius * radius;
+
+            while (true)
+            {
+                Vector3 offset = new(
+                    Random.NextFloat(-radius, radius),
+                    Random.NextFloat(-radius, radius),
+                    Random.NextFloat(-radius, radius)
+                );
+
+                if (radiusSquared < offset.sqrMagnitude)
+                {
+                    continue;
+                }
+
+                Vector3 point = center + offset;
+
+                /*
+                    Adding and subtracting the center can lengthen the offset by a few ULPs; validate the
+                    rounded point with the same predicate as the tree.
+                */
+                if (radiusSquared < (point - center).sqrMagnitude)
+                {
+                    continue;
+                }
+
+                return point;
+            }
         }
     }
 }

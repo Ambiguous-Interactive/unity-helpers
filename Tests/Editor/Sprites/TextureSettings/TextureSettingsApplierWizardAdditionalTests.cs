@@ -23,6 +23,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
     {
         private const string Root = "Assets/Temp/TextureSettingsApplierWizardAdditionalTests";
 
+        private static void CreateJpg(string relPath, int w, int h, Color c)
+        {
+            EnsureFolderStatic(Path.GetDirectoryName(relPath).SanitizePath());
+            Texture2D t = new(w, h, TextureFormat.RGB24, false);
+            Color[] pix = new Color[w * h];
+            for (int i = 0; i < pix.Length; i++)
+            {
+                pix[i] = c;
+            }
+
+            t.SetPixels(pix);
+            t.Apply();
+            File.WriteAllBytes(RelToFull(relPath), t.EncodeToJPG());
+        }
+
+        private static string RelToFull(string rel)
+        {
+            return Path.Combine(
+                    Application.dataPath.Substring(
+                        0,
+                        Application.dataPath.Length - "Assets".Length
+                    ),
+                    rel
+                )
+                .SanitizePath();
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -355,33 +382,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             t.SetPixels(pix);
             t.Apply();
             File.WriteAllBytes(RelToFull(relPath), t.EncodeToPNG());
-        }
-
-        private static void CreateJpg(string relPath, int w, int h, Color c)
-        {
-            EnsureFolderStatic(Path.GetDirectoryName(relPath).SanitizePath());
-            Texture2D t = new(w, h, TextureFormat.RGB24, false);
-            Color[] pix = new Color[w * h];
-            for (int i = 0; i < pix.Length; i++)
-            {
-                pix[i] = c;
-            }
-
-            t.SetPixels(pix);
-            t.Apply();
-            File.WriteAllBytes(RelToFull(relPath), t.EncodeToJPG());
-        }
-
-        private static string RelToFull(string rel)
-        {
-            return Path.Combine(
-                    Application.dataPath.Substring(
-                        0,
-                        Application.dataPath.Length - "Assets".Length
-                    ),
-                    rel
-                )
-                .SanitizePath();
         }
     }
 #endif

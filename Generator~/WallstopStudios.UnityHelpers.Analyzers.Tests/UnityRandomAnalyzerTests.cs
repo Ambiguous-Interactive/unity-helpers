@@ -77,6 +77,125 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                   }
               }";
 
+        private static string FindRepositoryRoot()
+        {
+            DirectoryInfo directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
+            while (directory != null)
+            {
+                if (Directory.Exists(Path.Combine(directory.FullName, "Runtime")))
+                {
+                    return directory.FullName;
+                }
+
+                directory = directory.Parent;
+            }
+
+            throw new DirectoryNotFoundException(
+                "Could not find the repository root above the test directory"
+            );
+        }
+
+        private static Diagnostic Single(string directives, string body, string shape)
+        {
+            ImmutableArray<Diagnostic> reported = Analyze(
+                directives,
+                body,
+                ReportDiagnostic.Default
+            );
+            Assert.AreEqual(1, reported.Length, shape + " must report exactly one diagnostic");
+            return reported[0];
+        }
+
+        private static ImmutableArray<Diagnostic> Analyze(string body)
+        {
+            return Analyze(string.Empty, body, ReportDiagnostic.Default);
+        }
+
+        /// <summary>
+        /// Compiles <paramref name="body"/> as members of a static class and runs the analyzer.
+        /// </summary>
+        /// <param name="directives">
+        /// Using directives placed inside <c>namespace Consumer</c>, which is where an alias or a
+        /// <c>using static</c> has to sit for the fixture to exercise it.
+        /// </param>
+        /// <param name="body">Members of a static class in namespace <c>Consumer</c>.</param>
+        /// <param name="reportedAs">
+        /// What the compilation says about the diagnostic -- <see cref="ReportDiagnostic.Default"/>
+        /// for a consumer who configures nothing, or anything else for the ruleset /
+        /// <c>.editorconfig</c> entry they would write, expressed as the option Roslyn resolves both
+        /// of them to.
+        /// </param>
+        /// <returns>Everything the analyzer reported.</returns>
+        private static ImmutableArray<Diagnostic> Analyze(
+            string directives,
+            string body,
+            ReportDiagnostic reportedAs
+        )
+        {
+            string source =
+                "namespace Consumer\n{\n"
+                + directives
+                + "\n    public static class Subject\n    {\n"
+                + body
+                + "\n    }\n}\n"
+                + UnityRandomStub;
+
+            return Run(Compile(source, reportedAs), "the fixture");
+        }
+
+        private static CSharpCompilation Compile(string source, ReportDiagnostic reportedAs)
+        {
+            List<MetadataReference> references = new List<MetadataReference>();
+            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
+                {
+                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
+                }
+            }
+
+            return CSharpCompilation.Create(
+                "ConsumerAssembly",
+                new[]
+                {
+                    CSharpSyntaxTree.ParseText(
+                        source,
+                        new CSharpParseOptions(LanguageVersion.CSharp9)
+                    ),
+                },
+                references,
+                new CSharpCompilationOptions(
+                    OutputKind.DynamicallyLinkedLibrary
+                ).WithSpecificDiagnosticOptions(
+                    ImmutableDictionary<string, ReportDiagnostic>.Empty.Add(
+                        DiagnosticId,
+                        reportedAs
+                    )
+                )
+            );
+        }
+
+        private static ImmutableArray<Diagnostic> Run(
+            CSharpCompilation compilation,
+            string described
+        )
+        {
+            ImmutableArray<Diagnostic> compileErrors = compilation
+                .GetDiagnostics()
+                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+                .ToImmutableArray();
+            Assert.IsEmpty(
+                compileErrors.Select(diagnostic => diagnostic.ToString()).ToArray(),
+                described + " must compile"
+            );
+
+            return compilation
+                .WithAnalyzers(ImmutableArray.Create<DiagnosticAnalyzer>(new UnityRandomAnalyzer()))
+                .GetAnalyzerDiagnosticsAsync()
+                .GetAwaiter()
+                .GetResult();
+        }
+
         [TestCase(
             "Range(int, int)",
             "",
@@ -477,125 +596,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                 source,
                 "the analyzer's exemption names this type"
             );
-        }
-
-        private static string FindRepositoryRoot()
-        {
-            DirectoryInfo directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-            while (directory != null)
-            {
-                if (Directory.Exists(Path.Combine(directory.FullName, "Runtime")))
-                {
-                    return directory.FullName;
-                }
-
-                directory = directory.Parent;
-            }
-
-            throw new DirectoryNotFoundException(
-                "Could not find the repository root above the test directory"
-            );
-        }
-
-        private static Diagnostic Single(string directives, string body, string shape)
-        {
-            ImmutableArray<Diagnostic> reported = Analyze(
-                directives,
-                body,
-                ReportDiagnostic.Default
-            );
-            Assert.AreEqual(1, reported.Length, shape + " must report exactly one diagnostic");
-            return reported[0];
-        }
-
-        private static ImmutableArray<Diagnostic> Analyze(string body)
-        {
-            return Analyze(string.Empty, body, ReportDiagnostic.Default);
-        }
-
-        /// <summary>
-        /// Compiles <paramref name="body"/> as members of a static class and runs the analyzer.
-        /// </summary>
-        /// <param name="directives">
-        /// Using directives placed inside <c>namespace Consumer</c>, which is where an alias or a
-        /// <c>using static</c> has to sit for the fixture to exercise it.
-        /// </param>
-        /// <param name="body">Members of a static class in namespace <c>Consumer</c>.</param>
-        /// <param name="reportedAs">
-        /// What the compilation says about the diagnostic -- <see cref="ReportDiagnostic.Default"/>
-        /// for a consumer who configures nothing, or anything else for the ruleset /
-        /// <c>.editorconfig</c> entry they would write, expressed as the option Roslyn resolves both
-        /// of them to.
-        /// </param>
-        /// <returns>Everything the analyzer reported.</returns>
-        private static ImmutableArray<Diagnostic> Analyze(
-            string directives,
-            string body,
-            ReportDiagnostic reportedAs
-        )
-        {
-            string source =
-                "namespace Consumer\n{\n"
-                + directives
-                + "\n    public static class Subject\n    {\n"
-                + body
-                + "\n    }\n}\n"
-                + UnityRandomStub;
-
-            return Run(Compile(source, reportedAs), "the fixture");
-        }
-
-        private static CSharpCompilation Compile(string source, ReportDiagnostic reportedAs)
-        {
-            List<MetadataReference> references = new List<MetadataReference>();
-            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
-                {
-                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
-                }
-            }
-
-            return CSharpCompilation.Create(
-                "ConsumerAssembly",
-                new[]
-                {
-                    CSharpSyntaxTree.ParseText(
-                        source,
-                        new CSharpParseOptions(LanguageVersion.CSharp9)
-                    ),
-                },
-                references,
-                new CSharpCompilationOptions(
-                    OutputKind.DynamicallyLinkedLibrary
-                ).WithSpecificDiagnosticOptions(
-                    ImmutableDictionary<string, ReportDiagnostic>.Empty.Add(
-                        DiagnosticId,
-                        reportedAs
-                    )
-                )
-            );
-        }
-
-        private static ImmutableArray<Diagnostic> Run(
-            CSharpCompilation compilation,
-            string described
-        )
-        {
-            ImmutableArray<Diagnostic> compileErrors = compilation
-                .GetDiagnostics()
-                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-                .ToImmutableArray();
-            Assert.IsEmpty(
-                compileErrors.Select(diagnostic => diagnostic.ToString()).ToArray(),
-                described + " must compile"
-            );
-
-            return compilation
-                .WithAnalyzers(ImmutableArray.Create<DiagnosticAnalyzer>(new UnityRandomAnalyzer()))
-                .GetAnalyzerDiagnosticsAsync()
-                .GetAwaiter()
-                .GetResult();
         }
     }
 }

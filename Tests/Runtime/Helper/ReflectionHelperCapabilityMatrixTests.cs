@@ -22,6 +22,62 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             CapabilityMode.Reflection,
         };
 
+        private static void RunInCapabilityMode(CapabilityMode mode, Action assertion)
+        {
+            switch (mode)
+            {
+                case CapabilityMode.Expressions:
+                    /*
+                        IL2CPP expression interpretation can reject typed generic delegates at call time; use
+                        the runtime capability probe.
+                    */
+                    if (!ReflectionHelpers.ExpressionsEnabled)
+                    {
+                        Assert.Ignore("Expression compilation is not available on this platform.");
+                    }
+
+                    using (
+                        ReflectionHelpers.OverrideReflectionCapabilities(
+                            expressions: true,
+                            dynamicIl: ReflectionHelpers.DynamicIlEnabled
+                        )
+                    )
+                    {
+                        assertion();
+                    }
+                    break;
+                case CapabilityMode.DynamicIl:
+                    if (!ReflectionHelpers.DynamicIlEnabled)
+                    {
+                        Assert.Ignore("Dynamic IL is not available on this platform.");
+                    }
+
+                    using (
+                        ReflectionHelpers.OverrideReflectionCapabilities(
+                            expressions: false,
+                            dynamicIl: true
+                        )
+                    )
+                    {
+                        assertion();
+                    }
+                    break;
+                case CapabilityMode.Reflection:
+                    using (
+                        ReflectionHelpers.OverrideReflectionCapabilities(
+                            expressions: false,
+                            dynamicIl: false
+                        )
+                    )
+                    {
+                        assertion();
+                    }
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(mode), mode, null);
+            }
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -2950,62 +3006,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     Assert.AreEqual(22, result);
                 }
             );
-        }
-
-        private static void RunInCapabilityMode(CapabilityMode mode, Action assertion)
-        {
-            switch (mode)
-            {
-                case CapabilityMode.Expressions:
-                    /*
-                        IL2CPP expression interpretation can reject typed generic delegates at call time; use
-                        the runtime capability probe.
-                    */
-                    if (!ReflectionHelpers.ExpressionsEnabled)
-                    {
-                        Assert.Ignore("Expression compilation is not available on this platform.");
-                    }
-
-                    using (
-                        ReflectionHelpers.OverrideReflectionCapabilities(
-                            expressions: true,
-                            dynamicIl: ReflectionHelpers.DynamicIlEnabled
-                        )
-                    )
-                    {
-                        assertion();
-                    }
-                    break;
-                case CapabilityMode.DynamicIl:
-                    if (!ReflectionHelpers.DynamicIlEnabled)
-                    {
-                        Assert.Ignore("Dynamic IL is not available on this platform.");
-                    }
-
-                    using (
-                        ReflectionHelpers.OverrideReflectionCapabilities(
-                            expressions: false,
-                            dynamicIl: true
-                        )
-                    )
-                    {
-                        assertion();
-                    }
-                    break;
-                case CapabilityMode.Reflection:
-                    using (
-                        ReflectionHelpers.OverrideReflectionCapabilities(
-                            expressions: false,
-                            dynamicIl: false
-                        )
-                    )
-                    {
-                        assertion();
-                    }
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(mode), mode, null);
-            }
         }
 
         public enum CapabilityMode

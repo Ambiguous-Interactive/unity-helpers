@@ -10,8 +10,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
     [NUnit.Framework.Category("Fast")]
     public sealed class DotNetRandomTests : RandomTestBase
     {
-        protected override IRandom NewRandom() => new DotNetRandom(DeterministicGuid);
-
         [Test]
         public void SnapshotPayloadRestoresExactSequence()
         {
@@ -62,5 +60,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                 Assert.AreEqual(original.Next(), restored.Next(), $"Mismatch at {i}");
             }
         }
+
+        protected override IRandom NewRandom() => new DotNetRandom(DeterministicGuid);
     }
 }

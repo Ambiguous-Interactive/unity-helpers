@@ -46,6 +46,70 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [NUnit.Framework.Category("Serialization")]
     public sealed class WProtoPortedContractTests
     {
+        /// <summary>
+        /// Asserts the encoding and that the payload reads back.
+        /// </summary>
+        /// <typeparam name="T">The contract type.</typeparam>
+        /// <param name="value">The value to encode.</param>
+        /// <param name="expectedHex">The bytes protobuf-net produces for this shape.</param>
+        /// <remarks>
+        /// Deliberately does not compare the decoded value to the original: most of these contracts
+        /// are reference types with no equality member, so the comparison would be by reference and
+        /// would fail on a perfectly correct read. Contracts that define equality use
+        /// <see cref="AssertBytesAndValue{T}"/>; the rest have their contents compared field by field
+        /// in the round-trip tests above.
+        /// </remarks>
+        private static void AssertBytes<T>(T value, string expectedHex)
+        {
+            byte[] encoded = Encode(value);
+
+            Assert.AreEqual(expectedHex, ToHex(encoded), typeof(T).Name);
+
+            WProtoReader reader = new WProtoReader(encoded);
+            Assert.IsTrue(
+                WProtoFormatterProvider.Get<T>().TryRead(ref reader, out T _),
+                typeof(T).Name + " refused its own bytes"
+            );
+        }
+
+        private static void AssertBytesAndValue<T>(T value, string expectedHex)
+        {
+            AssertBytes(value, expectedHex);
+            Assert.AreEqual(value, RoundTrip(value), typeof(T).Name);
+        }
+
+        private static T RoundTrip<T>(T value)
+        {
+            WProtoReader reader = new WProtoReader(Encode(value));
+            Assert.IsTrue(
+                WProtoFormatterProvider.Get<T>().TryRead(ref reader, out T restored),
+                typeof(T).Name + " refused its own bytes"
+            );
+            return restored;
+        }
+
+        private static byte[] Encode<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new WProtoWriter(buffer);
+
+            Assert.IsTrue(formatter.Write(ref writer, value), typeof(T).Name + " failed to write");
+
+            // Measure sizes buffers and nested prefixes; a short measurement truncates output.
+            Assert.AreEqual(
+                buffer.Length,
+                writer.Position,
+                typeof(T).Name + " measured a different length than it wrote"
+            );
+            return buffer;
+        }
+
+        private static string ToHex(byte[] bytes)
+        {
+            return BitConverter.ToString(bytes).Replace("-", string.Empty);
+        }
+
         [Test]
         public void AContractWithNoMembersEncodesToNothing()
         {
@@ -256,70 +320,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     "the restored generator diverged at draw " + index
                 );
             }
-        }
-
-        /// <summary>
-        /// Asserts the encoding and that the payload reads back.
-        /// </summary>
-        /// <typeparam name="T">The contract type.</typeparam>
-        /// <param name="value">The value to encode.</param>
-        /// <param name="expectedHex">The bytes protobuf-net produces for this shape.</param>
-        /// <remarks>
-        /// Deliberately does not compare the decoded value to the original: most of these contracts
-        /// are reference types with no equality member, so the comparison would be by reference and
-        /// would fail on a perfectly correct read. Contracts that define equality use
-        /// <see cref="AssertBytesAndValue{T}"/>; the rest have their contents compared field by field
-        /// in the round-trip tests above.
-        /// </remarks>
-        private static void AssertBytes<T>(T value, string expectedHex)
-        {
-            byte[] encoded = Encode(value);
-
-            Assert.AreEqual(expectedHex, ToHex(encoded), typeof(T).Name);
-
-            WProtoReader reader = new WProtoReader(encoded);
-            Assert.IsTrue(
-                WProtoFormatterProvider.Get<T>().TryRead(ref reader, out T _),
-                typeof(T).Name + " refused its own bytes"
-            );
-        }
-
-        private static void AssertBytesAndValue<T>(T value, string expectedHex)
-        {
-            AssertBytes(value, expectedHex);
-            Assert.AreEqual(value, RoundTrip(value), typeof(T).Name);
-        }
-
-        private static T RoundTrip<T>(T value)
-        {
-            WProtoReader reader = new WProtoReader(Encode(value));
-            Assert.IsTrue(
-                WProtoFormatterProvider.Get<T>().TryRead(ref reader, out T restored),
-                typeof(T).Name + " refused its own bytes"
-            );
-            return restored;
-        }
-
-        private static byte[] Encode<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new WProtoWriter(buffer);
-
-            Assert.IsTrue(formatter.Write(ref writer, value), typeof(T).Name + " failed to write");
-
-            // Measure sizes buffers and nested prefixes; a short measurement truncates output.
-            Assert.AreEqual(
-                buffer.Length,
-                writer.Position,
-                typeof(T).Name + " measured a different length than it wrote"
-            );
-            return buffer;
-        }
-
-        private static string ToHex(byte[] bytes)
-        {
-            return BitConverter.ToString(bytes).Replace("-", string.Empty);
         }
     }
 }

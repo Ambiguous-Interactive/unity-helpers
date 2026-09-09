@@ -27,48 +27,12 @@ namespace WallstopStudios.UnityHelpers.Editor
     public sealed class FitTextureSizeWindow : EditorWindow
     {
         private static bool SuppressUserPrompts { get; set; }
-
-        static FitTextureSizeWindow()
-        {
-            try
-            {
-                if (Application.isBatchMode || IsInvokedByTestRunner())
-                {
-                    SuppressUserPrompts = true;
-                }
-            }
-            catch { }
-        }
-
-        private static bool IsInvokedByTestRunner()
-        {
-            string[] args = Environment.GetCommandLineArgs();
-            foreach (string a in args)
-            {
-                if (
-                    0 <= a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
-                    || 0 <= a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)
-                    || 0 <= a.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase)
-                )
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
+        internal SerializedObject SerializedStateForTesting => _serializedObject;
 
         internal FitMode _fitMode = FitMode.GrowAndShrink;
 
         [SerializeField]
         internal List<Object> _textureSourcePaths = new();
-        private Vector2 _scrollPosition = Vector2.zero;
-        private SerializedObject _serializedObject;
-        internal SerializedObject SerializedStateForTesting => _serializedObject;
-        private SerializedProperty _textureSourcePathsProperty;
-        private int _potentialChangeCount = -1;
-        private int _potentialGrowCount;
-        private int _potentialShrinkCount;
-        private int _potentialUnchangedCount;
 
         // Label-query GUIDs avoid reloading per-asset labels for case-insensitive filtering.
         internal readonly HashSet<string> _labelQueryGuids = new();
@@ -112,11 +76,398 @@ namespace WallstopStudios.UnityHelpers.Editor
 
         [SerializeField]
         internal string _labelFilterCsv = string.Empty;
+        private Vector2 _scrollPosition = Vector2.zero;
+        private SerializedObject _serializedObject;
+        private SerializedProperty _textureSourcePathsProperty;
+        private int _potentialChangeCount = -1;
+        private int _potentialGrowCount;
+        private int _potentialShrinkCount;
+        private int _potentialUnchangedCount;
+
+        static FitTextureSizeWindow()
+        {
+            try
+            {
+                if (Application.isBatchMode || IsInvokedByTestRunner())
+                {
+                    SuppressUserPrompts = true;
+                }
+            }
+            catch { }
+        }
 
         [MenuItem("Tools/Wallstop Studios/Unity Helpers/Fit Texture Size", priority = -1)]
         public static void ShowWindow()
         {
             GetWindow<FitTextureSizeWindow>("Fit Texture Size");
+        }
+
+        /// <summary>
+        /// Computes the target <c>maxTextureSize</c> for a source texture given its dimensions,
+        /// its current max size, the fit mode, and the allowed min/max bounds. Pure: depends only
+        /// on integers, performs NO AssetDatabase/importer I/O, so it is exercised by fast unit
+        /// tests (<c>FitTextureSizeMathTests</c>) instead of full texture-import round-trips.
+        /// </summary>
+        internal static FitComputation ComputeFit(
+            int width,
+            int height,
+            int currentTextureSize,
+            FitMode fitMode,
+            int minAllowedTextureSize,
+            int maxAllowedTextureSize
+        )
+        {
+            int targetTextureSize = currentTextureSize;
+            bool needsChange = false;
+            bool grew = false;
+            bool shrank = false;
+
+            if (fitMode == FitMode.RoundToNearest)
+            {
+                int largest = Mathf.Max(width, height);
+                int upper = Mathf.NextPowerOfTwo(Mathf.Max(largest, 1));
+                int lower = upper == largest ? upper : (upper >> 1);
+                int diffDown = largest - lower;
+                int diffUp = upper - largest;
+                int nearest = diffDown < diffUp ? lower : upper;
+                if (nearest != targetTextureSize)
+                {
+                    targetTextureSize = nearest;
+                    needsChange = true;
+                }
+            }
+            else if (fitMode == FitMode.GrowAndShrink)
+            {
+                int largest = Mathf.Max(width, height);
+                int target = Mathf.NextPowerOfTwo(Mathf.Max(largest, 1));
+                if (currentTextureSize != target)
+                {
+                    targetTextureSize = target;
+                    needsChange = true;
+                }
+            }
+            else if (fitMode == FitMode.GrowOnly)
+            {
+                int size = Mathf.Max(width, height);
+                int tempSize = targetTextureSize;
+                while (tempSize < size)
+                {
+                    tempSize <<= 1;
+                }
+                if (tempSize != targetTextureSize)
+                {
+                    targetTextureSize = tempSize;
+                    needsChange = true;
+                }
+            }
+            else if (fitMode == FitMode.ShrinkOnly)
+            {
+                int size = Mathf.Max(width, height);
+                int neededPot = Mathf.NextPowerOfTwo(Mathf.Max(size, 1));
+                int tempSize = targetTextureSize;
+
+                if (neededPot < tempSize)
+                {
+                    tempSize = neededPot;
+                }
+                if (tempSize != targetTextureSize)
+                {
+                    targetTextureSize = tempSize;
+                    needsChange = true;
+                }
+            }
+
+            if (targetTextureSize < minAllowedTextureSize)
+            {
+                targetTextureSize = minAllowedTextureSize;
+                needsChange = needsChange || (currentTextureSize != targetTextureSize);
+            }
+            if (maxAllowedTextureSize < targetTextureSize)
+            {
+                targetTextureSize = maxAllowedTextureSize;
+                needsChange = needsChange || (currentTextureSize != targetTextureSize);
+            }
+
+            if (needsChange)
+            {
+                grew = currentTextureSize < targetTextureSize;
+                shrank = targetTextureSize < currentTextureSize;
+            }
+
+            return new FitComputation(targetTextureSize, needsChange, grew, shrank);
+        }
+
+        private static bool IsInvokedByTestRunner()
+        {
+            string[] args = Environment.GetCommandLineArgs();
+            foreach (string a in args)
+            {
+                if (
+                    0 <= a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
+                    || 0 <= a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)
+                    || 0 <= a.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase)
+                )
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        internal int CalculateTextureChanges(bool applyChanges)
+        {
+            using PooledResource<List<string>> textureGuidLease = Buffers<string>.List.Get(
+                out List<string> textureGuids
+            );
+            CollectAssetGuids(textureGuids);
+
+            if (textureGuids.Count <= 0)
+            {
+                this.Log($"No textures found in the specified paths.");
+                return 0;
+            }
+
+            int changedCount = 0;
+            int growCount = 0;
+            int shrinkCount = 0;
+            int unchangedCount = 0;
+
+            Regex nameRegex = null;
+            if (!string.IsNullOrWhiteSpace(_nameFilter) && _useRegexForName)
+            {
+                RegexOptions opts = _caseSensitiveNameFilter
+                    ? RegexOptions.None
+                    : RegexOptions.IgnoreCase;
+                try
+                {
+                    nameRegex = new Regex(_nameFilter, opts);
+                }
+                catch (Exception e)
+                {
+                    this.LogError($"Invalid name regex '{_nameFilter}'", e);
+                    nameRegex = null;
+                }
+            }
+            bool hasNameFilter = !string.IsNullOrWhiteSpace(_nameFilter);
+            PooledResource<HashSet<string>> labelSetRes = default;
+            HashSet<string> labelSet = null;
+            string[] parsedLabels = null;
+            bool hasLabelFilterCsv = !string.IsNullOrWhiteSpace(_labelFilterCsv);
+            if (hasLabelFilterCsv)
+            {
+                string raw = _labelFilterCsv;
+                char[] seps = { ',', ';' };
+                string[] parts = raw.Split(seps, StringSplitOptions.RemoveEmptyEntries);
+
+                int count = 0;
+                for (int i = 0; i < parts.Length; i++)
+                {
+                    string item = parts[i] != null ? parts[i].Trim() : string.Empty;
+                    if (!string.IsNullOrEmpty(item))
+                    {
+                        parts[count++] = item;
+                    }
+                }
+                if (0 < count)
+                {
+                    parsedLabels = new string[count];
+                    for (int i = 0; i < count; i++)
+                    {
+                        parsedLabels[i] = parts[i];
+                    }
+
+                    labelSetRes = Buffers<string>.HashSet.Get(out labelSet);
+                    foreach (string parsedLabelsElement in parsedLabels)
+                    {
+                        string norm = _caseSensitiveNameFilter
+                            ? parsedLabelsElement
+                            : parsedLabelsElement.ToLowerInvariant();
+                        _ = labelSet.Add(norm);
+                    }
+                }
+            }
+            int totalAssets = textureGuids.Count;
+            AssetDatabaseBatchScope batchScope = applyChanges
+                ? AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false)
+                : default;
+            try
+            {
+                for (int i = 0; i < textureGuids.Count; i++)
+                {
+                    string guid = textureGuids[i];
+                    string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                    float progress = (i + 1) / (float)totalAssets;
+                    string progressBarTitle = applyChanges
+                        ? "Fitting Texture Size"
+                        : "Calculating Changes";
+                    bool cancel = false;
+                    // Throttle progress updates to reduce allocation and repaint overhead.
+                    if ((i % 32) == 0 || i == textureGuids.Count - 1)
+                    {
+                        cancel = EditorUi.CancelableProgress(
+                            progressBarTitle,
+                            $"Checking: {Path.GetFileName(assetPath)} ({i + 1}/{textureGuids.Count})",
+                            progress
+                        );
+                    }
+
+                    if (cancel)
+                    {
+                        this.LogWarn($"Operation cancelled by user.");
+                        return -1;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(assetPath))
+                    {
+                        continue;
+                    }
+
+                    TextureImporter textureImporter =
+                        AssetImporter.GetAtPath(assetPath) as TextureImporter;
+                    if (textureImporter == null)
+                    {
+                        continue;
+                    }
+
+                    if (_onlySprites && textureImporter.textureType != TextureImporterType.Sprite)
+                    {
+                        continue;
+                    }
+
+                    if (hasNameFilter)
+                    {
+                        string fileName = Path.GetFileNameWithoutExtension(assetPath);
+                        bool nameMatch = false;
+                        if (nameRegex != null)
+                        {
+                            nameMatch = nameRegex.IsMatch(fileName);
+                        }
+                        else
+                        {
+                            StringComparison comp = _caseSensitiveNameFilter
+                                ? StringComparison.Ordinal
+                                : StringComparison.OrdinalIgnoreCase;
+                            nameMatch = 0 <= fileName.IndexOf(_nameFilter, comp);
+                        }
+                        if (!nameMatch)
+                        {
+                            continue;
+                        }
+                    }
+
+                    if (
+                        labelSet != null
+                        && (_caseSensitiveNameFilter || !_labelQueryGuids.Contains(guid))
+                    )
+                    {
+                        Object main = AssetDatabase.LoadMainAssetAtPath(assetPath);
+                        if (main == null)
+                        {
+                            continue;
+                        }
+                        string[] labels = AssetDatabase.GetLabels(main);
+                        bool any = false;
+                        foreach (string labelsElement in labels)
+                        {
+                            string lab = _caseSensitiveNameFilter
+                                ? labelsElement
+                                : labelsElement.ToLowerInvariant();
+                            if (labelSet.Contains(lab))
+                            {
+                                any = true;
+                                break;
+                            }
+                        }
+                        if (!any)
+                        {
+                            continue;
+                        }
+                    }
+
+                    textureImporter.GetSourceTextureWidthAndHeight(out int width, out int height);
+
+                    int currentTextureSize = textureImporter.maxTextureSize;
+                    FitComputation fit = ComputeFit(
+                        width,
+                        height,
+                        currentTextureSize,
+                        _fitMode,
+                        _minAllowedTextureSize,
+                        _maxAllowedTextureSize
+                    );
+                    int targetTextureSize = fit.TargetSize;
+                    bool needsChange = fit.NeedsChange;
+                    bool grew = fit.Grew;
+                    bool shrank = fit.Shrank;
+
+                    if (!needsChange || currentTextureSize == targetTextureSize)
+                    {
+                        unchangedCount++;
+                        continue;
+                    }
+
+                    changedCount++;
+                    if (grew)
+                    {
+                        growCount++;
+                    }
+                    if (shrank)
+                    {
+                        shrinkCount++;
+                    }
+                    if (!applyChanges)
+                    {
+                        continue;
+                    }
+
+                    Undo.RecordObject(textureImporter, "Fit Texture Size");
+                    textureImporter.maxTextureSize = targetTextureSize;
+
+                    ApplyPlatformOverride(textureImporter, "Standalone", targetTextureSize);
+                    ApplyPlatformOverride(textureImporter, "Android", targetTextureSize);
+                    ApplyPlatformOverride(textureImporter, "iPhone", targetTextureSize);
+
+                    // Persist only dirty importers to avoid unnecessary reimports.
+                    AssetDatabase.WriteImportSettingsIfDirty(assetPath);
+                }
+            }
+            finally
+            {
+                EditorUi.ClearProgress();
+                if (labelSetRes.resource != null)
+                {
+                    labelSetRes.Dispose();
+                }
+                if (applyChanges)
+                {
+                    batchScope.Dispose();
+                }
+                if (applyChanges)
+                {
+                    _hasLastRunSummary = true;
+                    _lastRunTotal = totalAssets;
+                    _lastRunChanged = changedCount;
+                    _lastRunGrows = growCount;
+                    _lastRunShrinks = shrinkCount;
+                    _lastRunUnchanged = unchangedCount;
+
+                    if (changedCount != 0)
+                    {
+                        this.Log($"Updated {changedCount} textures.");
+                        AssetDatabase.SaveAssets();
+                        AssetDatabase.Refresh();
+                    }
+                    else
+                    {
+                        this.Log($"No textures updated.");
+                    }
+                }
+            }
+
+            _potentialGrowCount = growCount;
+            _potentialShrinkCount = shrinkCount;
+            _potentialUnchangedCount = unchangedCount;
+            return changedCount;
         }
 
         private void OnEnable()
@@ -478,357 +829,6 @@ namespace WallstopStudios.UnityHelpers.Editor
             {
                 destination.Add(guid);
             }
-        }
-
-        internal int CalculateTextureChanges(bool applyChanges)
-        {
-            using PooledResource<List<string>> textureGuidLease = Buffers<string>.List.Get(
-                out List<string> textureGuids
-            );
-            CollectAssetGuids(textureGuids);
-
-            if (textureGuids.Count <= 0)
-            {
-                this.Log($"No textures found in the specified paths.");
-                return 0;
-            }
-
-            int changedCount = 0;
-            int growCount = 0;
-            int shrinkCount = 0;
-            int unchangedCount = 0;
-
-            Regex nameRegex = null;
-            if (!string.IsNullOrWhiteSpace(_nameFilter) && _useRegexForName)
-            {
-                RegexOptions opts = _caseSensitiveNameFilter
-                    ? RegexOptions.None
-                    : RegexOptions.IgnoreCase;
-                try
-                {
-                    nameRegex = new Regex(_nameFilter, opts);
-                }
-                catch (Exception e)
-                {
-                    this.LogError($"Invalid name regex '{_nameFilter}'", e);
-                    nameRegex = null;
-                }
-            }
-            bool hasNameFilter = !string.IsNullOrWhiteSpace(_nameFilter);
-            PooledResource<HashSet<string>> labelSetRes = default;
-            HashSet<string> labelSet = null;
-            string[] parsedLabels = null;
-            bool hasLabelFilterCsv = !string.IsNullOrWhiteSpace(_labelFilterCsv);
-            if (hasLabelFilterCsv)
-            {
-                string raw = _labelFilterCsv;
-                char[] seps = { ',', ';' };
-                string[] parts = raw.Split(seps, StringSplitOptions.RemoveEmptyEntries);
-
-                int count = 0;
-                for (int i = 0; i < parts.Length; i++)
-                {
-                    string item = parts[i] != null ? parts[i].Trim() : string.Empty;
-                    if (!string.IsNullOrEmpty(item))
-                    {
-                        parts[count++] = item;
-                    }
-                }
-                if (0 < count)
-                {
-                    parsedLabels = new string[count];
-                    for (int i = 0; i < count; i++)
-                    {
-                        parsedLabels[i] = parts[i];
-                    }
-
-                    labelSetRes = Buffers<string>.HashSet.Get(out labelSet);
-                    foreach (string parsedLabelsElement in parsedLabels)
-                    {
-                        string norm = _caseSensitiveNameFilter
-                            ? parsedLabelsElement
-                            : parsedLabelsElement.ToLowerInvariant();
-                        _ = labelSet.Add(norm);
-                    }
-                }
-            }
-            int totalAssets = textureGuids.Count;
-            AssetDatabaseBatchScope batchScope = applyChanges
-                ? AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false)
-                : default;
-            try
-            {
-                for (int i = 0; i < textureGuids.Count; i++)
-                {
-                    string guid = textureGuids[i];
-                    string assetPath = AssetDatabase.GUIDToAssetPath(guid);
-                    float progress = (i + 1) / (float)totalAssets;
-                    string progressBarTitle = applyChanges
-                        ? "Fitting Texture Size"
-                        : "Calculating Changes";
-                    bool cancel = false;
-                    // Throttle progress updates to reduce allocation and repaint overhead.
-                    if ((i % 32) == 0 || i == textureGuids.Count - 1)
-                    {
-                        cancel = EditorUi.CancelableProgress(
-                            progressBarTitle,
-                            $"Checking: {Path.GetFileName(assetPath)} ({i + 1}/{textureGuids.Count})",
-                            progress
-                        );
-                    }
-
-                    if (cancel)
-                    {
-                        this.LogWarn($"Operation cancelled by user.");
-                        return -1;
-                    }
-
-                    if (string.IsNullOrWhiteSpace(assetPath))
-                    {
-                        continue;
-                    }
-
-                    TextureImporter textureImporter =
-                        AssetImporter.GetAtPath(assetPath) as TextureImporter;
-                    if (textureImporter == null)
-                    {
-                        continue;
-                    }
-
-                    if (_onlySprites && textureImporter.textureType != TextureImporterType.Sprite)
-                    {
-                        continue;
-                    }
-
-                    if (hasNameFilter)
-                    {
-                        string fileName = Path.GetFileNameWithoutExtension(assetPath);
-                        bool nameMatch = false;
-                        if (nameRegex != null)
-                        {
-                            nameMatch = nameRegex.IsMatch(fileName);
-                        }
-                        else
-                        {
-                            StringComparison comp = _caseSensitiveNameFilter
-                                ? StringComparison.Ordinal
-                                : StringComparison.OrdinalIgnoreCase;
-                            nameMatch = 0 <= fileName.IndexOf(_nameFilter, comp);
-                        }
-                        if (!nameMatch)
-                        {
-                            continue;
-                        }
-                    }
-
-                    if (
-                        labelSet != null
-                        && (_caseSensitiveNameFilter || !_labelQueryGuids.Contains(guid))
-                    )
-                    {
-                        Object main = AssetDatabase.LoadMainAssetAtPath(assetPath);
-                        if (main == null)
-                        {
-                            continue;
-                        }
-                        string[] labels = AssetDatabase.GetLabels(main);
-                        bool any = false;
-                        foreach (string labelsElement in labels)
-                        {
-                            string lab = _caseSensitiveNameFilter
-                                ? labelsElement
-                                : labelsElement.ToLowerInvariant();
-                            if (labelSet.Contains(lab))
-                            {
-                                any = true;
-                                break;
-                            }
-                        }
-                        if (!any)
-                        {
-                            continue;
-                        }
-                    }
-
-                    textureImporter.GetSourceTextureWidthAndHeight(out int width, out int height);
-
-                    int currentTextureSize = textureImporter.maxTextureSize;
-                    FitComputation fit = ComputeFit(
-                        width,
-                        height,
-                        currentTextureSize,
-                        _fitMode,
-                        _minAllowedTextureSize,
-                        _maxAllowedTextureSize
-                    );
-                    int targetTextureSize = fit.TargetSize;
-                    bool needsChange = fit.NeedsChange;
-                    bool grew = fit.Grew;
-                    bool shrank = fit.Shrank;
-
-                    if (!needsChange || currentTextureSize == targetTextureSize)
-                    {
-                        unchangedCount++;
-                        continue;
-                    }
-
-                    changedCount++;
-                    if (grew)
-                    {
-                        growCount++;
-                    }
-                    if (shrank)
-                    {
-                        shrinkCount++;
-                    }
-                    if (!applyChanges)
-                    {
-                        continue;
-                    }
-
-                    Undo.RecordObject(textureImporter, "Fit Texture Size");
-                    textureImporter.maxTextureSize = targetTextureSize;
-
-                    ApplyPlatformOverride(textureImporter, "Standalone", targetTextureSize);
-                    ApplyPlatformOverride(textureImporter, "Android", targetTextureSize);
-                    ApplyPlatformOverride(textureImporter, "iPhone", targetTextureSize);
-
-                    // Persist only dirty importers to avoid unnecessary reimports.
-                    AssetDatabase.WriteImportSettingsIfDirty(assetPath);
-                }
-            }
-            finally
-            {
-                EditorUi.ClearProgress();
-                if (labelSetRes.resource != null)
-                {
-                    labelSetRes.Dispose();
-                }
-                if (applyChanges)
-                {
-                    batchScope.Dispose();
-                }
-                if (applyChanges)
-                {
-                    _hasLastRunSummary = true;
-                    _lastRunTotal = totalAssets;
-                    _lastRunChanged = changedCount;
-                    _lastRunGrows = growCount;
-                    _lastRunShrinks = shrinkCount;
-                    _lastRunUnchanged = unchangedCount;
-
-                    if (changedCount != 0)
-                    {
-                        this.Log($"Updated {changedCount} textures.");
-                        AssetDatabase.SaveAssets();
-                        AssetDatabase.Refresh();
-                    }
-                    else
-                    {
-                        this.Log($"No textures updated.");
-                    }
-                }
-            }
-
-            _potentialGrowCount = growCount;
-            _potentialShrinkCount = shrinkCount;
-            _potentialUnchangedCount = unchangedCount;
-            return changedCount;
-        }
-
-        /// <summary>
-        /// Computes the target <c>maxTextureSize</c> for a source texture given its dimensions,
-        /// its current max size, the fit mode, and the allowed min/max bounds. Pure: depends only
-        /// on integers, performs NO AssetDatabase/importer I/O, so it is exercised by fast unit
-        /// tests (<c>FitTextureSizeMathTests</c>) instead of full texture-import round-trips.
-        /// </summary>
-        internal static FitComputation ComputeFit(
-            int width,
-            int height,
-            int currentTextureSize,
-            FitMode fitMode,
-            int minAllowedTextureSize,
-            int maxAllowedTextureSize
-        )
-        {
-            int targetTextureSize = currentTextureSize;
-            bool needsChange = false;
-            bool grew = false;
-            bool shrank = false;
-
-            if (fitMode == FitMode.RoundToNearest)
-            {
-                int largest = Mathf.Max(width, height);
-                int upper = Mathf.NextPowerOfTwo(Mathf.Max(largest, 1));
-                int lower = upper == largest ? upper : (upper >> 1);
-                int diffDown = largest - lower;
-                int diffUp = upper - largest;
-                int nearest = diffDown < diffUp ? lower : upper;
-                if (nearest != targetTextureSize)
-                {
-                    targetTextureSize = nearest;
-                    needsChange = true;
-                }
-            }
-            else if (fitMode == FitMode.GrowAndShrink)
-            {
-                int largest = Mathf.Max(width, height);
-                int target = Mathf.NextPowerOfTwo(Mathf.Max(largest, 1));
-                if (currentTextureSize != target)
-                {
-                    targetTextureSize = target;
-                    needsChange = true;
-                }
-            }
-            else if (fitMode == FitMode.GrowOnly)
-            {
-                int size = Mathf.Max(width, height);
-                int tempSize = targetTextureSize;
-                while (tempSize < size)
-                {
-                    tempSize <<= 1;
-                }
-                if (tempSize != targetTextureSize)
-                {
-                    targetTextureSize = tempSize;
-                    needsChange = true;
-                }
-            }
-            else if (fitMode == FitMode.ShrinkOnly)
-            {
-                int size = Mathf.Max(width, height);
-                int neededPot = Mathf.NextPowerOfTwo(Mathf.Max(size, 1));
-                int tempSize = targetTextureSize;
-
-                if (neededPot < tempSize)
-                {
-                    tempSize = neededPot;
-                }
-                if (tempSize != targetTextureSize)
-                {
-                    targetTextureSize = tempSize;
-                    needsChange = true;
-                }
-            }
-
-            if (targetTextureSize < minAllowedTextureSize)
-            {
-                targetTextureSize = minAllowedTextureSize;
-                needsChange = needsChange || (currentTextureSize != targetTextureSize);
-            }
-            if (maxAllowedTextureSize < targetTextureSize)
-            {
-                targetTextureSize = maxAllowedTextureSize;
-                needsChange = needsChange || (currentTextureSize != targetTextureSize);
-            }
-
-            if (needsChange)
-            {
-                grew = currentTextureSize < targetTextureSize;
-                shrank = targetTextureSize < currentTextureSize;
-            }
-
-            return new FitComputation(targetTextureSize, needsChange, grew, shrank);
         }
 
         private void ApplyPlatformOverride(TextureImporter importer, string platform, int target)

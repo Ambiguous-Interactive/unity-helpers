@@ -98,9 +98,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
     internal static class WButtonGUI
     {
-        private static readonly Dictionary<WButtonGroupKey, int> GroupCounts = new();
-        private static readonly Dictionary<WButtonGroupKey, string> GroupNames = new();
-
         /// <remarks>
         /// The key carries a target instance id, so every inspected object a session touches
         /// adds an entry that nothing removes.
@@ -112,6 +109,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         /// because the least recently used entry is by definition not the foldout being drawn.
         /// </remarks>
         private const int MaxFoldoutAnimations = 256;
+        private const string RunningLabel = "Running...";
+
+        private const float ClearHistoryButtonPadding = 12f;
+        private const float ClearHistoryMinWidth = 96f;
+        private const float ClearHistorySpacing = 6f;
+
+        private static readonly Dictionary<WButtonGroupKey, int> GroupCounts = new();
+        private static readonly Dictionary<WButtonGroupKey, string> GroupNames = new();
 
         private static readonly Cache<WButtonGroupKey, AnimBool> FoldoutAnimations = CacheBuilder<
             WButtonGroupKey,
@@ -139,44 +144,39 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         private static readonly Dictionary<string, GUIContent> ButtonDisplayNameCache = new(
             StringComparer.Ordinal
         );
-        private const string RunningLabel = "Running...";
-
-        private const float ClearHistoryButtonPadding = 12f;
-        private const float ClearHistoryMinWidth = 96f;
-        private const float ClearHistorySpacing = 6f;
-
-        /// <summary>
-        /// Gets a cached pagination label. Delegates to <see cref="EditorCacheHelper.GetPaginationLabel"/>.
-        /// </summary>
-        private static string GetPaginationLabel(int page, int totalPages)
-        {
-            return EditorCacheHelper.GetPaginationLabel(page, totalPages);
-        }
-
-        /// <summary>
-        /// Gets a cached string representation of an integer.
-        /// Delegates to <see cref="EditorCacheHelper.GetCachedIntString"/>.
-        /// </summary>
-        /// <param name="value">The integer value to convert.</param>
-        /// <returns>A cached string representation of the integer.</returns>
-        private static string GetCachedIntString(int value)
-        {
-            return EditorCacheHelper.GetCachedIntString(value);
-        }
 
         private static readonly Dictionary<int, string> RunningLabelByCountCache = new();
 
-        private static string GetRunningLabel(int count)
-        {
-            if (count == 1)
-            {
-                return RunningLabel;
-            }
-            return RunningLabelByCountCache.GetOrAdd(
-                count,
-                static c => "Running (" + GetCachedIntString(c) + ")"
-            );
-        }
+        private static readonly Dictionary<ContextCacheKey, WButtonMethodContext> ContextCache =
+            new();
+
+        /// <summary>
+        /// Warnings about groups with conflicting draw orders. Populated during grouping.
+        /// </summary>
+        private static readonly Dictionary<
+            string,
+            DrawOrderConflictInfo
+        > ConflictingDrawOrderWarnings = new();
+
+        /// <summary>
+        /// Warnings about groups with conflicting group priorities. Populated during grouping.
+        /// </summary>
+        private static readonly Dictionary<
+            string,
+            GroupPriorityConflictInfo
+        > ConflictingGroupPriorityWarnings = new();
+
+        /// <summary>
+        /// Warnings about groups with conflicting group placements. Populated during grouping.
+        /// </summary>
+        private static readonly Dictionary<
+            string,
+            GroupPlacementConflictInfo
+        > ConflictingGroupPlacementWarnings = new();
+
+        private static readonly Dictionary<string, string> ConflictWarningTextCache = new();
+        private static readonly Dictionary<string, string> GroupPriorityWarningTextCache = new();
+        private static readonly Dictionary<string, string> GroupPlacementWarningTextCache = new();
 
         internal static bool DrawButtons(
             Editor editor,
@@ -347,6 +347,273 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             GroupNames.Clear();
         }
 
+        internal static void ClearContextCache()
+        {
+            ContextCache.Clear();
+        }
+
+        /// <summary>
+        /// Gets the current conflicting draw order warnings. Used for testing and UI display.
+        /// </summary>
+        internal static IReadOnlyDictionary<
+            string,
+            DrawOrderConflictInfo
+        > GetConflictingDrawOrderWarnings()
+        {
+            return ConflictingDrawOrderWarnings;
+        }
+
+        /// <summary>
+        /// Gets the current conflicting group priority warnings. Used for testing and UI display.
+        /// </summary>
+        internal static IReadOnlyDictionary<
+            string,
+            GroupPriorityConflictInfo
+        > GetConflictingGroupPriorityWarnings()
+        {
+            return ConflictingGroupPriorityWarnings;
+        }
+
+        /// <summary>
+        /// Gets the current conflicting group placement warnings. Used for testing and UI display.
+        /// </summary>
+        internal static IReadOnlyDictionary<
+            string,
+            GroupPlacementConflictInfo
+        > GetConflictingGroupPlacementWarnings()
+        {
+            return ConflictingGroupPlacementWarnings;
+        }
+
+        /// <summary>
+        /// Clears conflicting draw order warnings. Used for testing.
+        /// </summary>
+        internal static void ClearConflictingDrawOrderWarningsForTesting()
+        {
+            ConflictingDrawOrderWarnings.Clear();
+        }
+
+        /// <summary>
+        /// Clears conflicting group priority warnings. Used for testing.
+        /// </summary>
+        internal static void ClearConflictingGroupPriorityWarningsForTesting()
+        {
+            ConflictingGroupPriorityWarnings.Clear();
+        }
+
+        /// <summary>
+        /// Clears conflicting group placement warnings. Used for testing.
+        /// </summary>
+        internal static void ClearConflictingGroupPlacementWarningsForTesting()
+        {
+            ConflictingGroupPlacementWarnings.Clear();
+        }
+
+        /// <summary>
+        /// Clears the conflict warning content cache. Used for testing.
+        /// </summary>
+        internal static void ClearConflictWarningContentCacheForTesting()
+        {
+            ConflictWarningTextCache.Clear();
+            GroupPriorityWarningTextCache.Clear();
+            GroupPlacementWarningTextCache.Clear();
+        }
+
+        /// <summary>
+        /// Gets cached group placement warning text by group name. Used for testing.
+        /// </summary>
+        internal static bool TryGetGroupPlacementWarningTextForTesting(
+            string groupName,
+            out string warningText
+        )
+        {
+            if (string.IsNullOrEmpty(groupName))
+            {
+                warningText = null;
+                return false;
+            }
+
+            return GroupPlacementWarningTextCache.TryGetValue(
+                "placement_" + groupName,
+                out warningText
+            );
+        }
+
+        /// <summary>
+        /// Gets cached group priority warning text by group name. Used for testing.
+        /// </summary>
+        internal static bool TryGetGroupPriorityWarningTextForTesting(
+            string groupName,
+            out string warningText
+        )
+        {
+            if (string.IsNullOrEmpty(groupName))
+            {
+                warningText = null;
+                return false;
+            }
+
+            return GroupPriorityWarningTextCache.TryGetValue(
+                "priority_" + groupName,
+                out warningText
+            );
+        }
+
+        /// <summary>
+        /// Gets cached draw order warning text by group name. Used for testing.
+        /// </summary>
+        internal static bool TryGetDrawOrderWarningTextForTesting(
+            string groupName,
+            out string warningText
+        )
+        {
+            if (string.IsNullOrEmpty(groupName))
+            {
+                warningText = null;
+                return false;
+            }
+
+            return ConflictWarningTextCache.TryGetValue(groupName, out warningText);
+        }
+
+        internal static GUIContent BuildGroupHeader(WButtonGroupKey groupKey)
+        {
+            WButtonGroupPlacement groupPlacement = groupKey._groupPlacement;
+
+            GUIContent baseLabel =
+                groupPlacement == WButtonGroupPlacement.Bottom
+                    ? WButtonStyles.BottomGroupLabel
+                    : WButtonStyles.TopGroupLabel;
+
+            if (
+                GroupNames.TryGetValue(groupKey, out string customName)
+                && !string.IsNullOrWhiteSpace(customName)
+            )
+            {
+                if (!GroupHeaderCache.TryGetValue(groupKey, out GUIContent cached))
+                {
+                    cached = new GUIContent(customName, baseLabel.tooltip);
+                    GroupHeaderCache[groupKey] = cached;
+                }
+                else if (!string.Equals(cached.text, customName, StringComparison.Ordinal))
+                {
+                    cached.text = customName;
+                    cached.tooltip = baseLabel.tooltip;
+                }
+                return cached;
+            }
+
+            if (GroupCounts.Count <= 1)
+            {
+                return baseLabel;
+            }
+
+            if (!GroupCounts.TryGetValue(groupKey, out int count) || count <= 0)
+            {
+                return baseLabel;
+            }
+
+            int drawOrder = groupKey._drawOrder;
+            (string, int) textCacheKey = (baseLabel.text, drawOrder);
+            if (!GroupHeaderTextCache.TryGetValue(textCacheKey, out string textWithOrder))
+            {
+                textWithOrder = baseLabel.text + " (" + GetCachedIntString(drawOrder) + ")";
+                GroupHeaderTextCache[textCacheKey] = textWithOrder;
+            }
+
+            if (!GroupHeaderCache.TryGetValue(groupKey, out GUIContent cachedWithOrder))
+            {
+                cachedWithOrder = new GUIContent(textWithOrder, baseLabel.tooltip);
+                GroupHeaderCache[groupKey] = cachedWithOrder;
+            }
+            else if (!string.Equals(cachedWithOrder.text, textWithOrder, StringComparison.Ordinal))
+            {
+                cachedWithOrder.text = textWithOrder;
+                cachedWithOrder.tooltip = baseLabel.tooltip;
+            }
+            return cachedWithOrder;
+        }
+
+        /// <summary>
+        /// Legacy overload for testing compatibility.
+        /// </summary>
+        internal static GUIContent BuildGroupHeader(int drawOrder)
+        {
+            WButtonGroupKey key = new(
+                WButtonAttribute.NoGroupPriority,
+                drawOrder,
+                null,
+                0,
+                WButtonGroupPlacement.UseGlobalSetting
+            );
+            return BuildGroupHeader(key);
+        }
+
+        internal static void GetInvocationStatus(
+            WButtonMethodState[] states,
+            out int runningCount,
+            out bool cancellable
+        )
+        {
+            int running = 0;
+            bool anyCancellable = false;
+
+            if (states != null)
+            {
+                foreach (WButtonMethodState state in states)
+                {
+                    WButtonInvocationHandle handle = state.ActiveInvocation;
+                    if (handle == null)
+                    {
+                        continue;
+                    }
+
+                    if (
+                        handle.Status == WButtonInvocationStatus.Running
+                        || handle.Status == WButtonInvocationStatus.CancelRequested
+                    )
+                    {
+                        running++;
+                        anyCancellable |= handle.SupportsCancellation;
+                    }
+                }
+            }
+
+            runningCount = running;
+            cancellable = anyCancellable;
+        }
+
+        /// <summary>
+        /// Gets a cached pagination label. Delegates to <see cref="EditorCacheHelper.GetPaginationLabel"/>.
+        /// </summary>
+        private static string GetPaginationLabel(int page, int totalPages)
+        {
+            return EditorCacheHelper.GetPaginationLabel(page, totalPages);
+        }
+
+        /// <summary>
+        /// Gets a cached string representation of an integer.
+        /// Delegates to <see cref="EditorCacheHelper.GetCachedIntString"/>.
+        /// </summary>
+        /// <param name="value">The integer value to convert.</param>
+        /// <returns>A cached string representation of the integer.</returns>
+        private static string GetCachedIntString(int value)
+        {
+            return EditorCacheHelper.GetCachedIntString(value);
+        }
+
+        private static string GetRunningLabel(int count)
+        {
+            if (count == 1)
+            {
+                return RunningLabel;
+            }
+            return RunningLabelByCountCache.GetOrAdd(
+                count,
+                static c => "Running (" + GetCachedIntString(c) + ")"
+            );
+        }
+
         private static void BuildContexts(
             IReadOnlyList<WButtonMethodMetadata> metadataList,
             UnityEngine.Object[] targets,
@@ -399,9 +666,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             }
         }
 
-        private static readonly Dictionary<ContextCacheKey, WButtonMethodContext> ContextCache =
-            new();
-
         private static WButtonMethodContext FindCachedContext(
             WButtonMethodMetadata metadata,
             UnityEngine.Object[] targets
@@ -448,11 +712,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 }
             }
             return true;
-        }
-
-        internal static void ClearContextCache()
-        {
-            ContextCache.Clear();
         }
 
         private static void GroupByDrawOrderAndGroupName(
@@ -703,87 +962,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             }
         }
 
-        /// <summary>
-        /// Warnings about groups with conflicting draw orders. Populated during grouping.
-        /// </summary>
-        private static readonly Dictionary<
-            string,
-            DrawOrderConflictInfo
-        > ConflictingDrawOrderWarnings = new();
-
-        /// <summary>
-        /// Warnings about groups with conflicting group priorities. Populated during grouping.
-        /// </summary>
-        private static readonly Dictionary<
-            string,
-            GroupPriorityConflictInfo
-        > ConflictingGroupPriorityWarnings = new();
-
-        /// <summary>
-        /// Warnings about groups with conflicting group placements. Populated during grouping.
-        /// </summary>
-        private static readonly Dictionary<
-            string,
-            GroupPlacementConflictInfo
-        > ConflictingGroupPlacementWarnings = new();
-
-        /// <summary>
-        /// Gets the current conflicting draw order warnings. Used for testing and UI display.
-        /// </summary>
-        internal static IReadOnlyDictionary<
-            string,
-            DrawOrderConflictInfo
-        > GetConflictingDrawOrderWarnings()
-        {
-            return ConflictingDrawOrderWarnings;
-        }
-
-        /// <summary>
-        /// Gets the current conflicting group priority warnings. Used for testing and UI display.
-        /// </summary>
-        internal static IReadOnlyDictionary<
-            string,
-            GroupPriorityConflictInfo
-        > GetConflictingGroupPriorityWarnings()
-        {
-            return ConflictingGroupPriorityWarnings;
-        }
-
-        /// <summary>
-        /// Gets the current conflicting group placement warnings. Used for testing and UI display.
-        /// </summary>
-        internal static IReadOnlyDictionary<
-            string,
-            GroupPlacementConflictInfo
-        > GetConflictingGroupPlacementWarnings()
-        {
-            return ConflictingGroupPlacementWarnings;
-        }
-
-        /// <summary>
-        /// Clears conflicting draw order warnings. Used for testing.
-        /// </summary>
-        internal static void ClearConflictingDrawOrderWarningsForTesting()
-        {
-            ConflictingDrawOrderWarnings.Clear();
-        }
-
-        /// <summary>
-        /// Clears conflicting group priority warnings. Used for testing.
-        /// </summary>
-        internal static void ClearConflictingGroupPriorityWarningsForTesting()
-        {
-            ConflictingGroupPriorityWarnings.Clear();
-        }
-
-        /// <summary>
-        /// Clears conflicting group placement warnings. Used for testing.
-        /// </summary>
-        internal static void ClearConflictingGroupPlacementWarningsForTesting()
-        {
-            ConflictingGroupPlacementWarnings.Clear();
-        }
-
         private static void DrawGroup(
             WButtonGroupKey groupKey,
             List<WButtonMethodContext> contexts,
@@ -988,10 +1166,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             EditorGUILayout.Space(4f);
         }
 
-        private static readonly Dictionary<string, string> ConflictWarningTextCache = new();
-        private static readonly Dictionary<string, string> GroupPriorityWarningTextCache = new();
-        private static readonly Dictionary<string, string> GroupPlacementWarningTextCache = new();
-
         private static void DrawConflictWarnings(WButtonGroupKey groupKey)
         {
             DrawConflictingDrawOrderWarning(groupKey);
@@ -1110,73 +1284,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             EditorGUILayout.Space(2f);
         }
 
-        /// <summary>
-        /// Clears the conflict warning content cache. Used for testing.
-        /// </summary>
-        internal static void ClearConflictWarningContentCacheForTesting()
-        {
-            ConflictWarningTextCache.Clear();
-            GroupPriorityWarningTextCache.Clear();
-            GroupPlacementWarningTextCache.Clear();
-        }
-
-        /// <summary>
-        /// Gets cached group placement warning text by group name. Used for testing.
-        /// </summary>
-        internal static bool TryGetGroupPlacementWarningTextForTesting(
-            string groupName,
-            out string warningText
-        )
-        {
-            if (string.IsNullOrEmpty(groupName))
-            {
-                warningText = null;
-                return false;
-            }
-
-            return GroupPlacementWarningTextCache.TryGetValue(
-                "placement_" + groupName,
-                out warningText
-            );
-        }
-
-        /// <summary>
-        /// Gets cached group priority warning text by group name. Used for testing.
-        /// </summary>
-        internal static bool TryGetGroupPriorityWarningTextForTesting(
-            string groupName,
-            out string warningText
-        )
-        {
-            if (string.IsNullOrEmpty(groupName))
-            {
-                warningText = null;
-                return false;
-            }
-
-            return GroupPriorityWarningTextCache.TryGetValue(
-                "priority_" + groupName,
-                out warningText
-            );
-        }
-
-        /// <summary>
-        /// Gets cached draw order warning text by group name. Used for testing.
-        /// </summary>
-        internal static bool TryGetDrawOrderWarningTextForTesting(
-            string groupName,
-            out string warningText
-        )
-        {
-            if (string.IsNullOrEmpty(groupName))
-            {
-                warningText = null;
-                return false;
-            }
-
-            return ConflictWarningTextCache.TryGetValue(groupName, out warningText);
-        }
-
         private static bool GetFoldoutState(
             IDictionary<WButtonGroupKey, bool> foldoutStates,
             WButtonGroupKey groupKey,
@@ -1225,79 +1332,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             {
                 anim.valueChanged.RemoveListener(RequestRepaint);
             }
-        }
-
-        internal static GUIContent BuildGroupHeader(WButtonGroupKey groupKey)
-        {
-            WButtonGroupPlacement groupPlacement = groupKey._groupPlacement;
-
-            GUIContent baseLabel =
-                groupPlacement == WButtonGroupPlacement.Bottom
-                    ? WButtonStyles.BottomGroupLabel
-                    : WButtonStyles.TopGroupLabel;
-
-            if (
-                GroupNames.TryGetValue(groupKey, out string customName)
-                && !string.IsNullOrWhiteSpace(customName)
-            )
-            {
-                if (!GroupHeaderCache.TryGetValue(groupKey, out GUIContent cached))
-                {
-                    cached = new GUIContent(customName, baseLabel.tooltip);
-                    GroupHeaderCache[groupKey] = cached;
-                }
-                else if (!string.Equals(cached.text, customName, StringComparison.Ordinal))
-                {
-                    cached.text = customName;
-                    cached.tooltip = baseLabel.tooltip;
-                }
-                return cached;
-            }
-
-            if (GroupCounts.Count <= 1)
-            {
-                return baseLabel;
-            }
-
-            if (!GroupCounts.TryGetValue(groupKey, out int count) || count <= 0)
-            {
-                return baseLabel;
-            }
-
-            int drawOrder = groupKey._drawOrder;
-            (string, int) textCacheKey = (baseLabel.text, drawOrder);
-            if (!GroupHeaderTextCache.TryGetValue(textCacheKey, out string textWithOrder))
-            {
-                textWithOrder = baseLabel.text + " (" + GetCachedIntString(drawOrder) + ")";
-                GroupHeaderTextCache[textCacheKey] = textWithOrder;
-            }
-
-            if (!GroupHeaderCache.TryGetValue(groupKey, out GUIContent cachedWithOrder))
-            {
-                cachedWithOrder = new GUIContent(textWithOrder, baseLabel.tooltip);
-                GroupHeaderCache[groupKey] = cachedWithOrder;
-            }
-            else if (!string.Equals(cachedWithOrder.text, textWithOrder, StringComparison.Ordinal))
-            {
-                cachedWithOrder.text = textWithOrder;
-                cachedWithOrder.tooltip = baseLabel.tooltip;
-            }
-            return cachedWithOrder;
-        }
-
-        /// <summary>
-        /// Legacy overload for testing compatibility.
-        /// </summary>
-        internal static GUIContent BuildGroupHeader(int drawOrder)
-        {
-            WButtonGroupKey key = new(
-                WButtonAttribute.NoGroupPriority,
-                drawOrder,
-                null,
-                0,
-                WButtonGroupPlacement.UseGlobalSetting
-            );
-            return BuildGroupHeader(key);
         }
 
         private static string ResolveGroupName(List<WButtonMethodContext> contexts)
@@ -1387,40 +1421,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
             GUILayout.Space(2f);
             GUILayout.EndVertical();
-        }
-
-        internal static void GetInvocationStatus(
-            WButtonMethodState[] states,
-            out int runningCount,
-            out bool cancellable
-        )
-        {
-            int running = 0;
-            bool anyCancellable = false;
-
-            if (states != null)
-            {
-                foreach (WButtonMethodState state in states)
-                {
-                    WButtonInvocationHandle handle = state.ActiveInvocation;
-                    if (handle == null)
-                    {
-                        continue;
-                    }
-
-                    if (
-                        handle.Status == WButtonInvocationStatus.Running
-                        || handle.Status == WButtonInvocationStatus.CancelRequested
-                    )
-                    {
-                        running++;
-                        anyCancellable |= handle.SupportsCancellation;
-                    }
-                }
-            }
-
-            runningCount = running;
-            cancellable = anyCancellable;
         }
 
         private static void DrawRunningStatus(
@@ -1651,6 +1651,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
     internal sealed class WButtonMethodContext
     {
+        internal WButtonMethodMetadata Metadata { get; }
+
+        internal WButtonMethodState[] States { get; }
+
+        internal UnityEngine.Object[] Targets { get; }
+
+        internal bool InvocationRequested { get; private set; }
+
         internal WButtonMethodContext(
             WButtonMethodMetadata metadata,
             WButtonMethodState[] states,
@@ -1661,14 +1669,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             States = states;
             Targets = targets;
         }
-
-        internal WButtonMethodMetadata Metadata { get; }
-
-        internal WButtonMethodState[] States { get; }
-
-        internal UnityEngine.Object[] Targets { get; }
-
-        internal bool InvocationRequested { get; private set; }
 
         internal void MarkTriggered()
         {

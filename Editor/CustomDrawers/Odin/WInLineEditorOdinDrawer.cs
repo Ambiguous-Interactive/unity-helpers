@@ -25,6 +25,138 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
     /// </remarks>
     public sealed class WInLineEditorOdinDrawer : OdinAttributeDrawer<WInLineEditorAttribute>
     {
+        /// <summary>
+        /// Clears cached editors and state. Primarily for testing purposes.
+        /// </summary>
+        internal static void ClearCachedStateForTesting()
+        {
+            InLineEditorShared.ClearCachedStateForTesting();
+        }
+
+        /// <summary>
+        /// Test hook to set the foldout state for a given key.
+        /// </summary>
+        internal static void SetFoldoutStateForTesting(string key, bool expanded)
+        {
+            InLineEditorShared.SetFoldoutStateForTesting(key, expanded);
+        }
+
+        /// <summary>
+        /// Test hook to get the foldout state for a given key.
+        /// </summary>
+        internal static bool GetFoldoutStateForTesting(string key)
+        {
+            return InLineEditorShared.GetFoldoutStateForTesting(key);
+        }
+
+        private static bool DrawHeader(
+            Object value,
+            GUIContent label,
+            bool showFoldoutToggle,
+            bool foldoutState,
+            string foldoutKey
+        )
+        {
+            Rect rect = EditorGUILayout.GetControlRect(false, InLineEditorShared.HeaderHeight);
+
+            float pingWidth = InLineEditorShared.GetPingButtonWidth();
+            bool showPingButton = InLineEditorShared.ShouldShowPingButton(value);
+            float headerSpacing = 0f;
+            float headerRightMargin = 0f;
+
+            if (showPingButton)
+            {
+                headerSpacing = InLineEditorShared.HeaderPingSpacing;
+                headerRightMargin = InLineEditorShared.PingButtonRightMargin;
+                bool hasSpace =
+                    InLineEditorShared.MinimumFoldoutLabelWidth
+                    <= rect.width - pingWidth - headerSpacing - headerRightMargin;
+                if (!hasSpace)
+                {
+                    showPingButton = false;
+                    headerSpacing = 0f;
+                    headerRightMargin = 0f;
+                }
+            }
+
+            float labelWidth = showPingButton
+                ? Mathf.Max(0f, rect.width - pingWidth - headerSpacing - headerRightMargin)
+                : rect.width;
+            Rect labelRect = new Rect(rect.x, rect.y, labelWidth, rect.height);
+            Rect pingRect = new Rect(
+                rect.x + labelWidth + (showPingButton ? headerSpacing : 0f),
+                rect.y,
+                pingWidth,
+                rect.height
+            );
+
+            GUIContent headerContent = InLineEditorShared.PrepareHeaderContent(value, label);
+
+            if (showFoldoutToggle)
+            {
+                bool newState = EditorGUI.Foldout(labelRect, foldoutState, headerContent, true);
+                if (newState != foldoutState)
+                {
+                    foldoutState = newState;
+                    InLineEditorShared.SetFoldoutState(foldoutKey, foldoutState);
+                }
+            }
+            else
+            {
+                EditorGUI.LabelField(labelRect, headerContent, EditorStyles.boldLabel);
+            }
+
+            if (showPingButton)
+            {
+                using (new EditorGUI.DisabledScope(value == null))
+                {
+                    if (
+                        GUI.Button(
+                            pingRect,
+                            InLineEditorShared.PingButtonContent,
+                            EditorStyles.miniButton
+                        )
+                    )
+                    {
+                        EditorGUIUtility.PingObject(value);
+                    }
+                }
+            }
+
+            return foldoutState;
+        }
+
+        private static void DrawPreview(Object value, float previewHeight)
+        {
+            if (value == null)
+            {
+                return;
+            }
+
+            Texture2D preview = AssetPreview.GetAssetPreview(value);
+            if (preview == null)
+            {
+                preview = AssetPreview.GetMiniThumbnail(value);
+            }
+
+            if (preview == null)
+            {
+                return;
+            }
+
+            Rect previewRect = EditorGUILayout.GetControlRect(false, previewHeight);
+            float aspectRatio = (float)preview.width / preview.height;
+            float previewWidth = Mathf.Min(previewRect.width, previewHeight * aspectRatio);
+            Rect centeredRect = new Rect(
+                previewRect.x + (previewRect.width - previewWidth) * 0.5f,
+                previewRect.y,
+                previewWidth,
+                previewHeight
+            );
+
+            GUI.DrawTexture(centeredRect, preview, ScaleMode.ScaleToFit);
+        }
+
         protected override void DrawPropertyLayout(GUIContent label)
         {
             WInLineEditorAttribute inlineAttribute = Attribute;
@@ -130,83 +262,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             return InLineEditorShared.BuildScrollKey(BuildFoldoutKey());
         }
 
-        private static bool DrawHeader(
-            Object value,
-            GUIContent label,
-            bool showFoldoutToggle,
-            bool foldoutState,
-            string foldoutKey
-        )
-        {
-            Rect rect = EditorGUILayout.GetControlRect(false, InLineEditorShared.HeaderHeight);
-
-            float pingWidth = InLineEditorShared.GetPingButtonWidth();
-            bool showPingButton = InLineEditorShared.ShouldShowPingButton(value);
-            float headerSpacing = 0f;
-            float headerRightMargin = 0f;
-
-            if (showPingButton)
-            {
-                headerSpacing = InLineEditorShared.HeaderPingSpacing;
-                headerRightMargin = InLineEditorShared.PingButtonRightMargin;
-                bool hasSpace =
-                    InLineEditorShared.MinimumFoldoutLabelWidth
-                    <= rect.width - pingWidth - headerSpacing - headerRightMargin;
-                if (!hasSpace)
-                {
-                    showPingButton = false;
-                    headerSpacing = 0f;
-                    headerRightMargin = 0f;
-                }
-            }
-
-            float labelWidth = showPingButton
-                ? Mathf.Max(0f, rect.width - pingWidth - headerSpacing - headerRightMargin)
-                : rect.width;
-            Rect labelRect = new Rect(rect.x, rect.y, labelWidth, rect.height);
-            Rect pingRect = new Rect(
-                rect.x + labelWidth + (showPingButton ? headerSpacing : 0f),
-                rect.y,
-                pingWidth,
-                rect.height
-            );
-
-            GUIContent headerContent = InLineEditorShared.PrepareHeaderContent(value, label);
-
-            if (showFoldoutToggle)
-            {
-                bool newState = EditorGUI.Foldout(labelRect, foldoutState, headerContent, true);
-                if (newState != foldoutState)
-                {
-                    foldoutState = newState;
-                    InLineEditorShared.SetFoldoutState(foldoutKey, foldoutState);
-                }
-            }
-            else
-            {
-                EditorGUI.LabelField(labelRect, headerContent, EditorStyles.boldLabel);
-            }
-
-            if (showPingButton)
-            {
-                using (new EditorGUI.DisabledScope(value == null))
-                {
-                    if (
-                        GUI.Button(
-                            pingRect,
-                            InLineEditorShared.PingButtonContent,
-                            EditorStyles.miniButton
-                        )
-                    )
-                    {
-                        EditorGUIUtility.PingObject(value);
-                    }
-                }
-            }
-
-            return foldoutState;
-        }
-
         private void DrawInlineInspector(Object value, WInLineEditorAttribute inlineAttribute)
         {
             Editor editor = InLineEditorShared.GetOrCreateEditor(value);
@@ -270,61 +325,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                     EditorGUILayout.EndVertical();
                 }
             }
-        }
-
-        private static void DrawPreview(Object value, float previewHeight)
-        {
-            if (value == null)
-            {
-                return;
-            }
-
-            Texture2D preview = AssetPreview.GetAssetPreview(value);
-            if (preview == null)
-            {
-                preview = AssetPreview.GetMiniThumbnail(value);
-            }
-
-            if (preview == null)
-            {
-                return;
-            }
-
-            Rect previewRect = EditorGUILayout.GetControlRect(false, previewHeight);
-            float aspectRatio = (float)preview.width / preview.height;
-            float previewWidth = Mathf.Min(previewRect.width, previewHeight * aspectRatio);
-            Rect centeredRect = new Rect(
-                previewRect.x + (previewRect.width - previewWidth) * 0.5f,
-                previewRect.y,
-                previewWidth,
-                previewHeight
-            );
-
-            GUI.DrawTexture(centeredRect, preview, ScaleMode.ScaleToFit);
-        }
-
-        /// <summary>
-        /// Clears cached editors and state. Primarily for testing purposes.
-        /// </summary>
-        internal static void ClearCachedStateForTesting()
-        {
-            InLineEditorShared.ClearCachedStateForTesting();
-        }
-
-        /// <summary>
-        /// Test hook to set the foldout state for a given key.
-        /// </summary>
-        internal static void SetFoldoutStateForTesting(string key, bool expanded)
-        {
-            InLineEditorShared.SetFoldoutStateForTesting(key, expanded);
-        }
-
-        /// <summary>
-        /// Test hook to get the foldout state for a given key.
-        /// </summary>
-        internal static bool GetFoldoutStateForTesting(string key)
-        {
-            return InLineEditorShared.GetFoldoutStateForTesting(key);
         }
     }
 #endif

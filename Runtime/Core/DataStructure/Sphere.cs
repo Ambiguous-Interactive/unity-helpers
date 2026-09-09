@@ -22,6 +22,22 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// </example>
     public readonly struct Sphere : IEquatable<Sphere>
     {
+        /// <summary>
+        /// Determines whether two spheres are equal.
+        /// </summary>
+        public static bool operator ==(Sphere left, Sphere right)
+        {
+            return left.Equals(right);
+        }
+
+        /// <summary>
+        /// Determines whether two spheres are not equal.
+        /// </summary>
+        public static bool operator !=(Sphere left, Sphere right)
+        {
+            return !left.Equals(right);
+        }
+
         public readonly Vector3 center;
         public readonly float radius;
         private readonly float _radiusSquared;
@@ -265,22 +281,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         public override int GetHashCode()
         {
             return Objects.HashCode(center, radius);
-        }
-
-        /// <summary>
-        /// Determines whether two spheres are equal.
-        /// </summary>
-        public static bool operator ==(Sphere left, Sphere right)
-        {
-            return left.Equals(right);
-        }
-
-        /// <summary>
-        /// Determines whether two spheres are not equal.
-        /// </summary>
-        public static bool operator !=(Sphere left, Sphere right)
-        {
-            return !left.Equals(right);
         }
 
         /// <summary>

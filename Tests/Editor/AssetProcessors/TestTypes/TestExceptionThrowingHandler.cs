@@ -17,9 +17,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     /// </remarks>
     internal static class TestExceptionThrowingHandler
     {
-        private static int _invocationCount;
-        private static bool _shouldThrow;
-
         public static int InvocationCount => _invocationCount;
 
         /// <summary>
@@ -31,6 +28,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             get => _shouldThrow;
             set => _shouldThrow = value;
         }
+
+        private static int _invocationCount;
+        private static bool _shouldThrow;
 
         public static void Clear()
         {

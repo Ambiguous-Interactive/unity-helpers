@@ -26,13 +26,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// </remarks>
     public static class WProtoGeneric<T>
     {
-        // Nullability is fixed per closed generic, avoiding repeated checks for every element.
-        private static readonly bool IsReferenceType = !typeof(T).IsValueType;
-
-        private static IWProtoScalarFormatter<T> _scalar;
-        private static IWProtoFormatter<T> _message;
-        private static bool _resolved;
-
         /// <summary>The wire type a field of this type carries in its key.</summary>
         public static int WireType
         {
@@ -41,16 +34,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 Resolve();
                 return _scalar != null ? _scalar.WireType : WProtoWireType.LengthDelimited;
             }
-        }
-
-        /// <summary>
-        /// Reports whether a field of this type accepts <paramref name="wireType"/> on read.
-        /// </summary>
-        /// <param name="wireType">The wire type from the field's key.</param>
-        /// <returns><c>true</c> when the value can be decoded from that wire type.</returns>
-        public static bool Accepts(int wireType)
-        {
-            return wireType == WireType;
         }
 
         /// <summary>
@@ -141,6 +124,23 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 Resolve();
                 return _scalar == null && !WProtoBcl.IsBclType<T>();
             }
+        }
+
+        // Nullability is fixed per closed generic, avoiding repeated checks for every element.
+        private static readonly bool IsReferenceType = !typeof(T).IsValueType;
+
+        private static IWProtoScalarFormatter<T> _scalar;
+        private static IWProtoFormatter<T> _message;
+        private static bool _resolved;
+
+        /// <summary>
+        /// Reports whether a field of this type accepts <paramref name="wireType"/> on read.
+        /// </summary>
+        /// <param name="wireType">The wire type from the field's key.</param>
+        /// <returns><c>true</c> when the value can be decoded from that wire type.</returns>
+        public static bool Accepts(int wireType)
+        {
+            return wireType == WireType;
         }
 
         /// <summary>
@@ -379,6 +379,22 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         }
 
         /// <summary>
+        /// Forgets a cached resolution, so a formatter registered later is picked up.
+        /// </summary>
+        /// <remarks>
+        /// Registration is meant to happen once during startup, before anything serializes, and the
+        /// cache exists so a per-element resolution is a field read. A test that registers a
+        /// formatter after this type has already resolved would otherwise see the stale answer.
+        /// </remarks>
+        public static void Reset()
+        {
+            // Clear the published flag before its fields so readers cannot observe resolved nulls.
+            Volatile.Write(ref _resolved, false);
+            _scalar = null;
+            _message = null;
+        }
+
+        /// <summary>
         /// Reports whether a scalar member is left off the wire.
         /// </summary>
         /// <remarks>
@@ -441,22 +457,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             _scalar = scalar;
             _message = message;
             Volatile.Write(ref _resolved, true);
-        }
-
-        /// <summary>
-        /// Forgets a cached resolution, so a formatter registered later is picked up.
-        /// </summary>
-        /// <remarks>
-        /// Registration is meant to happen once during startup, before anything serializes, and the
-        /// cache exists so a per-element resolution is a field read. A test that registers a
-        /// formatter after this type has already resolved would otherwise see the stale answer.
-        /// </remarks>
-        public static void Reset()
-        {
-            // Clear the published flag before its fields so readers cannot observe resolved nulls.
-            Volatile.Write(ref _resolved, false);
-            _scalar = null;
-            _message = null;
         }
     }
 }

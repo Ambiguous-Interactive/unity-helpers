@@ -36,17 +36,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     [Serializable]
     public sealed class OctTree3D<T> : ISpatialTree3D<T>
     {
-        private const float MinimumNodeSize = 0.001f;
-        private const int NumChildren = 8;
-
         public const int DefaultBucketSize = 12;
 
-        public readonly ImmutableArray<T> elements;
+        private const float MinimumNodeSize = 0.001f;
+        private const int NumChildren = 8;
 
         /// <summary>Gets the overall bounding box of the indexed points.</summary>
         /// <remarks>Bounds conservatively enclose finite entries. Float size or edges can be infinite
         /// when the enclosing span is not representable; queries still test the stored geometry.</remarks>
         public Bounds Boundary => _boundary;
+
+        public readonly ImmutableArray<T> elements;
 
         private readonly BoundingBox3D _bounds;
         private readonly Bounds _boundary;
@@ -186,173 +186,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _head = BuildNode(_bounds, 0, elementCount, bucketSize, scratch);
         }
 
-        private OctTreeNode BuildNode(
-            BoundingBox3D boundary,
-            int startIndex,
-            int count,
-            int bucketSize,
-            int[] scratch
-        )
+        private static void EnsureMinimumUnityBounds(ref Bounds bounds)
         {
-            if (count <= 0)
-            {
-                return OctTreeNode.CreateLeaf(boundary, startIndex, 0, new Bounds());
-            }
-
-            if (count <= bucketSize)
-            {
-                Bounds leafUnity = CalculateUnityBounds(startIndex, count);
-                return OctTreeNode.CreateLeaf(boundary, startIndex, count, leafUnity);
-            }
-
-            Vector3 boundaryCenter = SpatialQueryMath.Midpoint(
-                boundary.min,
-                Vector3.Min(
-                    boundary.max,
-                    new Vector3(float.MaxValue, float.MaxValue, float.MaxValue)
-                )
+            bounds = SpatialQueryMath.CreateConservativeBounds(
+                bounds.min,
+                bounds.max,
+                MinimumNodeSize
             );
-            if (!SpatialQueryMath.IsFinite(boundaryCenter))
-            {
-                Bounds unsplittableUnity = CalculateUnityBounds(startIndex, count);
-                return OctTreeNode.CreateLeaf(boundary, startIndex, count, unsplittableUnity);
-            }
-
-            Span<int> counts = stackalloc int[NumChildren];
-            Span<int> starts = stackalloc int[NumChildren];
-            Span<int> next = stackalloc int[NumChildren];
-
-            Span<int> source = _indices.AsSpan(startIndex, count);
-            Span<int> temp = scratch.AsSpan(0, count);
-
-            Vector3 boundaryMin = boundary.min;
-            Vector3 boundaryMax = boundary.max;
-            float centerX = boundaryCenter.x;
-            float centerY = boundaryCenter.y;
-            float centerZ = boundaryCenter.z;
-
-            Entry[] entries = _entries;
-            for (int i = 0; i < count; ++i)
-            {
-                int entryIndex = source[i];
-                Vector3 position = entries[entryIndex].position;
-                bool east = centerX <= position.x;
-                bool north = centerY <= position.y;
-                bool up = centerZ <= position.z;
-                int octant = (up ? 4 : 0) | (east ? 2 : 0) | (north ? 1 : 0);
-                counts[octant]++;
-            }
-
-            int maxChildCount = 0;
-            int running = 0;
-            for (int q = 0; q < NumChildren; ++q)
-            {
-                starts[q] = running;
-                next[q] = running;
-                running += counts[q];
-                if (maxChildCount < counts[q])
-                {
-                    maxChildCount = counts[q];
-                }
-            }
-
-            if (maxChildCount == count)
-            {
-                Bounds degenerateUnity = CalculateUnityBounds(startIndex, count);
-                return OctTreeNode.CreateLeaf(boundary, startIndex, count, degenerateUnity);
-            }
-
-            for (int i = 0; i < count; ++i)
-            {
-                int entryIndex = source[i];
-                Vector3 position = entries[entryIndex].position;
-                bool east = centerX <= position.x;
-                bool north = centerY <= position.y;
-                bool up = centerZ <= position.z;
-                int octant = (up ? 4 : 0) | (east ? 2 : 0) | (north ? 1 : 0);
-                int destination = next[octant]++;
-                temp[destination] = entryIndex;
-            }
-
-            temp.CopyTo(source);
-
-            float minX = boundaryMin.x;
-            float minY = boundaryMin.y;
-            float minZ = boundaryMin.z;
-            float maxX = boundaryMax.x;
-            float maxY = boundaryMax.y;
-            float maxZ = boundaryMax.z;
-
-            Span<BoundingBox3D> octants = stackalloc BoundingBox3D[NumChildren];
-
-            octants[0] = new BoundingBox3D(
-                new Vector3(minX, minY, minZ),
-                new Vector3(centerX, centerY, centerZ)
-            );
-            octants[2] = new BoundingBox3D(
-                new Vector3(centerX, minY, minZ),
-                new Vector3(maxX, centerY, centerZ)
-            );
-            octants[1] = new BoundingBox3D(
-                new Vector3(minX, centerY, minZ),
-                new Vector3(centerX, maxY, centerZ)
-            );
-            octants[3] = new BoundingBox3D(
-                new Vector3(centerX, centerY, minZ),
-                new Vector3(maxX, maxY, centerZ)
-            );
-
-            octants[4] = new BoundingBox3D(
-                new Vector3(minX, minY, centerZ),
-                new Vector3(centerX, centerY, maxZ)
-            );
-            octants[6] = new BoundingBox3D(
-                new Vector3(centerX, minY, centerZ),
-                new Vector3(maxX, centerY, maxZ)
-            );
-            octants[5] = new BoundingBox3D(
-                new Vector3(minX, centerY, centerZ),
-                new Vector3(centerX, maxY, maxZ)
-            );
-            octants[7] = new BoundingBox3D(
-                new Vector3(centerX, centerY, centerZ),
-                new Vector3(maxX, maxY, maxZ)
-            );
-
-            OctTreeNode[] children = new OctTreeNode[NumChildren];
-            for (int q = 0; q < NumChildren; ++q)
-            {
-                int childCount = counts[q];
-                if (childCount <= 0)
-                {
-                    continue;
-                }
-
-                int childStart = startIndex + starts[q];
-                children[q] = BuildNode(octants[q], childStart, childCount, bucketSize, scratch);
-            }
-
-            Bounds nodeUnity = default;
-            bool initialized = false;
-            for (int q = 0; q < NumChildren; ++q)
-            {
-                OctTreeNode child = children[q];
-                if (child is null || child._count <= 0)
-                {
-                    continue;
-                }
-                if (!initialized)
-                {
-                    nodeUnity = child.unityBoundary;
-                    initialized = true;
-                }
-                else
-                {
-                    nodeUnity = SpatialQueryMath.Union(nodeUnity, child.unityBoundary);
-                }
-            }
-            EnsureMinimumUnityBounds(ref nodeUnity);
-            return OctTreeNode.CreateInternal(boundary, children, startIndex, count, nodeUnity);
         }
 
         /// <summary>
@@ -565,6 +405,175 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             return GetElementsInBoundsInternal(queryBounds, elementsInBounds, logger);
+        }
+
+        private OctTreeNode BuildNode(
+            BoundingBox3D boundary,
+            int startIndex,
+            int count,
+            int bucketSize,
+            int[] scratch
+        )
+        {
+            if (count <= 0)
+            {
+                return OctTreeNode.CreateLeaf(boundary, startIndex, 0, new Bounds());
+            }
+
+            if (count <= bucketSize)
+            {
+                Bounds leafUnity = CalculateUnityBounds(startIndex, count);
+                return OctTreeNode.CreateLeaf(boundary, startIndex, count, leafUnity);
+            }
+
+            Vector3 boundaryCenter = SpatialQueryMath.Midpoint(
+                boundary.min,
+                Vector3.Min(
+                    boundary.max,
+                    new Vector3(float.MaxValue, float.MaxValue, float.MaxValue)
+                )
+            );
+            if (!SpatialQueryMath.IsFinite(boundaryCenter))
+            {
+                Bounds unsplittableUnity = CalculateUnityBounds(startIndex, count);
+                return OctTreeNode.CreateLeaf(boundary, startIndex, count, unsplittableUnity);
+            }
+
+            Span<int> counts = stackalloc int[NumChildren];
+            Span<int> starts = stackalloc int[NumChildren];
+            Span<int> next = stackalloc int[NumChildren];
+
+            Span<int> source = _indices.AsSpan(startIndex, count);
+            Span<int> temp = scratch.AsSpan(0, count);
+
+            Vector3 boundaryMin = boundary.min;
+            Vector3 boundaryMax = boundary.max;
+            float centerX = boundaryCenter.x;
+            float centerY = boundaryCenter.y;
+            float centerZ = boundaryCenter.z;
+
+            Entry[] entries = _entries;
+            for (int i = 0; i < count; ++i)
+            {
+                int entryIndex = source[i];
+                Vector3 position = entries[entryIndex].position;
+                bool east = centerX <= position.x;
+                bool north = centerY <= position.y;
+                bool up = centerZ <= position.z;
+                int octant = (up ? 4 : 0) | (east ? 2 : 0) | (north ? 1 : 0);
+                counts[octant]++;
+            }
+
+            int maxChildCount = 0;
+            int running = 0;
+            for (int q = 0; q < NumChildren; ++q)
+            {
+                starts[q] = running;
+                next[q] = running;
+                running += counts[q];
+                if (maxChildCount < counts[q])
+                {
+                    maxChildCount = counts[q];
+                }
+            }
+
+            if (maxChildCount == count)
+            {
+                Bounds degenerateUnity = CalculateUnityBounds(startIndex, count);
+                return OctTreeNode.CreateLeaf(boundary, startIndex, count, degenerateUnity);
+            }
+
+            for (int i = 0; i < count; ++i)
+            {
+                int entryIndex = source[i];
+                Vector3 position = entries[entryIndex].position;
+                bool east = centerX <= position.x;
+                bool north = centerY <= position.y;
+                bool up = centerZ <= position.z;
+                int octant = (up ? 4 : 0) | (east ? 2 : 0) | (north ? 1 : 0);
+                int destination = next[octant]++;
+                temp[destination] = entryIndex;
+            }
+
+            temp.CopyTo(source);
+
+            float minX = boundaryMin.x;
+            float minY = boundaryMin.y;
+            float minZ = boundaryMin.z;
+            float maxX = boundaryMax.x;
+            float maxY = boundaryMax.y;
+            float maxZ = boundaryMax.z;
+
+            Span<BoundingBox3D> octants = stackalloc BoundingBox3D[NumChildren];
+
+            octants[0] = new BoundingBox3D(
+                new Vector3(minX, minY, minZ),
+                new Vector3(centerX, centerY, centerZ)
+            );
+            octants[2] = new BoundingBox3D(
+                new Vector3(centerX, minY, minZ),
+                new Vector3(maxX, centerY, centerZ)
+            );
+            octants[1] = new BoundingBox3D(
+                new Vector3(minX, centerY, minZ),
+                new Vector3(centerX, maxY, centerZ)
+            );
+            octants[3] = new BoundingBox3D(
+                new Vector3(centerX, centerY, minZ),
+                new Vector3(maxX, maxY, centerZ)
+            );
+
+            octants[4] = new BoundingBox3D(
+                new Vector3(minX, minY, centerZ),
+                new Vector3(centerX, centerY, maxZ)
+            );
+            octants[6] = new BoundingBox3D(
+                new Vector3(centerX, minY, centerZ),
+                new Vector3(maxX, centerY, maxZ)
+            );
+            octants[5] = new BoundingBox3D(
+                new Vector3(minX, centerY, centerZ),
+                new Vector3(centerX, maxY, maxZ)
+            );
+            octants[7] = new BoundingBox3D(
+                new Vector3(centerX, centerY, centerZ),
+                new Vector3(maxX, maxY, maxZ)
+            );
+
+            OctTreeNode[] children = new OctTreeNode[NumChildren];
+            for (int q = 0; q < NumChildren; ++q)
+            {
+                int childCount = counts[q];
+                if (childCount <= 0)
+                {
+                    continue;
+                }
+
+                int childStart = startIndex + starts[q];
+                children[q] = BuildNode(octants[q], childStart, childCount, bucketSize, scratch);
+            }
+
+            Bounds nodeUnity = default;
+            bool initialized = false;
+            for (int q = 0; q < NumChildren; ++q)
+            {
+                OctTreeNode child = children[q];
+                if (child is null || child._count <= 0)
+                {
+                    continue;
+                }
+                if (!initialized)
+                {
+                    nodeUnity = child.unityBoundary;
+                    initialized = true;
+                }
+                else
+                {
+                    nodeUnity = SpatialQueryMath.Union(nodeUnity, child.unityBoundary);
+                }
+            }
+            EnsureMinimumUnityBounds(ref nodeUnity);
+            return OctTreeNode.CreateInternal(boundary, children, startIndex, count, nodeUnity);
         }
 
         private List<T> GetElementsInBoundsInternal(
@@ -810,15 +819,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             Bounds b = SpatialQueryMath.CreateConservativeBounds(min, max, MinimumNodeSize);
             EnsureMinimumUnityBounds(ref b);
             return b;
-        }
-
-        private static void EnsureMinimumUnityBounds(ref Bounds bounds)
-        {
-            bounds = SpatialQueryMath.CreateConservativeBounds(
-                bounds.min,
-                bounds.max,
-                MinimumNodeSize
-            );
         }
 
 #if UNITY_ASSERTIONS && ENABLE_SPATIAL_DIAGNOSTICS
@@ -1153,11 +1153,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         public sealed class OctTreeNode
         {
             public readonly BoundingBox3D boundary;
+            public readonly bool isTerminal;
+            public readonly Bounds unityBoundary;
             internal readonly OctTreeNode[] _children;
             internal readonly int _startIndex;
             internal readonly int _count;
-            public readonly bool isTerminal;
-            public readonly Bounds unityBoundary;
 
             private OctTreeNode(
                 BoundingBox3D boundary,
@@ -1256,6 +1256,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         public readonly struct BoundsQueryNodeTrace
         {
+            public BoundingBox3D Boundary { get; }
+
+            public Bounds UnityBounds { get; }
+
+            public int Count { get; }
+
+            public bool IsTerminal { get; }
+
+            public bool NodeFullyContained { get; }
+
+            public NodeVisitKind VisitKind { get; }
+
             public BoundsQueryNodeTrace(
                 BoundingBox3D boundary,
                 Bounds unityBounds,
@@ -1271,18 +1283,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 NodeFullyContained = nodeFullyContained;
                 VisitKind = DetermineVisitKind(isTerminal, nodeFullyContained);
             }
-
-            public BoundingBox3D Boundary { get; }
-
-            public Bounds UnityBounds { get; }
-
-            public int Count { get; }
-
-            public bool IsTerminal { get; }
-
-            public bool NodeFullyContained { get; }
-
-            public NodeVisitKind VisitKind { get; }
 
             private static NodeVisitKind DetermineVisitKind(
                 bool isTerminal,

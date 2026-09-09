@@ -44,11 +44,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private static readonly Dictionary<string, DrawerState> States = new();
 
-        static PoolTypeConfigurationDrawer()
-        {
-            AssemblyReloadEvents.beforeAssemblyReload += ClearCachedStates;
-        }
-
         private static readonly GUIContent TypeNameLabel = new(
             "Type Name",
             "Type name in any supported format:\n"
@@ -101,6 +96,118 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         );
 
         private static readonly GUIContent ReusableHeaderLabel = new();
+
+        static PoolTypeConfigurationDrawer()
+        {
+            AssemblyReloadEvents.beforeAssemblyReload += ClearCachedStates;
+        }
+
+        internal static DrawerState GetState(SerializedProperty property)
+        {
+            string key = property.propertyPath;
+            return States.GetOrAdd(key);
+        }
+
+        internal static void ClearCachedStates()
+        {
+            States.Clear();
+        }
+
+        private static void DrawTwoColumnRow(
+            Rect position,
+            ref float currentY,
+            float lineHeight,
+            float spacing,
+            float halfWidth,
+            float indent,
+            SerializedProperty leftProp,
+            GUIContent leftLabel,
+            SerializedProperty rightProp,
+            GUIContent rightLabel
+        )
+        {
+            Rect leftRect = new(position.x, currentY, halfWidth, lineHeight);
+            Rect rightRect = new(position.x + halfWidth + spacing, currentY, halfWidth, lineHeight);
+
+            if (leftProp != null)
+            {
+                EditorGUI.PropertyField(leftRect, leftProp, leftLabel);
+            }
+
+            using (IndentLevelScope.AtLevel(0))
+            {
+                Rect adjustedRightRect = new(
+                    rightRect.x + indent,
+                    rightRect.y,
+                    rightRect.width - indent,
+                    rightRect.height
+                );
+                if (rightProp != null)
+                {
+                    EditorGUI.PropertyField(adjustedRightRect, rightProp, rightLabel);
+                }
+            }
+
+            currentY += lineHeight + spacing;
+        }
+
+        private static void ValidateTypeName(DrawerState state, string typeName)
+        {
+            if (string.IsNullOrWhiteSpace(typeName))
+            {
+                state.resolvedType = null;
+                state.isValid = false;
+                state.statusMessage = string.Empty;
+                state.messageType = MessageType.None;
+                return;
+            }
+
+            Type resolved = PoolTypeResolver.ResolveType(typeName);
+            if (resolved == null)
+            {
+                state.resolvedType = null;
+                state.isValid = false;
+                state.statusMessage = $"Unable to resolve type: {typeName}";
+                state.messageType = MessageType.Warning;
+                return;
+            }
+
+            state.resolvedType = resolved;
+            state.isValid = true;
+
+            if (resolved.IsGenericTypeDefinition)
+            {
+                string displayName = PoolTypeResolver.GetDisplayName(resolved);
+                state.statusMessage = $"Open generic pattern: matches all {displayName} types";
+                state.messageType = MessageType.Info;
+            }
+            else if (resolved.IsGenericType)
+            {
+                string displayName = PoolTypeResolver.GetDisplayName(resolved);
+                state.statusMessage = $"Resolved: {displayName}";
+                state.messageType = MessageType.Info;
+            }
+            else
+            {
+                state.statusMessage = $"Resolved: {resolved.FullName}";
+                state.messageType = MessageType.Info;
+            }
+        }
+
+        private static float GetStatusBoxWidth()
+        {
+            try
+            {
+                return Mathf.Max(
+                    MinStatusBoxWidth,
+                    EditorGUIUtility.currentViewWidth - StatusBoxMargin * 2
+                );
+            }
+            catch (ArgumentException)
+            {
+                return MinStatusBoxWidth;
+            }
+        }
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
@@ -299,113 +406,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             EditorGUI.EndProperty();
-        }
-
-        private static void DrawTwoColumnRow(
-            Rect position,
-            ref float currentY,
-            float lineHeight,
-            float spacing,
-            float halfWidth,
-            float indent,
-            SerializedProperty leftProp,
-            GUIContent leftLabel,
-            SerializedProperty rightProp,
-            GUIContent rightLabel
-        )
-        {
-            Rect leftRect = new(position.x, currentY, halfWidth, lineHeight);
-            Rect rightRect = new(position.x + halfWidth + spacing, currentY, halfWidth, lineHeight);
-
-            if (leftProp != null)
-            {
-                EditorGUI.PropertyField(leftRect, leftProp, leftLabel);
-            }
-
-            using (IndentLevelScope.AtLevel(0))
-            {
-                Rect adjustedRightRect = new(
-                    rightRect.x + indent,
-                    rightRect.y,
-                    rightRect.width - indent,
-                    rightRect.height
-                );
-                if (rightProp != null)
-                {
-                    EditorGUI.PropertyField(adjustedRightRect, rightProp, rightLabel);
-                }
-            }
-
-            currentY += lineHeight + spacing;
-        }
-
-        private static void ValidateTypeName(DrawerState state, string typeName)
-        {
-            if (string.IsNullOrWhiteSpace(typeName))
-            {
-                state.resolvedType = null;
-                state.isValid = false;
-                state.statusMessage = string.Empty;
-                state.messageType = MessageType.None;
-                return;
-            }
-
-            Type resolved = PoolTypeResolver.ResolveType(typeName);
-            if (resolved == null)
-            {
-                state.resolvedType = null;
-                state.isValid = false;
-                state.statusMessage = $"Unable to resolve type: {typeName}";
-                state.messageType = MessageType.Warning;
-                return;
-            }
-
-            state.resolvedType = resolved;
-            state.isValid = true;
-
-            if (resolved.IsGenericTypeDefinition)
-            {
-                string displayName = PoolTypeResolver.GetDisplayName(resolved);
-                state.statusMessage = $"Open generic pattern: matches all {displayName} types";
-                state.messageType = MessageType.Info;
-            }
-            else if (resolved.IsGenericType)
-            {
-                string displayName = PoolTypeResolver.GetDisplayName(resolved);
-                state.statusMessage = $"Resolved: {displayName}";
-                state.messageType = MessageType.Info;
-            }
-            else
-            {
-                state.statusMessage = $"Resolved: {resolved.FullName}";
-                state.messageType = MessageType.Info;
-            }
-        }
-
-        internal static DrawerState GetState(SerializedProperty property)
-        {
-            string key = property.propertyPath;
-            return States.GetOrAdd(key);
-        }
-
-        internal static void ClearCachedStates()
-        {
-            States.Clear();
-        }
-
-        private static float GetStatusBoxWidth()
-        {
-            try
-            {
-                return Mathf.Max(
-                    MinStatusBoxWidth,
-                    EditorGUIUtility.currentViewWidth - StatusBoxMargin * 2
-                );
-            }
-            catch (ArgumentException)
-            {
-                return MinStatusBoxWidth;
-            }
         }
 
         internal sealed class DrawerState

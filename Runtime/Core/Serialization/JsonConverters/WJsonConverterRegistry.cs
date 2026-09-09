@@ -35,8 +35,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
     /// </remarks>
     public static class WJsonConverterRegistry
     {
-        private static readonly ConcurrentDictionary<Type, JsonConverter> Converters = new();
-
         /// <summary>The number of closed constructions registered so far.</summary>
         /// <remarks>
         /// Exposed so a build can assert that generation happened at all. A registry that is empty
@@ -44,6 +42,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
         /// invisible until the first serialization throws.
         /// </remarks>
         public static int Count => Converters.Count;
+
+        private static readonly ConcurrentDictionary<Type, JsonConverter> Converters = new();
 
         /// <summary>
         /// Registers <paramref name="converter"/> as the converter for

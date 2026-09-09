@@ -1550,12 +1550,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         */
         internal sealed class SampleValue
         {
+            public string Identifier { get; }
+
             public SampleValue(string identifier)
             {
                 Identifier = identifier;
             }
-
-            public string Identifier { get; }
 
             public override bool Equals(object candidate)
             {

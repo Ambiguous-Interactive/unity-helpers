@@ -38,14 +38,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
             ImmutableArray.Create(UnityHelpersDiagnostics.UntestedTryOutValueIsRead);
 
-        /// <inheritdoc />
-        public override void Initialize(AnalysisContext context)
-        {
-            context.EnableConcurrentExecution();
-            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
-            context.RegisterOperationBlockStartAction(OnOperationBlockStart);
-        }
-
         private static void OnOperationBlockStart(OperationBlockStartAnalysisContext context)
         {
             BlockState state = new BlockState();
@@ -199,18 +191,19 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 );
         }
 
+        /// <inheritdoc />
+        public override void Initialize(AnalysisContext context)
+        {
+            context.EnableConcurrentExecution();
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+            context.RegisterOperationBlockStartAction(OnOperationBlockStart);
+        }
+
         /// <summary>
         /// A write to a tracked symbol, recorded at the source position by which it has happened.
         /// </summary>
         private sealed class Binding
         {
-            public Binding(ISymbol symbol, int writtenAt, string untestedTryMethodName)
-            {
-                Symbol = symbol;
-                WrittenAt = writtenAt;
-                UntestedTryMethodName = untestedTryMethodName;
-            }
-
             /// <summary>The local, parameter or field this write binds.</summary>
             public ISymbol Symbol { get; }
 
@@ -228,6 +221,13 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             /// remaining reads of the same value stay quiet.
             /// </summary>
             public bool Reported { get; set; }
+
+            public Binding(ISymbol symbol, int writtenAt, string untestedTryMethodName)
+            {
+                Symbol = symbol;
+                WrittenAt = writtenAt;
+                UntestedTryMethodName = untestedTryMethodName;
+            }
         }
 
         /// <summary>
@@ -235,13 +235,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         /// </summary>
         private sealed class ReadSite
         {
-            public ReadSite(ISymbol symbol, int readAt, Location location)
-            {
-                Symbol = symbol;
-                ReadAt = readAt;
-                Location = location;
-            }
-
             /// <summary>The local, parameter or field being read.</summary>
             public ISymbol Symbol { get; }
 
@@ -250,6 +243,13 @@ namespace WallstopStudios.UnityHelpers.Analyzers
 
             /// <summary>Where the diagnostic is reported.</summary>
             public Location Location { get; }
+
+            public ReadSite(ISymbol symbol, int readAt, Location location)
+            {
+                Symbol = symbol;
+                ReadAt = readAt;
+                Location = location;
+            }
         }
 
         /// <summary>

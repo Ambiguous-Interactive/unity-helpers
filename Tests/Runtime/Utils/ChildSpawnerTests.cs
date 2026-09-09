@@ -17,6 +17,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     [NUnit.Framework.Category("Fast")]
     public sealed class ChildSpawnerTests : CommonTestBase
     {
+        private static void InvokeStartOnce(ChildSpawner childSpawner)
+        {
+            childSpawner.SendMessage(nameof(ChildSpawnMethod.Start));
+            childSpawner._spawnMethod = ChildSpawnMethod.Awake;
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -519,12 +525,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.AreEqual(1, spawnerStart.transform.childCount);
 
             yield return null;
-        }
-
-        private static void InvokeStartOnce(ChildSpawner childSpawner)
-        {
-            childSpawner.SendMessage(nameof(ChildSpawnMethod.Start));
-            childSpawner._spawnMethod = ChildSpawnMethod.Awake;
         }
     }
 }

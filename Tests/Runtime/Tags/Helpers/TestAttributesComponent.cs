@@ -13,6 +13,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags.Helpers
         public readonly List<(string attribute, float previous, float current)> notifications =
             new();
 
+        public void ResetAttributes(float healthValue = 100f, float armorValue = 50f)
+        {
+            health = new Attribute(healthValue);
+            armor = new Attribute(armorValue);
+        }
+
         protected override void Awake()
         {
             base.Awake();
@@ -20,12 +26,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags.Helpers
             {
                 notifications.Add((attribute, previous, current));
             };
-        }
-
-        public void ResetAttributes(float healthValue = 100f, float armorValue = 50f)
-        {
-            health = new Attribute(healthValue);
-            armor = new Attribute(armorValue);
         }
     }
 }

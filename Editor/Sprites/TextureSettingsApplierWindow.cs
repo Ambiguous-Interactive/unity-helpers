@@ -18,6 +18,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
     public sealed class TextureSettingsApplierWindow : EditorWindow
     {
+        internal SerializedObject SerializedStateForTesting => _so;
+
         public bool applyReadOnly;
         public bool isReadOnly;
         public bool applyMipMaps;
@@ -42,10 +44,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         public List<Object> directories = new();
 
         public List<PlatformOverrideEntry> platformOverrides = new();
-        private int _addPlatformIndex;
-        private readonly Dictionary<int, int> _replaceSelectionByIndex = new();
 
         public bool requireChangesBeforeApply = true;
+        private int _addPlatformIndex;
+        private readonly Dictionary<int, int> _replaceSelectionByIndex = new();
 
         private SerializedObject _so;
         private SerializedProperty _texturesProp;
@@ -70,7 +72,184 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             window.Show();
         }
 
-        internal SerializedObject SerializedStateForTesting => _so;
+        /// <summary>
+        /// Counts pending texture changes and clears progress when the scan ends or fails.
+        /// </summary>
+        public void CalculateStats()
+        {
+            using PooledResource<List<string>> targetsLease = Buffers<string>.List.Get(
+                out List<string> targets
+            );
+            GetTargetTexturePaths(targets);
+            _totalTexturesToProcess = targets.Count;
+            _texturesThatWillChange = 0;
+            _assetsThatWillChange.Clear();
+            if (_assetsThatWillChange.Capacity < targets.Count)
+            {
+                _assetsThatWillChange.Capacity = targets.Count;
+            }
+
+            TextureSettingsApplierAPI.Config config = BuildConfig();
+            double last = EditorApplication.timeSinceStartup;
+            try
+            {
+                for (int i = 0; i < targets.Count; i++)
+                {
+                    string rel = targets[i];
+                    double now = EditorApplication.timeSinceStartup;
+                    if (i == 0 || i == targets.Count - 1 || i % 50 == 0 || 0.2 < now - last)
+                    {
+                        Utils.EditorUi.ShowProgress(
+                            "Calculating Stats",
+                            $"Checking '{Path.GetFileName(rel)}' ({i + 1}/{_totalTexturesToProcess})",
+                            (float)(i + 1) / Math.Max(1, _totalTexturesToProcess)
+                        );
+                        last = now;
+                    }
+                    if (
+                        TextureSettingsApplierAPI.WillTextureSettingsChange(
+                            rel,
+                            in config,
+                            _settingsBuffer
+                        )
+                    )
+                    {
+                        _texturesThatWillChange++;
+                        _assetsThatWillChange.Add(rel);
+                    }
+                }
+            }
+            finally
+            {
+                Utils.EditorUi.ClearProgress();
+            }
+        }
+
+        /// <summary>
+        /// Applies texture settings, retaining completed changes on cancellation and clearing progress on failure.
+        /// </summary>
+        public void ApplySettings()
+        {
+            if (
+                requireChangesBeforeApply
+                && (_totalTexturesToProcess < 0 || _texturesThatWillChange < 0)
+            )
+            {
+                CalculateStats();
+            }
+            if (requireChangesBeforeApply && _texturesThatWillChange == 0)
+            {
+                this.Log($"No textures require changes. Skipping apply.");
+                return;
+            }
+
+            using PooledResource<List<string>> targetsLease = Buffers<string>.List.Get(
+                out List<string> targets
+            );
+            GetTargetTexturePaths(targets);
+            TextureSettingsApplierAPI.Config config = BuildConfig();
+
+            if (platformOverrides != null)
+            {
+                string[] knownNames = TexturePlatformNameHelper.GetKnownPlatformNames();
+                foreach (
+                    WallstopStudios.UnityHelpers.Editor.Sprites.TextureSettingsApplierWindow.PlatformOverrideEntry platformOverridesElement in platformOverrides
+                )
+                {
+                    string name = platformOverridesElement?.platformName?.Trim();
+                    if (
+                        !string.IsNullOrEmpty(name)
+                        && Array.IndexOf(knownNames, name) < 0
+                        && !string.Equals(
+                            name,
+                            TexturePlatformNameHelper.DefaultPlatformName,
+                            StringComparison.Ordinal
+                        )
+                    )
+                    {
+                        this.LogWarn(
+                            $"Unknown texture platform '{name}'. Settings will be applied as-is."
+                        );
+                    }
+                }
+            }
+            int count = 0;
+            using PooledResource<List<TextureImporter>> changedResource =
+                Buffers<TextureImporter>.List.Get(out List<TextureImporter> changed);
+            try
+            {
+                using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
+                {
+                    double lastUpdate = EditorApplication.timeSinceStartup;
+                    for (int i = 0; i < targets.Count; i++)
+                    {
+                        string path = targets[i];
+                        double now = EditorApplication.timeSinceStartup;
+                        bool shouldUpdate =
+                            i == 0
+                            || i == targets.Count - 1
+                            || i % 50 == 0
+                            || 0.2 < now - lastUpdate;
+                        if (
+                            shouldUpdate
+                            && EditorUi.CancelableProgress(
+                                "Applying Texture Settings",
+                                $"Processing '{Path.GetFileName(path)}' ({i + 1}/{targets.Count})",
+                                (float)(i + 1) / Math.Max(1, targets.Count)
+                            )
+                        )
+                        {
+                            break;
+                        }
+                        if (shouldUpdate)
+                        {
+                            lastUpdate = now;
+                        }
+
+                        if (
+                            TextureSettingsApplierAPI.TryUpdateTextureSettings(
+                                path,
+                                in config,
+                                out TextureImporter importer,
+                                _settingsBuffer
+                            )
+                        )
+                        {
+                            if (importer != null)
+                            {
+                                changed.Add(importer);
+                                ++count;
+                            }
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                EditorUi.ClearProgress();
+            }
+            foreach (UnityEditor.TextureImporter changedElement in changed)
+            {
+                changedElement.SaveAndReimport();
+            }
+
+            if (0 < count)
+            {
+                this.Log($"Processed {count} textures.");
+            }
+            else
+            {
+                this.Log($"No textures required changes.");
+            }
+            if (0 < count)
+            {
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+            }
+
+            _totalTexturesToProcess = -1;
+            _texturesThatWillChange = -1;
+        }
 
         private void BindSerializedState()
         {
@@ -501,185 +680,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                 }
             }
-        }
-
-        /// <summary>
-        /// Counts pending texture changes and clears progress when the scan ends or fails.
-        /// </summary>
-        public void CalculateStats()
-        {
-            using PooledResource<List<string>> targetsLease = Buffers<string>.List.Get(
-                out List<string> targets
-            );
-            GetTargetTexturePaths(targets);
-            _totalTexturesToProcess = targets.Count;
-            _texturesThatWillChange = 0;
-            _assetsThatWillChange.Clear();
-            if (_assetsThatWillChange.Capacity < targets.Count)
-            {
-                _assetsThatWillChange.Capacity = targets.Count;
-            }
-
-            TextureSettingsApplierAPI.Config config = BuildConfig();
-            double last = EditorApplication.timeSinceStartup;
-            try
-            {
-                for (int i = 0; i < targets.Count; i++)
-                {
-                    string rel = targets[i];
-                    double now = EditorApplication.timeSinceStartup;
-                    if (i == 0 || i == targets.Count - 1 || i % 50 == 0 || 0.2 < now - last)
-                    {
-                        Utils.EditorUi.ShowProgress(
-                            "Calculating Stats",
-                            $"Checking '{Path.GetFileName(rel)}' ({i + 1}/{_totalTexturesToProcess})",
-                            (float)(i + 1) / Math.Max(1, _totalTexturesToProcess)
-                        );
-                        last = now;
-                    }
-                    if (
-                        TextureSettingsApplierAPI.WillTextureSettingsChange(
-                            rel,
-                            in config,
-                            _settingsBuffer
-                        )
-                    )
-                    {
-                        _texturesThatWillChange++;
-                        _assetsThatWillChange.Add(rel);
-                    }
-                }
-            }
-            finally
-            {
-                Utils.EditorUi.ClearProgress();
-            }
-        }
-
-        /// <summary>
-        /// Applies texture settings, retaining completed changes on cancellation and clearing progress on failure.
-        /// </summary>
-        public void ApplySettings()
-        {
-            if (
-                requireChangesBeforeApply
-                && (_totalTexturesToProcess < 0 || _texturesThatWillChange < 0)
-            )
-            {
-                CalculateStats();
-            }
-            if (requireChangesBeforeApply && _texturesThatWillChange == 0)
-            {
-                this.Log($"No textures require changes. Skipping apply.");
-                return;
-            }
-
-            using PooledResource<List<string>> targetsLease = Buffers<string>.List.Get(
-                out List<string> targets
-            );
-            GetTargetTexturePaths(targets);
-            TextureSettingsApplierAPI.Config config = BuildConfig();
-
-            if (platformOverrides != null)
-            {
-                string[] knownNames = TexturePlatformNameHelper.GetKnownPlatformNames();
-                foreach (
-                    WallstopStudios.UnityHelpers.Editor.Sprites.TextureSettingsApplierWindow.PlatformOverrideEntry platformOverridesElement in platformOverrides
-                )
-                {
-                    string name = platformOverridesElement?.platformName?.Trim();
-                    if (
-                        !string.IsNullOrEmpty(name)
-                        && Array.IndexOf(knownNames, name) < 0
-                        && !string.Equals(
-                            name,
-                            TexturePlatformNameHelper.DefaultPlatformName,
-                            StringComparison.Ordinal
-                        )
-                    )
-                    {
-                        this.LogWarn(
-                            $"Unknown texture platform '{name}'. Settings will be applied as-is."
-                        );
-                    }
-                }
-            }
-            int count = 0;
-            using PooledResource<List<TextureImporter>> changedResource =
-                Buffers<TextureImporter>.List.Get(out List<TextureImporter> changed);
-            try
-            {
-                using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
-                {
-                    double lastUpdate = EditorApplication.timeSinceStartup;
-                    for (int i = 0; i < targets.Count; i++)
-                    {
-                        string path = targets[i];
-                        double now = EditorApplication.timeSinceStartup;
-                        bool shouldUpdate =
-                            i == 0
-                            || i == targets.Count - 1
-                            || i % 50 == 0
-                            || 0.2 < now - lastUpdate;
-                        if (
-                            shouldUpdate
-                            && EditorUi.CancelableProgress(
-                                "Applying Texture Settings",
-                                $"Processing '{Path.GetFileName(path)}' ({i + 1}/{targets.Count})",
-                                (float)(i + 1) / Math.Max(1, targets.Count)
-                            )
-                        )
-                        {
-                            break;
-                        }
-                        if (shouldUpdate)
-                        {
-                            lastUpdate = now;
-                        }
-
-                        if (
-                            TextureSettingsApplierAPI.TryUpdateTextureSettings(
-                                path,
-                                in config,
-                                out TextureImporter importer,
-                                _settingsBuffer
-                            )
-                        )
-                        {
-                            if (importer != null)
-                            {
-                                changed.Add(importer);
-                                ++count;
-                            }
-                        }
-                    }
-                }
-            }
-            finally
-            {
-                EditorUi.ClearProgress();
-            }
-            foreach (UnityEditor.TextureImporter changedElement in changed)
-            {
-                changedElement.SaveAndReimport();
-            }
-
-            if (0 < count)
-            {
-                this.Log($"Processed {count} textures.");
-            }
-            else
-            {
-                this.Log($"No textures required changes.");
-            }
-            if (0 < count)
-            {
-                AssetDatabase.SaveAssets();
-                AssetDatabase.Refresh();
-            }
-
-            _totalTexturesToProcess = -1;
-            _texturesThatWillChange = -1;
         }
 
         [Serializable]

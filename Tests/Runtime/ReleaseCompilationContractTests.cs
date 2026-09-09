@@ -33,6 +33,63 @@ namespace WallstopStudios.UnityHelpers.Tests
         // The prefix also matches this test assembly; require the actual runtime assembly.
         private const string RuntimeAssemblyName = "WallstopStudios.UnityHelpers";
 
+        private static bool TryReadOptimizerDisabled(Assembly assembly, out bool optimizerDisabled)
+        {
+            optimizerDisabled = false;
+            object[] attributes;
+            try
+            {
+                attributes = assembly.GetCustomAttributes(typeof(DebuggableAttribute), false);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+
+            foreach (object attribute in attributes)
+            {
+                if (attribute is DebuggableAttribute debuggable)
+                {
+                    optimizerDisabled = debuggable.IsJITOptimizerDisabled;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static string Describe(
+            IReadOnlyList<string> optimized,
+            IReadOnlyList<string> unoptimized,
+            bool enforced
+        )
+        {
+            StringBuilder message = new();
+            if (enforced)
+            {
+                message.Append(
+                    "Compiled with the optimizer DISABLED. Unity CI must pass "
+                        + "-releaseCodeOptimization for editor compilation and omit "
+                        + "BuildOptions.Development for player builds. Offending assemblies: "
+                );
+            }
+            else
+            {
+                message.Append(
+                    "Reported, not enforced: this run is not under CI. "
+                        + $"{optimized.Count} optimized, {unoptimized.Count} unoptimized"
+                );
+                if (unoptimized.Count == 0)
+                {
+                    return message.Append('.').ToString();
+                }
+
+                message.Append(" -- ");
+            }
+
+            return message.Append(string.Join(", ", unoptimized)).Append('.').ToString();
+        }
+
         [Test]
         public void PackageAssembliesAreCompiledWithOptimizationsEnabled()
         {
@@ -98,63 +155,6 @@ namespace WallstopStudios.UnityHelpers.Tests
             }
 
             Assert.IsEmpty(unoptimized, Describe(optimized, unoptimized, enforced: true));
-        }
-
-        private static bool TryReadOptimizerDisabled(Assembly assembly, out bool optimizerDisabled)
-        {
-            optimizerDisabled = false;
-            object[] attributes;
-            try
-            {
-                attributes = assembly.GetCustomAttributes(typeof(DebuggableAttribute), false);
-            }
-            catch (Exception)
-            {
-                return false;
-            }
-
-            foreach (object attribute in attributes)
-            {
-                if (attribute is DebuggableAttribute debuggable)
-                {
-                    optimizerDisabled = debuggable.IsJITOptimizerDisabled;
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static string Describe(
-            IReadOnlyList<string> optimized,
-            IReadOnlyList<string> unoptimized,
-            bool enforced
-        )
-        {
-            StringBuilder message = new();
-            if (enforced)
-            {
-                message.Append(
-                    "Compiled with the optimizer DISABLED. Unity CI must pass "
-                        + "-releaseCodeOptimization for editor compilation and omit "
-                        + "BuildOptions.Development for player builds. Offending assemblies: "
-                );
-            }
-            else
-            {
-                message.Append(
-                    "Reported, not enforced: this run is not under CI. "
-                        + $"{optimized.Count} optimized, {unoptimized.Count} unoptimized"
-                );
-                if (unoptimized.Count == 0)
-                {
-                    return message.Append('.').ToString();
-                }
-
-                message.Append(" -- ");
-            }
-
-            return message.Append(string.Join(", ", unoptimized)).Append('.').ToString();
         }
     }
 }

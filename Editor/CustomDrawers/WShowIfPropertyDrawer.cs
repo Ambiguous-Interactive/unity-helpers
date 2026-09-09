@@ -90,19 +90,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private WShowIfAttribute _overrideAttribute;
 
         /// <summary>
-        /// Clears all caches used by WShowIfPropertyDrawer.
-        /// Called during domain reload to prevent stale references.
-        /// </summary>
-        internal static void ClearCache()
-        {
-            CachedAccessors.Clear();
-            ConditionPropertyCache.Clear();
-            FieldInfoCache.Clear();
-            MemberInfoCache.Clear();
-            _lastConditionCacheFrame = -1;
-        }
-
-        /// <summary>
         /// Checks whether a property with [WShowIf] attribute should be visible.
         /// This method should be called by custom editors before drawing properties
         /// to properly handle conditional visibility for arrays/lists.
@@ -123,6 +110,19 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             return EvaluateShowCondition(property, showIfAttribute);
+        }
+
+        /// <summary>
+        /// Clears all caches used by WShowIfPropertyDrawer.
+        /// Called during domain reload to prevent stale references.
+        /// </summary>
+        internal static void ClearCache()
+        {
+            CachedAccessors.Clear();
+            ConditionPropertyCache.Clear();
+            FieldInfoCache.Clear();
+            MemberInfoCache.Clear();
+            _lastConditionCacheFrame = -1;
         }
 
         private static WShowIfAttribute GetShowIfAttribute(SerializedProperty property)
@@ -173,29 +173,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 ) || reflectedResult;
         }
 
-        public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
-        {
-            if (!ShouldShowInternal(property))
-            {
-                return 0f;
-            }
-
-            return EditorGUI.GetPropertyHeight(property, label, true);
-        }
-
-        public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
-        {
-            if (ShouldShowInternal(property))
-            {
-                EditorGUI.PropertyField(position, property, label, true);
-            }
-        }
-
-        private bool ShouldShowInternal(SerializedProperty property)
-        {
-            return ShouldShow(property);
-        }
-
         private static bool IsArrayElement(SerializedProperty property)
         {
             string propertyPath = property?.propertyPath;
@@ -205,67 +182,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             return propertyPath.Contains(ArrayDataMarker);
-        }
-
-        internal void InitializeForTesting(WShowIfAttribute attributeOverride)
-        {
-            _overrideAttribute = attributeOverride;
-        }
-
-        private WShowIfAttribute ResolveAttribute()
-        {
-            if (_overrideAttribute != null)
-            {
-                return _overrideAttribute;
-            }
-
-            return attribute as WShowIfAttribute;
-        }
-
-        internal bool ShouldShow(SerializedProperty property)
-        {
-            // Unity invokes collection drawers per element; hiding elements while the container remains visible corrupts layout.
-            if (IsArrayElement(property))
-            {
-                return true;
-            }
-
-            WShowIfAttribute showIf = ResolveAttribute();
-            if (showIf == null)
-            {
-                return true;
-            }
-
-            if (
-                TryGetConditionProperty(
-                    property,
-                    showIf.conditionField,
-                    out SerializedProperty conditionProperty
-                )
-            )
-            {
-                if (TryEvaluateCondition(conditionProperty, showIf, out bool serializedResult))
-                {
-                    return serializedResult;
-                }
-
-                return true;
-            }
-
-            object enclosingObject = property.GetEnclosingObject(out _);
-            if (enclosingObject == null)
-            {
-                return true;
-            }
-
-            Type ownerType = enclosingObject.GetType();
-            Func<object, object> accessor = GetAccessor(ownerType, showIf.conditionField);
-            object fieldValue = accessor(enclosingObject);
-            return !ShowIfConditionEvaluator.TryEvaluateCondition(
-                    fieldValue,
-                    showIf,
-                    out bool reflectedResult
-                ) || reflectedResult;
         }
 
         private static bool TryEvaluateCondition(
@@ -865,51 +781,135 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             return null;
         }
 
+        public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
+        {
+            if (!ShouldShowInternal(property))
+            {
+                return 0f;
+            }
+
+            return EditorGUI.GetPropertyHeight(property, label, true);
+        }
+
+        public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+        {
+            if (ShouldShowInternal(property))
+            {
+                EditorGUI.PropertyField(position, property, label, true);
+            }
+        }
+
+        internal void InitializeForTesting(WShowIfAttribute attributeOverride)
+        {
+            _overrideAttribute = attributeOverride;
+        }
+
+        internal bool ShouldShow(SerializedProperty property)
+        {
+            // Unity invokes collection drawers per element; hiding elements while the container remains visible corrupts layout.
+            if (IsArrayElement(property))
+            {
+                return true;
+            }
+
+            WShowIfAttribute showIf = ResolveAttribute();
+            if (showIf == null)
+            {
+                return true;
+            }
+
+            if (
+                TryGetConditionProperty(
+                    property,
+                    showIf.conditionField,
+                    out SerializedProperty conditionProperty
+                )
+            )
+            {
+                if (TryEvaluateCondition(conditionProperty, showIf, out bool serializedResult))
+                {
+                    return serializedResult;
+                }
+
+                return true;
+            }
+
+            object enclosingObject = property.GetEnclosingObject(out _);
+            if (enclosingObject == null)
+            {
+                return true;
+            }
+
+            Type ownerType = enclosingObject.GetType();
+            Func<object, object> accessor = GetAccessor(ownerType, showIf.conditionField);
+            object fieldValue = accessor(enclosingObject);
+            return !ShowIfConditionEvaluator.TryEvaluateCondition(
+                    fieldValue,
+                    showIf,
+                    out bool reflectedResult
+                ) || reflectedResult;
+        }
+
+        private bool ShouldShowInternal(SerializedProperty property)
+        {
+            return ShouldShow(property);
+        }
+
+        private WShowIfAttribute ResolveAttribute()
+        {
+            if (_overrideAttribute != null)
+            {
+                return _overrideAttribute;
+            }
+
+            return attribute as WShowIfAttribute;
+        }
+
         private readonly struct MemberAccessor
         {
             public static readonly MemberAccessor Invalid = new(null, null);
-
-            public MemberAccessor(Func<object, object> getter, Type valueType)
-            {
-                Getter = getter;
-                ValueType = valueType;
-            }
 
             public Func<object, object> Getter { get; }
 
             public Type ValueType { get; }
 
             public bool IsValid => Getter != null;
+
+            public MemberAccessor(Func<object, object> getter, Type valueType)
+            {
+                Getter = getter;
+                ValueType = valueType;
+            }
         }
 
         private readonly struct IndexAccessor
         {
             public static readonly IndexAccessor Invalid = new(null, null);
 
-            public IndexAccessor(Func<object, object> getter, Type elementType)
-            {
-                Getter = getter;
-                ElementType = elementType;
-            }
-
             public Func<object, object> Getter { get; }
 
             public Type ElementType { get; }
 
             public bool IsValid => Getter != null;
+
+            public IndexAccessor(Func<object, object> getter, Type elementType)
+            {
+                Getter = getter;
+                ElementType = elementType;
+            }
         }
 
         private readonly struct MemberPathSegment
         {
+            public string MemberName { get; }
+
+            public int[] Indices { get; }
+
             public MemberPathSegment(string memberName, int[] indices)
             {
                 MemberName = memberName;
                 Indices = indices;
             }
-
-            public string MemberName { get; }
-
-            public int[] Indices { get; }
         }
     }
 #endif

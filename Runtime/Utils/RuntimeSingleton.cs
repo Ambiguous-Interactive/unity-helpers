@@ -68,53 +68,14 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private static readonly Action _clearInstances = ClearInstances;
 
-        private bool _isPendingDestruction;
-
         // -1 rather than 0, because frame 0 is a real frame.
         private static int _creationRefusedFrame = -1;
+
+        private bool _isPendingDestruction;
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         private static bool _creationRefusedWarningLogged;
 #endif
-
-        static RuntimeSingleton()
-        {
-            RuntimeSingletonRegistry.Register(
-                typeof(T),
-                ResetCachedInstance,
-                ClearInstance,
-                () => _instance,
-                () => Resources.FindObjectsOfTypeAll<T>()
-            );
-        }
-
-        private static SingletonCreationPolicy ResolveCreationPolicy()
-        {
-            if (
-                !ReflectionHelpers.TryGetAttributeSafe(
-                    typeof(T),
-                    out SingletonCreationAttribute attribute,
-                    inherit: true
-                )
-            )
-            {
-                return SingletonCreationPolicy.CreateOnDemand;
-            }
-
-            // Unknown policies use the default so newer serialized values cannot suppress singleton creation.
-            return attribute.Policy == SingletonCreationPolicy.NeverCreate
-                ? SingletonCreationPolicy.NeverCreate
-                : SingletonCreationPolicy.CreateOnDemand;
-        }
-
-        /// <summary>
-        /// Gets a value that controls whether the instance persists across scene loads.
-        /// Defaults to <c>true</c>. Override and return <c>false</c> to keep the instance
-        /// scene‑local.
-        /// </summary>
-        protected virtual bool Preserve => true;
-
-        protected virtual bool LogErrorOnDestruction => true;
 
         /// <summary>
         /// Gets the global instance, creating one if needed. Returns <c>null</c> when none exists and
@@ -203,29 +164,24 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
         }
 
-        private static T FindAvailableInstance()
+        /// <summary>
+        /// Gets a value that controls whether the instance persists across scene loads.
+        /// Defaults to <c>true</c>. Override and return <c>false</c> to keep the instance
+        /// scene‑local.
+        /// </summary>
+        protected virtual bool Preserve => true;
+
+        protected virtual bool LogErrorOnDestruction => true;
+
+        static RuntimeSingleton()
         {
-            T candidate = FindAnyObjectByType<T>(FindObjectsInactive.Exclude);
-            if (candidate == null || !candidate._isPendingDestruction)
-            {
-                return candidate;
-            }
-
-            foreach (T instance in UnityObjectExtensions.FindObjectsOfTypeShim<T>(false))
-            {
-                if (instance != null && !instance._isPendingDestruction)
-                {
-                    return instance;
-                }
-            }
-
-            return null;
-        }
-
-        void IRuntimeSingletonLifecycle.MarkPendingDestruction()
-        {
-            _isPendingDestruction = true;
-            StopAllCoroutines();
+            RuntimeSingletonRegistry.Register(
+                typeof(T),
+                ResetCachedInstance,
+                ClearInstance,
+                () => _instance,
+                () => Resources.FindObjectsOfTypeAll<T>()
+            );
         }
 
         /// <summary>
@@ -254,6 +210,44 @@ namespace WallstopStudios.UnityHelpers.Utils
         {
             UnityMainThreadGuard.EnsureMainThread();
             RuntimeSingletonRegistry.ClearInstances(_clearInstances);
+        }
+
+        private static SingletonCreationPolicy ResolveCreationPolicy()
+        {
+            if (
+                !ReflectionHelpers.TryGetAttributeSafe(
+                    typeof(T),
+                    out SingletonCreationAttribute attribute,
+                    inherit: true
+                )
+            )
+            {
+                return SingletonCreationPolicy.CreateOnDemand;
+            }
+
+            // Unknown policies use the default so newer serialized values cannot suppress singleton creation.
+            return attribute.Policy == SingletonCreationPolicy.NeverCreate
+                ? SingletonCreationPolicy.NeverCreate
+                : SingletonCreationPolicy.CreateOnDemand;
+        }
+
+        private static T FindAvailableInstance()
+        {
+            T candidate = FindAnyObjectByType<T>(FindObjectsInactive.Exclude);
+            if (candidate == null || !candidate._isPendingDestruction)
+            {
+                return candidate;
+            }
+
+            foreach (T instance in UnityObjectExtensions.FindObjectsOfTypeShim<T>(false))
+            {
+                if (instance != null && !instance._isPendingDestruction)
+                {
+                    return instance;
+                }
+            }
+
+            return null;
         }
 
         private static void ClearInstances()
@@ -366,6 +360,16 @@ namespace WallstopStudios.UnityHelpers.Utils
             DestroySingletonGameObject();
         }
 
+        protected virtual void OnDestroy()
+        {
+            if (_instance == this)
+            {
+                _instance = null;
+            }
+        }
+
+        protected virtual void OnApplicationQuit() { }
+
         private void DestroySingletonGameObject()
         {
             foreach (
@@ -379,14 +383,10 @@ namespace WallstopStudios.UnityHelpers.Utils
             gameObject.Destroy();
         }
 
-        protected virtual void OnDestroy()
+        void IRuntimeSingletonLifecycle.MarkPendingDestruction()
         {
-            if (_instance == this)
-            {
-                _instance = null;
-            }
+            _isPendingDestruction = true;
+            StopAllCoroutines();
         }
-
-        protected virtual void OnApplicationQuit() { }
     }
 }

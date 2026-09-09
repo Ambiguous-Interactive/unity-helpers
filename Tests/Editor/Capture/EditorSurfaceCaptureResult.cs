@@ -11,33 +11,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
     /// </summary>
     internal readonly struct EditorSurfaceCaptureResult
     {
-        internal EditorSurfaceCaptureResult(
-            string outputPath,
-            int width,
-            int height,
-            int byteCount,
-            byte pngColorType,
-            int distinctColorCount,
-            int renderErrorCount,
-            bool onlyCursorRectErrors,
-            string renderErrorSummary,
-            bool isProSkin,
-            string unityVersion
-        )
-        {
-            OutputPath = outputPath;
-            Width = width;
-            Height = height;
-            ByteCount = byteCount;
-            PngColorType = pngColorType;
-            DistinctColorCount = distinctColorCount;
-            RenderErrorCount = renderErrorCount;
-            OnlyCursorRectErrors = onlyCursorRectErrors;
-            RenderErrorSummary = renderErrorSummary;
-            IsProSkin = isProSkin;
-            UnityVersion = unityVersion;
-        }
-
         internal string OutputPath { get; }
 
         internal int Width { get; }
@@ -78,6 +51,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
         internal bool IsProSkin { get; }
 
         internal string UnityVersion { get; }
+
+        internal EditorSurfaceCaptureResult(
+            string outputPath,
+            int width,
+            int height,
+            int byteCount,
+            byte pngColorType,
+            int distinctColorCount,
+            int renderErrorCount,
+            bool onlyCursorRectErrors,
+            string renderErrorSummary,
+            bool isProSkin,
+            string unityVersion
+        )
+        {
+            OutputPath = outputPath;
+            Width = width;
+            Height = height;
+            ByteCount = byteCount;
+            PngColorType = pngColorType;
+            DistinctColorCount = distinctColorCount;
+            RenderErrorCount = renderErrorCount;
+            OnlyCursorRectErrors = onlyCursorRectErrors;
+            RenderErrorSummary = renderErrorSummary;
+            IsProSkin = isProSkin;
+            UnityVersion = unityVersion;
+        }
 
         public override string ToString()
         {

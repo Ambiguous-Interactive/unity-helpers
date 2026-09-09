@@ -20,6 +20,128 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         private const string TestFolder = "Assets/TempSpriteApplierAdditional";
         private string _assetPath;
 
+        private static IEnumerable<TestCaseData> NullEmptyMatchPatternCases()
+        {
+            yield return new TestCaseData(SpriteSettings.MatchMode.Any, null, true).SetName(
+                "MatchPattern.Null.Any.MatchesAnyFile"
+            );
+
+            yield return new TestCaseData(SpriteSettings.MatchMode.Any, "", true).SetName(
+                "MatchPattern.Empty.Any.MatchesAnyFile"
+            );
+
+            yield return new TestCaseData(SpriteSettings.MatchMode.Any, "   ", true).SetName(
+                "MatchPattern.Whitespace.Any.MatchesAnyFile"
+            );
+
+            yield return new TestCaseData(
+                SpriteSettings.MatchMode.NameContains,
+                null,
+                false
+            ).SetName("MatchPattern.Null.NameContains.NoMatch");
+
+            yield return new TestCaseData(SpriteSettings.MatchMode.NameContains, "", false).SetName(
+                "MatchPattern.Empty.NameContains.NoMatch"
+            );
+
+            yield return new TestCaseData(
+                SpriteSettings.MatchMode.NameContains,
+                "   ",
+                false
+            ).SetName("MatchPattern.Whitespace.NameContains.NoMatch");
+
+            yield return new TestCaseData(
+                SpriteSettings.MatchMode.PathContains,
+                null,
+                false
+            ).SetName("MatchPattern.Null.PathContains.NoMatch");
+
+            yield return new TestCaseData(SpriteSettings.MatchMode.PathContains, "", false).SetName(
+                "MatchPattern.Empty.PathContains.NoMatch"
+            );
+
+            yield return new TestCaseData(SpriteSettings.MatchMode.Extension, null, false).SetName(
+                "MatchPattern.Null.Extension.NoMatch"
+            );
+
+            yield return new TestCaseData(SpriteSettings.MatchMode.Extension, "", false).SetName(
+                "MatchPattern.Empty.Extension.NoMatch"
+            );
+
+            yield return new TestCaseData(SpriteSettings.MatchMode.Regex, null, false).SetName(
+                "MatchPattern.Null.Regex.NoMatch"
+            );
+
+            yield return new TestCaseData(SpriteSettings.MatchMode.Regex, "", false).SetName(
+                "MatchPattern.Empty.Regex.NoMatch"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> CaseSensitivityCases()
+        {
+            yield return new TestCaseData(
+                SpriteSettings.MatchMode.NameContains,
+                "CASE",
+                true
+            ).SetName("CaseSensitivity.NameContains.UpperCase.Matches");
+
+            yield return new TestCaseData(
+                SpriteSettings.MatchMode.NameContains,
+                "case",
+                true
+            ).SetName("CaseSensitivity.NameContains.LowerCase.Matches");
+
+            yield return new TestCaseData(
+                SpriteSettings.MatchMode.NameContains,
+                "CaSe",
+                true
+            ).SetName("CaseSensitivity.NameContains.MixedCase.Matches");
+
+            yield return new TestCaseData(
+                SpriteSettings.MatchMode.NameContains,
+                "SENSITIVE",
+                true
+            ).SetName("CaseSensitivity.NameContains.UpperSensitive.Matches");
+
+            yield return new TestCaseData(
+                SpriteSettings.MatchMode.PathContains,
+                "TEMPSPR",
+                true
+            ).SetName("CaseSensitivity.PathContains.UpperCase.Matches");
+
+            yield return new TestCaseData(
+                SpriteSettings.MatchMode.PathContains,
+                "tempspr",
+                true
+            ).SetName("CaseSensitivity.PathContains.LowerCase.Matches");
+
+            yield return new TestCaseData(
+                SpriteSettings.MatchMode.PathContains,
+                "TeMpSpR",
+                true
+            ).SetName("CaseSensitivity.PathContains.MixedCase.Matches");
+
+            yield return new TestCaseData(
+                SpriteSettings.MatchMode.PathContains,
+                "ADDITIONAL",
+                true
+            ).SetName("CaseSensitivity.PathContains.UpperAdditional.Matches");
+        }
+
+        private static IEnumerable<TestCaseData> NegativePriorityCases()
+        {
+            yield return new TestCaseData(-1, 0, 0).SetName("Priority.NegativeVsZero.ZeroWins");
+            yield return new TestCaseData(-100, -50, -50).SetName(
+                "Priority.TwoNegatives.HigherNegativeWins"
+            );
+            yield return new TestCaseData(int.MinValue, 0, 0).SetName(
+                "Priority.MinValueVsZero.ZeroWins"
+            );
+            yield return new TestCaseData(int.MinValue, int.MaxValue, int.MaxValue).SetName(
+                "Priority.MinValueVsMaxValue.MaxValueWins"
+            );
+        }
+
         [OneTimeSetUp]
         public override void CommonOneTimeSetUp()
         {
@@ -53,27 +175,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             {
                 TrackAssetPath(_assetPath);
             }
-        }
-
-        private string CreatePng(string name, bool asSprite)
-        {
-            Texture2D tex = Track(new Texture2D(4, 4, TextureFormat.RGBA32, false));
-            byte[] png = tex.EncodeToPNG();
-            string path = Path.Combine(TestFolder, name + ".png");
-            File.WriteAllBytes(path, png);
-
-            ExecuteWithImmediateImport(() =>
-            {
-                AssetDatabase.ImportAsset(path);
-                TextureImporter ti = AssetImporter.GetAtPath(path) as TextureImporter;
-                Assert.IsTrue(ti != null, "Importer not found for asset path: " + path);
-                if (asSprite)
-                {
-                    ti.textureType = TextureImporterType.Sprite;
-                    ti.SaveAndReimport();
-                }
-            });
-            return path;
         }
 
         [Test]
@@ -1025,63 +1126,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             );
         }
 
-        private static IEnumerable<TestCaseData> NullEmptyMatchPatternCases()
-        {
-            yield return new TestCaseData(SpriteSettings.MatchMode.Any, null, true).SetName(
-                "MatchPattern.Null.Any.MatchesAnyFile"
-            );
-
-            yield return new TestCaseData(SpriteSettings.MatchMode.Any, "", true).SetName(
-                "MatchPattern.Empty.Any.MatchesAnyFile"
-            );
-
-            yield return new TestCaseData(SpriteSettings.MatchMode.Any, "   ", true).SetName(
-                "MatchPattern.Whitespace.Any.MatchesAnyFile"
-            );
-
-            yield return new TestCaseData(
-                SpriteSettings.MatchMode.NameContains,
-                null,
-                false
-            ).SetName("MatchPattern.Null.NameContains.NoMatch");
-
-            yield return new TestCaseData(SpriteSettings.MatchMode.NameContains, "", false).SetName(
-                "MatchPattern.Empty.NameContains.NoMatch"
-            );
-
-            yield return new TestCaseData(
-                SpriteSettings.MatchMode.NameContains,
-                "   ",
-                false
-            ).SetName("MatchPattern.Whitespace.NameContains.NoMatch");
-
-            yield return new TestCaseData(
-                SpriteSettings.MatchMode.PathContains,
-                null,
-                false
-            ).SetName("MatchPattern.Null.PathContains.NoMatch");
-
-            yield return new TestCaseData(SpriteSettings.MatchMode.PathContains, "", false).SetName(
-                "MatchPattern.Empty.PathContains.NoMatch"
-            );
-
-            yield return new TestCaseData(SpriteSettings.MatchMode.Extension, null, false).SetName(
-                "MatchPattern.Null.Extension.NoMatch"
-            );
-
-            yield return new TestCaseData(SpriteSettings.MatchMode.Extension, "", false).SetName(
-                "MatchPattern.Empty.Extension.NoMatch"
-            );
-
-            yield return new TestCaseData(SpriteSettings.MatchMode.Regex, null, false).SetName(
-                "MatchPattern.Null.Regex.NoMatch"
-            );
-
-            yield return new TestCaseData(SpriteSettings.MatchMode.Regex, "", false).SetName(
-                "MatchPattern.Empty.Regex.NoMatch"
-            );
-        }
-
         [Test]
         [TestCaseSource(nameof(NullEmptyMatchPatternCases))]
         public void NullOrEmptyMatchPatternBehavesCorrectly(
@@ -1122,57 +1166,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     + ", actual match="
                     + didMatch
             );
-        }
-
-        private static IEnumerable<TestCaseData> CaseSensitivityCases()
-        {
-            yield return new TestCaseData(
-                SpriteSettings.MatchMode.NameContains,
-                "CASE",
-                true
-            ).SetName("CaseSensitivity.NameContains.UpperCase.Matches");
-
-            yield return new TestCaseData(
-                SpriteSettings.MatchMode.NameContains,
-                "case",
-                true
-            ).SetName("CaseSensitivity.NameContains.LowerCase.Matches");
-
-            yield return new TestCaseData(
-                SpriteSettings.MatchMode.NameContains,
-                "CaSe",
-                true
-            ).SetName("CaseSensitivity.NameContains.MixedCase.Matches");
-
-            yield return new TestCaseData(
-                SpriteSettings.MatchMode.NameContains,
-                "SENSITIVE",
-                true
-            ).SetName("CaseSensitivity.NameContains.UpperSensitive.Matches");
-
-            yield return new TestCaseData(
-                SpriteSettings.MatchMode.PathContains,
-                "TEMPSPR",
-                true
-            ).SetName("CaseSensitivity.PathContains.UpperCase.Matches");
-
-            yield return new TestCaseData(
-                SpriteSettings.MatchMode.PathContains,
-                "tempspr",
-                true
-            ).SetName("CaseSensitivity.PathContains.LowerCase.Matches");
-
-            yield return new TestCaseData(
-                SpriteSettings.MatchMode.PathContains,
-                "TeMpSpR",
-                true
-            ).SetName("CaseSensitivity.PathContains.MixedCase.Matches");
-
-            yield return new TestCaseData(
-                SpriteSettings.MatchMode.PathContains,
-                "ADDITIONAL",
-                true
-            ).SetName("CaseSensitivity.PathContains.UpperAdditional.Matches");
         }
 
         [Test]
@@ -1555,20 +1548,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             );
         }
 
-        private static IEnumerable<TestCaseData> NegativePriorityCases()
-        {
-            yield return new TestCaseData(-1, 0, 0).SetName("Priority.NegativeVsZero.ZeroWins");
-            yield return new TestCaseData(-100, -50, -50).SetName(
-                "Priority.TwoNegatives.HigherNegativeWins"
-            );
-            yield return new TestCaseData(int.MinValue, 0, 0).SetName(
-                "Priority.MinValueVsZero.ZeroWins"
-            );
-            yield return new TestCaseData(int.MinValue, int.MaxValue, int.MaxValue).SetName(
-                "Priority.MinValueVsMaxValue.MaxValueWins"
-            );
-        }
-
         [Test]
         [TestCaseSource(nameof(NegativePriorityCases))]
         public void NegativePriorityHandledCorrectly(
@@ -1620,6 +1599,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     + "actual: "
                     + matched.priority
             );
+        }
+
+        private string CreatePng(string name, bool asSprite)
+        {
+            Texture2D tex = Track(new Texture2D(4, 4, TextureFormat.RGBA32, false));
+            byte[] png = tex.EncodeToPNG();
+            string path = Path.Combine(TestFolder, name + ".png");
+            File.WriteAllBytes(path, png);
+
+            ExecuteWithImmediateImport(() =>
+            {
+                AssetDatabase.ImportAsset(path);
+                TextureImporter ti = AssetImporter.GetAtPath(path) as TextureImporter;
+                Assert.IsTrue(ti != null, "Importer not found for asset path: " + path);
+                if (asSprite)
+                {
+                    ti.textureType = TextureImporterType.Sprite;
+                    ti.SaveAndReimport();
+                }
+            });
+            return path;
         }
     }
 #endif

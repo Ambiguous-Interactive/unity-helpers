@@ -57,35 +57,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [SkipUnderIL2CPP]
     public sealed class JsonConverterFuzzTests
     {
-        /// <summary>
-        /// Values substituted for one node of a valid payload at a time. Chosen for the accessor
-        /// each one breaks: a wrong token kind breaks <c>GetInt32</c>/<c>GetString</c>, a fractional
-        /// or out-of-range number breaks the integral accessors, and a container where a scalar
-        /// belongs breaks any reader that assumes it can step over one token.
-        /// </summary>
-        private static readonly string[] HostileValues =
-        {
-            "null",
-            "true",
-            "\"\"",
-            "\"not-a-number\"",
-            /*
-                An all-zero identifier: the value a type's own "unset" writes, and the one a reader that
-                validates its input is most likely to refuse for being unset.
-            */
-            "\"00000000-0000-0000-0000-000000000000\"",
-            "1.5",
-            "-1",
-            "2147483648",
-            "-2147483649",
-            "99999999999999999999999999",
-            "1e309",
-            "[]",
-            "[1,2,3]",
-            "{}",
-            "{\"nested\":1}",
-        };
-
         private const int TruncationSamples = 24;
 
         private const int ByteMutationSamples = 48;
@@ -109,32 +80,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         /// </summary>
         private const int AmplifyingElementCount = 200_000;
 
-        private static IReadOnlyList<FuzzTarget> _targets;
-
-        private static string _repeatingPrefixPayload;
-
-        private static string _wideArrayPayload;
-
-        /// <summary>
-        /// The converters that deliberately write a value they cannot rebuild, each with the reason.
-        /// This is the declaration <see cref="JsonConverterCoverageTests"/> checks the registered
-        /// converters against, so a forty-eighth converter cannot be added the way these two were --
-        /// with a <c>Read</c> that throws and nothing anywhere that says so.
-        /// </summary>
-        /// <remarks>
-        /// Adding an entry is the escape hatch and is meant to cost something: a type listed here is
-        /// asserted to refuse every read, so a converter that quietly gains a read path fails this
-        /// list rather than silently outgrowing it.
-        /// </remarks>
-        public static readonly IReadOnlyDictionary<Type, string> WriteOnlyConverters =
-            new Dictionary<Type, string>
-            {
-                [typeof(Touch)] =
-                    "the platform owns every field, so there is nothing to restore a Touch into",
-                [typeof(GameObject)] =
-                    "the record written is a name/type/instance-id for diagnostics; a scene object cannot be rebuilt from it",
-            };
-
         /// <summary>
         /// The <see cref="WriteOnlyConverters"/> keys, as a test case source.
         /// </summary>
@@ -155,17 +100,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 return _targets;
             }
         }
-
-        /// <summary>
-        /// Built once and shared: every case source is enumerated per test, and these two payloads
-        /// are the only ones large enough for that to matter.
-        /// </summary>
-        private static string RepeatingPrefixPayload =>
-            _repeatingPrefixPayload ??= RepeatedArrayPrefix(AmplifyingNestingLevels);
-
-        /// <inheritdoc cref="RepeatingPrefixPayload"/>
-        private static string WideArrayPayload =>
-            _wideArrayPayload ??= WideArray(AmplifyingElementCount);
 
         /// <summary>
         /// One case per read limit, on both sides of its boundary, plus the two shapes a hostile
@@ -300,648 +234,70 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         }
 
         /// <summary>
-        /// A converter handed a value it cannot read must say so with <see cref="JsonException"/>.
-        /// Anything else is a framework exception escaping through a public API, which a consumer
-        /// calling <c>JsonSerializer.Deserialize</c> with these options cannot catch by contract.
+        /// Built once and shared: every case source is enumerated per test, and these two payloads
+        /// are the only ones large enough for that to matter.
         /// </summary>
-        [Test]
-        [TestCaseSource(nameof(Targets))]
-        public void MalformedPayloadsAreReportedAsJsonException(FuzzTarget target)
-        {
-            JsonSerializerOptions options = Serializer.CreateNormalJsonOptions();
-            StringBuilder failures = new();
-            int failureCount = 0;
-            int accepted = 0;
-            int examined = 0;
+        private static string RepeatingPrefixPayload =>
+            _repeatingPrefixPayload ??= RepeatedArrayPrefix(AmplifyingNestingLevels);
 
-            foreach (string payload in Corpus(target))
-            {
-                examined++;
-                try
-                {
-                    object decoded = JsonSerializer.Deserialize(payload, target.Type, options);
-                    if (decoded != null)
-                    {
-                        // A reference-type null result bypasses the converter and cannot count toward converter coverage.
-                        accepted++;
-                    }
-                }
-                catch (JsonException) { }
-                catch (NotSupportedException)
-                {
-                    // System.Text.Json's own answer for a type it declines to construct.
-                }
-                catch (Exception unexpected)
-                {
-                    failureCount++;
-                    if (failureCount <= 5)
-                    {
-                        failures
-                            .Append("  ")
-                            .Append(unexpected.GetType().FullName)
-                            .Append(" from ")
-                            .Append(Abbreviate(payload))
-                            .Append(" -> ")
-                            .Append(unexpected.Message)
-                            .Append('\n');
-                    }
-                }
-            }
-
-            Assert.Zero(
-                failureCount,
-                $"{target.Name}: {failureCount} of {examined} malformed payloads left a "
-                    + $"non-JsonException escape the converter.\n{failures}"
-            );
-
-            if (target.ReadSupported)
-            {
-                Assert.Positive(
-                    accepted,
-                    $"{target.Name}: no payload in a corpus of {examined} was accepted, so this "
-                        + "target proves nothing about the read path. The seed or the mutator is "
-                        + "broken."
-                );
-            }
-            else
-            {
-                Assert.Zero(
-                    accepted,
-                    $"{target.Name} is declared write-only, but {accepted} payloads were read back. "
-                        + "Either the converter gained a read path or the declaration is stale."
-                );
-            }
-        }
+        /// <inheritdoc cref="RepeatingPrefixPayload"/>
+        private static string WideArrayPayload =>
+            _wideArrayPayload ??= WideArray(AmplifyingElementCount);
 
         /// <summary>
-        /// The package-level entry point converts every failure into
-        /// <see cref="SerializationFailureException"/>, including one a converter reports oddly.
-        /// </summary>
-        [Test]
-        [TestCaseSource(nameof(Targets))]
-        public void SerializerOnlyLeaksSerializationFailureException(FuzzTarget target)
-        {
-            foreach (string payload in Corpus(target))
-            {
-                try
-                {
-                    _ = Serializer.JsonDeserialize<object>(payload, target.Type);
-                }
-                catch (SerializationFailureException) { }
-                catch (Exception unexpected)
-                {
-                    Assert.Fail(
-                        $"{target.Name}: JsonDeserialize leaked "
-                            + $"{unexpected.GetType().FullName} on {Abbreviate(payload)}: "
-                            + unexpected.Message
-                    );
-                }
-            }
-        }
-
-        /// <summary>
-        /// <c>TryJsonDeserialize</c> promises a bool rather than an exception, for every input.
-        /// </summary>
-        [Test]
-        [TestCaseSource(nameof(Targets))]
-        public void TryJsonDeserializeNeverThrows(FuzzTarget target)
-        {
-            foreach (string payload in Corpus(target))
-            {
-                try
-                {
-                    _ = Serializer.TryJsonDeserialize(payload, out object _, target.Type);
-                }
-                catch (Exception unexpected)
-                {
-                    Assert.Fail(
-                        $"{target.Name}: TryJsonDeserialize threw "
-                            + $"{unexpected.GetType().FullName} on {Abbreviate(payload)}: "
-                            + unexpected.Message
-                    );
-                }
-            }
-        }
-
-        /// <summary>
-        /// A payload a converter accepts must survive its own re-encoding. A shape that reads back
-        /// but cannot be written and read again is a converter whose <c>Write</c> and <c>Read</c>
-        /// disagree, which corrupts the next save rather than the one being loaded.
-        /// </summary>
-        [Test]
-        [TestCaseSource(nameof(Targets))]
-        public void AcceptedPayloadsSurviveTheirOwnReEncoding(FuzzTarget target)
-        {
-            JsonSerializerOptions options = Serializer.CreateNormalJsonOptions();
-
-            foreach (string payload in Corpus(target))
-            {
-                object first;
-                try
-                {
-                    first = JsonSerializer.Deserialize(payload, target.Type, options);
-                }
-                catch (Exception)
-                {
-                    continue;
-                }
-
-                string reEncoded;
-                try
-                {
-                    reEncoded = JsonSerializer.Serialize(first, target.Type, options);
-                }
-                catch (Exception unexpected)
-                {
-                    Assert.Fail(
-                        $"{target.Name}: a value read from {Abbreviate(payload)} could not be "
-                            + $"written back: {unexpected.GetType().FullName}: {unexpected.Message}"
-                    );
-                    return;
-                }
-
-                try
-                {
-                    _ = JsonSerializer.Deserialize(reEncoded, target.Type, options);
-                }
-                catch (Exception unexpected)
-                {
-                    Assert.Fail(
-                        $"{target.Name}: this converter wrote {Abbreviate(reEncoded)} and then "
-                            + $"refused to read it: {unexpected.GetType().FullName}: "
-                            + $"{unexpected.Message} (source payload {Abbreviate(payload)})"
-                    );
-                    return;
-                }
-            }
-        }
-
-        /// <summary>
-        /// A <see cref="Type"/> written through an <see cref="object"/> reaches the package's
-        /// <c>TypeConverter</c> whatever concrete <see cref="Type"/> subclass carries it.
+        /// The converters that deliberately write a value they cannot rebuild, each with the reason.
+        /// This is the declaration <see cref="JsonConverterCoverageTests"/> checks the registered
+        /// converters against, so a forty-eighth converter cannot be added the way these two were --
+        /// with a <c>Read</c> that throws and nothing anywhere that says so.
         /// </summary>
         /// <remarks>
-        /// <c>typeof(X)</c> hands back the internal <c>System.RuntimeType</c>, so a rule that
-        /// exempted public runtime types from the base-converter walk looked correct and was not:
-        /// <see cref="System.Reflection.TypeDelegator"/> is a <b>public</b> subclass of
-        /// <see cref="Type"/>, and it reached the reflection-light writer instead, which threw
-        /// <see cref="NullReferenceException"/> walking it.
+        /// Adding an entry is the escape hatch and is meant to cost something: a type listed here is
+        /// asserted to refuse every read, so a converter that quietly gains a read path fails this
+        /// list rather than silently outgrowing it.
         /// </remarks>
-        [Test]
-        public void ATypeSubclassIsWrittenThroughTheTypeConverter()
-        {
-            System.Reflection.TypeDelegator delegated = new(typeof(Vector3));
-
-            string viaDelegator = Serializer.JsonStringify<object>(delegated);
-            string viaType = Serializer.JsonStringify<object>(typeof(Vector3));
-
-            Assert.AreEqual(
-                viaType,
-                viaDelegator,
-                "A public Type subclass must be written by the same converter as the Type it carries."
-            );
-        }
-
-        /// <summary>
-        /// A converter that only writes must say so with <see cref="NotSupportedException"/>.
-        /// </summary>
-        /// <remarks>
-        /// Both threw <see cref="NotImplementedException"/>, which reads as an unfinished converter
-        /// rather than a deliberate one-way encoding, and which no caller would think to catch.
-        /// <see cref="GameObject"/> is asserted here rather than as a fuzz target because reading
-        /// one needs no instance, and allocating one would pull this whole fixture into Unity object
-        /// lifecycle management for a converter with no read path to fuzz.
-        /// </remarks>
-        [Test]
-        [TestCaseSource(nameof(WriteOnlyTypes))]
-        public void AWriteOnlyConverterRefusesToRead(Type type)
-        {
-            JsonSerializerOptions options = Serializer.CreateNormalJsonOptions();
-
-            Assert.Throws<NotSupportedException>(
-                () => JsonSerializer.Deserialize("{}", type, options),
-                $"{type.Name} is declared write-only ({WriteOnlyConverters.ValueFor(type)}) and must refuse a read with NotSupportedException"
-            );
-        }
-
-        /// <summary>
-        /// A converter that is not declared write-only must read back the value it just wrote.
-        /// </summary>
-        /// <remarks>
-        /// <see cref="AcceptedPayloadsSurviveTheirOwnReEncoding"/> cannot make this assertion: a
-        /// payload it fails to decode is skipped, because most of its corpus is deliberately
-        /// hostile, so a converter whose <b>own seed</b> does not read back is silently passed over
-        /// rather than reported. That is precisely the shape of the <see cref="WGuid"/> defect --
-        /// a value the converter writes and then refuses -- and it is a save file that cannot be
-        /// loaded rather than a rejected attack.
-        /// </remarks>
-        [Test]
-        [TestCaseSource(nameof(Targets))]
-        public void AReadableConverterReadsBackTheValueItWrote(FuzzTarget target)
-        {
-            JsonSerializerOptions options = Serializer.CreateNormalJsonOptions();
-            string written = target.Seeds[0];
-
-            if (!target.ReadSupported)
+        public static readonly IReadOnlyDictionary<Type, string> WriteOnlyConverters =
+            new Dictionary<Type, string>
             {
-                Assert.Throws<NotSupportedException>(
-                    () => JsonSerializer.Deserialize(written, target.Type, options),
-                    $"{target.Name} is declared write-only and must refuse its own output too"
-                );
-                return;
-            }
+                [typeof(Touch)] =
+                    "the platform owns every field, so there is nothing to restore a Touch into",
+                [typeof(GameObject)] =
+                    "the record written is a name/type/instance-id for diagnostics; a scene object cannot be rebuilt from it",
+            };
 
-            object restored = null;
-            Assert.DoesNotThrow(
-                () =>
-                {
-                    restored = JsonSerializer.Deserialize(written, target.Type, options);
-                },
-                $"{target.Name} wrote {Abbreviate(written)} and refused to read it back."
-            );
-            Assert.IsTrue(
-                restored != null,
-                $"{target.Name} wrote {Abbreviate(written)} and read it back as null."
-            );
-
+        /// <summary>
+        /// Values substituted for one node of a valid payload at a time. Chosen for the accessor
+        /// each one breaks: a wrong token kind breaks <c>GetInt32</c>/<c>GetString</c>, a fractional
+        /// or out-of-range number breaks the integral accessors, and a container where a scalar
+        /// belongs breaks any reader that assumes it can step over one token.
+        /// </summary>
+        private static readonly string[] HostileValues =
+        {
+            "null",
+            "true",
+            "\"\"",
+            "\"not-a-number\"",
             /*
-                Compare re-encoded bytes: boxed structs make null checks vacuous and several reference targets
-                lack value equality.
+                An all-zero identifier: the value a type's own "unset" writes, and the one a reader that
+                validates its input is most likely to refuse for being unset.
             */
-            string rewritten = JsonSerializer.Serialize(restored, target.Type, options);
-            Assert.AreEqual(
-                written,
-                rewritten,
-                $"{target.Name} wrote {Abbreviate(written)}, read it back, and then wrote {Abbreviate(rewritten)} -- the value did not survive."
-            );
-        }
+            "\"00000000-0000-0000-0000-000000000000\"",
+            "1.5",
+            "-1",
+            "2147483648",
+            "-2147483649",
+            "99999999999999999999999999",
+            "1e309",
+            "[]",
+            "[1,2,3]",
+            "{}",
+            "{\"nested\":1}",
+        };
 
-        /// <summary>
-        /// Reordering object properties, escaping their names and adding insignificant whitespace
-        /// must not change the value a converter reads (#462).
-        /// </summary>
-        [Test]
-        [TestCaseSource(nameof(Targets))]
-        public void EquivalentJsonSpellingsPreserveConverterValue(FuzzTarget target)
-        {
-            if (!target.ReadSupported)
-            {
-                return;
-            }
+        private static IReadOnlyList<FuzzTarget> _targets;
 
-            JsonSerializerOptions options = Serializer.CreateNormalJsonOptions();
-            int acceptedSeedCount = 0;
+        private static string _repeatingPrefixPayload;
 
-            foreach (string seed in target.Seeds)
-            {
-                object original = null;
-                bool originalAccepted = true;
-                try
-                {
-                    original = JsonSerializer.Deserialize(seed, target.Type, options);
-                }
-                catch (JsonException)
-                {
-                    originalAccepted = false;
-                }
-
-                using JsonDocument document = JsonDocument.Parse(seed);
-                string equivalent = BuildEquivalentJson(document.RootElement);
-                Assert.AreNotEqual(
-                    seed,
-                    equivalent,
-                    $"{target.Name}: the equivalent-spelling transform did not change {Abbreviate(seed)}."
-                );
-
-                using JsonDocument transformedDocument = JsonDocument.Parse(equivalent);
-                Assert.IsTrue(
-                    EquivalentStructureIsReversed(
-                        document.RootElement,
-                        transformedDocument.RootElement,
-                        out int propertyCount
-                    ),
-                    $"{target.Name}: property names must be case-insensitively unique and every object must be reversed in {Abbreviate(seed)}."
-                );
-                Assert.IsTrue(
-                    PropertyTokensUseOnlyUnicodeEscapes(equivalent, propertyCount),
-                    $"{target.Name}: at least one property name was not Unicode-escaped in {Abbreviate(equivalent)}."
-                );
-
-                if (!originalAccepted)
-                {
-                    Assert.Throws<JsonException>(
-                        () => JsonSerializer.Deserialize(equivalent, target.Type, options),
-                        $"{target.Name}: equivalent spelling changed a rejected payload into an accepted value. "
-                            + $"Original {Abbreviate(seed)}; transformed {Abbreviate(equivalent)}."
-                    );
-                    continue;
-                }
-
-                acceptedSeedCount++;
-                object transformed = JsonSerializer.Deserialize(equivalent, target.Type, options);
-                string originalCanonical = JsonSerializer.Serialize(original, target.Type, options);
-                string transformedCanonical = JsonSerializer.Serialize(
-                    transformed,
-                    target.Type,
-                    options
-                );
-
-                Assert.AreEqual(
-                    originalCanonical,
-                    transformedCanonical,
-                    $"{target.Name}: equivalent JSON changed the decoded value. Original "
-                        + $"{Abbreviate(seed)}; transformed {Abbreviate(equivalent)}."
-                );
-            }
-
-            Assert.Positive(
-                acceptedSeedCount,
-                $"{target.Name}: no accepted seed exercised the metamorphic equivalence oracle."
-            );
-        }
-
-        /// <summary>
-        /// An empty <see cref="WGuid"/> is what an unset id serializes to, and it must load again.
-        /// </summary>
-        /// <remarks>
-        /// <see cref="WGuid"/> is version-4-only, so <c>WGuid.TryParse</c> refuses the all-zero GUID
-        /// that <c>Write</c> emits for <see cref="WGuid.Empty"/> -- the converter rejected its own
-        /// output, and every save holding an unset id was unreadable.
-        /// </remarks>
-        [Test]
-        public void AnEmptyWGuidSurvivesAJsonRoundTrip()
-        {
-            string json = Serializer.JsonStringify(WGuid.Empty);
-            WGuid restored = Serializer.JsonDeserialize<WGuid>(json);
-
-            Assert.IsTrue(restored.IsEmpty, $"An empty WGuid wrote {json} and did not read back.");
-        }
-
-        /// <summary>
-        /// The converter accepts a GUID's text in two shapes, and they must agree about the empty
-        /// one. The first fix reached only the bare string, which left the object form refusing an
-        /// unset id -- the same defect one branch over.
-        /// </summary>
-        [Test]
-        [TestCase("\"00000000-0000-0000-0000-000000000000\"")]
-        [TestCase("{\"Guid\":\"00000000-0000-0000-0000-000000000000\"}")]
-        [TestCase("{\"_low\":0,\"_high\":0}")]
-        [TestCase("\"\"")]
-        [TestCase("null")]
-        public void EveryEncodingOfAnEmptyWGuidReadsBack(string payload)
-        {
-            WGuid restored = Serializer.JsonDeserialize<WGuid>(payload);
-
-            Assert.IsTrue(restored.IsEmpty, $"{payload} should read back as an empty WGuid.");
-        }
-
-        /// <summary>
-        /// Every converter-backed value must be writable at the root of a graph, not only as a
-        /// member of a POCO whose declared property type names it.
-        /// </summary>
-        /// <remarks>
-        /// <see cref="Type"/> is the case that failed: it is abstract, so the write path replaced
-        /// the declared type with <c>value.GetType()</c>, which is the internal
-        /// <c>System.RuntimeType</c>. System.Text.Json refuses that outright, and the package's own
-        /// <c>TypeConverter</c> never matched it.
-        /// </remarks>
-        [Test]
-        [TestCaseSource(nameof(Targets))]
-        public void ASeedValueCanBeWrittenAtTheRoot(FuzzTarget target)
-        {
-            Assert.DoesNotThrow(
-                () =>
-                {
-                    _ = Serializer.JsonStringify(target.Seed);
-                },
-                $"{target.Name}: a value of this type could not be written at the root of a graph."
-            );
-        }
-
-        /// <summary>
-        /// The payloads the fuzzer has already found, pinned so a regression is a named failure
-        /// rather than a corpus that happens to still contain the shape.
-        /// </summary>
-        [Test]
-        [TestCase(typeof(Vector2Int), "{\"x\":\"not-a-number\",\"y\":0}")]
-        [TestCase(typeof(Vector2Int), "{\"x\":1.5,\"y\":0}")]
-        [TestCase(typeof(Vector2Int), "{\"x\":2147483648,\"y\":0}")]
-        [TestCase(typeof(Vector3), "{\"x\":true,\"y\":0,\"z\":0}")]
-        [TestCase(typeof(Color), "{\"r\":{},\"g\":0,\"b\":0,\"a\":1}")]
-        [TestCase(typeof(Type), "12345")]
-        [TestCase(typeof(BitSet), "{\"capacity\":\"huge\",\"indices\":[]}")]
-        [TestCase(
-            typeof(Range<int>),
-            "{\"min\":1,\"max\":-1,\"startInclusive\":true,\"endInclusive\":false}"
-        )]
-        [TestCase(typeof(Range<int>), "{\"min\":1,\"startInclusive\":true,\"endInclusive\":false}")]
-        [TestCase(
-            typeof(Range<float>),
-            "{\"min\":2.5,\"max\":-1.5,\"startInclusive\":true,\"endInclusive\":true}"
-        )]
-        [TestCase(typeof(WGuid), "{\"_low\":81985529216486895,\"_high\":-1147797409030816257}")]
-        [TestCase(
-            typeof(Gradient),
-            "{\"mode\":\"Blend\",\"colorKeys\":[{\"color\":{\"r\":1,\"g\":0,\"b\":0,\"a\":1},\"time\":0},"
-                + "{\"color\":{\"r\":1,\"g\":0,\"b\":0,\"a\":1},\"time\":0},"
-                + "{\"color\":{\"r\":1,\"g\":0,\"b\":0,\"a\":1},\"time\":0},"
-                + "{\"color\":{\"r\":1,\"g\":0,\"b\":0,\"a\":1},\"time\":0},"
-                + "{\"color\":{\"r\":1,\"g\":0,\"b\":0,\"a\":1},\"time\":0},"
-                + "{\"color\":{\"r\":1,\"g\":0,\"b\":0,\"a\":1},\"time\":0},"
-                + "{\"color\":{\"r\":1,\"g\":0,\"b\":0,\"a\":1},\"time\":0},"
-                + "{\"color\":{\"r\":1,\"g\":0,\"b\":0,\"a\":1},\"time\":0},"
-                + "{\"color\":{\"r\":1,\"g\":0,\"b\":0,\"a\":1},\"time\":0}],\"alphaKeys\":[]}"
-        )]
-        public void AKnownHostilePayloadIsRefusedCleanly(Type type, string payload)
-        {
-            JsonSerializerOptions options = Serializer.CreateNormalJsonOptions();
-
-            Assert.Throws<JsonException>(
-                () => JsonSerializer.Deserialize(payload, type, options),
-                $"{type.Name} must refuse {payload} with JsonException"
-            );
-        }
-
-        /// <summary>
-        /// A document inside its read budget decodes exactly as it does with no budget at all, and
-        /// one outside it is refused rather than truncated (#647).
-        /// </summary>
-        /// <remarks>
-        /// Both halves matter. The refusal is the point of the limits, but a budget that also
-        /// changed what an in-budget save file decodes to would be a worse defect than the one it
-        /// closes, so every accepted case is compared against the overload without limits.
-        /// </remarks>
-        [Test]
-        [TestCaseSource(nameof(BudgetCases))]
-        public void JsonReadLimitsRefuseOnlyAnOverBudgetDocument(JsonBudgetCase budgetCase)
-        {
-            JsonSerializerOptions options = Serializer.CreateNormalJsonOptions();
-
-            if (budgetCase.AcceptedWithLimits)
-            {
-                object unlimited = Serializer.JsonDeserialize<object>(
-                    budgetCase.Payload,
-                    budgetCase.Type
-                );
-                object limited = Serializer.JsonDeserialize<object>(
-                    budgetCase.Payload,
-                    budgetCase.Type,
-                    null,
-                    budgetCase.Limits
-                );
-
-                Assert.AreEqual(
-                    JsonSerializer.Serialize(unlimited, budgetCase.Type, options),
-                    JsonSerializer.Serialize(limited, budgetCase.Type, options),
-                    $"{budgetCase.Name}: read limits changed the value an in-budget document decodes to."
-                );
-                return;
-            }
-
-            if (budgetCase.AcceptedWithoutLimits)
-            {
-                Assert.DoesNotThrow(
-                    () =>
-                    {
-                        _ = Serializer.JsonDeserialize<object>(budgetCase.Payload, budgetCase.Type);
-                    },
-                    $"{budgetCase.Name}: this payload is legal JSON for this type, so the refusal "
-                        + "below has to be the budget's doing rather than the payload's."
-                );
-            }
-            else
-            {
-                Assert.Throws<SerializationCorruptDataException>(
-                    () => Serializer.JsonDeserialize<object>(budgetCase.Payload, budgetCase.Type),
-                    $"{budgetCase.Name}: this payload is declared unreadable even without limits."
-                );
-            }
-
-            SerializationCorruptDataException refusal =
-                Assert.Throws<SerializationCorruptDataException>(
-                    () =>
-                        Serializer.JsonDeserialize<object>(
-                            budgetCase.Payload,
-                            budgetCase.Type,
-                            null,
-                            budgetCase.Limits
-                        ),
-                    $"{budgetCase.Name}: an over-budget document must be refused, not decoded."
-                );
-            StringAssert.Contains(
-                budgetCase.RefusedBy,
-                refusal.Reason,
-                $"{budgetCase.Name}: the refusal must name the limit that refused it."
-            );
-            Assert.IsFalse(
-                Serializer.TryJsonDeserialize(
-                    budgetCase.Payload,
-                    out object _,
-                    budgetCase.Type,
-                    null,
-                    budgetCase.Limits
-                ),
-                $"{budgetCase.Name}: the Try overload must fail closed rather than throw or truncate."
-            );
-        }
-
-        /// <summary>
-        /// Refusing a hostile document costs less than a copy of it, so a tiny payload cannot buy
-        /// a large allocation (#647).
-        /// </summary>
-        /// <remarks>
-        /// The relative half is the one that says something: the wide-array shape materializes a
-        /// two-hundred-thousand-element list when nothing refuses it, and the budget has to be what
-        /// prevents that rather than merely reporting it afterwards.
-        /// </remarks>
-        [Test]
-        [TestCaseSource(nameof(AmplifyingShapes))]
-        public void RefusingAnAmplifyingDocumentDoesNotAmplifyAllocation(JsonBudgetCase budgetCase)
-        {
-            byte[] utf8 = Encoding.UTF8.GetBytes(budgetCase.Payload);
-            long refused = GCAssert.MeasureAllocatedBytes(() =>
-            {
-                try
-                {
-                    _ = Serializer.JsonDeserialize<object>(
-                        utf8,
-                        budgetCase.Type,
-                        null,
-                        budgetCase.Limits
-                    );
-                }
-                catch (SerializationCorruptDataException) { }
-            });
-
-            if (refused <= 0)
-            {
-                Assert.Inconclusive(
-                    $"{budgetCase.Name}: refusing a document allocates its exception, so a zero "
-                        + "reading means this runtime's allocation counter is too coarse to bound "
-                        + "anything here."
-                );
-            }
-
-            Assert.LessOrEqual(
-                refused,
-                utf8.Length,
-                $"{budgetCase.Name}: refusing this document ten times allocated more than one copy "
-                    + "of it, which is the amplification the limits exist to prevent."
-            );
-
-            if (!budgetCase.AcceptedWithoutLimits)
-            {
-                return;
-            }
-
-            long materialized = GCAssert.MeasureAllocatedBytes(() =>
-            {
-                _ = Serializer.JsonDeserialize<object>(utf8, budgetCase.Type);
-            });
-            Assert.LessOrEqual(
-                refused * 8,
-                materialized,
-                $"{budgetCase.Name}: decoding this document allocated {materialized} bytes and "
-                    + $"refusing it allocated {refused}. The budget has to be what avoids the "
-                    + "materialization, not a report filed after it."
-            );
-        }
-
-        /// <summary>
-        /// The parameterless constructor produces the default profile, so a generic
-        /// <c>new()</c> factory can build one.
-        /// </summary>
-        [Test]
-        public void ParameterlessJsonReadLimitsSupportGenericFactories()
-        {
-            WJsonReadLimits limits = CreateDefault<WJsonReadLimits>();
-
-            Assert.AreEqual(int.MaxValue, limits.MaximumElementCount);
-            Assert.AreEqual(int.MaxValue, limits.MaximumTextLength);
-            Assert.AreEqual(
-                WJsonReadLimits.MaximumSupportedNestingDepth,
-                limits.MaximumNestingDepth
-            );
-        }
-
-        /// <summary>
-        /// Nesting is stack depth and a stack overflow cannot be caught, so the ceiling is the
-        /// package's rather than the caller's.
-        /// </summary>
-        [TestCase(-1, 0)]
-        [TestCase(0, 0)]
-        [TestCase(
-            WJsonReadLimits.MaximumSupportedNestingDepth,
-            WJsonReadLimits.MaximumSupportedNestingDepth
-        )]
-        [TestCase(int.MaxValue, WJsonReadLimits.MaximumSupportedNestingDepth)]
-        public void ACallerCannotRaiseTheJsonNestingCeiling(int requested, int expected)
-        {
-            Assert.AreEqual(
-                expected,
-                new WJsonReadLimits(maximumNestingDepth: requested).MaximumNestingDepth
-            );
-        }
+        private static string _wideArrayPayload;
 
         private static T CreateDefault<T>()
             where T : class, new()
@@ -1637,6 +993,650 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             };
         }
 
+        /// <summary>
+        /// A converter handed a value it cannot read must say so with <see cref="JsonException"/>.
+        /// Anything else is a framework exception escaping through a public API, which a consumer
+        /// calling <c>JsonSerializer.Deserialize</c> with these options cannot catch by contract.
+        /// </summary>
+        [Test]
+        [TestCaseSource(nameof(Targets))]
+        public void MalformedPayloadsAreReportedAsJsonException(FuzzTarget target)
+        {
+            JsonSerializerOptions options = Serializer.CreateNormalJsonOptions();
+            StringBuilder failures = new();
+            int failureCount = 0;
+            int accepted = 0;
+            int examined = 0;
+
+            foreach (string payload in Corpus(target))
+            {
+                examined++;
+                try
+                {
+                    object decoded = JsonSerializer.Deserialize(payload, target.Type, options);
+                    if (decoded != null)
+                    {
+                        // A reference-type null result bypasses the converter and cannot count toward converter coverage.
+                        accepted++;
+                    }
+                }
+                catch (JsonException) { }
+                catch (NotSupportedException)
+                {
+                    // System.Text.Json's own answer for a type it declines to construct.
+                }
+                catch (Exception unexpected)
+                {
+                    failureCount++;
+                    if (failureCount <= 5)
+                    {
+                        failures
+                            .Append("  ")
+                            .Append(unexpected.GetType().FullName)
+                            .Append(" from ")
+                            .Append(Abbreviate(payload))
+                            .Append(" -> ")
+                            .Append(unexpected.Message)
+                            .Append('\n');
+                    }
+                }
+            }
+
+            Assert.Zero(
+                failureCount,
+                $"{target.Name}: {failureCount} of {examined} malformed payloads left a "
+                    + $"non-JsonException escape the converter.\n{failures}"
+            );
+
+            if (target.ReadSupported)
+            {
+                Assert.Positive(
+                    accepted,
+                    $"{target.Name}: no payload in a corpus of {examined} was accepted, so this "
+                        + "target proves nothing about the read path. The seed or the mutator is "
+                        + "broken."
+                );
+            }
+            else
+            {
+                Assert.Zero(
+                    accepted,
+                    $"{target.Name} is declared write-only, but {accepted} payloads were read back. "
+                        + "Either the converter gained a read path or the declaration is stale."
+                );
+            }
+        }
+
+        /// <summary>
+        /// The package-level entry point converts every failure into
+        /// <see cref="SerializationFailureException"/>, including one a converter reports oddly.
+        /// </summary>
+        [Test]
+        [TestCaseSource(nameof(Targets))]
+        public void SerializerOnlyLeaksSerializationFailureException(FuzzTarget target)
+        {
+            foreach (string payload in Corpus(target))
+            {
+                try
+                {
+                    _ = Serializer.JsonDeserialize<object>(payload, target.Type);
+                }
+                catch (SerializationFailureException) { }
+                catch (Exception unexpected)
+                {
+                    Assert.Fail(
+                        $"{target.Name}: JsonDeserialize leaked "
+                            + $"{unexpected.GetType().FullName} on {Abbreviate(payload)}: "
+                            + unexpected.Message
+                    );
+                }
+            }
+        }
+
+        /// <summary>
+        /// <c>TryJsonDeserialize</c> promises a bool rather than an exception, for every input.
+        /// </summary>
+        [Test]
+        [TestCaseSource(nameof(Targets))]
+        public void TryJsonDeserializeNeverThrows(FuzzTarget target)
+        {
+            foreach (string payload in Corpus(target))
+            {
+                try
+                {
+                    _ = Serializer.TryJsonDeserialize(payload, out object _, target.Type);
+                }
+                catch (Exception unexpected)
+                {
+                    Assert.Fail(
+                        $"{target.Name}: TryJsonDeserialize threw "
+                            + $"{unexpected.GetType().FullName} on {Abbreviate(payload)}: "
+                            + unexpected.Message
+                    );
+                }
+            }
+        }
+
+        /// <summary>
+        /// A payload a converter accepts must survive its own re-encoding. A shape that reads back
+        /// but cannot be written and read again is a converter whose <c>Write</c> and <c>Read</c>
+        /// disagree, which corrupts the next save rather than the one being loaded.
+        /// </summary>
+        [Test]
+        [TestCaseSource(nameof(Targets))]
+        public void AcceptedPayloadsSurviveTheirOwnReEncoding(FuzzTarget target)
+        {
+            JsonSerializerOptions options = Serializer.CreateNormalJsonOptions();
+
+            foreach (string payload in Corpus(target))
+            {
+                object first;
+                try
+                {
+                    first = JsonSerializer.Deserialize(payload, target.Type, options);
+                }
+                catch (Exception)
+                {
+                    continue;
+                }
+
+                string reEncoded;
+                try
+                {
+                    reEncoded = JsonSerializer.Serialize(first, target.Type, options);
+                }
+                catch (Exception unexpected)
+                {
+                    Assert.Fail(
+                        $"{target.Name}: a value read from {Abbreviate(payload)} could not be "
+                            + $"written back: {unexpected.GetType().FullName}: {unexpected.Message}"
+                    );
+                    return;
+                }
+
+                try
+                {
+                    _ = JsonSerializer.Deserialize(reEncoded, target.Type, options);
+                }
+                catch (Exception unexpected)
+                {
+                    Assert.Fail(
+                        $"{target.Name}: this converter wrote {Abbreviate(reEncoded)} and then "
+                            + $"refused to read it: {unexpected.GetType().FullName}: "
+                            + $"{unexpected.Message} (source payload {Abbreviate(payload)})"
+                    );
+                    return;
+                }
+            }
+        }
+
+        /// <summary>
+        /// A <see cref="Type"/> written through an <see cref="object"/> reaches the package's
+        /// <c>TypeConverter</c> whatever concrete <see cref="Type"/> subclass carries it.
+        /// </summary>
+        /// <remarks>
+        /// <c>typeof(X)</c> hands back the internal <c>System.RuntimeType</c>, so a rule that
+        /// exempted public runtime types from the base-converter walk looked correct and was not:
+        /// <see cref="System.Reflection.TypeDelegator"/> is a <b>public</b> subclass of
+        /// <see cref="Type"/>, and it reached the reflection-light writer instead, which threw
+        /// <see cref="NullReferenceException"/> walking it.
+        /// </remarks>
+        [Test]
+        public void ATypeSubclassIsWrittenThroughTheTypeConverter()
+        {
+            System.Reflection.TypeDelegator delegated = new(typeof(Vector3));
+
+            string viaDelegator = Serializer.JsonStringify<object>(delegated);
+            string viaType = Serializer.JsonStringify<object>(typeof(Vector3));
+
+            Assert.AreEqual(
+                viaType,
+                viaDelegator,
+                "A public Type subclass must be written by the same converter as the Type it carries."
+            );
+        }
+
+        /// <summary>
+        /// A converter that only writes must say so with <see cref="NotSupportedException"/>.
+        /// </summary>
+        /// <remarks>
+        /// Both threw <see cref="NotImplementedException"/>, which reads as an unfinished converter
+        /// rather than a deliberate one-way encoding, and which no caller would think to catch.
+        /// <see cref="GameObject"/> is asserted here rather than as a fuzz target because reading
+        /// one needs no instance, and allocating one would pull this whole fixture into Unity object
+        /// lifecycle management for a converter with no read path to fuzz.
+        /// </remarks>
+        [Test]
+        [TestCaseSource(nameof(WriteOnlyTypes))]
+        public void AWriteOnlyConverterRefusesToRead(Type type)
+        {
+            JsonSerializerOptions options = Serializer.CreateNormalJsonOptions();
+
+            Assert.Throws<NotSupportedException>(
+                () => JsonSerializer.Deserialize("{}", type, options),
+                $"{type.Name} is declared write-only ({WriteOnlyConverters.ValueFor(type)}) and must refuse a read with NotSupportedException"
+            );
+        }
+
+        /// <summary>
+        /// A converter that is not declared write-only must read back the value it just wrote.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="AcceptedPayloadsSurviveTheirOwnReEncoding"/> cannot make this assertion: a
+        /// payload it fails to decode is skipped, because most of its corpus is deliberately
+        /// hostile, so a converter whose <b>own seed</b> does not read back is silently passed over
+        /// rather than reported. That is precisely the shape of the <see cref="WGuid"/> defect --
+        /// a value the converter writes and then refuses -- and it is a save file that cannot be
+        /// loaded rather than a rejected attack.
+        /// </remarks>
+        [Test]
+        [TestCaseSource(nameof(Targets))]
+        public void AReadableConverterReadsBackTheValueItWrote(FuzzTarget target)
+        {
+            JsonSerializerOptions options = Serializer.CreateNormalJsonOptions();
+            string written = target.Seeds[0];
+
+            if (!target.ReadSupported)
+            {
+                Assert.Throws<NotSupportedException>(
+                    () => JsonSerializer.Deserialize(written, target.Type, options),
+                    $"{target.Name} is declared write-only and must refuse its own output too"
+                );
+                return;
+            }
+
+            object restored = null;
+            Assert.DoesNotThrow(
+                () =>
+                {
+                    restored = JsonSerializer.Deserialize(written, target.Type, options);
+                },
+                $"{target.Name} wrote {Abbreviate(written)} and refused to read it back."
+            );
+            Assert.IsTrue(
+                restored != null,
+                $"{target.Name} wrote {Abbreviate(written)} and read it back as null."
+            );
+
+            /*
+                Compare re-encoded bytes: boxed structs make null checks vacuous and several reference targets
+                lack value equality.
+            */
+            string rewritten = JsonSerializer.Serialize(restored, target.Type, options);
+            Assert.AreEqual(
+                written,
+                rewritten,
+                $"{target.Name} wrote {Abbreviate(written)}, read it back, and then wrote {Abbreviate(rewritten)} -- the value did not survive."
+            );
+        }
+
+        /// <summary>
+        /// Reordering object properties, escaping their names and adding insignificant whitespace
+        /// must not change the value a converter reads (#462).
+        /// </summary>
+        [Test]
+        [TestCaseSource(nameof(Targets))]
+        public void EquivalentJsonSpellingsPreserveConverterValue(FuzzTarget target)
+        {
+            if (!target.ReadSupported)
+            {
+                return;
+            }
+
+            JsonSerializerOptions options = Serializer.CreateNormalJsonOptions();
+            int acceptedSeedCount = 0;
+
+            foreach (string seed in target.Seeds)
+            {
+                object original = null;
+                bool originalAccepted = true;
+                try
+                {
+                    original = JsonSerializer.Deserialize(seed, target.Type, options);
+                }
+                catch (JsonException)
+                {
+                    originalAccepted = false;
+                }
+
+                using JsonDocument document = JsonDocument.Parse(seed);
+                string equivalent = BuildEquivalentJson(document.RootElement);
+                Assert.AreNotEqual(
+                    seed,
+                    equivalent,
+                    $"{target.Name}: the equivalent-spelling transform did not change {Abbreviate(seed)}."
+                );
+
+                using JsonDocument transformedDocument = JsonDocument.Parse(equivalent);
+                Assert.IsTrue(
+                    EquivalentStructureIsReversed(
+                        document.RootElement,
+                        transformedDocument.RootElement,
+                        out int propertyCount
+                    ),
+                    $"{target.Name}: property names must be case-insensitively unique and every object must be reversed in {Abbreviate(seed)}."
+                );
+                Assert.IsTrue(
+                    PropertyTokensUseOnlyUnicodeEscapes(equivalent, propertyCount),
+                    $"{target.Name}: at least one property name was not Unicode-escaped in {Abbreviate(equivalent)}."
+                );
+
+                if (!originalAccepted)
+                {
+                    Assert.Throws<JsonException>(
+                        () => JsonSerializer.Deserialize(equivalent, target.Type, options),
+                        $"{target.Name}: equivalent spelling changed a rejected payload into an accepted value. "
+                            + $"Original {Abbreviate(seed)}; transformed {Abbreviate(equivalent)}."
+                    );
+                    continue;
+                }
+
+                acceptedSeedCount++;
+                object transformed = JsonSerializer.Deserialize(equivalent, target.Type, options);
+                string originalCanonical = JsonSerializer.Serialize(original, target.Type, options);
+                string transformedCanonical = JsonSerializer.Serialize(
+                    transformed,
+                    target.Type,
+                    options
+                );
+
+                Assert.AreEqual(
+                    originalCanonical,
+                    transformedCanonical,
+                    $"{target.Name}: equivalent JSON changed the decoded value. Original "
+                        + $"{Abbreviate(seed)}; transformed {Abbreviate(equivalent)}."
+                );
+            }
+
+            Assert.Positive(
+                acceptedSeedCount,
+                $"{target.Name}: no accepted seed exercised the metamorphic equivalence oracle."
+            );
+        }
+
+        /// <summary>
+        /// An empty <see cref="WGuid"/> is what an unset id serializes to, and it must load again.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="WGuid"/> is version-4-only, so <c>WGuid.TryParse</c> refuses the all-zero GUID
+        /// that <c>Write</c> emits for <see cref="WGuid.Empty"/> -- the converter rejected its own
+        /// output, and every save holding an unset id was unreadable.
+        /// </remarks>
+        [Test]
+        public void AnEmptyWGuidSurvivesAJsonRoundTrip()
+        {
+            string json = Serializer.JsonStringify(WGuid.Empty);
+            WGuid restored = Serializer.JsonDeserialize<WGuid>(json);
+
+            Assert.IsTrue(restored.IsEmpty, $"An empty WGuid wrote {json} and did not read back.");
+        }
+
+        /// <summary>
+        /// The converter accepts a GUID's text in two shapes, and they must agree about the empty
+        /// one. The first fix reached only the bare string, which left the object form refusing an
+        /// unset id -- the same defect one branch over.
+        /// </summary>
+        [Test]
+        [TestCase("\"00000000-0000-0000-0000-000000000000\"")]
+        [TestCase("{\"Guid\":\"00000000-0000-0000-0000-000000000000\"}")]
+        [TestCase("{\"_low\":0,\"_high\":0}")]
+        [TestCase("\"\"")]
+        [TestCase("null")]
+        public void EveryEncodingOfAnEmptyWGuidReadsBack(string payload)
+        {
+            WGuid restored = Serializer.JsonDeserialize<WGuid>(payload);
+
+            Assert.IsTrue(restored.IsEmpty, $"{payload} should read back as an empty WGuid.");
+        }
+
+        /// <summary>
+        /// Every converter-backed value must be writable at the root of a graph, not only as a
+        /// member of a POCO whose declared property type names it.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="Type"/> is the case that failed: it is abstract, so the write path replaced
+        /// the declared type with <c>value.GetType()</c>, which is the internal
+        /// <c>System.RuntimeType</c>. System.Text.Json refuses that outright, and the package's own
+        /// <c>TypeConverter</c> never matched it.
+        /// </remarks>
+        [Test]
+        [TestCaseSource(nameof(Targets))]
+        public void ASeedValueCanBeWrittenAtTheRoot(FuzzTarget target)
+        {
+            Assert.DoesNotThrow(
+                () =>
+                {
+                    _ = Serializer.JsonStringify(target.Seed);
+                },
+                $"{target.Name}: a value of this type could not be written at the root of a graph."
+            );
+        }
+
+        /// <summary>
+        /// The payloads the fuzzer has already found, pinned so a regression is a named failure
+        /// rather than a corpus that happens to still contain the shape.
+        /// </summary>
+        [Test]
+        [TestCase(typeof(Vector2Int), "{\"x\":\"not-a-number\",\"y\":0}")]
+        [TestCase(typeof(Vector2Int), "{\"x\":1.5,\"y\":0}")]
+        [TestCase(typeof(Vector2Int), "{\"x\":2147483648,\"y\":0}")]
+        [TestCase(typeof(Vector3), "{\"x\":true,\"y\":0,\"z\":0}")]
+        [TestCase(typeof(Color), "{\"r\":{},\"g\":0,\"b\":0,\"a\":1}")]
+        [TestCase(typeof(Type), "12345")]
+        [TestCase(typeof(BitSet), "{\"capacity\":\"huge\",\"indices\":[]}")]
+        [TestCase(
+            typeof(Range<int>),
+            "{\"min\":1,\"max\":-1,\"startInclusive\":true,\"endInclusive\":false}"
+        )]
+        [TestCase(typeof(Range<int>), "{\"min\":1,\"startInclusive\":true,\"endInclusive\":false}")]
+        [TestCase(
+            typeof(Range<float>),
+            "{\"min\":2.5,\"max\":-1.5,\"startInclusive\":true,\"endInclusive\":true}"
+        )]
+        [TestCase(typeof(WGuid), "{\"_low\":81985529216486895,\"_high\":-1147797409030816257}")]
+        [TestCase(
+            typeof(Gradient),
+            "{\"mode\":\"Blend\",\"colorKeys\":[{\"color\":{\"r\":1,\"g\":0,\"b\":0,\"a\":1},\"time\":0},"
+                + "{\"color\":{\"r\":1,\"g\":0,\"b\":0,\"a\":1},\"time\":0},"
+                + "{\"color\":{\"r\":1,\"g\":0,\"b\":0,\"a\":1},\"time\":0},"
+                + "{\"color\":{\"r\":1,\"g\":0,\"b\":0,\"a\":1},\"time\":0},"
+                + "{\"color\":{\"r\":1,\"g\":0,\"b\":0,\"a\":1},\"time\":0},"
+                + "{\"color\":{\"r\":1,\"g\":0,\"b\":0,\"a\":1},\"time\":0},"
+                + "{\"color\":{\"r\":1,\"g\":0,\"b\":0,\"a\":1},\"time\":0},"
+                + "{\"color\":{\"r\":1,\"g\":0,\"b\":0,\"a\":1},\"time\":0},"
+                + "{\"color\":{\"r\":1,\"g\":0,\"b\":0,\"a\":1},\"time\":0}],\"alphaKeys\":[]}"
+        )]
+        public void AKnownHostilePayloadIsRefusedCleanly(Type type, string payload)
+        {
+            JsonSerializerOptions options = Serializer.CreateNormalJsonOptions();
+
+            Assert.Throws<JsonException>(
+                () => JsonSerializer.Deserialize(payload, type, options),
+                $"{type.Name} must refuse {payload} with JsonException"
+            );
+        }
+
+        /// <summary>
+        /// A document inside its read budget decodes exactly as it does with no budget at all, and
+        /// one outside it is refused rather than truncated (#647).
+        /// </summary>
+        /// <remarks>
+        /// Both halves matter. The refusal is the point of the limits, but a budget that also
+        /// changed what an in-budget save file decodes to would be a worse defect than the one it
+        /// closes, so every accepted case is compared against the overload without limits.
+        /// </remarks>
+        [Test]
+        [TestCaseSource(nameof(BudgetCases))]
+        public void JsonReadLimitsRefuseOnlyAnOverBudgetDocument(JsonBudgetCase budgetCase)
+        {
+            JsonSerializerOptions options = Serializer.CreateNormalJsonOptions();
+
+            if (budgetCase.AcceptedWithLimits)
+            {
+                object unlimited = Serializer.JsonDeserialize<object>(
+                    budgetCase.Payload,
+                    budgetCase.Type
+                );
+                object limited = Serializer.JsonDeserialize<object>(
+                    budgetCase.Payload,
+                    budgetCase.Type,
+                    null,
+                    budgetCase.Limits
+                );
+
+                Assert.AreEqual(
+                    JsonSerializer.Serialize(unlimited, budgetCase.Type, options),
+                    JsonSerializer.Serialize(limited, budgetCase.Type, options),
+                    $"{budgetCase.Name}: read limits changed the value an in-budget document decodes to."
+                );
+                return;
+            }
+
+            if (budgetCase.AcceptedWithoutLimits)
+            {
+                Assert.DoesNotThrow(
+                    () =>
+                    {
+                        _ = Serializer.JsonDeserialize<object>(budgetCase.Payload, budgetCase.Type);
+                    },
+                    $"{budgetCase.Name}: this payload is legal JSON for this type, so the refusal "
+                        + "below has to be the budget's doing rather than the payload's."
+                );
+            }
+            else
+            {
+                Assert.Throws<SerializationCorruptDataException>(
+                    () => Serializer.JsonDeserialize<object>(budgetCase.Payload, budgetCase.Type),
+                    $"{budgetCase.Name}: this payload is declared unreadable even without limits."
+                );
+            }
+
+            SerializationCorruptDataException refusal =
+                Assert.Throws<SerializationCorruptDataException>(
+                    () =>
+                        Serializer.JsonDeserialize<object>(
+                            budgetCase.Payload,
+                            budgetCase.Type,
+                            null,
+                            budgetCase.Limits
+                        ),
+                    $"{budgetCase.Name}: an over-budget document must be refused, not decoded."
+                );
+            StringAssert.Contains(
+                budgetCase.RefusedBy,
+                refusal.Reason,
+                $"{budgetCase.Name}: the refusal must name the limit that refused it."
+            );
+            Assert.IsFalse(
+                Serializer.TryJsonDeserialize(
+                    budgetCase.Payload,
+                    out object _,
+                    budgetCase.Type,
+                    null,
+                    budgetCase.Limits
+                ),
+                $"{budgetCase.Name}: the Try overload must fail closed rather than throw or truncate."
+            );
+        }
+
+        /// <summary>
+        /// Refusing a hostile document costs less than a copy of it, so a tiny payload cannot buy
+        /// a large allocation (#647).
+        /// </summary>
+        /// <remarks>
+        /// The relative half is the one that says something: the wide-array shape materializes a
+        /// two-hundred-thousand-element list when nothing refuses it, and the budget has to be what
+        /// prevents that rather than merely reporting it afterwards.
+        /// </remarks>
+        [Test]
+        [TestCaseSource(nameof(AmplifyingShapes))]
+        public void RefusingAnAmplifyingDocumentDoesNotAmplifyAllocation(JsonBudgetCase budgetCase)
+        {
+            byte[] utf8 = Encoding.UTF8.GetBytes(budgetCase.Payload);
+            long refused = GCAssert.MeasureAllocatedBytes(() =>
+            {
+                try
+                {
+                    _ = Serializer.JsonDeserialize<object>(
+                        utf8,
+                        budgetCase.Type,
+                        null,
+                        budgetCase.Limits
+                    );
+                }
+                catch (SerializationCorruptDataException) { }
+            });
+
+            if (refused <= 0)
+            {
+                Assert.Inconclusive(
+                    $"{budgetCase.Name}: refusing a document allocates its exception, so a zero "
+                        + "reading means this runtime's allocation counter is too coarse to bound "
+                        + "anything here."
+                );
+            }
+
+            Assert.LessOrEqual(
+                refused,
+                utf8.Length,
+                $"{budgetCase.Name}: refusing this document ten times allocated more than one copy "
+                    + "of it, which is the amplification the limits exist to prevent."
+            );
+
+            if (!budgetCase.AcceptedWithoutLimits)
+            {
+                return;
+            }
+
+            long materialized = GCAssert.MeasureAllocatedBytes(() =>
+            {
+                _ = Serializer.JsonDeserialize<object>(utf8, budgetCase.Type);
+            });
+            Assert.LessOrEqual(
+                refused * 8,
+                materialized,
+                $"{budgetCase.Name}: decoding this document allocated {materialized} bytes and "
+                    + $"refusing it allocated {refused}. The budget has to be what avoids the "
+                    + "materialization, not a report filed after it."
+            );
+        }
+
+        /// <summary>
+        /// The parameterless constructor produces the default profile, so a generic
+        /// <c>new()</c> factory can build one.
+        /// </summary>
+        [Test]
+        public void ParameterlessJsonReadLimitsSupportGenericFactories()
+        {
+            WJsonReadLimits limits = CreateDefault<WJsonReadLimits>();
+
+            Assert.AreEqual(int.MaxValue, limits.MaximumElementCount);
+            Assert.AreEqual(int.MaxValue, limits.MaximumTextLength);
+            Assert.AreEqual(
+                WJsonReadLimits.MaximumSupportedNestingDepth,
+                limits.MaximumNestingDepth
+            );
+        }
+
+        /// <summary>
+        /// Nesting is stack depth and a stack overflow cannot be caught, so the ceiling is the
+        /// package's rather than the caller's.
+        /// </summary>
+        [TestCase(-1, 0)]
+        [TestCase(0, 0)]
+        [TestCase(
+            WJsonReadLimits.MaximumSupportedNestingDepth,
+            WJsonReadLimits.MaximumSupportedNestingDepth
+        )]
+        [TestCase(int.MaxValue, WJsonReadLimits.MaximumSupportedNestingDepth)]
+        public void ACallerCannotRaiseTheJsonNestingCeiling(int requested, int expected)
+        {
+            Assert.AreEqual(
+                expected,
+                new WJsonReadLimits(maximumNestingDepth: requested).MaximumNestingDepth
+            );
+        }
+
         private enum MutationKind
         {
             ReplaceValue = 1,
@@ -1649,16 +1649,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
         private readonly struct Mutation
         {
+            public int NodeIndex { get; }
+            public MutationKind Kind { get; }
+            public string Replacement { get; }
+
             public Mutation(int nodeIndex, MutationKind kind, string replacement)
             {
                 NodeIndex = nodeIndex;
                 Kind = kind;
                 Replacement = replacement;
             }
-
-            public int NodeIndex { get; }
-            public MutationKind Kind { get; }
-            public string Replacement { get; }
         }
 
         /// <summary>
@@ -1666,34 +1666,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         /// </summary>
         public sealed class FuzzTarget
         {
-            private readonly object _seed;
-            private readonly string[] _alternateSeeds;
-            private string[] _seeds;
-
-            /// <param name="alternateSeeds">
-            /// Shapes that reach branches a converter's own output does not -- accepted legacy
-            /// encodings and well-formed probes that validation may reject. Mutating only the
-            /// converter's own output leaves those branches unvisited.
-            /// </param>
-            public FuzzTarget(Type type, object seed, params string[] alternateSeeds)
-            {
-                Type = type;
-                Name = type.Name;
-                _seed = seed;
-                _alternateSeeds = alternateSeeds ?? Array.Empty<string>();
-                ReadSupported = true;
-            }
-
-            /// <summary>
-            /// A converter that writes a value for diagnostics and cannot rebuild it. Every payload
-            /// must be refused, and refused with <see cref="NotSupportedException"/> rather than
-            /// with <see cref="NotImplementedException"/>, which reads as an unfinished converter.
-            /// </summary>
-            public static FuzzTarget WriteOnly(Type type, object seed)
-            {
-                return new FuzzTarget(type, seed) { ReadSupported = false };
-            }
-
             public Type Type { get; }
             public string Name { get; }
             public object Seed => _seed;
@@ -1723,6 +1695,34 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 }
             }
 
+            private readonly object _seed;
+            private readonly string[] _alternateSeeds;
+            private string[] _seeds;
+
+            /// <param name="alternateSeeds">
+            /// Shapes that reach branches a converter's own output does not -- accepted legacy
+            /// encodings and well-formed probes that validation may reject. Mutating only the
+            /// converter's own output leaves those branches unvisited.
+            /// </param>
+            public FuzzTarget(Type type, object seed, params string[] alternateSeeds)
+            {
+                Type = type;
+                Name = type.Name;
+                _seed = seed;
+                _alternateSeeds = alternateSeeds ?? Array.Empty<string>();
+                ReadSupported = true;
+            }
+
+            /// <summary>
+            /// A converter that writes a value for diagnostics and cannot rebuild it. Every payload
+            /// must be refused, and refused with <see cref="NotSupportedException"/> rather than
+            /// with <see cref="NotImplementedException"/>, which reads as an unfinished converter.
+            /// </summary>
+            public static FuzzTarget WriteOnly(Type type, object seed)
+            {
+                return new FuzzTarget(type, seed) { ReadSupported = false };
+            }
+
             public override string ToString()
             {
                 return Name;
@@ -1735,6 +1735,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         /// </summary>
         public sealed class JsonBudgetCase
         {
+            /// <summary>The case name, and the name NUnit reports.</summary>
+            public string Name { get; }
+
+            /// <summary>The type the document is read as.</summary>
+            public Type Type { get; }
+
+            /// <summary>The document.</summary>
+            public string Payload { get; }
+
+            /// <summary>The limits it is read under; null exercises the default profile.</summary>
+            public WJsonReadLimits Limits { get; }
+
+            /// <summary>Whether the overloads without limits read this document.</summary>
+            public bool AcceptedWithoutLimits { get; }
+
+            /// <summary>The limit that must refuse it, or null when it is in budget.</summary>
+            public string RefusedBy { get; }
+
+            /// <summary>Whether the limits admit this document.</summary>
+            public bool AcceptedWithLimits => RefusedBy == null;
+
             private JsonBudgetCase(
                 string name,
                 Type type,
@@ -1794,27 +1815,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     refusedBy
                 );
             }
-
-            /// <summary>The case name, and the name NUnit reports.</summary>
-            public string Name { get; }
-
-            /// <summary>The type the document is read as.</summary>
-            public Type Type { get; }
-
-            /// <summary>The document.</summary>
-            public string Payload { get; }
-
-            /// <summary>The limits it is read under; null exercises the default profile.</summary>
-            public WJsonReadLimits Limits { get; }
-
-            /// <summary>Whether the overloads without limits read this document.</summary>
-            public bool AcceptedWithoutLimits { get; }
-
-            /// <summary>The limit that must refuse it, or null when it is in budget.</summary>
-            public string RefusedBy { get; }
-
-            /// <summary>Whether the limits admit this document.</summary>
-            public bool AcceptedWithLimits => RefusedBy == null;
 
             public override string ToString()
             {

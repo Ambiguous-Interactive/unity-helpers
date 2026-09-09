@@ -27,6 +27,96 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         private const string FirstGuid = "00000000000000000000000000000001";
         private const string SecondGuid = "00000000000000000000000000000002";
 
+        /// <summary>
+        /// Reads a rendered report back, which is what makes the assertions about content rather
+        /// than about how Unity happens to indent.
+        /// </summary>
+        /// <param name="json">The rendered document.</param>
+        /// <returns>The parsed document; never <c>null</c>.</returns>
+        private static ValidationReport.Document Read(string json)
+        {
+            ValidationReport.Document document = JsonUtility.FromJson<ValidationReport.Document>(
+                json
+            );
+            Assert.IsTrue(
+                document != null,
+                "the report has to be a document a reader can parse: " + json
+            );
+            return document;
+        }
+
+        private static string[] Ids(List<IValidationRule> rules)
+        {
+            List<string> ids = new List<string>();
+            foreach (
+                WallstopStudios.UnityHelpers.Editor.Validation.Continuous.IValidationRule rulesElement in rules
+            )
+            {
+                ids.Add(rulesElement.RuleId);
+            }
+
+            return ids.ToArray();
+        }
+
+        private static string[] Names(List<IValidationRule> rules)
+        {
+            List<string> names = new List<string>();
+            foreach (
+                WallstopStudios.UnityHelpers.Editor.Validation.Continuous.IValidationRule rulesElement in rules
+            )
+            {
+                names.Add(rulesElement.GetType().FullName);
+            }
+
+            return names.ToArray();
+        }
+
+        private static ValidationFinding Finding(
+            string ruleId,
+            string guid,
+            string discriminator,
+            string path = "Assets/Asset.asset",
+            string message = "message",
+            ValidationSeverity severity = ValidationSeverity.Error
+        )
+        {
+            return new ValidationFinding(
+                ruleId,
+                severity,
+                null,
+                guid,
+                path,
+                discriminator,
+                message
+            );
+        }
+
+        /// <summary>
+        /// A finished run whose findings are exactly those given.
+        /// </summary>
+        /// <param name="findings">What the run should report.</param>
+        /// <returns>The completed run.</returns>
+        private static ValidationRun RunOver(params ValidationFinding[] findings)
+        {
+            List<ValidationTarget> targets = new List<ValidationTarget>
+            {
+                new ValidationTarget(FirstGuid, "Assets/Only.asset", typeof(ScriptableObject)),
+            };
+            ValidationRun run = new ValidationRun(
+                new List<IValidationRule> { new ScriptedRule(findings) },
+                targets,
+                Never
+            );
+            while (!run.Step(double.MaxValue)) { }
+
+            return run;
+        }
+
+        private static Object Never(ValidationTarget target)
+        {
+            return null;
+        }
+
         [Test]
         public void ParsingIgnoresBlankLinesCommentsAndDuplicates()
         {
@@ -481,109 +571,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
         }
 
-        /// <summary>
-        /// Reads a rendered report back, which is what makes the assertions about content rather
-        /// than about how Unity happens to indent.
-        /// </summary>
-        /// <param name="json">The rendered document.</param>
-        /// <returns>The parsed document; never <c>null</c>.</returns>
-        private static ValidationReport.Document Read(string json)
-        {
-            ValidationReport.Document document = JsonUtility.FromJson<ValidationReport.Document>(
-                json
-            );
-            Assert.IsTrue(
-                document != null,
-                "the report has to be a document a reader can parse: " + json
-            );
-            return document;
-        }
-
-        private static string[] Ids(List<IValidationRule> rules)
-        {
-            List<string> ids = new List<string>();
-            foreach (
-                WallstopStudios.UnityHelpers.Editor.Validation.Continuous.IValidationRule rulesElement in rules
-            )
-            {
-                ids.Add(rulesElement.RuleId);
-            }
-
-            return ids.ToArray();
-        }
-
-        private static string[] Names(List<IValidationRule> rules)
-        {
-            List<string> names = new List<string>();
-            foreach (
-                WallstopStudios.UnityHelpers.Editor.Validation.Continuous.IValidationRule rulesElement in rules
-            )
-            {
-                names.Add(rulesElement.GetType().FullName);
-            }
-
-            return names.ToArray();
-        }
-
-        private static ValidationFinding Finding(
-            string ruleId,
-            string guid,
-            string discriminator,
-            string path = "Assets/Asset.asset",
-            string message = "message",
-            ValidationSeverity severity = ValidationSeverity.Error
-        )
-        {
-            return new ValidationFinding(
-                ruleId,
-                severity,
-                null,
-                guid,
-                path,
-                discriminator,
-                message
-            );
-        }
-
-        /// <summary>
-        /// A finished run whose findings are exactly those given.
-        /// </summary>
-        /// <param name="findings">What the run should report.</param>
-        /// <returns>The completed run.</returns>
-        private static ValidationRun RunOver(params ValidationFinding[] findings)
-        {
-            List<ValidationTarget> targets = new List<ValidationTarget>
-            {
-                new ValidationTarget(FirstGuid, "Assets/Only.asset", typeof(ScriptableObject)),
-            };
-            ValidationRun run = new ValidationRun(
-                new List<IValidationRule> { new ScriptedRule(findings) },
-                targets,
-                Never
-            );
-            while (!run.Step(double.MaxValue)) { }
-
-            return run;
-        }
-
-        private static Object Never(ValidationTarget target)
-        {
-            return null;
-        }
-
         /// <summary>A rule that reports whatever the fixture handed it, once.</summary>
         private sealed class ScriptedRule : IValidationRule
         {
+            public string RuleId => "Tests.Scripted";
+
+            public string DisplayName => "Scripted";
+
             private readonly ValidationFinding[] _findings;
 
             internal ScriptedRule(ValidationFinding[] findings)
             {
                 _findings = findings;
             }
-
-            public string RuleId => "Tests.Scripted";
-
-            public string DisplayName => "Scripted";
 
             public bool AppliesTo(in ValidationTarget target)
             {

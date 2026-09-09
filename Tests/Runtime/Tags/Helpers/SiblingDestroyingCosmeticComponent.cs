@@ -21,11 +21,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags.Helpers
 
         public static int RemoveCount { get; private set; }
 
+        public override bool RequiresInstance => requireInstance;
+
         public bool requireInstance;
         public bool destroysSibling;
         public bool destroysDuringRemoval;
-
-        public override bool RequiresInstance => requireInstance;
 
         public static void ResetForTests()
         {

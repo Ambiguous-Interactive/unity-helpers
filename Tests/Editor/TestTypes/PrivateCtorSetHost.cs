@@ -15,6 +15,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
     [Serializable]
     internal sealed class PrivateCtorElement
     {
+        // ReSharper disable once UnusedMember.Local
+        public int Magnitude => magnitude;
+
         [SerializeField]
         private int magnitude;
 
@@ -22,8 +25,5 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
         {
             magnitude = 5;
         }
-
-        // ReSharper disable once UnusedMember.Local
-        public int Magnitude => magnitude;
     }
 }

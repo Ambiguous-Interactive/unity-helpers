@@ -30,6 +30,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     {
         private const string ResourcesRoot = "Assets/Resources";
 
+        private static Type[] AllTestSingletonTypes =>
+            new List<Type>(AllTestSingletonTypesWithExclusion)
+                .Concat(TestSingletonTypesWithoutExclusion)
+                .ToArray();
+
         private static readonly Type[] AllTestSingletonTypesWithExclusion = new[]
         {
             typeof(TestSingleton),
@@ -59,6 +64,203 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         private Func<Type, bool> _previousTypeFilter;
         private bool _previousEditorUiSuppress;
         private readonly List<string> _createdAssets = new();
+
+        private static IEnumerable<ProtectedPathTestCase> ProtectedPathTestCases()
+        {
+            yield return new ProtectedPathTestCase(
+                "Assets/Resources/Wallstop Studios",
+                true,
+                false,
+                "Main Wallstop Studios folder should be protected"
+            );
+            yield return new ProtectedPathTestCase(
+                "Assets/Resources/Wallstop Studios/Unity Helpers",
+                true,
+                false,
+                "Main Unity Helpers folder should be protected"
+            );
+            yield return new ProtectedPathTestCase(
+                "Assets/Resources/Wallstop Studios/Unity Helpers/SomeAsset.asset",
+                true,
+                false,
+                "Assets inside Unity Helpers should be protected"
+            );
+            yield return new ProtectedPathTestCase(
+                "Assets/Resources/Wallstop Studios 1",
+                false,
+                true,
+                "Wallstop Studios 1 is a duplicate and should NOT be protected"
+            );
+            yield return new ProtectedPathTestCase(
+                "Assets/Resources/Wallstop Studios 2",
+                false,
+                true,
+                "Wallstop Studios 2 is a duplicate and should NOT be protected"
+            );
+            yield return new ProtectedPathTestCase(
+                "Assets/Resources/Wallstop Studios/Unity Helpers 1",
+                false,
+                true,
+                "Unity Helpers 1 is a duplicate and should NOT be protected"
+            );
+            yield return new ProtectedPathTestCase(
+                "Assets/Resources/Wallstop Studios/Unity Helpers 15",
+                false,
+                true,
+                "Unity Helpers 15 is a duplicate and should NOT be protected"
+            );
+            yield return new ProtectedPathTestCase(
+                "Assets/Resources/Wallstop Studios/Unity Helpers 1/SomeAsset.asset",
+                false,
+                true,
+                "Assets inside duplicate Unity Helpers should NOT be protected"
+            );
+            yield return new ProtectedPathTestCase(
+                "Assets/Resources/Wallstop Studios/Unity Helpers 99/Nested/File.asset",
+                false,
+                true,
+                "Nested assets inside duplicate Unity Helpers should NOT be protected"
+            );
+            yield return new ProtectedPathTestCase(
+                "Assets/Plugins",
+                true,
+                false,
+                "Plugins folder should be protected"
+            );
+            yield return new ProtectedPathTestCase(
+                "Assets/Plugins/SomePlugin/Code.cs",
+                true,
+                false,
+                "Assets inside Plugins should be protected"
+            );
+            yield return new ProtectedPathTestCase(
+                "Assets/TempTestFolder",
+                false,
+                false,
+                "Temp test folders should NOT be protected"
+            );
+            yield return new ProtectedPathTestCase(
+                "Assets/Resources/Tests",
+                false,
+                false,
+                "Test folders in Resources should NOT be protected"
+            );
+            yield return new ProtectedPathTestCase(
+                "",
+                false,
+                false,
+                "Empty path should NOT be protected"
+            );
+            yield return new ProtectedPathTestCase(
+                null,
+                false,
+                false,
+                "Null path should NOT be protected"
+            );
+        }
+
+        /// <summary>
+        /// Data source for duplicate folder detection tests.
+        /// Each entry contains: parentPath, folderBaseName
+        /// </summary>
+        private static IEnumerable<DuplicateFolderTestCase> DuplicateFolderTestCases()
+        {
+            yield return new DuplicateFolderTestCase(
+                "Assets/Resources",
+                "Wallstop Studios",
+                "Duplicate Wallstop Studios folders may be created during test runs"
+            );
+
+            yield return new DuplicateFolderTestCase(
+                "Assets/Resources/Wallstop Studios",
+                "Unity Helpers",
+                "Duplicate Unity Helpers folders may be created during concurrent test execution"
+            );
+        }
+
+        private static string GetExpectedAssetPath(Type type)
+        {
+            if (
+                ReflectionHelpers.TryGetAttributeSafe<ScriptableSingletonPathAttribute>(
+                    type,
+                    out ScriptableSingletonPathAttribute pathAttr,
+                    inherit: false
+                ) && !string.IsNullOrWhiteSpace(pathAttr.resourcesPath)
+            )
+            {
+                return $"{ResourcesRoot}/{pathAttr.resourcesPath}/{type.Name}.asset";
+            }
+
+            return $"{ResourcesRoot}/{type.Name}.asset";
+        }
+
+        private static void DeleteAssetIfExists(string assetPath)
+        {
+            if (string.IsNullOrWhiteSpace(assetPath))
+            {
+                return;
+            }
+
+            Object existing = AssetDatabase.LoadAssetAtPath<Object>(assetPath);
+            if (existing != null || !string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(assetPath)))
+            {
+                AssetDatabase.DeleteAsset(assetPath);
+            }
+        }
+
+        private static void EnsureMetadataFolder()
+        {
+            string metadataFolder = "Assets/Resources/Wallstop Studios/Unity Helpers";
+            // Create the directory on disk first, or Unity raises its "Moving file failed" modal.
+            string projectRoot = Path.GetDirectoryName(Application.dataPath);
+            if (!string.IsNullOrEmpty(projectRoot))
+            {
+                string absoluteDirectory = Path.Combine(projectRoot, metadataFolder);
+                if (!Directory.Exists(absoluteDirectory))
+                {
+                    Directory.CreateDirectory(absoluteDirectory);
+                }
+            }
+
+            string[] parts = metadataFolder.Split('/');
+            string current = parts[0];
+            for (int i = 1; i < parts.Length; i++)
+            {
+                string next = current + "/" + parts[i];
+                if (!AssetDatabase.IsValidFolder(next))
+                {
+                    AssetDatabase.CreateFolder(current, parts[i]);
+                }
+                current = next;
+            }
+        }
+
+        private static void TryDeleteEmptyFolder(string folderPath)
+        {
+            if (string.IsNullOrWhiteSpace(folderPath))
+            {
+                return;
+            }
+
+            if (!AssetDatabase.IsValidFolder(folderPath))
+            {
+                return;
+            }
+
+            string[] subFolders = AssetDatabase.GetSubFolders(folderPath);
+            if (subFolders != null && 0 < subFolders.Length)
+            {
+                return;
+            }
+
+            string[] assets = AssetDatabase.FindAssets(string.Empty, new[] { folderPath });
+            if (assets != null && 0 < assets.Length)
+            {
+                return;
+            }
+
+            AssetDatabase.DeleteAsset(folderPath);
+        }
 
         [OneTimeSetUp]
         public void OneTimeSetUp()
@@ -157,100 +359,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.IsEmpty(
                 hasAttribute,
                 $"The following creator test types should NOT have [ExcludeFromSingletonCreation] attribute as they are used to test creation logic:\n{string.Join("\n", hasAttribute)}"
-            );
-        }
-
-        private static IEnumerable<ProtectedPathTestCase> ProtectedPathTestCases()
-        {
-            yield return new ProtectedPathTestCase(
-                "Assets/Resources/Wallstop Studios",
-                true,
-                false,
-                "Main Wallstop Studios folder should be protected"
-            );
-            yield return new ProtectedPathTestCase(
-                "Assets/Resources/Wallstop Studios/Unity Helpers",
-                true,
-                false,
-                "Main Unity Helpers folder should be protected"
-            );
-            yield return new ProtectedPathTestCase(
-                "Assets/Resources/Wallstop Studios/Unity Helpers/SomeAsset.asset",
-                true,
-                false,
-                "Assets inside Unity Helpers should be protected"
-            );
-            yield return new ProtectedPathTestCase(
-                "Assets/Resources/Wallstop Studios 1",
-                false,
-                true,
-                "Wallstop Studios 1 is a duplicate and should NOT be protected"
-            );
-            yield return new ProtectedPathTestCase(
-                "Assets/Resources/Wallstop Studios 2",
-                false,
-                true,
-                "Wallstop Studios 2 is a duplicate and should NOT be protected"
-            );
-            yield return new ProtectedPathTestCase(
-                "Assets/Resources/Wallstop Studios/Unity Helpers 1",
-                false,
-                true,
-                "Unity Helpers 1 is a duplicate and should NOT be protected"
-            );
-            yield return new ProtectedPathTestCase(
-                "Assets/Resources/Wallstop Studios/Unity Helpers 15",
-                false,
-                true,
-                "Unity Helpers 15 is a duplicate and should NOT be protected"
-            );
-            yield return new ProtectedPathTestCase(
-                "Assets/Resources/Wallstop Studios/Unity Helpers 1/SomeAsset.asset",
-                false,
-                true,
-                "Assets inside duplicate Unity Helpers should NOT be protected"
-            );
-            yield return new ProtectedPathTestCase(
-                "Assets/Resources/Wallstop Studios/Unity Helpers 99/Nested/File.asset",
-                false,
-                true,
-                "Nested assets inside duplicate Unity Helpers should NOT be protected"
-            );
-            yield return new ProtectedPathTestCase(
-                "Assets/Plugins",
-                true,
-                false,
-                "Plugins folder should be protected"
-            );
-            yield return new ProtectedPathTestCase(
-                "Assets/Plugins/SomePlugin/Code.cs",
-                true,
-                false,
-                "Assets inside Plugins should be protected"
-            );
-            yield return new ProtectedPathTestCase(
-                "Assets/TempTestFolder",
-                false,
-                false,
-                "Temp test folders should NOT be protected"
-            );
-            yield return new ProtectedPathTestCase(
-                "Assets/Resources/Tests",
-                false,
-                false,
-                "Test folders in Resources should NOT be protected"
-            );
-            yield return new ProtectedPathTestCase(
-                "",
-                false,
-                false,
-                "Empty path should NOT be protected"
-            );
-            yield return new ProtectedPathTestCase(
-                null,
-                false,
-                false,
-                "Null path should NOT be protected"
             );
         }
 
@@ -608,25 +716,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             );
         }
 
-        /// <summary>
-        /// Data source for duplicate folder detection tests.
-        /// Each entry contains: parentPath, folderBaseName
-        /// </summary>
-        private static IEnumerable<DuplicateFolderTestCase> DuplicateFolderTestCases()
-        {
-            yield return new DuplicateFolderTestCase(
-                "Assets/Resources",
-                "Wallstop Studios",
-                "Duplicate Wallstop Studios folders may be created during test runs"
-            );
-
-            yield return new DuplicateFolderTestCase(
-                "Assets/Resources/Wallstop Studios",
-                "Unity Helpers",
-                "Duplicate Unity Helpers folders may be created during concurrent test execution"
-            );
-        }
-
         [Test]
         public void NoDuplicateFoldersExist(
             [ValueSource(nameof(DuplicateFolderTestCases))] DuplicateFolderTestCase testCase
@@ -705,27 +794,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             );
         }
 
-        private static string GetExpectedAssetPath(Type type)
-        {
-            if (
-                ReflectionHelpers.TryGetAttributeSafe<ScriptableSingletonPathAttribute>(
-                    type,
-                    out ScriptableSingletonPathAttribute pathAttr,
-                    inherit: false
-                ) && !string.IsNullOrWhiteSpace(pathAttr.resourcesPath)
-            )
-            {
-                return $"{ResourcesRoot}/{pathAttr.resourcesPath}/{type.Name}.asset";
-            }
-
-            return $"{ResourcesRoot}/{type.Name}.asset";
-        }
-
-        private static Type[] AllTestSingletonTypes =>
-            new List<Type>(AllTestSingletonTypesWithExclusion)
-                .Concat(TestSingletonTypesWithoutExclusion)
-                .ToArray();
-
         private IEnumerator CleanupExistingTestSingletonAssets()
         {
             foreach (Type type in AllTestSingletonTypes)
@@ -740,20 +808,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
             yield return null;
-        }
-
-        private static void DeleteAssetIfExists(string assetPath)
-        {
-            if (string.IsNullOrWhiteSpace(assetPath))
-            {
-                return;
-            }
-
-            Object existing = AssetDatabase.LoadAssetAtPath<Object>(assetPath);
-            if (existing != null || !string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(assetPath)))
-            {
-                AssetDatabase.DeleteAsset(assetPath);
-            }
         }
 
         private IEnumerator CleanupTestFolders()
@@ -787,60 +841,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
             TryDeleteEmptyFolder(ResourcesRoot);
             yield return null;
-        }
-
-        private static void EnsureMetadataFolder()
-        {
-            string metadataFolder = "Assets/Resources/Wallstop Studios/Unity Helpers";
-            // Create the directory on disk first, or Unity raises its "Moving file failed" modal.
-            string projectRoot = Path.GetDirectoryName(Application.dataPath);
-            if (!string.IsNullOrEmpty(projectRoot))
-            {
-                string absoluteDirectory = Path.Combine(projectRoot, metadataFolder);
-                if (!Directory.Exists(absoluteDirectory))
-                {
-                    Directory.CreateDirectory(absoluteDirectory);
-                }
-            }
-
-            string[] parts = metadataFolder.Split('/');
-            string current = parts[0];
-            for (int i = 1; i < parts.Length; i++)
-            {
-                string next = current + "/" + parts[i];
-                if (!AssetDatabase.IsValidFolder(next))
-                {
-                    AssetDatabase.CreateFolder(current, parts[i]);
-                }
-                current = next;
-            }
-        }
-
-        private static void TryDeleteEmptyFolder(string folderPath)
-        {
-            if (string.IsNullOrWhiteSpace(folderPath))
-            {
-                return;
-            }
-
-            if (!AssetDatabase.IsValidFolder(folderPath))
-            {
-                return;
-            }
-
-            string[] subFolders = AssetDatabase.GetSubFolders(folderPath);
-            if (subFolders != null && 0 < subFolders.Length)
-            {
-                return;
-            }
-
-            string[] assets = AssetDatabase.FindAssets(string.Empty, new[] { folderPath });
-            if (assets != null && 0 < assets.Length)
-            {
-                return;
-            }
-
-            AssetDatabase.DeleteAsset(folderPath);
         }
 
         public sealed class ProtectedPathTestCase

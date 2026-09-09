@@ -10,12 +10,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags.Helpers
     {
         public static int RemoveInvocationCount { get; private set; }
 
+        public int AppliedCount => _appliedTargets.Count;
+
         public static void ResetForTests()
         {
             RemoveInvocationCount = 0;
         }
-
-        public int AppliedCount => _appliedTargets.Count;
 
         public override void OnApplyEffect(GameObject target)
         {

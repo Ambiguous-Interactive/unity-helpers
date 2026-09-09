@@ -38,32 +38,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     {
         private const int Iterations = 400;
 
-        [Test]
-        public void EveryRandomRepeatedValueEncodesAsProtobufNetDoes()
-        {
-            RunCorpus(1, seeded => Repeated(seeded), byteIdentical: false);
-        }
-
-        [Test]
-        public void EveryRandomMapValueEncodesAsProtobufNetDoes()
-        {
-            /*
-             * protobuf-net 2 omits empty string map keys; version 3 and this writer emit them. Compare
-             * decoded values across both formats.
-             */
-#if PROTOBUF_NET_ORACLE_V2
-            RunCorpus(2, seeded => Map(seeded), byteIdentical: false);
-#else
-            RunCorpus(2, seeded => Map(seeded), byteIdentical: true);
-#endif
-        }
-
-        [Test]
-        public void EveryRandomPolymorphicValueEncodesAsProtobufNetDoes()
-        {
-            RunCorpus(3, seeded => Polymorphic(seeded), byteIdentical: true);
-        }
-
         /// <summary>
         /// Drives one corpus and asserts every property that holds for it.
         /// </summary>
@@ -334,6 +308,32 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
 
             return builder.ToString();
+        }
+
+        [Test]
+        public void EveryRandomRepeatedValueEncodesAsProtobufNetDoes()
+        {
+            RunCorpus(1, seeded => Repeated(seeded), byteIdentical: false);
+        }
+
+        [Test]
+        public void EveryRandomMapValueEncodesAsProtobufNetDoes()
+        {
+            /*
+             * protobuf-net 2 omits empty string map keys; version 3 and this writer emit them. Compare
+             * decoded values across both formats.
+             */
+#if PROTOBUF_NET_ORACLE_V2
+            RunCorpus(2, seeded => Map(seeded), byteIdentical: false);
+#else
+            RunCorpus(2, seeded => Map(seeded), byteIdentical: true);
+#endif
+        }
+
+        [Test]
+        public void EveryRandomPolymorphicValueEncodesAsProtobufNetDoes()
+        {
+            RunCorpus(3, seeded => Polymorphic(seeded), byteIdentical: true);
         }
     }
 }

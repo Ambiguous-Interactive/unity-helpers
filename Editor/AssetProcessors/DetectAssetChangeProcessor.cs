@@ -18,33 +18,14 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
 
     internal sealed class DetectAssetChangeProcessor : AssetPostprocessor
     {
+        internal const int MaxPendingChangeSetsPerCycle = 32;
+        internal const int MaxConsecutiveChangeSetsWithinWindow = 128;
+
         private const string TestAssetFolderMarker = "__DetectAssetChangedTests__";
         private const string SupportedSignatureDescription =
             "Supported signatures: () with no parameters; (AssetChangeContext context); or (TAsset[] createdAssets, string[] deletedAssetPaths) where TAsset derives from UnityEngine.Object.";
         private const string InfiniteLoopWarning =
             "[DetectAssetChanged] Detected a potentially infinite asset change loop triggered by DetectAssetChanged handlers. Additional change batches will be skipped to prevent recursion until the editor domain reloads. Please fix the offending callbacks.";
-
-        internal const int MaxPendingChangeSetsPerCycle = 32;
-        internal const int MaxConsecutiveChangeSetsWithinWindow = 128;
-
-        private static readonly Func<double> DefaultTimeProvider = () =>
-            EditorApplication.timeSinceStartup;
-
-        private static readonly Dictionary<Type, AssetWatcher> WatchersByAssetType = new();
-        private static readonly Queue<PendingAssetChangeSet> PendingAssetChanges = new();
-        private static bool _initialized;
-        private static bool _includeTestAssets;
-        private static List<string> _testAssetFolderAllowlist;
-        private static bool _processingAssetChanges;
-        private static bool _loopProtectionActive;
-        private static int _consecutiveChangeBatches;
-        private static double _lastChangeProcessTimestamp;
-        private static Func<double> _timeProvider = DefaultTimeProvider;
-        private static double? _loopWindowSecondsOverride;
-        private static bool _diagnosticsEnabled;
-        private static bool? _enabledOverride;
-
-        private static readonly Action DrainPendingChangesAction = ProcessPendingAssetChangesCore;
 
         internal static Func<double> TimeProvider
         {
@@ -114,6 +95,25 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
         /// <see cref="AssetChangeDetectionUtility.Enabled"/>.
         /// </remarks>
         internal static bool IsEnabled => _enabledOverride ?? !Application.isBatchMode;
+
+        private static readonly Func<double> DefaultTimeProvider = () =>
+            EditorApplication.timeSinceStartup;
+
+        private static readonly Dictionary<Type, AssetWatcher> WatchersByAssetType = new();
+        private static readonly Queue<PendingAssetChangeSet> PendingAssetChanges = new();
+        private static bool _initialized;
+        private static bool _includeTestAssets;
+        private static List<string> _testAssetFolderAllowlist;
+        private static bool _processingAssetChanges;
+        private static bool _loopProtectionActive;
+        private static int _consecutiveChangeBatches;
+        private static double _lastChangeProcessTimestamp;
+        private static Func<double> _timeProvider = DefaultTimeProvider;
+        private static double? _loopWindowSecondsOverride;
+        private static bool _diagnosticsEnabled;
+        private static bool? _enabledOverride;
+
+        private static readonly Action DrainPendingChangesAction = ProcessPendingAssetChangesCore;
 
         static DetectAssetChangeProcessor()
         {
@@ -1567,6 +1567,13 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
 
         internal sealed class AssetWatcher
         {
+            internal Type AssetType { get; }
+            internal bool IncludeAssignableTypes { get; private set; }
+            internal bool SearchPrefabs { get; private set; }
+            internal bool SearchSceneObjects { get; private set; }
+            internal HashSet<string> KnownAssetPaths { get; }
+            internal List<MethodSubscription> Subscriptions { get; }
+
             internal AssetWatcher(Type assetType, bool includeAssignableTypes)
             {
                 AssetType = assetType;
@@ -1574,13 +1581,6 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 KnownAssetPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 Subscriptions = new List<MethodSubscription>();
             }
-
-            internal Type AssetType { get; }
-            internal bool IncludeAssignableTypes { get; private set; }
-            internal bool SearchPrefabs { get; private set; }
-            internal bool SearchSceneObjects { get; private set; }
-            internal HashSet<string> KnownAssetPaths { get; }
-            internal List<MethodSubscription> Subscriptions { get; }
 
             internal void EnableAssignableMatching()
             {
@@ -1600,6 +1600,11 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
 
         internal sealed class PendingAssetChangeSet
         {
+            internal IReadOnlyList<string> Imported { get; }
+            internal IReadOnlyList<string> Deleted { get; }
+            internal IReadOnlyList<string> Moved { get; }
+            internal IReadOnlyList<string> MovedFrom { get; }
+
             internal PendingAssetChangeSet(
                 IReadOnlyList<string> imported,
                 IReadOnlyList<string> deleted,
@@ -1612,11 +1617,6 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 Moved = moved ?? Array.Empty<string>();
                 MovedFrom = movedFrom ?? Array.Empty<string>();
             }
-
-            internal IReadOnlyList<string> Imported { get; }
-            internal IReadOnlyList<string> Deleted { get; }
-            internal IReadOnlyList<string> Moved { get; }
-            internal IReadOnlyList<string> MovedFrom { get; }
         }
     }
 }

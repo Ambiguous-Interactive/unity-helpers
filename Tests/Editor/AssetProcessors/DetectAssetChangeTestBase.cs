@@ -25,11 +25,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         protected const string TestRoot = "Assets/__DetectAssetChangedTests__";
 
         /// <summary>
-        /// Default path for the payload test asset.
-        /// </summary>
-        protected virtual string DefaultPayloadAssetPath => TestRoot + "/Payload.asset";
-
-        /// <summary>
         /// Default path for the alternate payload test asset.
         /// </summary>
         protected const string DefaultAlternatePayloadAssetPath =
@@ -45,6 +40,11 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         /// <see cref="DetectAssetChangeProcessor.ResetForTesting()"/> (which clears it).
         /// </summary>
         protected static readonly string[] FixtureAllowlist = { TestRoot + "/" };
+
+        /// <summary>
+        /// Default path for the payload test asset.
+        /// </summary>
+        protected virtual string DefaultPayloadAssetPath => TestRoot + "/Payload.asset";
 
         /// <summary>
         /// Deletes the test root folder (and anything under it) through the AssetDatabase.
@@ -87,35 +87,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         }
 
         /// <summary>
-        /// Clears all test handler state to ensure clean test isolation.
-        /// Delegates to the centralized <see cref="AssetPostprocessorTestHandlers.FlushAndClearAll"/>
-        /// helper so every <c>[DetectAssetChanged]</c> handler in the test assemblies is
-        /// cleared — not just the ones this fixture personally uses. The helper
-        /// internally flushes any pending <see cref="AssetPostprocessorDeferral"/>
-        /// drains first so a late-arriving drain cannot re-populate the statics we
-        /// just cleared.
-        ///
-        /// <para>Relationship to the teardown-flush contract: the contract test
-        /// <c>TestTeardownsThatClearHandlerStateFlushDeferralsFirst</c> accepts
-        /// three call sites as flush-equivalents — a direct
-        /// <c>AssetPostprocessorDeferral.FlushForTesting()</c> call,
-        /// <see cref="AssetPostprocessorTestHandlers.FlushAndClearAll"/>, or
-        /// <see cref="AssetPostprocessorTestHandlers.AssertCleanAndClearAll"/>.
-        /// Because this method's body IS a call to <c>FlushAndClearAll</c>,
-        /// calling <c>ClearTestState()</c> (or <c>base.ClearTestState()</c>)
-        /// from a derived fixture also satisfies the contract transitively;
-        /// the scanner additionally whitelists the literal token
-        /// <c>ClearTestState(</c> as flush-equivalent for that reason. The
-        /// transitive delegation is guarded by
-        /// <c>CentralizedClearHelpersActuallyFlush</c>, which fails loudly if
-        /// this body ever stops routing through a terminal flush root.</para>
-        /// </summary>
-        protected virtual void ClearTestState()
-        {
-            AssetPostprocessorTestHandlers.FlushAndClearAll();
-        }
-
-        /// <summary>
         /// Resets the processor with a clean state and ensures the test folder is properly registered.
         /// This method should be called when a test needs to reinitialize the processor after the
         /// standard SetUp has already run. It ensures the test folder exists before enabling test
@@ -144,6 +115,82 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             {
                 AssetDatabase.DeleteAsset(assetPath);
             }
+        }
+
+        /// <summary>
+        /// Creates a subfolder within the test root folder.
+        /// </summary>
+        /// <param name="subFolderName">The name of the subfolder to create.</param>
+        /// <returns>The full path to the created subfolder.</returns>
+        protected static string CreateTestSubFolder(string subFolderName)
+        {
+            string subFolderPath = TestRoot + "/" + subFolderName;
+            // Pausing the batch is what makes the subfolder immediately valid.
+            AssetDatabaseBatchHelper.EnsureAssetFolder(subFolderPath);
+            return subFolderPath;
+        }
+
+        /// <summary>
+        /// Verifies that all tracked test assets have been cleaned up properly.
+        /// Useful for cleanup verification tests.
+        /// </summary>
+        /// <returns>True if all test assets have been cleaned up; otherwise, false.</returns>
+        protected static bool VerifyTestFolderCleanedUp()
+        {
+            if (AssetDatabase.IsValidFolder(TestRoot))
+            {
+                return false;
+            }
+
+            string[] allFolders = AssetDatabase.GetSubFolders("Assets");
+            if (allFolders != null)
+            {
+                foreach (string folder in allFolders)
+                {
+                    string folderName = Path.GetFileName(folder);
+                    if (
+                        folderName != null
+                        && folderName.StartsWith(
+                            "__DetectAssetChangedTests__",
+                            StringComparison.Ordinal
+                        )
+                    )
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Clears all test handler state to ensure clean test isolation.
+        /// Delegates to the centralized <see cref="AssetPostprocessorTestHandlers.FlushAndClearAll"/>
+        /// helper so every <c>[DetectAssetChanged]</c> handler in the test assemblies is
+        /// cleared — not just the ones this fixture personally uses. The helper
+        /// internally flushes any pending <see cref="AssetPostprocessorDeferral"/>
+        /// drains first so a late-arriving drain cannot re-populate the statics we
+        /// just cleared.
+        ///
+        /// <para>Relationship to the teardown-flush contract: the contract test
+        /// <c>TestTeardownsThatClearHandlerStateFlushDeferralsFirst</c> accepts
+        /// three call sites as flush-equivalents — a direct
+        /// <c>AssetPostprocessorDeferral.FlushForTesting()</c> call,
+        /// <see cref="AssetPostprocessorTestHandlers.FlushAndClearAll"/>, or
+        /// <see cref="AssetPostprocessorTestHandlers.AssertCleanAndClearAll"/>.
+        /// Because this method's body IS a call to <c>FlushAndClearAll</c>,
+        /// calling <c>ClearTestState()</c> (or <c>base.ClearTestState()</c>)
+        /// from a derived fixture also satisfies the contract transitively;
+        /// the scanner additionally whitelists the literal token
+        /// <c>ClearTestState(</c> as flush-equivalent for that reason. The
+        /// transitive delegation is guarded by
+        /// <c>CentralizedClearHelpersActuallyFlush</c>, which fails loudly if
+        /// this body ever stops routing through a terminal flush root.</para>
+        /// </summary>
+        protected virtual void ClearTestState()
+        {
+            AssetPostprocessorTestHandlers.FlushAndClearAll();
         }
 
         /// <summary>
@@ -258,53 +305,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                         + "in ExecuteWithImmediateImport regressed under -batchmode."
                 );
             }
-        }
-
-        /// <summary>
-        /// Creates a subfolder within the test root folder.
-        /// </summary>
-        /// <param name="subFolderName">The name of the subfolder to create.</param>
-        /// <returns>The full path to the created subfolder.</returns>
-        protected static string CreateTestSubFolder(string subFolderName)
-        {
-            string subFolderPath = TestRoot + "/" + subFolderName;
-            // Pausing the batch is what makes the subfolder immediately valid.
-            AssetDatabaseBatchHelper.EnsureAssetFolder(subFolderPath);
-            return subFolderPath;
-        }
-
-        /// <summary>
-        /// Verifies that all tracked test assets have been cleaned up properly.
-        /// Useful for cleanup verification tests.
-        /// </summary>
-        /// <returns>True if all test assets have been cleaned up; otherwise, false.</returns>
-        protected static bool VerifyTestFolderCleanedUp()
-        {
-            if (AssetDatabase.IsValidFolder(TestRoot))
-            {
-                return false;
-            }
-
-            string[] allFolders = AssetDatabase.GetSubFolders("Assets");
-            if (allFolders != null)
-            {
-                foreach (string folder in allFolders)
-                {
-                    string folderName = Path.GetFileName(folder);
-                    if (
-                        folderName != null
-                        && folderName.StartsWith(
-                            "__DetectAssetChangedTests__",
-                            StringComparison.Ordinal
-                        )
-                    )
-                    {
-                        return false;
-                    }
-                }
-            }
-
-            return true;
         }
     }
 }

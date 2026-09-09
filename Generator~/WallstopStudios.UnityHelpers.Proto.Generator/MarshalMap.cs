@@ -177,6 +177,76 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
         }
 
+        private static bool Formats(INamedTypeSymbol formatter, INamedTypeSymbol real)
+        {
+            if (formatter == null || real == null)
+            {
+                return false;
+            }
+
+            foreach (INamedTypeSymbol candidate in formatter.AllInterfaces)
+            {
+                if (
+                    candidate.Name != FormatterInterface
+                    || candidate.Arity != 1
+                    || candidate.ContainingNamespace?.ToDisplayString() != FormatterNamespace
+                )
+                {
+                    continue;
+                }
+
+                if (SymbolEqualityComparer.Default.Equals(candidate.TypeArguments[0], real))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsContract(INamedTypeSymbol type)
+        {
+            foreach (AttributeData attribute in type.GetAttributes())
+            {
+                if (attribute.AttributeClass?.ToDisplayString() == ContractAttribute)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static IEnumerable<Pair> Pairs(IAssemblySymbol assembly)
+        {
+            foreach (AttributeData attribute in assembly.GetAttributes())
+            {
+                if (
+                    attribute.AttributeClass == null
+                    || attribute.AttributeClass.ToDisplayString() != MarshalAttribute
+                    || attribute.ConstructorArguments.Length < 2
+                )
+                {
+                    continue;
+                }
+
+                if (
+                    !(attribute.ConstructorArguments[0].Value is INamedTypeSymbol real)
+                    || !(attribute.ConstructorArguments[1].Value is INamedTypeSymbol formatter)
+                )
+                {
+                    continue;
+                }
+
+                // Normalize unbound typeof arguments to definitions so they match source closures.
+                yield return new Pair(
+                    real.OriginalDefinition,
+                    formatter.OriginalDefinition,
+                    attribute
+                );
+            }
+        }
+
         /// <summary>
         /// Returns one registration expression per marshal this compilation can register.
         /// </summary>
@@ -271,78 +341,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return registrations;
         }
 
-        private static bool Formats(INamedTypeSymbol formatter, INamedTypeSymbol real)
-        {
-            if (formatter == null || real == null)
-            {
-                return false;
-            }
-
-            foreach (INamedTypeSymbol candidate in formatter.AllInterfaces)
-            {
-                if (
-                    candidate.Name != FormatterInterface
-                    || candidate.Arity != 1
-                    || candidate.ContainingNamespace?.ToDisplayString() != FormatterNamespace
-                )
-                {
-                    continue;
-                }
-
-                if (SymbolEqualityComparer.Default.Equals(candidate.TypeArguments[0], real))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool IsContract(INamedTypeSymbol type)
-        {
-            foreach (AttributeData attribute in type.GetAttributes())
-            {
-                if (attribute.AttributeClass?.ToDisplayString() == ContractAttribute)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static IEnumerable<Pair> Pairs(IAssemblySymbol assembly)
-        {
-            foreach (AttributeData attribute in assembly.GetAttributes())
-            {
-                if (
-                    attribute.AttributeClass == null
-                    || attribute.AttributeClass.ToDisplayString() != MarshalAttribute
-                    || attribute.ConstructorArguments.Length < 2
-                )
-                {
-                    continue;
-                }
-
-                if (
-                    !(attribute.ConstructorArguments[0].Value is INamedTypeSymbol real)
-                    || !(attribute.ConstructorArguments[1].Value is INamedTypeSymbol formatter)
-                )
-                {
-                    continue;
-                }
-
-                // Normalize unbound typeof arguments to definitions so they match source closures.
-                yield return new Pair(
-                    real.OriginalDefinition,
-                    formatter.OriginalDefinition,
-                    attribute
-                );
-            }
-        }
-
         private readonly struct Pair
         {
+            internal INamedTypeSymbol Real { get; }
+
+            internal INamedTypeSymbol Formatter { get; }
+
+            internal AttributeData Attribute { get; }
+
             internal Pair(
                 INamedTypeSymbol real,
                 INamedTypeSymbol formatter,
@@ -353,12 +359,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 Formatter = formatter;
                 Attribute = attribute;
             }
-
-            internal INamedTypeSymbol Real { get; }
-
-            internal INamedTypeSymbol Formatter { get; }
-
-            internal AttributeData Attribute { get; }
         }
     }
 }

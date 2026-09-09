@@ -22,6 +22,38 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
     [NUnit.Framework.Category("Integration")]
     public sealed class WValueDropDownDrawerTests : CommonTestBase
     {
+        private static IEnumerable<TestCaseData> FormatOptionCachedNeverReturnsEmptyStringData()
+        {
+            yield return new TestCaseData(null).SetName("Option.Null");
+            yield return new TestCaseData(new EmptyToStringHelper()).SetName(
+                "Option.EmptyToString"
+            );
+            yield return new TestCaseData(new NullToStringHelper()).SetName("Option.NullToString");
+            yield return new TestCaseData(42).SetName("Option.Integer");
+            yield return new TestCaseData("hello").SetName("Option.String");
+        }
+
+        private static void InvokeApplyOption(SerializedProperty property, object value)
+        {
+            WValueDropDownDrawer.ApplyOption(property, value);
+        }
+
+        private static void AssignAttribute(PropertyDrawer drawer, PropertyAttribute attribute)
+        {
+            PropertyDrawerTestHelper.AssignAttribute(drawer, attribute);
+        }
+
+        private static void InvokeApplySelection(BaseField<string> selector, int optionIndex)
+        {
+            WDropDownSelectorBase<string> dropDownSelector =
+                selector as WDropDownSelectorBase<string>;
+            Assert.IsTrue(
+                dropDownSelector != null,
+                $"Expected selector to derive from WDropDownSelectorBase<string>, but was {selector?.GetType().FullName ?? "null"}."
+            );
+            dropDownSelector.ApplySelection(optionIndex);
+        }
+
         [Test]
         public void ApplyOptionUpdatesFloatSerializedProperty()
         {
@@ -688,38 +720,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
             Assert.That(rawIndex, Is.EqualTo(-1));
             Assert.That(Mathf.Max(0, rawIndex), Is.EqualTo(0));
-        }
-
-        private static IEnumerable<TestCaseData> FormatOptionCachedNeverReturnsEmptyStringData()
-        {
-            yield return new TestCaseData(null).SetName("Option.Null");
-            yield return new TestCaseData(new EmptyToStringHelper()).SetName(
-                "Option.EmptyToString"
-            );
-            yield return new TestCaseData(new NullToStringHelper()).SetName("Option.NullToString");
-            yield return new TestCaseData(42).SetName("Option.Integer");
-            yield return new TestCaseData("hello").SetName("Option.String");
-        }
-
-        private static void InvokeApplyOption(SerializedProperty property, object value)
-        {
-            WValueDropDownDrawer.ApplyOption(property, value);
-        }
-
-        private static void AssignAttribute(PropertyDrawer drawer, PropertyAttribute attribute)
-        {
-            PropertyDrawerTestHelper.AssignAttribute(drawer, attribute);
-        }
-
-        private static void InvokeApplySelection(BaseField<string> selector, int optionIndex)
-        {
-            WDropDownSelectorBase<string> dropDownSelector =
-                selector as WDropDownSelectorBase<string>;
-            Assert.IsTrue(
-                dropDownSelector != null,
-                $"Expected selector to derive from WDropDownSelectorBase<string>, but was {selector?.GetType().FullName ?? "null"}."
-            );
-            dropDownSelector.ApplySelection(optionIndex);
         }
 
         private sealed class EmptyToStringHelper

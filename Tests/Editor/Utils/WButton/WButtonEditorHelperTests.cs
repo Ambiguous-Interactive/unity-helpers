@@ -24,6 +24,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
     [NUnit.Framework.Category("Integration")]
     public sealed class WButtonEditorHelperTests : BatchedEditorTestBase
     {
+        private static void ClearWButtonCaches()
+        {
+            WButtonMetadataCache.ClearCache();
+        }
+
+        private static IEnumerator WaitUntil(Func<bool> condition, float timeoutSeconds)
+        {
+            float endTime = Time.realtimeSinceStartup + timeoutSeconds;
+            while (!condition())
+            {
+                if (endTime < Time.realtimeSinceStartup)
+                {
+                    Assert.Fail("Timed out while waiting for condition.");
+                }
+                yield return null;
+            }
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -36,11 +54,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
         {
             ClearWButtonCaches();
             base.TearDown();
-        }
-
-        private static void ClearWButtonCaches()
-        {
-            WButtonMetadataCache.ClearCache();
         }
 
         [Test]
@@ -680,19 +693,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             Assert.That(multiParamMethod.Parameters[0].ParameterType, Is.EqualTo(typeof(string)));
             Assert.That(multiParamMethod.Parameters[1].ParameterType, Is.EqualTo(typeof(int)));
             Assert.That(multiParamMethod.Parameters[2].ParameterType, Is.EqualTo(typeof(bool)));
-        }
-
-        private static IEnumerator WaitUntil(Func<bool> condition, float timeoutSeconds)
-        {
-            float endTime = Time.realtimeSinceStartup + timeoutSeconds;
-            while (!condition())
-            {
-                if (endTime < Time.realtimeSinceStartup)
-                {
-                    Assert.Fail("Timed out while waiting for condition.");
-                }
-                yield return null;
-            }
         }
 
         [UnityTest]

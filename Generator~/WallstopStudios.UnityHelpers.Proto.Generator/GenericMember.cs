@@ -18,28 +18,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     /// </remarks>
     internal sealed class GenericMember : Member
     {
-        private readonly string _parameter;
-        private readonly bool _required;
-
-        private GenericMember(string name, int tag, string parameter, bool required)
-            : base(name, tag)
-        {
-            _parameter = parameter;
-            _required = required;
-        }
-
-        internal static GenericMember TryCreate(
-            string name,
-            int tag,
-            ITypeSymbol type,
-            bool isRequired
-        )
-        {
-            return type is ITypeParameterSymbol parameter
-                ? new GenericMember(name, tag, parameter.Name, isRequired)
-                : null;
-        }
-
         /// <summary>
         /// The literal passed to <c>WProtoGeneric&lt;T&gt;</c> for this member's IsRequired.
         /// </summary>
@@ -93,6 +71,28 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     ? none
                     : "(" + SeedGuard + " ? " + Destination + " : " + none + ")";
             }
+        }
+
+        private readonly string _parameter;
+        private readonly bool _required;
+
+        private GenericMember(string name, int tag, string parameter, bool required)
+            : base(name, tag)
+        {
+            _parameter = parameter;
+            _required = required;
+        }
+
+        internal static GenericMember TryCreate(
+            string name,
+            int tag,
+            ITypeSymbol type,
+            bool isRequired
+        )
+        {
+            return type is ITypeParameterSymbol parameter
+                ? new GenericMember(name, tag, parameter.Name, isRequired)
+                : null;
         }
 
         /// <inheritdoc />

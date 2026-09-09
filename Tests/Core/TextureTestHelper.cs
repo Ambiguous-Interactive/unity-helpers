@@ -45,13 +45,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     /// </example>
     public sealed class TextureTestHelper : IDisposable
     {
-        private readonly List<Object> _trackedObjects;
-        private bool _disposed;
-
         /// <summary>
         /// Gets the number of objects currently being tracked by this helper.
         /// </summary>
         public int TrackedCount => _trackedObjects.Count;
+
+        private readonly List<Object> _trackedObjects;
+        private bool _disposed;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="TextureTestHelper"/> class.

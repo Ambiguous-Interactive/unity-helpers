@@ -16,16 +16,62 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
     /// <typeparam name="TValue">The type of the field value (string, int, etc.).</typeparam>
     public abstract class WDropDownPopupSelectorBase<TValue> : BaseField<TValue>
     {
+        /// <summary>
+        /// Gets the total number of options available.
+        /// </summary>
+        protected abstract int OptionCount { get; }
+
         private SerializedObject _serializedObject;
         private string _propertyPath = string.Empty;
         private GUIContent _labelContent = GUIContent.none;
         private readonly GUIContent _buttonContent = new();
         private int _pageSize;
 
+        protected WDropDownPopupSelectorBase()
+            : base(string.Empty, CreateInputElement(out IMGUIContainer container))
+        {
+            AddToClassList("unity-base-field");
+            AddToClassList("unity-base-field__aligned");
+            labelElement.AddToClassList("unity-base-field__label");
+            labelElement.AddToClassList("unity-label");
+
+            _pageSize = Mathf.Max(1, UnityHelpersSettings.GetStringInListPageLimit());
+
+            container.style.flexGrow = 1f;
+            container.style.marginLeft = 0f;
+            container.style.paddingLeft = 0f;
+            container.onGUIHandler = OnGUIHandler;
+        }
+
+        private static VisualElement CreateInputElement(out IMGUIContainer container)
+        {
+            container = new IMGUIContainer();
+            return container;
+        }
+
         /// <summary>
-        /// Gets the total number of options available.
+        /// Binds this selector to a serialized property.
         /// </summary>
-        protected abstract int OptionCount { get; }
+        /// <param name="property">The property to bind.</param>
+        /// <param name="labelText">The label text to display.</param>
+        public void BindProperty(SerializedProperty property, string labelText)
+        {
+            _serializedObject = property?.serializedObject;
+            _propertyPath = property?.propertyPath ?? string.Empty;
+            string resolvedLabel =
+                labelText ?? property?.displayName ?? property?.name ?? string.Empty;
+            label = resolvedLabel;
+            _labelContent = new GUIContent(resolvedLabel);
+        }
+
+        /// <summary>
+        /// Unbinds this selector from any property.
+        /// </summary>
+        public void UnbindProperty()
+        {
+            _serializedObject = null;
+            _propertyPath = string.Empty;
+        }
 
         /// <summary>
         /// Gets the display value to show on the popup button for the current property state.
@@ -52,52 +98,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Base
             SerializedProperty property,
             int pageSize
         );
-
-        private static VisualElement CreateInputElement(out IMGUIContainer container)
-        {
-            container = new IMGUIContainer();
-            return container;
-        }
-
-        protected WDropDownPopupSelectorBase()
-            : base(string.Empty, CreateInputElement(out IMGUIContainer container))
-        {
-            AddToClassList("unity-base-field");
-            AddToClassList("unity-base-field__aligned");
-            labelElement.AddToClassList("unity-base-field__label");
-            labelElement.AddToClassList("unity-label");
-
-            _pageSize = Mathf.Max(1, UnityHelpersSettings.GetStringInListPageLimit());
-
-            container.style.flexGrow = 1f;
-            container.style.marginLeft = 0f;
-            container.style.paddingLeft = 0f;
-            container.onGUIHandler = OnGUIHandler;
-        }
-
-        /// <summary>
-        /// Binds this selector to a serialized property.
-        /// </summary>
-        /// <param name="property">The property to bind.</param>
-        /// <param name="labelText">The label text to display.</param>
-        public void BindProperty(SerializedProperty property, string labelText)
-        {
-            _serializedObject = property?.serializedObject;
-            _propertyPath = property?.propertyPath ?? string.Empty;
-            string resolvedLabel =
-                labelText ?? property?.displayName ?? property?.name ?? string.Empty;
-            label = resolvedLabel;
-            _labelContent = new GUIContent(resolvedLabel);
-        }
-
-        /// <summary>
-        /// Unbinds this selector from any property.
-        /// </summary>
-        public void UnbindProperty()
-        {
-            _serializedObject = null;
-            _propertyPath = string.Empty;
-        }
 
         private void OnGUIHandler()
         {

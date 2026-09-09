@@ -39,6 +39,37 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             return 0 < value && (value & (value - 1)) == 0;
         }
 
+        private static long MeasureAllocated(Action action)
+        {
+            GCAssert.IgnoreIfAllocationMeasurementUnavailable();
+            action();
+            try
+            {
+                long before = GC.GetAllocatedBytesForCurrentThread();
+                action();
+                return GC.GetAllocatedBytesForCurrentThread() - before;
+            }
+            catch (PlatformNotSupportedException)
+            {
+                Assert.Ignore("allocation accounting is unavailable on this runtime");
+                return -1;
+            }
+        }
+
+        private static int CountByEnumeration<T>(IntMap<T> map)
+        {
+            int count = 0;
+            using IEnumerator<KeyValuePair<int, T>> enumerator = (
+                (IEnumerable<KeyValuePair<int, T>>)map
+            ).GetEnumerator();
+            while (enumerator.MoveNext())
+            {
+                ++count;
+            }
+
+            return count;
+        }
+
         [TestCase(-1)]
         public void ConstructorRefusesNegativeCapacityHints(int capacityHint)
         {
@@ -407,37 +438,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             second.Remove(0, out _);
             Assert.Throws<InvalidOperationException>(() => frozenKeys.MoveNext());
             Assert.Throws<InvalidOperationException>(() => typedReset.Reset());
-        }
-
-        private static long MeasureAllocated(Action action)
-        {
-            GCAssert.IgnoreIfAllocationMeasurementUnavailable();
-            action();
-            try
-            {
-                long before = GC.GetAllocatedBytesForCurrentThread();
-                action();
-                return GC.GetAllocatedBytesForCurrentThread() - before;
-            }
-            catch (PlatformNotSupportedException)
-            {
-                Assert.Ignore("allocation accounting is unavailable on this runtime");
-                return -1;
-            }
-        }
-
-        private static int CountByEnumeration<T>(IntMap<T> map)
-        {
-            int count = 0;
-            using IEnumerator<KeyValuePair<int, T>> enumerator = (
-                (IEnumerable<KeyValuePair<int, T>>)map
-            ).GetEnumerator();
-            while (enumerator.MoveNext())
-            {
-                ++count;
-            }
-
-            return count;
         }
 
         private sealed class GuidHolder

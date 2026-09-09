@@ -12,11 +12,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
     [NUnit.Framework.Category("Fast")]
     public sealed class IllusionFlowTests : RandomTestBase
     {
-        protected override IRandom NewRandom()
-        {
-            return new IllusionFlow(DeterministicGuid, DeterministicSeed32);
-        }
-
         [Test]
         public void InternalStateEncodesExtraSeedInPayload()
         {
@@ -92,6 +87,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             {
                 Assert.AreEqual(original.NextUint(), restored.NextUint(), $"Mismatch at {i}");
             }
+        }
+
+        protected override IRandom NewRandom()
+        {
+            return new IllusionFlow(DeterministicGuid, DeterministicSeed32);
         }
     }
 }

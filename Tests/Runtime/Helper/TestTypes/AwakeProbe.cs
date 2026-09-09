@@ -9,14 +9,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     {
         public int InvocationCount { get; private set; }
 
-        private void Awake()
-        {
-            ++InvocationCount;
-        }
-
         public void ResetCount()
         {
             InvocationCount = 0;
+        }
+
+        private void Awake()
+        {
+            ++InvocationCount;
         }
     }
 }

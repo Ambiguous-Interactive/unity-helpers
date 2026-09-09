@@ -33,6 +33,26 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// </remarks>
     public ref struct WProtoWriter
     {
+        /// <summary>Bytes written so far.</summary>
+        public int Position => _position;
+
+        /// <summary>
+        /// How many enclosing sub-messages this writer is currently inside; 0 at the top level.
+        /// </summary>
+        public int Depth => _depth;
+
+        /// <summary>Bytes still available in the destination span.</summary>
+        public int Remaining => _buffer.Length - _position;
+
+        /// <summary>
+        /// Indicates whether any write has been refused -- for lack of space, or for an invalid
+        /// field number, wire type or length. Once set, it stays set and later writes are refused.
+        /// </summary>
+        public bool Faulted => _faulted;
+
+        /// <summary>The bytes written so far.</summary>
+        public ReadOnlySpan<byte> Written => _buffer.Slice(0, _position);
+
         private readonly Span<byte> _buffer;
         private readonly ReadOnlySpan<int> _sizePlan;
         private int _position;
@@ -56,26 +76,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             _depth = 0;
             _faulted = false;
         }
-
-        /// <summary>Bytes written so far.</summary>
-        public int Position => _position;
-
-        /// <summary>
-        /// How many enclosing sub-messages this writer is currently inside; 0 at the top level.
-        /// </summary>
-        public int Depth => _depth;
-
-        /// <summary>Bytes still available in the destination span.</summary>
-        public int Remaining => _buffer.Length - _position;
-
-        /// <summary>
-        /// Indicates whether any write has been refused -- for lack of space, or for an invalid
-        /// field number, wire type or length. Once set, it stays set and later writes are refused.
-        /// </summary>
-        public bool Faulted => _faulted;
-
-        /// <summary>The bytes written so far.</summary>
-        public ReadOnlySpan<byte> Written => _buffer.Slice(0, _position);
 
         /// <summary>
         /// Writes the field key for <paramref name="fieldNumber"/> and <paramref name="wireType"/>.
@@ -492,6 +492,25 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             return TryBeginLengthDelimited(fieldNumber, nested, 1, -1, out token);
         }
 
+        /// <summary>
+        /// Closes a field opened by <see cref="TryBeginLengthDelimited(int, out WProtoLengthToken)"/>, back-filling its length.
+        /// </summary>
+        /// <param name="token">The token from the matching open.</param>
+        /// <returns><c>true</c> when the length was written.</returns>
+        public bool TryCloseLengthDelimited(in WProtoLengthToken token)
+        {
+            if (token.Nested)
+            {
+                _depth--;
+            }
+
+            return TryBackfillLength(
+                token.PrefixStart,
+                token.PayloadStart,
+                token.ReservedPrefixSize
+            );
+        }
+
         private bool TryBeginLengthDelimited(
             int fieldNumber,
             bool nested,
@@ -541,25 +560,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
             token = new WProtoLengthToken(prefixStart, _position, reservedPrefixSize, nested);
             return true;
-        }
-
-        /// <summary>
-        /// Closes a field opened by <see cref="TryBeginLengthDelimited(int, out WProtoLengthToken)"/>, back-filling its length.
-        /// </summary>
-        /// <param name="token">The token from the matching open.</param>
-        /// <returns><c>true</c> when the length was written.</returns>
-        public bool TryCloseLengthDelimited(in WProtoLengthToken token)
-        {
-            if (token.Nested)
-            {
-                _depth--;
-            }
-
-            return TryBackfillLength(
-                token.PrefixStart,
-                token.PayloadStart,
-                token.ReservedPrefixSize
-            );
         }
 
         private bool TryBackfillLength(int prefixStart, int payloadStart, int reservedPrefixSize)

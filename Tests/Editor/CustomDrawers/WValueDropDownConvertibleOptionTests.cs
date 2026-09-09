@@ -30,119 +30,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         private static readonly Guid SampleGuid = new("6f9619ff-8b86-4d11-b42d-00c04fc964ff");
         private static readonly Guid OtherGuid = new("2f9619ff-8b86-4d11-b42d-00c04fc964ff");
 
-        [Test]
-        public void ResolveSelectedIndexMatchesAGuidOptionAgainstAWGuidField()
-        {
-            WValueDropDownConvertibleOptionAsset asset =
-                CreateScriptableObject<WValueDropDownConvertibleOptionAsset>();
-            asset.selectedGuid = new WGuid(WValueDropDownConvertibleOptionSource.SecondGuid);
-
-            Assert.AreEqual(
-                1,
-                ResolveSelectedIndex(
-                    asset,
-                    nameof(WValueDropDownConvertibleOptionAsset.selectedGuid)
-                ),
-                "A WGuid field must select the Guid option it holds"
-            );
-        }
-
-        [Test]
-        public void ResolveSelectedIndexMatchesAnIntOptionAgainstASerializableNullableField()
-        {
-            WValueDropDownConvertibleOptionAsset asset =
-                CreateScriptableObject<WValueDropDownConvertibleOptionAsset>();
-            asset.selectedNullable = new SerializableNullable<int>(7);
-
-            Assert.AreEqual(
-                2,
-                ResolveSelectedIndex(
-                    asset,
-                    nameof(WValueDropDownConvertibleOptionAsset.selectedNullable)
-                ),
-                "A SerializableNullable<int> field must select the int option it holds"
-            );
-        }
-
-        [Test]
-        public void ResolveSelectedIndexFindsNothingForAnEmptySerializableNullableField()
-        {
-            WValueDropDownConvertibleOptionAsset asset =
-                CreateScriptableObject<WValueDropDownConvertibleOptionAsset>();
-            asset.selectedNullable = default;
-
-            Assert.AreEqual(
-                -1,
-                ResolveSelectedIndex(
-                    asset,
-                    nameof(WValueDropDownConvertibleOptionAsset.selectedNullable)
-                ),
-                "A field holding no value must select no option"
-            );
-        }
-
-        [Test]
-        public void ResolveSelectedIndexMatchesAValueTupleOptionAgainstASerializablePairField()
-        {
-            WValueDropDownConvertibleOptionAsset asset =
-                CreateScriptableObject<WValueDropDownConvertibleOptionAsset>();
-            asset.selectedPair = new SerializableValueTuple<int, float>(7, 1.5f);
-
-            Assert.AreEqual(
-                1,
-                ResolveSelectedIndex(
-                    asset,
-                    nameof(WValueDropDownConvertibleOptionAsset.selectedPair)
-                ),
-                "A SerializableValueTuple<int, float> field must select the ValueTuple option it holds"
-            );
-        }
-
-        [Test]
-        public void ResolveSelectedIndexMatchesAValueTupleOptionAgainstASerializableTripleField()
-        {
-            WValueDropDownConvertibleOptionAsset asset =
-                CreateScriptableObject<WValueDropDownConvertibleOptionAsset>();
-            asset.selectedTriple = new SerializableValueTuple<int, float, string>(7, 1.5f, "loot");
-
-            Assert.AreEqual(
-                1,
-                ResolveSelectedIndex(
-                    asset,
-                    nameof(WValueDropDownConvertibleOptionAsset.selectedTriple)
-                ),
-                "A SerializableValueTuple<int, float, string> field must select the ValueTuple option it holds"
-            );
-        }
-
-        [Test]
-        [TestCaseSource(nameof(ConvertiblePairs))]
-        public void MatchesAuthoredOptionAcceptsAConvertibleOption(
-            object serializedValue,
-            object option
-        )
-        {
-            Assert.IsTrue(
-                WValueDropDownDrawer.TestHooks.MatchesAuthoredOption(serializedValue, option),
-                $"{serializedValue.GetType().Name} holding {serializedValue} must match the authored "
-                    + $"{option.GetType().Name} {option}"
-            );
-        }
-
-        [Test]
-        [TestCaseSource(nameof(NonConvertiblePairs))]
-        public void MatchesAuthoredOptionRefusesAnOptionThatDenotesAnotherValue(
-            object serializedValue,
-            object option
-        )
-        {
-            Assert.IsFalse(
-                WValueDropDownDrawer.TestHooks.MatchesAuthoredOption(serializedValue, option),
-                $"{serializedValue.GetType().Name} holding {serializedValue} must not match the "
-                    + $"authored {option.GetType().Name} {option}"
-            );
-        }
-
         private static int ResolveSelectedIndex(
             WValueDropDownConvertibleOptionAsset asset,
             string propertyPath
@@ -265,6 +152,119 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
 
             yield return new TestCaseData(new FastVector2Int(3, 5), "not a vector").SetName(
                 "NonConvertible.FastVector2IntToString"
+            );
+        }
+
+        [Test]
+        public void ResolveSelectedIndexMatchesAGuidOptionAgainstAWGuidField()
+        {
+            WValueDropDownConvertibleOptionAsset asset =
+                CreateScriptableObject<WValueDropDownConvertibleOptionAsset>();
+            asset.selectedGuid = new WGuid(WValueDropDownConvertibleOptionSource.SecondGuid);
+
+            Assert.AreEqual(
+                1,
+                ResolveSelectedIndex(
+                    asset,
+                    nameof(WValueDropDownConvertibleOptionAsset.selectedGuid)
+                ),
+                "A WGuid field must select the Guid option it holds"
+            );
+        }
+
+        [Test]
+        public void ResolveSelectedIndexMatchesAnIntOptionAgainstASerializableNullableField()
+        {
+            WValueDropDownConvertibleOptionAsset asset =
+                CreateScriptableObject<WValueDropDownConvertibleOptionAsset>();
+            asset.selectedNullable = new SerializableNullable<int>(7);
+
+            Assert.AreEqual(
+                2,
+                ResolveSelectedIndex(
+                    asset,
+                    nameof(WValueDropDownConvertibleOptionAsset.selectedNullable)
+                ),
+                "A SerializableNullable<int> field must select the int option it holds"
+            );
+        }
+
+        [Test]
+        public void ResolveSelectedIndexFindsNothingForAnEmptySerializableNullableField()
+        {
+            WValueDropDownConvertibleOptionAsset asset =
+                CreateScriptableObject<WValueDropDownConvertibleOptionAsset>();
+            asset.selectedNullable = default;
+
+            Assert.AreEqual(
+                -1,
+                ResolveSelectedIndex(
+                    asset,
+                    nameof(WValueDropDownConvertibleOptionAsset.selectedNullable)
+                ),
+                "A field holding no value must select no option"
+            );
+        }
+
+        [Test]
+        public void ResolveSelectedIndexMatchesAValueTupleOptionAgainstASerializablePairField()
+        {
+            WValueDropDownConvertibleOptionAsset asset =
+                CreateScriptableObject<WValueDropDownConvertibleOptionAsset>();
+            asset.selectedPair = new SerializableValueTuple<int, float>(7, 1.5f);
+
+            Assert.AreEqual(
+                1,
+                ResolveSelectedIndex(
+                    asset,
+                    nameof(WValueDropDownConvertibleOptionAsset.selectedPair)
+                ),
+                "A SerializableValueTuple<int, float> field must select the ValueTuple option it holds"
+            );
+        }
+
+        [Test]
+        public void ResolveSelectedIndexMatchesAValueTupleOptionAgainstASerializableTripleField()
+        {
+            WValueDropDownConvertibleOptionAsset asset =
+                CreateScriptableObject<WValueDropDownConvertibleOptionAsset>();
+            asset.selectedTriple = new SerializableValueTuple<int, float, string>(7, 1.5f, "loot");
+
+            Assert.AreEqual(
+                1,
+                ResolveSelectedIndex(
+                    asset,
+                    nameof(WValueDropDownConvertibleOptionAsset.selectedTriple)
+                ),
+                "A SerializableValueTuple<int, float, string> field must select the ValueTuple option it holds"
+            );
+        }
+
+        [Test]
+        [TestCaseSource(nameof(ConvertiblePairs))]
+        public void MatchesAuthoredOptionAcceptsAConvertibleOption(
+            object serializedValue,
+            object option
+        )
+        {
+            Assert.IsTrue(
+                WValueDropDownDrawer.TestHooks.MatchesAuthoredOption(serializedValue, option),
+                $"{serializedValue.GetType().Name} holding {serializedValue} must match the authored "
+                    + $"{option.GetType().Name} {option}"
+            );
+        }
+
+        [Test]
+        [TestCaseSource(nameof(NonConvertiblePairs))]
+        public void MatchesAuthoredOptionRefusesAnOptionThatDenotesAnotherValue(
+            object serializedValue,
+            object option
+        )
+        {
+            Assert.IsFalse(
+                WValueDropDownDrawer.TestHooks.MatchesAuthoredOption(serializedValue, option),
+                $"{serializedValue.GetType().Name} holding {serializedValue} must not match the "
+                    + $"authored {option.GetType().Name} {option}"
             );
         }
     }

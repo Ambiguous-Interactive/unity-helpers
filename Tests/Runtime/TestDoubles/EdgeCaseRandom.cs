@@ -15,6 +15,8 @@ namespace WallstopStudios.UnityHelpers.Tests.TestDoubles
     /// </summary>
     public sealed class EdgeCaseRandom : IRandom
     {
+        public RandomState InternalState => throw new NotSupportedException();
+
         private readonly Queue<float> _floatSequence;
         private readonly Queue<double> _doubleSequence;
         private readonly float _floatFallback;
@@ -39,38 +41,6 @@ namespace WallstopStudios.UnityHelpers.Tests.TestDoubles
             _doubleFallback = doubleFallback;
             _maxFloatCalls = maxFloatCalls;
             _maxDoubleCalls = maxDoubleCalls;
-        }
-
-        public RandomState InternalState => throw new NotSupportedException();
-
-        private float SampleFloat()
-        {
-            if (_maxFloatCalls < ++_floatCalls)
-            {
-                throw new InvalidOperationException("Exceeded configured float call budget.");
-            }
-
-            if (_floatSequence != null && 0 < _floatSequence.Count)
-            {
-                return _floatSequence.Dequeue();
-            }
-
-            return _floatFallback;
-        }
-
-        private double SampleDouble()
-        {
-            if (_maxDoubleCalls < ++_doubleCalls)
-            {
-                throw new InvalidOperationException("Exceeded configured double call budget.");
-            }
-
-            if (_doubleSequence != null && 0 < _doubleSequence.Count)
-            {
-                return _doubleSequence.Dequeue();
-            }
-
-            return _doubleFallback;
         }
 
         public int Next()
@@ -327,6 +297,36 @@ namespace WallstopStudios.UnityHelpers.Tests.TestDoubles
         public IRandom Copy()
         {
             throw new NotSupportedException();
+        }
+
+        private float SampleFloat()
+        {
+            if (_maxFloatCalls < ++_floatCalls)
+            {
+                throw new InvalidOperationException("Exceeded configured float call budget.");
+            }
+
+            if (_floatSequence != null && 0 < _floatSequence.Count)
+            {
+                return _floatSequence.Dequeue();
+            }
+
+            return _floatFallback;
+        }
+
+        private double SampleDouble()
+        {
+            if (_maxDoubleCalls < ++_doubleCalls)
+            {
+                throw new InvalidOperationException("Exceeded configured double call budget.");
+            }
+
+            if (_doubleSequence != null && 0 < _doubleSequence.Count)
+            {
+                return _doubleSequence.Dequeue();
+            }
+
+            return _doubleFallback;
         }
     }
 }

@@ -338,6 +338,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             private const string MessageKeyPrefix = "message ";
             private const string EnumKeyPrefix = "enum ";
 
+            public List<string> Diagnostics => _diagnostics;
+
+            public int MessageCount => _rendered.Count;
+
             private readonly IReadOnlyDictionary<Type, Type> _surrogates;
             private readonly Dictionary<Type, List<KeyValuePair<int, Type>>> _declaredSubtypes;
             private readonly List<string> _diagnostics = new List<string>();
@@ -362,9 +366,166 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 _declaredSubtypes = declaredSubtypes;
             }
 
-            public List<string> Diagnostics => _diagnostics;
+            private static string SanitizeIdentifier(string desired)
+            {
+                StringBuilder builder = new StringBuilder(desired.Length);
+                foreach (char character in desired)
+                {
+                    if (IsAsciiIdentifierCharacter(character))
+                    {
+                        builder.Append(character);
+                    }
+                }
 
-            public int MessageCount => _rendered.Count;
+                if (builder.Length == 0 || char.IsDigit(builder[0]))
+                {
+                    builder.Insert(0, '_');
+                }
+
+                return builder.ToString();
+            }
+
+            private static string ResolveContractName(Type type)
+            {
+                object[] markers = type.GetCustomAttributes(typeof(WProtoContractAttribute), false);
+                if (0 < markers.Length)
+                {
+                    string declared = ((WProtoContractAttribute)markers[0]).Name;
+                    if (!string.IsNullOrEmpty(declared))
+                    {
+                        return declared;
+                    }
+                }
+
+                return type.Name;
+            }
+
+            private static Type GetElementType(Type type)
+            {
+                if (type.IsArray)
+                {
+                    return type.GetElementType();
+                }
+
+                if (type.IsGenericType)
+                {
+                    Type definition = type.GetGenericTypeDefinition();
+                    if (definition == typeof(IEnumerable<>))
+                    {
+                        return type.GetGenericArguments()[0];
+                    }
+                }
+
+                foreach (Type implemented in type.GetInterfaces())
+                {
+                    if (
+                        implemented.IsGenericType
+                        && implemented.GetGenericTypeDefinition() == typeof(IEnumerable<>)
+                    )
+                    {
+                        return implemented.GetGenericArguments()[0];
+                    }
+                }
+
+                return null;
+            }
+
+            private static bool IsCollection(Type type)
+            {
+                if (type == typeof(string) || type == typeof(byte[]))
+                {
+                    return false;
+                }
+
+                if (
+                    type.IsArray
+                    || (
+                        type.IsGenericType
+                        && type.GetGenericTypeDefinition() == typeof(IEnumerable<>)
+                    )
+                )
+                {
+                    return true;
+                }
+
+                foreach (Type implemented in type.GetInterfaces())
+                {
+                    if (
+                        implemented.IsGenericType
+                        && implemented.GetGenericTypeDefinition() == typeof(IEnumerable<>)
+                    )
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            private static bool IsMapDictionary(Type type)
+            {
+                Type definition = type.GetGenericTypeDefinition();
+                return definition == typeof(Dictionary<,>)
+                    || definition == typeof(IDictionary<,>)
+                    || definition == typeof(IReadOnlyDictionary<,>)
+                    || definition == typeof(ReadOnlyDictionary<,>);
+            }
+
+            private static bool IsProto3MapKey(string protoType)
+            {
+                switch (protoType)
+                {
+                    case "bool":
+                    case "int32":
+                    case "int64":
+                    case "uint32":
+                    case "uint64":
+                    case "sint32":
+                    case "sint64":
+                    case "fixed32":
+                    case "fixed64":
+                    case "string":
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+
+            private static bool IsValidProtoIdentifier(string name)
+            {
+                if (string.IsNullOrEmpty(name))
+                {
+                    return false;
+                }
+
+                if (!IsAsciiIdentifierCharacter(name[0]) || char.IsDigit(name[0]))
+                {
+                    return false;
+                }
+
+                for (int i = 1; i < name.Length; ++i)
+                {
+                    if (!IsAsciiIdentifierCharacter(name[i]))
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
+            private static bool IsAsciiIdentifierCharacter(char character)
+            {
+                return ('a' <= character && character <= 'z')
+                    || ('A' <= character && character <= 'Z')
+                    || ('0' <= character && character <= '9')
+                    || character == '_';
+            }
+
+            private static string FieldName(string messageName)
+            {
+                return char.ToLowerInvariant(messageName[0]) + messageName.Substring(1);
+            }
 
             public string TryAddContract(Type contractType)
             {
@@ -424,6 +585,30 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 body.Append("}");
                 _blocks[MessageKeyPrefix + messageName] = body.ToString();
                 return messageName;
+            }
+
+            public string Render(string packageName)
+            {
+                StringBuilder schema = new StringBuilder();
+                schema.Append(Header);
+                if (!string.IsNullOrWhiteSpace(packageName))
+                {
+                    schema.Append("package ").Append(packageName.Trim()).Append(";").Append("\n");
+                }
+
+                schema.Append("\n");
+                foreach (
+                    KeyValuePair<string, string> block in _blocks.OrderBy(
+                        pair => pair.Key,
+                        StringComparer.Ordinal
+                    )
+                )
+                {
+                    schema.Append(block.Value).Append("\n");
+                    schema.Append("\n");
+                }
+
+                return schema.ToString();
             }
 
             /// <summary>
@@ -1006,25 +1191,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return candidate;
             }
 
-            private static string SanitizeIdentifier(string desired)
-            {
-                StringBuilder builder = new StringBuilder(desired.Length);
-                foreach (char character in desired)
-                {
-                    if (IsAsciiIdentifierCharacter(character))
-                    {
-                        builder.Append(character);
-                    }
-                }
-
-                if (builder.Length == 0 || char.IsDigit(builder[0]))
-                {
-                    builder.Insert(0, '_');
-                }
-
-                return builder.ToString();
-            }
-
             /// <summary>
             /// Every subtype of one contract, however it was declared, ordered by field number.
             /// </summary>
@@ -1259,21 +1425,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return string.IsNullOrEmpty(marker.Name) ? ResolveContractName(type) : marker.Name;
             }
 
-            private static string ResolveContractName(Type type)
-            {
-                object[] markers = type.GetCustomAttributes(typeof(WProtoContractAttribute), false);
-                if (0 < markers.Length)
-                {
-                    string declared = ((WProtoContractAttribute)markers[0]).Name;
-                    if (!string.IsNullOrEmpty(declared))
-                    {
-                        return declared;
-                    }
-                }
-
-                return type.Name;
-            }
-
             private string NextName(string desired)
             {
                 string candidate = desired;
@@ -1290,30 +1441,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
                 _usedNames.Add(candidate);
                 return candidate;
-            }
-
-            public string Render(string packageName)
-            {
-                StringBuilder schema = new StringBuilder();
-                schema.Append(Header);
-                if (!string.IsNullOrWhiteSpace(packageName))
-                {
-                    schema.Append("package ").Append(packageName.Trim()).Append(";").Append("\n");
-                }
-
-                schema.Append("\n");
-                foreach (
-                    KeyValuePair<string, string> block in _blocks.OrderBy(
-                        pair => pair.Key,
-                        StringComparer.Ordinal
-                    )
-                )
-                {
-                    schema.Append(block.Value).Append("\n");
-                    schema.Append("\n");
-                }
-
-                return schema.ToString();
             }
 
             private bool TryMapScalar(Type type, MemberEntry member, out string protoType)
@@ -1441,133 +1568,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 }
 
                 return TryMapContract(type, out protoType);
-            }
-
-            private static Type GetElementType(Type type)
-            {
-                if (type.IsArray)
-                {
-                    return type.GetElementType();
-                }
-
-                if (type.IsGenericType)
-                {
-                    Type definition = type.GetGenericTypeDefinition();
-                    if (definition == typeof(IEnumerable<>))
-                    {
-                        return type.GetGenericArguments()[0];
-                    }
-                }
-
-                foreach (Type implemented in type.GetInterfaces())
-                {
-                    if (
-                        implemented.IsGenericType
-                        && implemented.GetGenericTypeDefinition() == typeof(IEnumerable<>)
-                    )
-                    {
-                        return implemented.GetGenericArguments()[0];
-                    }
-                }
-
-                return null;
-            }
-
-            private static bool IsCollection(Type type)
-            {
-                if (type == typeof(string) || type == typeof(byte[]))
-                {
-                    return false;
-                }
-
-                if (
-                    type.IsArray
-                    || (
-                        type.IsGenericType
-                        && type.GetGenericTypeDefinition() == typeof(IEnumerable<>)
-                    )
-                )
-                {
-                    return true;
-                }
-
-                foreach (Type implemented in type.GetInterfaces())
-                {
-                    if (
-                        implemented.IsGenericType
-                        && implemented.GetGenericTypeDefinition() == typeof(IEnumerable<>)
-                    )
-                    {
-                        return true;
-                    }
-                }
-
-                return false;
-            }
-
-            private static bool IsMapDictionary(Type type)
-            {
-                Type definition = type.GetGenericTypeDefinition();
-                return definition == typeof(Dictionary<,>)
-                    || definition == typeof(IDictionary<,>)
-                    || definition == typeof(IReadOnlyDictionary<,>)
-                    || definition == typeof(ReadOnlyDictionary<,>);
-            }
-
-            private static bool IsProto3MapKey(string protoType)
-            {
-                switch (protoType)
-                {
-                    case "bool":
-                    case "int32":
-                    case "int64":
-                    case "uint32":
-                    case "uint64":
-                    case "sint32":
-                    case "sint64":
-                    case "fixed32":
-                    case "fixed64":
-                    case "string":
-                        return true;
-                    default:
-                        return false;
-                }
-            }
-
-            private static bool IsValidProtoIdentifier(string name)
-            {
-                if (string.IsNullOrEmpty(name))
-                {
-                    return false;
-                }
-
-                if (!IsAsciiIdentifierCharacter(name[0]) || char.IsDigit(name[0]))
-                {
-                    return false;
-                }
-
-                for (int i = 1; i < name.Length; ++i)
-                {
-                    if (!IsAsciiIdentifierCharacter(name[i]))
-                    {
-                        return false;
-                    }
-                }
-
-                return true;
-            }
-
-            private static bool IsAsciiIdentifierCharacter(char character)
-            {
-                return ('a' <= character && character <= 'z')
-                    || ('A' <= character && character <= 'Z')
-                    || ('0' <= character && character <= '9')
-                    || character == '_';
-            }
-
-            private static string FieldName(string messageName)
-            {
-                return char.ToLowerInvariant(messageName[0]) + messageName.Substring(1);
             }
         }
 

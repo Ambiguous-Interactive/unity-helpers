@@ -42,14 +42,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
     internal sealed class WButtonTargetState
     {
+        internal Type TargetType { get; }
+
         private readonly Dictionary<MethodKey, WButtonMethodState> _methodStates = new();
 
         internal WButtonTargetState(Type targetType)
         {
             TargetType = targetType ?? typeof(UnityEngine.Object);
         }
-
-        internal Type TargetType { get; }
 
         internal WButtonMethodState GetOrCreateMethodState(WButtonMethodMetadata metadata)
         {
@@ -72,6 +72,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
     internal sealed class WButtonMethodState
     {
+        internal WButtonMethodMetadata Metadata { get; }
+
+        internal WButtonParameterState[] Parameters { get; }
+
+        internal WButtonInvocationHandle ActiveInvocation { get; set; }
+
+        internal List<WButtonResultEntry> History { get; } = new();
+
+        internal bool HasHistory => 0 < History.Count;
+
         internal WButtonMethodState(WButtonMethodMetadata metadata)
         {
             Metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
@@ -93,16 +103,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                 Parameters = states;
             }
         }
-
-        internal WButtonMethodMetadata Metadata { get; }
-
-        internal WButtonParameterState[] Parameters { get; }
-
-        internal WButtonInvocationHandle ActiveInvocation { get; set; }
-
-        internal List<WButtonResultEntry> History { get; } = new();
-
-        internal bool HasHistory => 0 < History.Count;
 
         internal void AddResult(WButtonResultEntry entry, int historyCapacity)
         {
@@ -135,17 +135,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
     internal sealed class WButtonParameterState
     {
-        internal WButtonParameterState(WButtonParameterMetadata metadata)
-        {
-            Metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
-            CurrentValue = CreateInitialValue(metadata);
-        }
-
         internal WButtonParameterMetadata Metadata { get; }
 
         internal object CurrentValue { get; set; }
 
         internal string JsonFallback { get; set; }
+
+        internal WButtonParameterState(WButtonParameterMetadata metadata)
+        {
+            Metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
+            CurrentValue = CreateInitialValue(metadata);
+        }
 
         private static object CreateInitialValue(WButtonParameterMetadata metadata)
         {

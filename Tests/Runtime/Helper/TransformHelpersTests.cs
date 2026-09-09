@@ -15,6 +15,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     [NUnit.Framework.Category("Fast")]
     public sealed class TransformHelpersTests : CommonTestBase
     {
+        private (TransformProbe root, TransformProbe middle, TransformProbe leaf) BuildHierarchy()
+        {
+            TransformProbe root = Track(new GameObject("RootProbe", typeof(TransformProbe)))
+                .GetComponent<TransformProbe>();
+            root.Id = "Root";
+
+            TransformProbe middle = Track(new GameObject("MiddleProbe", typeof(TransformProbe)))
+                .GetComponent<TransformProbe>();
+            middle.Id = "Middle";
+
+            TransformProbe leaf = Track(new GameObject("LeafProbe", typeof(TransformProbe)))
+                .GetComponent<TransformProbe>();
+            leaf.Id = "Leaf";
+
+            middle.transform.SetParent(root.transform);
+            leaf.transform.SetParent(middle.transform);
+
+            return (root, middle, leaf);
+        }
+
         [TestCase(true, "Leaf,Middle,Root")]
         [TestCase(false, "Middle,Root")]
         public void IterateOverAllParentComponentsEnumeratorRespectsIncludeSelf(
@@ -94,26 +114,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
             List<Transform> listResult = result.IterateOverAllParents(buffer, includeSelf: true);
             Assert.IsEmpty(listResult);
-        }
-
-        private (TransformProbe root, TransformProbe middle, TransformProbe leaf) BuildHierarchy()
-        {
-            TransformProbe root = Track(new GameObject("RootProbe", typeof(TransformProbe)))
-                .GetComponent<TransformProbe>();
-            root.Id = "Root";
-
-            TransformProbe middle = Track(new GameObject("MiddleProbe", typeof(TransformProbe)))
-                .GetComponent<TransformProbe>();
-            middle.Id = "Middle";
-
-            TransformProbe leaf = Track(new GameObject("LeafProbe", typeof(TransformProbe)))
-                .GetComponent<TransformProbe>();
-            leaf.Id = "Leaf";
-
-            middle.transform.SetParent(root.transform);
-            leaf.transform.SetParent(middle.transform);
-
-            return (root, middle, leaf);
         }
     }
 }

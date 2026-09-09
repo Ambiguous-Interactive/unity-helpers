@@ -14,6 +14,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     [NUnit.Framework.Category("Fast")]
     public sealed class StringExtensionTests : CommonTestBase
     {
+        private static readonly object[] ToCaseMatrixData =
+        {
+            new object[] { "mixed_input", StringCase.PascalCase, "MixedInput" },
+            new object[] { "mixed_input", StringCase.CamelCase, "mixedInput" },
+            new object[] { "mixed_input", StringCase.SnakeCase, "mixed_input" },
+            new object[] { "mixed_input", StringCase.KebabCase, "mixed-input" },
+            new object[] { "mixed_input", StringCase.TitleCase, "Mixed Input" },
+            new object[] { "mixed_input", StringCase.LowerCase, "mixed_input" },
+            new object[] { "mixed_input", StringCase.UpperCase, "MIXED_INPUT" },
+            new object[] { "mixed_input", StringCase.LowerInvariant, "mixed_input" },
+            new object[] { "mixed_input", StringCase.UpperInvariant, "MIXED_INPUT" },
+#pragma warning disable CS0618
+            new object[] { "mixed_input", StringCase.None, "mixed_input" },
+#pragma warning restore CS0618
+            new object[] { "HeLLo WoRLd", StringCase.LowerCase, "hello world" },
+            new object[] { "HeLLo WoRLd", StringCase.UpperCase, "HELLO WORLD" },
+            new object[] { "İSTANBUL", StringCase.LowerInvariant, "istanbul" },
+            new object[] { "istanbul", StringCase.UpperInvariant, "ISTANBUL" },
+        };
+
         private static IEnumerable<TestCaseData> LevenshteinDistanceTestCases()
         {
             yield return new TestCaseData("test", "test", 0).SetName(
@@ -97,14 +117,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             );
         }
 
-        [TestCaseSource(nameof(LevenshteinDistanceTestCases))]
-        public void LevenshteinDistanceReturnsExpected(string first, string second, int expected)
-        {
-            int actual = first.LevenshteinDistance(second);
-
-            Assert.AreEqual(expected, actual);
-        }
-
         private static IEnumerable<TestCaseData> NeedsLowerInvariantConversionTestCases()
         {
             yield return new TestCaseData(null, false).SetName("NeedsLower.Null.ReturnsFalse");
@@ -146,14 +158,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             yield return new TestCaseData("hello123", false).SetName(
                 "NeedsLower.LowerThenNumbers.ReturnsFalse"
             );
-        }
-
-        [TestCaseSource(nameof(NeedsLowerInvariantConversionTestCases))]
-        public void NeedsLowerInvariantConversionReturnsExpected(string input, bool expected)
-        {
-            bool actual = input.NeedsLowerInvariantConversion();
-
-            Assert.AreEqual(expected, actual);
         }
 
         private static IEnumerable<TestCaseData> NeedsTrimTestCases()
@@ -206,14 +210,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             );
         }
 
-        [TestCaseSource(nameof(NeedsTrimTestCases))]
-        public void NeedsTrimReturnsExpected(string input, bool expected)
-        {
-            bool actual = input.NeedsTrim();
-
-            Assert.AreEqual(expected, actual);
-        }
-
         private static IEnumerable<TestCaseData> TruncateTestCases()
         {
             yield return new TestCaseData(null, 5, "...", null).SetName(
@@ -264,19 +260,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             );
         }
 
-        [TestCaseSource(nameof(TruncateTestCases))]
-        public void TruncateReturnsExpected(
-            string input,
-            int maxLength,
-            string ellipsis,
-            string expected
-        )
-        {
-            string actual = input.Truncate(maxLength, ellipsis);
-
-            Assert.AreEqual(expected, actual);
-        }
-
         private static IEnumerable<TestCaseData> CenterTestCases()
         {
             yield return new TestCaseData(null, 10, null).SetName("Center.Null.ReturnsNull");
@@ -308,6 +291,81 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             yield return new TestCaseData("", 5, "     ").SetName(
                 "Center.EmptyWithWidth.ReturnsPadding"
             );
+        }
+
+        private static IEnumerable<TestCaseData> NonBasicPlaneStrings()
+        {
+            yield return new TestCaseData("ab\U0001F44Dcd").SetName("NonBmp.EmojiInMiddle");
+            yield return new TestCaseData("\U0001F600").SetName("NonBmp.EmojiAlone");
+            yield return new TestCaseData("\U0001F3F4\U000E0067b").SetName("NonBmp.TwoPairs");
+            yield return new TestCaseData("x\U00020BB7").SetName("NonBmp.EmojiLast");
+            yield return new TestCaseData("\U0001D11Ez").SetName("NonBmp.EmojiFirst");
+        }
+
+        private static bool IsWellFormedUtf16(string value)
+        {
+            for (int i = 0; i < value.Length; ++i)
+            {
+                if (char.IsHighSurrogate(value[i]))
+                {
+                    if (value.Length <= i + 1 || !char.IsLowSurrogate(value[i + 1]))
+                    {
+                        return false;
+                    }
+
+                    ++i;
+                    continue;
+                }
+
+                if (char.IsLowSurrogate(value[i]))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static string Describe(string value)
+        {
+            return string.Concat(value.Select(character => $"\\u{(int)character:X4}"));
+        }
+
+        [TestCaseSource(nameof(LevenshteinDistanceTestCases))]
+        public void LevenshteinDistanceReturnsExpected(string first, string second, int expected)
+        {
+            int actual = first.LevenshteinDistance(second);
+
+            Assert.AreEqual(expected, actual);
+        }
+
+        [TestCaseSource(nameof(NeedsLowerInvariantConversionTestCases))]
+        public void NeedsLowerInvariantConversionReturnsExpected(string input, bool expected)
+        {
+            bool actual = input.NeedsLowerInvariantConversion();
+
+            Assert.AreEqual(expected, actual);
+        }
+
+        [TestCaseSource(nameof(NeedsTrimTestCases))]
+        public void NeedsTrimReturnsExpected(string input, bool expected)
+        {
+            bool actual = input.NeedsTrim();
+
+            Assert.AreEqual(expected, actual);
+        }
+
+        [TestCaseSource(nameof(TruncateTestCases))]
+        public void TruncateReturnsExpected(
+            string input,
+            int maxLength,
+            string ellipsis,
+            string expected
+        )
+        {
+            string actual = input.Truncate(maxLength, ellipsis);
+
+            Assert.AreEqual(expected, actual);
         }
 
         [TestCaseSource(nameof(CenterTestCases))]
@@ -1751,15 +1809,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.AreEqual("noon", "noon".Reverse());
         }
 
-        private static IEnumerable<TestCaseData> NonBasicPlaneStrings()
-        {
-            yield return new TestCaseData("ab\U0001F44Dcd").SetName("NonBmp.EmojiInMiddle");
-            yield return new TestCaseData("\U0001F600").SetName("NonBmp.EmojiAlone");
-            yield return new TestCaseData("\U0001F3F4\U000E0067b").SetName("NonBmp.TwoPairs");
-            yield return new TestCaseData("x\U00020BB7").SetName("NonBmp.EmojiLast");
-            yield return new TestCaseData("\U0001D11Ez").SetName("NonBmp.EmojiFirst");
-        }
-
         [TestCaseSource(nameof(NonBasicPlaneStrings))]
         public void ReverseKeepsSurrogatePairsIntact(string input)
         {
@@ -1802,35 +1851,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.AreEqual("he", "hello".Truncate(2, "..."));
             Assert.AreEqual(string.Empty, "hello".Truncate(0, "..."));
             Assert.AreEqual("...", "hello".Truncate(3, "..."));
-        }
-
-        private static bool IsWellFormedUtf16(string value)
-        {
-            for (int i = 0; i < value.Length; ++i)
-            {
-                if (char.IsHighSurrogate(value[i]))
-                {
-                    if (value.Length <= i + 1 || !char.IsLowSurrogate(value[i + 1]))
-                    {
-                        return false;
-                    }
-
-                    ++i;
-                    continue;
-                }
-
-                if (char.IsLowSurrogate(value[i]))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        private static string Describe(string value)
-        {
-            return string.Concat(value.Select(character => $"\\u{(int)character:X4}"));
         }
 
         [Test]
@@ -2455,26 +2475,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.AreEqual("HelloWorld", "hello\"World".ToPascalCase());
             Assert.AreEqual("MixedTest", "mixed.'Test".ToPascalCase());
         }
-
-        private static readonly object[] ToCaseMatrixData =
-        {
-            new object[] { "mixed_input", StringCase.PascalCase, "MixedInput" },
-            new object[] { "mixed_input", StringCase.CamelCase, "mixedInput" },
-            new object[] { "mixed_input", StringCase.SnakeCase, "mixed_input" },
-            new object[] { "mixed_input", StringCase.KebabCase, "mixed-input" },
-            new object[] { "mixed_input", StringCase.TitleCase, "Mixed Input" },
-            new object[] { "mixed_input", StringCase.LowerCase, "mixed_input" },
-            new object[] { "mixed_input", StringCase.UpperCase, "MIXED_INPUT" },
-            new object[] { "mixed_input", StringCase.LowerInvariant, "mixed_input" },
-            new object[] { "mixed_input", StringCase.UpperInvariant, "MIXED_INPUT" },
-#pragma warning disable CS0618
-            new object[] { "mixed_input", StringCase.None, "mixed_input" },
-#pragma warning restore CS0618
-            new object[] { "HeLLo WoRLd", StringCase.LowerCase, "hello world" },
-            new object[] { "HeLLo WoRLd", StringCase.UpperCase, "HELLO WORLD" },
-            new object[] { "İSTANBUL", StringCase.LowerInvariant, "istanbul" },
-            new object[] { "istanbul", StringCase.UpperInvariant, "ISTANBUL" },
-        };
 
         [TestCaseSource(nameof(ToCaseMatrixData))]
         public void ToCaseMatrixCoversAllStringCases(

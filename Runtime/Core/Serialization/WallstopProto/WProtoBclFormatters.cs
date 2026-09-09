@@ -25,22 +25,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// </remarks>
     internal static class WProtoBcl
     {
-        private static readonly IWProtoFormatter<DateTime> DateTimeRoot =
-            new WProtoBclRootFormatter<DateTime>();
-
-        private static readonly IWProtoFormatter<TimeSpan> TimeSpanRoot =
-            new WProtoBclRootFormatter<TimeSpan>();
-
-        private static readonly IWProtoFormatter<Guid> GuidRoot =
-            new WProtoBclRootFormatter<Guid>();
-
-        private static readonly IWProtoFormatter<decimal> DecimalRoot =
-            new WProtoBclRootFormatter<decimal>();
-
-        private static readonly IWProtoFormatter<Uri> UriRoot = new WProtoBclRootFormatter<Uri>();
-
-        private static readonly IWProtoFormatter<char> CharRoot = new WProtoCharRootFormatter();
-
         /// <summary>The scale identifiers protobuf-net's <c>.bcl.TimeSpan</c> message carries.</summary>
         internal const int ScaleDays = 0;
         internal const int ScaleHours = 1;
@@ -63,6 +47,22 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         private const long TicksPerMinute = 600000000L;
         private const long TicksPerSecond = 10000000L;
         private const long TicksPerMillisecond = 10000L;
+
+        private static readonly IWProtoFormatter<DateTime> DateTimeRoot =
+            new WProtoBclRootFormatter<DateTime>();
+
+        private static readonly IWProtoFormatter<TimeSpan> TimeSpanRoot =
+            new WProtoBclRootFormatter<TimeSpan>();
+
+        private static readonly IWProtoFormatter<Guid> GuidRoot =
+            new WProtoBclRootFormatter<Guid>();
+
+        private static readonly IWProtoFormatter<decimal> DecimalRoot =
+            new WProtoBclRootFormatter<decimal>();
+
+        private static readonly IWProtoFormatter<Uri> UriRoot = new WProtoBclRootFormatter<Uri>();
+
+        private static readonly IWProtoFormatter<char> CharRoot = new WProtoCharRootFormatter();
 
         /// <summary>
         /// Splits a tick count into the scaled magnitude and unit identifier the wire carries.
@@ -171,21 +171,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
         }
 
-        private static bool CheckedMultiply(long value, long unit, out long ticks)
-        {
-            if (
-                value == 0L
-                || (0L < value ? value <= long.MaxValue / unit : long.MinValue / unit <= value)
-            )
-            {
-                ticks = value * unit;
-                return true;
-            }
-
-            ticks = 0;
-            return false;
-        }
-
         /// <summary>The byte size of the optional scaled-value and scale fields.</summary>
         internal static int FieldsSize(long value, int scale)
         {
@@ -267,6 +252,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             WProtoRootMarshalProvider.Register(DecimalRoot);
             WProtoRootMarshalProvider.Register(UriRoot);
             WProtoRootMarshalProvider.Register(CharRoot);
+        }
+
+        private static bool CheckedMultiply(long value, long unit, out long ticks)
+        {
+            if (
+                value == 0L
+                || (0L < value ? value <= long.MaxValue / unit : long.MinValue / unit <= value)
+            )
+            {
+                ticks = value * unit;
+                return true;
+            }
+
+            ticks = 0;
+            return false;
         }
 
         /// <summary>A scaled duration ready for the shared wire-field helpers.</summary>
@@ -376,6 +376,75 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
         private WProtoDateTimeFormatter() { }
 
+        internal static bool TryReadScaled(
+            ref WProtoReader reader,
+            out WProtoBcl.ScaledFields fields
+        )
+        {
+            long value = 0L;
+            int scale = WProtoBcl.ScaleDays;
+            uint kind = (uint)DateTimeKind.Unspecified;
+
+            while (reader.TryReadTag(out int fieldNumber, out int wireType))
+            {
+                switch (fieldNumber)
+                {
+                    case 1 when wireType == WProtoWireType.Varint:
+                    {
+                        if (!reader.TryReadZigZag64(out value))
+                        {
+                            return RefuseScaled(out fields);
+                        }
+
+                        break;
+                    }
+                    case 2 when wireType == WProtoWireType.Varint:
+                    {
+                        if (!reader.TryReadVarint32(out uint encoded))
+                        {
+                            return RefuseScaled(out fields);
+                        }
+
+                        scale = (int)encoded;
+                        break;
+                    }
+                    case 3 when wireType == WProtoWireType.Varint:
+                    {
+                        // Accept the oracle kind marker, but refuse unknown values in both temporal readers.
+                        if (!reader.TryReadVarint32(out kind) || 2U < kind)
+                        {
+                            return RefuseScaled(out fields);
+                        }
+
+                        break;
+                    }
+                    default:
+                    {
+                        if (!reader.TrySkipField(fieldNumber, wireType))
+                        {
+                            return RefuseScaled(out fields);
+                        }
+
+                        break;
+                    }
+                }
+            }
+
+            if (reader.Malformed)
+            {
+                return RefuseScaled(out fields);
+            }
+
+            fields = new WProtoBcl.ScaledFields(value, scale, kind);
+            return true;
+        }
+
+        private static bool RefuseScaled(out WProtoBcl.ScaledFields fields)
+        {
+            fields = default(WProtoBcl.ScaledFields);
+            return false;
+        }
+
         /// <inheritdoc />
         public int Measure(in DateTime value)
         {
@@ -453,75 +522,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 return false;
             }
         }
-
-        internal static bool TryReadScaled(
-            ref WProtoReader reader,
-            out WProtoBcl.ScaledFields fields
-        )
-        {
-            long value = 0L;
-            int scale = WProtoBcl.ScaleDays;
-            uint kind = (uint)DateTimeKind.Unspecified;
-
-            while (reader.TryReadTag(out int fieldNumber, out int wireType))
-            {
-                switch (fieldNumber)
-                {
-                    case 1 when wireType == WProtoWireType.Varint:
-                    {
-                        if (!reader.TryReadZigZag64(out value))
-                        {
-                            return RefuseScaled(out fields);
-                        }
-
-                        break;
-                    }
-                    case 2 when wireType == WProtoWireType.Varint:
-                    {
-                        if (!reader.TryReadVarint32(out uint encoded))
-                        {
-                            return RefuseScaled(out fields);
-                        }
-
-                        scale = (int)encoded;
-                        break;
-                    }
-                    case 3 when wireType == WProtoWireType.Varint:
-                    {
-                        // Accept the oracle kind marker, but refuse unknown values in both temporal readers.
-                        if (!reader.TryReadVarint32(out kind) || 2U < kind)
-                        {
-                            return RefuseScaled(out fields);
-                        }
-
-                        break;
-                    }
-                    default:
-                    {
-                        if (!reader.TrySkipField(fieldNumber, wireType))
-                        {
-                            return RefuseScaled(out fields);
-                        }
-
-                        break;
-                    }
-                }
-            }
-
-            if (reader.Malformed)
-            {
-                return RefuseScaled(out fields);
-            }
-
-            fields = new WProtoBcl.ScaledFields(value, scale, kind);
-            return true;
-        }
-
-        private static bool RefuseScaled(out WProtoBcl.ScaledFields fields)
-        {
-            fields = default(WProtoBcl.ScaledFields);
-            return false;
-        }
     }
 
     /// <summary>
@@ -595,10 +595,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// </summary>
     public sealed class WProtoGuidFormatter : IWProtoFormatter<Guid>
     {
+        private const int ByteCount = 16;
+
         /// <summary>The shared instance; the formatter holds no state.</summary>
         public static readonly WProtoGuidFormatter Instance = new WProtoGuidFormatter();
-
-        private const int ByteCount = 16;
 
         private WProtoGuidFormatter() { }
 
@@ -710,6 +710,58 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         private static readonly bool DecimalLayoutOptimized = VerifyDecimalLayout();
 
         private WProtoDecimalFormatter() { }
+
+        private static void Decompose(
+            decimal value,
+            out ulong low,
+            out uint high,
+            out uint signScale
+        )
+        {
+            int lo;
+            int mid;
+            int hi;
+            int flags;
+            if (DecimalLayoutOptimized)
+            {
+                DecimalBits bits = new DecimalBits(value);
+                lo = bits.Lo;
+                mid = bits.Mid;
+                hi = bits.Hi;
+                flags = bits.Flags;
+            }
+            else
+            {
+                int[] bits = decimal.GetBits(value);
+                lo = bits[0];
+                mid = bits[1];
+                hi = bits[2];
+                flags = bits[3];
+            }
+
+            low = ((ulong)(uint)mid << 32) | (uint)lo;
+            high = unchecked((uint)hi);
+            signScale = (uint)(((flags >> 15) & 0x01FE) | ((flags >> 31) & 0x0001));
+        }
+
+        private static bool VerifyDecimalLayout()
+        {
+            try
+            {
+                decimal value = 1.0000000000000000000000000000m;
+                DecimalBits layout = new DecimalBits(value);
+                int[] bits = decimal.GetBits(value);
+                return bits.Length == 4
+                    && layout.Lo == bits[0]
+                    && layout.Mid == bits[1]
+                    && layout.Hi == bits[2]
+                    && layout.Flags == bits[3];
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
 
         /// <inheritdoc />
         public int Measure(in decimal value)
@@ -837,58 +889,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 (byte)scale
             );
             return true;
-        }
-
-        private static void Decompose(
-            decimal value,
-            out ulong low,
-            out uint high,
-            out uint signScale
-        )
-        {
-            int lo;
-            int mid;
-            int hi;
-            int flags;
-            if (DecimalLayoutOptimized)
-            {
-                DecimalBits bits = new DecimalBits(value);
-                lo = bits.Lo;
-                mid = bits.Mid;
-                hi = bits.Hi;
-                flags = bits.Flags;
-            }
-            else
-            {
-                int[] bits = decimal.GetBits(value);
-                lo = bits[0];
-                mid = bits[1];
-                hi = bits[2];
-                flags = bits[3];
-            }
-
-            low = ((ulong)(uint)mid << 32) | (uint)lo;
-            high = unchecked((uint)hi);
-            signScale = (uint)(((flags >> 15) & 0x01FE) | ((flags >> 31) & 0x0001));
-        }
-
-        private static bool VerifyDecimalLayout()
-        {
-            try
-            {
-                decimal value = 1.0000000000000000000000000000m;
-                DecimalBits layout = new DecimalBits(value);
-                int[] bits = decimal.GetBits(value);
-                return bits.Length == 4
-                    && layout.Lo == bits[0]
-                    && layout.Mid == bits[1]
-                    && layout.Hi == bits[2]
-                    && layout.Flags == bits[3];
-            }
-            catch (Exception)
-            {
-                return false;
-            }
         }
 
         [StructLayout(LayoutKind.Explicit)]

@@ -21,6 +21,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     {
         private const string FirstGuid = "00000000000000000000000000000001";
 
+        private static ValidationFinding Finding(
+            ValidationSeverity severity,
+            string discriminator,
+            string message
+        )
+        {
+            return new ValidationFinding(
+                "SampleRule",
+                severity,
+                null,
+                FirstGuid,
+                "Assets/Sample.asset",
+                discriminator,
+                message
+            );
+        }
+
         [Test]
         public void NullFindingsFilterToNothingRatherThanThrowing()
         {
@@ -234,23 +251,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
             Assert.AreEqual("SampleRule|" + FirstGuid + "|slot", finding.Id);
             Assert.AreEqual("||", default(ValidationFinding).Id);
-        }
-
-        private static ValidationFinding Finding(
-            ValidationSeverity severity,
-            string discriminator,
-            string message
-        )
-        {
-            return new ValidationFinding(
-                "SampleRule",
-                severity,
-                null,
-                FirstGuid,
-                "Assets/Sample.asset",
-                discriminator,
-                message
-            );
         }
     }
 }

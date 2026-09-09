@@ -20,6 +20,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
     [NUnit.Framework.Category("Fast")]
     public sealed class RelationalComponentCollectorTests : CommonTestBase
     {
+        private static void ClearChildFields(ExpectChildSpriteRenderers subject)
+        {
+            subject.inclusiveChildrenArray = null;
+            subject.exclusiveChildrenArray = null;
+            subject.inclusiveChildrenList = null;
+            subject.exclusiveChildrenList = null;
+            subject.inclusiveChild = null;
+            subject.exclusiveChild = null;
+        }
+
+        private static void ClearParentFields(ExpectParentSpriteRenderers subject)
+        {
+            subject.inclusiveParentArray = null;
+            subject.exclusiveParentArray = null;
+            subject.inclusiveParentList = null;
+            subject.exclusiveParentList = null;
+        }
+
         [TearDown]
         public void ResetCollectorMode()
         {
@@ -182,24 +200,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             );
             leaf.transform.SetParent(disabledAncestor.transform);
             return leaf.GetComponent<ExpectParentSpriteRenderers>();
-        }
-
-        private static void ClearChildFields(ExpectChildSpriteRenderers subject)
-        {
-            subject.inclusiveChildrenArray = null;
-            subject.exclusiveChildrenArray = null;
-            subject.inclusiveChildrenList = null;
-            subject.exclusiveChildrenList = null;
-            subject.inclusiveChild = null;
-            subject.exclusiveChild = null;
-        }
-
-        private static void ClearParentFields(ExpectParentSpriteRenderers subject)
-        {
-            subject.inclusiveParentArray = null;
-            subject.exclusiveParentArray = null;
-            subject.inclusiveParentList = null;
-            subject.exclusiveParentList = null;
         }
     }
 }

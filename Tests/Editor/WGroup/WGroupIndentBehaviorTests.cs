@@ -29,34 +29,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
         private UnityHelpersSettings.WGroupAutoIncludeConfiguration _previousConfiguration;
         private int _originalIndentLevel;
 
-        [SetUp]
-        public override void BaseSetUp()
-        {
-            base.BaseSetUp();
-            WGroupLayoutBuilder.ClearCache();
-            GroupGUIWidthUtility.ResetForTests();
-            _originalIndentLevel = EditorGUI.indentLevel;
-            EditorGUI.indentLevel = 0;
-            _previousConfiguration = UnityHelpersSettings.GetWGroupAutoIncludeConfiguration();
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
-                UnityHelpersSettings.WGroupAutoIncludeMode.None,
-                0
-            );
-        }
-
-        [TearDown]
-        public override void TearDown()
-        {
-            WGroupLayoutBuilder.ClearCache();
-            GroupGUIWidthUtility.ResetForTests();
-            EditorGUI.indentLevel = _originalIndentLevel;
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
-                _previousConfiguration.Mode,
-                _previousConfiguration.RowCount
-            );
-            base.TearDown();
-        }
-
         private static string FormatLayoutDiagnostics(WGroupLayout layout)
         {
             List<string> lines = new()
@@ -91,6 +63,116 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
             }
 
             return string.Join("\n", lines);
+        }
+
+        /// <summary>
+        /// Data-driven test cases validating that groups contain their expected properties.
+        /// These test cases validate the correct behavior of explicit [WGroup] + InfiniteAutoInclude
+        /// combined with [WGroup] + [WGroupEnd] patterns.
+        /// </summary>
+        private static System.Collections.IEnumerable GroupPropertyCountTestCases()
+        {
+            yield return new TestCaseData(
+                typeof(SimpleFieldsTarget),
+                "Primitives",
+                4,
+                new[]
+                {
+                    nameof(SimpleFieldsTarget.intField),
+                    nameof(SimpleFieldsTarget.floatField),
+                    nameof(SimpleFieldsTarget.stringField),
+                    nameof(SimpleFieldsTarget.boolField),
+                }
+            ).SetName("SimpleFields.HasAllFourPrimitives");
+
+            yield return new TestCaseData(
+                typeof(ListFieldsTarget),
+                "Lists",
+                3,
+                new[]
+                {
+                    nameof(ListFieldsTarget.intList),
+                    nameof(ListFieldsTarget.stringList),
+                    nameof(ListFieldsTarget.floatList),
+                }
+            ).SetName("ListFields.HasAllThreeLists");
+
+            yield return new TestCaseData(
+                typeof(ArrayFieldsTarget),
+                "Arrays",
+                3,
+                new[]
+                {
+                    nameof(ArrayFieldsTarget.intArray),
+                    nameof(ArrayFieldsTarget.stringArray),
+                    nameof(ArrayFieldsTarget.floatArray),
+                }
+            ).SetName("ArrayFields.HasAllThreeArrays");
+
+            yield return new TestCaseData(
+                typeof(SerializableClassTarget),
+                "Nested",
+                2,
+                new[]
+                {
+                    nameof(SerializableClassTarget.nestedData),
+                    nameof(SerializableClassTarget.anotherNestedData),
+                }
+            ).SetName("SerializableClass.HasBothNestedFields");
+
+            yield return new TestCaseData(
+                typeof(MixedFieldsTarget),
+                "Mixed",
+                5,
+                new[]
+                {
+                    nameof(MixedFieldsTarget.simpleInt),
+                    nameof(MixedFieldsTarget.listField),
+                    nameof(MixedFieldsTarget.simpleString),
+                    nameof(MixedFieldsTarget.nestedField),
+                    nameof(MixedFieldsTarget.simpleFloat),
+                }
+            ).SetName("MixedFields.HasAllFiveMixedFields");
+        }
+
+        /// <summary>
+        /// Test cases validating behavior of WGroupEnd without [WGroup] (should NOT include field).
+        /// </summary>
+        private static System.Collections.IEnumerable WGroupEndOnlyDoesNotIncludeFieldTestCases()
+        {
+            yield return new TestCaseData(
+                typeof(SiblingGroupsWithDifferentTypesTarget),
+                "GroupC",
+                nameof(SiblingGroupsWithDifferentTypesTarget.afterAllGroups)
+            ).SetName("WGroupEndOnly.DoesNotIncludeTerminatingField");
+        }
+
+        [SetUp]
+        public override void BaseSetUp()
+        {
+            base.BaseSetUp();
+            WGroupLayoutBuilder.ClearCache();
+            GroupGUIWidthUtility.ResetForTests();
+            _originalIndentLevel = EditorGUI.indentLevel;
+            EditorGUI.indentLevel = 0;
+            _previousConfiguration = UnityHelpersSettings.GetWGroupAutoIncludeConfiguration();
+            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+                UnityHelpersSettings.WGroupAutoIncludeMode.None,
+                0
+            );
+        }
+
+        [TearDown]
+        public override void TearDown()
+        {
+            WGroupLayoutBuilder.ClearCache();
+            GroupGUIWidthUtility.ResetForTests();
+            EditorGUI.indentLevel = _originalIndentLevel;
+            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+                _previousConfiguration.Mode,
+                _previousConfiguration.RowCount
+            );
+            base.TearDown();
         }
 
         [Test]
@@ -633,76 +715,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
             );
         }
 
-        /// <summary>
-        /// Data-driven test cases validating that groups contain their expected properties.
-        /// These test cases validate the correct behavior of explicit [WGroup] + InfiniteAutoInclude
-        /// combined with [WGroup] + [WGroupEnd] patterns.
-        /// </summary>
-        private static System.Collections.IEnumerable GroupPropertyCountTestCases()
-        {
-            yield return new TestCaseData(
-                typeof(SimpleFieldsTarget),
-                "Primitives",
-                4,
-                new[]
-                {
-                    nameof(SimpleFieldsTarget.intField),
-                    nameof(SimpleFieldsTarget.floatField),
-                    nameof(SimpleFieldsTarget.stringField),
-                    nameof(SimpleFieldsTarget.boolField),
-                }
-            ).SetName("SimpleFields.HasAllFourPrimitives");
-
-            yield return new TestCaseData(
-                typeof(ListFieldsTarget),
-                "Lists",
-                3,
-                new[]
-                {
-                    nameof(ListFieldsTarget.intList),
-                    nameof(ListFieldsTarget.stringList),
-                    nameof(ListFieldsTarget.floatList),
-                }
-            ).SetName("ListFields.HasAllThreeLists");
-
-            yield return new TestCaseData(
-                typeof(ArrayFieldsTarget),
-                "Arrays",
-                3,
-                new[]
-                {
-                    nameof(ArrayFieldsTarget.intArray),
-                    nameof(ArrayFieldsTarget.stringArray),
-                    nameof(ArrayFieldsTarget.floatArray),
-                }
-            ).SetName("ArrayFields.HasAllThreeArrays");
-
-            yield return new TestCaseData(
-                typeof(SerializableClassTarget),
-                "Nested",
-                2,
-                new[]
-                {
-                    nameof(SerializableClassTarget.nestedData),
-                    nameof(SerializableClassTarget.anotherNestedData),
-                }
-            ).SetName("SerializableClass.HasBothNestedFields");
-
-            yield return new TestCaseData(
-                typeof(MixedFieldsTarget),
-                "Mixed",
-                5,
-                new[]
-                {
-                    nameof(MixedFieldsTarget.simpleInt),
-                    nameof(MixedFieldsTarget.listField),
-                    nameof(MixedFieldsTarget.simpleString),
-                    nameof(MixedFieldsTarget.nestedField),
-                    nameof(MixedFieldsTarget.simpleFloat),
-                }
-            ).SetName("MixedFields.HasAllFiveMixedFields");
-        }
-
         [Test]
         [TestCaseSource(nameof(GroupPropertyCountTestCases))]
         public void GroupContainsExpectedProperties(
@@ -739,18 +751,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                         $"Group '{groupName}' should contain '{expectedProperty}'.\n{FormatLayoutDiagnostics(layout)}"
                 );
             }
-        }
-
-        /// <summary>
-        /// Test cases validating behavior of WGroupEnd without [WGroup] (should NOT include field).
-        /// </summary>
-        private static System.Collections.IEnumerable WGroupEndOnlyDoesNotIncludeFieldTestCases()
-        {
-            yield return new TestCaseData(
-                typeof(SiblingGroupsWithDifferentTypesTarget),
-                "GroupC",
-                nameof(SiblingGroupsWithDifferentTypesTarget.afterAllGroups)
-            ).SetName("WGroupEndOnly.DoesNotIncludeTerminatingField");
         }
 
         [Test]

@@ -13,14 +13,6 @@ namespace WallstopStudios.UnityHelpers.Utils
     [DisallowMultipleComponent]
     public sealed class SpriteRendererMetadata : MonoBehaviour
     {
-        private bool Enabled => enabled && gameObject.activeInHierarchy;
-
-        private readonly List<(Component component, Color color)> _colorStack = new();
-        private readonly List<(Component component, Material material)> _materialStack = new();
-
-        private readonly List<(Component component, Color color)> _colorStackCache = new();
-        private readonly List<(Component component, Material material)> _materialStackCache = new();
-
         public Color OriginalColor => _colorStack[0].color;
 
         public Color CurrentColor => _colorStack[^1].color;
@@ -51,6 +43,14 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
         }
 
+        private bool Enabled => enabled && gameObject.activeInHierarchy;
+
+        private readonly List<(Component component, Color color)> _colorStack = new();
+        private readonly List<(Component component, Material material)> _materialStack = new();
+
+        private readonly List<(Component component, Color color)> _colorStackCache = new();
+        private readonly List<(Component component, Material material)> _materialStackCache = new();
+
         [SiblingComponent]
         [SerializeField]
         private SpriteRenderer _spriteRenderer;
@@ -70,13 +70,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             InternalPushColor(component, color);
-        }
-
-        private void InternalPushColor(Component component, Color color)
-        {
-            RemoveColor(component);
-            _colorStack.Add((component, color));
-            _spriteRenderer.color = CurrentColor;
         }
 
         public void PushBackColor(Component component, Color color, bool force = false)
@@ -143,15 +136,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 #endif
             return InternalPushMaterial(component, material);
-        }
-
-        private Material InternalPushMaterial(Component component, Material material)
-        {
-            RemoveMaterial(component);
-            _spriteRenderer.material = material;
-            Material instanced = _spriteRenderer.material;
-            _materialStack.Add((component, instanced));
-            return instanced;
         }
 
         /// <summary>
@@ -221,6 +205,22 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             material = default;
             return false;
+        }
+
+        private void InternalPushColor(Component component, Color color)
+        {
+            RemoveColor(component);
+            _colorStack.Add((component, color));
+            _spriteRenderer.color = CurrentColor;
+        }
+
+        private Material InternalPushMaterial(Component component, Material material)
+        {
+            RemoveMaterial(component);
+            _spriteRenderer.material = material;
+            Material instanced = _spriteRenderer.material;
+            _materialStack.Add((component, instanced));
+            return instanced;
         }
 
         private void Awake()

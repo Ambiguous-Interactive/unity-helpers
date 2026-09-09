@@ -24,6 +24,54 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     {
         private const string SwitchNativeSkinMethodName = "Internal_SwitchSkin";
 
+        private static void SelectActualEditorSkin(bool dark)
+        {
+            if (EditorGUIUtility.isProSkin == dark)
+                return;
+
+            // The preference command requests a domain reload; capture creates fresh panels instead.
+            MethodInfo switchSkin = typeof(EditorGUIUtility).GetMethod(
+                SwitchNativeSkinMethodName,
+                BindingFlags.Static | BindingFlags.NonPublic
+            );
+            Assert.IsTrue(
+                switchSkin != null,
+                "Unity must expose its native editor resource skin switch."
+            );
+            switchSkin.Invoke(null, null);
+            Assert.AreEqual(dark, EditorGUIUtility.isProSkin);
+        }
+
+        private static void CaptureRoot(VisualElement root, string path)
+        {
+            VisualElement surface = new VisualElement();
+            surface.style.width = 1280;
+            surface.style.height = 720;
+            surface.style.paddingLeft = root.style.paddingLeft;
+            surface.style.paddingRight = root.style.paddingRight;
+            surface.style.paddingTop = root.style.paddingTop;
+            surface.style.paddingBottom = root.style.paddingBottom;
+            surface.style.backgroundColor = root.style.backgroundColor;
+            foreach (string className in root.GetClasses())
+                surface.AddToClassList(className);
+            for (int index = 0; index < root.styleSheets.count; index++)
+                surface.styleSheets.Add(root.styleSheets[index]);
+            while (0 < root.childCount)
+                surface.Add(root.ElementAt(0));
+            EditorSurfaceCaptureResult result = EditorSurfaceCapture.Capture(
+                surface,
+                1280,
+                720,
+                path
+            );
+            Assert.AreEqual(0, result.RenderErrorCount, result.RenderErrorSummary);
+            Assert.IsTrue(File.Exists(path));
+            Assert.IsTrue(
+                16 < result.DistinctColorCount,
+                "The tool must draw more than a blank or control surface."
+            );
+        }
+
         [UnityTest]
         public IEnumerator CaptureBothActualEditorSkins()
         {
@@ -90,24 +138,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             }
             yield return null;
             Assert.AreEqual(previous, EditorGUIUtility.isProSkin);
-        }
-
-        private static void SelectActualEditorSkin(bool dark)
-        {
-            if (EditorGUIUtility.isProSkin == dark)
-                return;
-
-            // The preference command requests a domain reload; capture creates fresh panels instead.
-            MethodInfo switchSkin = typeof(EditorGUIUtility).GetMethod(
-                SwitchNativeSkinMethodName,
-                BindingFlags.Static | BindingFlags.NonPublic
-            );
-            Assert.IsTrue(
-                switchSkin != null,
-                "Unity must expose its native editor resource skin switch."
-            );
-            switchSkin.Invoke(null, null);
-            Assert.AreEqual(dark, EditorGUIUtility.isProSkin);
         }
 
         /// <summary>Captures each actual validation view through the editor's offscreen panel renderer.</summary>
@@ -262,36 +292,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             {
                 UnityEngine.Object.DestroyImmediate(decoded); // UNH-SUPPRESS UNH001: release each readback before capturing the next surface.
             }
-        }
-
-        private static void CaptureRoot(VisualElement root, string path)
-        {
-            VisualElement surface = new VisualElement();
-            surface.style.width = 1280;
-            surface.style.height = 720;
-            surface.style.paddingLeft = root.style.paddingLeft;
-            surface.style.paddingRight = root.style.paddingRight;
-            surface.style.paddingTop = root.style.paddingTop;
-            surface.style.paddingBottom = root.style.paddingBottom;
-            surface.style.backgroundColor = root.style.backgroundColor;
-            foreach (string className in root.GetClasses())
-                surface.AddToClassList(className);
-            for (int index = 0; index < root.styleSheets.count; index++)
-                surface.styleSheets.Add(root.styleSheets[index]);
-            while (0 < root.childCount)
-                surface.Add(root.ElementAt(0));
-            EditorSurfaceCaptureResult result = EditorSurfaceCapture.Capture(
-                surface,
-                1280,
-                720,
-                path
-            );
-            Assert.AreEqual(0, result.RenderErrorCount, result.RenderErrorSummary);
-            Assert.IsTrue(File.Exists(path));
-            Assert.IsTrue(
-                16 < result.DistinctColorCount,
-                "The tool must draw more than a blank or control surface."
-            );
         }
     }
 }

@@ -27,6 +27,10 @@ namespace WallstopStudios.UnityHelpers.Editor
         private const float ToggleWidth = 18f;
         private const float ToggleSpacing = 4f;
 
+        private const int MaxTransformScanForMissingOwner = 5000;
+
+        private const string DefaultPrefabsFolder = "Assets/Prefabs";
+
         private static readonly Dictionary<Type, List<FieldInfo>> FieldsByType = new();
         private static readonly Dictionary<Type, List<FieldInfo>> ListFieldsByType = new();
         private static readonly Dictionary<Type, List<FieldInfo>> StringFieldsByType = new();
@@ -52,221 +56,12 @@ namespace WallstopStudios.UnityHelpers.Editor
         private readonly List<string> _excludeLabels = new();
         private string _componentTypeDenyListCsv = string.Empty;
 
-        private const int MaxTransformScanForMissingOwner = 5000;
-
-        private const string DefaultPrefabsFolder = "Assets/Prefabs";
+        private ScanReport _lastReport;
 
         [MenuItem("Tools/Wallstop Studios/Unity Helpers/Prefab Checker", priority = -1)]
         public static void ShowWindow()
         {
             GetWindow<PrefabChecker>("Prefab Check");
-        }
-
-        private void OnEnable()
-        {
-            PopulateDefaultPaths();
-            TryRestoreFromHistory();
-            SetupReorderableList();
-        }
-
-        private void PopulateDefaultPaths()
-        {
-            // Avoid implicit state when running in tests or suppressed UI contexts
-            if (EditorUi.Suppress)
-            {
-                return;
-            }
-
-            if (_assetPaths.Count == 0 && AssetDatabase.IsValidFolder(DefaultPrefabsFolder))
-            {
-                _assetPaths.Add(DefaultPrefabsFolder);
-            }
-        }
-
-        private void OnGUI()
-        {
-            _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
-            try
-            {
-                DrawConfigurationOptions();
-
-                EditorGUILayout.Space();
-                EditorGUILayout.LabelField("Target Folders", EditorStyles.boldLabel);
-                DrawAssetPaths();
-                if (GUILayout.Button("Add Folder"))
-                {
-                    AddFolder();
-                }
-
-                HandleDragAndDropForPaths();
-
-                EditorGUILayout.Space();
-                DrawFiltersAndUtilities();
-                EditorGUILayout.Space();
-                if (GUILayout.Button("Run Checks", GUILayout.Height(30)))
-                {
-                    RunChecksImproved();
-                }
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    GUI.enabled = _offerAutoFixes;
-                    if (GUILayout.Button("Fix Missing Scripts"))
-                    {
-                        FixMissingScripts();
-                    }
-                    GUI.enabled = true;
-                    if (GUILayout.Button("Export Report (JSON)"))
-                    {
-                        ExportLastReport();
-                    }
-                    if (GUILayout.Button("Export Report (CSV)"))
-                    {
-                        ExportLastReportCsv();
-                    }
-                }
-            }
-            finally
-            {
-                EditorGUILayout.EndScrollView();
-            }
-        }
-
-        private void DrawConfigurationOptions()
-        {
-            EditorGUILayout.LabelField("Validation Checks", EditorStyles.boldLabel);
-
-            Func<GUIContent, bool, float?, bool, bool> drawRightAlignedToggle =
-                SetupDrawRightAlignedToggle();
-
-            float targetAlignmentX = 0f;
-            bool alignmentCalculated = false;
-
-            DrawAndAlign(
-                new GUIContent(
-                    "Missing Scripts",
-                    "Check for GameObjects with missing script references."
-                ),
-                () => _checkMissingScripts,
-                v => _checkMissingScripts = v,
-                false
-            );
-            DrawAndAlign(
-                new GUIContent(
-                    "Nulls in Lists/Arrays",
-                    "Check for null elements within serialized lists or arrays."
-                ),
-                () => _checkNullElementsInLists,
-                v => _checkNullElementsInLists = v,
-                false
-            );
-            DrawAndAlign(
-                new GUIContent(
-                    "Missing Required Components",
-                    "Check if components are missing dependencies defined by [RequireComponent]."
-                ),
-                () => _checkMissingRequiredComponents,
-                v => _checkMissingRequiredComponents = v,
-                false
-            );
-            DrawAndAlign(
-                new GUIContent(
-                    "Empty String Fields",
-                    "Check for serialized string fields that are empty."
-                ),
-                () => _checkEmptyStringFields,
-                v => _checkEmptyStringFields = v,
-                false
-            );
-
-            DrawAndAlign(
-                new GUIContent(
-                    "Null Object References",
-                    "Check for serialized UnityEngine.Object fields that are null."
-                ),
-                () => _checkNullObjectReferences,
-                v => _checkNullObjectReferences = v,
-                false
-            );
-
-            bool wasEnabled = GUI.enabled;
-            GUI.enabled = wasEnabled && _checkNullObjectReferences;
-            try
-            {
-                using EditorGUI.IndentLevelScope indent = new();
-                DrawAndAlign(
-                    new GUIContent(
-                        "Only if [ValidateAssignment]",
-                        "Only report null object references if the field has the [ValidateAssignment] attribute."
-                    ),
-                    () => _onlyCheckNullObjectsWithAttribute,
-                    v => _onlyCheckNullObjectsWithAttribute = v,
-                    true
-                );
-            }
-            finally
-            {
-                GUI.enabled = wasEnabled;
-            }
-
-            DrawAndAlign(
-                new GUIContent(
-                    "Disabled Root GameObject",
-                    "Check if the prefab's root GameObject is inactive."
-                ),
-                () => _checkDisabledRootGameObjects,
-                v => _checkDisabledRootGameObjects = v,
-                false
-            );
-            DrawAndAlign(
-                new GUIContent(
-                    "Disabled Components",
-                    "Check for any components on the prefab that are disabled."
-                ),
-                () => _checkDisabledComponents,
-                v => _checkDisabledComponents = v,
-                false
-            );
-            return;
-
-            void DrawAndAlign(
-                GUIContent content,
-                Func<bool> getter,
-                Action<bool> setter,
-                bool isNested
-            )
-            {
-                switch (alignmentCalculated)
-                {
-                    case false when !isNested:
-                    {
-                        float viewWidth = EditorGUIUtility.currentViewWidth;
-
-                        float availableWidth = viewWidth - 18f;
-                        targetAlignmentX = availableWidth - ToggleWidth;
-                        alignmentCalculated = true;
-                        break;
-                    }
-                    case false when isNested:
-                    {
-                        float viewWidth = EditorGUIUtility.currentViewWidth;
-                        float availableWidth = viewWidth - 20f - 15f;
-                        targetAlignmentX = availableWidth - ToggleWidth;
-                        alignmentCalculated = true;
-                        this.LogWarn(
-                            $"Calculated alignment X based on first item being nested. Alignment might be approximate."
-                        );
-                        break;
-                    }
-                }
-
-                float? overrideX = isNested ? targetAlignmentX : null;
-
-                bool newValue = drawRightAlignedToggle(content, getter(), overrideX, isNested);
-                if (newValue != getter())
-                {
-                    setter(newValue);
-                }
-            }
         }
 
         private static Func<GUIContent, bool, float?, bool, bool> SetupDrawRightAlignedToggle()
@@ -297,30 +92,322 @@ namespace WallstopStudios.UnityHelpers.Editor
             };
         }
 
-        private void DrawAssetPaths()
+        private static bool TryGetUnityFolderFromAbsolute(
+            string absolutePath,
+            out string unityRelative
+        )
         {
-            if (_pathsList == null)
+            if (string.IsNullOrWhiteSpace(absolutePath))
             {
-                SetupReorderableList();
+                unityRelative = string.Empty;
+                return false;
             }
-            // ReSharper disable once PossibleNullReferenceException
-            _pathsList.DoLayoutList();
+
+            string rel = DirectoryHelper.AbsoluteToUnityRelativePath(absolutePath);
+            if (string.IsNullOrWhiteSpace(rel))
+            {
+                unityRelative = string.Empty;
+                return false;
+            }
+
+            rel = rel.SanitizePath();
+
+            rel = rel.TrimEnd('/', '\\');
+
+            if (rel.StartsWith("assets/", StringComparison.OrdinalIgnoreCase))
+            {
+                rel = "Assets/" + rel.Substring("assets/".Length);
+            }
+            else if (string.Equals(rel, "assets", StringComparison.OrdinalIgnoreCase))
+            {
+                rel = "Assets";
+            }
+
+            unityRelative = rel;
+            return true;
         }
 
-        private void AddFolder()
+        private static GameObject FindOwnerOfMissingScript(
+            GameObject prefabRoot,
+            List<MonoBehaviour> buffer
+        )
         {
-            string absolutePath = EditorUi.OpenFolderPanel(
-                "Select Prefab Folder",
-                "Assets",
-                string.Empty
+            using PooledResource<List<Transform>> transformBufferResource =
+                Buffers<Transform>.List.Get(out List<Transform> transforms);
+            prefabRoot.GetComponentsInChildren(true, transforms);
+            foreach (Transform transform in transforms)
+            {
+                using PooledResource<List<MonoBehaviour>> componentBuffer =
+                    Buffers<MonoBehaviour>.List.Get(out List<MonoBehaviour> components);
+                transform.GetComponents(components);
+                int bufferCount = 0;
+                foreach (MonoBehaviour c in components)
+                {
+                    if (c != null && c.gameObject == transform.gameObject)
+                    {
+                        ++bufferCount;
+                    }
+                }
+                if (components.Count == bufferCount)
+                {
+                    continue;
+                }
+
+                bool foundInNonNullBuffer = false;
+                foreach (MonoBehaviour c in components)
+                {
+                    if (buffer.Contains(c))
+                    {
+                        foundInNonNullBuffer = true;
+                        break;
+                    }
+                }
+
+                if (foundInNonNullBuffer)
+                {
+                    return transform.gameObject;
+                }
+
+                if (components.Count != 0 || !buffer.Exists(c => c == null))
+                {
+                    continue;
+                }
+
+                using PooledResource<HashSet<GameObject>> setResource =
+                    Buffers<GameObject>.HashSet.Get(
+                        out HashSet<GameObject> gameObjectsWithComponentsInBuffer
+                    );
+                foreach (MonoBehaviour c in buffer)
+                {
+                    if (c != null)
+                    {
+                        gameObjectsWithComponentsInBuffer.Add(c.gameObject);
+                    }
+                }
+                if (!gameObjectsWithComponentsInBuffer.Contains(transform.gameObject))
+                {
+                    return transform.gameObject;
+                }
+            }
+
+            return prefabRoot;
+        }
+
+        private static IEnumerable<FieldInfo> GetFieldsToCheck(
+            Type componentType,
+            Dictionary<Type, List<FieldInfo>> cache
+        )
+        {
+            return cache.GetOrAdd(
+                componentType,
+                static type =>
+                {
+                    FieldInfo[] fields = ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(
+                        type
+                    );
+                    int len = fields.Length;
+                    List<FieldInfo> list = new(len);
+                    for (int i = 0; i < len; i++)
+                    {
+                        FieldInfo field = fields[i];
+                        bool include =
+                            field.IsPublic
+                            || field.IsAttributeDefined<SerializeField>(out _, inherit: true);
+                        if (include)
+                        {
+                            list.Add(field);
+                        }
+                    }
+                    return list;
+                }
+            );
+        }
+
+        private static int ValidateNoNullsInLists(Object component, GameObject context)
+        {
+            int issueCount = 0;
+            Type componentType = component.GetType();
+
+            List<FieldInfo> listFields = ListFieldsByType.GetOrAdd(
+                componentType,
+                static type =>
+                {
+                    IEnumerable<FieldInfo> baseFields = GetFieldsToCheck(type, FieldsByType);
+                    List<FieldInfo> res = new();
+                    foreach (FieldInfo f in baseFields)
+                    {
+                        if (f == null)
+                        {
+                            continue;
+                        }
+                        Type ft = f.FieldType;
+                        if (typeof(IEnumerable).IsAssignableFrom(ft) && ft != typeof(string))
+                        {
+                            res.Add(f);
+                        }
+                    }
+                    return res;
+                }
+            );
+            foreach (FieldInfo field in listFields)
+            {
+                object fieldValue = field.GetValue(component);
+
+                if (fieldValue is not IEnumerable list)
+                {
+                    continue;
+                }
+
+                int index = 0;
+                if (list is Object unityObject)
+                {
+                    if (list.GetType() != typeof(Transform) && unityObject == null)
+                    {
+                        unityObject.LogError(
+                            $"Field '{field.Name}' ({field.FieldType.Name}) on component '{componentType.Name}' has a null enumerable."
+                        );
+                    }
+                    continue;
+                }
+                foreach (object element in list)
+                {
+                    if (element == null || (element is Object unityObj && !unityObj))
+                    {
+                        context.LogError(
+                            $"Field '{field.Name}' ({field.FieldType.Name}) on component '{componentType.Name}' has a null or missing element at index {index}."
+                        );
+                        issueCount++;
+                    }
+                    index++;
+                }
+            }
+            return issueCount;
+        }
+
+        private static int ValidateRequiredComponentsFast(
+            Component component,
+            GameObject context,
+            HashSet<Type> presentTypes
+        )
+        {
+            int issueCount = 0;
+            Type componentType = component.GetType();
+
+            RequireComponent[] required = RequiredComponentsByType.GetOrAdd(
+                componentType,
+                static type => type.GetAllAttributesSafe<RequireComponent>(inherit: true)
             );
 
-            if (string.IsNullOrWhiteSpace(absolutePath))
+            if (required.Length <= 0)
+            {
+                return issueCount;
+            }
+
+            foreach (RequireComponent requiredComponent in required)
+            {
+                if (
+                    requiredComponent.m_Type0 != null
+                    && !presentTypes.Contains(requiredComponent.m_Type0)
+                )
+                {
+                    context.LogError(
+                        $"Component '{componentType.Name}' requires component '{requiredComponent.m_Type0.Name}', but it is missing."
+                    );
+                    issueCount++;
+                }
+                if (
+                    requiredComponent.m_Type1 != null
+                    && !presentTypes.Contains(requiredComponent.m_Type1)
+                )
+                {
+                    context.LogError(
+                        $"Component '{componentType.Name}' requires component '{requiredComponent.m_Type1.Name}', but it is missing."
+                    );
+                    issueCount++;
+                }
+                if (
+                    requiredComponent.m_Type2 != null
+                    && !presentTypes.Contains(requiredComponent.m_Type2)
+                )
+                {
+                    context.LogError(
+                        $"Component '{componentType.Name}' requires component '{requiredComponent.m_Type2.Name}', but it is missing."
+                    );
+                    issueCount++;
+                }
+            }
+            return issueCount;
+        }
+
+        private static int ValidateEmptyStrings(Object component, GameObject context)
+        {
+            int issueCount = 0;
+            Type componentType = component.GetType();
+
+            List<FieldInfo> stringFields = StringFieldsByType.GetOrAdd(
+                componentType,
+                static type =>
+                {
+                    IEnumerable<FieldInfo> baseFields = GetFieldsToCheck(type, FieldsByType);
+                    List<FieldInfo> res = new();
+                    foreach (FieldInfo f in baseFields)
+                    {
+                        if (f != null && f.FieldType == typeof(string))
+                        {
+                            res.Add(f);
+                        }
+                    }
+                    return res;
+                }
+            );
+            foreach (FieldInfo field in stringFields)
+            {
+                object fieldValue = field.GetValue(component);
+                if (fieldValue is string stringValue && string.IsNullOrEmpty(stringValue))
+                {
+                    context.LogWarn(
+                        $"String field '{field.Name}' on component '{componentType.Name}' is null or empty."
+                    );
+                    issueCount++;
+                }
+            }
+            return issueCount;
+        }
+
+        private static GameObject FindOwnerOfMissingScriptBounded(
+            GameObject prefabRoot,
+            List<MonoBehaviour> buffer
+        )
+        {
+            using PooledResource<List<Transform>> transformBufferResource =
+                Buffers<Transform>.List.Get(out List<Transform> transforms);
+            prefabRoot.GetComponentsInChildren(true, transforms);
+            if (MaxTransformScanForMissingOwner < transforms.Count)
+            {
+                prefabRoot.LogWarn(
+                    $"Hierarchy too large to locate owner of missing script (>{MaxTransformScanForMissingOwner}). Reporting at prefab root."
+                );
+                return prefabRoot;
+            }
+            return FindOwnerOfMissingScript(prefabRoot, buffer);
+        }
+
+        private static void TryRecordHistory(string relativePath)
+        {
+            if (PersistentDirectorySettings.Instance == null)
             {
                 return;
             }
 
-            _ = TryAddFolderFromAbsolute(absolutePath);
+            try
+            {
+                PersistentDirectorySettings.Instance.RecordPath(
+                    ToolName,
+                    TargetContextKey,
+                    relativePath
+                );
+            }
+            catch { }
         }
 
         internal bool TryAddFolderFromAbsolute(string absolutePath)
@@ -366,41 +453,6 @@ namespace WallstopStudios.UnityHelpers.Editor
 
             this.LogWarn($"Selected path '{relativePath}' is not a valid Unity folder.");
             return false;
-        }
-
-        private static bool TryGetUnityFolderFromAbsolute(
-            string absolutePath,
-            out string unityRelative
-        )
-        {
-            if (string.IsNullOrWhiteSpace(absolutePath))
-            {
-                unityRelative = string.Empty;
-                return false;
-            }
-
-            string rel = DirectoryHelper.AbsoluteToUnityRelativePath(absolutePath);
-            if (string.IsNullOrWhiteSpace(rel))
-            {
-                unityRelative = string.Empty;
-                return false;
-            }
-
-            rel = rel.SanitizePath();
-
-            rel = rel.TrimEnd('/', '\\');
-
-            if (rel.StartsWith("assets/", StringComparison.OrdinalIgnoreCase))
-            {
-                rel = "Assets/" + rel.Substring("assets/".Length);
-            }
-            else if (string.Equals(rel, "assets", StringComparison.OrdinalIgnoreCase))
-            {
-                rel = "Assets";
-            }
-
-            unityRelative = rel;
-            return true;
         }
 
         internal void RunChecksImproved()
@@ -715,251 +767,237 @@ namespace WallstopStudios.UnityHelpers.Editor
             );
         }
 
-        private static GameObject FindOwnerOfMissingScript(
-            GameObject prefabRoot,
-            List<MonoBehaviour> buffer
-        )
+        private void OnEnable()
         {
-            using PooledResource<List<Transform>> transformBufferResource =
-                Buffers<Transform>.List.Get(out List<Transform> transforms);
-            prefabRoot.GetComponentsInChildren(true, transforms);
-            foreach (Transform transform in transforms)
+            PopulateDefaultPaths();
+            TryRestoreFromHistory();
+            SetupReorderableList();
+        }
+
+        private void PopulateDefaultPaths()
+        {
+            // Avoid implicit state when running in tests or suppressed UI contexts
+            if (EditorUi.Suppress)
             {
-                using PooledResource<List<MonoBehaviour>> componentBuffer =
-                    Buffers<MonoBehaviour>.List.Get(out List<MonoBehaviour> components);
-                transform.GetComponents(components);
-                int bufferCount = 0;
-                foreach (MonoBehaviour c in components)
+                return;
+            }
+
+            if (_assetPaths.Count == 0 && AssetDatabase.IsValidFolder(DefaultPrefabsFolder))
+            {
+                _assetPaths.Add(DefaultPrefabsFolder);
+            }
+        }
+
+        private void OnGUI()
+        {
+            _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
+            try
+            {
+                DrawConfigurationOptions();
+
+                EditorGUILayout.Space();
+                EditorGUILayout.LabelField("Target Folders", EditorStyles.boldLabel);
+                DrawAssetPaths();
+                if (GUILayout.Button("Add Folder"))
                 {
-                    if (c != null && c.gameObject == transform.gameObject)
-                    {
-                        ++bufferCount;
-                    }
-                }
-                if (components.Count == bufferCount)
-                {
-                    continue;
+                    AddFolder();
                 }
 
-                bool foundInNonNullBuffer = false;
-                foreach (MonoBehaviour c in components)
+                HandleDragAndDropForPaths();
+
+                EditorGUILayout.Space();
+                DrawFiltersAndUtilities();
+                EditorGUILayout.Space();
+                if (GUILayout.Button("Run Checks", GUILayout.Height(30)))
                 {
-                    if (buffer.Contains(c))
+                    RunChecksImproved();
+                }
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    GUI.enabled = _offerAutoFixes;
+                    if (GUILayout.Button("Fix Missing Scripts"))
                     {
-                        foundInNonNullBuffer = true;
+                        FixMissingScripts();
+                    }
+                    GUI.enabled = true;
+                    if (GUILayout.Button("Export Report (JSON)"))
+                    {
+                        ExportLastReport();
+                    }
+                    if (GUILayout.Button("Export Report (CSV)"))
+                    {
+                        ExportLastReportCsv();
+                    }
+                }
+            }
+            finally
+            {
+                EditorGUILayout.EndScrollView();
+            }
+        }
+
+        private void DrawConfigurationOptions()
+        {
+            EditorGUILayout.LabelField("Validation Checks", EditorStyles.boldLabel);
+
+            Func<GUIContent, bool, float?, bool, bool> drawRightAlignedToggle =
+                SetupDrawRightAlignedToggle();
+
+            float targetAlignmentX = 0f;
+            bool alignmentCalculated = false;
+
+            DrawAndAlign(
+                new GUIContent(
+                    "Missing Scripts",
+                    "Check for GameObjects with missing script references."
+                ),
+                () => _checkMissingScripts,
+                v => _checkMissingScripts = v,
+                false
+            );
+            DrawAndAlign(
+                new GUIContent(
+                    "Nulls in Lists/Arrays",
+                    "Check for null elements within serialized lists or arrays."
+                ),
+                () => _checkNullElementsInLists,
+                v => _checkNullElementsInLists = v,
+                false
+            );
+            DrawAndAlign(
+                new GUIContent(
+                    "Missing Required Components",
+                    "Check if components are missing dependencies defined by [RequireComponent]."
+                ),
+                () => _checkMissingRequiredComponents,
+                v => _checkMissingRequiredComponents = v,
+                false
+            );
+            DrawAndAlign(
+                new GUIContent(
+                    "Empty String Fields",
+                    "Check for serialized string fields that are empty."
+                ),
+                () => _checkEmptyStringFields,
+                v => _checkEmptyStringFields = v,
+                false
+            );
+
+            DrawAndAlign(
+                new GUIContent(
+                    "Null Object References",
+                    "Check for serialized UnityEngine.Object fields that are null."
+                ),
+                () => _checkNullObjectReferences,
+                v => _checkNullObjectReferences = v,
+                false
+            );
+
+            bool wasEnabled = GUI.enabled;
+            GUI.enabled = wasEnabled && _checkNullObjectReferences;
+            try
+            {
+                using EditorGUI.IndentLevelScope indent = new();
+                DrawAndAlign(
+                    new GUIContent(
+                        "Only if [ValidateAssignment]",
+                        "Only report null object references if the field has the [ValidateAssignment] attribute."
+                    ),
+                    () => _onlyCheckNullObjectsWithAttribute,
+                    v => _onlyCheckNullObjectsWithAttribute = v,
+                    true
+                );
+            }
+            finally
+            {
+                GUI.enabled = wasEnabled;
+            }
+
+            DrawAndAlign(
+                new GUIContent(
+                    "Disabled Root GameObject",
+                    "Check if the prefab's root GameObject is inactive."
+                ),
+                () => _checkDisabledRootGameObjects,
+                v => _checkDisabledRootGameObjects = v,
+                false
+            );
+            DrawAndAlign(
+                new GUIContent(
+                    "Disabled Components",
+                    "Check for any components on the prefab that are disabled."
+                ),
+                () => _checkDisabledComponents,
+                v => _checkDisabledComponents = v,
+                false
+            );
+            return;
+
+            void DrawAndAlign(
+                GUIContent content,
+                Func<bool> getter,
+                Action<bool> setter,
+                bool isNested
+            )
+            {
+                switch (alignmentCalculated)
+                {
+                    case false when !isNested:
+                    {
+                        float viewWidth = EditorGUIUtility.currentViewWidth;
+
+                        float availableWidth = viewWidth - 18f;
+                        targetAlignmentX = availableWidth - ToggleWidth;
+                        alignmentCalculated = true;
+                        break;
+                    }
+                    case false when isNested:
+                    {
+                        float viewWidth = EditorGUIUtility.currentViewWidth;
+                        float availableWidth = viewWidth - 20f - 15f;
+                        targetAlignmentX = availableWidth - ToggleWidth;
+                        alignmentCalculated = true;
+                        this.LogWarn(
+                            $"Calculated alignment X based on first item being nested. Alignment might be approximate."
+                        );
                         break;
                     }
                 }
 
-                if (foundInNonNullBuffer)
-                {
-                    return transform.gameObject;
-                }
+                float? overrideX = isNested ? targetAlignmentX : null;
 
-                if (components.Count != 0 || !buffer.Exists(c => c == null))
+                bool newValue = drawRightAlignedToggle(content, getter(), overrideX, isNested);
+                if (newValue != getter())
                 {
-                    continue;
-                }
-
-                using PooledResource<HashSet<GameObject>> setResource =
-                    Buffers<GameObject>.HashSet.Get(
-                        out HashSet<GameObject> gameObjectsWithComponentsInBuffer
-                    );
-                foreach (MonoBehaviour c in buffer)
-                {
-                    if (c != null)
-                    {
-                        gameObjectsWithComponentsInBuffer.Add(c.gameObject);
-                    }
-                }
-                if (!gameObjectsWithComponentsInBuffer.Contains(transform.gameObject))
-                {
-                    return transform.gameObject;
+                    setter(newValue);
                 }
             }
-
-            return prefabRoot;
         }
 
-        private static IEnumerable<FieldInfo> GetFieldsToCheck(
-            Type componentType,
-            Dictionary<Type, List<FieldInfo>> cache
-        )
+        private void DrawAssetPaths()
         {
-            return cache.GetOrAdd(
-                componentType,
-                static type =>
-                {
-                    FieldInfo[] fields = ReflectionHelpers.GetInstanceFieldsIncludingBaseTypes(
-                        type
-                    );
-                    int len = fields.Length;
-                    List<FieldInfo> list = new(len);
-                    for (int i = 0; i < len; i++)
-                    {
-                        FieldInfo field = fields[i];
-                        bool include =
-                            field.IsPublic
-                            || field.IsAttributeDefined<SerializeField>(out _, inherit: true);
-                        if (include)
-                        {
-                            list.Add(field);
-                        }
-                    }
-                    return list;
-                }
-            );
+            if (_pathsList == null)
+            {
+                SetupReorderableList();
+            }
+            // ReSharper disable once PossibleNullReferenceException
+            _pathsList.DoLayoutList();
         }
 
-        private static int ValidateNoNullsInLists(Object component, GameObject context)
+        private void AddFolder()
         {
-            int issueCount = 0;
-            Type componentType = component.GetType();
-
-            List<FieldInfo> listFields = ListFieldsByType.GetOrAdd(
-                componentType,
-                static type =>
-                {
-                    IEnumerable<FieldInfo> baseFields = GetFieldsToCheck(type, FieldsByType);
-                    List<FieldInfo> res = new();
-                    foreach (FieldInfo f in baseFields)
-                    {
-                        if (f == null)
-                        {
-                            continue;
-                        }
-                        Type ft = f.FieldType;
-                        if (typeof(IEnumerable).IsAssignableFrom(ft) && ft != typeof(string))
-                        {
-                            res.Add(f);
-                        }
-                    }
-                    return res;
-                }
-            );
-            foreach (FieldInfo field in listFields)
-            {
-                object fieldValue = field.GetValue(component);
-
-                if (fieldValue is not IEnumerable list)
-                {
-                    continue;
-                }
-
-                int index = 0;
-                if (list is Object unityObject)
-                {
-                    if (list.GetType() != typeof(Transform) && unityObject == null)
-                    {
-                        unityObject.LogError(
-                            $"Field '{field.Name}' ({field.FieldType.Name}) on component '{componentType.Name}' has a null enumerable."
-                        );
-                    }
-                    continue;
-                }
-                foreach (object element in list)
-                {
-                    if (element == null || (element is Object unityObj && !unityObj))
-                    {
-                        context.LogError(
-                            $"Field '{field.Name}' ({field.FieldType.Name}) on component '{componentType.Name}' has a null or missing element at index {index}."
-                        );
-                        issueCount++;
-                    }
-                    index++;
-                }
-            }
-            return issueCount;
-        }
-
-        private static int ValidateRequiredComponentsFast(
-            Component component,
-            GameObject context,
-            HashSet<Type> presentTypes
-        )
-        {
-            int issueCount = 0;
-            Type componentType = component.GetType();
-
-            RequireComponent[] required = RequiredComponentsByType.GetOrAdd(
-                componentType,
-                static type => type.GetAllAttributesSafe<RequireComponent>(inherit: true)
+            string absolutePath = EditorUi.OpenFolderPanel(
+                "Select Prefab Folder",
+                "Assets",
+                string.Empty
             );
 
-            if (required.Length <= 0)
+            if (string.IsNullOrWhiteSpace(absolutePath))
             {
-                return issueCount;
+                return;
             }
 
-            foreach (RequireComponent requiredComponent in required)
-            {
-                if (
-                    requiredComponent.m_Type0 != null
-                    && !presentTypes.Contains(requiredComponent.m_Type0)
-                )
-                {
-                    context.LogError(
-                        $"Component '{componentType.Name}' requires component '{requiredComponent.m_Type0.Name}', but it is missing."
-                    );
-                    issueCount++;
-                }
-                if (
-                    requiredComponent.m_Type1 != null
-                    && !presentTypes.Contains(requiredComponent.m_Type1)
-                )
-                {
-                    context.LogError(
-                        $"Component '{componentType.Name}' requires component '{requiredComponent.m_Type1.Name}', but it is missing."
-                    );
-                    issueCount++;
-                }
-                if (
-                    requiredComponent.m_Type2 != null
-                    && !presentTypes.Contains(requiredComponent.m_Type2)
-                )
-                {
-                    context.LogError(
-                        $"Component '{componentType.Name}' requires component '{requiredComponent.m_Type2.Name}', but it is missing."
-                    );
-                    issueCount++;
-                }
-            }
-            return issueCount;
-        }
-
-        private static int ValidateEmptyStrings(Object component, GameObject context)
-        {
-            int issueCount = 0;
-            Type componentType = component.GetType();
-
-            List<FieldInfo> stringFields = StringFieldsByType.GetOrAdd(
-                componentType,
-                static type =>
-                {
-                    IEnumerable<FieldInfo> baseFields = GetFieldsToCheck(type, FieldsByType);
-                    List<FieldInfo> res = new();
-                    foreach (FieldInfo f in baseFields)
-                    {
-                        if (f != null && f.FieldType == typeof(string))
-                        {
-                            res.Add(f);
-                        }
-                    }
-                    return res;
-                }
-            );
-            foreach (FieldInfo field in stringFields)
-            {
-                object fieldValue = field.GetValue(component);
-                if (fieldValue is string stringValue && string.IsNullOrEmpty(stringValue))
-                {
-                    context.LogWarn(
-                        $"String field '{field.Name}' on component '{componentType.Name}' is null or empty."
-                    );
-                    issueCount++;
-                }
-            }
-            return issueCount;
+            _ = TryAddFolderFromAbsolute(absolutePath);
         }
 
         private int ValidateNullObjectReferences(Object component, GameObject context)
@@ -1009,24 +1047,6 @@ namespace WallstopStudios.UnityHelpers.Editor
                 issueCount++;
             }
             return issueCount;
-        }
-
-        private static GameObject FindOwnerOfMissingScriptBounded(
-            GameObject prefabRoot,
-            List<MonoBehaviour> buffer
-        )
-        {
-            using PooledResource<List<Transform>> transformBufferResource =
-                Buffers<Transform>.List.Get(out List<Transform> transforms);
-            prefabRoot.GetComponentsInChildren(true, transforms);
-            if (MaxTransformScanForMissingOwner < transforms.Count)
-            {
-                prefabRoot.LogWarn(
-                    $"Hierarchy too large to locate owner of missing script (>{MaxTransformScanForMissingOwner}). Reporting at prefab root."
-                );
-                return prefabRoot;
-            }
-            return FindOwnerOfMissingScript(prefabRoot, buffer);
         }
 
         private void SetupReorderableList()
@@ -1222,24 +1242,6 @@ namespace WallstopStudios.UnityHelpers.Editor
             }
         }
 
-        private static void TryRecordHistory(string relativePath)
-        {
-            if (PersistentDirectorySettings.Instance == null)
-            {
-                return;
-            }
-
-            try
-            {
-                PersistentDirectorySettings.Instance.RecordPath(
-                    ToolName,
-                    TargetContextKey,
-                    relativePath
-                );
-            }
-            catch { }
-        }
-
         private void FixMissingScripts()
         {
             if (!_offerAutoFixes)
@@ -1266,8 +1268,6 @@ namespace WallstopStudios.UnityHelpers.Editor
             AssetDatabase.Refresh();
             this.Log($"Auto-fix complete: Removed missing scripts in selected folders.");
         }
-
-        private ScanReport _lastReport;
 
         private void ExportLastReport()
         {

@@ -26,6 +26,31 @@ namespace WallstopStudios.UnityHelpers.Core.Math
 #pragma warning restore WPROTO030
     public readonly struct Parabola : IEquatable<Parabola>
     {
+        public static bool operator ==(Parabola left, Parabola right)
+        {
+            return left.Equals(right);
+        }
+
+        public static bool operator !=(Parabola left, Parabola right)
+        {
+            return !left.Equals(right);
+        }
+
+        /// <summary>
+        /// The x-coordinate of the vertex (always at Length/2).
+        /// </summary>
+        public float VertexX => Length * 0.5f;
+
+        /// <summary>
+        /// The vertex position of the parabola.
+        /// </summary>
+        public (float x, float y) Vertex => (VertexX, MaxHeight);
+
+        /// <summary>
+        /// The valid x-range for this parabola [0, Length].
+        /// </summary>
+        public (float min, float max) XRange => (0f, Length);
+
         /// <summary>
         /// The distance between the two x-intercepts (at x=0 and x=Length).
         /// </summary>
@@ -53,21 +78,6 @@ namespace WallstopStudios.UnityHelpers.Core.Math
         [DataMember]
         [ProtoMember(4)]
         public readonly float MaxHeight;
-
-        /// <summary>
-        /// The x-coordinate of the vertex (always at Length/2).
-        /// </summary>
-        public float VertexX => Length * 0.5f;
-
-        /// <summary>
-        /// The vertex position of the parabola.
-        /// </summary>
-        public (float x, float y) Vertex => (VertexX, MaxHeight);
-
-        /// <summary>
-        /// The valid x-range for this parabola [0, Length].
-        /// </summary>
-        public (float min, float max) XRange => (0f, Length);
 
         /// <summary>
         /// Creates a Parabola that reaches a max height and has a specified length.
@@ -235,16 +245,6 @@ namespace WallstopStudios.UnityHelpers.Core.Math
         public override int GetHashCode()
         {
             return Objects.HashCode(Length, A, B, MaxHeight);
-        }
-
-        public static bool operator ==(Parabola left, Parabola right)
-        {
-            return left.Equals(right);
-        }
-
-        public static bool operator !=(Parabola left, Parabola right)
-        {
-            return !left.Equals(right);
         }
 
         public override string ToString()

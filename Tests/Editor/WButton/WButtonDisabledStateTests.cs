@@ -20,6 +20,49 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
     [NUnit.Framework.Category("Integration")]
     public sealed class WButtonDisabledStateTests : CommonTestBase
     {
+        private static void GetInvocationStatusViaReflection(
+            WButtonMethodState[] states,
+            out int runningCount,
+            out bool cancellable
+        )
+        {
+            WButtonGUI.GetInvocationStatus(states, out runningCount, out cancellable);
+        }
+
+        private static IEnumerator WaitUntil(Func<bool> condition, float timeoutSeconds)
+        {
+            float endTime = Time.realtimeSinceStartup + timeoutSeconds;
+            while (!condition())
+            {
+                if (endTime < Time.realtimeSinceStartup)
+                {
+                    Assert.Fail("Timed out while waiting for condition.");
+                }
+                yield return null;
+            }
+        }
+
+        private static IEnumerator WaitUntilWithDiagnostics(
+            Func<bool> condition,
+            float timeoutSeconds,
+            Func<string> diagnosticsProvider
+        )
+        {
+            float endTime = Time.realtimeSinceStartup + timeoutSeconds;
+            while (!condition())
+            {
+                if (endTime < Time.realtimeSinceStartup)
+                {
+                    string diagnostics =
+                        diagnosticsProvider?.Invoke() ?? "No diagnostics available";
+                    Assert.Fail(
+                        $"Timed out while waiting for condition. Diagnostics: {diagnostics}"
+                    );
+                }
+                yield return null;
+            }
+        }
+
         [Test]
         public void GetInvocationStatusNoActiveInvocationReturnsZeroRunningCount()
         {
@@ -650,49 +693,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             WButtonInvocationController.CancelActiveInvocations(context);
             yield return WaitUntil(() => methodState.ActiveInvocation == null, 5f);
-        }
-
-        private static void GetInvocationStatusViaReflection(
-            WButtonMethodState[] states,
-            out int runningCount,
-            out bool cancellable
-        )
-        {
-            WButtonGUI.GetInvocationStatus(states, out runningCount, out cancellable);
-        }
-
-        private static IEnumerator WaitUntil(Func<bool> condition, float timeoutSeconds)
-        {
-            float endTime = Time.realtimeSinceStartup + timeoutSeconds;
-            while (!condition())
-            {
-                if (endTime < Time.realtimeSinceStartup)
-                {
-                    Assert.Fail("Timed out while waiting for condition.");
-                }
-                yield return null;
-            }
-        }
-
-        private static IEnumerator WaitUntilWithDiagnostics(
-            Func<bool> condition,
-            float timeoutSeconds,
-            Func<string> diagnosticsProvider
-        )
-        {
-            float endTime = Time.realtimeSinceStartup + timeoutSeconds;
-            while (!condition())
-            {
-                if (endTime < Time.realtimeSinceStartup)
-                {
-                    string diagnostics =
-                        diagnosticsProvider?.Invoke() ?? "No diagnostics available";
-                    Assert.Fail(
-                        $"Timed out while waiting for condition. Diagnostics: {diagnostics}"
-                    );
-                }
-                yield return null;
-            }
         }
     }
 }

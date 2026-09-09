@@ -25,6 +25,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     [NUnit.Framework.Category("Fast")]
     public sealed class RuntimeSingletonTests : CommonTestBase
     {
+        private static readonly Regex RefusalPattern = new(
+            $".*{nameof(NeverCreatedSingleton)}.*{nameof(SingletonCreationPolicy.NeverCreate)}.*"
+        );
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -74,10 +78,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 }
             }
         }
-
-        private static readonly Regex RefusalPattern = new(
-            $".*{nameof(NeverCreatedSingleton)}.*{nameof(SingletonCreationPolicy.NeverCreate)}.*"
-        );
 
         // Refusal warnings are development diagnostics and absent from Release players.
 #if UNITY_EDITOR || DEVELOPMENT_BUILD

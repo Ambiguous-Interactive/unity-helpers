@@ -33,11 +33,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// </remarks>
     public ref struct WProtoMessageAccumulator
     {
-        private ReadOnlySpan<byte> _payload;
-        private byte[] _buffer;
-        private int _length;
-        private bool _seen;
-
         /// <summary>
         /// Indicates whether the field appeared at all, which is what separates an absent
         /// sub-message from one whose payload is empty.
@@ -46,6 +41,23 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 
         /// <summary>The bytes of every occurrence, in the order they arrived.</summary>
         public ReadOnlySpan<byte> Payload => _payload;
+
+        private ReadOnlySpan<byte> _payload;
+        private byte[] _buffer;
+        private int _length;
+        private bool _seen;
+
+        // Geometric growth avoids quadratic copying when a payload repeats the same field many times.
+        private static int Capacity(int current, int required)
+        {
+            long doubled = (long)current * 2;
+            if (doubled <= required)
+            {
+                return required;
+            }
+
+            return int.MaxValue < doubled ? int.MaxValue : (int)doubled;
+        }
 
         /// <summary>
         /// Adds one occurrence of the field.
@@ -87,18 +99,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             _length += occurrence.Length;
             _payload = new ReadOnlySpan<byte>(_buffer, 0, _length);
             return true;
-        }
-
-        // Geometric growth avoids quadratic copying when a payload repeats the same field many times.
-        private static int Capacity(int current, int required)
-        {
-            long doubled = (long)current * 2;
-            if (doubled <= required)
-            {
-                return required;
-            }
-
-            return int.MaxValue < doubled ? int.MaxValue : (int)doubled;
         }
     }
 }

@@ -24,15 +24,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     )]
     public sealed class WProtoMemberAttribute : Attribute
     {
-        /// <summary>
-        /// Initializes the attribute with the member's wire field number.
-        /// </summary>
-        /// <param name="tag">The field number, 1 through 536,870,911.</param>
-        public WProtoMemberAttribute(int tag)
-        {
-            Tag = tag;
-        }
-
         /// <summary>The wire field number.</summary>
         public int Tag { get; }
 
@@ -86,5 +77,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// same bytes, so there is nothing for a replacement to be triggered by.
         /// </remarks>
         public bool OverwriteList { get; set; }
+
+        /// <summary>
+        /// Initializes the attribute with the member's wire field number.
+        /// </summary>
+        /// <param name="tag">The field number, 1 through 536,870,911.</param>
+        public WProtoMemberAttribute(int tag)
+        {
+            Tag = tag;
+        }
     }
 }

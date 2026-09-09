@@ -22,6 +22,38 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
         private const string ProjectAssetRoot = AuthoredAssetPaths.AssetsFolder;
 
+        /// <summary>Builds the line a command logs, so the wording and the severity are testable.</summary>
+        /// <param name="subject">What was scanned, for the first line.</param>
+        /// <param name="budget">What the scan judged, so a vacuous pass is visible.</param>
+        /// <param name="unreadable">The asset paths the scan could not read.</param>
+        /// <param name="findings">The defects found.</param>
+        /// <returns>The message, and whether it is a warning.</returns>
+        internal static (string Message, bool Warn) Compose<T>(
+            string subject,
+            string budget,
+            IReadOnlyList<string> unreadable,
+            IReadOnlyList<T> findings
+        )
+        {
+            StringBuilder message = new();
+            message
+                .Append("[Unity Helpers] ")
+                .Append(subject)
+                .Append(": ")
+                .Append(findings.Count)
+                .Append(findings.Count == 1 ? " finding across " : " findings across ")
+                .Append(budget);
+
+            UnreadableAssetPaths.Append(message, unreadable);
+
+            for (int index = 0; index < findings.Count; ++index)
+            {
+                message.AppendLine().Append("  ").Append(findings[index]);
+            }
+
+            return (message.ToString(), 0 < findings.Count);
+        }
+
         /// <summary>
         /// Reports every type that cannot be authored, and every script asset that misnames what it
         /// binds, under <c>Assets/</c>.
@@ -154,38 +186,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 unreadable,
                 findings
             );
-        }
-
-        /// <summary>Builds the line a command logs, so the wording and the severity are testable.</summary>
-        /// <param name="subject">What was scanned, for the first line.</param>
-        /// <param name="budget">What the scan judged, so a vacuous pass is visible.</param>
-        /// <param name="unreadable">The asset paths the scan could not read.</param>
-        /// <param name="findings">The defects found.</param>
-        /// <returns>The message, and whether it is a warning.</returns>
-        internal static (string Message, bool Warn) Compose<T>(
-            string subject,
-            string budget,
-            IReadOnlyList<string> unreadable,
-            IReadOnlyList<T> findings
-        )
-        {
-            StringBuilder message = new();
-            message
-                .Append("[Unity Helpers] ")
-                .Append(subject)
-                .Append(": ")
-                .Append(findings.Count)
-                .Append(findings.Count == 1 ? " finding across " : " findings across ")
-                .Append(budget);
-
-            UnreadableAssetPaths.Append(message, unreadable);
-
-            for (int index = 0; index < findings.Count; ++index)
-            {
-                message.AppendLine().Append("  ").Append(findings[index]);
-            }
-
-            return (message.ToString(), 0 < findings.Count);
         }
 
         /// <remarks>

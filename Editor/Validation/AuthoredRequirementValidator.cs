@@ -237,6 +237,126 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             return inspected;
         }
 
+        internal static bool IsEmptyValue(AuthoredRequirementField field, string value)
+        {
+            if (field.IsObjectReference)
+            {
+                return AuthoredAssetYaml.IsNullObjectReference(value);
+            }
+
+            return string.IsNullOrEmpty(value);
+        }
+
+        /// <summary>
+        /// Maps every annotated field onto the script guid of every type that carries it.
+        /// </summary>
+        /// <param name="requirementAttributeType">The attribute that means "the author must fill this".</param>
+        /// <param name="exemptions">Receives the annotated fields that cannot be judged from text.</param>
+        /// <returns>The annotated fields, keyed by the guid of every script that carries them.</returns>
+        internal static Dictionary<string, List<AuthoredRequirementField>> FieldsByScriptGuid(
+            Type requirementAttributeType,
+            List<AuthoredRequirementExemption> exemptions
+        )
+        {
+            Dictionary<string, List<AuthoredRequirementField>> byScriptGuid = new(
+                StringComparer.Ordinal
+            );
+            List<string> guids = new();
+            foreach (FieldInfo field in TypeCache.GetFieldsWithAttribute(requirementAttributeType))
+            {
+                Type declaringType = field.DeclaringType;
+                if (declaringType == null)
+                {
+                    continue;
+                }
+
+                if (!TryClassify(field, out AuthoredRequirementField required))
+                {
+                    exemptions.Add(
+                        new AuthoredRequirementExemption(
+                            declaringType,
+                            field.Name,
+                            AuthoredRequirementExemptionReason.ValueNotReadableAsText
+                        )
+                    );
+                    continue;
+                }
+
+                CollectCarrierGuids(declaringType, guids);
+                if (guids.Count <= 0)
+                {
+                    exemptions.Add(
+                        new AuthoredRequirementExemption(
+                            declaringType,
+                            field.Name,
+                            AuthoredRequirementExemptionReason.NoBoundScript
+                        )
+                    );
+                    continue;
+                }
+
+                foreach (string guid in guids)
+                {
+                    if (!byScriptGuid.TryGetValue(guid, out List<AuthoredRequirementField> fields))
+                    {
+                        fields = new List<AuthoredRequirementField>();
+                        byScriptGuid[guid] = fields;
+                    }
+
+                    fields.Add(required);
+                }
+            }
+
+            return byScriptGuid;
+        }
+
+        internal static bool TryClassify(FieldInfo field, out AuthoredRequirementField required)
+        {
+            if (field.IsDefined(typeof(SerializeReference), inherit: true))
+            {
+                required = default;
+                return false;
+            }
+
+            Type fieldType = field.FieldType;
+            bool isCollection = false;
+            if (fieldType.IsArray)
+            {
+                isCollection = true;
+                fieldType = fieldType.GetElementType();
+            }
+            else if (
+                fieldType.IsGenericType
+                && fieldType.GetGenericTypeDefinition() == typeof(List<>)
+            )
+            {
+                isCollection = true;
+                fieldType = fieldType.GetGenericArguments()[0];
+            }
+
+            if (fieldType == null)
+            {
+                required = default;
+                return false;
+            }
+
+            bool isObjectReference = typeof(Object).IsAssignableFrom(fieldType);
+            if (!isObjectReference && fieldType != typeof(string))
+            {
+                required = default;
+                return false;
+            }
+
+            required = new AuthoredRequirementField(
+                field.DeclaringType,
+                field.Name,
+                isObjectReference,
+                isCollection,
+                AliasesOf(field)
+            );
+            return true;
+        }
+
         private static void Judge(
             string assetPath,
             IReadOnlyList<string> lines,
@@ -340,79 +460,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             return false;
         }
 
-        internal static bool IsEmptyValue(AuthoredRequirementField field, string value)
-        {
-            if (field.IsObjectReference)
-            {
-                return AuthoredAssetYaml.IsNullObjectReference(value);
-            }
-
-            return string.IsNullOrEmpty(value);
-        }
-
-        /// <summary>
-        /// Maps every annotated field onto the script guid of every type that carries it.
-        /// </summary>
-        /// <param name="requirementAttributeType">The attribute that means "the author must fill this".</param>
-        /// <param name="exemptions">Receives the annotated fields that cannot be judged from text.</param>
-        /// <returns>The annotated fields, keyed by the guid of every script that carries them.</returns>
-        internal static Dictionary<string, List<AuthoredRequirementField>> FieldsByScriptGuid(
-            Type requirementAttributeType,
-            List<AuthoredRequirementExemption> exemptions
-        )
-        {
-            Dictionary<string, List<AuthoredRequirementField>> byScriptGuid = new(
-                StringComparer.Ordinal
-            );
-            List<string> guids = new();
-            foreach (FieldInfo field in TypeCache.GetFieldsWithAttribute(requirementAttributeType))
-            {
-                Type declaringType = field.DeclaringType;
-                if (declaringType == null)
-                {
-                    continue;
-                }
-
-                if (!TryClassify(field, out AuthoredRequirementField required))
-                {
-                    exemptions.Add(
-                        new AuthoredRequirementExemption(
-                            declaringType,
-                            field.Name,
-                            AuthoredRequirementExemptionReason.ValueNotReadableAsText
-                        )
-                    );
-                    continue;
-                }
-
-                CollectCarrierGuids(declaringType, guids);
-                if (guids.Count <= 0)
-                {
-                    exemptions.Add(
-                        new AuthoredRequirementExemption(
-                            declaringType,
-                            field.Name,
-                            AuthoredRequirementExemptionReason.NoBoundScript
-                        )
-                    );
-                    continue;
-                }
-
-                foreach (string guid in guids)
-                {
-                    if (!byScriptGuid.TryGetValue(guid, out List<AuthoredRequirementField> fields))
-                    {
-                        fields = new List<AuthoredRequirementField>();
-                        byScriptGuid[guid] = fields;
-                    }
-
-                    fields.Add(required);
-                }
-            }
-
-            return byScriptGuid;
-        }
-
         private static void CollectCarrierGuids(Type declaringType, List<string> guids)
         {
             guids.Clear();
@@ -434,53 +481,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
                 guids.Add(derivedGuid);
             }
-        }
-
-        internal static bool TryClassify(FieldInfo field, out AuthoredRequirementField required)
-        {
-            if (field.IsDefined(typeof(SerializeReference), inherit: true))
-            {
-                required = default;
-                return false;
-            }
-
-            Type fieldType = field.FieldType;
-            bool isCollection = false;
-            if (fieldType.IsArray)
-            {
-                isCollection = true;
-                fieldType = fieldType.GetElementType();
-            }
-            else if (
-                fieldType.IsGenericType
-                && fieldType.GetGenericTypeDefinition() == typeof(List<>)
-            )
-            {
-                isCollection = true;
-                fieldType = fieldType.GetGenericArguments()[0];
-            }
-
-            if (fieldType == null)
-            {
-                required = default;
-                return false;
-            }
-
-            bool isObjectReference = typeof(Object).IsAssignableFrom(fieldType);
-            if (!isObjectReference && fieldType != typeof(string))
-            {
-                required = default;
-                return false;
-            }
-
-            required = new AuthoredRequirementField(
-                field.DeclaringType,
-                field.Name,
-                isObjectReference,
-                isCollection,
-                AliasesOf(field)
-            );
-            return true;
         }
 
         private static IReadOnlyList<string> AliasesOf(FieldInfo field)

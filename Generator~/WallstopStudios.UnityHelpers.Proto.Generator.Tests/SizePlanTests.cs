@@ -11,6 +11,102 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [TestFixture]
     public sealed class SizePlanTests
     {
+        private static long MeasurePlannedAllocations(
+            BulkNode value,
+            ref byte[] buffer,
+            int iterations
+        )
+        {
+            const int readings = 3;
+            long minimum = long.MaxValue;
+            for (int reading = 0; reading < readings; ++reading)
+            {
+                long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+                _ = MeasurePlanned(value, ref buffer, iterations);
+                long allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+                if (allocated < minimum)
+                {
+                    minimum = allocated;
+                }
+
+                if (minimum == 0)
+                {
+                    break;
+                }
+            }
+
+            return minimum;
+        }
+
+        private static long MeasureBackpatchedAllocations(
+            BulkNodeFormatter formatter,
+            BulkNode value,
+            byte[] buffer,
+            int iterations
+        )
+        {
+            const int readings = 3;
+            long minimum = long.MaxValue;
+            for (int reading = 0; reading < readings; ++reading)
+            {
+                long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+                _ = MeasureBackpatched(formatter, value, buffer, iterations);
+                long allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+                if (allocated < minimum)
+                {
+                    minimum = allocated;
+                }
+
+                if (minimum == 0)
+                {
+                    break;
+                }
+            }
+
+            return minimum;
+        }
+
+        private static long MeasurePlanned(BulkNode value, ref byte[] buffer, int iterations)
+        {
+            long started = Stopwatch.GetTimestamp();
+            for (int iteration = 0; iteration < iterations; iteration++)
+            {
+                WProtoWriteResult result = WProtoFacade.Serialize(value, ref buffer);
+                if (!result.Served || result.Resized)
+                {
+                    Assert.Fail("The warmed planned writer stopped reusing its buffer.");
+                }
+            }
+
+            return Stopwatch.GetTimestamp() - started;
+        }
+
+        private static long MeasureBackpatched(
+            BulkNodeFormatter formatter,
+            BulkNode value,
+            byte[] buffer,
+            int iterations
+        )
+        {
+            long started = Stopwatch.GetTimestamp();
+            for (int iteration = 0; iteration < iterations; iteration++)
+            {
+                _ = formatter.Measure(value);
+                WProtoWriter writer = new WProtoWriter(buffer);
+                if (!formatter.Write(ref writer, value))
+                {
+                    Assert.Fail("The direct backpatch baseline refused the measured value.");
+                }
+            }
+
+            return Stopwatch.GetTimestamp() - started;
+        }
+
+        private static double ToNanoseconds(long ticks, int iterations)
+        {
+            return ticks * (1_000_000_000d / Stopwatch.Frequency) / iterations;
+        }
+
         [Test]
         public void CapturedSizesFollowWritePreorderAcrossSiblings()
         {
@@ -290,102 +386,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             }
         }
 
-        private static long MeasurePlannedAllocations(
-            BulkNode value,
-            ref byte[] buffer,
-            int iterations
-        )
-        {
-            const int readings = 3;
-            long minimum = long.MaxValue;
-            for (int reading = 0; reading < readings; ++reading)
-            {
-                long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
-                _ = MeasurePlanned(value, ref buffer, iterations);
-                long allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
-                if (allocated < minimum)
-                {
-                    minimum = allocated;
-                }
-
-                if (minimum == 0)
-                {
-                    break;
-                }
-            }
-
-            return minimum;
-        }
-
-        private static long MeasureBackpatchedAllocations(
-            BulkNodeFormatter formatter,
-            BulkNode value,
-            byte[] buffer,
-            int iterations
-        )
-        {
-            const int readings = 3;
-            long minimum = long.MaxValue;
-            for (int reading = 0; reading < readings; ++reading)
-            {
-                long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
-                _ = MeasureBackpatched(formatter, value, buffer, iterations);
-                long allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
-                if (allocated < minimum)
-                {
-                    minimum = allocated;
-                }
-
-                if (minimum == 0)
-                {
-                    break;
-                }
-            }
-
-            return minimum;
-        }
-
-        private static long MeasurePlanned(BulkNode value, ref byte[] buffer, int iterations)
-        {
-            long started = Stopwatch.GetTimestamp();
-            for (int iteration = 0; iteration < iterations; iteration++)
-            {
-                WProtoWriteResult result = WProtoFacade.Serialize(value, ref buffer);
-                if (!result.Served || result.Resized)
-                {
-                    Assert.Fail("The warmed planned writer stopped reusing its buffer.");
-                }
-            }
-
-            return Stopwatch.GetTimestamp() - started;
-        }
-
-        private static long MeasureBackpatched(
-            BulkNodeFormatter formatter,
-            BulkNode value,
-            byte[] buffer,
-            int iterations
-        )
-        {
-            long started = Stopwatch.GetTimestamp();
-            for (int iteration = 0; iteration < iterations; iteration++)
-            {
-                _ = formatter.Measure(value);
-                WProtoWriter writer = new WProtoWriter(buffer);
-                if (!formatter.Write(ref writer, value))
-                {
-                    Assert.Fail("The direct backpatch baseline refused the measured value.");
-                }
-            }
-
-            return Stopwatch.GetTimestamp() - started;
-        }
-
-        private static double ToNanoseconds(long ticks, int iterations)
-        {
-            return ticks * (1_000_000_000d / Stopwatch.Frequency) / iterations;
-        }
-
         private sealed class BulkNode
         {
             internal byte[] Payload { get; set; }
@@ -499,24 +499,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 return MeasurePayload(value);
             }
 
-            internal int MeasurePayload(Node value)
-            {
-                int size = value.PayloadLength;
-                if (value.First != null)
-                {
-                    size += WProtoSizes.TagSize(1);
-                    size += WProtoSizes.MessageSize(this, value.First);
-                }
-
-                if (value.Second != null)
-                {
-                    size += WProtoSizes.TagSize(2);
-                    size += WProtoSizes.MessageSize(this, value.Second);
-                }
-
-                return size;
-            }
-
             public bool Write(ref WProtoWriter writer, in Node value)
             {
                 for (int index = 0; index < value.PayloadLength; index++)
@@ -540,6 +522,24 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 value = null;
                 return false;
             }
+
+            internal int MeasurePayload(Node value)
+            {
+                int size = value.PayloadLength;
+                if (value.First != null)
+                {
+                    size += WProtoSizes.TagSize(1);
+                    size += WProtoSizes.MessageSize(this, value.First);
+                }
+
+                if (value.Second != null)
+                {
+                    size += WProtoSizes.TagSize(2);
+                    size += WProtoSizes.MessageSize(this, value.Second);
+                }
+
+                return size;
+            }
         }
 
         private sealed class ReentrantContract
@@ -555,6 +555,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             internal ReentrantFormatter(NodeFormatter nodeFormatter)
             {
                 _nodeFormatter = nodeFormatter;
+            }
+
+            private static void SerializeInner(Node value)
+            {
+                byte[] buffer = null;
+                WProtoWriteResult result = WProtoFacade.Serialize(value, ref buffer);
+                if (!result.Served)
+                {
+                    throw new InvalidOperationException("The reentrant serialization was refused.");
+                }
             }
 
             public int Measure(in ReentrantContract value)
@@ -574,16 +584,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             {
                 value = null;
                 return false;
-            }
-
-            private static void SerializeInner(Node value)
-            {
-                byte[] buffer = null;
-                WProtoWriteResult result = WProtoFacade.Serialize(value, ref buffer);
-                if (!result.Served)
-                {
-                    throw new InvalidOperationException("The reentrant serialization was refused.");
-                }
             }
         }
 
@@ -629,12 +629,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
         private sealed class RawPayload
         {
+            internal int Length { get; }
+
             internal RawPayload(int length)
             {
                 Length = length;
             }
-
-            internal int Length { get; }
         }
 
         private sealed class RawPayloadFormatter : IWProtoFormatter<RawPayload>

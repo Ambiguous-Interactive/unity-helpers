@@ -21,9 +21,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
     [Serializable]
     public struct StructIntSet : ISet<int>
     {
-        private HashSet<int> _items;
-
-        private HashSet<int> Items => _items ??= new HashSet<int>();
+        private static readonly HashSet<int> Empty = new HashSet<int>();
 
         /// <inheritdoc />
         public int Count => _items == null ? 0 : _items.Count;
@@ -31,15 +29,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
         /// <inheritdoc />
         public bool IsReadOnly => false;
 
+        private HashSet<int> Items => _items ??= new HashSet<int>();
+
+        private HashSet<int> _items;
+
         /// <inheritdoc />
         public bool Add(int item)
         {
             return Items.Add(item);
-        }
-
-        void ICollection<int>.Add(int item)
-        {
-            Items.Add(item);
         }
 
         /// <inheritdoc />
@@ -135,6 +132,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
             return (_items ?? Empty).GetEnumerator();
         }
 
+        void ICollection<int>.Add(int item)
+        {
+            Items.Add(item);
+        }
+
         IEnumerator<int> IEnumerable<int>.GetEnumerator()
         {
             return GetEnumerator();
@@ -144,8 +146,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
         {
             return GetEnumerator();
         }
-
-        private static readonly HashSet<int> Empty = new HashSet<int>();
     }
 
     /// <summary>

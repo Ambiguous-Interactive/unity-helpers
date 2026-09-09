@@ -24,6 +24,22 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
     public sealed class SerializableSortedDictionaryTests
     {
+        private static IEnumerable<TestCaseData> SortedDictionaryProtoArraysTestCases()
+        {
+            yield return new TestCaseData(new[] { 1 }, new[] { "one" }).SetName("SingleEntry");
+            yield return new TestCaseData(
+                new[] { 4, 2, 9, 1 },
+                new[] { "four", "two", "nine", "one" }
+            ).SetName("MultipleEntries");
+            yield return new TestCaseData(new[] { -5 }, new[] { "negative" }).SetName(
+                "NegativeKey"
+            );
+            yield return new TestCaseData(
+                new[] { int.MaxValue, int.MinValue, 0 },
+                new[] { "max", "min", "zero" }
+            ).SetName("ExtremeBoundaryKeys");
+        }
+
         [Test]
         public void EntriesEnumerateInAscendingOrder()
         {
@@ -744,22 +760,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 deserialized._values,
                 "Values should contain the same elements"
             );
-        }
-
-        private static IEnumerable<TestCaseData> SortedDictionaryProtoArraysTestCases()
-        {
-            yield return new TestCaseData(new[] { 1 }, new[] { "one" }).SetName("SingleEntry");
-            yield return new TestCaseData(
-                new[] { 4, 2, 9, 1 },
-                new[] { "four", "two", "nine", "one" }
-            ).SetName("MultipleEntries");
-            yield return new TestCaseData(new[] { -5 }, new[] { "negative" }).SetName(
-                "NegativeKey"
-            );
-            yield return new TestCaseData(
-                new[] { int.MaxValue, int.MinValue, 0 },
-                new[] { "max", "min", "zero" }
-            ).SetName("ExtremeBoundaryKeys");
         }
 
         [TestCaseSource(nameof(SortedDictionaryProtoArraysTestCases))]
@@ -1803,33 +1803,18 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         */
         internal sealed class CaseInsensitiveKey : IComparable<CaseInsensitiveKey>, IComparable
         {
+            public string Token { get; }
+
             public CaseInsensitiveKey(string token)
             {
                 Token = token;
             }
-
-            public string Token { get; }
 
             public int CompareTo(CaseInsensitiveKey other)
             {
                 return other == null
                     ? 1
                     : string.Compare(Token, other.Token, StringComparison.OrdinalIgnoreCase);
-            }
-
-            int IComparable.CompareTo(object obj)
-            {
-                if (ReferenceEquals(this, obj))
-                {
-                    return 0;
-                }
-
-                if (obj is CaseInsensitiveKey candidate)
-                {
-                    return CompareTo(candidate);
-                }
-
-                return 1;
             }
 
             public override bool Equals(object obj)
@@ -1855,6 +1840,21 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             public override string ToString()
             {
                 return Token ?? string.Empty;
+            }
+
+            int IComparable.CompareTo(object obj)
+            {
+                if (ReferenceEquals(this, obj))
+                {
+                    return 0;
+                }
+
+                if (obj is CaseInsensitiveKey candidate)
+                {
+                    return CompareTo(candidate);
+                }
+
+                return 1;
             }
         }
     }

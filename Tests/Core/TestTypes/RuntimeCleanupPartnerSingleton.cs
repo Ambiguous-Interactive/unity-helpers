@@ -11,9 +11,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
     public sealed class RuntimeCleanupPartnerSingleton
         : RuntimeSingleton<RuntimeCleanupPartnerSingleton>
     {
-        public Action disabling;
-
         protected override bool Preserve => false;
+
+        public Action disabling;
 
         private void OnDisable()
         {

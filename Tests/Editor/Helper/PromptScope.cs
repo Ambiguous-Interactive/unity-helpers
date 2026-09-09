@@ -16,15 +16,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             _scope = scope;
         }
 
-        public void Dispose()
-        {
-            _scope.Dispose();
-        }
-
         public static PromptScope Suppress(Func<bool> getter, Action<bool> setter)
         {
             RestorableGlobal<bool> owner = new RestorableGlobal<bool>(getter, setter);
             return new PromptScope(owner.Borrow(true));
+        }
+
+        public void Dispose()
+        {
+            _scope.Dispose();
         }
     }
 #endif

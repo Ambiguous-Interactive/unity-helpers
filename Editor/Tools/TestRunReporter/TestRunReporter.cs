@@ -28,15 +28,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         private static TestRunReporter _instance;
         private static TestRunnerApi _api;
 
-        // Re-register synchronously after reload so early RunFinished events are captured even when delayCall never runs.
-        [InitializeOnLoadMethod]
-        private static void RegisterAfterDomainReload()
-        {
-            TryRegisterForRunInFlight();
-            EditorApplication.delayCall -= RegisterWhenRunInFlight;
-            EditorApplication.delayCall += RegisterWhenRunInFlight;
-        }
-
         /// <summary>
         ///     Reports whether either mode's summary file is currently held by a run in flight.
         /// </summary>
@@ -96,48 +87,26 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         }
 
         /// <summary>
-        ///     Called by the Test Runner when a run begins; the summary file was already claimed by
-        ///     the menu item that started it.
+        ///     Registers Test Runner callbacks when, and only when, a run still holds a summary file.
         /// </summary>
-        /// <param name="testsToRun">The test tree that will be executed.</param>
-        void ICallbacks.RunStarted(ITestAdaptor testsToRun) { }
-
-        /// <summary>
-        ///     Called by the Test Runner when an individual test begins. No action is taken.
-        /// </summary>
-        /// <param name="test">The test that is starting.</param>
-        void ICallbacks.TestStarted(ITestAdaptor test) { }
-
-        /// <summary>
-        ///     Called by the Test Runner when an individual test finishes. No action is taken; the
-        ///     whole tree is walked once at the end instead.
-        /// </summary>
-        /// <param name="result">The result of the completed test.</param>
-        void ICallbacks.TestFinished(ITestResultAdaptor result) { }
-
-        /// <summary>
-        ///     Called by the Test Runner when a run finishes. Replaces the running marker of
-        ///     whichever summary file this reporter claimed with the completed summary.
-        /// </summary>
-        /// <param name="result">The aggregate result of the test run.</param>
-        void ICallbacks.RunFinished(ITestResultAdaptor result)
+        /// <returns><c>true</c> when a run is in flight and callbacks are registered for it.</returns>
+        internal static bool TryRegisterForRunInFlight()
         {
-            DateTime finishedUtc = DateTime.UtcNow;
-            if (!TryFindRunInFlight(out TestMode mode, out string summaryPath))
+            if (!IsAnyRunInFlight())
             {
-                return;
+                return false;
             }
 
-            TestRunResultNode root = BuildNode(result, 0);
-            PopulateAssemblyBuildTimes(root);
+            return TryEnsureRegistered();
+        }
 
-            if (!TestRunSummaryFile.TryFinishRun(summaryPath, mode, finishedUtc, root))
-            {
-                Debug.LogError($"{LogPrefix}Could not write the {mode} summary to {summaryPath}.");
-                return;
-            }
-
-            Debug.Log($"{LogPrefix}Wrote the {mode} summary to {summaryPath}.");
+        // Re-register synchronously after reload so early RunFinished events are captured even when delayCall never runs.
+        [InitializeOnLoadMethod]
+        private static void RegisterAfterDomainReload()
+        {
+            TryRegisterForRunInFlight();
+            EditorApplication.delayCall -= RegisterWhenRunInFlight;
+            EditorApplication.delayCall += RegisterWhenRunInFlight;
         }
 
         [MenuItem(EditModeMenuPath, priority = 110)]
@@ -156,20 +125,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         {
             EditorApplication.delayCall -= RegisterWhenRunInFlight;
             TryRegisterForRunInFlight();
-        }
-
-        /// <summary>
-        ///     Registers Test Runner callbacks when, and only when, a run still holds a summary file.
-        /// </summary>
-        /// <returns><c>true</c> when a run is in flight and callbacks are registered for it.</returns>
-        internal static bool TryRegisterForRunInFlight()
-        {
-            if (!IsAnyRunInFlight())
-            {
-                return false;
-            }
-
-            return TryEnsureRegistered();
         }
 
         private static bool TryFindRunInFlight(out TestMode mode, out string summaryPath)
@@ -335,6 +290,51 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
 
             return name.Substring(0, name.Length - CompiledAssemblyExtension.Length);
+        }
+
+        /// <summary>
+        ///     Called by the Test Runner when a run begins; the summary file was already claimed by
+        ///     the menu item that started it.
+        /// </summary>
+        /// <param name="testsToRun">The test tree that will be executed.</param>
+        void ICallbacks.RunStarted(ITestAdaptor testsToRun) { }
+
+        /// <summary>
+        ///     Called by the Test Runner when an individual test begins. No action is taken.
+        /// </summary>
+        /// <param name="test">The test that is starting.</param>
+        void ICallbacks.TestStarted(ITestAdaptor test) { }
+
+        /// <summary>
+        ///     Called by the Test Runner when an individual test finishes. No action is taken; the
+        ///     whole tree is walked once at the end instead.
+        /// </summary>
+        /// <param name="result">The result of the completed test.</param>
+        void ICallbacks.TestFinished(ITestResultAdaptor result) { }
+
+        /// <summary>
+        ///     Called by the Test Runner when a run finishes. Replaces the running marker of
+        ///     whichever summary file this reporter claimed with the completed summary.
+        /// </summary>
+        /// <param name="result">The aggregate result of the test run.</param>
+        void ICallbacks.RunFinished(ITestResultAdaptor result)
+        {
+            DateTime finishedUtc = DateTime.UtcNow;
+            if (!TryFindRunInFlight(out TestMode mode, out string summaryPath))
+            {
+                return;
+            }
+
+            TestRunResultNode root = BuildNode(result, 0);
+            PopulateAssemblyBuildTimes(root);
+
+            if (!TestRunSummaryFile.TryFinishRun(summaryPath, mode, finishedUtc, root))
+            {
+                Debug.LogError($"{LogPrefix}Could not write the {mode} summary to {summaryPath}.");
+                return;
+            }
+
+            Debug.Log($"{LogPrefix}Wrote the {mode} summary to {summaryPath}.");
         }
     }
 #endif

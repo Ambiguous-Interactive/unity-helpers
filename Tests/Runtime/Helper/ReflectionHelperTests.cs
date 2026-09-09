@@ -54,11 +54,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             StaticMethodCallCount++;
         }
 
-        public void InstanceVoidMethod()
-        {
-            instanceMethodCallCount++;
-        }
-
         public static int StaticIntMethod()
         {
             StaticMethodCallCount++;
@@ -77,18 +72,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             return true;
         }
 
-        public int InstanceIntMethod()
-        {
-            instanceMethodCallCount++;
-            return 100;
-        }
-
-        public string InstanceStringMethod()
-        {
-            instanceMethodCallCount++;
-            return "instance";
-        }
-
         public static int StaticMethodWithParam(int param)
         {
             StaticMethodCallCount++;
@@ -99,18 +82,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             StaticMethodCallCount++;
             return a + b;
-        }
-
-        public int InstanceMethodWithParam(string param)
-        {
-            instanceMethodCallCount++;
-            return param?.Length ?? 0;
-        }
-
-        public int InstanceMethodThreeParams(int a, string b, bool c)
-        {
-            instanceMethodCallCount++;
-            return a + (b?.Length ?? 0) + (c ? 1 : 0);
         }
 
         public static void StaticVoidMethodWithParam(int param)
@@ -143,6 +114,40 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public static void StaticActionFour(int a, int b, int c, int d)
         {
             StaticMethodCallCount = a + b + c + d;
+        }
+
+        public static void ResetStatic()
+        {
+            StaticMethodCallCount = 0;
+        }
+
+        public void InstanceVoidMethod()
+        {
+            instanceMethodCallCount++;
+        }
+
+        public int InstanceIntMethod()
+        {
+            instanceMethodCallCount++;
+            return 100;
+        }
+
+        public string InstanceStringMethod()
+        {
+            instanceMethodCallCount++;
+            return "instance";
+        }
+
+        public int InstanceMethodWithParam(string param)
+        {
+            instanceMethodCallCount++;
+            return param?.Length ?? 0;
+        }
+
+        public int InstanceMethodThreeParams(int a, string b, bool c)
+        {
+            instanceMethodCallCount++;
+            return a + (b?.Length ?? 0) + (c ? 1 : 0);
         }
 
         public int InstanceSum(int a, int b)
@@ -181,11 +186,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             StaticMethodCallCount = 0;
             instanceMethodCallCount = 0;
-        }
-
-        public static void ResetStatic()
-        {
-            StaticMethodCallCount = 0;
         }
     }
 
@@ -236,14 +236,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
     public sealed class TestPropertyClass
     {
-        private static int _staticValue = 50;
-        private int _instanceValue = 25;
-
         public static int StaticProperty
         {
             get => _staticValue;
             set => _staticValue = value;
         }
+
+        public static string StaticStringProperty { get; set; } = "static";
+
+        public static int StaticReadOnlyProperty => 999;
+
+        private static int _staticValue = 50;
 
         public int InstanceProperty
         {
@@ -251,26 +254,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             set => _instanceValue = value;
         }
 
-        public static string StaticStringProperty { get; set; } = "static";
-
         public string InstanceStringProperty { get; set; } = "instance";
-
-        public static int StaticReadOnlyProperty => 999;
         public int InstanceReadOnlyProperty => 888;
+        private int _instanceValue = 25;
     }
 
     public sealed class VariantPropertyClass
     {
-        public object ObjectProperty { get; set; } = "instance";
         public static object StaticObjectProperty { get; set; } = "static";
-        public object objectField = "instance-field";
         public static object StaticObjectField = "static-field";
+
+        public object ObjectProperty { get; set; } = "instance";
+        public object objectField = "instance-field";
     }
 
     public sealed class SelfReferentialType
     {
-        public static SelfReferentialType InstanceField = new();
         public static SelfReferentialType InstanceProperty { get; } = new();
+
+        public static SelfReferentialType InstanceField = new();
     }
 
     public struct ValueStruct
@@ -283,12 +285,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
     public sealed class IndexerClass
     {
-        private readonly int[] _data = new int[10];
         public int this[int i]
         {
             get => _data[i];
             set => _data[i] = value;
         }
+
+        private readonly int[] _data = new int[10];
     }
 
     public static class RefOutMethods
@@ -308,22 +311,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     [ReflectionTestAttribute("ClassLevel", 10)]
     public sealed class TestAttributeClass
     {
+        [Description("Static property for testing")]
+        [ReflectionTestAttribute("StaticProperty", 20)]
+        public static string StaticPropertyWithAttribute { get; set; } = "static";
+
         [Description("Static field with description")]
         [ReflectionTestAttribute("StaticField", 15)]
         public static int StaticFieldWithAttribute = 1;
 
         [Category("TestCategory")]
-        [ReflectionTestAttribute("InstanceField", 5)]
-        public int instanceFieldWithAttribute = 2;
-
-        [Description("Static property for testing")]
-        [ReflectionTestAttribute("StaticProperty", 20)]
-        public static string StaticPropertyWithAttribute { get; set; } = "static";
-
-        [Category("TestCategory")]
         [Description("Instance property")]
         [ReflectionTestAttribute("InstanceProperty", 8)]
         public string InstancePropertyWithAttribute { get; set; } = "instance";
+
+        [Category("TestCategory")]
+        [ReflectionTestAttribute("InstanceField", 5)]
+        public int instanceFieldWithAttribute = 2;
 
         [Description("Static method for testing")]
         [ReflectionTestAttribute("StaticMethod", 12)]
@@ -355,6 +358,147 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     public sealed class ReflectionHelperTests : CommonTestBase
     {
         private const int NumTries = 1_000;
+
+        private static void RunWithDynamicIlOnly(Action assertion)
+        {
+            if (!ReflectionHelpers.DynamicIlEnabled)
+            {
+                Assert.Ignore("Dynamic IL is not available on this platform.");
+            }
+
+            using (
+                ReflectionHelpers.OverrideReflectionCapabilities(
+                    expressions: false,
+                    dynamicIl: true
+                )
+            )
+            {
+                assertion();
+            }
+        }
+
+        private static int InvokeTypedFunction<TInstance>(int parameterCount, TInstance instance)
+        {
+            switch (parameterCount)
+            {
+                case 0:
+                    return ReflectionHelpers.GetInstanceMethodInvoker<TInstance, int>(
+                        typeof(TestMethodClass).GetMethod(nameof(TestMethodClass.InstanceIntMethod))
+                    )(instance);
+                case 1:
+                    return ReflectionHelpers.GetInstanceMethodInvoker<TInstance, string, int>(
+                        typeof(TestMethodClass).GetMethod(
+                            nameof(TestMethodClass.InstanceMethodWithParam)
+                        )
+                    )(instance, "abc");
+                case 2:
+                    return ReflectionHelpers.GetInstanceMethodInvoker<TInstance, int, int, int>(
+                        typeof(TestMethodClass).GetMethod(nameof(TestMethodClass.InstanceSum))
+                    )(instance, 1, 2);
+                case 3:
+                    return ReflectionHelpers.GetInstanceMethodInvoker<
+                        TInstance,
+                        int,
+                        string,
+                        bool,
+                        int
+                    >(
+                        typeof(TestMethodClass).GetMethod(
+                            nameof(TestMethodClass.InstanceMethodThreeParams)
+                        )
+                    )(instance, 1, "ab", true);
+                case 4:
+                    return ReflectionHelpers.GetInstanceMethodInvoker<
+                        TInstance,
+                        int,
+                        int,
+                        int,
+                        int,
+                        int
+                    >(typeof(TestMethodClass).GetMethod(nameof(TestMethodClass.InstanceSumFour)))(
+                        instance,
+                        1,
+                        2,
+                        3,
+                        4
+                    );
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(parameterCount));
+            }
+        }
+
+        private static void InvokeTypedAction<TInstance>(int parameterCount, TInstance instance)
+        {
+            switch (parameterCount)
+            {
+                case 0:
+                    ReflectionHelpers.GetInstanceActionInvoker<TInstance>(
+                        typeof(TestMethodClass).GetMethod(
+                            nameof(TestMethodClass.InstanceVoidMethod)
+                        )
+                    )(instance);
+                    return;
+                case 1:
+                    ReflectionHelpers.GetInstanceActionInvoker<TInstance, int>(
+                        typeof(TestMethodClass).GetMethod(nameof(TestMethodClass.InstanceSetOne))
+                    )(instance, 1);
+                    return;
+                case 2:
+                    ReflectionHelpers.GetInstanceActionInvoker<TInstance, int, int>(
+                        typeof(TestMethodClass).GetMethod(nameof(TestMethodClass.InstanceSetTwo))
+                    )(instance, 1, 2);
+                    return;
+                case 3:
+                    ReflectionHelpers.GetInstanceActionInvoker<TInstance, int, int, int>(
+                        typeof(TestMethodClass).GetMethod(nameof(TestMethodClass.InstanceSetThree))
+                    )(instance, 1, 2, 3);
+                    return;
+                case 4:
+                    ReflectionHelpers.GetInstanceActionInvoker<TInstance, int, int, int, int>(
+                        typeof(TestMethodClass).GetMethod(nameof(TestMethodClass.InstanceSetFour))
+                    )(instance, 1, 2, 3, 4);
+                    return;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(parameterCount));
+            }
+        }
+
+        private static Delegate GetStaticFunctionWithWrongReturnType(int parameterCount)
+        {
+            switch (parameterCount)
+            {
+                case 0:
+                    return ReflectionHelpers.GetStaticMethodInvoker<string>(
+                        typeof(TestMethodClass).GetMethod(nameof(TestMethodClass.StaticIntMethod))
+                    );
+                case 1:
+                    return ReflectionHelpers.GetStaticMethodInvoker<int, string>(
+                        typeof(TestMethodClass).GetMethod(
+                            nameof(TestMethodClass.StaticMethodWithParam)
+                        )
+                    );
+                case 2:
+                    return ReflectionHelpers.GetStaticMethodInvoker<int, int, string>(
+                        typeof(TestMethodClass).GetMethod(
+                            nameof(TestMethodClass.StaticMethodTwoParams)
+                        )
+                    );
+                case 3:
+                    return ReflectionHelpers.GetStaticMethodInvoker<int, string, bool, string>(
+                        typeof(TestMethodClass).GetMethod(
+                            nameof(TestMethodClass.StaticMethodMultipleParams)
+                        )
+                    );
+                case 4:
+                    return ReflectionHelpers.GetStaticMethodInvoker<int, int, int, int, string>(
+                        typeof(TestMethodClass).GetMethod(
+                            nameof(TestMethodClass.StaticMethodFourParams)
+                        )
+                    );
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(parameterCount));
+            }
+        }
 
         [Test]
         public void GetFieldGetterClassMemberField()
@@ -2155,24 +2299,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             });
         }
 
-        private static void RunWithDynamicIlOnly(Action assertion)
-        {
-            if (!ReflectionHelpers.DynamicIlEnabled)
-            {
-                Assert.Ignore("Dynamic IL is not available on this platform.");
-            }
-
-            using (
-                ReflectionHelpers.OverrideReflectionCapabilities(
-                    expressions: false,
-                    dynamicIl: true
-                )
-            )
-            {
-                assertion();
-            }
-        }
-
         [Test]
         public void TypedPropertySetterCastsReferenceTypes()
         {
@@ -2965,129 +3091,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.Throws<ArgumentException>(() =>
                 GetStaticFunctionWithWrongReturnType(parameterCount)
             );
-        }
-
-        private static int InvokeTypedFunction<TInstance>(int parameterCount, TInstance instance)
-        {
-            switch (parameterCount)
-            {
-                case 0:
-                    return ReflectionHelpers.GetInstanceMethodInvoker<TInstance, int>(
-                        typeof(TestMethodClass).GetMethod(nameof(TestMethodClass.InstanceIntMethod))
-                    )(instance);
-                case 1:
-                    return ReflectionHelpers.GetInstanceMethodInvoker<TInstance, string, int>(
-                        typeof(TestMethodClass).GetMethod(
-                            nameof(TestMethodClass.InstanceMethodWithParam)
-                        )
-                    )(instance, "abc");
-                case 2:
-                    return ReflectionHelpers.GetInstanceMethodInvoker<TInstance, int, int, int>(
-                        typeof(TestMethodClass).GetMethod(nameof(TestMethodClass.InstanceSum))
-                    )(instance, 1, 2);
-                case 3:
-                    return ReflectionHelpers.GetInstanceMethodInvoker<
-                        TInstance,
-                        int,
-                        string,
-                        bool,
-                        int
-                    >(
-                        typeof(TestMethodClass).GetMethod(
-                            nameof(TestMethodClass.InstanceMethodThreeParams)
-                        )
-                    )(instance, 1, "ab", true);
-                case 4:
-                    return ReflectionHelpers.GetInstanceMethodInvoker<
-                        TInstance,
-                        int,
-                        int,
-                        int,
-                        int,
-                        int
-                    >(typeof(TestMethodClass).GetMethod(nameof(TestMethodClass.InstanceSumFour)))(
-                        instance,
-                        1,
-                        2,
-                        3,
-                        4
-                    );
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(parameterCount));
-            }
-        }
-
-        private static void InvokeTypedAction<TInstance>(int parameterCount, TInstance instance)
-        {
-            switch (parameterCount)
-            {
-                case 0:
-                    ReflectionHelpers.GetInstanceActionInvoker<TInstance>(
-                        typeof(TestMethodClass).GetMethod(
-                            nameof(TestMethodClass.InstanceVoidMethod)
-                        )
-                    )(instance);
-                    return;
-                case 1:
-                    ReflectionHelpers.GetInstanceActionInvoker<TInstance, int>(
-                        typeof(TestMethodClass).GetMethod(nameof(TestMethodClass.InstanceSetOne))
-                    )(instance, 1);
-                    return;
-                case 2:
-                    ReflectionHelpers.GetInstanceActionInvoker<TInstance, int, int>(
-                        typeof(TestMethodClass).GetMethod(nameof(TestMethodClass.InstanceSetTwo))
-                    )(instance, 1, 2);
-                    return;
-                case 3:
-                    ReflectionHelpers.GetInstanceActionInvoker<TInstance, int, int, int>(
-                        typeof(TestMethodClass).GetMethod(nameof(TestMethodClass.InstanceSetThree))
-                    )(instance, 1, 2, 3);
-                    return;
-                case 4:
-                    ReflectionHelpers.GetInstanceActionInvoker<TInstance, int, int, int, int>(
-                        typeof(TestMethodClass).GetMethod(nameof(TestMethodClass.InstanceSetFour))
-                    )(instance, 1, 2, 3, 4);
-                    return;
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(parameterCount));
-            }
-        }
-
-        private static Delegate GetStaticFunctionWithWrongReturnType(int parameterCount)
-        {
-            switch (parameterCount)
-            {
-                case 0:
-                    return ReflectionHelpers.GetStaticMethodInvoker<string>(
-                        typeof(TestMethodClass).GetMethod(nameof(TestMethodClass.StaticIntMethod))
-                    );
-                case 1:
-                    return ReflectionHelpers.GetStaticMethodInvoker<int, string>(
-                        typeof(TestMethodClass).GetMethod(
-                            nameof(TestMethodClass.StaticMethodWithParam)
-                        )
-                    );
-                case 2:
-                    return ReflectionHelpers.GetStaticMethodInvoker<int, int, string>(
-                        typeof(TestMethodClass).GetMethod(
-                            nameof(TestMethodClass.StaticMethodTwoParams)
-                        )
-                    );
-                case 3:
-                    return ReflectionHelpers.GetStaticMethodInvoker<int, string, bool, string>(
-                        typeof(TestMethodClass).GetMethod(
-                            nameof(TestMethodClass.StaticMethodMultipleParams)
-                        )
-                    );
-                case 4:
-                    return ReflectionHelpers.GetStaticMethodInvoker<int, int, int, int, string>(
-                        typeof(TestMethodClass).GetMethod(
-                            nameof(TestMethodClass.StaticMethodFourParams)
-                        )
-                    );
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(parameterCount));
-            }
         }
 
         [Test]

@@ -7,10 +7,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Internal
 
     internal static class InlineInspectorContext
     {
+        public static bool IsActive => 0 < _scopeDepth;
+
         [ThreadStatic]
         private static int _scopeDepth;
-
-        public static bool IsActive => 0 < _scopeDepth;
 
         public static IDisposable Enter()
         {

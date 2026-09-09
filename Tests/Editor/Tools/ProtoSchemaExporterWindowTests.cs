@@ -20,8 +20,38 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         private const string OutputDirectory = "proto-schema-tests";
         private const string OutputFileName = "exported.proto";
 
+        private static Type[] SampleContracts =>
+            new[]
+            {
+                typeof(ProtoSchemaExporterSampleContract),
+                typeof(ProtoSchemaExporterSecondSampleContract),
+            };
+
         private ProtoSchemaExporterWindow _window;
         private string _outputPath;
+
+        private static void DeleteDirectory(string outputDirectory)
+        {
+            if (Directory.Exists(outputDirectory))
+            {
+                Directory.Delete(outputDirectory, true);
+            }
+        }
+
+        private static ScrollView LastScrollView(VisualElement root)
+        {
+            ScrollView found = null;
+            foreach (VisualElement child in root.Children())
+            {
+                if (child is ScrollView scrollView)
+                {
+                    found = scrollView;
+                }
+            }
+
+            Assert.IsTrue(found != null, "The window builds at least one scrolling region.");
+            return found;
+        }
 
         [SetUp]
         public override void BaseSetUp()
@@ -277,35 +307,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             );
         }
 
-        private static Type[] SampleContracts =>
-            new[]
-            {
-                typeof(ProtoSchemaExporterSampleContract),
-                typeof(ProtoSchemaExporterSecondSampleContract),
-            };
-
-        private string ExportToDirectory(string leafName)
-        {
-            string outputDirectory = Path.Combine(
-                Path.Combine(Application.temporaryCachePath, OutputDirectory),
-                leafName
-            );
-            DeleteDirectory(outputDirectory);
-            Assert.IsTrue(
-                _window.ExportSchemasToDirectory(outputDirectory),
-                _window.LastStatusForTest
-            );
-            return outputDirectory;
-        }
-
-        private static void DeleteDirectory(string outputDirectory)
-        {
-            if (Directory.Exists(outputDirectory))
-            {
-                Directory.Delete(outputDirectory, true);
-            }
-        }
-
         /// <summary>
         /// The popup is constructed with an index into one array and a label list from the other;
         /// a length mismatch throws where a user can only see a broken window.
@@ -436,21 +437,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             Assert.Less(0f, diagnostics.style.maxHeight.value.value);
         }
 
-        private static ScrollView LastScrollView(VisualElement root)
-        {
-            ScrollView found = null;
-            foreach (VisualElement child in root.Children())
-            {
-                if (child is ScrollView scrollView)
-                {
-                    found = scrollView;
-                }
-            }
-
-            Assert.IsTrue(found != null, "The window builds at least one scrolling region.");
-            return found;
-        }
-
         [Test]
         public void RebuildingTheInterfaceReplacesTheChromeInsteadOfDuplicatingIt()
         {
@@ -481,6 +467,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                     File.Delete(outsidePath);
                 }
             }
+        }
+
+        private string ExportToDirectory(string leafName)
+        {
+            string outputDirectory = Path.Combine(
+                Path.Combine(Application.temporaryCachePath, OutputDirectory),
+                leafName
+            );
+            DeleteDirectory(outputDirectory);
+            Assert.IsTrue(
+                _window.ExportSchemasToDirectory(outputDirectory),
+                _window.LastStatusForTest
+            );
+            return outputDirectory;
         }
     }
 

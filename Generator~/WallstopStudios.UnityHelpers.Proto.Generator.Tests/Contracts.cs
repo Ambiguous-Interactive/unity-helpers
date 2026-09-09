@@ -12,6 +12,17 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [WProtoContract]
     public sealed partial class ScalarContract
     {
+        /// <summary>Exposes the private member so a test can set and read it.</summary>
+        public int Hidden
+        {
+            get => _hidden;
+            set => _hidden = value;
+        }
+
+        /// <summary>A property, to prove members are not restricted to fields.</summary>
+        [WProtoMember(14)]
+        public int Counted { get; set; }
+
         [WProtoMember(1)]
         public int Int32;
 
@@ -50,17 +61,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
         [WProtoMember(13)]
         private int _hidden;
-
-        /// <summary>Exposes the private member so a test can set and read it.</summary>
-        public int Hidden
-        {
-            get => _hidden;
-            set => _hidden = value;
-        }
-
-        /// <summary>A property, to prove members are not restricted to fields.</summary>
-        [WProtoMember(14)]
-        public int Counted { get; set; }
     }
 
     /// <summary>Tags declared out of source order, the way FastVector3Int declares them.</summary>
@@ -81,9 +81,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [WProtoContract]
     public sealed partial class HookedContract
     {
-        /// <summary>The order the hooks actually ran in, for the test to assert against.</summary>
-        public readonly System.Collections.Generic.List<string> Trace = new();
-
         /// <summary>
         /// How many times the after-deserialization hook has run, across every instance.
         /// </summary>
@@ -93,6 +90,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// only inspects the returned value passes whether or not the hook fired.
         /// </remarks>
         public static int AfterDeserializationRuns;
+
+        /// <summary>The order the hooks actually ran in, for the test to assert against.</summary>
+        public readonly System.Collections.Generic.List<string> Trace = new();
 
         [WProtoMember(1)]
         public int Value;
@@ -523,13 +523,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     /// </remarks>
     public struct IntBag : ICollection<int>
     {
-        private List<int> _items;
+        private static readonly List<int> Empty = new List<int>();
 
         /// <inheritdoc />
         public int Count => _items == null ? 0 : _items.Count;
 
         /// <inheritdoc />
         public bool IsReadOnly => false;
+
+        private List<int> _items;
 
         /// <inheritdoc />
         public void Add(int item)
@@ -580,8 +582,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         {
             return GetEnumerator();
         }
-
-        private static readonly List<int> Empty = new List<int>();
     }
 
     /// <summary>
@@ -617,9 +617,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     /// </remarks>
     public struct IntPairs : IDictionary<int, int>
     {
-        private Dictionary<int, int> _items;
-
-        private Dictionary<int, int> Items => _items ??= new Dictionary<int, int>();
+        private static readonly Dictionary<int, int> Empty = new Dictionary<int, int>();
 
         /// <inheritdoc />
         public int this[int key]
@@ -639,6 +637,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
         /// <inheritdoc />
         public bool IsReadOnly => false;
+
+        private Dictionary<int, int> Items => _items ??= new Dictionary<int, int>();
+
+        private Dictionary<int, int> _items;
 
         /// <inheritdoc />
         public void Add(int key, int value)
@@ -712,8 +714,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         {
             return GetEnumerator();
         }
-
-        private static readonly Dictionary<int, int> Empty = new Dictionary<int, int>();
     }
 
     /// <summary>
@@ -1010,15 +1010,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [WProtoContract]
     public partial class PolyListSub : PolyListBase
     {
+        /// <summary>The subtype's own member.</summary>
+        [WProtoMember(1)]
+        public int SubOnly;
+
         /// <summary>Replaces the base constructor's seed.</summary>
         public PolyListSub()
         {
             Items = new List<int> { 5 };
         }
-
-        /// <summary>The subtype's own member.</summary>
-        [WProtoMember(1)]
-        public int SubOnly;
     }
 
     /// <summary>
@@ -1052,16 +1052,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [WProtoContract]
     public partial class PolyStackSub : PolyStackBase
     {
+        /// <summary>The subtype's own member.</summary>
+        [WProtoMember(1)]
+        public int SubOnly;
+
         /// <summary>Replaces the base constructor's seeds, so seeding too early is visible.</summary>
         public PolyStackSub()
         {
             Stacked = new Stack<int>(new[] { 5 });
             Listed = new List<int> { 5 };
         }
-
-        /// <summary>The subtype's own member.</summary>
-        [WProtoMember(1)]
-        public int SubOnly;
     }
 
     /// <summary>
@@ -1076,6 +1076,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [WProtoContract]
     public sealed partial class ImmutableCollectionRecord
     {
+        /// <summary>A get-only interface member.</summary>
+        [WProtoMember(3)]
+        public IList<int> Listed { get; }
+
         /// <summary>A readonly stack, whose commit constructs its own target.</summary>
         [WProtoMember(1)]
         public readonly Stack<int> Stacked;
@@ -1083,10 +1087,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// <summary>A readonly read-only collection: constructed twice over.</summary>
         [WProtoMember(2)]
         public readonly System.Collections.ObjectModel.ReadOnlyCollection<int> Frozen;
-
-        /// <summary>A get-only interface member.</summary>
-        [WProtoMember(3)]
-        public IList<int> Listed { get; }
 
         /// <summary>A readonly dictionary interface.</summary>
         [WProtoMember(4)]

@@ -27,6 +27,39 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         private const float PinnedLayoutHeight = 123.5f;
         private const float HeightTolerance = 0.0001f;
 
+        private static WEnumToggleButtonsPagination.PaginationState GetPaginationState(
+            SerializedProperty slots,
+            int slotIndex
+        )
+        {
+            return WEnumToggleButtonsPagination.GetState(
+                slots.GetArrayElementAtIndex(slotIndex),
+                PaginationTotalItems,
+                PaginationPageSize
+            );
+        }
+
+        private static SerializedProperty ResizeSlotArray(
+            SerializedObject serializedObject,
+            int length
+        )
+        {
+            serializedObject.Update();
+            SerializedProperty slots = serializedObject.FindProperty(
+                nameof(BoundedDrawerCacheChurnHost.slots)
+            );
+            Assert.NotNull(slots);
+            slots.arraySize = length;
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+            serializedObject.Update();
+
+            SerializedProperty resized = serializedObject.FindProperty(
+                nameof(BoundedDrawerCacheChurnHost.slots)
+            );
+            Assert.AreEqual(length, resized.arraySize);
+            return resized;
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -249,39 +282,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 "A miss must report a zero height so the caller re-measures instead of laying out a "
                     + "stale one."
             );
-        }
-
-        private static WEnumToggleButtonsPagination.PaginationState GetPaginationState(
-            SerializedProperty slots,
-            int slotIndex
-        )
-        {
-            return WEnumToggleButtonsPagination.GetState(
-                slots.GetArrayElementAtIndex(slotIndex),
-                PaginationTotalItems,
-                PaginationPageSize
-            );
-        }
-
-        private static SerializedProperty ResizeSlotArray(
-            SerializedObject serializedObject,
-            int length
-        )
-        {
-            serializedObject.Update();
-            SerializedProperty slots = serializedObject.FindProperty(
-                nameof(BoundedDrawerCacheChurnHost.slots)
-            );
-            Assert.NotNull(slots);
-            slots.arraySize = length;
-            serializedObject.ApplyModifiedPropertiesWithoutUndo();
-            serializedObject.Update();
-
-            SerializedProperty resized = serializedObject.FindProperty(
-                nameof(BoundedDrawerCacheChurnHost.slots)
-            );
-            Assert.AreEqual(length, resized.arraySize);
-            return resized;
         }
     }
 }

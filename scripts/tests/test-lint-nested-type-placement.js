@@ -19,7 +19,13 @@ const { spawnSync } = require("child_process");
 
 const repoRoot = path.resolve(__dirname, "..", "..");
 const linterPath = path.join(repoRoot, "scripts", "lint-nested-type-placement.js");
-const { maskNoise, regionKeys, analyzeFile, applyEdits } = require(linterPath);
+const {
+  maskNoise,
+  regionKeys,
+  analyzeFile,
+  applyEdits,
+  ORDER_TIERS
+} = require(linterPath);
 
 let passed = 0;
 let failed = 0;
@@ -54,18 +60,19 @@ function fixedText(source) {
   return text;
 }
 
-/** Shapes that are NOT a nested type declaration between members. Every one must stay silent. */
+/** Shapes that are NOT a nested type declaration between members, and shapes the #672 member
+ * ordering already accepts. Every one must stay silent. */
 const SILENT = [
   ["a nested type already at the end", "class A { int _x; class B { } }"],
   ["the only member", "class A { class B { } }"],
   ["two nested types at the end", "class A { int _x; class B { } class C { } }"],
   [
     "a class constraint, which is not a declaration",
-    "class A { void M<T>() where T : class where U : new() { } int _x; }"
+    "class A { int _x; void M<T>() where T : class where U : new() { } }"
   ],
   [
     "a struct constraint",
-    "class A { void M<T>() where T : struct, System.IComparable { } int _x; }"
+    "class A { int _x; void M<T>() where T : struct, System.IComparable { } }"
   ],
   ["`record` used as a field name", "class A { Entry record; int _x; }"],
   ["a brace inside an attribute argument", "class A { [Values(new[] { 1, 2 })] int _x; int _y; }"],
@@ -77,7 +84,101 @@ const SILENT = [
   ["the word class inside a comment", "class A { // class B is elsewhere\n int _x; }"],
   ["the word class inside a string", 'class A { string _s = "class B { }"; int _x; }'],
   ["an enum body, whose members are not types", "enum E { A = 1, B = 2 }"],
-  ["a top-level type after another top-level type", "namespace N { class A { } class B { } }"]
+  ["a top-level type after another top-level type", "namespace N { class A { } class B { } }"],
+  // --- #672 member ordering, accepted shapes -----------------------------------------
+  [
+    "the canonical tier order",
+    [
+      "class A",
+      "{",
+      "    public const int PublicConstant = 1;",
+      "    private const int Constant = 2;",
+      "    public static int PublicStaticProperty { get; set; }",
+      "    private static int StaticProperty { get; set; }",
+      "    public static readonly int PublicStaticField = 3;",
+      "    private static int _staticField;",
+      "    public int PublicProperty { get; set; }",
+      "    private int Property => 4;",
+      "    public readonly int PublicField = 5;",
+      "    private int _field;",
+      "    public A() { }",
+      "    private A(int value) { _field = value; }",
+      "    public static void PublicStaticMethod() { }",
+      "    private static void StaticMethod() { }",
+      "    public void PublicMethod() { }",
+      "    private void Method() { }",
+      "}"
+    ].join("\n")
+  ],
+  [
+    "an expression-bodied property before a field",
+    "class A { int Count => 5; int _y; }"
+  ],
+  [
+    "a tuple-typed field and a tuple-typed property",
+    "class A { (int X, int Y) Point { get; set; } (int X, int Y) _point; }"
+  ],
+  ["an indexer is a property", "class A { int this[int i] => i; int _y; }"],
+  [
+    "an operator overload is a static method",
+    "class A { public static A operator +(A left, A right) => left; }"
+  ],
+  ["a static constructor sorts with the constructors", "class A { static A() { } A(int v) { } }"],
+  [
+    "a destructor sorts with the constructors",
+    "class A { ~A() { } public void Method() { } }"
+  ],
+  [
+    "an event and a delegate sort after const, before static properties",
+    "class A { private const int C = 1; private event System.Action Happened; private delegate void Handler(int value); private static int P { get; set; } }"
+  ],
+  [
+    "an accessor-less auto-property before its field",
+    "class A { public int Count { get; set; } private int _count; }"
+  ],
+  [
+    "an object-initializer chain that continues past its closing brace",
+    [
+      "class A",
+      "{",
+      "    private const char C = 'x';",
+      "    private static readonly ImmutableHashSet<char> WordSeparators = new HashSet<char>",
+      "    {",
+      "        '_',",
+      "    }.ToImmutableHashSet();",
+      "    private int _z;",
+      "}"
+    ].join("\n")
+  ],
+  [
+    "an initializer inside a call argument that ends past its brace",
+    [
+      "class A",
+      "{",
+      "    private const char C = 'x';",
+      "    private static readonly Foo X = Build(new Foo",
+      "    {",
+      "        A = 1,",
+      "    });",
+      "    private int _z;",
+      "}"
+    ].join("\n")
+  ],
+  [
+    "a nested interpolated string inside an interpolation hole",
+    [
+      "class A",
+      "{",
+      "    private const char C = 'x';",
+      "    private int _z;",
+      '    private static string Describe(string platformName, string v) =>',
+      "        TestContext.WriteLine(",
+      '            $"Input: {(platformName == null ? "(null)" : $"\\u0022{platformName}\\u0022")}, "',
+      '                + $"Serialized: \\u0022{v}\\u0022"',
+      "        );",
+      "}"
+    ].join("\n")
+  ]
 ];
 
 for (const [name, source] of SILENT) {
@@ -112,6 +213,178 @@ for (const [name, source, expected] of REPORTED) {
     assert.strictEqual(violations[0].name, expected);
   });
 }
+
+/** Shapes the #672 member ordering MUST report. */
+const ORDER_REPORTED = [
+  [
+    "a static property after a static field",
+    "class A { private static int _f; private static int P { get; set; } }",
+    "static property",
+    "P"
+  ],
+  [
+    "a property after a field",
+    "class A { private int _f; private int P => 1; }",
+    "property",
+    "P"
+  ],
+  [
+    "a field after a method",
+    "class A { private void M() { } private int _f; }",
+    "field",
+    "_f"
+  ],
+  [
+    "an internal field after a private field of the same tier",
+    "class A { private int _f; internal int _g; }",
+    "field",
+    "_g"
+  ],
+  [
+    "a static method after a method",
+    "class A { private void M() { } private static void S() { } }",
+    "static method",
+    "S"
+  ],
+  [
+    "a constructor after a method",
+    "class A { private void M() { } private A() { } }",
+    "constructor",
+    "A"
+  ],
+  [
+    "a const after a static property",
+    "class A { private static int P { get; set; } private const int C = 1; }",
+    "const",
+    "C"
+  ],
+  [
+    "a public method after a private method of the same tier",
+    "class A { private void M() { } public void N() { } }",
+    "method",
+    "N"
+  ]
+];
+
+for (const [name, source, expectedKind, expectedName] of ORDER_REPORTED) {
+  runTest(`ordering reported: ${name}`, () => {
+    const violations = violationsIn(source);
+    assert.strictEqual(violations.length, 1, `expected exactly one report for: ${source}`);
+    assert.strictEqual(violations[0].kind, expectedKind);
+    assert.strictEqual(violations[0].name, expectedName);
+  });
+}
+
+runTest("ordering: the canonical tier order passes and the same body scrambled fails", () => {
+  const ordered = [
+    "private const int C = 1;",
+    "private static int P { get; set; }",
+    "private static int _sf;",
+    "private int Prop => 2;",
+    "private int _f;",
+    "private A() { }",
+    "private static void S() { }",
+    "private void M() { }"
+  ];
+  const ok = `class A { ${ordered.join(" ")} }`;
+  assert.deepStrictEqual(violationsIn(ok), [], `expected the ordered body to pass: ${ok}`);
+  const reversed = `class A { ${ordered.reverse().join(" ")} }`;
+  assert.strictEqual(
+    violationsIn(reversed).length,
+    ordered.length - 1,
+    `every adjacent descent in the reversed body is reported: ${reversed}`
+  );
+});
+
+runTest("ordering: members on opposite sides of a conditional are never compared", () => {
+  const source = [
+    "class A",
+    "{",
+    "#if UNITY_EDITOR",
+    "    private void EditorMethod() { }",
+    "#else",
+    "    private int _field;",
+    "#endif",
+    "}"
+  ].join("\n");
+  assert.deepStrictEqual(
+    violationsIn(source).filter((violation) => ORDER_TIERS.includes(violation.kind)),
+    [],
+    "an #if branch and its #else branch are independent orderings"
+  );
+});
+
+runTest("ordering: a conditional inside a method does not reset the comparison", () => {
+  const source = [
+    "class A",
+    "{",
+    "    private void M()",
+    "    {",
+    "#if UNITY_EDITOR",
+    "        Log();",
+    "#endif",
+    "    }",
+    "",
+    "    private int _lateField;",
+    "}"
+  ].join("\n");
+  const violations = violationsIn(source);
+  assert.strictEqual(violations.length, 1);
+  assert.strictEqual(violations[0].kind, "field");
+  assert.strictEqual(violations[0].name, "_lateField");
+});
+
+runTest("ordering: --fix reorders a scrambled body and changes nothing else", () => {
+  const source = [
+    "class A",
+    "{",
+    "    private void Method() { }",
+    "",
+    "    // keeps its comment",
+    "    private int _field = 1;",
+    "",
+    "    private const int Constant = 2;",
+    "}"
+  ].join("\n");
+  const result = fixedText(source);
+  const expected = [
+    "class A",
+    "{",
+    "    private const int Constant = 2;",
+    "",
+    "    // keeps its comment",
+    "    private int _field = 1;",
+    "",
+    "    private void Method() { }",
+    "}"
+  ].join("\n");
+  assert.strictEqual(result, expected, `the fix is an exact permutation:\n${result}`);
+  assert.strictEqual(result.length, source.length, "the rewrite must be a permutation of slices");
+});
+
+runTest("ordering: --fix orders access within a tier and keeps nested types last", () => {
+  const source = "class A { private int _p; public int P; private void M() { } class B { } }";
+  const result = fixedText(source);
+  assert.strictEqual(
+    result,
+    "class A { public int P; private int _p; private void M() { } class B { } }"
+  );
+  assert.strictEqual(result.length, source.length);
+});
+
+runTest("ordering: --fix slots an event between const and static properties", () => {
+  const source =
+    "class A { private void M() { } private event System.Action E; private const int C = 1; }";
+  const violations = violationsIn(source);
+  assert.ok(0 < violations.length, "the descent is reported");
+  const result = fixedText(source);
+  assert.strictEqual(
+    result,
+    "class A { private const int C = 1; private event System.Action E; private void M() { } }",
+    `events take the tier after const:\n${result}`
+  );
+  assert.strictEqual(result.length, source.length);
+});
 
 runTest("--fix moves the type to the end and changes nothing else", () => {
   const source = "class A { class B { } int _x; }";

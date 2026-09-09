@@ -23,6 +23,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     {
         private bool _previousGlobalLogging;
 
+        private static void AssertCallSiteRetained()
+        {
+            Assert.That(
+                LoggingCallSiteProbe.ReceiverEvaluations,
+                Is.EqualTo(1),
+                "Logging must still run where Unity defines the enabling symbols."
+            );
+            Assert.That(
+                LoggingCallSiteProbe.ArgumentEvaluations,
+                Is.EqualTo(1),
+                "Logging must still build its message where Unity defines the enabling symbols."
+            );
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -95,20 +109,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 LoggingCallSiteProbe.ReceiverEvaluations,
                 Is.EqualTo(1),
                 "ValidateAssignments must still run where Unity defines the enabling symbols."
-            );
-        }
-
-        private static void AssertCallSiteRetained()
-        {
-            Assert.That(
-                LoggingCallSiteProbe.ReceiverEvaluations,
-                Is.EqualTo(1),
-                "Logging must still run where Unity defines the enabling symbols."
-            );
-            Assert.That(
-                LoggingCallSiteProbe.ArgumentEvaluations,
-                Is.EqualTo(1),
-                "Logging must still build its message where Unity defines the enabling symbols."
             );
         }
     }

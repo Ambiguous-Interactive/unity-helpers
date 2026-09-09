@@ -15,6 +15,67 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
     public static partial class IListExtensions
     {
+        private static (int pivotStart, int pivotEnd, bool swapped) PartitionRange<T, TComparer>(
+            T[] array,
+            int left,
+            int right,
+            int pivotIndex,
+            TComparer comparer
+        )
+            where TComparer : IComparer<T>
+        {
+            SortSwap(array, left, pivotIndex);
+            T pivot = array[left];
+            int i = left + 1;
+            int j = right;
+            bool swapped = false;
+
+            while (i <= j)
+            {
+                while (i <= j && comparer.Compare(array[i], pivot) < 0)
+                {
+                    i++;
+                }
+
+                while (i <= j && 0 < comparer.Compare(array[j], pivot))
+                {
+                    j--;
+                }
+
+                if (j < i)
+                {
+                    break;
+                }
+
+                if (i < j)
+                {
+                    SortSwap(array, i, j);
+                    swapped = true;
+                }
+
+                i++;
+                j--;
+            }
+
+            int pivotPosition = j;
+            SortSwap(array, left, pivotPosition);
+
+            int pivotStart = pivotPosition;
+            int pivotEnd = pivotPosition;
+
+            while (left < pivotStart && comparer.Compare(array[pivotStart - 1], pivot) == 0)
+            {
+                pivotStart--;
+            }
+
+            while (pivotEnd < right && comparer.Compare(array[pivotEnd + 1], pivot) == 0)
+            {
+                pivotEnd++;
+            }
+
+            return (pivotStart, pivotEnd, swapped || pivotIndex != pivotPosition);
+        }
+
         /// <summary>
         /// Sorts the elements in the list using pattern-defeating quicksort, an adaptive quicksort variant with
         /// introspective fallbacks and pattern detection.
@@ -138,67 +199,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             InsertionSortRange(array, left, right, comparer);
-        }
-
-        private static (int pivotStart, int pivotEnd, bool swapped) PartitionRange<T, TComparer>(
-            T[] array,
-            int left,
-            int right,
-            int pivotIndex,
-            TComparer comparer
-        )
-            where TComparer : IComparer<T>
-        {
-            SortSwap(array, left, pivotIndex);
-            T pivot = array[left];
-            int i = left + 1;
-            int j = right;
-            bool swapped = false;
-
-            while (i <= j)
-            {
-                while (i <= j && comparer.Compare(array[i], pivot) < 0)
-                {
-                    i++;
-                }
-
-                while (i <= j && 0 < comparer.Compare(array[j], pivot))
-                {
-                    j--;
-                }
-
-                if (j < i)
-                {
-                    break;
-                }
-
-                if (i < j)
-                {
-                    SortSwap(array, i, j);
-                    swapped = true;
-                }
-
-                i++;
-                j--;
-            }
-
-            int pivotPosition = j;
-            SortSwap(array, left, pivotPosition);
-
-            int pivotStart = pivotPosition;
-            int pivotEnd = pivotPosition;
-
-            while (left < pivotStart && comparer.Compare(array[pivotStart - 1], pivot) == 0)
-            {
-                pivotStart--;
-            }
-
-            while (pivotEnd < right && comparer.Compare(array[pivotEnd + 1], pivot) == 0)
-            {
-                pivotEnd++;
-            }
-
-            return (pivotStart, pivotEnd, swapped || pivotIndex != pivotPosition);
         }
     }
 }

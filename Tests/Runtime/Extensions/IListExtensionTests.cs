@@ -23,50 +23,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
         public delegate IList<int> ContainerFactory(IEnumerable<int> source);
 
-        /// <remarks>
-        /// Shuffle, Shift, Reverse and Fill each take a different path per container: a bulk array
-        /// primitive, a pooled copy written back in one Array.Copy, or the interface indexer. Every
-        /// shape has to produce the same answer, so every behavior assertion below runs over all
-        /// four rather than over whichever one the operation happens to be fastest on.
-        /// </remarks>
-        private static IEnumerable<TestCaseData> ContainerShapeCases()
-        {
-            yield return new TestCaseData(
-                "T[]",
-                (ContainerFactory)(source => source.ToArray())
-            ).SetName("Array");
-            yield return new TestCaseData(
-                "List<T>",
-                (ContainerFactory)(source => new List<int>(source))
-            ).SetName("List");
-            yield return new TestCaseData(
-                "SerializableList<T>",
-                (ContainerFactory)(
-                    source =>
-                    {
-                        SerializableList<int> serializable = new();
-                        serializable.AddRange(source);
-                        return serializable;
-                    }
-                )
-            ).SetName("SerializableList");
-            yield return new TestCaseData(
-                "IList<T>",
-                (ContainerFactory)(
-                    source =>
-                    {
-                        CustomList<int> custom = new();
-                        foreach (int value in source)
-                        {
-                            custom.Add(value);
-                        }
-
-                        return custom;
-                    }
-                )
-            ).SetName("CustomList");
-        }
-
         public delegate void IntSortAlgorithm(IList<int> list, IComparer<int> comparer);
 
         public delegate void TupleSortAlgorithm(
@@ -153,22 +109,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             }
         }
 
-        private static readonly int[] StabilityCounts = { 7, 64, 120, 513 };
-
-        // Descending runs with equal neighbors expose unstable reversal; ascending input cannot catch it.
-        private static readonly (string Name, Func<int, int, int> KeyOf)[] StabilityShapes =
-        {
-            ("ascending duplicates", static (i, _) => i / 3),
-            ("descending duplicates", static (i, count) => (count - i) / 3),
-            ("descending pairs", static (i, count) => (count - i) / 2),
-            (
-                "strict descent then equals",
-                static (i, count) => (count - i) % 5 == 0 ? count - i : 0
-            ),
-            ("all equal", static (_, _) => 0),
-            ("sawtooth duplicates", static (i, count) => (i % Math.Max(1, count / 4)) / 2),
-        };
-
         private static IEnumerable<TestCaseData> StableSortingAlgorithmCases
         {
             get
@@ -232,6 +172,66 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             }
         }
 
+        private static readonly int[] StabilityCounts = { 7, 64, 120, 513 };
+
+        // Descending runs with equal neighbors expose unstable reversal; ascending input cannot catch it.
+        private static readonly (string Name, Func<int, int, int> KeyOf)[] StabilityShapes =
+        {
+            ("ascending duplicates", static (i, _) => i / 3),
+            ("descending duplicates", static (i, count) => (count - i) / 3),
+            ("descending pairs", static (i, count) => (count - i) / 2),
+            (
+                "strict descent then equals",
+                static (i, count) => (count - i) % 5 == 0 ? count - i : 0
+            ),
+            ("all equal", static (_, _) => 0),
+            ("sawtooth duplicates", static (i, count) => (i % Math.Max(1, count / 4)) / 2),
+        };
+
+        /// <remarks>
+        /// Shuffle, Shift, Reverse and Fill each take a different path per container: a bulk array
+        /// primitive, a pooled copy written back in one Array.Copy, or the interface indexer. Every
+        /// shape has to produce the same answer, so every behavior assertion below runs over all
+        /// four rather than over whichever one the operation happens to be fastest on.
+        /// </remarks>
+        private static IEnumerable<TestCaseData> ContainerShapeCases()
+        {
+            yield return new TestCaseData(
+                "T[]",
+                (ContainerFactory)(source => source.ToArray())
+            ).SetName("Array");
+            yield return new TestCaseData(
+                "List<T>",
+                (ContainerFactory)(source => new List<int>(source))
+            ).SetName("List");
+            yield return new TestCaseData(
+                "SerializableList<T>",
+                (ContainerFactory)(
+                    source =>
+                    {
+                        SerializableList<int> serializable = new();
+                        serializable.AddRange(source);
+                        return serializable;
+                    }
+                )
+            ).SetName("SerializableList");
+            yield return new TestCaseData(
+                "IList<T>",
+                (ContainerFactory)(
+                    source =>
+                    {
+                        CustomList<int> custom = new();
+                        foreach (int value in source)
+                        {
+                            custom.Add(value);
+                        }
+
+                        return custom;
+                    }
+                )
+            ).SetName("CustomList");
+        }
+
         private static IEnumerable<SortDataset> GetSortingDatasets()
         {
             yield return new SortDataset("Empty", () => Array.Empty<int>());
@@ -274,28 +274,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 data[i] = random.Next(-50_000, 50_000);
             }
             return data;
-        }
-
-        [TestCaseSource(nameof(SortingAlgorithmCases))]
-        public void SortingAlgorithmsMatchArraySort(
-            string algorithmName,
-            IntSortAlgorithm algorithm
-        )
-        {
-            foreach (SortDataset dataset in GetSortingDatasets())
-            {
-                int[] source = dataset.Create();
-                int[] expected = source.OrderBy(x => x).ToArray();
-                int[] actual = source.ToArray();
-
-                algorithm(actual, new IntComparer());
-
-                Assert.That(
-                    actual,
-                    Is.EqualTo(expected),
-                    $"{algorithmName} failed for dataset {dataset.Label}"
-                );
-            }
         }
 
         private static int[] BuildNearlySortedDataset(int length, int disturbanceStride)
@@ -358,6 +336,46 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.That(actual, Is.EqualTo(expected));
 
             return comparer.ComparisonCount;
+        }
+
+        private static void AssertRemoveAtSwapBackRejects(int size, int index)
+        {
+            List<int> list = new(size);
+            for (int i = 0; i < size; ++i)
+            {
+                list.Add(i);
+            }
+
+            List<int> before = new(list);
+            Assert.Throws<ArgumentOutOfRangeException>(
+                () => list.RemoveAtSwapBack(index),
+                "size {0}, index {1}",
+                size,
+                index
+            );
+            Assert.That(list, Is.EqualTo(before), "size {0}, index {1}", size, index);
+        }
+
+        [TestCaseSource(nameof(SortingAlgorithmCases))]
+        public void SortingAlgorithmsMatchArraySort(
+            string algorithmName,
+            IntSortAlgorithm algorithm
+        )
+        {
+            foreach (SortDataset dataset in GetSortingDatasets())
+            {
+                int[] source = dataset.Create();
+                int[] expected = source.OrderBy(x => x).ToArray();
+                int[] actual = source.ToArray();
+
+                algorithm(actual, new IntComparer());
+
+                Assert.That(
+                    actual,
+                    Is.EqualTo(expected),
+                    $"{algorithmName} failed for dataset {dataset.Label}"
+                );
+            }
         }
 
         [Test]
@@ -1070,24 +1088,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             }
         }
 
-        private static void AssertRemoveAtSwapBackRejects(int size, int index)
-        {
-            List<int> list = new(size);
-            for (int i = 0; i < size; ++i)
-            {
-                list.Add(i);
-            }
-
-            List<int> before = new(list);
-            Assert.Throws<ArgumentOutOfRangeException>(
-                () => list.RemoveAtSwapBack(index),
-                "size {0}, index {1}",
-                size,
-                index
-            );
-            Assert.That(list, Is.EqualTo(before), "size {0}, index {1}", size, index);
-        }
-
         [Test]
         public void IsSortedEmptyList()
         {
@@ -1711,8 +1711,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
         private sealed class CustomList<T> : IList<T>
         {
-            private readonly List<T> _inner = new();
-
             public T this[int index]
             {
                 get => _inner[index];
@@ -1721,6 +1719,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             public int Count => _inner.Count;
             public bool IsReadOnly => false;
+
+            private readonly List<T> _inner = new();
 
             public void Add(T item) => _inner.Add(item);
 
@@ -1777,6 +1777,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
         private readonly struct SortDataset
         {
+            public string Label { get; }
+
             private readonly Func<int[]> factory;
 
             public SortDataset(string label, Func<int[]> factory)
@@ -1784,8 +1786,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 Label = label;
                 this.factory = factory;
             }
-
-            public string Label { get; }
 
             public int[] Create()
             {

@@ -32,9 +32,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 #pragma warning restore WPROTO030
     public sealed class CyclicBuffer<T> : IReadOnlyList<T>
     {
-        [ProtoIgnore]
-        private PooledResource<List<T>> _serializedItemsLease;
-
         [ProtoMember(1)]
         [field: SerializeField]
         public int Capacity { get; private set; }
@@ -42,17 +39,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         [ProtoMember(2)]
         [field: SerializeField]
         public int Count { get; private set; }
-
-        [ProtoMember(3)]
-        private List<T> _serializedItems;
-
-        [SerializeField]
-        [ProtoIgnore]
-        private List<T> _buffer;
-
-        [SerializeField]
-        [ProtoMember(4)]
-        private int _position;
 
         public T this[int index]
         {
@@ -68,13 +54,19 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
         }
 
-        private CyclicBuffer()
-        {
-            Capacity = 0;
-            _position = 0;
-            Count = 0;
-            _buffer = new List<T>();
-        }
+        [ProtoIgnore]
+        private PooledResource<List<T>> _serializedItemsLease;
+
+        [ProtoMember(3)]
+        private List<T> _serializedItems;
+
+        [SerializeField]
+        [ProtoIgnore]
+        private List<T> _buffer;
+
+        [SerializeField]
+        [ProtoMember(4)]
+        private int _position;
 
         public CyclicBuffer(int capacity, IEnumerable<T> initialContents = null)
         {
@@ -96,19 +88,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
         }
 
+        private CyclicBuffer()
+        {
+            Capacity = 0;
+            _position = 0;
+            Count = 0;
+            _buffer = new List<T>();
+        }
+
         public CyclicBufferEnumerator GetEnumerator()
         {
             return new CyclicBufferEnumerator(this);
-        }
-
-        IEnumerator<T> IEnumerable<T>.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
-
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
         }
 
         public void Add(T item)
@@ -237,14 +227,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
         }
 
-        private void RebuildFromCache(List<T> temp)
-        {
-            _buffer.Clear();
-            _buffer.AddRange(temp);
-            Count = temp.Count;
-            _position = Count < Capacity ? Count : 0;
-        }
-
         public void Clear()
         {
             Count = 0;
@@ -354,6 +336,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return true;
         }
 
+        private void RebuildFromCache(List<T> temp)
+        {
+            _buffer.Clear();
+            _buffer.AddRange(temp);
+            Count = temp.Count;
+            _position = Count < Capacity ? Count : 0;
+        }
+
         [ProtoBeforeSerialization]
         private void OnProtoSerialize()
         {
@@ -460,8 +450,22 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return 0 <= index && index < Count;
         }
 
+        IEnumerator<T> IEnumerable<T>.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+
         public struct CyclicBufferEnumerator : IEnumerator<T>
         {
+            public T Current => _current;
+
+            object IEnumerator.Current => Current;
+
             private readonly CyclicBuffer<T> _buffer;
 
             private int _index;
@@ -485,10 +489,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 _current = default;
                 return false;
             }
-
-            public T Current => _current;
-
-            object IEnumerator.Current => Current;
 
             public void Reset()
             {
