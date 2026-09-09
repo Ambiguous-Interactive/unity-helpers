@@ -35,11 +35,15 @@ Unity Helpers ships several custom sorting algorithms for `IList<T>` that cover 
 
 `JesseSort` adapts [Jesse Lew's dual-patience design](https://github.com/lewj85/jessesort).
 It handles sorted, reverse-sorted, and equal input in linear time. Pile assignments are recorded,
-reconstructed into contiguous ascending piles, then merged bottom-up, one adjacent pair at a time,
-with ordered-boundary and reverse-disjoint shortcuts that skip comparisons when two neighboring
-piles already read as a sorted run. Upstream alignment is still
-in progress; [current measurements](https://github.com/Ambiguous-Interactive/unity-helpers/issues/747#issuecomment-5588241194)
-are available in the tracking issue. The historical Jesse columns below measure the previous C# port.
+reconstructed into contiguous ascending piles, then merged bottom-up, one adjacent pair at a time:
+an ordered-boundary shortcut emits a single copy when two neighboring piles already read as one
+sorted run, and a reverse-disjoint shortcut block-swaps the pair when every element of the right
+pile precedes every element of the left one. Upstream alignment is still
+in progress; the pairwise-merge adaptation's
+[current measurements](https://github.com/Ambiguous-Interactive/unity-helpers/issues/747#issuecomment-5607805585)
+are available in the tracking issue. The historical Jesse columns below measure the previous C#
+port, and the tracking issue also holds the superseded numbers for the intermediate k-way merge
+adaptation.
 
 ## Where the Time Actually Goes
 

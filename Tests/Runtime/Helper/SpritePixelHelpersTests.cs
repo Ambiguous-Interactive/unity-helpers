@@ -4,15 +4,22 @@
 namespace WallstopStudios.UnityHelpers.Tests.Helper
 {
     using System.Collections.Generic;
+    using System.Text.RegularExpressions;
     using NUnit.Framework;
     using UnityEngine;
+    using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Tests.Core;
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
-    public sealed class SpriteHelpersTests : CommonTestBase
+    public sealed class SpritePixelHelpersTests : CommonTestBase
     {
+        private static readonly Regex InsideTextureErrorPattern = new(
+            @"\[Sprite\].*ExtractSpriteRect requires a sprite rect inside its texture",
+            RegexOptions.Compiled
+        );
+
         private static IEnumerable<TestCaseData> RotationCases()
         {
             yield return new TestCaseData(
@@ -97,17 +104,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             ).SetName("RotateTexture90.Clockwise.OneByFour");
         }
 
-        private static IEnumerable<Color32> EnumerateSource(int width, int height)
-        {
-            for (int y = 0; y < height; ++y)
-            {
-                for (int x = 0; x < width; ++x)
-                {
-                    yield return NewColor(x, y);
-                }
-            }
-        }
-
         private static Color32[] BuildSourcePixels(int width, int height)
         {
             Color32[] pixels = new Color32[width * height];
@@ -144,7 +140,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.AreEqual(width, rotated.height);
             Assert.AreEqual(source.format, rotated.format);
             CollectionAssert.AreEqual(expected, rotated.GetPixels32());
-            CollectionAssert.AreEqual(EnumerateSource(width, height), source.GetPixels32());
+            CollectionAssert.AreEqual(BuildSourcePixels(width, height), source.GetPixels32());
         }
 
         [Test]
@@ -168,7 +164,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     $"Pixel {index} did not match the reversed source."
                 );
             }
-            CollectionAssert.AreEqual(EnumerateSource(width, height), source.GetPixels32());
+            CollectionAssert.AreEqual(BuildSourcePixels(width, height), source.GetPixels32());
         }
 
         [Test]
@@ -232,6 +228,77 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public void ExtractSpriteRectReturnsNullForNullSprite()
         {
             Assert.IsTrue(((Sprite)null).ExtractSpriteRect() == null);
+        }
+
+        [Test]
+        public void ExtractSpriteRectRejectsNegativeOrigin()
+        {
+            Texture2D source = CreateTexture(4, 4);
+            Sprite sprite = Track(
+                Sprite.Create(source, new Rect(-1, 0, 2, 2), new Vector2(0.5f, 0.5f))
+            );
+            LogAssert.Expect(LogType.Error, InsideTextureErrorPattern);
+            Assert.IsTrue(sprite.ExtractSpriteRect() == null);
+        }
+
+        [Test]
+        public void ExtractSpriteRectRejectsRectBeyondTexture()
+        {
+            Texture2D source = CreateTexture(4, 4);
+            Sprite sprite = Track(
+                Sprite.Create(source, new Rect(-4, -4, 8, 8), new Vector2(0.5f, 0.5f))
+            );
+            LogAssert.Expect(LogType.Error, InsideTextureErrorPattern);
+            Assert.IsTrue(sprite.ExtractSpriteRect() == null);
+        }
+
+        [Test]
+        public void ExtractSpriteRectExpandsFractionalRectToWholePixels()
+        {
+            const int size = 5;
+            Texture2D source = CreateTexture(size, size);
+            Sprite sprite = Track(
+                Sprite.Create(source, new Rect(1.5f, 1.5f, 3.5f, 3.5f), new Vector2(0.5f, 0.5f))
+            );
+            Texture2D extracted = Track(sprite.ExtractSpriteRect());
+            Assert.IsTrue(extracted != null);
+            Assert.AreEqual(4, extracted.width);
+            Assert.AreEqual(4, extracted.height);
+            Color32[] allPixels = source.GetPixels32();
+            Color32[] expectedRegion = new Color32[16];
+            int index = 0;
+            for (int y = 1; y < size; ++y)
+            {
+                for (int x = 1; x < size; ++x)
+                {
+                    expectedRegion[index] = allPixels[y * size + x];
+                    ++index;
+                }
+            }
+            CollectionAssert.AreEqual(expectedRegion, extracted.GetPixels32());
+        }
+
+        [Test]
+        public void ExtractSpriteRectAcceptsRectTouchingFarEdge()
+        {
+            Texture2D source = CreateTexture(4, 4);
+            Sprite sprite = Track(
+                Sprite.Create(source, new Rect(2, 2, 2, 2), new Vector2(0.5f, 0.5f))
+            );
+            Texture2D extracted = Track(sprite.ExtractSpriteRect());
+            Assert.IsTrue(extracted != null);
+            Color32[] allPixels = source.GetPixels32();
+            Color32[] expectedRegion = new Color32[4];
+            int index = 0;
+            for (int y = 2; y < 4; ++y)
+            {
+                for (int x = 2; x < 4; ++x)
+                {
+                    expectedRegion[index] = allPixels[y * source.width + x];
+                    ++index;
+                }
+            }
+            CollectionAssert.AreEqual(expectedRegion, extracted.GetPixels32());
         }
 
         private Texture2D CreateTexture(int width, int height)

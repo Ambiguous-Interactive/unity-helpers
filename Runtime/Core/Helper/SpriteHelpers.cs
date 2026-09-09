@@ -60,7 +60,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <param name="clockwise">When true, rotates clockwise; otherwise counterclockwise.</param>
         /// <returns>
         /// The rotated texture with the source's format, or null when <paramref name="texture"/>
-        /// is null, not readable, or its format does not support pixel writes.
+        /// is null, not readable, or its format does not support pixel writes. The caller owns the
+        /// returned texture and must destroy it when finished with it.
         /// </returns>
         public static Texture2D RotateTexture90(this Texture2D texture, bool clockwise)
         {
@@ -92,7 +93,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
             }
 
-            return CreateTexture(texture, rotatedWidth, rotatedHeight, rotated);
+            return CreateTexture(texture, rotatedWidth, rotatedHeight, rotated, "RotateTexture90");
         }
 
         /// <summary>
@@ -101,7 +102,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <param name="texture">The texture to rotate.</param>
         /// <returns>
         /// The rotated texture with the source's format, or null when <paramref name="texture"/>
-        /// is null, not readable, or its format does not support pixel writes.
+        /// is null, not readable, or its format does not support pixel writes. The caller owns the
+        /// returned texture and must destroy it when finished with it.
         /// </returns>
         public static Texture2D RotateTexture180(this Texture2D texture)
         {
@@ -126,18 +128,19 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 rotated[index] = source[last - index];
             }
 
-            return CreateTexture(texture, sourceWidth, sourceHeight, rotated);
+            return CreateTexture(texture, sourceWidth, sourceHeight, rotated, "RotateTexture180");
         }
 
         /// <summary>
         /// Returns a new Texture2D containing the pixels of <paramref name="sprite"/>'s region in
-        /// its source texture.
+        /// its source texture. A fractional rect expands to the whole pixels it touches.
         /// </summary>
         /// <param name="sprite">The sprite to extract.</param>
         /// <returns>
         /// The extracted texture with the source's format, or null when <paramref name="sprite"/>
-        /// is null, its texture is null or not readable, or its format does not support pixel
-        /// writes.
+        /// is null, its texture is null or not readable, its rect lies outside the texture, or its
+        /// format does not support pixel writes. The caller owns the returned texture and must
+        /// destroy it when finished with it.
         /// </returns>
         public static Texture2D ExtractSpriteRect(this Sprite sprite)
         {
@@ -158,37 +161,58 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return null;
             }
 
-            Rect rect = sprite.textureRect;
-            int width = Mathf.RoundToInt(rect.width);
-            int height = Mathf.RoundToInt(rect.height);
-            if (width < 1 || height < 1)
+            Rect rect;
+            try
             {
-                sprite.LogError($"ExtractSpriteRect requires a sprite with pixels.");
+                rect = sprite.textureRect;
+            }
+            catch (Exception exception)
+            {
+                sprite.LogError($"Failed to read the sprite's textureRect: {exception.Message}");
                 return null;
             }
 
+            int startX = Mathf.FloorToInt(rect.x);
+            int startY = Mathf.FloorToInt(rect.y);
+            int endX = Mathf.CeilToInt(rect.xMax);
+            int endY = Mathf.CeilToInt(rect.yMax);
+            if (
+                endX < startX
+                || endY < startY
+                || startX < 0
+                || startY < 0
+                || texture.width < endX
+                || texture.height < endY
+            )
+            {
+                sprite.LogError($"ExtractSpriteRect requires a sprite rect inside its texture.");
+                return null;
+            }
+
+            int width = endX - startX;
+            int height = endY - startY;
             Color32[] allPixels = texture.GetPixels32();
             Color32[] region = new Color32[width * height];
-            int startX = Mathf.RoundToInt(rect.x);
-            int startY = Mathf.RoundToInt(rect.y);
+            int textureWidth = texture.width;
             int index = 0;
-            for (int y = startY; y < startY + height; ++y)
+            for (int y = startY; y < endY; ++y)
             {
-                int rowStart = y * texture.width + startX;
+                int rowStart = y * textureWidth + startX;
                 for (int x = 0; x < width; ++x)
                 {
                     region[index] = allPixels[rowStart + x];
                     ++index;
                 }
             }
-            return CreateTexture(texture, width, height, region);
+            return CreateTexture(texture, width, height, region, "ExtractSpriteRect");
         }
 
         private static Texture2D CreateTexture(
             Texture2D source,
             int width,
             int height,
-            Color32[] pixels
+            Color32[] pixels,
+            string operation
         )
         {
             Texture2D result = null;
@@ -205,7 +229,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 {
                     UnityEngine.Object.DestroyImmediate(result);
                 }
-                source.LogError($"Failed to write rotated pixels: {exception.Message}");
+                source.LogError($"{operation} failed to write pixels: {exception.Message}");
                 return null;
             }
         }

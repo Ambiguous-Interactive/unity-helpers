@@ -1222,7 +1222,8 @@ Texture2D upsideDown = source.RotateTexture180();
 ```
 
 Both return null, with a logged reason, when the texture is not readable or its format refuses
-pixel writes, so a compressed atlas never throws mid-load.
+pixel writes, so a compressed atlas never throws mid-load. Each returned texture is a new
+allocation: destroy it when finished with it.
 
 <!-- doc-sample: compiles -->
 
@@ -1230,15 +1231,16 @@ pixel writes, so a compressed atlas never throws mid-load.
 using WallstopStudios.UnityHelpers.Core.Helper;
 using UnityEngine;
 
-Texture2D atlas = new Texture2D(256, 256, TextureFormat.RGBA32, false);
-atlas.Apply();
-Sprite sprite = Sprite.Create(atlas, new Rect(0, 0, 32, 32), new Vector2(0.5f, 0.5f));
+Texture2D sheet = new Texture2D(256, 256, TextureFormat.RGBA32, false);
+sheet.Apply();
+Sprite sprite = Sprite.Create(sheet, new Rect(0, 0, 32, 32), new Vector2(0.5f, 0.5f));
 
 Texture2D extracted = sprite.ExtractSpriteRect();
 ```
 
-`ExtractSpriteRect` copies the sprite's `textureRect` region, so it works for packed atlases where
-the sprite occupies a sub-rectangle of a larger sheet.
+`ExtractSpriteRect` copies the sprite's `textureRect` region from its source sheet, so it reads a
+sprite out of a larger sheet without touching the sheet itself. The sheet must be readable, and a
+rect that leaves the sheet is reported as a logged null rather than an out-of-range read.
 
 ---
 
