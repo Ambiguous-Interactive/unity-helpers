@@ -99,7 +99,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 $"wuh-sha256-{Guid.NewGuid():N}.missing"
             );
             Assert.IsFalse(Objects.TrySha256HexOfFile(path, out string hex));
-            Assert.IsNull(hex);
+            Assert.IsTrue(hex == null);
         }
 
         [TestCase(null)]
@@ -107,7 +107,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public void TrySha256HexOfFileRefusesNullOrEmptyPath(string path)
         {
             Assert.IsFalse(Objects.TrySha256HexOfFile(path, out string hex));
-            Assert.IsNull(hex);
+            Assert.IsTrue(hex == null);
         }
     }
 }

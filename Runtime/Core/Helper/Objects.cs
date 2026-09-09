@@ -935,9 +935,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </returns>
         public static bool TrySha256HexOfFile(string filePath, out string hex)
         {
-            hex = null;
             if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
             {
+                hex = null;
                 return false;
             }
 
