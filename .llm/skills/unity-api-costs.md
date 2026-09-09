@@ -86,6 +86,16 @@ RectTransform.GetWorldCorners(len 8)  -> accepted; it needs four OR MORE
 So `SpriteSheetExtractor` is the one justified exact-size rent in the package, and `GetWorldCorners`
 — which looks like it needs exactly four — does not.
 
+A texture read has no such lever: `Texture2D` declares `GetPixels32()` and its mip-level overload
+and nothing else — there is no array-filling overload to rent into (measured on 6000.4.6f1; the
+array-filling overload belongs to `WebCamTexture`). `GetRawTextureData<T>` is the zero-allocation
+read, and for an uncompressed mip-0 read its layout is byte-identical to `GetPixels32` order
+(verified 0/12 mismatches on RGBA32) — a rotate or a blit through it is safe. What makes it unsafe
+is channel layout: ARGB32 and BGRA32 store their channels in a different memory order, so
+reinterpreting their raw bytes as `Color32` reads channel-swapped pixels; a raw fast path must
+check `texture.format == TextureFormat.RGBA32` first, which is what `ColorExtensions`' averaging
+fast paths now guard.
+
 Go to `System.Buffers.ArrayPool<T>.Shared` unwrapped only for a buffer whose lifetime is not scoped,
 as `PooledBufferStream` does while growing.
 

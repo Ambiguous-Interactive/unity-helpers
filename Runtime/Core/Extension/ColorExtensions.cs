@@ -160,7 +160,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     texture.MakeReadable();
                     int expectedBytes = texture.width * texture.height * 4;
                     NativeArray<byte> rawBytes = texture.GetRawTextureData<byte>();
-                    if (rawBytes.Length == expectedBytes)
+                    /* Only RGBA32 stores its channels in Color32 order; ARGB32 and BGRA32 match
+                    the byte count and would read as channel-swapped here. */
+                    if (texture.format == TextureFormat.RGBA32 && rawBytes.Length == expectedBytes)
                     {
                         NativeArray<Color32> raw = texture.GetRawTextureData<Color32>();
                         int n = raw.Length;
@@ -224,7 +226,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     texture.MakeReadable();
                     int expectedBytes = texture.width * texture.height * 4;
                     NativeArray<byte> rawBytes = texture.GetRawTextureData<byte>();
-                    if (rawBytes.Length == expectedBytes)
+                    /* Only RGBA32 stores its channels in Color32 order; ARGB32 and BGRA32 match
+                    the byte count and would read as channel-swapped here. */
+                    if (texture.format == TextureFormat.RGBA32 && rawBytes.Length == expectedBytes)
                     {
                         NativeArray<Color32> raw = texture.GetRawTextureData<Color32>();
                         int n = raw.Length;
@@ -307,7 +311,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     texture.MakeReadable();
                     int expectedBytes = texture.width * texture.height * 4;
                     NativeArray<byte> rawBytes = texture.GetRawTextureData<byte>();
-                    if (rawBytes.Length == expectedBytes)
+                    /* Only RGBA32 stores its channels in Color32 order; ARGB32 and BGRA32 match
+                    the byte count and would read as channel-swapped here. */
+                    if (texture.format == TextureFormat.RGBA32 && rawBytes.Length == expectedBytes)
                     {
                         NativeArray<Color32> raw = texture.GetRawTextureData<Color32>();
                         int n = raw.Length;
@@ -386,7 +392,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     texture.MakeReadable();
                     int expectedBytes = texture.width * texture.height * 4;
                     NativeArray<byte> rawBytes = texture.GetRawTextureData<byte>();
-                    if (rawBytes.Length == expectedBytes)
+                    /* Only RGBA32 stores its channels in Color32 order; ARGB32 and BGRA32 match
+                    the byte count and would read as channel-swapped here. */
+                    if (texture.format == TextureFormat.RGBA32 && rawBytes.Length == expectedBytes)
                     {
                         NativeArray<Color32> raw = texture.GetRawTextureData<Color32>();
                         int n = raw.Length;

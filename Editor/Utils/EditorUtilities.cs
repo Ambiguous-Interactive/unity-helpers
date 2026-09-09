@@ -22,29 +22,40 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         }
 
         /// <summary>
-        /// Reports whether this editor session was launched by the Unity Test Runner.
+        /// Reports whether this editor session was launched with Unity Test Runner command-line
+        /// arguments.
         /// </summary>
         /// <returns>
         /// True when any command-line argument mentions <c>runTests</c>, <c>testResults</c> or
-        /// <c>testPlatform</c>, case-insensitively.
+        /// <c>testPlatform</c>, case-insensitively. False when none do, when the session was
+        /// started from the in-editor Test Runner window, or when the command line cannot be read.
         /// </returns>
         /// <remarks>
-        /// Test-runner launches open window <c>OnEnable</c> during the run itself, which can
-        /// consume fixtures or produce logs the test session never asked for.
+        /// Gate fixture-consuming work in window <c>OnEnable</c> on this alongside
+        /// <see cref="UnityEngine.Application.isBatchMode"/> and
+        /// <see cref="WallstopStudios.UnityHelpers.Core.Helper.Helpers.IsRunningInContinuousIntegration"/>.
+        /// Never throws.
         /// </remarks>
-        internal static bool IsInvokedByTestRunner()
+        public static bool IsInvokedByTestRunner()
         {
-            string[] args = Environment.GetCommandLineArgs();
-            foreach (string a in args)
+            try
             {
-                if (
-                    0 <= a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
-                    || 0 <= a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)
-                    || 0 <= a.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase)
-                )
+                string[] args = Environment.GetCommandLineArgs();
+                foreach (string a in args)
                 {
-                    return true;
+                    if (
+                        0 <= a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
+                        || 0 <= a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)
+                        || 0 <= a.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase)
+                    )
+                    {
+                        return true;
+                    }
                 }
+            }
+            catch
+            {
+                return false;
             }
 
             return false;

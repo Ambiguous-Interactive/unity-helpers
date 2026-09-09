@@ -8,7 +8,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     using System.IO;
     using System.Runtime.CompilerServices;
     using System.Security.Cryptography;
-    using System.Text;
+    using Extension;
 
     /// <summary>
     /// Utilities for null checks (including UnityEngine.Object overloads) and hash code composition.
@@ -31,6 +31,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         public const uint Fnv32OffsetBasis = 2166136261u;
 
         private const uint Fnv32Prime = 16777619u;
+
+        private const string HexDigits = "0123456789abcdef";
 
         /// <summary>
         /// Unity-aware null check for UnityEngine.Object types (handles destroyed objects returning true for == null).
@@ -851,8 +853,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// addressing and cross-machine agreement.
         /// </para>
         /// <para>
-        /// It hashes bytes and only bytes. Encode text yourself -- <c>Encoding.UTF8</c> is the usual
-        /// choice -- so the encoding is part of your format rather than an assumption of this one.
+        /// It hashes bytes and only bytes. Encode text yourself -- <see cref="StringExtensions.GetBytes(string)"/>
+        /// is the usual choice -- so the encoding is part of your format rather than an assumption
+        /// of this one.
         /// </para>
         /// </remarks>
         /// <param name="bytes">The bytes to hash. An empty span returns <paramref name="seed"/> unchanged.</param>
@@ -860,7 +863,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <returns>The FNV-1a hash of <paramref name="bytes"/> starting from <paramref name="seed"/>.</returns>
         /// <example>
         /// <code><![CDATA[
-        /// byte[] payload = Encoding.UTF8.GetBytes(saveSlotName);
+        /// byte[] payload = saveSlotName.GetBytes();
         /// uint digest = Objects.StableHash32V1(payload, Objects.Fnv32OffsetBasis);
         /// ]]></code>
         /// </example>
@@ -888,8 +891,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// hash buckets. The answer depends only on the bytes of <paramref name="text"/>.
         /// </para>
         /// <para>
-        /// UTF-8 is the encoding, so the same string hashes the same on every platform. Hash bytes
-        /// yourself with the <c>byte[]</c> overload when the encoding is part of your format.
+        /// UTF-8 is the encoding, and it is frozen. A <see cref="string"/> is UTF-16 in memory, so
+        /// hashing that representation would produce a digest no other tool agrees with; encoding
+        /// as UTF-8 first is what makes this digest interoperable. Hash bytes yourself with the
+        /// <c>byte[]</c> overload when the encoding is part of your format.
         /// </para>
         /// </remarks>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="text"/> is null.</exception>
@@ -900,7 +905,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 throw new ArgumentNullException(nameof(text));
             }
 
-            return Sha256Hex(Encoding.UTF8.GetBytes(text));
+            return Sha256Hex(text.GetBytes());
         }
 
         /// <summary>
@@ -931,11 +936,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </param>
         /// <returns>
         /// True when the file was read and hashed; false when <paramref name="filePath"/> is null
-        /// or empty, the file does not exist, or reading it failed.
+        /// or whitespace, or when the file does not exist or cannot be read.
         /// </returns>
         public static bool TrySha256HexOfFile(string filePath, out string hex)
         {
-            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+            if (string.IsNullOrWhiteSpace(filePath))
             {
                 hex = null;
                 return false;
@@ -943,8 +948,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             try
             {
-                using SHA256 sha256 = SHA256.Create();
                 using FileStream stream = File.OpenRead(filePath);
+                using SHA256 sha256 = SHA256.Create();
                 byte[] digest = sha256.ComputeHash(stream);
                 hex = ToHex(digest);
                 return true;
@@ -958,13 +963,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private static string ToHex(byte[] digest)
         {
-            StringBuilder builder = new(digest.Length * 2);
+            char[] hex = new char[digest.Length * 2];
             for (int i = 0; i < digest.Length; ++i)
             {
-                _ = builder.Append(digest[i].ToString("x2"));
+                hex[i * 2] = HexDigits[digest[i] >> 4];
+                hex[(i * 2) + 1] = HexDigits[digest[i] & 0xF];
             }
 
-            return builder.ToString();
+            return new string(hex);
         }
 
         private struct HashCodeBuilder

@@ -86,14 +86,10 @@ namespace WallstopStudios.UnityHelpers.Editor
 
         static FitTextureSizeWindow()
         {
-            try
+            if (Application.isBatchMode || EditorUtilities.IsInvokedByTestRunner())
             {
-                if (Application.isBatchMode || EditorUtilities.IsInvokedByTestRunner())
-                {
-                    SuppressUserPrompts = true;
-                }
+                SuppressUserPrompts = true;
             }
-            catch { }
         }
 
         [MenuItem("Tools/Wallstop Studios/Unity Helpers/Fit Texture Size", priority = -1)]

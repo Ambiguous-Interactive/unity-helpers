@@ -1645,6 +1645,46 @@ public static class CreateAbilityAsset
 an empty string when it cannot determine one — always have a fallback, as above. It reaches an
 internal Unity API by reflection, so treat the empty-string case as normal rather than exceptional.
 
+`IsInvokedByTestRunner()` reports whether this editor process was launched with Unity Test Runner
+command-line arguments, by looking for `runTests`, `testResults` or `testPlatform` in the command
+line. A run started from the in-editor Test Runner window does not carry those arguments and is not
+detected — this answers "was this editor launched to run tests", not "is a test session running
+right now". A window's `OnEnable` runs during a command-line test session too, so work that
+consumes fixtures or writes logs should be gated on it — together with `Application.isBatchMode`
+and [`Helpers.IsRunningInContinuousIntegration`](../utilities/helper-utilities.md#cicd-detection),
+the other two legs of the same question:
+
+```csharp
+using UnityEditor;
+using UnityEngine;
+using WallstopStudios.UnityHelpers.Core.Helper;
+using WallstopStudios.UnityHelpers.Editor.Utils;
+
+public sealed class AssetReportWindow : EditorWindow
+{
+    private void OnEnable()
+    {
+        if (
+            Application.isBatchMode
+            || EditorUtilities.IsInvokedByTestRunner()
+            || Helpers.IsRunningInContinuousIntegration
+        )
+        {
+            return;
+        }
+
+        ImportReports();
+    }
+
+    private void ImportReports() { /* fixture-consuming work */ }
+}
+```
+
+It answers `false` rather than throwing, even on a host that refuses to share its command line. If
+all you want is to skip dialogs, `EditorUi` already folds this in behind
+`EditorUi.Confirm`/`EditorUi.Info`; reach for this predicate when the work itself, not just the
+prompt, should be skipped.
+
 `IndentLevelScope.Indent()` and `IndentLevelScope.AtLevel(level)` change
 `EditorGUI.indentLevel` without per-scope garbage after the shared owner has warmed to the maximum
 concurrent nesting depth. Copies are safe to dispose more than once. Nested scopes also restore the

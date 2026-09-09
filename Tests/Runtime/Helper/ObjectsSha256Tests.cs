@@ -104,6 +104,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
         [TestCase(null)]
         [TestCase("")]
+        [TestCase("   ")]
         public void TrySha256HexOfFileRefusesNullOrEmptyPath(string path)
         {
             Assert.IsFalse(Objects.TrySha256HexOfFile(path, out string hex));

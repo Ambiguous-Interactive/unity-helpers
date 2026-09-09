@@ -1149,10 +1149,10 @@ every later version of this package. The algorithm is frozen -- that is what the
 future change arrives under a different name rather than as a new answer here.
 
 ```csharp
-using System.Text;
+using WallstopStudios.UnityHelpers.Core.Extension;
 using WallstopStudios.UnityHelpers.Core.Helper;
 
-byte[] payload = Encoding.UTF8.GetBytes(saveSlotName);
+byte[] payload = saveSlotName.GetBytes();
 uint digest = Objects.StableHash32V1(payload, Objects.Fnv32OffsetBasis);
 ```
 
