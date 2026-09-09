@@ -17,12 +17,12 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     /// </remarks>
     public sealed class TestPrefabAssetChangeHandler : MonoBehaviour
     {
-        private static readonly List<AssetChangeContext> Recorded = new();
-        private static readonly List<TestPrefabAssetChangeHandler> InvokedInstances = new();
-
         public static IReadOnlyList<AssetChangeContext> RecordedContexts => Recorded;
         public static IReadOnlyList<TestPrefabAssetChangeHandler> RecordedInstances =>
             InvokedInstances;
+
+        private static readonly List<AssetChangeContext> Recorded = new();
+        private static readonly List<TestPrefabAssetChangeHandler> InvokedInstances = new();
 
         public static void Clear()
         {

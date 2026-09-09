@@ -41,6 +41,41 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private const string ReadOnlyDictionaryType =
             "global::System.Collections.ObjectModel.ReadOnlyDictionary";
 
+        /// <summary>
+        /// Whether entries are collected into a dictionary of a different type from the member's.
+        /// </summary>
+        /// <remarks>
+        /// True for the two dictionary interfaces and for <c>ReadOnlyDictionary&lt;K,V&gt;</c>: none
+        /// can be constructed and filled, so the member's current entries are copied into a
+        /// <c>Dictionary&lt;K,V&gt;</c> and the decoded ones merged on top.
+        /// </remarks>
+        private bool SeedsByCopy => _accumulatorQualified != _mapQualified;
+
+        private string PairLocal => "pair" + Tag;
+
+        private string EntrySize => "entrySize" + Tag;
+
+        private string Accumulator => "map" + Tag;
+
+        /// <summary>Whether <c>SkipConstructor</c> suppresses this member's seed outright.</summary>
+        /// <remarks>
+        /// Only where the instance can never have come from a caller; otherwise the answer is a
+        /// run-time one. See <see cref="Member.SeedGuard"/>.
+        /// </remarks>
+        private bool SeedSuppressed => SkipConstructor && SeedGuard == null;
+
+        /// <summary>The run-time guard on this member's seed, or <c>null</c> when it has none.</summary>
+        private string Guard => SkipConstructor ? SeedGuard : null;
+
+        private string SeenFlag => "seen" + Tag;
+
+        private string PendingType =>
+            ListType + "<" + PairType + "<" + _keyQualified + ", " + _valueQualified + ">>";
+
+        private string KeyAccess => PairLocal + ".Key";
+
+        private string ValueAccess => PairLocal + ".Value";
+
         private readonly Shape _key;
         private readonly Shape _value;
         private readonly string _keyQualified;
@@ -85,16 +120,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             _keyIsString = keyIsString;
             _valueIsString = valueIsString;
         }
-
-        /// <summary>
-        /// Whether entries are collected into a dictionary of a different type from the member's.
-        /// </summary>
-        /// <remarks>
-        /// True for the two dictionary interfaces and for <c>ReadOnlyDictionary&lt;K,V&gt;</c>: none
-        /// can be constructed and filled, so the member's current entries are copied into a
-        /// <c>Dictionary&lt;K,V&gt;</c> and the decoded ones merged on top.
-        /// </remarks>
-        private bool SeedsByCopy => _accumulatorQualified != _mapQualified;
 
         /// <summary>
         /// Builds the member when <paramref name="type"/> is a supported map, and returns
@@ -320,30 +345,29 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return false;
         }
 
-        private string PairLocal => "pair" + Tag;
+        private static void CloseAll(Writer writer, int count)
+        {
+            for (int closed = 0; closed < count; closed++)
+            {
+                Close(writer);
+            }
+        }
 
-        private string EntrySize => "entrySize" + Tag;
-
-        private string Accumulator => "map" + Tag;
-
-        /// <summary>Whether <c>SkipConstructor</c> suppresses this member's seed outright.</summary>
-        /// <remarks>
-        /// Only where the instance can never have come from a caller; otherwise the answer is a
-        /// run-time one. See <see cref="Member.SeedGuard"/>.
-        /// </remarks>
-        private bool SeedSuppressed => SkipConstructor && SeedGuard == null;
-
-        /// <summary>The run-time guard on this member's seed, or <c>null</c> when it has none.</summary>
-        private string Guard => SkipConstructor ? SeedGuard : null;
-
-        private string SeenFlag => "seen" + Tag;
-
-        private string PendingType =>
-            ListType + "<" + PairType + "<" + _keyQualified + ", " + _valueQualified + ">>";
-
-        private string KeyAccess => PairLocal + ".Key";
-
-        private string ValueAccess => PairLocal + ".Value";
+        private static string MapPresence(Shape shape, string access, bool isKey)
+        {
+            /*
+             * The shipped v3 oracle writes fixed-width zero keys but omits zero values; both forms remain
+             * readable across majors.
+             */
+            return
+                isKey
+                && (
+                    shape.WireType == Proto + ".WProtoWireType.Fixed32"
+                    || shape.WireType == Proto + ".WProtoWireType.Fixed64"
+                )
+                ? "true"
+                : Shape.Fill(shape.PresenceTest, access);
+        }
 
         /// <inheritdoc />
         internal override void EmitMeasure(Writer writer)
@@ -397,112 +421,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             CloseAll(writer, open);
             writer.Blank();
-        }
-
-        private void EmitHalfWrite(Writer writer, Shape shape, string access, int tag, bool isKey)
-        {
-            writer.Line("if (" + MapPresence(shape, access, isKey) + ")" + Writer.Open);
-            writer.Indent();
-            writer.Line("if (!(" + shape.WriteCall(access, tag) + "))" + Writer.Open);
-            writer.Indent();
-            writer.Line("return false;");
-            Close(writer);
-            Close(writer);
-            writer.Blank();
-        }
-
-        /// <summary>
-        /// Emits the presence guard and the <c>foreach</c> header, and returns how many blocks the
-        /// caller has to close.
-        /// </summary>
-        /// <remarks>
-        /// <para>
-        /// A struct dictionary is always present, so it gets no guard: <c>member != null</c> on a
-        /// value type is <c>CS0019</c>, a compiler error inside code the consumer never wrote.
-        /// </para>
-        /// <para>
-        /// Unlike a repeated element, a null map <b>value</b> is legal -- protobuf-net omits it and
-        /// the entry carries only its key -- so there is nothing to guard inside the loop.
-        /// </para>
-        /// </remarks>
-        private int OpenLoop(Writer writer)
-        {
-            int open = 0;
-            if (!_mapIsValueType)
-            {
-                writer.Line("if (" + Access + " != null)" + Writer.Open);
-                writer.Indent();
-                open++;
-            }
-
-            writer.Line(
-                "foreach ("
-                    + PairType
-                    + "<"
-                    + _keyQualified
-                    + ", "
-                    + _valueQualified
-                    + "> "
-                    + PairLocal
-                    + " in "
-                    + Access
-                    + ")"
-                    + Writer.Open
-            );
-            writer.Indent();
-            return open + 1;
-        }
-
-        private static void CloseAll(Writer writer, int count)
-        {
-            for (int closed = 0; closed < count; closed++)
-            {
-                Close(writer);
-            }
-        }
-
-        /// <summary>
-        /// Emits the entry's payload size, which both halves obey protobuf-net's map omission rules for.
-        /// </summary>
-        private void EmitEntrySize(Writer writer)
-        {
-            writer.Line("int " + EntrySize + " = 0;");
-            EmitHalfSize(writer, _key, KeyAccess, 1, true);
-            EmitHalfSize(writer, _value, ValueAccess, 2, false);
-            writer.Blank();
-        }
-
-        private void EmitHalfSize(Writer writer, Shape shape, string access, int tag, bool isKey)
-        {
-            writer.Line("if (" + MapPresence(shape, access, isKey) + ")" + Writer.Open);
-            writer.Indent();
-            writer.Line(
-                EntrySize
-                    + " += "
-                    + Proto
-                    + ".WProtoSizes.TagSize("
-                    + tag
-                    + ") + "
-                    + Shape.Fill(shape.SizeExpression, access)
-                    + ";"
-            );
-            Close(writer);
-        }
-
-        private static string MapPresence(Shape shape, string access, bool isKey)
-        {
-            /*
-             * The shipped v3 oracle writes fixed-width zero keys but omits zero values; both forms remain
-             * readable across majors.
-             */
-            return
-                isKey
-                && (
-                    shape.WireType == Proto + ".WProtoWireType.Fixed32"
-                    || shape.WireType == Proto + ".WProtoWireType.Fixed64"
-                )
-                ? "true"
-                : Shape.Fill(shape.PresenceTest, access);
         }
 
         /// <inheritdoc />
@@ -659,6 +577,153 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             Close(writer);
         }
 
+        /// <inheritdoc />
+        internal override void EmitPresentSeed(Writer writer)
+        {
+            EmitSeed(writer);
+        }
+
+        /// <inheritdoc />
+        internal override void EmitReadEpilogue(Writer writer, string qualifiedContract)
+        {
+            writer.Line("if (" + SeenFlag + ")" + Writer.Open);
+            writer.Indent();
+
+            string destination = ConstructAtEnd ? ReadLocal : "read." + Name;
+
+            if (!Deferred)
+            {
+                writer.Line(destination + " = " + Commit(Accumulator) + ";");
+                Close(writer);
+                writer.Blank();
+                return;
+            }
+
+            string target = "target" + Tag;
+            bool fresh = _overwrite || Unseeded || SeedSuppressed;
+            writer.Line(
+                _accumulatorQualified
+                    + " "
+                    + target
+                    + " = "
+                    + (
+                        fresh || SeedsByCopy
+                            ? "new " + _accumulatorQualified + "()"
+                            : ExistingOrFresh()
+                    )
+                    + ";"
+            );
+
+            if (!fresh && SeedsByCopy)
+            {
+                EmitCopyFromMember(writer, target);
+            }
+
+            writer.Line(
+                "foreach ("
+                    + PairType
+                    + "<"
+                    + _keyQualified
+                    + ", "
+                    + _valueQualified
+                    + "> "
+                    + PairLocal
+                    + " in "
+                    + Accumulator
+                    + ")"
+                    + Writer.Open
+            );
+            writer.Indent();
+            writer.Line(target + "[" + KeyAccess + "] = " + ValueAccess + ";");
+            Close(writer);
+            writer.Line(destination + " = " + Commit(target) + ";");
+
+            Close(writer);
+            writer.Blank();
+        }
+
+        private void EmitHalfWrite(Writer writer, Shape shape, string access, int tag, bool isKey)
+        {
+            writer.Line("if (" + MapPresence(shape, access, isKey) + ")" + Writer.Open);
+            writer.Indent();
+            writer.Line("if (!(" + shape.WriteCall(access, tag) + "))" + Writer.Open);
+            writer.Indent();
+            writer.Line("return false;");
+            Close(writer);
+            Close(writer);
+            writer.Blank();
+        }
+
+        /// <summary>
+        /// Emits the presence guard and the <c>foreach</c> header, and returns how many blocks the
+        /// caller has to close.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// A struct dictionary is always present, so it gets no guard: <c>member != null</c> on a
+        /// value type is <c>CS0019</c>, a compiler error inside code the consumer never wrote.
+        /// </para>
+        /// <para>
+        /// Unlike a repeated element, a null map <b>value</b> is legal -- protobuf-net omits it and
+        /// the entry carries only its key -- so there is nothing to guard inside the loop.
+        /// </para>
+        /// </remarks>
+        private int OpenLoop(Writer writer)
+        {
+            int open = 0;
+            if (!_mapIsValueType)
+            {
+                writer.Line("if (" + Access + " != null)" + Writer.Open);
+                writer.Indent();
+                open++;
+            }
+
+            writer.Line(
+                "foreach ("
+                    + PairType
+                    + "<"
+                    + _keyQualified
+                    + ", "
+                    + _valueQualified
+                    + "> "
+                    + PairLocal
+                    + " in "
+                    + Access
+                    + ")"
+                    + Writer.Open
+            );
+            writer.Indent();
+            return open + 1;
+        }
+
+        /// <summary>
+        /// Emits the entry's payload size, which both halves obey protobuf-net's map omission rules for.
+        /// </summary>
+        private void EmitEntrySize(Writer writer)
+        {
+            writer.Line("int " + EntrySize + " = 0;");
+            EmitHalfSize(writer, _key, KeyAccess, 1, true);
+            EmitHalfSize(writer, _value, ValueAccess, 2, false);
+            writer.Blank();
+        }
+
+        private void EmitHalfSize(Writer writer, Shape shape, string access, int tag, bool isKey)
+        {
+            writer.Line("if (" + MapPresence(shape, access, isKey) + ")" + Writer.Open);
+            writer.Indent();
+            writer.Line(
+                EntrySize
+                    + " += "
+                    + Proto
+                    + ".WProtoSizes.TagSize("
+                    + tag
+                    + ") + "
+                    + Shape.Fill(shape.SizeExpression, access)
+                    + ";"
+            );
+            Close(writer);
+        }
+
         private void EmitHalfRead(
             Writer writer,
             Shape shape,
@@ -788,71 +853,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return _mapIsValueType
                 ? "(" + Guard + " ? read." + Name + " : " + fresh + ")"
                 : "(" + Guard + " ? read." + Name + " : null) ?? " + fresh;
-        }
-
-        /// <inheritdoc />
-        internal override void EmitPresentSeed(Writer writer)
-        {
-            EmitSeed(writer);
-        }
-
-        /// <inheritdoc />
-        internal override void EmitReadEpilogue(Writer writer, string qualifiedContract)
-        {
-            writer.Line("if (" + SeenFlag + ")" + Writer.Open);
-            writer.Indent();
-
-            string destination = ConstructAtEnd ? ReadLocal : "read." + Name;
-
-            if (!Deferred)
-            {
-                writer.Line(destination + " = " + Commit(Accumulator) + ";");
-                Close(writer);
-                writer.Blank();
-                return;
-            }
-
-            string target = "target" + Tag;
-            bool fresh = _overwrite || Unseeded || SeedSuppressed;
-            writer.Line(
-                _accumulatorQualified
-                    + " "
-                    + target
-                    + " = "
-                    + (
-                        fresh || SeedsByCopy
-                            ? "new " + _accumulatorQualified + "()"
-                            : ExistingOrFresh()
-                    )
-                    + ";"
-            );
-
-            if (!fresh && SeedsByCopy)
-            {
-                EmitCopyFromMember(writer, target);
-            }
-
-            writer.Line(
-                "foreach ("
-                    + PairType
-                    + "<"
-                    + _keyQualified
-                    + ", "
-                    + _valueQualified
-                    + "> "
-                    + PairLocal
-                    + " in "
-                    + Accumulator
-                    + ")"
-                    + Writer.Open
-            );
-            writer.Indent();
-            writer.Line(target + "[" + KeyAccess + "] = " + ValueAccess + ";");
-            Close(writer);
-            writer.Line(destination + " = " + Commit(target) + ";");
-
-            Close(writer);
-            writer.Blank();
         }
 
         /// <summary>The expression that turns a finished dictionary into the member's value.</summary>

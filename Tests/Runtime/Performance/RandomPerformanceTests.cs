@@ -25,42 +25,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         // Use enough draws per slot to keep timer resolution out of the ranking.
         private const int RankingDrawsPerSlot = 20_000_000;
 
-        // Restore UnityEngine.Random after measuring it so other fixtures retain their original state.
-#pragma warning disable WUH005
-        [Test, Timeout(0)]
-        public void Benchmark()
-        {
-            TimeSpan timeout = TimeSpan.FromSeconds(1);
-
-            UnityEngine.Random.State originalUnityRandomState = UnityEngine.Random.state;
-            try
-            {
-                List<IRandom> generators = new(CreateDeterministicGenerators());
-                List<RandomBenchmarkResult> results = new(generators.Count);
-                foreach (IRandom random in generators)
-                {
-                    results.Add(RunBenchmark(random, timeout));
-                }
-
-                ApplySpeedBuckets(results, generators);
-
-                List<string> markdown = RandomBenchmarkMarkdownBuilder.BuildTables(results);
-
-                BenchmarkReadmeUpdater.UpdateSection(
-                    "RANDOM_BENCHMARKS",
-                    markdown,
-                    "docs/performance/random-performance.md"
-                );
-
-                UnityEngine.Debug.Log("Random benchmark summary generated.");
-            }
-            finally
-            {
-                UnityEngine.Random.state = originalUnityRandomState;
-            }
-        }
-#pragma warning restore WUH005
-
         private static IEnumerable<IRandom> CreateDeterministicGenerators()
         {
             int seedIndex = 1;
@@ -431,5 +395,41 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
             return count;
         }
+
+        // Restore UnityEngine.Random after measuring it so other fixtures retain their original state.
+#pragma warning disable WUH005
+        [Test, Timeout(0)]
+        public void Benchmark()
+        {
+            TimeSpan timeout = TimeSpan.FromSeconds(1);
+
+            UnityEngine.Random.State originalUnityRandomState = UnityEngine.Random.state;
+            try
+            {
+                List<IRandom> generators = new(CreateDeterministicGenerators());
+                List<RandomBenchmarkResult> results = new(generators.Count);
+                foreach (IRandom random in generators)
+                {
+                    results.Add(RunBenchmark(random, timeout));
+                }
+
+                ApplySpeedBuckets(results, generators);
+
+                List<string> markdown = RandomBenchmarkMarkdownBuilder.BuildTables(results);
+
+                BenchmarkReadmeUpdater.UpdateSection(
+                    "RANDOM_BENCHMARKS",
+                    markdown,
+                    "docs/performance/random-performance.md"
+                );
+
+                UnityEngine.Debug.Log("Random benchmark summary generated.");
+            }
+            finally
+            {
+                UnityEngine.Random.state = originalUnityRandomState;
+            }
+        }
+#pragma warning restore WUH005
     }
 }

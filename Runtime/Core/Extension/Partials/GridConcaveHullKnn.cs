@@ -27,111 +27,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return points.BuildConcaveHull(options);
         }
 
-        private static List<Vector2> BuildConcaveHull2(
-            this IReadOnlyCollection<Vector2> input,
-            int nearestNeighbors
-        )
-        {
-            const int minimumNearestNeighbors = 3;
-            nearestNeighbors = Math.Max(minimumNearestNeighbors, nearestNeighbors);
-
-            using PooledResource<List<Vector2>> dataSetRes = Buffers<Vector2>.List.Get(
-                out List<Vector2> dataSet
-            );
-            using PooledResource<HashSet<Vector2>> uniqueRes = Buffers<Vector2>.HashSet.Get(
-                out HashSet<Vector2> unique
-            );
-            using PooledResource<List<Vector2>> originalRes = Buffers<Vector2>.List.Get(
-                out List<Vector2> original
-            );
-            original.AddRange(input);
-
-            foreach (Vector2 point in original)
-            {
-                if (unique.Add(point))
-                {
-                    dataSet.Add(point);
-                }
-            }
-
-            int totalPoints = dataSet.Count;
-            if (totalPoints <= 4)
-            {
-                return input.BuildConvexHull(includeColinearPoints: false);
-            }
-
-            int maximumNearestNeighbors = totalPoints;
-            int attemptNearestNeighbors = Math.Min(totalPoints, nearestNeighbors);
-
-            int firstIndex = FindLowestPointIndex(dataSet);
-            List<Vector2> hull = new(totalPoints);
-            if (firstIndex < 0)
-            {
-                hull.AddRange(dataSet);
-                return hull;
-            }
-
-            Vector2 firstPoint = dataSet[firstIndex];
-            int maxSteps = Math.Max(16, totalPoints * 6);
-
-            using PooledArray<bool> availabilityResource = SystemArrayPool<bool>.Get(
-                totalPoints,
-                out bool[] availability
-            );
-
-            using PooledResource<List<int>> neighborIndicesRes = Buffers<int>.List.Get(
-                out List<int> neighborIndices
-            );
-
-            using PooledArray<float> distanceBufferRes = SystemArrayPool<float>.Get(
-                totalPoints,
-                out float[] neighborDistances
-            );
-
-            while (true)
-            {
-                hull.Clear();
-                hull.Add(firstPoint);
-
-                if (neighborIndices.Capacity < attemptNearestNeighbors)
-                {
-                    neighborIndices.Capacity = attemptNearestNeighbors;
-                }
-
-                bool success = TryBuildConcaveHull2Attempt(
-                    dataSet,
-                    hull,
-                    availability,
-                    neighborIndices,
-                    neighborDistances,
-                    attemptNearestNeighbors,
-                    firstIndex,
-                    firstPoint,
-                    maxSteps
-                );
-
-                if (success)
-                {
-                    PruneColinearOnHull(hull);
-                    return hull;
-                }
-
-                if (maximumNearestNeighbors <= attemptNearestNeighbors)
-                {
-                    return BuildConvexHullJarvisFallback(
-                        dataSet,
-                        hull,
-                        includeColinearPoints: false,
-                        neighborIndices,
-                        neighborDistances,
-                        availability
-                    );
-                }
-
-                ++attemptNearestNeighbors;
-            }
-        }
-
         /// <summary>
         /// Builds a concave hull using a k-nearest neighbors approach for grid points.
         /// </summary>
@@ -263,6 +158,111 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     return BuildGridConvexHullJarvisFallback(
                         dataSet,
                         worldPositions,
+                        hull,
+                        includeColinearPoints: false,
+                        neighborIndices,
+                        neighborDistances,
+                        availability
+                    );
+                }
+
+                ++attemptNearestNeighbors;
+            }
+        }
+
+        private static List<Vector2> BuildConcaveHull2(
+            this IReadOnlyCollection<Vector2> input,
+            int nearestNeighbors
+        )
+        {
+            const int minimumNearestNeighbors = 3;
+            nearestNeighbors = Math.Max(minimumNearestNeighbors, nearestNeighbors);
+
+            using PooledResource<List<Vector2>> dataSetRes = Buffers<Vector2>.List.Get(
+                out List<Vector2> dataSet
+            );
+            using PooledResource<HashSet<Vector2>> uniqueRes = Buffers<Vector2>.HashSet.Get(
+                out HashSet<Vector2> unique
+            );
+            using PooledResource<List<Vector2>> originalRes = Buffers<Vector2>.List.Get(
+                out List<Vector2> original
+            );
+            original.AddRange(input);
+
+            foreach (Vector2 point in original)
+            {
+                if (unique.Add(point))
+                {
+                    dataSet.Add(point);
+                }
+            }
+
+            int totalPoints = dataSet.Count;
+            if (totalPoints <= 4)
+            {
+                return input.BuildConvexHull(includeColinearPoints: false);
+            }
+
+            int maximumNearestNeighbors = totalPoints;
+            int attemptNearestNeighbors = Math.Min(totalPoints, nearestNeighbors);
+
+            int firstIndex = FindLowestPointIndex(dataSet);
+            List<Vector2> hull = new(totalPoints);
+            if (firstIndex < 0)
+            {
+                hull.AddRange(dataSet);
+                return hull;
+            }
+
+            Vector2 firstPoint = dataSet[firstIndex];
+            int maxSteps = Math.Max(16, totalPoints * 6);
+
+            using PooledArray<bool> availabilityResource = SystemArrayPool<bool>.Get(
+                totalPoints,
+                out bool[] availability
+            );
+
+            using PooledResource<List<int>> neighborIndicesRes = Buffers<int>.List.Get(
+                out List<int> neighborIndices
+            );
+
+            using PooledArray<float> distanceBufferRes = SystemArrayPool<float>.Get(
+                totalPoints,
+                out float[] neighborDistances
+            );
+
+            while (true)
+            {
+                hull.Clear();
+                hull.Add(firstPoint);
+
+                if (neighborIndices.Capacity < attemptNearestNeighbors)
+                {
+                    neighborIndices.Capacity = attemptNearestNeighbors;
+                }
+
+                bool success = TryBuildConcaveHull2Attempt(
+                    dataSet,
+                    hull,
+                    availability,
+                    neighborIndices,
+                    neighborDistances,
+                    attemptNearestNeighbors,
+                    firstIndex,
+                    firstPoint,
+                    maxSteps
+                );
+
+                if (success)
+                {
+                    PruneColinearOnHull(hull);
+                    return hull;
+                }
+
+                if (maximumNearestNeighbors <= attemptNearestNeighbors)
+                {
+                    return BuildConvexHullJarvisFallback(
+                        dataSet,
                         hull,
                         includeColinearPoints: false,
                         neighborIndices,

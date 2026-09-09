@@ -35,6 +35,90 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     [NUnit.Framework.Category("Fast")]
     public sealed class RTreeBoundsSemanticsTests
     {
+        private const int Sentinel = -1;
+        private const int StraddlingElement = 1;
+
+        private static BoxQuery StraddlingQuery =>
+            new("straddling", new Vector3(2.5f, -0.5f, -0.5f), new Vector3(3.5f, 0.5f, 0.5f));
+
+        private static Bounds[] Extents()
+        {
+            return new[]
+            {
+                new Bounds(Vector3.zero, new Vector3(2f, 2f, 2f)),
+                new Bounds(new Vector3(2f, 0f, 0f), new Vector3(2f, 2f, 2f)),
+                new Bounds(new Vector3(4f, 0f, 0f), new Vector3(2f, 2f, 2f)),
+                new Bounds(new Vector3(0f, 4f, 0f), new Vector3(4f, 4f, 4f)),
+                new Bounds(new Vector3(6f, 6f, 6f), Vector3.zero),
+                new Bounds(Vector3.zero, Vector3.zero),
+                new Bounds(Vector3.zero, new Vector3(2f, 2f, 2f)),
+                new Bounds(new Vector3(-4f, -4f, -4f), new Vector3(2f, 2f, 2f)),
+            };
+        }
+
+        private static List<int> Elements(int count)
+        {
+            List<int> elements = new(count);
+            for (int i = 0; i < count; ++i)
+            {
+                elements.Add(i);
+            }
+
+            return elements;
+        }
+
+        private static SpatialQueryOracle.Sample[] Centers(Bounds[] extents)
+        {
+            SpatialQueryOracle.Sample[] centers = new SpatialQueryOracle.Sample[extents.Length];
+            for (int i = 0; i < extents.Length; ++i)
+            {
+                centers[i] = new SpatialQueryOracle.Sample(extents[i].center, i, i);
+            }
+
+            return centers;
+        }
+
+        private static IEnumerable<BoxQuery> Queries()
+        {
+            yield return new BoxQuery(
+                "unit cube",
+                new Vector3(-1f, -1f, -1f),
+                new Vector3(1f, 1f, 1f)
+            );
+            yield return StraddlingQuery;
+            yield return new BoxQuery("origin point", Vector3.zero, Vector3.zero);
+            yield return new BoxQuery(
+                "shared face",
+                new Vector3(1f, -0.5f, -0.5f),
+                new Vector3(1f, 0.5f, 0.5f)
+            );
+            yield return new BoxQuery(
+                "everything",
+                new Vector3(-64f, -64f, -64f),
+                new Vector3(64f, 64f, 64f)
+            );
+            yield return new BoxQuery(
+                "elsewhere",
+                new Vector3(40f, 40f, 40f),
+                new Vector3(50f, 50f, 50f)
+            );
+            yield return new BoxQuery(
+                "z only",
+                new Vector3(-0.5f, -0.5f, 8f),
+                new Vector3(0.5f, 0.5f, 9f)
+            );
+            yield return new BoxQuery(
+                "nan edge",
+                new Vector3(float.NaN, -1f, -1f),
+                new Vector3(1f, 1f, 1f)
+            );
+            yield return new BoxQuery(
+                "inverted",
+                new Vector3(2f, 2f, 2f),
+                new Vector3(-2f, -2f, -2f)
+            );
+        }
+
         [Test]
         public void BoundsQueriesReturnEveryTouchingElement()
         {
@@ -145,90 +229,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
             Assert.Throws<ArgumentNullException>(() =>
                 tree3D.GetElementsWithCentersInBounds(bounds, null)
-            );
-        }
-
-        private const int Sentinel = -1;
-        private const int StraddlingElement = 1;
-
-        private static BoxQuery StraddlingQuery =>
-            new("straddling", new Vector3(2.5f, -0.5f, -0.5f), new Vector3(3.5f, 0.5f, 0.5f));
-
-        private static Bounds[] Extents()
-        {
-            return new[]
-            {
-                new Bounds(Vector3.zero, new Vector3(2f, 2f, 2f)),
-                new Bounds(new Vector3(2f, 0f, 0f), new Vector3(2f, 2f, 2f)),
-                new Bounds(new Vector3(4f, 0f, 0f), new Vector3(2f, 2f, 2f)),
-                new Bounds(new Vector3(0f, 4f, 0f), new Vector3(4f, 4f, 4f)),
-                new Bounds(new Vector3(6f, 6f, 6f), Vector3.zero),
-                new Bounds(Vector3.zero, Vector3.zero),
-                new Bounds(Vector3.zero, new Vector3(2f, 2f, 2f)),
-                new Bounds(new Vector3(-4f, -4f, -4f), new Vector3(2f, 2f, 2f)),
-            };
-        }
-
-        private static List<int> Elements(int count)
-        {
-            List<int> elements = new(count);
-            for (int i = 0; i < count; ++i)
-            {
-                elements.Add(i);
-            }
-
-            return elements;
-        }
-
-        private static SpatialQueryOracle.Sample[] Centers(Bounds[] extents)
-        {
-            SpatialQueryOracle.Sample[] centers = new SpatialQueryOracle.Sample[extents.Length];
-            for (int i = 0; i < extents.Length; ++i)
-            {
-                centers[i] = new SpatialQueryOracle.Sample(extents[i].center, i, i);
-            }
-
-            return centers;
-        }
-
-        private static IEnumerable<BoxQuery> Queries()
-        {
-            yield return new BoxQuery(
-                "unit cube",
-                new Vector3(-1f, -1f, -1f),
-                new Vector3(1f, 1f, 1f)
-            );
-            yield return StraddlingQuery;
-            yield return new BoxQuery("origin point", Vector3.zero, Vector3.zero);
-            yield return new BoxQuery(
-                "shared face",
-                new Vector3(1f, -0.5f, -0.5f),
-                new Vector3(1f, 0.5f, 0.5f)
-            );
-            yield return new BoxQuery(
-                "everything",
-                new Vector3(-64f, -64f, -64f),
-                new Vector3(64f, 64f, 64f)
-            );
-            yield return new BoxQuery(
-                "elsewhere",
-                new Vector3(40f, 40f, 40f),
-                new Vector3(50f, 50f, 50f)
-            );
-            yield return new BoxQuery(
-                "z only",
-                new Vector3(-0.5f, -0.5f, 8f),
-                new Vector3(0.5f, 0.5f, 9f)
-            );
-            yield return new BoxQuery(
-                "nan edge",
-                new Vector3(float.NaN, -1f, -1f),
-                new Vector3(1f, 1f, 1f)
-            );
-            yield return new BoxQuery(
-                "inverted",
-                new Vector3(2f, 2f, 2f),
-                new Vector3(-2f, -2f, -2f)
             );
         }
 

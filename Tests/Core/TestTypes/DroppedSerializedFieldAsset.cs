@@ -26,10 +26,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
         /// <summary>Dropped, and it carries <c>[Serializable]</c>, which is the confusing part.</summary>
         public (int, float) frameworkPair;
 
-        /// <summary>Dropped, private but explicitly asked for.</summary>
-        [SerializeField]
-        private SortedDictionary<string, int> _ordered;
-
         /// <summary>Serialized. A control, so the check is not simply reporting every field.</summary>
         public int count;
 
@@ -43,9 +39,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
         [NonSerialized]
         public Dictionary<string, int> runtimeCache;
 
-        /// <summary>Not serialized and not reported: private, with no request to serialize it.</summary>
-        private Dictionary<string, int> _privateCache;
-
         /// <summary>Serialized as a whole; its own dropped field is the nested case.</summary>
         public NestedBlock block = new();
 
@@ -58,6 +51,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
         /// <summary>Serialized by reference and null on a fresh instance, so it has no children.</summary>
         [SerializeReference]
         public ProbePayload payload;
+
+        /// <summary>Dropped, private but explicitly asked for.</summary>
+        [SerializeField]
+        private SortedDictionary<string, int> _ordered;
+
+        /// <summary>Not serialized and not reported: private, with no request to serialize it.</summary>
+        private Dictionary<string, int> _privateCache;
 
         /// <summary>Reads the private fields so nothing warns them unused.</summary>
         /// <returns>The count of both private caches, or zero.</returns>

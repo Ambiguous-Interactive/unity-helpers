@@ -87,125 +87,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             }
         }
 
-        private static ScriptableObjectSingletonMetadata MigrateLegacyMetadata(
-            ScriptableObjectSingletonMetadata legacyMetadata
-        )
-        {
-            // If we're inside a batch scope, temporarily exit to allow asset operations
-            using (AssetDatabaseBatchHelper.PauseBatch())
-            {
-                if (!EnsureResourcesFolder())
-                {
-                    Debug.LogWarning(
-                        "ScriptableObjectSingletonMetadataUtility: Could not ensure Resources folder exists. Keeping legacy metadata asset."
-                    );
-                    return legacyMetadata;
-                }
-
-                string legacyPath = ScriptableObjectSingletonMetadata.LegacyAssetPath;
-                string targetPath = ScriptableObjectSingletonMetadata.AssetPath;
-
-                string moveResult = AssetDatabase.MoveAsset(legacyPath, targetPath);
-                if (string.IsNullOrEmpty(moveResult))
-                {
-                    TryDeleteEmptyParentFolders(legacyPath);
-                    AssetDatabase.SaveAssets();
-                    AssetDatabase.Refresh();
-                    return AssetDatabase.LoadAssetAtPath<ScriptableObjectSingletonMetadata>(
-                        targetPath
-                    );
-                }
-
-                Debug.LogWarning(
-                    $"Failed to move ScriptableObjectSingletonMetadata from {legacyPath} to {targetPath}: {moveResult}. Creating new asset."
-                );
-
-                ScriptableObjectSingletonMetadata created =
-                    ScriptableObject.CreateInstance<ScriptableObjectSingletonMetadata>();
-                try
-                {
-                    AssetDatabase.CreateAsset(created, targetPath);
-                }
-                catch (Exception ex)
-                {
-                    Debug.LogWarning(
-                        $"ScriptableObjectSingletonMetadataUtility: Failed to create new metadata asset during migration: {ex.Message}. Keeping legacy metadata."
-                    );
-                    if (created != null)
-                    {
-                        Object.DestroyImmediate(created);
-                    }
-                    return legacyMetadata;
-                }
-
-                if (AssetDatabase.DeleteAsset(legacyPath))
-                {
-                    TryDeleteEmptyParentFolders(legacyPath);
-                }
-
-                AssetDatabase.SaveAssets();
-                AssetDatabase.Refresh();
-                return created;
-            }
-        }
-
-        private static void TryDeleteEmptyParentFolders(string assetPath)
-        {
-            try
-            {
-                string folder = Path.GetDirectoryName(assetPath);
-                if (string.IsNullOrWhiteSpace(folder))
-                {
-                    return;
-                }
-
-                folder = folder.SanitizePath();
-                while (
-                    !string.IsNullOrWhiteSpace(folder)
-                    && !string.Equals(folder, "Assets", StringComparison.OrdinalIgnoreCase)
-                    && !string.Equals(
-                        folder,
-                        "Assets/Resources",
-                        StringComparison.OrdinalIgnoreCase
-                    )
-                )
-                {
-                    if (!AssetDatabase.IsValidFolder(folder))
-                    {
-                        folder = Path.GetDirectoryName(folder);
-                        if (folder != null)
-                        {
-                            folder = folder.SanitizePath();
-                        }
-                        continue;
-                    }
-
-                    string[] contents = AssetDatabase.FindAssets(string.Empty, new[] { folder });
-                    if (contents == null || contents.Length == 0)
-                    {
-                        if (AssetDatabase.DeleteAsset(folder))
-                        {
-                            string parent = Path.GetDirectoryName(folder);
-                            if (parent != null)
-                            {
-                                folder = parent.SanitizePath();
-                            }
-                            else
-                            {
-                                break;
-                            }
-                            continue;
-                        }
-                    }
-                    break;
-                }
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning($"Failed to clean up empty folders after migration: {e.Message}");
-            }
-        }
-
         internal static bool UpdateEntry(
             Type type,
             string resourcesLoadPath,
@@ -331,27 +212,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             return staleEntries.Count;
         }
 
-        private static bool EnsureResourcesFolder()
-        {
-            string assetPath = ScriptableObjectSingletonMetadata.AssetPath;
-            string directory = Path.GetDirectoryName(assetPath);
-            if (string.IsNullOrEmpty(directory))
-            {
-                return false;
-            }
-
-            // Create folders through AssetDatabase outside active batches to avoid numbered filesystem duplicates.
-            if (!AssetDatabaseBatchHelper.EnsureAssetFolder(directory))
-            {
-                Debug.LogError(
-                    $"ScriptableObjectSingletonMetadataUtility: Failed to ensure folder '{directory.SanitizePath()}'."
-                );
-                return false;
-            }
-
-            return true;
-        }
-
         /// <summary>
         /// Resets legacy state for testing. AssetDatabase batch cleanup is now handled
         /// by the unified <see cref="AssetDatabaseBatchHelper"/>.
@@ -363,16 +223,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         internal static void ResetAssetEditingDepthForTesting()
         {
             // CommonTestBase owns batch cleanup; this compatibility entry point remains inert.
-        }
-
-        /// <summary>
-        /// Registers the sync implementation with the Runtime metadata class.
-        /// Called automatically via InitializeOnLoadMethod.
-        /// </summary>
-        [InitializeOnLoadMethod]
-        private static void RegisterSyncImplementation()
-        {
-            ScriptableObjectSingletonMetadata.SyncImplementation = SyncAllSingletonMetadata;
         }
 
         /// <summary>
@@ -552,6 +402,156 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     "ScriptableObjectSingletonMetadata.Sync: Metadata is already up to date."
                 );
             }
+        }
+
+        private static ScriptableObjectSingletonMetadata MigrateLegacyMetadata(
+            ScriptableObjectSingletonMetadata legacyMetadata
+        )
+        {
+            // If we're inside a batch scope, temporarily exit to allow asset operations
+            using (AssetDatabaseBatchHelper.PauseBatch())
+            {
+                if (!EnsureResourcesFolder())
+                {
+                    Debug.LogWarning(
+                        "ScriptableObjectSingletonMetadataUtility: Could not ensure Resources folder exists. Keeping legacy metadata asset."
+                    );
+                    return legacyMetadata;
+                }
+
+                string legacyPath = ScriptableObjectSingletonMetadata.LegacyAssetPath;
+                string targetPath = ScriptableObjectSingletonMetadata.AssetPath;
+
+                string moveResult = AssetDatabase.MoveAsset(legacyPath, targetPath);
+                if (string.IsNullOrEmpty(moveResult))
+                {
+                    TryDeleteEmptyParentFolders(legacyPath);
+                    AssetDatabase.SaveAssets();
+                    AssetDatabase.Refresh();
+                    return AssetDatabase.LoadAssetAtPath<ScriptableObjectSingletonMetadata>(
+                        targetPath
+                    );
+                }
+
+                Debug.LogWarning(
+                    $"Failed to move ScriptableObjectSingletonMetadata from {legacyPath} to {targetPath}: {moveResult}. Creating new asset."
+                );
+
+                ScriptableObjectSingletonMetadata created =
+                    ScriptableObject.CreateInstance<ScriptableObjectSingletonMetadata>();
+                try
+                {
+                    AssetDatabase.CreateAsset(created, targetPath);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning(
+                        $"ScriptableObjectSingletonMetadataUtility: Failed to create new metadata asset during migration: {ex.Message}. Keeping legacy metadata."
+                    );
+                    if (created != null)
+                    {
+                        Object.DestroyImmediate(created);
+                    }
+                    return legacyMetadata;
+                }
+
+                if (AssetDatabase.DeleteAsset(legacyPath))
+                {
+                    TryDeleteEmptyParentFolders(legacyPath);
+                }
+
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+                return created;
+            }
+        }
+
+        private static void TryDeleteEmptyParentFolders(string assetPath)
+        {
+            try
+            {
+                string folder = Path.GetDirectoryName(assetPath);
+                if (string.IsNullOrWhiteSpace(folder))
+                {
+                    return;
+                }
+
+                folder = folder.SanitizePath();
+                while (
+                    !string.IsNullOrWhiteSpace(folder)
+                    && !string.Equals(folder, "Assets", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(
+                        folder,
+                        "Assets/Resources",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
+                {
+                    if (!AssetDatabase.IsValidFolder(folder))
+                    {
+                        folder = Path.GetDirectoryName(folder);
+                        if (folder != null)
+                        {
+                            folder = folder.SanitizePath();
+                        }
+                        continue;
+                    }
+
+                    string[] contents = AssetDatabase.FindAssets(string.Empty, new[] { folder });
+                    if (contents == null || contents.Length == 0)
+                    {
+                        if (AssetDatabase.DeleteAsset(folder))
+                        {
+                            string parent = Path.GetDirectoryName(folder);
+                            if (parent != null)
+                            {
+                                folder = parent.SanitizePath();
+                            }
+                            else
+                            {
+                                break;
+                            }
+                            continue;
+                        }
+                    }
+                    break;
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"Failed to clean up empty folders after migration: {e.Message}");
+            }
+        }
+
+        private static bool EnsureResourcesFolder()
+        {
+            string assetPath = ScriptableObjectSingletonMetadata.AssetPath;
+            string directory = Path.GetDirectoryName(assetPath);
+            if (string.IsNullOrEmpty(directory))
+            {
+                return false;
+            }
+
+            // Create folders through AssetDatabase outside active batches to avoid numbered filesystem duplicates.
+            if (!AssetDatabaseBatchHelper.EnsureAssetFolder(directory))
+            {
+                Debug.LogError(
+                    $"ScriptableObjectSingletonMetadataUtility: Failed to ensure folder '{directory.SanitizePath()}'."
+                );
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Registers the sync implementation with the Runtime metadata class.
+        /// Called automatically via InitializeOnLoadMethod.
+        /// </summary>
+        [InitializeOnLoadMethod]
+        private static void RegisterSyncImplementation()
+        {
+            ScriptableObjectSingletonMetadata.SyncImplementation = SyncAllSingletonMetadata;
         }
 
         private static string FindSingletonAssetPath(Type type)

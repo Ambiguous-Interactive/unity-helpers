@@ -11,17 +11,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
     public static class EditorUi
     {
-        private static bool _suppressManual;
-        private static bool _suppressAuto;
-
-        internal static Func<bool> ProgressForTesting;
-        internal static Action ProgressClearedForTesting;
-
         public static bool Suppress
         {
             get => _suppressManual || _suppressAuto;
             set => _suppressManual = value;
         }
+
+        internal static Func<bool> ProgressForTesting;
+        internal static Action ProgressClearedForTesting;
+
+        private static bool _suppressManual;
+        private static bool _suppressAuto;
 
         static EditorUi()
         {
@@ -38,23 +38,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             }
 
             // Tests suppress UI explicitly so the Editor assembly needs no TestRunner dependency.
-        }
-
-        private static bool IsInvokedByTestRunner()
-        {
-            string[] args = Environment.GetCommandLineArgs();
-            foreach (string a in args)
-            {
-                if (
-                    0 <= a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
-                    || 0 <= a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)
-                    || 0 <= a.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase)
-                )
-                {
-                    return true;
-                }
-            }
-            return false;
         }
 
         public static bool Confirm(
@@ -126,6 +109,23 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return string.Empty;
             }
             return EditorUtility.OpenFolderPanel(title, directory, defaultName);
+        }
+
+        private static bool IsInvokedByTestRunner()
+        {
+            string[] args = Environment.GetCommandLineArgs();
+            foreach (string a in args)
+            {
+                if (
+                    0 <= a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
+                    || 0 <= a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)
+                    || 0 <= a.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase)
+                )
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         // Intentionally no hard dependency on TestRunner API to keep Editor asmdef clean.

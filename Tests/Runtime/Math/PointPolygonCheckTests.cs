@@ -12,6 +12,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
     [NUnit.Framework.Category("Fast")]
     public sealed class PointPolygonCheckTests
     {
+        private static Vector3[] RegularPolygon(int vertexCount, float radius)
+        {
+            Vector3[] polygon = new Vector3[vertexCount];
+            for (int index = 0; index < vertexCount; ++index)
+            {
+                float angle = 2f * Mathf.PI * index / vertexCount;
+                polygon[index] = new Vector3(
+                    radius * Mathf.Cos(angle),
+                    radius * Mathf.Sin(angle),
+                    0f
+                );
+            }
+
+            return polygon;
+        }
+
         [Test]
         public void IsPointInsidePolygonPointInsideSquareReturnsTrue()
         {
@@ -894,22 +910,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
                 ),
                 $"a point well outside a {vertexCount}-gon is outside it"
             );
-        }
-
-        private static Vector3[] RegularPolygon(int vertexCount, float radius)
-        {
-            Vector3[] polygon = new Vector3[vertexCount];
-            for (int index = 0; index < vertexCount; ++index)
-            {
-                float angle = 2f * Mathf.PI * index / vertexCount;
-                polygon[index] = new Vector3(
-                    radius * Mathf.Cos(angle),
-                    radius * Mathf.Sin(angle),
-                    0f
-                );
-            }
-
-            return polygon;
         }
     }
 }

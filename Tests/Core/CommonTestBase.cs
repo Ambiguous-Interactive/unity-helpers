@@ -41,11 +41,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         private const float TrackedDisposalTimeoutSeconds = 30f;
         private const int TrackedObjectDestroyMaxFrames = 30;
 
-        private UnityMainThreadDispatcher.AutoCreationScope _dispatcherScope;
-
-        protected readonly List<Object> _trackedObjects = new();
-        protected readonly List<IDisposable> _trackedDisposables = new();
-        protected readonly List<Scene> _trackedScenes = new();
+        /// <summary>
+        /// True when the package logger (<see cref="WallstopStudiosLogger"/>) actually emits at
+        /// runtime in THIS build. Its <c>Log/LogDebug/LogWarn/LogError</c> bodies are compiled out
+        /// unless one of <c>ENABLE_UBERLOGGING</c> / <c>DEVELOPMENT_BUILD</c> / <c>DEBUG</c> /
+        /// <c>UNITY_EDITOR</c> or a granular <c>*_LOGGING</c> symbol is set -- so a NON-development
+        /// IL2CPP player, which is what the standalone CI tier builds, produces NO such logs. A test
+        /// that asserts a log routed through the package logger must skip that assertion when this is
+        /// false, otherwise it fails with "expected log did not appear" for a log the build
+        /// intentionally omits.
+        /// <para>This evaluates the same symbol set the logger's <c>[Conditional]</c> attributes
+        /// carry, but it is resolved HERE, in Tests.Core. That is the right answer for every fixture
+        /// that does not manipulate the symbols itself; a fixture that does (see
+        /// <c>ConditionalLoggingStrippedTests</c>) must reason from its own file, because
+        /// <c>[Conditional]</c> is decided at the call site's file position.</para>
+        /// Kept as a <c>static readonly</c> (not <c>const</c>)
+        /// so <c>if (WallstopLoggingCompiledIn)</c> guards do not trip the unreachable-code warning
+        /// that the assembly's warnings-as-errors setting would otherwise promote to a build break.
+        /// </summary>
+        protected static readonly bool WallstopLoggingCompiledIn =
+#if ENABLE_UBERLOGGING || DEBUG_LOGGING || WARN_LOGGING || ERROR_LOGGING || DEVELOPMENT_BUILD || DEBUG || UNITY_EDITOR
+            true;
+#else
+            false;
+#endif
 
         /*
             PlayMode scene operations can replay completed tests and leak expected logs into other fixtures. A
@@ -58,9 +77,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         private static readonly System.Collections.Generic.HashSet<System.Text.RegularExpressions.Regex> _matchedExpectedErrors =
             new();
         private static readonly object _expectedErrorLock = new();
+
+        /*
+            Native allocator warnings depend on editor scheduling, not test behavior. Ignore these optional
+            engine messages without requiring a matching occurrence.
+        */
+        private static readonly List<(
+            UnityEngine.LogType type,
+            System.Text.RegularExpressions.Regex pattern
+        )> _toleratedLogs = new();
+
         private static UnityEngine.ILogHandler _expectErrorInnerHandler;
         private static ExpectedErrorSuppressingHandler _expectErrorHandler;
+
+        protected readonly List<Object> _trackedObjects = new();
+        protected readonly List<IDisposable> _trackedDisposables = new();
+        protected readonly List<Scene> _trackedScenes = new();
         protected readonly List<Func<ValueTask>> _trackedAsyncDisposals = new();
+
+        private UnityMainThreadDispatcher.AutoCreationScope _dispatcherScope;
 
         /// <summary>
         /// PlayMode cross-test leak guard. Captured at the start of every test (in
@@ -90,6 +125,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         private bool _testStartRootsCaptured;
 
 #if UNITY_EDITOR
+
+        /// <summary>
+        /// When true, CleanupTrackedFoldersAndAssets() accumulates assets for batch cleanup
+        /// in OneTimeTearDown instead of cleaning per-test. Set in subclass constructor or OneTimeSetUp.
+        /// </summary>
+        protected bool DeferAssetCleanupToOneTimeTearDown { get; set; }
+
         /// <summary>
         /// Tracks folders created by this test instance for cleanup.
         /// Stored in order of creation (deepest paths may come later).
@@ -100,12 +142,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         /// Tracks asset paths created by this test instance for cleanup.
         /// </summary>
         protected readonly List<string> _trackedAssetPaths = new();
-
-        /// <summary>
-        /// When true, CleanupTrackedFoldersAndAssets() accumulates assets for batch cleanup
-        /// in OneTimeTearDown instead of cleaning per-test. Set in subclass constructor or OneTimeSetUp.
-        /// </summary>
-        protected bool DeferAssetCleanupToOneTimeTearDown { get; set; }
 
         /// <summary>
         /// Accumulated asset paths when deferred cleanup is enabled.
@@ -119,6 +155,212 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
         private bool _previousEditorUiSuppress;
 #endif
+
+        /// <summary>
+        /// Test hook for the leak-guard self-test: the number of root GameObjects captured in the
+        /// current baseline. Non-zero in PlayMode proves <see cref="CommonUnitySetUp"/> actually
+        /// snapshotted the runner infrastructure (so a silent capture regression can't pass the
+        /// self-test).
+        /// </summary>
+        protected int LeakGuardBaselineCountForTests => _testStartRootIds.Count;
+
+        /// <summary>
+        /// Registers a <see cref="LogAssert.Expect(LogType, Regex)"/> expectation only when the
+        /// package logger is compiled in for this build (see <see cref="WallstopLoggingCompiledIn"/>).
+        /// Use for logs produced via <see cref="WallstopStudiosLogger"/> (<c>component.Log/LogWarn/
+        /// LogError</c>) so the expectation is silently skipped in a NON-development player where those
+        /// bodies are no-ops. For logs emitted via raw <c>UnityEngine.Debug.Log*</c> (which are NOT
+        /// stripped) keep using <see cref="LogAssert.Expect(LogType, Regex)"/> directly.
+        /// </summary>
+        protected static void ExpectWallstopLog(
+            UnityEngine.LogType type,
+            System.Text.RegularExpressions.Regex pattern
+        )
+        {
+            if (!WallstopLoggingCompiledIn)
+            {
+                return;
+            }
+
+            LogAssert.Expect(type, pattern);
+        }
+
+        /// <summary>
+        /// Registers an EXPECTED error/warning log pattern that is captured + SUPPRESSED (kept out of
+        /// the global Unity log) for the rest of the current PlayMode test, instead of asserted via
+        /// LogAssert.Expect. This makes the assertion immune to the Unity Test Framework re-invoking a
+        /// completed test body on a later scene op (which would otherwise re-emit the log into a
+        /// bystander). The pattern must still be matched at least once by teardown, or the test fails
+        /// (same guarantee as LogAssert.Expect's "expected log did not appear"). EditMode (where the
+        /// suppressing handler is not installed) falls back to LogAssert.Expect.
+        /// </summary>
+        protected static void ExpectError(UnityEngine.LogType type, string pattern) =>
+            ExpectError(type, new System.Text.RegularExpressions.Regex(pattern));
+
+        protected static void ExpectError(
+            UnityEngine.LogType type,
+            System.Text.RegularExpressions.Regex pattern
+        )
+        {
+            lock (_expectedErrorLock)
+            {
+                if (_expectErrorHandler != null)
+                {
+                    _expectedErrors.Add((type, pattern));
+                    return;
+                }
+            }
+            UnityEngine.TestTools.LogAssert.Expect(type, pattern);
+        }
+
+        /// <summary>
+        /// Registers a <see cref="LogAssert"/> expectation for the exact <c>[Error]</c> a relational
+        /// component assignment logs when a REQUIRED field cannot be resolved. Centralizes the log
+        /// FORMAT -- the <c>&lt;time&gt;|&lt;name&gt;[&lt;type&gt;]|message</c> shape produced by the
+        /// package logger -- so the dozen-plus child/parent/sibling tests share ONE source of truth
+        /// (mirroring the producer in <c>BaseRelationalComponentAttribute</c>) instead of hand-copied
+        /// regexes that silently rot if the format changes. Caller-supplied values are regex-escaped,
+        /// so pass plain display names (e.g. <c>"UnityEngine.SpriteRenderer[]"</c>).
+        /// </summary>
+        /// <param name="ownerName">GameObject name hosting the component (e.g. "Child-Missing").</param>
+        /// <param name="ownerType">Owning component type name (e.g. "ChildMissingTester").</param>
+        /// <param name="relationship">"child", "parent", or "sibling".</param>
+        /// <param name="fieldType">Field type display name (e.g. "UnityEngine.SpriteRenderer").</param>
+        /// <param name="fieldName">Field name (e.g. "requiredRenderer").</param>
+        protected static void ExpectMissingRelationalComponentError(
+            string ownerName,
+            string ownerType,
+            string relationship,
+            string fieldType,
+            string fieldName
+        )
+        {
+            /*
+                The package logger omits missing-component errors in non-development players; retain behavior
+                assertions without requiring absent logs.
+            */
+            if (!WallstopLoggingCompiledIn)
+            {
+                return;
+            }
+
+            static string Escape(string value) =>
+                System.Text.RegularExpressions.Regex.Escape(value);
+
+            string pattern =
+                $@"^\d+(\.\d+)?\|{Escape(ownerName)}\[{Escape(ownerType)}\]\|Unable to find "
+                + $"{relationship} component of type {Escape(fieldType)} for field "
+                + $"'{Escape(fieldName)}'$";
+
+            ExpectError(LogType.Error, pattern);
+        }
+
+        private static string DescribeRoot(GameObject root)
+        {
+            string componentType = "GameObject";
+            Component[] components = root.GetComponents<Component>();
+            foreach (Component component in components)
+            {
+                if (component != null && component is not Transform)
+                {
+                    componentType = component.GetType().Name;
+                    break;
+                }
+            }
+
+            return $"'{root.name}' ({componentType}, scene '{root.scene.name}', "
+                + $"instance {root.GetUnityObjectId()}, active={root.activeInHierarchy})";
+        }
+
+        private static void InstallExpectedErrorSuppression()
+        {
+            if (_expectErrorHandler != null)
+            {
+                return;
+            }
+            _expectErrorInnerHandler = UnityEngine.Debug.unityLogger.logHandler;
+            _expectErrorHandler = new ExpectedErrorSuppressingHandler(_expectErrorInnerHandler);
+            UnityEngine.Debug.unityLogger.logHandler = _expectErrorHandler;
+            SeedToleratedLogs();
+        }
+
+        private static void SeedToleratedLogs()
+        {
+            lock (_expectedErrorLock)
+            {
+                if (0 < _toleratedLogs.Count)
+                {
+                    return;
+                }
+
+                _toleratedLogs.Add(
+                    (
+                        UnityEngine.LogType.Warning,
+                        new System.Text.RegularExpressions.Regex(
+                            "deleting an allocation that is older than its permitted lifetime",
+                            System.Text.RegularExpressions.RegexOptions.IgnoreCase
+                        )
+                    )
+                );
+            }
+        }
+
+        private static bool IsToleratedLog(UnityEngine.LogType logType, string message)
+        {
+            lock (_expectedErrorLock)
+            {
+                for (int i = 0; i < _toleratedLogs.Count; i++)
+                {
+                    if (
+                        _toleratedLogs[i].type == logType
+                        && _toleratedLogs[i].pattern.IsMatch(message)
+                    )
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static string RestoreExpectedErrorSuppressionAndVerify()
+        {
+            lock (_expectedErrorLock)
+            {
+                if (
+                    _expectErrorHandler != null
+                    && ReferenceEquals(
+                        UnityEngine.Debug.unityLogger.logHandler,
+                        _expectErrorHandler
+                    )
+                )
+                {
+                    UnityEngine.Debug.unityLogger.logHandler = _expectErrorInnerHandler;
+                }
+                _expectErrorHandler = null;
+                _expectErrorInnerHandler = null;
+
+                string failure = null;
+                foreach (
+                    (
+                        UnityEngine.LogType type,
+                        System.Text.RegularExpressions.Regex pattern
+                    ) in _expectedErrors
+                )
+                {
+                    if (!_matchedExpectedErrors.Contains(pattern))
+                    {
+                        failure =
+                            (failure ?? "Expected error log(s) never matched: ")
+                            + $"[{type}] {pattern} ; ";
+                    }
+                }
+                _expectedErrors.Clear();
+                _matchedExpectedErrors.Clear();
+                return failure;
+            }
+        }
 
         [SetUp]
         public virtual void BaseSetUp()
@@ -159,85 +401,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             }
 
             yield break;
-        }
-
-        protected GameObject NewGameObject(string name = "GameObject")
-        {
-            return Track(new GameObject(name));
-        }
-
-        protected T CreateScriptableObject<T>()
-            where T : ScriptableObject
-        {
-            return Track(ScriptableObject.CreateInstance<T>());
-        }
-
-        protected ScriptableObject CreateScriptableObject(Type type)
-        {
-            return Track(ScriptableObject.CreateInstance(type));
-        }
-
-        protected T Track<T>(T obj)
-            where T : Object
-        {
-            if (obj != null)
-            {
-                _trackedObjects.Add(obj);
-            }
-            return obj;
-        }
-
-        protected GameObject Track(GameObject obj)
-        {
-            return Track<GameObject>(obj);
-        }
-
-        protected T TrackDisposable<T>(T disposable)
-            where T : IDisposable
-        {
-            if (disposable != null)
-            {
-                _trackedDisposables.Add(disposable);
-            }
-            return disposable;
-        }
-
-        protected Func<ValueTask> TrackAsyncDisposal(Func<ValueTask> producer)
-        {
-            if (producer != null)
-            {
-                _trackedAsyncDisposals.Add(producer);
-            }
-            return producer;
-        }
-
-        protected Scene CreateTempScene(string name, bool setActive = true)
-        {
-            Scene scene;
-#if UNITY_EDITOR
-            if (!Application.isPlaying)
-            {
-                scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-            }
-            else
-#endif
-            {
-                scene = SceneManager.CreateScene(name);
-            }
-
-            if (setActive)
-            {
-                SceneManager.SetActiveScene(scene);
-            }
-
-            _trackedScenes.Add(scene);
-
-            if (Application.isPlaying)
-            {
-                TrackAsyncDisposal(() => UnloadSceneAsync(scene));
-            }
-
-            return scene;
         }
 
         [TearDown]
@@ -288,56 +451,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             }
 
             DisposeDispatcherScope();
-        }
-
-        /// <summary>
-        /// Destroys every currently tracked <see cref="Object"/> and clears the tracking list.
-        /// </summary>
-        /// <remarks>
-        /// In the editor, an object backed by a persisted asset is removed with
-        /// <see cref="UnityEditor.AssetDatabase.DeleteAsset"/> (which also removes its <c>.meta</c>);
-        /// anything else is destroyed with <c>allowDestroyingAssets: true</c>. That overload is the
-        /// asset-safe one: it can never trigger Unity's "Destroying assets is not permitted to avoid
-        /// data loss" error -- a <see cref="LogType.Error"/> that fails the running test in teardown
-        /// AND leaks the object -- even when an asset path can no longer be resolved (e.g. a subclass
-        /// already deleted the asset, leaving an orphaned persistent wrapper, or
-        /// <c>EditorUtility.IsPersistent</c> and <c>GetAssetPath</c> momentarily disagree). The flag
-        /// is a harmless no-op for in-memory objects, which -- together with the path-based
-        /// <c>DeleteAsset</c> -- covers every kind of object these fixtures track (in-memory objects
-        /// and standalone assets).
-        /// </remarks>
-        protected void DestroyTrackedObjects()
-        {
-            if (_trackedObjects.Count == 0)
-            {
-                return;
-            }
-
-#if UNITY_EDITOR
-            using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
-#endif
-            {
-                Object[] snapshot = _trackedObjects.ToArray();
-                foreach (Object obj in snapshot)
-                {
-                    if (obj == null)
-                    {
-                        continue;
-                    }
-#if UNITY_EDITOR
-                    string assetPath = UnityEditor.AssetDatabase.GetAssetPath(obj);
-                    if (!string.IsNullOrEmpty(assetPath))
-                    {
-                        UnityEditor.AssetDatabase.DeleteAsset(assetPath);
-                        continue;
-                    }
-                    Object.DestroyImmediate(obj, true); // UNH-SUPPRESS: asset-safe test cleanup
-#else
-                    Object.DestroyImmediate(obj); // UNH-SUPPRESS: Required for test cleanup
-#endif
-                }
-                _trackedObjects.Clear();
-            }
         }
 
         [UnityTearDown]
@@ -612,6 +725,175 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         }
 
         /// <summary>
+        /// Called once before any tests in the fixture run.
+        /// Subclasses can override to create shared test assets using BeginBatch().
+        /// </summary>
+        [OneTimeSetUp]
+        public virtual void CommonOneTimeSetUp()
+        {
+#if UNITY_EDITOR
+            CleanupPackageRootGeneratedArtifacts();
+            /*
+                Domain reload can reset Unity counters while tracked counters remain stale; resetting only our
+                counters avoids unmatched Unity API calls.
+            */
+            try
+            {
+                AssetDatabaseBatchHelper.ResetCountersOnly();
+            }
+            catch { }
+#endif
+        }
+
+        protected GameObject NewGameObject(string name = "GameObject")
+        {
+            return Track(new GameObject(name));
+        }
+
+        protected T CreateScriptableObject<T>()
+            where T : ScriptableObject
+        {
+            return Track(ScriptableObject.CreateInstance<T>());
+        }
+
+        protected ScriptableObject CreateScriptableObject(Type type)
+        {
+            return Track(ScriptableObject.CreateInstance(type));
+        }
+
+        protected T Track<T>(T obj)
+            where T : Object
+        {
+            if (obj != null)
+            {
+                _trackedObjects.Add(obj);
+            }
+            return obj;
+        }
+
+        protected GameObject Track(GameObject obj)
+        {
+            return Track<GameObject>(obj);
+        }
+
+        protected T TrackDisposable<T>(T disposable)
+            where T : IDisposable
+        {
+            if (disposable != null)
+            {
+                _trackedDisposables.Add(disposable);
+            }
+            return disposable;
+        }
+
+        protected Func<ValueTask> TrackAsyncDisposal(Func<ValueTask> producer)
+        {
+            if (producer != null)
+            {
+                _trackedAsyncDisposals.Add(producer);
+            }
+            return producer;
+        }
+
+        protected Scene CreateTempScene(string name, bool setActive = true)
+        {
+            Scene scene;
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+            {
+                scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            }
+            else
+#endif
+            {
+                scene = SceneManager.CreateScene(name);
+            }
+
+            if (setActive)
+            {
+                SceneManager.SetActiveScene(scene);
+            }
+
+            _trackedScenes.Add(scene);
+
+            if (Application.isPlaying)
+            {
+                TrackAsyncDisposal(() => UnloadSceneAsync(scene));
+            }
+
+            return scene;
+        }
+
+        /// <summary>
+        /// Destroys every currently tracked <see cref="Object"/> and clears the tracking list.
+        /// </summary>
+        /// <remarks>
+        /// In the editor, an object backed by a persisted asset is removed with
+        /// <see cref="UnityEditor.AssetDatabase.DeleteAsset"/> (which also removes its <c>.meta</c>);
+        /// anything else is destroyed with <c>allowDestroyingAssets: true</c>. That overload is the
+        /// asset-safe one: it can never trigger Unity's "Destroying assets is not permitted to avoid
+        /// data loss" error -- a <see cref="LogType.Error"/> that fails the running test in teardown
+        /// AND leaks the object -- even when an asset path can no longer be resolved (e.g. a subclass
+        /// already deleted the asset, leaving an orphaned persistent wrapper, or
+        /// <c>EditorUtility.IsPersistent</c> and <c>GetAssetPath</c> momentarily disagree). The flag
+        /// is a harmless no-op for in-memory objects, which -- together with the path-based
+        /// <c>DeleteAsset</c> -- covers every kind of object these fixtures track (in-memory objects
+        /// and standalone assets).
+        /// </remarks>
+        protected void DestroyTrackedObjects()
+        {
+            if (_trackedObjects.Count == 0)
+            {
+                return;
+            }
+
+#if UNITY_EDITOR
+            using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
+#endif
+            {
+                Object[] snapshot = _trackedObjects.ToArray();
+                foreach (Object obj in snapshot)
+                {
+                    if (obj == null)
+                    {
+                        continue;
+                    }
+#if UNITY_EDITOR
+                    string assetPath = UnityEditor.AssetDatabase.GetAssetPath(obj);
+                    if (!string.IsNullOrEmpty(assetPath))
+                    {
+                        UnityEditor.AssetDatabase.DeleteAsset(assetPath);
+                        continue;
+                    }
+                    Object.DestroyImmediate(obj, true); // UNH-SUPPRESS: asset-safe test cleanup
+#else
+                    Object.DestroyImmediate(obj); // UNH-SUPPRESS: Required for test cleanup
+#endif
+                }
+                _trackedObjects.Clear();
+            }
+        }
+
+        /// <summary>
+        /// Test hook for the leak-guard self-test: re-captures the current roots as this test's
+        /// baseline (mirrors <see cref="CommonUnitySetUp"/>), so a test can establish a known
+        /// baseline after creating objects it expects the sweep to spare. PlayMode only.
+        /// </summary>
+        protected void CaptureLeakGuardBaselineForTests()
+        {
+            CaptureLeakGuardBaseline();
+        }
+
+        /// <summary>
+        /// Test hook for the leak-guard self-test: runs the teardown leak sweep immediately and
+        /// returns its diagnostic (null when nothing leaked), destroying any non-baseline root.
+        /// </summary>
+        protected string RunLeakGuardSweepForTests()
+        {
+            return DestroyLeakedRootsAndDescribe(CollectLeakedRoots());
+        }
+
+        /// <summary>
         /// Snapshots the leak-guard baseline: the loaded scenes and the IDs of their existing root
         /// GameObjects. <see cref="SceneManager.GetSceneAt"/> excludes DontDestroyOnLoad, so framework
         /// infrastructure and leaked singletons there are out of scope (the registry clear handles the
@@ -718,286 +1000,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 + $"{TestContext.CurrentContext.Test.FullName}: {string.Join(", ", descriptions)}. "
                 + "Every GameObject a PlayMode test creates must be destroyed before teardown "
                 + "(Track(...) it, or destroy it explicitly); a survivor pollutes later tests.";
-        }
-
-        private static string DescribeRoot(GameObject root)
-        {
-            string componentType = "GameObject";
-            Component[] components = root.GetComponents<Component>();
-            foreach (Component component in components)
-            {
-                if (component != null && component is not Transform)
-                {
-                    componentType = component.GetType().Name;
-                    break;
-                }
-            }
-
-            return $"'{root.name}' ({componentType}, scene '{root.scene.name}', "
-                + $"instance {root.GetUnityObjectId()}, active={root.activeInHierarchy})";
-        }
-
-        /// <summary>
-        /// Test hook for the leak-guard self-test: re-captures the current roots as this test's
-        /// baseline (mirrors <see cref="CommonUnitySetUp"/>), so a test can establish a known
-        /// baseline after creating objects it expects the sweep to spare. PlayMode only.
-        /// </summary>
-        protected void CaptureLeakGuardBaselineForTests()
-        {
-            CaptureLeakGuardBaseline();
-        }
-
-        /// <summary>
-        /// Test hook for the leak-guard self-test: runs the teardown leak sweep immediately and
-        /// returns its diagnostic (null when nothing leaked), destroying any non-baseline root.
-        /// </summary>
-        protected string RunLeakGuardSweepForTests()
-        {
-            return DestroyLeakedRootsAndDescribe(CollectLeakedRoots());
-        }
-
-        /// <summary>
-        /// Test hook for the leak-guard self-test: the number of root GameObjects captured in the
-        /// current baseline. Non-zero in PlayMode proves <see cref="CommonUnitySetUp"/> actually
-        /// snapshotted the runner infrastructure (so a silent capture regression can't pass the
-        /// self-test).
-        /// </summary>
-        protected int LeakGuardBaselineCountForTests => _testStartRootIds.Count;
-
-        /// <summary>
-        /// True when the package logger (<see cref="WallstopStudiosLogger"/>) actually emits at
-        /// runtime in THIS build. Its <c>Log/LogDebug/LogWarn/LogError</c> bodies are compiled out
-        /// unless one of <c>ENABLE_UBERLOGGING</c> / <c>DEVELOPMENT_BUILD</c> / <c>DEBUG</c> /
-        /// <c>UNITY_EDITOR</c> or a granular <c>*_LOGGING</c> symbol is set -- so a NON-development
-        /// IL2CPP player, which is what the standalone CI tier builds, produces NO such logs. A test
-        /// that asserts a log routed through the package logger must skip that assertion when this is
-        /// false, otherwise it fails with "expected log did not appear" for a log the build
-        /// intentionally omits.
-        /// <para>This evaluates the same symbol set the logger's <c>[Conditional]</c> attributes
-        /// carry, but it is resolved HERE, in Tests.Core. That is the right answer for every fixture
-        /// that does not manipulate the symbols itself; a fixture that does (see
-        /// <c>ConditionalLoggingStrippedTests</c>) must reason from its own file, because
-        /// <c>[Conditional]</c> is decided at the call site's file position.</para>
-        /// Kept as a <c>static readonly</c> (not <c>const</c>)
-        /// so <c>if (WallstopLoggingCompiledIn)</c> guards do not trip the unreachable-code warning
-        /// that the assembly's warnings-as-errors setting would otherwise promote to a build break.
-        /// </summary>
-        protected static readonly bool WallstopLoggingCompiledIn =
-#if ENABLE_UBERLOGGING || DEBUG_LOGGING || WARN_LOGGING || ERROR_LOGGING || DEVELOPMENT_BUILD || DEBUG || UNITY_EDITOR
-            true;
-#else
-            false;
-#endif
-
-        /// <summary>
-        /// Registers a <see cref="LogAssert.Expect(LogType, Regex)"/> expectation only when the
-        /// package logger is compiled in for this build (see <see cref="WallstopLoggingCompiledIn"/>).
-        /// Use for logs produced via <see cref="WallstopStudiosLogger"/> (<c>component.Log/LogWarn/
-        /// LogError</c>) so the expectation is silently skipped in a NON-development player where those
-        /// bodies are no-ops. For logs emitted via raw <c>UnityEngine.Debug.Log*</c> (which are NOT
-        /// stripped) keep using <see cref="LogAssert.Expect(LogType, Regex)"/> directly.
-        /// </summary>
-        protected static void ExpectWallstopLog(
-            UnityEngine.LogType type,
-            System.Text.RegularExpressions.Regex pattern
-        )
-        {
-            if (!WallstopLoggingCompiledIn)
-            {
-                return;
-            }
-
-            LogAssert.Expect(type, pattern);
-        }
-
-        /// <summary>
-        /// Registers an EXPECTED error/warning log pattern that is captured + SUPPRESSED (kept out of
-        /// the global Unity log) for the rest of the current PlayMode test, instead of asserted via
-        /// LogAssert.Expect. This makes the assertion immune to the Unity Test Framework re-invoking a
-        /// completed test body on a later scene op (which would otherwise re-emit the log into a
-        /// bystander). The pattern must still be matched at least once by teardown, or the test fails
-        /// (same guarantee as LogAssert.Expect's "expected log did not appear"). EditMode (where the
-        /// suppressing handler is not installed) falls back to LogAssert.Expect.
-        /// </summary>
-        protected static void ExpectError(UnityEngine.LogType type, string pattern) =>
-            ExpectError(type, new System.Text.RegularExpressions.Regex(pattern));
-
-        protected static void ExpectError(
-            UnityEngine.LogType type,
-            System.Text.RegularExpressions.Regex pattern
-        )
-        {
-            lock (_expectedErrorLock)
-            {
-                if (_expectErrorHandler != null)
-                {
-                    _expectedErrors.Add((type, pattern));
-                    return;
-                }
-            }
-            UnityEngine.TestTools.LogAssert.Expect(type, pattern);
-        }
-
-        private static void InstallExpectedErrorSuppression()
-        {
-            if (_expectErrorHandler != null)
-            {
-                return;
-            }
-            _expectErrorInnerHandler = UnityEngine.Debug.unityLogger.logHandler;
-            _expectErrorHandler = new ExpectedErrorSuppressingHandler(_expectErrorInnerHandler);
-            UnityEngine.Debug.unityLogger.logHandler = _expectErrorHandler;
-            SeedToleratedLogs();
-        }
-
-        /*
-            Native allocator warnings depend on editor scheduling, not test behavior. Ignore these optional
-            engine messages without requiring a matching occurrence.
-        */
-        private static readonly List<(
-            UnityEngine.LogType type,
-            System.Text.RegularExpressions.Regex pattern
-        )> _toleratedLogs = new();
-
-        private static void SeedToleratedLogs()
-        {
-            lock (_expectedErrorLock)
-            {
-                if (0 < _toleratedLogs.Count)
-                {
-                    return;
-                }
-
-                _toleratedLogs.Add(
-                    (
-                        UnityEngine.LogType.Warning,
-                        new System.Text.RegularExpressions.Regex(
-                            "deleting an allocation that is older than its permitted lifetime",
-                            System.Text.RegularExpressions.RegexOptions.IgnoreCase
-                        )
-                    )
-                );
-            }
-        }
-
-        private static bool IsToleratedLog(UnityEngine.LogType logType, string message)
-        {
-            lock (_expectedErrorLock)
-            {
-                for (int i = 0; i < _toleratedLogs.Count; i++)
-                {
-                    if (
-                        _toleratedLogs[i].type == logType
-                        && _toleratedLogs[i].pattern.IsMatch(message)
-                    )
-                    {
-                        return true;
-                    }
-                }
-            }
-
-            return false;
-        }
-
-        private static string RestoreExpectedErrorSuppressionAndVerify()
-        {
-            lock (_expectedErrorLock)
-            {
-                if (
-                    _expectErrorHandler != null
-                    && ReferenceEquals(
-                        UnityEngine.Debug.unityLogger.logHandler,
-                        _expectErrorHandler
-                    )
-                )
-                {
-                    UnityEngine.Debug.unityLogger.logHandler = _expectErrorInnerHandler;
-                }
-                _expectErrorHandler = null;
-                _expectErrorInnerHandler = null;
-
-                string failure = null;
-                foreach (
-                    (
-                        UnityEngine.LogType type,
-                        System.Text.RegularExpressions.Regex pattern
-                    ) in _expectedErrors
-                )
-                {
-                    if (!_matchedExpectedErrors.Contains(pattern))
-                    {
-                        failure =
-                            (failure ?? "Expected error log(s) never matched: ")
-                            + $"[{type}] {pattern} ; ";
-                    }
-                }
-                _expectedErrors.Clear();
-                _matchedExpectedErrors.Clear();
-                return failure;
-            }
-        }
-
-        /// <summary>
-        /// Registers a <see cref="LogAssert"/> expectation for the exact <c>[Error]</c> a relational
-        /// component assignment logs when a REQUIRED field cannot be resolved. Centralizes the log
-        /// FORMAT -- the <c>&lt;time&gt;|&lt;name&gt;[&lt;type&gt;]|message</c> shape produced by the
-        /// package logger -- so the dozen-plus child/parent/sibling tests share ONE source of truth
-        /// (mirroring the producer in <c>BaseRelationalComponentAttribute</c>) instead of hand-copied
-        /// regexes that silently rot if the format changes. Caller-supplied values are regex-escaped,
-        /// so pass plain display names (e.g. <c>"UnityEngine.SpriteRenderer[]"</c>).
-        /// </summary>
-        /// <param name="ownerName">GameObject name hosting the component (e.g. "Child-Missing").</param>
-        /// <param name="ownerType">Owning component type name (e.g. "ChildMissingTester").</param>
-        /// <param name="relationship">"child", "parent", or "sibling".</param>
-        /// <param name="fieldType">Field type display name (e.g. "UnityEngine.SpriteRenderer").</param>
-        /// <param name="fieldName">Field name (e.g. "requiredRenderer").</param>
-        protected static void ExpectMissingRelationalComponentError(
-            string ownerName,
-            string ownerType,
-            string relationship,
-            string fieldType,
-            string fieldName
-        )
-        {
-            /*
-                The package logger omits missing-component errors in non-development players; retain behavior
-                assertions without requiring absent logs.
-            */
-            if (!WallstopLoggingCompiledIn)
-            {
-                return;
-            }
-
-            static string Escape(string value) =>
-                System.Text.RegularExpressions.Regex.Escape(value);
-
-            string pattern =
-                $@"^\d+(\.\d+)?\|{Escape(ownerName)}\[{Escape(ownerType)}\]\|Unable to find "
-                + $"{relationship} component of type {Escape(fieldType)} for field "
-                + $"'{Escape(fieldName)}'$";
-
-            ExpectError(LogType.Error, pattern);
-        }
-
-        /// <summary>
-        /// Called once before any tests in the fixture run.
-        /// Subclasses can override to create shared test assets using BeginBatch().
-        /// </summary>
-        [OneTimeSetUp]
-        public virtual void CommonOneTimeSetUp()
-        {
-#if UNITY_EDITOR
-            CleanupPackageRootGeneratedArtifacts();
-            /*
-                Domain reload can reset Unity counters while tracked counters remain stale; resetting only our
-                counters avoids unmatched Unity API calls.
-            */
-            try
-            {
-                AssetDatabaseBatchHelper.ResetCountersOnly();
-            }
-            catch { }
-#endif
         }
 
 #if UNITY_EDITOR
@@ -1167,6 +1169,114 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         }
 #endif
 
+        /// <summary>
+        /// Polls frames until a Unity object reports as destroyed (its overloaded <c>== null</c>
+        /// becomes true), or <paramref name="maxFrames"/> elapses. <see cref="Object.Destroy(Object)"/>
+        /// is ASYNCHRONOUS in PlayMode — the managed wrapper is not nulled until Unity processes
+        /// the deferred destruction, and the exact frame lag varies by editor version and CI load,
+        /// so the "Destroy then one <c>yield return null</c>, then assert null" pattern is flaky.
+        /// Poll instead. Returns quietly on timeout so the caller's own assertion produces the
+        /// test-specific failure message. For <c>[UnityTest]</c> fixtures. Runtime-safe (no editor
+        /// API), so it is available to the standalone player build too.
+        /// </summary>
+        protected static IEnumerator WaitUntilDestroyed(Object obj, int maxFrames = 30)
+        {
+            if (obj == null)
+            {
+                yield break;
+            }
+
+            Type objectType = obj.GetType();
+            string objectName = obj.name;
+            long objectId = obj.GetUnityObjectId();
+
+            for (int i = 0; i < maxFrames; i++)
+            {
+                if (obj == null)
+                {
+                    yield break;
+                }
+                yield return null;
+            }
+
+            int liveObjectCount = -1;
+            try
+            {
+                liveObjectCount = Resources.FindObjectsOfTypeAll(objectType).Length;
+            }
+            catch (Exception ex)
+            {
+                TestContext.WriteLine(
+                    $"WaitUntilDestroyed failed to count live {objectType.FullName} objects: {ex.Message}"
+                );
+            }
+
+            TestContext.WriteLine(
+                $"WaitUntilDestroyed timed out after {maxFrames} frame(s). "
+                    + $"Object '{objectName}' ({objectType.FullName}, instance {objectId}) "
+                    + $"still reports alive. Application.isPlaying={Application.isPlaying}, "
+                    + $"live objects of same type={liveObjectCount}."
+            );
+        }
+
+        private static string DrainUnityMainThreadDispatchersForTeardown()
+        {
+            const int MaxDrainPasses = 8;
+            for (int i = 0; i < MaxDrainPasses; i++)
+            {
+                int pendingActionCount =
+                    UnityMainThreadDispatcher.GetPendingActionCountForTesting();
+                if (pendingActionCount <= 0)
+                {
+                    return null;
+                }
+
+                UnityMainThreadDispatcher.DrainPendingActionsForTesting();
+            }
+
+            int remainingPendingActionCount =
+                UnityMainThreadDispatcher.GetPendingActionCountForTesting();
+            if (remainingPendingActionCount <= 0)
+            {
+                return null;
+            }
+
+            return $"[uh-leak] {remainingPendingActionCount} UnityMainThreadDispatcher action(s) "
+                + "remained queued after teardown drain of "
+                + $"{TestContext.CurrentContext.Test.FullName}. "
+                + UnityMainThreadDispatcher.DescribeLiveDispatchersForTesting();
+        }
+
+        private static async ValueTask UnloadSceneAsync(Scene scene)
+        {
+            if (!scene.IsValid())
+            {
+                return;
+            }
+
+            AsyncOperation unload = SceneManager.UnloadSceneAsync(scene);
+            if (unload == null)
+            {
+                return;
+            }
+
+            // A stalled scene unload must not hang teardown and lose the test results file.
+            float endTime = Time.realtimeSinceStartup + TrackedDisposalTimeoutSeconds;
+            while (!unload.isDone)
+            {
+                if (endTime < Time.realtimeSinceStartup)
+                {
+                    Debug.LogWarning(
+                        $"[uh-leak] Scene '{scene.name}' did not finish unloading within "
+                            + $"{TrackedDisposalTimeoutSeconds:0.###}s; abandoning the wait to "
+                            + "avoid hanging the run."
+                    );
+                    return;
+                }
+                await Task.Yield();
+            }
+        }
+
         [OneTimeTearDown]
         public virtual void OneTimeTearDown()
         {
@@ -1257,153 +1367,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             _dispatcherScope = null;
         }
 
-        private static string DrainUnityMainThreadDispatchersForTeardown()
-        {
-            const int MaxDrainPasses = 8;
-            for (int i = 0; i < MaxDrainPasses; i++)
-            {
-                int pendingActionCount =
-                    UnityMainThreadDispatcher.GetPendingActionCountForTesting();
-                if (pendingActionCount <= 0)
-                {
-                    return null;
-                }
-
-                UnityMainThreadDispatcher.DrainPendingActionsForTesting();
-            }
-
-            int remainingPendingActionCount =
-                UnityMainThreadDispatcher.GetPendingActionCountForTesting();
-            if (remainingPendingActionCount <= 0)
-            {
-                return null;
-            }
-
-            return $"[uh-leak] {remainingPendingActionCount} UnityMainThreadDispatcher action(s) "
-                + "remained queued after teardown drain of "
-                + $"{TestContext.CurrentContext.Test.FullName}. "
-                + UnityMainThreadDispatcher.DescribeLiveDispatchersForTesting();
-        }
-
-        private static async ValueTask UnloadSceneAsync(Scene scene)
-        {
-            if (!scene.IsValid())
-            {
-                return;
-            }
-
-            AsyncOperation unload = SceneManager.UnloadSceneAsync(scene);
-            if (unload == null)
-            {
-                return;
-            }
-
-            // A stalled scene unload must not hang teardown and lose the test results file.
-            float endTime = Time.realtimeSinceStartup + TrackedDisposalTimeoutSeconds;
-            while (!unload.isDone)
-            {
-                if (endTime < Time.realtimeSinceStartup)
-                {
-                    Debug.LogWarning(
-                        $"[uh-leak] Scene '{scene.name}' did not finish unloading within "
-                            + $"{TrackedDisposalTimeoutSeconds:0.###}s; abandoning the wait to "
-                            + "avoid hanging the run."
-                    );
-                    return;
-                }
-                await Task.Yield();
-            }
-        }
-
-        /// <summary>
-        /// Polls frames until a Unity object reports as destroyed (its overloaded <c>== null</c>
-        /// becomes true), or <paramref name="maxFrames"/> elapses. <see cref="Object.Destroy(Object)"/>
-        /// is ASYNCHRONOUS in PlayMode — the managed wrapper is not nulled until Unity processes
-        /// the deferred destruction, and the exact frame lag varies by editor version and CI load,
-        /// so the "Destroy then one <c>yield return null</c>, then assert null" pattern is flaky.
-        /// Poll instead. Returns quietly on timeout so the caller's own assertion produces the
-        /// test-specific failure message. For <c>[UnityTest]</c> fixtures. Runtime-safe (no editor
-        /// API), so it is available to the standalone player build too.
-        /// </summary>
-        protected static IEnumerator WaitUntilDestroyed(Object obj, int maxFrames = 30)
-        {
-            if (obj == null)
-            {
-                yield break;
-            }
-
-            Type objectType = obj.GetType();
-            string objectName = obj.name;
-            long objectId = obj.GetUnityObjectId();
-
-            for (int i = 0; i < maxFrames; i++)
-            {
-                if (obj == null)
-                {
-                    yield break;
-                }
-                yield return null;
-            }
-
-            int liveObjectCount = -1;
-            try
-            {
-                liveObjectCount = Resources.FindObjectsOfTypeAll(objectType).Length;
-            }
-            catch (Exception ex)
-            {
-                TestContext.WriteLine(
-                    $"WaitUntilDestroyed failed to count live {objectType.FullName} objects: {ex.Message}"
-                );
-            }
-
-            TestContext.WriteLine(
-                $"WaitUntilDestroyed timed out after {maxFrames} frame(s). "
-                    + $"Object '{objectName}' ({objectType.FullName}, instance {objectId}) "
-                    + $"still reports alive. Application.isPlaying={Application.isPlaying}, "
-                    + $"live objects of same type={liveObjectCount}."
-            );
-        }
-
 #if UNITY_EDITOR
-        private void CloseTrackedScenesInEditor()
-        {
-            for (int i = _trackedScenes.Count - 1; 0 <= i; i--)
-            {
-                Scene scene = _trackedScenes[i];
-                if (!scene.IsValid())
-                {
-                    continue;
-                }
-
-                try
-                {
-                    if (SceneManager.GetActiveScene() == scene)
-                    {
-                        TryPromoteAnotherScene(scene);
-                    }
-
-                    EditorSceneManager.CloseScene(scene, true);
-                }
-                catch { }
-            }
-
-            _trackedScenes.Clear();
-        }
-
-        private static void TryPromoteAnotherScene(Scene current)
-        {
-            int count = SceneManager.sceneCount;
-            for (int i = 0; i < count; i++)
-            {
-                Scene candidate = SceneManager.GetSceneAt(i);
-                if (candidate.IsValid() && candidate.isLoaded && candidate != current)
-                {
-                    SceneManager.SetActiveScene(candidate);
-                    return;
-                }
-            }
-        }
 
         /// <summary>
         /// Copies an asset file without triggering Unity's internal modal dialogs.
@@ -1470,6 +1434,139 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             {
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Static version of EnsureFolder that does not track folders.
+        /// Use the instance method EnsureFolder() when you need automatic cleanup.
+        /// </summary>
+        protected static void EnsureFolderStatic(string folderPath)
+        {
+            if (string.IsNullOrWhiteSpace(folderPath))
+            {
+                return;
+            }
+
+            folderPath = folderPath.SanitizePath();
+            string projectRoot = System.IO.Path.GetDirectoryName(Application.dataPath);
+
+            string[] parts = folderPath.Split('/');
+            string current = parts[0];
+
+            for (int i = 1; i < parts.Length; i++)
+            {
+                string desiredName = parts[i];
+                string intendedNext = current + "/" + desiredName;
+
+                if (UnityEditor.AssetDatabase.IsValidFolder(intendedNext))
+                {
+                    current = intendedNext;
+                    continue;
+                }
+
+                string actualFolderName = FindExistingFolderCaseInsensitive(
+                    projectRoot,
+                    current,
+                    desiredName
+                );
+                if (actualFolderName != null)
+                {
+                    string actualPath = current + "/" + actualFolderName;
+
+                    if (!UnityEditor.AssetDatabase.IsValidFolder(actualPath))
+                    {
+                        UnityEditor.AssetDatabase.ImportAsset(
+                            actualPath,
+                            UnityEditor.ImportAssetOptions.ForceSynchronousImport
+                        );
+                    }
+
+                    current = actualPath;
+                    continue;
+                }
+
+                if (!string.IsNullOrEmpty(projectRoot))
+                {
+                    string absoluteDirectory = System.IO.Path.Combine(projectRoot, intendedNext);
+                    try
+                    {
+                        if (!System.IO.Directory.Exists(absoluteDirectory))
+                        {
+                            System.IO.Directory.CreateDirectory(absoluteDirectory);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogWarning(
+                            $"CommonTestBase.EnsureFolderStatic: Failed to create directory on disk '{absoluteDirectory}': {ex.Message}"
+                        );
+                        return;
+                    }
+
+                    UnityEditor.AssetDatabase.ImportAsset(
+                        intendedNext,
+                        UnityEditor.ImportAssetOptions.ForceSynchronousImport
+                    );
+                }
+
+                if (!UnityEditor.AssetDatabase.IsValidFolder(intendedNext))
+                {
+                    UnityEditor.AssetDatabase.CreateFolder(current, desiredName);
+                }
+
+                current = intendedNext;
+            }
+        }
+
+        private static void TryPromoteAnotherScene(Scene current)
+        {
+            int count = SceneManager.sceneCount;
+            for (int i = 0; i < count; i++)
+            {
+                Scene candidate = SceneManager.GetSceneAt(i);
+                if (candidate.IsValid() && candidate.isLoaded && candidate != current)
+                {
+                    SceneManager.SetActiveScene(candidate);
+                    return;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Finds an existing folder on disk that matches the desired name case-insensitively.
+        /// Returns the actual folder name as it exists on disk, or null if not found.
+        /// </summary>
+        private static string FindExistingFolderCaseInsensitive(
+            string projectRoot,
+            string parentUnityPath,
+            string desiredName
+        )
+        {
+            if (string.IsNullOrEmpty(projectRoot))
+            {
+                return null;
+            }
+
+            string parentAbsolutePath = System.IO.Path.Combine(projectRoot, parentUnityPath);
+            if (!System.IO.Directory.Exists(parentAbsolutePath))
+            {
+                return null;
+            }
+
+            try
+            {
+                foreach (string dir in System.IO.Directory.GetDirectories(parentAbsolutePath))
+                {
+                    string name = System.IO.Path.GetFileName(dir);
+                    if (string.Equals(name, desiredName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return name;
+                    }
+                }
+            }
+            catch { }
+
+            return null;
         }
 
         /// <summary>
@@ -1565,125 +1662,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         }
 
         /// <summary>
-        /// Finds an existing folder on disk that matches the desired name case-insensitively.
-        /// Returns the actual folder name as it exists on disk, or null if not found.
-        /// </summary>
-        private static string FindExistingFolderCaseInsensitive(
-            string projectRoot,
-            string parentUnityPath,
-            string desiredName
-        )
-        {
-            if (string.IsNullOrEmpty(projectRoot))
-            {
-                return null;
-            }
-
-            string parentAbsolutePath = System.IO.Path.Combine(projectRoot, parentUnityPath);
-            if (!System.IO.Directory.Exists(parentAbsolutePath))
-            {
-                return null;
-            }
-
-            try
-            {
-                foreach (string dir in System.IO.Directory.GetDirectories(parentAbsolutePath))
-                {
-                    string name = System.IO.Path.GetFileName(dir);
-                    if (string.Equals(name, desiredName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return name;
-                    }
-                }
-            }
-            catch { }
-
-            return null;
-        }
-
-        /// <summary>
-        /// Static version of EnsureFolder that does not track folders.
-        /// Use the instance method EnsureFolder() when you need automatic cleanup.
-        /// </summary>
-        protected static void EnsureFolderStatic(string folderPath)
-        {
-            if (string.IsNullOrWhiteSpace(folderPath))
-            {
-                return;
-            }
-
-            folderPath = folderPath.SanitizePath();
-            string projectRoot = System.IO.Path.GetDirectoryName(Application.dataPath);
-
-            string[] parts = folderPath.Split('/');
-            string current = parts[0];
-
-            for (int i = 1; i < parts.Length; i++)
-            {
-                string desiredName = parts[i];
-                string intendedNext = current + "/" + desiredName;
-
-                if (UnityEditor.AssetDatabase.IsValidFolder(intendedNext))
-                {
-                    current = intendedNext;
-                    continue;
-                }
-
-                string actualFolderName = FindExistingFolderCaseInsensitive(
-                    projectRoot,
-                    current,
-                    desiredName
-                );
-                if (actualFolderName != null)
-                {
-                    string actualPath = current + "/" + actualFolderName;
-
-                    if (!UnityEditor.AssetDatabase.IsValidFolder(actualPath))
-                    {
-                        UnityEditor.AssetDatabase.ImportAsset(
-                            actualPath,
-                            UnityEditor.ImportAssetOptions.ForceSynchronousImport
-                        );
-                    }
-
-                    current = actualPath;
-                    continue;
-                }
-
-                if (!string.IsNullOrEmpty(projectRoot))
-                {
-                    string absoluteDirectory = System.IO.Path.Combine(projectRoot, intendedNext);
-                    try
-                    {
-                        if (!System.IO.Directory.Exists(absoluteDirectory))
-                        {
-                            System.IO.Directory.CreateDirectory(absoluteDirectory);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.LogWarning(
-                            $"CommonTestBase.EnsureFolderStatic: Failed to create directory on disk '{absoluteDirectory}': {ex.Message}"
-                        );
-                        return;
-                    }
-
-                    UnityEditor.AssetDatabase.ImportAsset(
-                        intendedNext,
-                        UnityEditor.ImportAssetOptions.ForceSynchronousImport
-                    );
-                }
-
-                if (!UnityEditor.AssetDatabase.IsValidFolder(intendedNext))
-                {
-                    UnityEditor.AssetDatabase.CreateFolder(current, desiredName);
-                }
-
-                current = intendedNext;
-            }
-        }
-
-        /// <summary>
         /// Tracks a folder path for cleanup during TearDown.
         /// Only tracked folders will be deleted - pre-existing user folders are safe.
         /// </summary>
@@ -1775,109 +1753,32 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 #endif
         }
 
+        private void CloseTrackedScenesInEditor()
+        {
+            for (int i = _trackedScenes.Count - 1; 0 <= i; i--)
+            {
+                Scene scene = _trackedScenes[i];
+                if (!scene.IsValid())
+                {
+                    continue;
+                }
+
+                try
+                {
+                    if (SceneManager.GetActiveScene() == scene)
+                    {
+                        TryPromoteAnotherScene(scene);
+                    }
+
+                    EditorSceneManager.CloseScene(scene, true);
+                }
+                catch { }
+            }
+
+            _trackedScenes.Clear();
+        }
+
 #if UNITY_EDITOR
-        /// <summary>
-        /// Executes an action with immediate asset import enabled by pausing any active batch scope.
-        /// Use this for operations that require immediate asset processing, such as
-        /// <see cref="UnityEditor.AssetImporter.SaveAndReimport"/> or texture operations that need
-        /// the asset to be fully imported before continuing.
-        /// </summary>
-        /// <param name="action">The action to execute outside of batch mode.</param>
-        /// <param name="refreshAfter">Whether to refresh the asset database after the action completes. Default is false.</param>
-        /// <remarks>
-        /// <para>
-        /// This method:
-        /// </para>
-        /// <list type="bullet">
-        /// <item>Pauses the current batch scope (if any)</item>
-        /// <item>Refreshes the AssetDatabase to ensure all pending operations are complete</item>
-        /// <item>Executes the provided action</item>
-        /// <item>Optionally refreshes the AssetDatabase again after the action (if <paramref name="refreshAfter"/> is true)</item>
-        /// <item>Resumes the batch scope</item>
-        /// </list>
-        /// <para>
-        /// Use sparingly, as each pause/resume cycle incurs overhead. Group related
-        /// immediate operations together when possible.
-        /// </para>
-        /// </remarks>
-        /// <example>
-        /// <code>
-        /// ExecuteWithImmediateImport(() =>
-        /// {
-        ///     TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
-        ///     importer.textureType = TextureImporterType.Sprite;
-        ///     importer.SaveAndReimport();
-        /// }, refreshAfter: true);
-        /// </code>
-        /// </example>
-        protected void ExecuteWithImmediateImport(Action action, bool refreshAfter = false)
-        {
-            if (action == null)
-            {
-                return;
-            }
-
-            using (AssetDatabaseBatchHelper.PauseBatch())
-            {
-                UnityEditor.AssetDatabase.Refresh(
-                    UnityEditor.ImportAssetOptions.ForceSynchronousImport
-                );
-                action();
-                if (refreshAfter)
-                {
-                    UnityEditor.AssetDatabase.Refresh(
-                        UnityEditor.ImportAssetOptions.ForceSynchronousImport
-                    );
-                }
-            }
-        }
-
-        /// <summary>
-        /// Executes a function with immediate asset import enabled by pausing any active batch scope
-        /// and returns the function's result.
-        /// </summary>
-        /// <typeparam name="T">The return type of the function.</typeparam>
-        /// <param name="func">The function to execute that returns a value.</param>
-        /// <param name="refreshAfter">
-        /// If <c>true</c>, a second <see cref="UnityEditor.AssetDatabase.Refresh"/> is called after <paramref name="func"/>
-        /// completes to ensure any newly created or modified assets are available. Default is <c>false</c>.
-        /// </param>
-        /// <returns>The result of the function, or <c>default(T)</c> if <paramref name="func"/> is <c>null</c>.</returns>
-        /// <remarks>
-        /// This method is useful when you need to perform asset operations that return values while
-        /// ensuring proper AssetDatabase synchronization. For void operations, use
-        /// <see cref="ExecuteWithImmediateImport(Action, bool)"/> instead.
-        /// </remarks>
-        /// <example>
-        /// <code>
-        /// TextureImporter importer = ExecuteWithImmediateImport(() =>
-        /// {
-        ///     return AssetImporter.GetAtPath(texturePath) as TextureImporter;
-        /// });
-        /// </code>
-        /// </example>
-        protected T ExecuteWithImmediateImport<T>(Func<T> func, bool refreshAfter = false)
-        {
-            if (func == null)
-            {
-                return default;
-            }
-
-            using (AssetDatabaseBatchHelper.PauseBatch())
-            {
-                UnityEditor.AssetDatabase.Refresh(
-                    UnityEditor.ImportAssetOptions.ForceSynchronousImport
-                );
-                T result = func();
-                if (refreshAfter)
-                {
-                    UnityEditor.AssetDatabase.Refresh(
-                        UnityEditor.ImportAssetOptions.ForceSynchronousImport
-                    );
-                }
-                return result;
-            }
-        }
 
         /// <summary>
         /// Coroutine: force the AssetDatabase to reconcile, then yield frames until the
@@ -2066,53 +1967,137 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
 
             return $"{obj.GetType().FullName}('{obj.name}', instance {obj.GetUnityObjectId()})";
         }
-#endif
 
         /// <summary>
-        /// Performs batch cleanup of all deferred assets and folders.
-        /// Call this in OneTimeTearDown when <see cref="DeferAssetCleanupToOneTimeTearDown"/> is true.
+        /// Executes an action with immediate asset import enabled by pausing any active batch scope.
+        /// Use this for operations that require immediate asset processing, such as
+        /// <see cref="UnityEditor.AssetImporter.SaveAndReimport"/> or texture operations that need
+        /// the asset to be fully imported before continuing.
         /// </summary>
-        protected void CleanupDeferredAssetsAndFolders()
+        /// <param name="action">The action to execute outside of batch mode.</param>
+        /// <param name="refreshAfter">Whether to refresh the asset database after the action completes. Default is false.</param>
+        /// <remarks>
+        /// <para>
+        /// This method:
+        /// </para>
+        /// <list type="bullet">
+        /// <item>Pauses the current batch scope (if any)</item>
+        /// <item>Refreshes the AssetDatabase to ensure all pending operations are complete</item>
+        /// <item>Executes the provided action</item>
+        /// <item>Optionally refreshes the AssetDatabase again after the action (if <paramref name="refreshAfter"/> is true)</item>
+        /// <item>Resumes the batch scope</item>
+        /// </list>
+        /// <para>
+        /// Use sparingly, as each pause/resume cycle incurs overhead. Group related
+        /// immediate operations together when possible.
+        /// </para>
+        /// </remarks>
+        /// <example>
+        /// <code>
+        /// ExecuteWithImmediateImport(() =>
+        /// {
+        ///     TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+        ///     importer.textureType = TextureImporterType.Sprite;
+        ///     importer.SaveAndReimport();
+        /// }, refreshAfter: true);
+        /// </code>
+        /// </example>
+        protected void ExecuteWithImmediateImport(Action action, bool refreshAfter = false)
         {
-#if UNITY_EDITOR
-            if (_deferredAssetPaths.Count == 0 && _deferredFolderPaths.Count == 0)
+            if (action == null)
             {
                 return;
             }
 
-            using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
+            using (AssetDatabaseBatchHelper.PauseBatch())
             {
-                foreach (string assetPath in _deferredAssetPaths)
+                UnityEditor.AssetDatabase.Refresh(
+                    UnityEditor.ImportAssetOptions.ForceSynchronousImport
+                );
+                action();
+                if (refreshAfter)
                 {
-                    if (
-                        !string.IsNullOrEmpty(assetPath)
-                        && UnityEditor.AssetDatabase.LoadAssetAtPath<Object>(assetPath) != null
-                    )
-                    {
-                        UnityEditor.AssetDatabase.DeleteAsset(assetPath);
-                    }
+                    UnityEditor.AssetDatabase.Refresh(
+                        UnityEditor.ImportAssetOptions.ForceSynchronousImport
+                    );
                 }
-                _deferredAssetPaths.Clear();
+            }
+        }
 
-                List<string> sortedFolders = new(_deferredFolderPaths);
-                sortedFolders.Sort((a, b) => b.Split('/').Length.CompareTo(a.Split('/').Length));
-
-                foreach (string folderPath in sortedFolders)
-                {
-                    if (
-                        !string.IsNullOrEmpty(folderPath)
-                        && UnityEditor.AssetDatabase.IsValidFolder(folderPath)
-                    )
-                    {
-                        UnityEditor.AssetDatabase.DeleteAsset(folderPath);
-                    }
-                }
-                _deferredFolderPaths.Clear();
+        /// <summary>
+        /// Executes a function with immediate asset import enabled by pausing any active batch scope
+        /// and returns the function's result.
+        /// </summary>
+        /// <typeparam name="T">The return type of the function.</typeparam>
+        /// <param name="func">The function to execute that returns a value.</param>
+        /// <param name="refreshAfter">
+        /// If <c>true</c>, a second <see cref="UnityEditor.AssetDatabase.Refresh"/> is called after <paramref name="func"/>
+        /// completes to ensure any newly created or modified assets are available. Default is <c>false</c>.
+        /// </param>
+        /// <returns>The result of the function, or <c>default(T)</c> if <paramref name="func"/> is <c>null</c>.</returns>
+        /// <remarks>
+        /// This method is useful when you need to perform asset operations that return values while
+        /// ensuring proper AssetDatabase synchronization. For void operations, use
+        /// <see cref="ExecuteWithImmediateImport(Action, bool)"/> instead.
+        /// </remarks>
+        /// <example>
+        /// <code>
+        /// TextureImporter importer = ExecuteWithImmediateImport(() =>
+        /// {
+        ///     return AssetImporter.GetAtPath(texturePath) as TextureImporter;
+        /// });
+        /// </code>
+        /// </example>
+        protected T ExecuteWithImmediateImport<T>(Func<T> func, bool refreshAfter = false)
+        {
+            if (func == null)
+            {
+                return default;
             }
 
-            AssetDatabaseBatchHelper.RefreshIfNotBatching();
-#endif
+            using (AssetDatabaseBatchHelper.PauseBatch())
+            {
+                UnityEditor.AssetDatabase.Refresh(
+                    UnityEditor.ImportAssetOptions.ForceSynchronousImport
+                );
+                T result = func();
+                if (refreshAfter)
+                {
+                    UnityEditor.AssetDatabase.Refresh(
+                        UnityEditor.ImportAssetOptions.ForceSynchronousImport
+                    );
+                }
+                return result;
+            }
         }
+#endif
+
+        /// <summary>
+        /// List of protected production folder paths that should NEVER be deleted by tests.
+        /// These paths are case-insensitive.
+        /// </summary>
+        private static readonly string[] ProtectedFolders = new[]
+        {
+            "Assets/Resources/Wallstop Studios",
+            "Assets/Plugins",
+            "Assets/Editor Default Resources",
+            "Assets/StreamingAssets",
+        };
+
+        /// <summary>
+        /// Known folder base names whose numbered duplicates (e.g., "Unity Helpers 1") should be
+        /// considered pollution and NOT protected. The main folders remain protected.
+        /// </summary>
+        private static readonly (
+            string parentPath,
+            string baseName
+        )[] KnownDuplicateFolderPatterns = new[]
+        {
+            ("Assets/Resources/Wallstop Studios", "Unity Helpers"),
+            ("Assets/Resources", "Wallstop Studios"),
+            ("Assets", "Resources"),
+            ("Assets", "Temp"),
+        };
 
         /// <summary>
         /// Cleans up all known test folders in Assets and Assets/Resources, including duplicates.
@@ -2365,33 +2350,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             // Only positive integers are valid duplicates (Unity uses 1, 2, 3, etc.)
             return int.TryParse(suffix, out int number) && 0 < number;
         }
-
-        /// <summary>
-        /// List of protected production folder paths that should NEVER be deleted by tests.
-        /// These paths are case-insensitive.
-        /// </summary>
-        private static readonly string[] ProtectedFolders = new[]
-        {
-            "Assets/Resources/Wallstop Studios",
-            "Assets/Plugins",
-            "Assets/Editor Default Resources",
-            "Assets/StreamingAssets",
-        };
-
-        /// <summary>
-        /// Known folder base names whose numbered duplicates (e.g., "Unity Helpers 1") should be
-        /// considered pollution and NOT protected. The main folders remain protected.
-        /// </summary>
-        private static readonly (
-            string parentPath,
-            string baseName
-        )[] KnownDuplicateFolderPatterns = new[]
-        {
-            ("Assets/Resources/Wallstop Studios", "Unity Helpers"),
-            ("Assets/Resources", "Wallstop Studios"),
-            ("Assets", "Resources"),
-            ("Assets", "Temp"),
-        };
 
         /// <summary>
         /// Checks if a path represents a numbered duplicate folder that is pollution, not production.
@@ -2651,6 +2609,52 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             }
             catch { }
         }
+
+        /// <summary>
+        /// Performs batch cleanup of all deferred assets and folders.
+        /// Call this in OneTimeTearDown when <see cref="DeferAssetCleanupToOneTimeTearDown"/> is true.
+        /// </summary>
+        protected void CleanupDeferredAssetsAndFolders()
+        {
+#if UNITY_EDITOR
+            if (_deferredAssetPaths.Count == 0 && _deferredFolderPaths.Count == 0)
+            {
+                return;
+            }
+
+            using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
+            {
+                foreach (string assetPath in _deferredAssetPaths)
+                {
+                    if (
+                        !string.IsNullOrEmpty(assetPath)
+                        && UnityEditor.AssetDatabase.LoadAssetAtPath<Object>(assetPath) != null
+                    )
+                    {
+                        UnityEditor.AssetDatabase.DeleteAsset(assetPath);
+                    }
+                }
+                _deferredAssetPaths.Clear();
+
+                List<string> sortedFolders = new(_deferredFolderPaths);
+                sortedFolders.Sort((a, b) => b.Split('/').Length.CompareTo(a.Split('/').Length));
+
+                foreach (string folderPath in sortedFolders)
+                {
+                    if (
+                        !string.IsNullOrEmpty(folderPath)
+                        && UnityEditor.AssetDatabase.IsValidFolder(folderPath)
+                    )
+                    {
+                        UnityEditor.AssetDatabase.DeleteAsset(folderPath);
+                    }
+                }
+                _deferredFolderPaths.Clear();
+            }
+
+            AssetDatabaseBatchHelper.RefreshIfNotBatching();
+#endif
+        }
 #endif
 
         // Suppress expected logs at the handler so Unity replay cannot publish them into another test scope.
@@ -2725,6 +2729,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         protected internal static class ProtectionTestHooks
         {
             /// <summary>
+            /// Gets the list of known duplicate folder patterns for verification.
+            /// </summary>
+            public static (
+                string parentPath,
+                string baseName
+            )[] GetKnownDuplicateFolderPatterns() => KnownDuplicateFolderPatterns;
+
+            /// <summary>
             /// Exposes IsProtectedPath for testing.
             /// </summary>
             public static bool TestIsProtectedPath(string path) => IsProtectedPath(path);
@@ -2739,14 +2751,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             /// Gets the list of protected folders for verification.
             /// </summary>
             public static string[] GetProtectedFolders() => ProtectedFolders;
-
-            /// <summary>
-            /// Gets the list of known duplicate folder patterns for verification.
-            /// </summary>
-            public static (
-                string parentPath,
-                string baseName
-            )[] GetKnownDuplicateFolderPatterns() => KnownDuplicateFolderPatterns;
         }
 #endif
     }

@@ -34,14 +34,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [TestFixture]
     public sealed class FuzzTests
     {
-        /// <summary>
-        /// Iterations per target per strategy. Raise it locally with <c>WPROTO_FUZZ_ITERATIONS</c>;
-        /// CI pays a fixed, small cost every run rather than an occasional large one.
-        /// </summary>
-        private static readonly int Iterations = ResolveIterations(
-            Environment.GetEnvironmentVariable("WPROTO_FUZZ_ITERATIONS")
-        );
-
         private const int DefaultIterations = 1500;
 
         /// <summary>
@@ -83,41 +75,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private const long AllocationMultiple = 256;
 
         /// <summary>
-        /// Resolves the iteration count from the environment, never below
-        /// <see cref="MinimumIterations"/>.
-        /// </summary>
-        /// <param name="configured">The raw environment value, which may be absent or nonsense.</param>
-        /// <returns>The iteration count every strategy runs.</returns>
-        internal static int ResolveIterations(string configured)
-        {
-            if (
-                !string.IsNullOrEmpty(configured)
-                && int.TryParse(configured, out int parsed)
-                && 0 < parsed
-            )
-            {
-                return parsed < MinimumIterations ? MinimumIterations : parsed;
-            }
-
-            return DefaultIterations;
-        }
-
-        [TestCase(null, ExpectedResult = DefaultIterations)]
-        [TestCase("", ExpectedResult = DefaultIterations)]
-        [TestCase("0", ExpectedResult = DefaultIterations)]
-        [TestCase("-1", ExpectedResult = DefaultIterations)]
-        [TestCase("2.5", ExpectedResult = DefaultIterations)]
-        [TestCase("many", ExpectedResult = DefaultIterations)]
-        [TestCase("3", ExpectedResult = MinimumIterations)]
-        [TestCase("200", ExpectedResult = MinimumIterations)]
-        [TestCase("5000", ExpectedResult = 5000)]
-        public int TheIterationCountNeverFallsBelowWhatTheGatesCanBeAskedAbout(string configured)
-        {
-            // Small corpora cannot reliably reach every member; the coverage gate needs enough iterations.
-            return ResolveIterations(configured);
-        }
-
-        /// <summary>
         /// Decodes a payload, reporting acceptance and how many bytes the reader consumed before it
         /// stopped. Must never throw.
         /// </summary>
@@ -155,6 +112,73 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             out int written,
             out byte[] encoded
         );
+
+        /// <summary>
+        /// Iterations per target per strategy. Raise it locally with <c>WPROTO_FUZZ_ITERATIONS</c>;
+        /// CI pays a fixed, small cost every run rather than an occasional large one.
+        /// </summary>
+        private static readonly int Iterations = ResolveIterations(
+            Environment.GetEnvironmentVariable("WPROTO_FUZZ_ITERATIONS")
+        );
+
+        /// <summary>
+        /// The largest allocation any decode in this run charged, and the payload that charged it.
+        /// Printed once at the end so the next person to tighten <see cref="AllocationSlackBytes"/>
+        /// starts from a measurement rather than from a sentence.
+        /// </summary>
+        private static long _worstAllocation;
+
+        private static int _worstAllocationPayloadLength;
+
+        private static string _worstAllocationTarget = "none";
+
+        private static double _worstAllocationRatio;
+
+        private static long _worstRatioAllocation;
+
+        private static int _worstRatioPayloadLength;
+
+        private static string _worstRatioTarget = "none";
+
+        /// <summary>
+        /// The dimensions a header can claim. Chosen so their products straddle every boundary that
+        /// matters: <c>int.MaxValue</c>, 2^32, and 2^64 exactly -- the last because a wrapped
+        /// product of exactly zero is the one an attacker steers toward, since it matches an empty
+        /// element run and asks for the whole address space.
+        /// </summary>
+        private static readonly int[] HostileDimensions =
+        {
+            0,
+            1,
+            2,
+            3,
+            46341,
+            65536,
+            1 << 21,
+            1 << 22,
+            1 << 30,
+            int.MaxValue,
+        };
+
+        /// <summary>
+        /// Resolves the iteration count from the environment, never below
+        /// <see cref="MinimumIterations"/>.
+        /// </summary>
+        /// <param name="configured">The raw environment value, which may be absent or nonsense.</param>
+        /// <returns>The iteration count every strategy runs.</returns>
+        internal static int ResolveIterations(string configured)
+        {
+            if (
+                !string.IsNullOrEmpty(configured)
+                && int.TryParse(configured, out int parsed)
+                && 0 < parsed
+            )
+            {
+                return parsed < MinimumIterations ? MinimumIterations : parsed;
+            }
+
+            return DefaultIterations;
+        }
 
         private static byte[] Encode<T>(IWProtoFormatter<T> formatter, T value)
         {
@@ -848,56 +872,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         /// <summary>
-        /// The largest allocation any decode in this run charged, and the payload that charged it.
-        /// Printed once at the end so the next person to tighten <see cref="AllocationSlackBytes"/>
-        /// starts from a measurement rather than from a sentence.
-        /// </summary>
-        private static long _worstAllocation;
-
-        private static int _worstAllocationPayloadLength;
-
-        private static string _worstAllocationTarget = "none";
-
-        private static double _worstAllocationRatio;
-
-        private static long _worstRatioAllocation;
-
-        private static int _worstRatioPayloadLength;
-
-        private static string _worstRatioTarget = "none";
-
-        [OneTimeSetUp]
-        public void WarmEveryReaderBeforeAnythingIsMeasured()
-        {
-            // Warm initialization and caches before measuring payload amplification.
-            foreach (Target target in Targets())
-            {
-                foreach (byte[] seed in target.Seeds)
-                {
-                    target.Read(seed, out int _);
-                    target.ReEncode(seed, out byte[] _, out byte[] _);
-                    target.FacadeRead(seed);
-                }
-
-                target.Read(Array.Empty<byte>(), out int _);
-                FuzzRandom random = new FuzzRandom(1);
-                target.WriteGenerated(ref random, out int _, out int _, out byte[] _);
-            }
-        }
-
-        [OneTimeTearDown]
-        public void ReportTheWorstAllocationObserved()
-        {
-            TestContext.Progress.WriteLine(
-                $"WallstopProto fuzz: worst decode allocation {_worstAllocation} B on a "
-                    + $"{_worstAllocationPayloadLength} byte {_worstAllocationTarget} payload; "
-                    + $"worst ratio {_worstAllocationRatio:F1}x ({_worstRatioAllocation} B on "
-                    + $"{_worstRatioPayloadLength} bytes, {_worstRatioTarget}). Ceiling is "
-                    + $"{AllocationSlackBytes} + {AllocationMultiple} x length."
-            );
-        }
-
-        /// <summary>
         /// Runs one payload through one target and asserts the three properties a shipped player
         /// depends on.
         /// </summary>
@@ -1080,132 +1054,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
-        [Test]
-        public void RandomBytesAreRefusedRatherThanThrown()
-        {
-            foreach (Target target in Targets())
-            {
-                FuzzRandom random = new FuzzRandom(0xC0FFEE);
-                for (int iteration = 0; iteration < Iterations; ++iteration)
-                {
-                    byte[] payload = new byte[random.Next(96)];
-                    for (int index = 0; index < payload.Length; ++index)
-                    {
-                        payload[index] = random.NextByte();
-                    }
-
-                    AssertDecodeIsSafe(
-                        target,
-                        payload,
-                        $"strategy=random seed=0xC0FFEE iteration={iteration}"
-                    );
-                }
-            }
-        }
-
-        [Test]
-        public void AMutatedValidPayloadIsRefusedRatherThanThrown()
-        {
-            /*
-             * Mutating valid encodings reaches member readers that random bytes rarely pass the first tag to
-             * reach.
-             */
-            foreach (Target target in Targets())
-            {
-                Coverage coverage = new Coverage();
-                FuzzRandom random = new FuzzRandom(0x5EED);
-                for (int iteration = 0; iteration < Iterations; ++iteration)
-                {
-                    byte[] seed = target.Seeds[random.Next(target.Seeds.Count)];
-                    byte[] payload = Mutate(ref random, seed);
-                    AssertDecodeIsSafe(
-                        target,
-                        payload,
-                        $"strategy=mutation seed=0x5EED iteration={iteration}",
-                        coverage
-                    );
-                }
-
-                /*
-                 * Acceptance is not a coverage proxy: correctly rejected dimension headers can still reach
-                 * deep readers.
-                 */
-                Assert.Greater(
-                    coverage.ReachRate,
-                    0.5,
-                    coverage.Describe(target.Name)
-                        + " -- the mutation corpus is dying at the first key, so it has become a "
-                        + "slower way of testing TryReadTag."
-                );
-                Assert.Greater(
-                    coverage.Accepted,
-                    0,
-                    coverage.Describe(target.Name)
-                        + " -- no mutated payload survived at all, which no valid seed should allow."
-                );
-                Assert.Less(
-                    coverage.AcceptanceRate,
-                    0.99,
-                    coverage.Describe(target.Name)
-                        + " -- the mutations are barely changing anything."
-                );
-
-                /*
-                 * Corpus-wide reach can hide untouched members, so derive per-member expectations from the
-                 * seeds.
-                 */
-                int minimumHits = Math.Max(1, Iterations / 100);
-                foreach (int member in target.Members)
-                {
-                    Assert.GreaterOrEqual(
-                        coverage.HitsFor(member),
-                        minimumHits,
-                        coverage.DescribeMembers(target.Name, target.Members)
-                            + $" -- field {member >> 3} at wire type {member & 7} was dispatched "
-                            + $"on fewer than {minimumHits} times, so this suite does not fuzz that "
-                            + "member's reader."
-                    );
-                }
-            }
-        }
-
-        [Test]
-        public void AHostileFieldSequenceIsRefusedRatherThanThrown()
-        {
-            // Large length and depth claims are too structured for random mutation to exercise reliably.
-            foreach (Target target in Targets())
-            {
-                Coverage coverage = new Coverage();
-                FuzzRandom random = new FuzzRandom(0xBADF00D);
-                for (int iteration = 0; iteration < Iterations; ++iteration)
-                {
-                    byte[] payload = HostileMessage(ref random, 0);
-                    AssertDecodeIsSafe(
-                        target,
-                        payload,
-                        $"strategy=hostile seed=0xBADF00D iteration={iteration}",
-                        coverage
-                    );
-                }
-
-                // Well-formed unknown fields establish corpus quality, not member coverage.
-                Assert.Greater(
-                    coverage.ReachRate,
-                    0.5,
-                    coverage.Describe(target.Name)
-                        + " -- the hostile field sequences are not well-formed enough to reach the "
-                        + "claims they carry."
-                );
-                Assert.Greater(
-                    coverage.Accepted,
-                    0,
-                    coverage.Describe(target.Name)
-                        + " -- not one hostile message was accepted, so unknown-field skipping is "
-                        + "never exercised."
-                );
-            }
-        }
-
         private static byte[] Mutate(ref FuzzRandom random, byte[] seed)
         {
             List<byte> payload = new List<byte>(seed);
@@ -1350,6 +1198,178 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             payload.Add((byte)value);
         }
 
+        [TestCase(null, ExpectedResult = DefaultIterations)]
+        [TestCase("", ExpectedResult = DefaultIterations)]
+        [TestCase("0", ExpectedResult = DefaultIterations)]
+        [TestCase("-1", ExpectedResult = DefaultIterations)]
+        [TestCase("2.5", ExpectedResult = DefaultIterations)]
+        [TestCase("many", ExpectedResult = DefaultIterations)]
+        [TestCase("3", ExpectedResult = MinimumIterations)]
+        [TestCase("200", ExpectedResult = MinimumIterations)]
+        [TestCase("5000", ExpectedResult = 5000)]
+        public int TheIterationCountNeverFallsBelowWhatTheGatesCanBeAskedAbout(string configured)
+        {
+            // Small corpora cannot reliably reach every member; the coverage gate needs enough iterations.
+            return ResolveIterations(configured);
+        }
+
+        [OneTimeSetUp]
+        public void WarmEveryReaderBeforeAnythingIsMeasured()
+        {
+            // Warm initialization and caches before measuring payload amplification.
+            foreach (Target target in Targets())
+            {
+                foreach (byte[] seed in target.Seeds)
+                {
+                    target.Read(seed, out int _);
+                    target.ReEncode(seed, out byte[] _, out byte[] _);
+                    target.FacadeRead(seed);
+                }
+
+                target.Read(Array.Empty<byte>(), out int _);
+                FuzzRandom random = new FuzzRandom(1);
+                target.WriteGenerated(ref random, out int _, out int _, out byte[] _);
+            }
+        }
+
+        [OneTimeTearDown]
+        public void ReportTheWorstAllocationObserved()
+        {
+            TestContext.Progress.WriteLine(
+                $"WallstopProto fuzz: worst decode allocation {_worstAllocation} B on a "
+                    + $"{_worstAllocationPayloadLength} byte {_worstAllocationTarget} payload; "
+                    + $"worst ratio {_worstAllocationRatio:F1}x ({_worstRatioAllocation} B on "
+                    + $"{_worstRatioPayloadLength} bytes, {_worstRatioTarget}). Ceiling is "
+                    + $"{AllocationSlackBytes} + {AllocationMultiple} x length."
+            );
+        }
+
+        [Test]
+        public void RandomBytesAreRefusedRatherThanThrown()
+        {
+            foreach (Target target in Targets())
+            {
+                FuzzRandom random = new FuzzRandom(0xC0FFEE);
+                for (int iteration = 0; iteration < Iterations; ++iteration)
+                {
+                    byte[] payload = new byte[random.Next(96)];
+                    for (int index = 0; index < payload.Length; ++index)
+                    {
+                        payload[index] = random.NextByte();
+                    }
+
+                    AssertDecodeIsSafe(
+                        target,
+                        payload,
+                        $"strategy=random seed=0xC0FFEE iteration={iteration}"
+                    );
+                }
+            }
+        }
+
+        [Test]
+        public void AMutatedValidPayloadIsRefusedRatherThanThrown()
+        {
+            /*
+             * Mutating valid encodings reaches member readers that random bytes rarely pass the first tag to
+             * reach.
+             */
+            foreach (Target target in Targets())
+            {
+                Coverage coverage = new Coverage();
+                FuzzRandom random = new FuzzRandom(0x5EED);
+                for (int iteration = 0; iteration < Iterations; ++iteration)
+                {
+                    byte[] seed = target.Seeds[random.Next(target.Seeds.Count)];
+                    byte[] payload = Mutate(ref random, seed);
+                    AssertDecodeIsSafe(
+                        target,
+                        payload,
+                        $"strategy=mutation seed=0x5EED iteration={iteration}",
+                        coverage
+                    );
+                }
+
+                /*
+                 * Acceptance is not a coverage proxy: correctly rejected dimension headers can still reach
+                 * deep readers.
+                 */
+                Assert.Greater(
+                    coverage.ReachRate,
+                    0.5,
+                    coverage.Describe(target.Name)
+                        + " -- the mutation corpus is dying at the first key, so it has become a "
+                        + "slower way of testing TryReadTag."
+                );
+                Assert.Greater(
+                    coverage.Accepted,
+                    0,
+                    coverage.Describe(target.Name)
+                        + " -- no mutated payload survived at all, which no valid seed should allow."
+                );
+                Assert.Less(
+                    coverage.AcceptanceRate,
+                    0.99,
+                    coverage.Describe(target.Name)
+                        + " -- the mutations are barely changing anything."
+                );
+
+                /*
+                 * Corpus-wide reach can hide untouched members, so derive per-member expectations from the
+                 * seeds.
+                 */
+                int minimumHits = Math.Max(1, Iterations / 100);
+                foreach (int member in target.Members)
+                {
+                    Assert.GreaterOrEqual(
+                        coverage.HitsFor(member),
+                        minimumHits,
+                        coverage.DescribeMembers(target.Name, target.Members)
+                            + $" -- field {member >> 3} at wire type {member & 7} was dispatched "
+                            + $"on fewer than {minimumHits} times, so this suite does not fuzz that "
+                            + "member's reader."
+                    );
+                }
+            }
+        }
+
+        [Test]
+        public void AHostileFieldSequenceIsRefusedRatherThanThrown()
+        {
+            // Large length and depth claims are too structured for random mutation to exercise reliably.
+            foreach (Target target in Targets())
+            {
+                Coverage coverage = new Coverage();
+                FuzzRandom random = new FuzzRandom(0xBADF00D);
+                for (int iteration = 0; iteration < Iterations; ++iteration)
+                {
+                    byte[] payload = HostileMessage(ref random, 0);
+                    AssertDecodeIsSafe(
+                        target,
+                        payload,
+                        $"strategy=hostile seed=0xBADF00D iteration={iteration}",
+                        coverage
+                    );
+                }
+
+                // Well-formed unknown fields establish corpus quality, not member coverage.
+                Assert.Greater(
+                    coverage.ReachRate,
+                    0.5,
+                    coverage.Describe(target.Name)
+                        + " -- the hostile field sequences are not well-formed enough to reach the "
+                        + "claims they carry."
+                );
+                Assert.Greater(
+                    coverage.Accepted,
+                    0,
+                    coverage.Describe(target.Name)
+                        + " -- not one hostile message was accepted, so unknown-field skipping is "
+                        + "never exercised."
+                );
+            }
+        }
+
         [Test]
         public void ADeeplyNestedChainIsRefusedWithoutOverflowingTheStack()
         {
@@ -1387,26 +1407,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 }
             }
         }
-
-        /// <summary>
-        /// The dimensions a header can claim. Chosen so their products straddle every boundary that
-        /// matters: <c>int.MaxValue</c>, 2^32, and 2^64 exactly -- the last because a wrapped
-        /// product of exactly zero is the one an attacker steers toward, since it matches an empty
-        /// element run and asks for the whole address space.
-        /// </summary>
-        private static readonly int[] HostileDimensions =
-        {
-            0,
-            1,
-            2,
-            3,
-            46341,
-            65536,
-            1 << 21,
-            1 << 22,
-            1 << 30,
-            int.MaxValue,
-        };
 
         [Test]
         public void ADimensionHeaderCannotReserveMoreThanItsElementsPayFor()
@@ -1664,25 +1664,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// </summary>
         private sealed class Target
         {
-            internal Target(
-                string name,
-                IReadOnlyList<byte[]> seeds,
-                IReadOnlyList<int> members,
-                ReadPayload read,
-                ReEncodePayload reEncode,
-                FacadeReadPayload facadeRead,
-                WriteGeneratedValue writeGenerated
-            )
-            {
-                Name = name;
-                Seeds = seeds;
-                Members = members;
-                Read = read;
-                ReEncode = reEncode;
-                FacadeRead = facadeRead;
-                WriteGenerated = writeGenerated;
-            }
-
             internal string Name { get; }
 
             internal IReadOnlyList<byte[]> Seeds { get; }
@@ -1702,6 +1683,25 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             internal FacadeReadPayload FacadeRead { get; }
 
             internal WriteGeneratedValue WriteGenerated { get; }
+
+            internal Target(
+                string name,
+                IReadOnlyList<byte[]> seeds,
+                IReadOnlyList<int> members,
+                ReadPayload read,
+                ReEncodePayload reEncode,
+                FacadeReadPayload facadeRead,
+                WriteGeneratedValue writeGenerated
+            )
+            {
+                Name = name;
+                Seeds = seeds;
+                Members = members;
+                Read = read;
+                ReEncode = reEncode;
+                FacadeRead = facadeRead;
+                WriteGenerated = writeGenerated;
+            }
         }
 
         /// <summary>
@@ -1754,6 +1754,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             /// </summary>
             private const int PastTheFirstKey = 4;
 
+            internal double AcceptanceRate => Payloads == 0 ? 0 : (double)Accepted / Payloads;
+
+            internal double ReachRate => Payloads == 0 ? 0 : (double)Reached / Payloads;
+
             internal int Payloads;
 
             internal int Accepted;
@@ -1787,10 +1791,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 _byMember.TryGetValue(member, out int hits);
                 return hits;
             }
-
-            internal double AcceptanceRate => Payloads == 0 ? 0 : (double)Accepted / Payloads;
-
-            internal double ReachRate => Payloads == 0 ? 0 : (double)Reached / Payloads;
 
             internal string Describe(string target)
             {

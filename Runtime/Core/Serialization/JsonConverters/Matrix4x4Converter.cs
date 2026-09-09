@@ -10,6 +10,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
 
     public sealed class Matrix4x4Converter : JsonConverter<Matrix4x4>
     {
+        public static readonly Matrix4x4Converter Instance = new();
+
         private static readonly string[] PropertyNames =
         {
             "m00",
@@ -29,8 +31,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             "m32",
             "m33",
         };
-
-        public static readonly Matrix4x4Converter Instance = new();
 
         private Matrix4x4Converter() { }
 

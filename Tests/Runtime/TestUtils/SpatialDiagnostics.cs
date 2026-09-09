@@ -12,6 +12,58 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
 
     public static class SpatialDiagnostics
     {
+        private static (List<Vector3> missing, List<Vector3> extra) ComputeDifferences(
+            ICollection<Vector3> expected,
+            ICollection<Vector3> actual,
+            int maxItems
+        )
+        {
+            Dictionary<Vector3, int> left = new();
+            foreach (Vector3 v in expected)
+            {
+                left[v] = left.TryGetValue(v, out int seen) ? seen + 1 : 1;
+            }
+
+            Dictionary<Vector3, int> right = new();
+            foreach (Vector3 v in actual)
+            {
+                right[v] = right.TryGetValue(v, out int seen) ? seen + 1 : 1;
+            }
+
+            List<Vector3> missing = new();
+            List<Vector3> extra = new();
+
+            HashSet<Vector3> all = new(left.Keys);
+            all.UnionWith(right.Keys);
+
+            foreach (Vector3 key in all)
+            {
+                int lc = left.TryGetValue(key, out int leftCount) ? leftCount : 0;
+                int rc = right.TryGetValue(key, out int rightCount) ? rightCount : 0;
+                if (rc < lc)
+                {
+                    int diff = lc - rc;
+                    for (int i = 0; i < diff && missing.Count < maxItems; ++i)
+                    {
+                        missing.Add(key);
+                    }
+                }
+                else if (lc < rc)
+                {
+                    int diff = rc - lc;
+                    for (int i = 0; i < diff && extra.Count < maxItems; ++i)
+                    {
+                        extra.Add(key);
+                    }
+                }
+            }
+
+            missing.Sort(CompareVector);
+            extra.Sort(CompareVector);
+
+            return (missing, extra);
+        }
+
         public static void AssertMatchingResults(
             string context,
             Bounds bounds,
@@ -124,58 +176,6 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
             return header
                 + $"\nMissing in Oct ({missing.Count}): {missingStr}"
                 + $"\nExtra in Oct ({extra.Count}): {extraStr}";
-        }
-
-        private static (List<Vector3> missing, List<Vector3> extra) ComputeDifferences(
-            ICollection<Vector3> expected,
-            ICollection<Vector3> actual,
-            int maxItems
-        )
-        {
-            Dictionary<Vector3, int> left = new();
-            foreach (Vector3 v in expected)
-            {
-                left[v] = left.TryGetValue(v, out int seen) ? seen + 1 : 1;
-            }
-
-            Dictionary<Vector3, int> right = new();
-            foreach (Vector3 v in actual)
-            {
-                right[v] = right.TryGetValue(v, out int seen) ? seen + 1 : 1;
-            }
-
-            List<Vector3> missing = new();
-            List<Vector3> extra = new();
-
-            HashSet<Vector3> all = new(left.Keys);
-            all.UnionWith(right.Keys);
-
-            foreach (Vector3 key in all)
-            {
-                int lc = left.TryGetValue(key, out int leftCount) ? leftCount : 0;
-                int rc = right.TryGetValue(key, out int rightCount) ? rightCount : 0;
-                if (rc < lc)
-                {
-                    int diff = lc - rc;
-                    for (int i = 0; i < diff && missing.Count < maxItems; ++i)
-                    {
-                        missing.Add(key);
-                    }
-                }
-                else if (lc < rc)
-                {
-                    int diff = rc - lc;
-                    for (int i = 0; i < diff && extra.Count < maxItems; ++i)
-                    {
-                        extra.Add(key);
-                    }
-                }
-            }
-
-            missing.Sort(CompareVector);
-            extra.Sort(CompareVector);
-
-            return (missing, extra);
         }
 
         private static int CompareVector(Vector3 a, Vector3 b)

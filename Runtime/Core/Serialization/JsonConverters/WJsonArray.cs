@@ -64,41 +64,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             return items;
         }
 
-        private static bool TryBeginArray(ref Utf8JsonReader reader, string owner)
-        {
-            if (reader.TokenType == JsonTokenType.Null)
-            {
-                return false;
-            }
-
-            if (reader.TokenType != JsonTokenType.StartArray)
-            {
-                throw new JsonException($"{owner} expects a JSON array, got {reader.TokenType}");
-            }
-
-            return true;
-        }
-
-        private static void ReadElements<T>(
-            ref Utf8JsonReader reader,
-            JsonSerializerOptions options,
-            string owner,
-            List<T> items
-        )
-        {
-            while (reader.Read())
-            {
-                if (reader.TokenType == JsonTokenType.EndArray)
-                {
-                    return;
-                }
-
-                items.Add(JsonSerializer.Deserialize<T>(ref reader, options));
-            }
-
-            throw new JsonException($"Incomplete JSON array for {owner}");
-        }
-
         /// <summary>
         /// Reads a JSON array into an array, or returns <c>null</c> for a JSON null.
         /// </summary>
@@ -175,6 +140,41 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
 
             writer.WriteEndArray();
         }
+
+        private static bool TryBeginArray(ref Utf8JsonReader reader, string owner)
+        {
+            if (reader.TokenType == JsonTokenType.Null)
+            {
+                return false;
+            }
+
+            if (reader.TokenType != JsonTokenType.StartArray)
+            {
+                throw new JsonException($"{owner} expects a JSON array, got {reader.TokenType}");
+            }
+
+            return true;
+        }
+
+        private static void ReadElements<T>(
+            ref Utf8JsonReader reader,
+            JsonSerializerOptions options,
+            string owner,
+            List<T> items
+        )
+        {
+            while (reader.Read())
+            {
+                if (reader.TokenType == JsonTokenType.EndArray)
+                {
+                    return;
+                }
+
+                items.Add(JsonSerializer.Deserialize<T>(ref reader, options));
+            }
+
+            throw new JsonException($"Incomplete JSON array for {owner}");
+        }
     }
 
     /// <summary>
@@ -198,12 +198,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
         private const int InitialCapacity = 4;
         private const int MaximumArrayLength = 0x3FFF_FFFF;
 
+        /// <summary>How many elements have been collected.</summary>
+        public int Count => _count;
+
         private PooledArray<T> _lease;
         private T[] _items;
         private int _count;
-
-        /// <summary>How many elements have been collected.</summary>
-        public int Count => _count;
 
         /// <summary>Appends one element.</summary>
         /// <param name="item">The element.</param>

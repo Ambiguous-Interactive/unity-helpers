@@ -70,6 +70,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         private const ulong MaximumDeserializationReplayCount = 1_000_000UL;
         private const int SnapshotSeedArrayLength = 56;
 
+        public static DotNetRandom Instance => ThreadLocalRandom<DotNetRandom>.Instance;
+
         private static readonly FieldInfo SeedArrayField =
             typeof(Random).GetField("SeedArray", RandomFieldFlags)
             ?? typeof(Random).GetField("_seedArray", RandomFieldFlags);
@@ -105,22 +107,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         private static readonly bool SnapshotSupported =
             SeedArrayField != null && InextField != null && InextpField != null;
 
-        public static DotNetRandom Instance => ThreadLocalRandom<DotNetRandom>.Instance;
-
         public override RandomState InternalState =>
             BuildState(
                 unchecked((ulong)_seed),
                 state2: _numberGenerated,
                 payload: CaptureSerializedState()
             );
-
-        [ProtoMember(6)]
-        [WProtoMember(6)]
-        private ulong _numberGenerated;
-
-        [ProtoMember(7)]
-        [WProtoMember(7)]
-        private int _seed;
 
         [ProtoMember(8)]
         [WProtoMember(8)]
@@ -130,6 +122,14 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             get => CaptureSerializedState();
             set => _pendingStatePayload = value;
         }
+
+        [ProtoMember(6)]
+        [WProtoMember(6)]
+        private ulong _numberGenerated;
+
+        [ProtoMember(7)]
+        [WProtoMember(7)]
+        private int _seed;
 
         [ProtoIgnore]
         [WProtoIgnore]
@@ -156,71 +156,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             _pendingStatePayload = CopyPayload(internalState.PayloadBytes);
             RestoreCommonState(internalState);
             EnsureRandomInitialized();
-        }
-
-        protected override void OnAfterDeserialization()
-        {
-            EnsureRandomInitialized();
-        }
-
-        private void EnsureRandomInitialized()
-        {
-            if (_random != null)
-            {
-                return;
-            }
-
-            _random = new Random(_seed);
-
-            if (_pendingStatePayload != null)
-            {
-                if (
-                    TryDeserializeSnapshot(_pendingStatePayload, out RandomSnapshot snapshot)
-                    && TryApplySnapshot(_random, snapshot)
-                )
-                {
-                    _pendingStatePayload = null;
-                    return;
-                }
-
-                _pendingStatePayload = null;
-            }
-
-            // Bound replay for older snapshots so an untrusted counter cannot cause unlimited work.
-            if (MaximumDeserializationReplayCount < _numberGenerated)
-            {
-                throw new SerializationException(
-                    $"A DotNetRandom without a usable state snapshot cannot replay more than "
-                        + $"{MaximumDeserializationReplayCount:N0} draws during deserialization."
-                );
-            }
-
-            for (ulong i = 0; i < _numberGenerated; ++i)
-            {
-                _ = _random.Next(int.MinValue, int.MaxValue);
-            }
-        }
-
-        public override uint NextUint()
-        {
-            ++_numberGenerated;
-            return unchecked((uint)_random.Next(int.MinValue, int.MaxValue));
-        }
-
-        public override IRandom Copy()
-        {
-            return new DotNetRandom(InternalState);
-        }
-
-        private byte[] CaptureSerializedState()
-        {
-            EnsureRandomInitialized();
-            if (!TryCaptureSnapshot(_random, out RandomSnapshot snapshot))
-            {
-                return null;
-            }
-
-            return SerializeSnapshot(snapshot);
         }
 
         private static byte[] CopyPayload(IReadOnlyList<byte> payload)
@@ -462,20 +397,85 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 && inextp < SnapshotSeedArrayLength;
         }
 
+        public override uint NextUint()
+        {
+            ++_numberGenerated;
+            return unchecked((uint)_random.Next(int.MinValue, int.MaxValue));
+        }
+
+        public override IRandom Copy()
+        {
+            return new DotNetRandom(InternalState);
+        }
+
+        protected override void OnAfterDeserialization()
+        {
+            EnsureRandomInitialized();
+        }
+
+        private void EnsureRandomInitialized()
+        {
+            if (_random != null)
+            {
+                return;
+            }
+
+            _random = new Random(_seed);
+
+            if (_pendingStatePayload != null)
+            {
+                if (
+                    TryDeserializeSnapshot(_pendingStatePayload, out RandomSnapshot snapshot)
+                    && TryApplySnapshot(_random, snapshot)
+                )
+                {
+                    _pendingStatePayload = null;
+                    return;
+                }
+
+                _pendingStatePayload = null;
+            }
+
+            // Bound replay for older snapshots so an untrusted counter cannot cause unlimited work.
+            if (MaximumDeserializationReplayCount < _numberGenerated)
+            {
+                throw new SerializationException(
+                    $"A DotNetRandom without a usable state snapshot cannot replay more than "
+                        + $"{MaximumDeserializationReplayCount:N0} draws during deserialization."
+                );
+            }
+
+            for (ulong i = 0; i < _numberGenerated; ++i)
+            {
+                _ = _random.Next(int.MinValue, int.MaxValue);
+            }
+        }
+
+        private byte[] CaptureSerializedState()
+        {
+            EnsureRandomInitialized();
+            if (!TryCaptureSnapshot(_random, out RandomSnapshot snapshot))
+            {
+                return null;
+            }
+
+            return SerializeSnapshot(snapshot);
+        }
+
         private readonly struct RandomSnapshot
         {
+            public int Inext { get; }
+
+            public int Inextp { get; }
+
+            public int[] SeedArray { get; }
+
             public RandomSnapshot(int inext, int inextp, int[] seedArray)
             {
                 Inext = inext;
                 Inextp = inextp;
                 SeedArray = seedArray;
             }
-
-            public int Inext { get; }
-
-            public int Inextp { get; }
-
-            public int[] SeedArray { get; }
         }
     }
 }

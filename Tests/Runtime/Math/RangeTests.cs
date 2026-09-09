@@ -61,23 +61,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
             );
         }
 
-        [TestCaseSource(nameof(WithinRangeTestCases))]
-        public void WithinRangeReturnsExpected(
-            int min,
-            int max,
-            bool startInclusive,
-            bool endInclusive,
-            int value,
-            bool expected
-        )
-        {
-            Range<int> range = new(min, max, startInclusive, endInclusive);
-
-            bool actual = range.WithinRange(value);
-
-            Assert.AreEqual(expected, actual);
-        }
-
         private static IEnumerable<TestCaseData> ContainsTestCases()
         {
             yield return new TestCaseData(0, 10, true, true, 10, true).SetName(
@@ -92,23 +75,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
             yield return new TestCaseData(0, 10, true, true, -1, false).SetName(
                 "Contains.BelowMin.ReturnsFalse"
             );
-        }
-
-        [TestCaseSource(nameof(ContainsTestCases))]
-        public void ContainsReturnsExpected(
-            int min,
-            int max,
-            bool startInclusive,
-            bool endInclusive,
-            int value,
-            bool expected
-        )
-        {
-            Range<int> range = new(min, max, startInclusive, endInclusive);
-
-            bool actual = range.Contains(value);
-
-            Assert.AreEqual(expected, actual);
         }
 
         private static IEnumerable<TestCaseData> ToStringTestCases()
@@ -131,6 +97,40 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
             yield return new TestCaseData(0, 0, true, true, "[0, 0]").SetName(
                 "ToString.SameMinMax.FormatsCorrectly"
             );
+        }
+
+        [TestCaseSource(nameof(WithinRangeTestCases))]
+        public void WithinRangeReturnsExpected(
+            int min,
+            int max,
+            bool startInclusive,
+            bool endInclusive,
+            int value,
+            bool expected
+        )
+        {
+            Range<int> range = new(min, max, startInclusive, endInclusive);
+
+            bool actual = range.WithinRange(value);
+
+            Assert.AreEqual(expected, actual);
+        }
+
+        [TestCaseSource(nameof(ContainsTestCases))]
+        public void ContainsReturnsExpected(
+            int min,
+            int max,
+            bool startInclusive,
+            bool endInclusive,
+            int value,
+            bool expected
+        )
+        {
+            Range<int> range = new(min, max, startInclusive, endInclusive);
+
+            bool actual = range.Contains(value);
+
+            Assert.AreEqual(expected, actual);
         }
 
         [TestCaseSource(nameof(ToStringTestCases))]

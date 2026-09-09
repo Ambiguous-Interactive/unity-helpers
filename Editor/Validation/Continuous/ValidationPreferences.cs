@@ -17,7 +17,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         internal const string SettingsPath = "Preferences/Unity Helpers/Sentinel";
         internal static event Action Changed;
-        private static bool _enabled = EditorPrefs.GetBool(EnabledPreferenceKey, true);
 
         /// <summary>Enables Sentinel editor UI and automatic work; explicit headless validation remains available.</summary>
         public static bool Enabled
@@ -37,6 +36,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 Changed?.Invoke();
             }
         }
+        private static bool _enabled = EditorPrefs.GetBool(EnabledPreferenceKey, true);
 
         [SettingsProvider]
         private static SettingsProvider CreateSettingsProvider()

@@ -264,15 +264,15 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 #endif
 
-        private static readonly bool CanCompileExpressions = CheckExpressionCompilationSupport();
-        private static readonly bool DynamicIlSupported = CheckDynamicIlSupport();
-        private static bool? _expressionCapabilityOverride;
-        private static bool? _dynamicIlCapabilityOverride;
-
         internal static bool ExpressionsEnabled =>
             _expressionCapabilityOverride ?? CanCompileExpressions;
 
         internal static bool DynamicIlEnabled => _dynamicIlCapabilityOverride ?? DynamicIlSupported;
+
+        private static readonly bool CanCompileExpressions = CheckExpressionCompilationSupport();
+        private static readonly bool DynamicIlSupported = CheckDynamicIlSupport();
+        private static bool? _expressionCapabilityOverride;
+        private static bool? _dynamicIlCapabilityOverride;
 
         internal static IDisposable OverrideReflectionCapabilities(
             bool? expressions,
@@ -353,172 +353,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             | BindingFlags.NonPublic
             | BindingFlags.Instance
             | BindingFlags.DeclaredOnly;
-
-        /// <summary>
-        /// Gets all fields for a type with caching to avoid repeated allocations.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static FieldInfo[] GetFieldsCached(Type type, BindingFlags flags)
-        {
-            if (type == null)
-            {
-                return Array.Empty<FieldInfo>();
-            }
-
-            (Type, BindingFlags) key = (type, flags);
-#if SINGLE_THREADED
-            if (!FieldArrayCache.TryGetValue(key, out FieldInfo[] fields))
-            {
-                try
-                {
-                    fields = type.GetFields(flags);
-                }
-                catch
-                {
-                    fields = Array.Empty<FieldInfo>();
-                }
-                FieldArrayCache[key] = fields;
-            }
-            return fields;
-#else
-            return FieldArrayCache.GetOrAdd(
-                key,
-                static k =>
-                {
-                    try
-                    {
-                        return k.type.GetFields(k.flags);
-                    }
-                    catch
-                    {
-                        return Array.Empty<FieldInfo>();
-                    }
-                }
-            );
-#endif
-        }
-
-        /// <summary>
-        /// Gets every instance field an instance of <paramref name="type"/> carries, including
-        /// private fields declared by base types, most-derived first.
-        /// </summary>
-        /// <remarks>
-        /// <see cref="Type.GetFields(BindingFlags)"/> without <see cref="BindingFlags.DeclaredOnly"/>
-        /// returns inherited public, protected and internal fields but never an inherited private
-        /// one, so any discovery keyed on the most derived type silently skips a base class's
-        /// private fields.
-        /// <para>
-        /// Where a derived type hides a <b>visible</b> base field name with <c>new</c>, only the
-        /// most derived declaration is returned, matching C# name hiding. A <b>private</b> base
-        /// field is not visible to a derived type and so cannot be hidden: a same-named field there
-        /// is a second, distinct field, and both are returned.
-        /// <see cref="GetFieldsWithAttribute{TAttribute}"/> reports every declaration in either
-        /// case, because a caller asking which fields carry an attribute wants all of them.
-        /// </para>
-        /// <para>
-        /// The walk stops before <see cref="object"/> rather than at
-        /// <c>MonoBehaviour</c>/<c>UnityEngine.Object</c>, so it also reports what Unity's own base
-        /// types declare. Every caller filters by attribute or field type first, and Unity's
-        /// declarations carry neither.
-        /// </para>
-        /// </remarks>
-        internal static FieldInfo[] GetInstanceFieldsIncludingBaseTypes(Type type)
-        {
-            if (type == null)
-            {
-                return Array.Empty<FieldInfo>();
-            }
-
-#if SINGLE_THREADED
-            if (
-                !InstanceFieldsIncludingBaseTypesCache.TryGetValue(
-                    type,
-                    out FieldInfo[] cachedFields
-                )
-            )
-            {
-                cachedFields = BuildInstanceFieldsIncludingBaseTypes(type);
-                InstanceFieldsIncludingBaseTypesCache[type] = cachedFields;
-            }
-            return cachedFields;
-#else
-            return InstanceFieldsIncludingBaseTypesCache.GetOrAdd(
-                type,
-                static key => BuildInstanceFieldsIncludingBaseTypes(key)
-            );
-#endif
-        }
-
-        /// <summary>
-        /// Finds the field named <paramref name="name"/> declared by <paramref name="type"/> or any
-        /// of its base types, including inherited private fields.
-        /// </summary>
-        internal static FieldInfo GetInstanceFieldIncludingBaseTypes(Type type, string name)
-        {
-            if (type == null || string.IsNullOrEmpty(name))
-            {
-                return null;
-            }
-
-            // Names do not identify private base fields uniquely; callers needing every declaration must enumerate.
-            foreach (FieldInfo field in GetInstanceFieldsIncludingBaseTypes(type))
-            {
-                if (string.Equals(field.Name, name, StringComparison.Ordinal))
-                {
-                    return field;
-                }
-            }
-
-            return null;
-        }
-
-        private static FieldInfo[] BuildInstanceFieldsIncludingBaseTypes(Type type)
-        {
-            FieldInfo[] declaredByType = GetFieldsCached(type, DeclaredInstanceFieldsFlags);
-            Type baseType;
-            try
-            {
-                baseType = type.BaseType;
-            }
-            catch
-            {
-                return declaredByType;
-            }
-
-            if (baseType == null || baseType == typeof(object))
-            {
-                return declaredByType;
-            }
-
-            List<FieldInfo> collected = new(declaredByType.Length);
-            HashSet<string> seenNames = new(StringComparer.Ordinal);
-            Type current = type;
-            while (current != null && current != typeof(object))
-            {
-                foreach (FieldInfo field in GetFieldsCached(current, DeclaredInstanceFieldsFlags))
-                {
-                    bool nameIsNew = seenNames.Add(field.Name);
-
-                    // A private base field is not hidden by a same-named derived field; retain both declarations.
-                    if (nameIsNew || field.IsPrivate)
-                    {
-                        collected.Add(field);
-                    }
-                }
-
-                // Resolving BaseType can throw when its assembly is missing; preserve the empty-result contract.
-                try
-                {
-                    current = current.BaseType;
-                }
-                catch
-                {
-                    break;
-                }
-            }
-
-            return collected.Count == 0 ? Array.Empty<FieldInfo>() : collected.ToArray();
-        }
 
         /// <summary>
         /// Tries to get an attribute of type <typeparamref name="T"/> and indicates whether it is present.
@@ -670,6 +504,142 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return GetListCreatorCached(elementType).Invoke();
         }
 
+        /// <summary>
+        /// Builds a cached delegate that returns the value of a field as <see cref="object"/>.
+        /// Supports instance and static fields.
+        /// </summary>
+        /// <param name="field">Field to read.</param>
+        /// <returns>Delegate: <c>object instance =&gt; object value</c></returns>
+        /// <example>
+        /// <code><![CDATA[
+        /// var fi = typeof(Player).GetField("Score");
+        /// var getter = ReflectionHelpers.GetFieldGetter(fi);
+        /// object value = getter(myPlayer);
+        /// ]]></code>
+        /// </example>
+        public static Func<object, object> GetFieldGetter(FieldInfo field)
+        {
+            return DelegateFactory.GetFieldGetter(field);
+        }
+
+        /// <summary>
+        /// Gets all fields for a type with caching to avoid repeated allocations.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static FieldInfo[] GetFieldsCached(Type type, BindingFlags flags)
+        {
+            if (type == null)
+            {
+                return Array.Empty<FieldInfo>();
+            }
+
+            (Type, BindingFlags) key = (type, flags);
+#if SINGLE_THREADED
+            if (!FieldArrayCache.TryGetValue(key, out FieldInfo[] fields))
+            {
+                try
+                {
+                    fields = type.GetFields(flags);
+                }
+                catch
+                {
+                    fields = Array.Empty<FieldInfo>();
+                }
+                FieldArrayCache[key] = fields;
+            }
+            return fields;
+#else
+            return FieldArrayCache.GetOrAdd(
+                key,
+                static k =>
+                {
+                    try
+                    {
+                        return k.type.GetFields(k.flags);
+                    }
+                    catch
+                    {
+                        return Array.Empty<FieldInfo>();
+                    }
+                }
+            );
+#endif
+        }
+
+        /// <summary>
+        /// Gets every instance field an instance of <paramref name="type"/> carries, including
+        /// private fields declared by base types, most-derived first.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="Type.GetFields(BindingFlags)"/> without <see cref="BindingFlags.DeclaredOnly"/>
+        /// returns inherited public, protected and internal fields but never an inherited private
+        /// one, so any discovery keyed on the most derived type silently skips a base class's
+        /// private fields.
+        /// <para>
+        /// Where a derived type hides a <b>visible</b> base field name with <c>new</c>, only the
+        /// most derived declaration is returned, matching C# name hiding. A <b>private</b> base
+        /// field is not visible to a derived type and so cannot be hidden: a same-named field there
+        /// is a second, distinct field, and both are returned.
+        /// <see cref="GetFieldsWithAttribute{TAttribute}"/> reports every declaration in either
+        /// case, because a caller asking which fields carry an attribute wants all of them.
+        /// </para>
+        /// <para>
+        /// The walk stops before <see cref="object"/> rather than at
+        /// <c>MonoBehaviour</c>/<c>UnityEngine.Object</c>, so it also reports what Unity's own base
+        /// types declare. Every caller filters by attribute or field type first, and Unity's
+        /// declarations carry neither.
+        /// </para>
+        /// </remarks>
+        internal static FieldInfo[] GetInstanceFieldsIncludingBaseTypes(Type type)
+        {
+            if (type == null)
+            {
+                return Array.Empty<FieldInfo>();
+            }
+
+#if SINGLE_THREADED
+            if (
+                !InstanceFieldsIncludingBaseTypesCache.TryGetValue(
+                    type,
+                    out FieldInfo[] cachedFields
+                )
+            )
+            {
+                cachedFields = BuildInstanceFieldsIncludingBaseTypes(type);
+                InstanceFieldsIncludingBaseTypesCache[type] = cachedFields;
+            }
+            return cachedFields;
+#else
+            return InstanceFieldsIncludingBaseTypesCache.GetOrAdd(
+                type,
+                static key => BuildInstanceFieldsIncludingBaseTypes(key)
+            );
+#endif
+        }
+
+        /// <summary>
+        /// Finds the field named <paramref name="name"/> declared by <paramref name="type"/> or any
+        /// of its base types, including inherited private fields.
+        /// </summary>
+        internal static FieldInfo GetInstanceFieldIncludingBaseTypes(Type type, string name)
+        {
+            if (type == null || string.IsNullOrEmpty(name))
+            {
+                return null;
+            }
+
+            // Names do not identify private base fields uniquely; callers needing every declaration must enumerate.
+            foreach (FieldInfo field in GetInstanceFieldsIncludingBaseTypes(type))
+            {
+                if (string.Equals(field.Name, name, StringComparison.Ordinal))
+                {
+                    return field;
+                }
+            }
+
+            return null;
+        }
+
         internal static bool IsFieldGetterCached(FieldInfo field)
         {
             return DelegateFactory.IsFieldGetterCached(field);
@@ -723,22 +693,52 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return DelegateFactory.TryGetStrategy(delegateInstance, out strategy);
         }
 
-        /// <summary>
-        /// Builds a cached delegate that returns the value of a field as <see cref="object"/>.
-        /// Supports instance and static fields.
-        /// </summary>
-        /// <param name="field">Field to read.</param>
-        /// <returns>Delegate: <c>object instance =&gt; object value</c></returns>
-        /// <example>
-        /// <code><![CDATA[
-        /// var fi = typeof(Player).GetField("Score");
-        /// var getter = ReflectionHelpers.GetFieldGetter(fi);
-        /// object value = getter(myPlayer);
-        /// ]]></code>
-        /// </example>
-        public static Func<object, object> GetFieldGetter(FieldInfo field)
+        private static FieldInfo[] BuildInstanceFieldsIncludingBaseTypes(Type type)
         {
-            return DelegateFactory.GetFieldGetter(field);
+            FieldInfo[] declaredByType = GetFieldsCached(type, DeclaredInstanceFieldsFlags);
+            Type baseType;
+            try
+            {
+                baseType = type.BaseType;
+            }
+            catch
+            {
+                return declaredByType;
+            }
+
+            if (baseType == null || baseType == typeof(object))
+            {
+                return declaredByType;
+            }
+
+            List<FieldInfo> collected = new(declaredByType.Length);
+            HashSet<string> seenNames = new(StringComparer.Ordinal);
+            Type current = type;
+            while (current != null && current != typeof(object))
+            {
+                foreach (FieldInfo field in GetFieldsCached(current, DeclaredInstanceFieldsFlags))
+                {
+                    bool nameIsNew = seenNames.Add(field.Name);
+
+                    // A private base field is not hidden by a same-named derived field; retain both declarations.
+                    if (nameIsNew || field.IsPrivate)
+                    {
+                        collected.Add(field);
+                    }
+                }
+
+                // Resolving BaseType can throw when its assembly is missing; preserve the empty-result contract.
+                try
+                {
+                    current = current.BaseType;
+                }
+                catch
+                {
+                    break;
+                }
+            }
+
+            return collected.Count == 0 ? Array.Empty<FieldInfo>() : collected.ToArray();
         }
 
 #if EMIT_DYNAMIC_IL
@@ -1208,6 +1208,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 #endif
 
+        private static readonly MethodInfo BuildTypedArrayMethod =
+            typeof(ReflectionHelpers).GetMethod(
+                nameof(BuildTypedArray),
+                BindingFlags.NonPublic | BindingFlags.Static
+            );
+
         /// <summary>
         /// Gets (or caches) an array creator function for the given element type.
         /// </summary>
@@ -1240,12 +1246,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return (Func<int, Array>)dynamicMethod.CreateDelegate(typeof(Func<int, Array>));
 #endif
         }
-
-        private static readonly MethodInfo BuildTypedArrayMethod =
-            typeof(ReflectionHelpers).GetMethod(
-                nameof(BuildTypedArray),
-                BindingFlags.NonPublic | BindingFlags.Static
-            );
 
         /// <summary>
         /// Builds an array whose element type is <paramref name="elementType"/> from the first
@@ -1306,86 +1306,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             return fallback;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static Func<List<TSource>, int, Array> GetTypedArrayBuilderCached<TSource>(
-            Type elementType
-        )
-            where TSource : class
-        {
-#if SINGLE_THREADED
-            if (
-                !TypedArrayBuilders<TSource>.Builders.TryGetValue(
-                    elementType,
-                    out Func<List<TSource>, int, Array> factory
-                )
-            )
-            {
-                factory = CreateTypedArrayBuilder<TSource>(elementType);
-                TypedArrayBuilders<TSource>.Builders[elementType] = factory;
-            }
-
-            return factory;
-#else
-            return TypedArrayBuilders<TSource>.Builders.GetOrAdd(
-                elementType,
-                static type => CreateTypedArrayBuilder<TSource>(type)
-            );
-#endif
-        }
-
-        private static Func<List<TSource>, int, Array> CreateTypedArrayBuilder<TSource>(
-            Type elementType
-        )
-            where TSource : class
-        {
-            if (BuildTypedArrayMethod == null || (!elementType.IsClass && !elementType.IsInterface))
-            {
-                return null;
-            }
-
-            try
-            {
-                MethodInfo closed = BuildTypedArrayMethod.MakeGenericMethod(
-                    typeof(TSource),
-                    elementType
-                );
-                return (Func<List<TSource>, int, Array>)
-                    Delegate.CreateDelegate(typeof(Func<List<TSource>, int, Array>), closed);
-            }
-            catch (Exception)
-            {
-                // AOT refusal can throw while closing a generic; cache null so the non-generic fallback serves later calls.
-                return null;
-            }
-        }
-
-        /// <remarks>
-        /// A loop, not <see cref="Array.Copy(Array, Array, int)"/> or <c>List.CopyTo</c>, and that is
-        /// measured rather than assumed. Those write through a covariant view of the destination --
-        /// a <c>TElement[]</c> handed around as <c>TSource[]</c> -- so the runtime re-checks the
-        /// element type on every element. On Unity 6000.4.6f1 Mono they cost 3.6-3.9x this loop, and
-        /// the ratio is flat from 5 elements to 500, which is the tell that the cost is per element
-        /// rather than fixed overhead that would amortize. They are also illegal when
-        /// <typeparamref name="TElement"/> is an interface: an interface array is not a covariant
-        /// view of a class array, so the cast throws.
-        ///
-        /// The bulk win exists, but it is upstream of here: filling a <c>List&lt;TElement&gt;</c> in
-        /// the first place makes <c>CopyTo</c> an exact-type memmove. For Unity component queries
-        /// that needs a run-time-closed generic, which IL2CPP has refused in this package before.
-        /// </remarks>
-        private static Array BuildTypedArray<TSource, TElement>(List<TSource> source, int count)
-            where TSource : class
-            where TElement : class
-        {
-            TElement[] result = new TElement[count];
-            for (int i = 0; i < count; ++i)
-            {
-                result[i] = source[i] as TElement;
-            }
-
-            return result;
         }
 
         /// <summary>
@@ -1722,50 +1642,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 );
             }
             return (T)CreateInstance(constructor, parameters);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static Type[] GetParameterTypes(object[] parameters)
-        {
-            if (parameters == null || parameters.Length == 0)
-            {
-                return Type.EmptyTypes;
-            }
-            Type[] types = new Type[parameters.Length];
-            for (int i = 0; i < parameters.Length; i++)
-            {
-                types[i] = parameters[i]?.GetType();
-            }
-            return types;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool HasByRefParameter(ParameterInfo[] parameters)
-        {
-            foreach (ParameterInfo parameter in parameters)
-            {
-                if (parameter.ParameterType.IsByRef)
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static bool HasParameterTypeMismatch(
-            ParameterInfo[] parameters,
-            Type[] expectedTypes
-        )
-        {
-            for (int i = 0; i < parameters.Length; i++)
-            {
-                if (parameters[i].ParameterType != expectedTypes[i])
-                {
-                    return true;
-                }
-            }
-            return false;
         }
 
         /// <summary>
@@ -2270,6 +2146,130 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 new[] { typeof(T1), typeof(T2), typeof(T3), typeof(T4) }
             );
             return DelegateFactory.GetInstanceActionInvokerTyped<TInstance, T1, T2, T3, T4>(method);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static Func<List<TSource>, int, Array> GetTypedArrayBuilderCached<TSource>(
+            Type elementType
+        )
+            where TSource : class
+        {
+#if SINGLE_THREADED
+            if (
+                !TypedArrayBuilders<TSource>.Builders.TryGetValue(
+                    elementType,
+                    out Func<List<TSource>, int, Array> factory
+                )
+            )
+            {
+                factory = CreateTypedArrayBuilder<TSource>(elementType);
+                TypedArrayBuilders<TSource>.Builders[elementType] = factory;
+            }
+
+            return factory;
+#else
+            return TypedArrayBuilders<TSource>.Builders.GetOrAdd(
+                elementType,
+                static type => CreateTypedArrayBuilder<TSource>(type)
+            );
+#endif
+        }
+
+        private static Func<List<TSource>, int, Array> CreateTypedArrayBuilder<TSource>(
+            Type elementType
+        )
+            where TSource : class
+        {
+            if (BuildTypedArrayMethod == null || (!elementType.IsClass && !elementType.IsInterface))
+            {
+                return null;
+            }
+
+            try
+            {
+                MethodInfo closed = BuildTypedArrayMethod.MakeGenericMethod(
+                    typeof(TSource),
+                    elementType
+                );
+                return (Func<List<TSource>, int, Array>)
+                    Delegate.CreateDelegate(typeof(Func<List<TSource>, int, Array>), closed);
+            }
+            catch (Exception)
+            {
+                // AOT refusal can throw while closing a generic; cache null so the non-generic fallback serves later calls.
+                return null;
+            }
+        }
+
+        /// <remarks>
+        /// A loop, not <see cref="Array.Copy(Array, Array, int)"/> or <c>List.CopyTo</c>, and that is
+        /// measured rather than assumed. Those write through a covariant view of the destination --
+        /// a <c>TElement[]</c> handed around as <c>TSource[]</c> -- so the runtime re-checks the
+        /// element type on every element. On Unity 6000.4.6f1 Mono they cost 3.6-3.9x this loop, and
+        /// the ratio is flat from 5 elements to 500, which is the tell that the cost is per element
+        /// rather than fixed overhead that would amortize. They are also illegal when
+        /// <typeparamref name="TElement"/> is an interface: an interface array is not a covariant
+        /// view of a class array, so the cast throws.
+        ///
+        /// The bulk win exists, but it is upstream of here: filling a <c>List&lt;TElement&gt;</c> in
+        /// the first place makes <c>CopyTo</c> an exact-type memmove. For Unity component queries
+        /// that needs a run-time-closed generic, which IL2CPP has refused in this package before.
+        /// </remarks>
+        private static Array BuildTypedArray<TSource, TElement>(List<TSource> source, int count)
+            where TSource : class
+            where TElement : class
+        {
+            TElement[] result = new TElement[count];
+            for (int i = 0; i < count; ++i)
+            {
+                result[i] = source[i] as TElement;
+            }
+
+            return result;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static Type[] GetParameterTypes(object[] parameters)
+        {
+            if (parameters == null || parameters.Length == 0)
+            {
+                return Type.EmptyTypes;
+            }
+            Type[] types = new Type[parameters.Length];
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                types[i] = parameters[i]?.GetType();
+            }
+            return types;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool HasByRefParameter(ParameterInfo[] parameters)
+        {
+            foreach (ParameterInfo parameter in parameters)
+            {
+                if (parameter.ParameterType.IsByRef)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static bool HasParameterTypeMismatch(
+            ParameterInfo[] parameters,
+            Type[] expectedTypes
+        )
+        {
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                if (parameters[i].ParameterType != expectedTypes[i])
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private static Delegate BuildTypedStaticInvoker2<T1, T2, TReturn>(MethodInfo method)
@@ -3399,111 +3399,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 #endif
 
-        private static Func<object, bool> BuildEnabledPropertyGetter(Type type)
-        {
-            try
-            {
-                PropertyInfo property = type.GetProperty(
-                    EnabledPropertyName,
-                    BindingFlags.Instance | BindingFlags.Public
-                );
-
-                if (property == null || property.PropertyType != typeof(bool))
-                {
-                    return null;
-                }
-
-                MethodInfo getMethod = property.GetGetMethod();
-                if (getMethod == null)
-                {
-                    return null;
-                }
-
-#if !EMIT_DYNAMIC_IL
-                return CreateCompiledEnabledPropertyGetter(property, type);
-#else
-                DynamicMethod dynamicMethod = new(
-                    $"GetEnabled_{type.Name}",
-                    typeof(bool),
-                    new[] { typeof(object) },
-                    type,
-                    true
-                );
-
-                ILGenerator il = dynamicMethod.GetILGenerator();
-
-                il.Emit(OpCodes.Ldarg_0);
-                il.Emit(type.IsValueType ? OpCodes.Unbox : OpCodes.Castclass, type);
-
-                il.Emit(type.IsValueType ? OpCodes.Call : OpCodes.Callvirt, getMethod);
-
-                il.Emit(OpCodes.Ret);
-
-                return (Func<object, bool>)dynamicMethod.CreateDelegate(typeof(Func<object, bool>));
-#endif
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        private static Func<object, bool> CreateCompiledEnabledPropertyGetter(
-            PropertyInfo property,
-            Type type
-        )
-        {
-            if (!ExpressionsEnabled)
-            {
-                // DynamicInvoke and runtime value-type generic construction are not reliable on IL2CPP.
-                return instance => ReadEnabledProperty(instance, property);
-            }
-
-            try
-            {
-                MethodInfo getMethod = property.GetGetMethod();
-                if (getMethod == null)
-                {
-                    return instance => (bool)property.GetValue(instance);
-                }
-
-                ParameterExpression instanceParam = Expression.Parameter(
-                    typeof(object),
-                    "instance"
-                );
-
-                Expression instanceExpression = type.IsValueType
-                    ? Expression.Unbox(instanceParam, type)
-                    : Expression.Convert(instanceParam, type);
-
-                Expression propertyExpression = Expression.Property(instanceExpression, property);
-
-                return Expression
-                    .Lambda<Func<object, bool>>(propertyExpression, instanceParam)
-                    .Compile();
-            }
-            catch
-            {
-                return instance => (bool)property.GetValue(instance);
-            }
-        }
-
-        private static bool ReadEnabledProperty(object instance, PropertyInfo property)
-        {
-            // Read built-in enabled properties through typed casts because IL2CPP reflection can fail on engine properties.
-            switch (instance)
-            {
-                case UnityEngine.Behaviour behaviour:
-                    return behaviour.enabled;
-                case UnityEngine.Collider collider:
-                    return collider.enabled;
-                case UnityEngine.Renderer renderer:
-                    return renderer.enabled;
-                default:
-                    return (bool)property.GetValue(instance);
-            }
-        }
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsComponentEnabled<T>(this T component)
             where T : UnityEngine.Object
@@ -4004,6 +3899,111 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             return false;
+        }
+
+        private static Func<object, bool> BuildEnabledPropertyGetter(Type type)
+        {
+            try
+            {
+                PropertyInfo property = type.GetProperty(
+                    EnabledPropertyName,
+                    BindingFlags.Instance | BindingFlags.Public
+                );
+
+                if (property == null || property.PropertyType != typeof(bool))
+                {
+                    return null;
+                }
+
+                MethodInfo getMethod = property.GetGetMethod();
+                if (getMethod == null)
+                {
+                    return null;
+                }
+
+#if !EMIT_DYNAMIC_IL
+                return CreateCompiledEnabledPropertyGetter(property, type);
+#else
+                DynamicMethod dynamicMethod = new(
+                    $"GetEnabled_{type.Name}",
+                    typeof(bool),
+                    new[] { typeof(object) },
+                    type,
+                    true
+                );
+
+                ILGenerator il = dynamicMethod.GetILGenerator();
+
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(type.IsValueType ? OpCodes.Unbox : OpCodes.Castclass, type);
+
+                il.Emit(type.IsValueType ? OpCodes.Call : OpCodes.Callvirt, getMethod);
+
+                il.Emit(OpCodes.Ret);
+
+                return (Func<object, bool>)dynamicMethod.CreateDelegate(typeof(Func<object, bool>));
+#endif
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static Func<object, bool> CreateCompiledEnabledPropertyGetter(
+            PropertyInfo property,
+            Type type
+        )
+        {
+            if (!ExpressionsEnabled)
+            {
+                // DynamicInvoke and runtime value-type generic construction are not reliable on IL2CPP.
+                return instance => ReadEnabledProperty(instance, property);
+            }
+
+            try
+            {
+                MethodInfo getMethod = property.GetGetMethod();
+                if (getMethod == null)
+                {
+                    return instance => (bool)property.GetValue(instance);
+                }
+
+                ParameterExpression instanceParam = Expression.Parameter(
+                    typeof(object),
+                    "instance"
+                );
+
+                Expression instanceExpression = type.IsValueType
+                    ? Expression.Unbox(instanceParam, type)
+                    : Expression.Convert(instanceParam, type);
+
+                Expression propertyExpression = Expression.Property(instanceExpression, property);
+
+                return Expression
+                    .Lambda<Func<object, bool>>(propertyExpression, instanceParam)
+                    .Compile();
+            }
+            catch
+            {
+                return instance => (bool)property.GetValue(instance);
+            }
+        }
+
+        private static bool ReadEnabledProperty(object instance, PropertyInfo property)
+        {
+            // Read built-in enabled properties through typed casts because IL2CPP reflection can fail on engine properties.
+            switch (instance)
+            {
+                case UnityEngine.Behaviour behaviour:
+                    return behaviour.enabled;
+                case UnityEngine.Collider collider:
+                    return collider.enabled;
+                case UnityEngine.Renderer renderer:
+                    return renderer.enabled;
+                default:
+                    return (bool)property.GetValue(instance);
+            }
         }
 
         private static bool CheckDynamicIlSupport()

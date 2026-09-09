@@ -31,6 +31,36 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         private Button _fix;
         private Button _fixVisible;
 
+        private static VisualElement Element(VisualElement parent, params string[] classes)
+        {
+            VisualElement element = new VisualElement();
+            foreach (string className in classes)
+            {
+                element.AddToClassList(className);
+            }
+            parent.Add(element);
+            return element;
+        }
+
+        private static Label AddLabel(VisualElement parent, string text, string className)
+        {
+            Label label = new Label(text);
+            label.AddToClassList(className);
+            parent.Add(label);
+            return label;
+        }
+
+        internal VisualElement PrepareCapture(string view, bool graph = false)
+        {
+            CreateGUI();
+            ShowView(view);
+            if (view == "Builder")
+                SetBuilderMode(graph);
+            if (0 < _visible.Count)
+                Select(0);
+            return rootVisualElement;
+        }
+
         private void CreateGUI()
         {
             VisualElement root = rootVisualElement;
@@ -203,17 +233,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             ShowView(_activeView);
         }
 
-        internal VisualElement PrepareCapture(string view, bool graph = false)
-        {
-            CreateGUI();
-            ShowView(view);
-            if (view == "Builder")
-                SetBuilderMode(graph);
-            if (0 < _visible.Count)
-                Select(0);
-            return rootVisualElement;
-        }
-
         private void AddAxis(VisualElement sidebar, string category)
         {
             Button button = new Button(() =>
@@ -275,25 +294,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     !_enabledSeverities.Contains(entry.Key)
                 );
             }
-        }
-
-        private static VisualElement Element(VisualElement parent, params string[] classes)
-        {
-            VisualElement element = new VisualElement();
-            foreach (string className in classes)
-            {
-                element.AddToClassList(className);
-            }
-            parent.Add(element);
-            return element;
-        }
-
-        private static Label AddLabel(VisualElement parent, string text, string className)
-        {
-            Label label = new Label(text);
-            label.AddToClassList(className);
-            parent.Add(label);
-            return label;
         }
 
         private VisualElement MakeRow()

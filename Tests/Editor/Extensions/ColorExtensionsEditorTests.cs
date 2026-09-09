@@ -20,6 +20,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         private const string TempFolder = "Assets/TempColorExtensionTests";
         private const string TempTexturePath = TempFolder + "/ReadableTest.png";
 
+        private static void CleanupTempAssets()
+        {
+            bool refreshed = false;
+            if (AssetDatabase.LoadAssetAtPath<Object>(TempTexturePath) != null)
+            {
+                if (AssetDatabase.DeleteAsset(TempTexturePath))
+                {
+                    refreshed = true;
+                }
+            }
+
+            if (AssetDatabase.IsValidFolder(TempFolder))
+            {
+                if (AssetDatabase.DeleteAsset(TempFolder))
+                {
+                    refreshed = true;
+                }
+            }
+
+            if (refreshed)
+            {
+                AssetDatabaseBatchHelper.RefreshIfNotBatching();
+            }
+        }
+
         [TearDown]
         public void TearDown()
         {
@@ -65,31 +90,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(TempTexturePath);
             return sprite;
-        }
-
-        private static void CleanupTempAssets()
-        {
-            bool refreshed = false;
-            if (AssetDatabase.LoadAssetAtPath<Object>(TempTexturePath) != null)
-            {
-                if (AssetDatabase.DeleteAsset(TempTexturePath))
-                {
-                    refreshed = true;
-                }
-            }
-
-            if (AssetDatabase.IsValidFolder(TempFolder))
-            {
-                if (AssetDatabase.DeleteAsset(TempFolder))
-                {
-                    refreshed = true;
-                }
-            }
-
-            if (refreshed)
-            {
-                AssetDatabaseBatchHelper.RefreshIfNotBatching();
-            }
         }
     }
 #endif

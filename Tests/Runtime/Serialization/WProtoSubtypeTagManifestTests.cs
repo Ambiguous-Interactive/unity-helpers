@@ -32,6 +32,109 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [NUnit.Framework.Category("Serialization")]
     public sealed class WProtoSubtypeTagManifestTests
     {
+        private static IEnumerable<TestCaseData> ManifestNumberedSubtypes()
+        {
+            yield return new TestCaseData(
+                typeof(WProtoManifestAlpha),
+                typeof(WProtoManifestBase)
+            ).SetName("{m} - Alpha");
+            yield return new TestCaseData(
+                typeof(WProtoManifestBeta),
+                typeof(WProtoManifestBase)
+            ).SetName("{m} - Beta");
+            yield return new TestCaseData(
+                typeof(WProtoManifestGamma),
+                typeof(WProtoManifestBeta)
+            ).SetName("{m} - Gamma");
+        }
+
+        private static bool TryManifestTag(Type subType, Type baseType, out int tag)
+        {
+            foreach (
+                WProtoSubtypeTagAttribute entry in subType.Assembly.GetCustomAttributes<WProtoSubtypeTagAttribute>()
+            )
+            {
+                if (
+                    string.Equals(entry.SubTypeName, subType.FullName, StringComparison.Ordinal)
+                    && entry.BaseType == baseType
+                )
+                {
+                    tag = entry.Tag;
+                    return true;
+                }
+            }
+
+            tag = 0;
+            return false;
+        }
+
+        /// <summary>
+        /// The manifest numbers a value of <paramref name="subType"/> is written under, outermost
+        /// first.
+        /// </summary>
+        /// <param name="subType">The concrete type being written.</param>
+        /// <returns>One field number per level between the root and that type.</returns>
+        private static List<int> ChainTags(Type subType)
+        {
+            List<int> tags = new List<int>();
+            for (
+                Type current = subType;
+                current != null && current != typeof(WProtoManifestBase);
+                current = current.BaseType
+            )
+            {
+                Assert.IsTrue(
+                    TryManifestTag(current, current.BaseType, out int tag),
+                    current.Name + " has no manifest entry"
+                );
+                tags.Insert(0, tag);
+            }
+
+            return tags;
+        }
+
+        private static long ReadVarint(byte[] buffer, ref int offset)
+        {
+            long value = 0;
+            int shift = 0;
+            while (offset < buffer.Length)
+            {
+                byte current = buffer[offset++];
+                value |= (long)(current & 0x7F) << shift;
+                if (current < 0x80)
+                {
+                    return value;
+                }
+
+                shift += 7;
+            }
+
+            Assert.Fail("The payload ended inside a varint.");
+            return value;
+        }
+
+        private static byte[] EncodeBytes<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new WProtoWriter(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+            Assert.AreEqual(buffer.Length, writer.Position, "Measure disagreed with Write");
+            return buffer;
+        }
+
+        private static T RoundTrip<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new WProtoWriter(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+
+            WProtoReader reader = new WProtoReader(buffer);
+            Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
+            return restored;
+        }
+
         [Test]
         public void EveryNumberlessSubtypeInThisAssemblyHasAManifestEntry()
         {
@@ -172,109 +275,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 );
                 owners[key] = entry.SubTypeName;
             }
-        }
-
-        private static IEnumerable<TestCaseData> ManifestNumberedSubtypes()
-        {
-            yield return new TestCaseData(
-                typeof(WProtoManifestAlpha),
-                typeof(WProtoManifestBase)
-            ).SetName("{m} - Alpha");
-            yield return new TestCaseData(
-                typeof(WProtoManifestBeta),
-                typeof(WProtoManifestBase)
-            ).SetName("{m} - Beta");
-            yield return new TestCaseData(
-                typeof(WProtoManifestGamma),
-                typeof(WProtoManifestBeta)
-            ).SetName("{m} - Gamma");
-        }
-
-        private static bool TryManifestTag(Type subType, Type baseType, out int tag)
-        {
-            foreach (
-                WProtoSubtypeTagAttribute entry in subType.Assembly.GetCustomAttributes<WProtoSubtypeTagAttribute>()
-            )
-            {
-                if (
-                    string.Equals(entry.SubTypeName, subType.FullName, StringComparison.Ordinal)
-                    && entry.BaseType == baseType
-                )
-                {
-                    tag = entry.Tag;
-                    return true;
-                }
-            }
-
-            tag = 0;
-            return false;
-        }
-
-        /// <summary>
-        /// The manifest numbers a value of <paramref name="subType"/> is written under, outermost
-        /// first.
-        /// </summary>
-        /// <param name="subType">The concrete type being written.</param>
-        /// <returns>One field number per level between the root and that type.</returns>
-        private static List<int> ChainTags(Type subType)
-        {
-            List<int> tags = new List<int>();
-            for (
-                Type current = subType;
-                current != null && current != typeof(WProtoManifestBase);
-                current = current.BaseType
-            )
-            {
-                Assert.IsTrue(
-                    TryManifestTag(current, current.BaseType, out int tag),
-                    current.Name + " has no manifest entry"
-                );
-                tags.Insert(0, tag);
-            }
-
-            return tags;
-        }
-
-        private static long ReadVarint(byte[] buffer, ref int offset)
-        {
-            long value = 0;
-            int shift = 0;
-            while (offset < buffer.Length)
-            {
-                byte current = buffer[offset++];
-                value |= (long)(current & 0x7F) << shift;
-                if (current < 0x80)
-                {
-                    return value;
-                }
-
-                shift += 7;
-            }
-
-            Assert.Fail("The payload ended inside a varint.");
-            return value;
-        }
-
-        private static byte[] EncodeBytes<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new WProtoWriter(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-            Assert.AreEqual(buffer.Length, writer.Position, "Measure disagreed with Write");
-            return buffer;
-        }
-
-        private static T RoundTrip<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new WProtoWriter(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-
-            WProtoReader reader = new WProtoReader(buffer);
-            Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
-            return restored;
         }
     }
 }

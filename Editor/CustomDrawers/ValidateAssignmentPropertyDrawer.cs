@@ -19,6 +19,41 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
     public sealed class ValidateAssignmentPropertyDrawer : PropertyDrawer
     {
         /// <summary>
+        /// Checks if the property value is invalid (null, empty string, or empty collection).
+        /// </summary>
+        /// <param name="property">The property to check.</param>
+        /// <returns>True if the property value is invalid.</returns>
+        internal static bool IsPropertyInvalid(SerializedProperty property)
+        {
+            return ValidationShared.IsPropertyInvalid(property);
+        }
+
+        /// <summary>
+        /// Draws a validation HelpBox for the property if it is invalid.
+        /// Call this from custom editors for array/list properties that won't have
+        /// their PropertyDrawer invoked at the array level.
+        /// </summary>
+        /// <returns>True if a HelpBox was drawn, false otherwise.</returns>
+        internal static bool DrawValidationHelpBoxIfNeeded(
+            SerializedProperty property,
+            ValidateAssignmentAttribute validateAttribute
+        )
+        {
+            return ValidationShared.DrawValidateAssignmentHelpBoxIfNeeded(
+                property,
+                validateAttribute
+            );
+        }
+
+        /// <summary>
+        /// Clears the height cache. Useful for tests or when font settings change.
+        /// </summary>
+        internal static void ClearHeightCache()
+        {
+            ValidationShared.ClearHeightCache();
+        }
+
+        /// <summary>
         /// Gets the total property height including the help box when the field is invalid.
         /// </summary>
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
@@ -103,16 +138,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             return container;
         }
 
-        /// <summary>
-        /// Checks if the property value is invalid (null, empty string, or empty collection).
-        /// </summary>
-        /// <param name="property">The property to check.</param>
-        /// <returns>True if the property value is invalid.</returns>
-        internal static bool IsPropertyInvalid(SerializedProperty property)
-        {
-            return ValidationShared.IsPropertyInvalid(property);
-        }
-
         private string GetMessage(SerializedProperty property)
         {
             ValidateAssignmentAttribute validateAttribute =
@@ -132,31 +157,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             ValidateAssignmentAttribute validateAttribute =
                 attribute as ValidateAssignmentAttribute;
             return ValidationShared.GetHelpBoxMessageType(validateAttribute);
-        }
-
-        /// <summary>
-        /// Draws a validation HelpBox for the property if it is invalid.
-        /// Call this from custom editors for array/list properties that won't have
-        /// their PropertyDrawer invoked at the array level.
-        /// </summary>
-        /// <returns>True if a HelpBox was drawn, false otherwise.</returns>
-        internal static bool DrawValidationHelpBoxIfNeeded(
-            SerializedProperty property,
-            ValidateAssignmentAttribute validateAttribute
-        )
-        {
-            return ValidationShared.DrawValidateAssignmentHelpBoxIfNeeded(
-                property,
-                validateAttribute
-            );
-        }
-
-        /// <summary>
-        /// Clears the height cache. Useful for tests or when font settings change.
-        /// </summary>
-        internal static void ClearHeightCache()
-        {
-            ValidationShared.ClearHeightCache();
         }
     }
 #endif

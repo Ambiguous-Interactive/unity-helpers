@@ -25,8 +25,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     [Serializable]
     public sealed class PriorityQueue<T> : IEnumerable<T>
     {
-        private readonly Heap<T> _heap;
-
         /// <summary>
         /// Gets the number of elements in the priority queue.
         /// </summary>
@@ -41,6 +39,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// Gets the current capacity of the underlying heap.
         /// </summary>
         public int Capacity => _heap.Capacity;
+
+        private readonly Heap<T> _heap;
 
         public PriorityQueue()
             : this(16) { }

@@ -54,78 +54,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         public static readonly JsonSerializerOptions FastJsonOptions;
         public static readonly JsonSerializerOptions FastPocoJsonOptions;
 
-        /// <summary>
-        /// Registers every converter this package ships, in the order the shipped options have
-        /// always registered them.
-        /// </summary>
-        /// <remarks>
-        /// One list, not one per configuration. The normal, pretty and fast builders each carried a
-        /// verbatim copy of the same forty-six entries, so a forty-seventh converter added to one and
-        /// missed on another would silently change what a value round-trips through based only on
-        /// which options the caller reached for -- and nothing compared the three.
-        ///
-        /// Order is part of the contract: System.Text.Json consults converters in registration order
-        /// and takes the first that claims the type.
-        /// </remarks>
-        /// <param name="options">Options to register into.</param>
-        /// <param name="stringEnums">
-        /// Whether to register <see cref="JsonStringEnumConverter"/>, which writes an enum as its
-        /// name. The fast configuration leaves it off and writes the underlying number.
-        /// </param>
-        private static void AddPackageConverters(JsonSerializerOptions options, bool stringEnums)
+        static SerializerEncoding()
         {
-            IList<JsonConverter> converters = options.Converters;
-            converters.Add(WGuidConverter.Instance);
-            converters.Add(RangeConverterFactory.Instance);
-            converters.Add(FastVector2IntConverter.Instance);
-            converters.Add(FastVector3IntConverter.Instance);
-            if (stringEnums)
-            {
-                converters.Add(new JsonStringEnumConverter());
-            }
-
-            converters.Add(Vector3Converter.Instance);
-            converters.Add(Vector2Converter.Instance);
-            converters.Add(Vector4Converter.Instance);
-            converters.Add(Vector2IntConverter.Instance);
-            converters.Add(Vector3IntConverter.Instance);
-            converters.Add(Matrix4x4Converter.Instance);
-            converters.Add(QuaternionConverter.Instance);
-            converters.Add(LayerMaskConverter.Instance);
-            converters.Add(ResolutionConverter.Instance);
-            converters.Add(RenderTextureDescriptorConverter.Instance);
-            converters.Add(MinMaxCurveConverter.Instance);
-            converters.Add(MinMaxGradientConverter.Instance);
-            converters.Add(ColorBlockConverter.Instance);
-            converters.Add(BoundingSphereConverter.Instance);
-            converters.Add(RaycastHitConverter.Instance);
-            converters.Add(TouchConverter.Instance);
-            converters.Add(SceneConverter.Instance);
-            converters.Add(PoseConverter.Instance);
-            converters.Add(PlaneConverter.Instance);
-            converters.Add(RayConverter.Instance);
-            converters.Add(Ray2DConverter.Instance);
-            converters.Add(RectOffsetConverter.Instance);
-            converters.Add(RangeIntConverter.Instance);
-            converters.Add(Hash128Converter.Instance);
-            converters.Add(AnimationCurveConverter.Instance);
-            converters.Add(GradientConverter.Instance);
-            converters.Add(SphericalHarmonicsL2Converter.Instance);
-            converters.Add(TypeConverter.Instance);
-            converters.Add(GameObjectConverter.Instance);
-            converters.Add(ColorConverter.Instance);
-            converters.Add(Color32Converter.Instance);
-            converters.Add(RectConverter.Instance);
-            converters.Add(RectIntConverter.Instance);
-            converters.Add(BoundsConverter.Instance);
-            converters.Add(BoundsIntConverter.Instance);
-            converters.Add(BitSetConverter.Instance);
-            converters.Add(ImmutableBitSetConverter.Instance);
-            converters.Add(DequeConverterFactory.Instance);
-            converters.Add(CyclicBufferConverterFactory.Instance);
-            converters.Add(SerializableSetConverterFactory.Instance);
-            converters.Add(SerializableDictionaryConverterFactory.Instance);
-            converters.Add(SerializableSortedDictionaryConverterFactory.Instance);
+            Encoding = Encoding.UTF8;
+            NormalJsonOptions = GetNormalJsonOptions();
+            PrettyJsonOptions = GetPrettyJsonOptions();
+            FastJsonOptions = GetFastJsonOptions();
+            FastPocoJsonOptions = GetFastPocoJsonOptions();
         }
 
         public static JsonSerializerOptions GetNormalJsonOptions()
@@ -199,13 +134,78 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             };
         }
 
-        static SerializerEncoding()
+        /// <summary>
+        /// Registers every converter this package ships, in the order the shipped options have
+        /// always registered them.
+        /// </summary>
+        /// <remarks>
+        /// One list, not one per configuration. The normal, pretty and fast builders each carried a
+        /// verbatim copy of the same forty-six entries, so a forty-seventh converter added to one and
+        /// missed on another would silently change what a value round-trips through based only on
+        /// which options the caller reached for -- and nothing compared the three.
+        ///
+        /// Order is part of the contract: System.Text.Json consults converters in registration order
+        /// and takes the first that claims the type.
+        /// </remarks>
+        /// <param name="options">Options to register into.</param>
+        /// <param name="stringEnums">
+        /// Whether to register <see cref="JsonStringEnumConverter"/>, which writes an enum as its
+        /// name. The fast configuration leaves it off and writes the underlying number.
+        /// </param>
+        private static void AddPackageConverters(JsonSerializerOptions options, bool stringEnums)
         {
-            Encoding = Encoding.UTF8;
-            NormalJsonOptions = GetNormalJsonOptions();
-            PrettyJsonOptions = GetPrettyJsonOptions();
-            FastJsonOptions = GetFastJsonOptions();
-            FastPocoJsonOptions = GetFastPocoJsonOptions();
+            IList<JsonConverter> converters = options.Converters;
+            converters.Add(WGuidConverter.Instance);
+            converters.Add(RangeConverterFactory.Instance);
+            converters.Add(FastVector2IntConverter.Instance);
+            converters.Add(FastVector3IntConverter.Instance);
+            if (stringEnums)
+            {
+                converters.Add(new JsonStringEnumConverter());
+            }
+
+            converters.Add(Vector3Converter.Instance);
+            converters.Add(Vector2Converter.Instance);
+            converters.Add(Vector4Converter.Instance);
+            converters.Add(Vector2IntConverter.Instance);
+            converters.Add(Vector3IntConverter.Instance);
+            converters.Add(Matrix4x4Converter.Instance);
+            converters.Add(QuaternionConverter.Instance);
+            converters.Add(LayerMaskConverter.Instance);
+            converters.Add(ResolutionConverter.Instance);
+            converters.Add(RenderTextureDescriptorConverter.Instance);
+            converters.Add(MinMaxCurveConverter.Instance);
+            converters.Add(MinMaxGradientConverter.Instance);
+            converters.Add(ColorBlockConverter.Instance);
+            converters.Add(BoundingSphereConverter.Instance);
+            converters.Add(RaycastHitConverter.Instance);
+            converters.Add(TouchConverter.Instance);
+            converters.Add(SceneConverter.Instance);
+            converters.Add(PoseConverter.Instance);
+            converters.Add(PlaneConverter.Instance);
+            converters.Add(RayConverter.Instance);
+            converters.Add(Ray2DConverter.Instance);
+            converters.Add(RectOffsetConverter.Instance);
+            converters.Add(RangeIntConverter.Instance);
+            converters.Add(Hash128Converter.Instance);
+            converters.Add(AnimationCurveConverter.Instance);
+            converters.Add(GradientConverter.Instance);
+            converters.Add(SphericalHarmonicsL2Converter.Instance);
+            converters.Add(TypeConverter.Instance);
+            converters.Add(GameObjectConverter.Instance);
+            converters.Add(ColorConverter.Instance);
+            converters.Add(Color32Converter.Instance);
+            converters.Add(RectConverter.Instance);
+            converters.Add(RectIntConverter.Instance);
+            converters.Add(BoundsConverter.Instance);
+            converters.Add(BoundsIntConverter.Instance);
+            converters.Add(BitSetConverter.Instance);
+            converters.Add(ImmutableBitSetConverter.Instance);
+            converters.Add(DequeConverterFactory.Instance);
+            converters.Add(CyclicBufferConverterFactory.Instance);
+            converters.Add(SerializableSetConverterFactory.Instance);
+            converters.Add(SerializableDictionaryConverterFactory.Instance);
+            converters.Add(SerializableSortedDictionaryConverterFactory.Instance);
         }
     }
 
@@ -300,40 +300,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     /// </example>
     public static class Serializer
     {
-        /// <summary>
-        /// Returns a copy of the package's Normal JSON options. The returned instance is independent
-        /// of internal defaults, so modifying it won't affect global behavior. Cache and reuse the
-        /// returned instance across calls to benefit from System.Text.Json metadata caches.
-        /// </summary>
-        public static JsonSerializerOptions CreateNormalJsonOptions() =>
-            SerializerEncoding.GetNormalJsonOptions();
-
-        /// <summary>
-        /// Returns a copy of the package's Pretty (indented) JSON options.
-        /// </summary>
-        public static JsonSerializerOptions CreatePrettyJsonOptions() =>
-            SerializerEncoding.GetPrettyJsonOptions();
-
-        /// <summary>
-        /// Returns a copy of the package's Fast JSON options, tuned for hot paths with reduced validation
-        /// and features to minimize allocations and branching. See docs for trade-offs.
-        /// </summary>
-        public static JsonSerializerOptions CreateFastJsonOptions() =>
-            SerializerEncoding.GetFastJsonOptions();
-
-        /// <summary>
-        /// Returns a copy of the package's Fast POCO JSON options.
-        /// Strict, minimal, and with no Unity-specific converters.
-        /// Use for pure POCO graphs when you want the fastest possible serialization/deserialization.
-        /// Notes:
-        /// - Case-sensitive property names (faster matching)
-        /// - No comments/trailing commas; strict numbers only
-        /// - IncludeFields = false (prefer properties for performance)
-        /// - Returns a new instance each call; cache and reuse within your app to leverage STJ metadata caches
-        /// </summary>
-        public static JsonSerializerOptions CreateFastPocoJsonOptions() =>
-            new(SerializerEncoding.FastPocoJsonOptions);
-
         // Small payloads use protobuf-net buffer access; larger reads avoid repeated stream allocation.
         private const int ProtobufMemoryStreamThreshold = 4096;
 
@@ -350,58 +316,62 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             object
         > ProtoDeserializeTypeFromROSFast;
 
-        /// <summary>
-        /// Reports whether protobuf serialization will write the byte layout this package documents.
-        /// </summary>
-        /// <param name="refusedTypes">
-        /// The names of the types whose surrogate was refused. Empty when the method returns true.
-        /// </param>
-        /// <returns>True when every surrogate this package declares is in effect.</returns>
-        /// <remarks>
-        /// <para>
-        /// <c>ProtoBuf.Meta.RuntimeTypeModel.Default</c> is process-global and freezes a type the
-        /// first time anything serializes one. If another package -- or your own code calling
-        /// <c>ProtoBuf.Serializer</c> directly -- reaches a type such as <see cref="UnityEngine.Vector3"/>
-        /// before this package's <see cref="Serializer"/> is first touched, the surrogate for it can
-        /// no longer be applied. The type still serializes, with a different byte layout and no
-        /// exception, which is why a game that stores protobuf saves wants to ask this before it
-        /// writes its first one.
-        /// </para>
-        /// <para>
-        /// A refusal cannot be repaired: protobuf-net will not re-bind a frozen type. Fix the order
-        /// instead -- touch <see cref="Serializer"/> during startup, before anything else
-        /// serializes -- or fall back to JSON for that session. This method reports; it never
-        /// changes the model.
-        /// </para>
-        /// <para>
-        /// Under IL2CPP this always reports ready. protobuf-net builds its serializers by
-        /// reflection, which an AOT compiler cannot emit, so these types are encoded by
-        /// WallstopProto there and a refused registration changes nothing you can observe.
-        /// </para>
-        /// Null handling: <paramref name="refusedTypes"/> is never null.
-        /// Thread-safety: safe to call from any thread once initialization has completed.
-        /// </remarks>
-        /// <example>
-        /// <code><![CDATA[
-        /// if (!Serializer.ProtobufSurrogatesReady(out IReadOnlyList<string> refused))
-        /// {
-        ///     Debug.LogError($"Refusing to autosave: {string.Join(", ", refused)} would encode wrongly.");
-        ///     return;
-        /// }
-        /// ]]></code>
-        /// </example>
-        public static bool ProtobufSurrogatesReady(out IReadOnlyList<string> refusedTypes)
-        {
-            // Wake the registering static constructor before reporting its failures.
-            ProtobufUnityModel.EnsureInitialized();
-#if ENABLE_IL2CPP
-            refusedTypes = Array.Empty<string>();
-            return true;
-#else
-            refusedTypes = ProtobufUnityModel.Refused;
-            return refusedTypes.Count == 0;
-#endif
-        }
+        private static readonly ConcurrentDictionary<Type, Type> ProtobufRootCache = new();
+        private static readonly ConcurrentDictionary<Type, Type> ExplicitProtobufRootCache = new();
+        private static readonly Type NoRootMarker = typeof(void);
+
+        // Legacy protobuf-net delegates require Mono; WallstopProto supplies the AOT path.
+        private static readonly ConcurrentDictionary<
+            Type,
+            Func<object, byte[]>
+        > SpecialCollectionSerializers = new();
+        private static readonly ConcurrentDictionary<
+            Type,
+            Func<byte[], object>
+        > SpecialCollectionDeserializers = new();
+
+        private static readonly MethodInfo SerializeDequeWrapperMethod =
+            typeof(Serializer).GetMethod(
+                nameof(SerializeDequeWrapper),
+                BindingFlags.NonPublic | BindingFlags.Static
+            );
+        private static readonly MethodInfo DeserializeDequeWrapperMethod =
+            typeof(Serializer).GetMethod(
+                nameof(DeserializeDequeWrapper),
+                BindingFlags.NonPublic | BindingFlags.Static
+            );
+        private static readonly MethodInfo SerializeCyclicBufferWrapperMethod =
+            typeof(Serializer).GetMethod(
+                nameof(SerializeCyclicBufferWrapper),
+                BindingFlags.NonPublic | BindingFlags.Static
+            );
+        private static readonly MethodInfo DeserializeCyclicBufferWrapperMethod =
+            typeof(Serializer).GetMethod(
+                nameof(DeserializeCyclicBufferWrapper),
+                BindingFlags.NonPublic | BindingFlags.Static
+            );
+
+        // Cache method-group delegates because C# 9 allocates the conversion on every call.
+        private static readonly Func<
+            Type,
+            Func<object, byte[]>
+        > SpecialCollectionSerializerFactory = BuildSpecialCollectionSerializer;
+        private static readonly Func<
+            Type,
+            Func<byte[], object>
+        > SpecialCollectionDeserializerFactory = BuildSpecialCollectionDeserializer;
+
+        private static readonly Utils.WallstopGenericPool<BinaryFormatter> BinaryFormatterPool =
+            new(() => new BinaryFormatter());
+
+        private static readonly Utils.WallstopGenericPool<Utf8JsonWriter> JsonWriterPool = new(
+            () => new Utf8JsonWriter(Stream.Null, new JsonWriterOptions { SkipValidation = true }),
+            onRelease: writer =>
+            {
+                writer.Reset(Stream.Null);
+            },
+            onDisposal: stream => stream.Dispose()
+        );
 
         static Serializer()
         {
@@ -479,538 +449,92 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             catch { }
         }
 
-        private static readonly ConcurrentDictionary<Type, Type> ProtobufRootCache = new();
-        private static readonly ConcurrentDictionary<Type, Type> ExplicitProtobufRootCache = new();
-        private static readonly Type NoRootMarker = typeof(void);
-
-        internal static bool ShouldUseRuntimeTypeForProtobuf<T>(
-            Type declared,
-            T instance,
-            bool forceRuntimeType
-        )
-        {
-            if (forceRuntimeType)
-            {
-                return true;
-            }
-
-            if (declared == null)
-            {
-                return true;
-            }
-
-            if (declared.IsInterface || declared.IsAbstract || declared == typeof(object))
-            {
-                return true;
-            }
-
-            // A different runtime type can need its own root contract to avoid subtype errors.
-            if (!declared.IsValueType && instance != null && instance.GetType() != declared)
-            {
-                return true;
-            }
-
-            return false;
-        }
+        /// <summary>
+        /// Returns a copy of the package's Normal JSON options. The returned instance is independent
+        /// of internal defaults, so modifying it won't affect global behavior. Cache and reuse the
+        /// returned instance across calls to benefit from System.Text.Json metadata caches.
+        /// </summary>
+        public static JsonSerializerOptions CreateNormalJsonOptions() =>
+            SerializerEncoding.GetNormalJsonOptions();
 
         /// <summary>
-        /// Checks if the type is a serializable collection type that needs wrapper-based protobuf serialization.
-        /// Returns true for SerializableHashSet, SerializableSortedSet, SerializableDictionary, SerializableSortedDictionary.
+        /// Returns a copy of the package's Pretty (indented) JSON options.
         /// </summary>
-        private static bool IsSerializableCollectionType(Type type)
-        {
-            if (type == null || !type.IsGenericType)
-            {
-                return false;
-            }
-
-            Type genericDef = type.GetGenericTypeDefinition();
-            return genericDef == typeof(SerializableHashSet<>)
-                || genericDef == typeof(SerializableSortedSet<>)
-                || genericDef == typeof(SerializableDictionary<,>)
-                || genericDef == typeof(SerializableSortedDictionary<,>);
-        }
+        public static JsonSerializerOptions CreatePrettyJsonOptions() =>
+            SerializerEncoding.GetPrettyJsonOptions();
 
         /// <summary>
-        /// Identifies <see cref="SerializableList{T}"/>, which shares the collections' zero-byte
-        /// empty encoding but none of their wrapper machinery.
+        /// Returns a copy of the package's Fast JSON options, tuned for hot paths with reduced validation
+        /// and features to minimize allocations and branching. See docs for trade-offs.
         /// </summary>
+        public static JsonSerializerOptions CreateFastJsonOptions() =>
+            SerializerEncoding.GetFastJsonOptions();
+
+        /// <summary>
+        /// Returns a copy of the package's Fast POCO JSON options.
+        /// Strict, minimal, and with no Unity-specific converters.
+        /// Use for pure POCO graphs when you want the fastest possible serialization/deserialization.
+        /// Notes:
+        /// - Case-sensitive property names (faster matching)
+        /// - No comments/trailing commas; strict numbers only
+        /// - IncludeFields = false (prefer properties for performance)
+        /// - Returns a new instance each call; cache and reuse within your app to leverage STJ metadata caches
+        /// </summary>
+        public static JsonSerializerOptions CreateFastPocoJsonOptions() =>
+            new(SerializerEncoding.FastPocoJsonOptions);
+
+        /// <summary>
+        /// Reports whether protobuf serialization will write the byte layout this package documents.
+        /// </summary>
+        /// <param name="refusedTypes">
+        /// The names of the types whose surrogate was refused. Empty when the method returns true.
+        /// </param>
+        /// <returns>True when every surrogate this package declares is in effect.</returns>
         /// <remarks>
-        /// Its single <c>[ProtoMember]</c> is a repeated field with no scalar beside it, so an
-        /// empty instance encodes to zero bytes -- exactly the case the empty-payload guard below
-        /// exists to reject for ordinary messages. Unlike the set and dictionary types it needs no
-        /// wrapper: its backing list is a direct member rather than an array synchronized through
-        /// <c>OnAfterDeserialize</c>, so a default instance already is the correct empty list.
+        /// <para>
+        /// <c>ProtoBuf.Meta.RuntimeTypeModel.Default</c> is process-global and freezes a type the
+        /// first time anything serializes one. If another package -- or your own code calling
+        /// <c>ProtoBuf.Serializer</c> directly -- reaches a type such as <see cref="UnityEngine.Vector3"/>
+        /// before this package's <see cref="Serializer"/> is first touched, the surrogate for it can
+        /// no longer be applied. The type still serializes, with a different byte layout and no
+        /// exception, which is why a game that stores protobuf saves wants to ask this before it
+        /// writes its first one.
+        /// </para>
+        /// <para>
+        /// A refusal cannot be repaired: protobuf-net will not re-bind a frozen type. Fix the order
+        /// instead -- touch <see cref="Serializer"/> during startup, before anything else
+        /// serializes -- or fall back to JSON for that session. This method reports; it never
+        /// changes the model.
+        /// </para>
+        /// <para>
+        /// Under IL2CPP this always reports ready. protobuf-net builds its serializers by
+        /// reflection, which an AOT compiler cannot emit, so these types are encoded by
+        /// WallstopProto there and a refused registration changes nothing you can observe.
+        /// </para>
+        /// Null handling: <paramref name="refusedTypes"/> is never null.
+        /// Thread-safety: safe to call from any thread once initialization has completed.
         /// </remarks>
-        private static bool IsSerializableListType(Type type)
+        /// <example>
+        /// <code><![CDATA[
+        /// if (!Serializer.ProtobufSurrogatesReady(out IReadOnlyList<string> refused))
+        /// {
+        ///     Debug.LogError($"Refusing to autosave: {string.Join(", ", refused)} would encode wrongly.");
+        ///     return;
+        /// }
+        /// ]]></code>
+        /// </example>
+        public static bool ProtobufSurrogatesReady(out IReadOnlyList<string> refusedTypes)
         {
-            return type != null
-                && type.IsGenericType
-                && type.GetGenericTypeDefinition() == typeof(SerializableList<>);
+            // Wake the registering static constructor before reporting its failures.
+            ProtobufUnityModel.EnsureInitialized();
+#if ENABLE_IL2CPP
+            refusedTypes = Array.Empty<string>();
+            return true;
+#else
+            refusedTypes = ProtobufUnityModel.Refused;
+            return refusedTypes.Count == 0;
+#endif
         }
-
-        private static Type ResolveCollectionWrapperType(Type type)
-        {
-            if (!type.IsGenericType)
-            {
-                return null;
-            }
-
-            Type genericDef = type.GetGenericTypeDefinition();
-            Type[] arguments = type.GetGenericArguments();
-
-            if (genericDef == typeof(SerializableHashSet<>))
-            {
-                return typeof(SerializableHashSetProtoWrapper<>).MakeGenericType(arguments);
-            }
-
-            if (genericDef == typeof(SerializableSortedSet<>))
-            {
-                return typeof(SerializableSortedSetProtoWrapper<>).MakeGenericType(arguments);
-            }
-
-            if (genericDef == typeof(SerializableDictionary<,>))
-            {
-                return typeof(SerializableDictionaryProtoWrapper<,>).MakeGenericType(arguments);
-            }
-
-            if (genericDef == typeof(SerializableSortedDictionary<,>))
-            {
-                return typeof(SerializableSortedDictionaryProtoWrapper<,>).MakeGenericType(
-                    arguments
-                );
-            }
-
-            return null;
-        }
-
-        /// <summary>
-        /// Serializes a serializable collection to a protobuf wrapper and then to bytes.
-        /// Uses cached reflection accessors for performance.
-        /// </summary>
-        internal static byte[] SerializeCollectionWithWrapper<T>(T input)
-        {
-            byte[] buffer = null;
-            SerializeCollectionWithWrapper(input, ref buffer);
-            return buffer;
-        }
-
-        /// <summary>
-        /// Serializes a serializable collection into <paramref name="buffer"/>, growing it only when
-        /// the payload does not fit, and returns the number of bytes written. The caller-buffer
-        /// overload of <see cref="ProtoSerialize{T}(T, ref byte[], bool)"/> exists so a per-frame
-        /// serialize allocates nothing; routing it through the array-returning overload above and
-        /// copying meant one full-payload allocation plus one full-payload copy on every call.
-        /// </summary>
-        internal static int SerializeCollectionWithWrapper<T>(T input, ref byte[] buffer)
-        {
-            object wrapper = BuildCollectionWrapper(input);
-
-            using Utils.PooledResource<PooledBufferStream> lease = PooledBufferStream.Rent(
-                out PooledBufferStream stream
-            );
-            ProtoBuf.Serializer.NonGeneric.Serialize(stream, wrapper);
-            return stream.ToArrayExact(ref buffer);
-        }
-
-        private static object BuildCollectionWrapper<T>(T input)
-        {
-            Type type = typeof(T);
-            Type wrapperType = CollectionShape<T>.WrapperType;
-            if (wrapperType == null)
-            {
-                throw new InvalidOperationException(
-                    $"Type {type} is not a supported serializable collection type."
-                );
-            }
-
-            Type genericDef = type.GetGenericTypeDefinition();
-            bool isSet =
-                genericDef == typeof(SerializableHashSet<>)
-                || genericDef == typeof(SerializableSortedSet<>);
-
-            (
-                Func<object, object> getItems,
-                Action<object, object> _,
-                Func<object, object> getKeys,
-                Action<object, object> __,
-                Func<object, object> getValues,
-                Action<object, object> ___,
-                Action<object, object> ____,
-                Action<object> onBeforeSerialize,
-                Action<object> _____
-            ) = CollectionProtoAccessors.GetAccessors(type);
-
-            (
-                Func<object, object> _______,
-                Action<object, object> setWrapperItems,
-                Func<object, object> ________,
-                Action<object, object> setWrapperKeys,
-                Func<object, object> _________,
-                Action<object, object> setWrapperValues
-            ) = CollectionProtoAccessors.GetWrapperAccessors(wrapperType, isSet);
-
-            onBeforeSerialize?.Invoke(input);
-
-            object wrapper = CollectionShape<T>.WrapperFactory();
-            if (isSet)
-            {
-                object items = getItems?.Invoke(input);
-                setWrapperItems?.Invoke(wrapper, items);
-            }
-            else
-            {
-                object keys = getKeys?.Invoke(input);
-                object values = getValues?.Invoke(input);
-                setWrapperKeys?.Invoke(wrapper, keys);
-                setWrapperValues?.Invoke(wrapper, values);
-            }
-
-            return wrapper;
-        }
-
-        /// <summary>
-        /// Deserializes a protobuf wrapper and constructs the serializable collection.
-        /// Uses cached reflection accessors for performance.
-        /// </summary>
-        internal static T DeserializeCollectionFromWrapper<T>(byte[] data)
-        {
-            return (T)DeserializeCollectionFromWrapper(data, typeof(T));
-        }
-
-        private static object DeserializeCollectionFromWrapper(byte[] data, Type type)
-        {
-            Type genericDef = type.GetGenericTypeDefinition();
-            bool isSet =
-                genericDef == typeof(SerializableHashSet<>)
-                || genericDef == typeof(SerializableSortedSet<>);
-
-            (
-                Func<object, object> _,
-                Action<object, object> setItems,
-                Func<object, object> __,
-                Action<object, object> setKeys,
-                Func<object, object> ___,
-                Action<object, object> setValues,
-                Action<object, object> setPreserve,
-                Action<object> ____,
-                Action<object> onAfterDeserialize
-            ) = CollectionProtoAccessors.GetAccessors(type);
-
-            Type wrapperType;
-            if (genericDef == typeof(SerializableHashSet<>))
-            {
-                wrapperType = typeof(SerializableHashSetProtoWrapper<>).MakeGenericType(
-                    type.GetGenericArguments()
-                );
-            }
-            else if (genericDef == typeof(SerializableSortedSet<>))
-            {
-                wrapperType = typeof(SerializableSortedSetProtoWrapper<>).MakeGenericType(
-                    type.GetGenericArguments()
-                );
-            }
-            else if (genericDef == typeof(SerializableDictionary<,>))
-            {
-                wrapperType = typeof(SerializableDictionaryProtoWrapper<,>).MakeGenericType(
-                    type.GetGenericArguments()
-                );
-            }
-            else if (genericDef == typeof(SerializableSortedDictionary<,>))
-            {
-                wrapperType = typeof(SerializableSortedDictionaryProtoWrapper<,>).MakeGenericType(
-                    type.GetGenericArguments()
-                );
-            }
-            else
-            {
-                throw new InvalidOperationException(
-                    $"Type {type} is not a supported serializable collection type."
-                );
-            }
-
-            (
-                Func<object, object> getWrapperItems,
-                Action<object, object> _____,
-                Func<object, object> getWrapperKeys,
-                Action<object, object> ______,
-                Func<object, object> getWrapperValues,
-                Action<object, object> _______
-            ) = CollectionProtoAccessors.GetWrapperAccessors(wrapperType, isSet);
-
-            using MemoryStream ms = new(data, writable: false);
-            object wrapper = ProtoBuf.Serializer.NonGeneric.Deserialize(wrapperType, ms);
-
-            object result = Activator.CreateInstance(type);
-            if (isSet)
-            {
-                object items = getWrapperItems?.Invoke(wrapper);
-                setItems?.Invoke(result, items);
-            }
-            else
-            {
-                object keys = getWrapperKeys?.Invoke(wrapper);
-                object values = getWrapperValues?.Invoke(wrapper);
-                setKeys?.Invoke(result, keys);
-                setValues?.Invoke(result, values);
-            }
-
-            // Set preserve flag to prevent clearing during OnAfterDeserialize
-            setPreserve?.Invoke(result, true);
-
-            onAfterDeserialize?.Invoke(result);
-
-            return result;
-        }
-
-        /// <summary>
-        /// Checks if the type is one of our [ProtoContract] data structures whose per-type protobuf
-        /// model build trips IL2CPP's unsupported GetTypeModifiers icall. These are routed through
-        /// plain array/scalar wrapper POCOs in <see cref="SerializeSpecialCollection{T}"/> /
-        /// <see cref="DeserializeSpecialCollection{T}"/> so protobuf-net never builds the original
-        /// type's model. Covers Deque&lt;T&gt;, CyclicBuffer&lt;T&gt;, and the non-generic SparseSet.
-        /// </summary>
-        private static bool IsSpecialCollectionType(Type type)
-        {
-            if (type == null)
-            {
-                return false;
-            }
-
-            if (type == typeof(SparseSet))
-            {
-                return true;
-            }
-
-            if (!type.IsGenericType)
-            {
-                return false;
-            }
-
-            Type genericDef = type.GetGenericTypeDefinition();
-            return genericDef == typeof(Deque<>) || genericDef == typeof(CyclicBuffer<>);
-        }
-
-        // Legacy protobuf-net delegates require Mono; WallstopProto supplies the AOT path.
-        private static readonly ConcurrentDictionary<
-            Type,
-            Func<object, byte[]>
-        > SpecialCollectionSerializers = new();
-        private static readonly ConcurrentDictionary<
-            Type,
-            Func<byte[], object>
-        > SpecialCollectionDeserializers = new();
-
-        private static readonly MethodInfo SerializeDequeWrapperMethod =
-            typeof(Serializer).GetMethod(
-                nameof(SerializeDequeWrapper),
-                BindingFlags.NonPublic | BindingFlags.Static
-            );
-        private static readonly MethodInfo DeserializeDequeWrapperMethod =
-            typeof(Serializer).GetMethod(
-                nameof(DeserializeDequeWrapper),
-                BindingFlags.NonPublic | BindingFlags.Static
-            );
-        private static readonly MethodInfo SerializeCyclicBufferWrapperMethod =
-            typeof(Serializer).GetMethod(
-                nameof(SerializeCyclicBufferWrapper),
-                BindingFlags.NonPublic | BindingFlags.Static
-            );
-        private static readonly MethodInfo DeserializeCyclicBufferWrapperMethod =
-            typeof(Serializer).GetMethod(
-                nameof(DeserializeCyclicBufferWrapper),
-                BindingFlags.NonPublic | BindingFlags.Static
-            );
-
-        // Cache method-group delegates because C# 9 allocates the conversion on every call.
-        private static readonly Func<
-            Type,
-            Func<object, byte[]>
-        > SpecialCollectionSerializerFactory = BuildSpecialCollectionSerializer;
-        private static readonly Func<
-            Type,
-            Func<byte[], object>
-        > SpecialCollectionDeserializerFactory = BuildSpecialCollectionDeserializer;
-
-        internal static byte[] SerializeSpecialCollection<T>(T input)
-        {
-            Type type = typeof(T);
-            Func<object, byte[]> serializer = SpecialCollectionSerializers.GetOrAdd(
-                type,
-                SpecialCollectionSerializerFactory
-            );
-            return serializer(input);
-        }
-
-        internal static T DeserializeSpecialCollection<T>(byte[] data)
-        {
-            return (T)DeserializeSpecialCollection(data, typeof(T));
-        }
-
-        private static object DeserializeSpecialCollection(byte[] data, Type type)
-        {
-            Func<byte[], object> deserializer = SpecialCollectionDeserializers.GetOrAdd(
-                type,
-                SpecialCollectionDeserializerFactory
-            );
-            return deserializer(data);
-        }
-
-        private static Func<object, byte[]> BuildSpecialCollectionSerializer(Type type)
-        {
-            if (type == typeof(SparseSet))
-            {
-                return input => SerializeSparseSetWrapper((SparseSet)input);
-            }
-
-            Type genericDef = type.GetGenericTypeDefinition();
-            Type elementType = type.GetGenericArguments()[0];
-            MethodInfo open =
-                genericDef == typeof(Deque<>)
-                    ? SerializeDequeWrapperMethod
-                    : SerializeCyclicBufferWrapperMethod;
-            MethodInfo closed = open.MakeGenericMethod(elementType);
-            return input => (byte[])closed.Invoke(null, new[] { input });
-        }
-
-        private static Func<byte[], object> BuildSpecialCollectionDeserializer(Type type)
-        {
-            if (type == typeof(SparseSet))
-            {
-                return data => DeserializeSparseSetWrapper(data);
-            }
-
-            Type genericDef = type.GetGenericTypeDefinition();
-            Type elementType = type.GetGenericArguments()[0];
-            MethodInfo open =
-                genericDef == typeof(Deque<>)
-                    ? DeserializeDequeWrapperMethod
-                    : DeserializeCyclicBufferWrapperMethod;
-            MethodInfo closed = open.MakeGenericMethod(elementType);
-            return data => closed.Invoke(null, new object[] { data });
-        }
-
-        private static byte[] SerializeWrapperObject(object wrapper)
-        {
-            using Utils.PooledResource<PooledBufferStream> lease = PooledBufferStream.Rent(
-                out PooledBufferStream stream
-            );
-            ProtoBuf.Serializer.NonGeneric.Serialize(stream, wrapper);
-            byte[] buffer = null;
-            stream.ToArrayExact(ref buffer);
-            return buffer;
-        }
-
-        internal static byte[] SerializeDequeWrapper<T>(Deque<T> input)
-        {
-            DequeProtoWrapper<T> wrapper = new()
-            {
-                Items = input.ToArray(),
-                Capacity = input.Capacity,
-            };
-            return SerializeWrapperObject(wrapper);
-        }
-
-        internal static Deque<T> DeserializeDequeWrapper<T>(byte[] data)
-        {
-            using MemoryStream ms = new(data, writable: false);
-            DequeProtoWrapper<T> wrapper =
-                (DequeProtoWrapper<T>)
-                    ProtoBuf.Serializer.NonGeneric.Deserialize(typeof(DequeProtoWrapper<T>), ms);
-
-            int itemCount = wrapper.Items?.Length ?? 0;
-            // Match Deque capacity reconciliation without allocating from a bare payload claim.
-            int capacity = wrapper.Capacity;
-            if (capacity <= 0)
-            {
-                capacity = 0 < itemCount ? itemCount : Deque<T>.DefaultCapacity;
-            }
-
-            capacity = SerializationCapacityLimits.Clamp(capacity, itemCount);
-
-            Deque<T> result = new(capacity);
-            for (int i = 0; i < itemCount; i++)
-            {
-                result.PushBack(wrapper.Items[i]);
-            }
-            return result;
-        }
-
-        internal static byte[] SerializeCyclicBufferWrapper<T>(CyclicBuffer<T> input)
-        {
-            T[] items = null;
-            int count = input.Count;
-            if (0 < count)
-            {
-                items = new T[count];
-                for (int i = 0; i < count; i++)
-                {
-                    items[i] = input[i];
-                }
-            }
-
-            CyclicBufferProtoWrapper<T> wrapper = new()
-            {
-                Items = items,
-                Capacity = input.Capacity,
-            };
-            return SerializeWrapperObject(wrapper);
-        }
-
-        internal static CyclicBuffer<T> DeserializeCyclicBufferWrapper<T>(byte[] data)
-        {
-            using MemoryStream ms = new(data, writable: false);
-            CyclicBufferProtoWrapper<T> wrapper =
-                (CyclicBufferProtoWrapper<T>)
-                    ProtoBuf.Serializer.NonGeneric.Deserialize(
-                        typeof(CyclicBufferProtoWrapper<T>),
-                        ms
-                    );
-
-            int itemCount = wrapper.Items?.Length ?? 0;
-
-            // CyclicBuffer allocates only as items arrive, so its capacity hint does not amplify memory use.
-            int capacity = wrapper.Capacity < itemCount ? itemCount : wrapper.Capacity;
-
-            return new CyclicBuffer<T>(capacity, wrapper.Items);
-        }
-
-        internal static byte[] SerializeSparseSetWrapper(SparseSet input)
-        {
-            SparseSetProtoWrapper wrapper = new()
-            {
-                Elements = input.ToArray(),
-                Capacity = input.Capacity,
-            };
-            return SerializeWrapperObject(wrapper);
-        }
-
-        internal static SparseSet DeserializeSparseSetWrapper(byte[] data)
-        {
-            using MemoryStream ms = new(data, writable: false);
-            SparseSetProtoWrapper wrapper = (SparseSetProtoWrapper)
-                ProtoBuf.Serializer.NonGeneric.Deserialize(typeof(SparseSetProtoWrapper), ms);
-
-            if (!wrapper.TryRestore(out SparseSet result))
-            {
-                throw new InvalidOperationException(
-                    "SparseSet payload contains invalid elements or an unsupported capacity."
-                );
-            }
-            return result;
-        }
-
-        private static readonly Utils.WallstopGenericPool<BinaryFormatter> BinaryFormatterPool =
-            new(() => new BinaryFormatter());
-
-        private static readonly Utils.WallstopGenericPool<Utf8JsonWriter> JsonWriterPool = new(
-            () => new Utf8JsonWriter(Stream.Null, new JsonWriterOptions { SkipValidation = true }),
-            onRelease: writer =>
-            {
-                writer.Reset(Stream.Null);
-            },
-            onDisposal: stream => stream.Dispose()
-        );
 
         /// <summary>
         /// Registers a concrete or abstract protobuf root type for a declared interface/abstract/object type.
@@ -1070,29 +594,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
             // Both serializers must agree on the declared root; payload bytes do not identify their contract.
             WallstopProto.WProtoDeclaredRootProvider.Claim(declared, root);
-        }
-
-        internal static void ClearProtobufRootCacheForTesting(params Type[] declaredTypes)
-        {
-            if (declaredTypes == null || declaredTypes.Length == 0)
-            {
-                ProtobufRootCache.Clear();
-                ExplicitProtobufRootCache.Clear();
-                WallstopProto.WProtoDeclaredRootProvider.ReleaseAllClaims();
-                return;
-            }
-
-            foreach (Type declaredType in declaredTypes)
-            {
-                if (declaredType == null)
-                {
-                    continue;
-                }
-
-                ProtobufRootCache.TryRemove(declaredType, out _);
-                ExplicitProtobufRootCache.TryRemove(declaredType, out _);
-                WallstopProto.WProtoDeclaredRootProvider.ReleaseClaim(declaredType);
-            }
         }
 
         /// <summary>
@@ -1637,6 +1138,505 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             }
         }
 
+        internal static bool ShouldUseRuntimeTypeForProtobuf<T>(
+            Type declared,
+            T instance,
+            bool forceRuntimeType
+        )
+        {
+            if (forceRuntimeType)
+            {
+                return true;
+            }
+
+            if (declared == null)
+            {
+                return true;
+            }
+
+            if (declared.IsInterface || declared.IsAbstract || declared == typeof(object))
+            {
+                return true;
+            }
+
+            // A different runtime type can need its own root contract to avoid subtype errors.
+            if (!declared.IsValueType && instance != null && instance.GetType() != declared)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Serializes a serializable collection to a protobuf wrapper and then to bytes.
+        /// Uses cached reflection accessors for performance.
+        /// </summary>
+        internal static byte[] SerializeCollectionWithWrapper<T>(T input)
+        {
+            byte[] buffer = null;
+            SerializeCollectionWithWrapper(input, ref buffer);
+            return buffer;
+        }
+
+        /// <summary>
+        /// Serializes a serializable collection into <paramref name="buffer"/>, growing it only when
+        /// the payload does not fit, and returns the number of bytes written. The caller-buffer
+        /// overload of <see cref="ProtoSerialize{T}(T, ref byte[], bool)"/> exists so a per-frame
+        /// serialize allocates nothing; routing it through the array-returning overload above and
+        /// copying meant one full-payload allocation plus one full-payload copy on every call.
+        /// </summary>
+        internal static int SerializeCollectionWithWrapper<T>(T input, ref byte[] buffer)
+        {
+            object wrapper = BuildCollectionWrapper(input);
+
+            using Utils.PooledResource<PooledBufferStream> lease = PooledBufferStream.Rent(
+                out PooledBufferStream stream
+            );
+            ProtoBuf.Serializer.NonGeneric.Serialize(stream, wrapper);
+            return stream.ToArrayExact(ref buffer);
+        }
+
+        /// <summary>
+        /// Deserializes a protobuf wrapper and constructs the serializable collection.
+        /// Uses cached reflection accessors for performance.
+        /// </summary>
+        internal static T DeserializeCollectionFromWrapper<T>(byte[] data)
+        {
+            return (T)DeserializeCollectionFromWrapper(data, typeof(T));
+        }
+
+        internal static byte[] SerializeSpecialCollection<T>(T input)
+        {
+            Type type = typeof(T);
+            Func<object, byte[]> serializer = SpecialCollectionSerializers.GetOrAdd(
+                type,
+                SpecialCollectionSerializerFactory
+            );
+            return serializer(input);
+        }
+
+        internal static T DeserializeSpecialCollection<T>(byte[] data)
+        {
+            return (T)DeserializeSpecialCollection(data, typeof(T));
+        }
+
+        internal static byte[] SerializeDequeWrapper<T>(Deque<T> input)
+        {
+            DequeProtoWrapper<T> wrapper = new()
+            {
+                Items = input.ToArray(),
+                Capacity = input.Capacity,
+            };
+            return SerializeWrapperObject(wrapper);
+        }
+
+        internal static Deque<T> DeserializeDequeWrapper<T>(byte[] data)
+        {
+            using MemoryStream ms = new(data, writable: false);
+            DequeProtoWrapper<T> wrapper =
+                (DequeProtoWrapper<T>)
+                    ProtoBuf.Serializer.NonGeneric.Deserialize(typeof(DequeProtoWrapper<T>), ms);
+
+            int itemCount = wrapper.Items?.Length ?? 0;
+            // Match Deque capacity reconciliation without allocating from a bare payload claim.
+            int capacity = wrapper.Capacity;
+            if (capacity <= 0)
+            {
+                capacity = 0 < itemCount ? itemCount : Deque<T>.DefaultCapacity;
+            }
+
+            capacity = SerializationCapacityLimits.Clamp(capacity, itemCount);
+
+            Deque<T> result = new(capacity);
+            for (int i = 0; i < itemCount; i++)
+            {
+                result.PushBack(wrapper.Items[i]);
+            }
+            return result;
+        }
+
+        internal static byte[] SerializeCyclicBufferWrapper<T>(CyclicBuffer<T> input)
+        {
+            T[] items = null;
+            int count = input.Count;
+            if (0 < count)
+            {
+                items = new T[count];
+                for (int i = 0; i < count; i++)
+                {
+                    items[i] = input[i];
+                }
+            }
+
+            CyclicBufferProtoWrapper<T> wrapper = new()
+            {
+                Items = items,
+                Capacity = input.Capacity,
+            };
+            return SerializeWrapperObject(wrapper);
+        }
+
+        internal static CyclicBuffer<T> DeserializeCyclicBufferWrapper<T>(byte[] data)
+        {
+            using MemoryStream ms = new(data, writable: false);
+            CyclicBufferProtoWrapper<T> wrapper =
+                (CyclicBufferProtoWrapper<T>)
+                    ProtoBuf.Serializer.NonGeneric.Deserialize(
+                        typeof(CyclicBufferProtoWrapper<T>),
+                        ms
+                    );
+
+            int itemCount = wrapper.Items?.Length ?? 0;
+
+            // CyclicBuffer allocates only as items arrive, so its capacity hint does not amplify memory use.
+            int capacity = wrapper.Capacity < itemCount ? itemCount : wrapper.Capacity;
+
+            return new CyclicBuffer<T>(capacity, wrapper.Items);
+        }
+
+        internal static byte[] SerializeSparseSetWrapper(SparseSet input)
+        {
+            SparseSetProtoWrapper wrapper = new()
+            {
+                Elements = input.ToArray(),
+                Capacity = input.Capacity,
+            };
+            return SerializeWrapperObject(wrapper);
+        }
+
+        internal static SparseSet DeserializeSparseSetWrapper(byte[] data)
+        {
+            using MemoryStream ms = new(data, writable: false);
+            SparseSetProtoWrapper wrapper = (SparseSetProtoWrapper)
+                ProtoBuf.Serializer.NonGeneric.Deserialize(typeof(SparseSetProtoWrapper), ms);
+
+            if (!wrapper.TryRestore(out SparseSet result))
+            {
+                throw new InvalidOperationException(
+                    "SparseSet payload contains invalid elements or an unsupported capacity."
+                );
+            }
+            return result;
+        }
+
+        internal static void ClearProtobufRootCacheForTesting(params Type[] declaredTypes)
+        {
+            if (declaredTypes == null || declaredTypes.Length == 0)
+            {
+                ProtobufRootCache.Clear();
+                ExplicitProtobufRootCache.Clear();
+                WallstopProto.WProtoDeclaredRootProvider.ReleaseAllClaims();
+                return;
+            }
+
+            foreach (Type declaredType in declaredTypes)
+            {
+                if (declaredType == null)
+                {
+                    continue;
+                }
+
+                ProtobufRootCache.TryRemove(declaredType, out _);
+                ExplicitProtobufRootCache.TryRemove(declaredType, out _);
+                WallstopProto.WProtoDeclaredRootProvider.ReleaseClaim(declaredType);
+            }
+        }
+
+        /// <summary>
+        /// Checks if the type is a serializable collection type that needs wrapper-based protobuf serialization.
+        /// Returns true for SerializableHashSet, SerializableSortedSet, SerializableDictionary, SerializableSortedDictionary.
+        /// </summary>
+        private static bool IsSerializableCollectionType(Type type)
+        {
+            if (type == null || !type.IsGenericType)
+            {
+                return false;
+            }
+
+            Type genericDef = type.GetGenericTypeDefinition();
+            return genericDef == typeof(SerializableHashSet<>)
+                || genericDef == typeof(SerializableSortedSet<>)
+                || genericDef == typeof(SerializableDictionary<,>)
+                || genericDef == typeof(SerializableSortedDictionary<,>);
+        }
+
+        /// <summary>
+        /// Identifies <see cref="SerializableList{T}"/>, which shares the collections' zero-byte
+        /// empty encoding but none of their wrapper machinery.
+        /// </summary>
+        /// <remarks>
+        /// Its single <c>[ProtoMember]</c> is a repeated field with no scalar beside it, so an
+        /// empty instance encodes to zero bytes -- exactly the case the empty-payload guard below
+        /// exists to reject for ordinary messages. Unlike the set and dictionary types it needs no
+        /// wrapper: its backing list is a direct member rather than an array synchronized through
+        /// <c>OnAfterDeserialize</c>, so a default instance already is the correct empty list.
+        /// </remarks>
+        private static bool IsSerializableListType(Type type)
+        {
+            return type != null
+                && type.IsGenericType
+                && type.GetGenericTypeDefinition() == typeof(SerializableList<>);
+        }
+
+        private static Type ResolveCollectionWrapperType(Type type)
+        {
+            if (!type.IsGenericType)
+            {
+                return null;
+            }
+
+            Type genericDef = type.GetGenericTypeDefinition();
+            Type[] arguments = type.GetGenericArguments();
+
+            if (genericDef == typeof(SerializableHashSet<>))
+            {
+                return typeof(SerializableHashSetProtoWrapper<>).MakeGenericType(arguments);
+            }
+
+            if (genericDef == typeof(SerializableSortedSet<>))
+            {
+                return typeof(SerializableSortedSetProtoWrapper<>).MakeGenericType(arguments);
+            }
+
+            if (genericDef == typeof(SerializableDictionary<,>))
+            {
+                return typeof(SerializableDictionaryProtoWrapper<,>).MakeGenericType(arguments);
+            }
+
+            if (genericDef == typeof(SerializableSortedDictionary<,>))
+            {
+                return typeof(SerializableSortedDictionaryProtoWrapper<,>).MakeGenericType(
+                    arguments
+                );
+            }
+
+            return null;
+        }
+
+        private static object BuildCollectionWrapper<T>(T input)
+        {
+            Type type = typeof(T);
+            Type wrapperType = CollectionShape<T>.WrapperType;
+            if (wrapperType == null)
+            {
+                throw new InvalidOperationException(
+                    $"Type {type} is not a supported serializable collection type."
+                );
+            }
+
+            Type genericDef = type.GetGenericTypeDefinition();
+            bool isSet =
+                genericDef == typeof(SerializableHashSet<>)
+                || genericDef == typeof(SerializableSortedSet<>);
+
+            (
+                Func<object, object> getItems,
+                Action<object, object> _,
+                Func<object, object> getKeys,
+                Action<object, object> __,
+                Func<object, object> getValues,
+                Action<object, object> ___,
+                Action<object, object> ____,
+                Action<object> onBeforeSerialize,
+                Action<object> _____
+            ) = CollectionProtoAccessors.GetAccessors(type);
+
+            (
+                Func<object, object> _______,
+                Action<object, object> setWrapperItems,
+                Func<object, object> ________,
+                Action<object, object> setWrapperKeys,
+                Func<object, object> _________,
+                Action<object, object> setWrapperValues
+            ) = CollectionProtoAccessors.GetWrapperAccessors(wrapperType, isSet);
+
+            onBeforeSerialize?.Invoke(input);
+
+            object wrapper = CollectionShape<T>.WrapperFactory();
+            if (isSet)
+            {
+                object items = getItems?.Invoke(input);
+                setWrapperItems?.Invoke(wrapper, items);
+            }
+            else
+            {
+                object keys = getKeys?.Invoke(input);
+                object values = getValues?.Invoke(input);
+                setWrapperKeys?.Invoke(wrapper, keys);
+                setWrapperValues?.Invoke(wrapper, values);
+            }
+
+            return wrapper;
+        }
+
+        private static object DeserializeCollectionFromWrapper(byte[] data, Type type)
+        {
+            Type genericDef = type.GetGenericTypeDefinition();
+            bool isSet =
+                genericDef == typeof(SerializableHashSet<>)
+                || genericDef == typeof(SerializableSortedSet<>);
+
+            (
+                Func<object, object> _,
+                Action<object, object> setItems,
+                Func<object, object> __,
+                Action<object, object> setKeys,
+                Func<object, object> ___,
+                Action<object, object> setValues,
+                Action<object, object> setPreserve,
+                Action<object> ____,
+                Action<object> onAfterDeserialize
+            ) = CollectionProtoAccessors.GetAccessors(type);
+
+            Type wrapperType;
+            if (genericDef == typeof(SerializableHashSet<>))
+            {
+                wrapperType = typeof(SerializableHashSetProtoWrapper<>).MakeGenericType(
+                    type.GetGenericArguments()
+                );
+            }
+            else if (genericDef == typeof(SerializableSortedSet<>))
+            {
+                wrapperType = typeof(SerializableSortedSetProtoWrapper<>).MakeGenericType(
+                    type.GetGenericArguments()
+                );
+            }
+            else if (genericDef == typeof(SerializableDictionary<,>))
+            {
+                wrapperType = typeof(SerializableDictionaryProtoWrapper<,>).MakeGenericType(
+                    type.GetGenericArguments()
+                );
+            }
+            else if (genericDef == typeof(SerializableSortedDictionary<,>))
+            {
+                wrapperType = typeof(SerializableSortedDictionaryProtoWrapper<,>).MakeGenericType(
+                    type.GetGenericArguments()
+                );
+            }
+            else
+            {
+                throw new InvalidOperationException(
+                    $"Type {type} is not a supported serializable collection type."
+                );
+            }
+
+            (
+                Func<object, object> getWrapperItems,
+                Action<object, object> _____,
+                Func<object, object> getWrapperKeys,
+                Action<object, object> ______,
+                Func<object, object> getWrapperValues,
+                Action<object, object> _______
+            ) = CollectionProtoAccessors.GetWrapperAccessors(wrapperType, isSet);
+
+            using MemoryStream ms = new(data, writable: false);
+            object wrapper = ProtoBuf.Serializer.NonGeneric.Deserialize(wrapperType, ms);
+
+            object result = Activator.CreateInstance(type);
+            if (isSet)
+            {
+                object items = getWrapperItems?.Invoke(wrapper);
+                setItems?.Invoke(result, items);
+            }
+            else
+            {
+                object keys = getWrapperKeys?.Invoke(wrapper);
+                object values = getWrapperValues?.Invoke(wrapper);
+                setKeys?.Invoke(result, keys);
+                setValues?.Invoke(result, values);
+            }
+
+            // Set preserve flag to prevent clearing during OnAfterDeserialize
+            setPreserve?.Invoke(result, true);
+
+            onAfterDeserialize?.Invoke(result);
+
+            return result;
+        }
+
+        /// <summary>
+        /// Checks if the type is one of our [ProtoContract] data structures whose per-type protobuf
+        /// model build trips IL2CPP's unsupported GetTypeModifiers icall. These are routed through
+        /// plain array/scalar wrapper POCOs in <see cref="SerializeSpecialCollection{T}"/> /
+        /// <see cref="DeserializeSpecialCollection{T}"/> so protobuf-net never builds the original
+        /// type's model. Covers Deque&lt;T&gt;, CyclicBuffer&lt;T&gt;, and the non-generic SparseSet.
+        /// </summary>
+        private static bool IsSpecialCollectionType(Type type)
+        {
+            if (type == null)
+            {
+                return false;
+            }
+
+            if (type == typeof(SparseSet))
+            {
+                return true;
+            }
+
+            if (!type.IsGenericType)
+            {
+                return false;
+            }
+
+            Type genericDef = type.GetGenericTypeDefinition();
+            return genericDef == typeof(Deque<>) || genericDef == typeof(CyclicBuffer<>);
+        }
+
+        private static object DeserializeSpecialCollection(byte[] data, Type type)
+        {
+            Func<byte[], object> deserializer = SpecialCollectionDeserializers.GetOrAdd(
+                type,
+                SpecialCollectionDeserializerFactory
+            );
+            return deserializer(data);
+        }
+
+        private static Func<object, byte[]> BuildSpecialCollectionSerializer(Type type)
+        {
+            if (type == typeof(SparseSet))
+            {
+                return input => SerializeSparseSetWrapper((SparseSet)input);
+            }
+
+            Type genericDef = type.GetGenericTypeDefinition();
+            Type elementType = type.GetGenericArguments()[0];
+            MethodInfo open =
+                genericDef == typeof(Deque<>)
+                    ? SerializeDequeWrapperMethod
+                    : SerializeCyclicBufferWrapperMethod;
+            MethodInfo closed = open.MakeGenericMethod(elementType);
+            return input => (byte[])closed.Invoke(null, new[] { input });
+        }
+
+        private static Func<byte[], object> BuildSpecialCollectionDeserializer(Type type)
+        {
+            if (type == typeof(SparseSet))
+            {
+                return data => DeserializeSparseSetWrapper(data);
+            }
+
+            Type genericDef = type.GetGenericTypeDefinition();
+            Type elementType = type.GetGenericArguments()[0];
+            MethodInfo open =
+                genericDef == typeof(Deque<>)
+                    ? DeserializeDequeWrapperMethod
+                    : DeserializeCyclicBufferWrapperMethod;
+            MethodInfo closed = open.MakeGenericMethod(elementType);
+            return data => closed.Invoke(null, new object[] { data });
+        }
+
+        private static byte[] SerializeWrapperObject(object wrapper)
+        {
+            using Utils.PooledResource<PooledBufferStream> lease = PooledBufferStream.Rent(
+                out PooledBufferStream stream
+            );
+            ProtoBuf.Serializer.NonGeneric.Serialize(stream, wrapper);
+            byte[] buffer = null;
+            stream.ToArrayExact(ref buffer);
+            return buffer;
+        }
+
 #if WALLSTOP_PROTO
         /// <summary>
         /// Asks WallstopProto for <paramref name="data"/>, reporting a refusal as this package's own
@@ -1685,6 +1685,18 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 #endif
 
         /// <summary>
+        /// Every runtime type this writer has already resolved, per options instance. The options
+        /// hold the converter list the answer depends on, and System.Text.Json makes an options
+        /// instance read-only the first time it is used to serialize, so an answer cannot go stale
+        /// under a caller who adds a converter later. The table holds the options weakly, so a
+        /// caller who builds options per call does not leak them.
+        /// </summary>
+        private static readonly ConditionalWeakTable<
+            JsonSerializerOptions,
+            ConcurrentDictionary<Type, Type>
+        > RuntimeWriteTypeCache = new();
+
+        /// <summary>
         /// Attempts to deserialize a protobuf payload. Returns <see langword="false"/> and sets
         /// <paramref name="value"/> to <see langword="default"/> for null or corrupt input.
         /// Polymorphic-root resolution failures still throw (programmer error).
@@ -1713,100 +1725,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 value = default;
                 return false;
             }
-        }
-
-        // Require an explicit root when the declared contract and its includes cannot identify one unambiguously.
-        private static Type ResolveProtobufRootType(Type declared)
-        {
-            if (declared == null)
-            {
-                return null;
-            }
-
-            if (!declared.IsInterface && !declared.IsAbstract && declared != typeof(object))
-            {
-                return declared;
-            }
-
-            if (ExplicitProtobufRootCache.TryGetValue(declared, out Type explicitRoot))
-            {
-                return explicitRoot;
-            }
-
-            // Root inference is deterministic; publish one winning result for concurrent callers.
-            Type resolved = ProtobufRootCache.GetOrAdd(
-                declared,
-                static declaredType => ComputeProtobufRootType(declaredType)
-            );
-            return resolved == NoRootMarker ? null : resolved;
-        }
-
-        private static Type ComputeProtobufRootType(Type declared)
-        {
-            // An abstract contract without includes cannot construct a root; require registration.
-            if (
-                declared.IsAbstract
-                && ReflectionHelpers.HasAttributeSafe<ProtoContractAttribute>(declared)
-                && ReflectionHelpers.HasAttributeSafe<ProtoIncludeAttribute>(declared)
-            )
-            {
-                return declared;
-            }
-
-            // Keep inference within the declaring assembly to avoid load-order-dependent root selection.
-            if (declared.IsInterface && declared != typeof(object))
-            {
-                try
-                {
-                    Type[] types = ReflectionHelpers.GetTypesFromAssembly(declared.Assembly);
-                    using PooledResource<List<Type>> candidatesLease = Buffers<Type>.List.Get(
-                        out List<Type> candidates
-                    );
-                    foreach (Type t in types)
-                    {
-                        if (
-                            t.IsClass
-                            && t.IsAbstract
-                            && declared.IsAssignableFrom(t)
-                            && ReflectionHelpers.HasAttributeSafe<ProtoContractAttribute>(t)
-                            && ReflectionHelpers.HasAttributeSafe<ProtoIncludeAttribute>(t)
-                        )
-                        {
-                            candidates.Add(t);
-                        }
-                    }
-
-                    switch (candidates.Count)
-                    {
-                        case 1:
-                        {
-                            return candidates[0];
-                        }
-                        case > 1:
-                        {
-                            using PooledResource<List<Type>> includeCandidatesLease =
-                                Buffers<Type>.List.Get(out List<Type> includeCandidates);
-                            foreach (Type t in candidates)
-                            {
-                                if (ReflectionHelpers.HasAttributeSafe<ProtoIncludeAttribute>(t))
-                                {
-                                    includeCandidates.Add(t);
-                                }
-                            }
-
-                            if (includeCandidates.Count == 1)
-                            {
-                                return includeCandidates[0];
-                            }
-
-                            break;
-                        }
-                    }
-                }
-                catch { }
-            }
-
-            return NoRootMarker;
         }
 
         /// <summary>
@@ -2303,89 +2221,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         }
 
         /// <summary>
-        /// Deserializes the valid prefix of a UTF-8 buffer without copying it into an exact-sized
-        /// array. The caller must keep the buffer alive and exclusively owned until this method
-        /// returns.
-        /// </summary>
-        internal static T JsonDeserializeUtf8Slice<T>(
-            byte[] data,
-            int length,
-            Type type = null,
-            JsonSerializerOptions options = null
-        )
-        {
-            return JsonDeserializeUtf8Slice<T>(data, length, type, options, null);
-        }
-
-        /// <summary>
-        /// Deserializes the valid prefix of a UTF-8 buffer, holding <paramref name="limits"/> when
-        /// the caller asked for them.
-        /// </summary>
-        /// <remarks>
-        /// Null limits mean no gate at all rather than the default profile, because the overloads
-        /// that predate them must not start paying for a pre-decode walk they never asked for. The
-        /// public limit-taking overloads resolve null to <c>WJsonReadLimits.Default</c> first.
-        /// </remarks>
-        internal static T JsonDeserializeUtf8Slice<T>(
-            byte[] data,
-            int length,
-            Type type,
-            JsonSerializerOptions options,
-            WJsonReadLimits limits
-        )
-        {
-            if (data == null)
-            {
-                SerializationFailureException.ThrowNullInput<T>(
-                    SerializationFormat.Json,
-                    SerializationOperation.Deserialize
-                );
-            }
-            if (length == 0)
-            {
-                SerializationFailureException.ThrowEmptyInput<T>(
-                    SerializationFormat.Json,
-                    SerializationOperation.Deserialize
-                );
-            }
-
-            try
-            {
-                ReadOnlySpan<byte> span = new(data, 0, length);
-                JsonSerializerOptions resolvedOptions =
-                    options ?? SerializerEncoding.NormalJsonOptions;
-                if (limits != null)
-                {
-                    WJsonReadBudget.Enforce(
-                        span,
-                        length,
-                        type ?? typeof(T),
-                        limits,
-                        resolvedOptions
-                    );
-                }
-
-                return (T)JsonSerializer.Deserialize(span, type ?? typeof(T), resolvedOptions);
-            }
-            catch (SerializationFailureException)
-            {
-                throw;
-            }
-            catch (Exception e)
-            {
-                SerializationFailureException.ThrowCorrupt<T>(
-                    SerializationFormat.Json,
-                    SerializationOperation.Deserialize,
-                    length,
-                    SerializationStage.Decode,
-                    e,
-                    "System.Text.Json rejected the payload."
-                );
-                return default;
-            }
-        }
-
-        /// <summary>
         /// Attempts to deserialize JSON bytes. Returns <see langword="false"/> for null/empty/corrupt input.
         /// </summary>
         public static bool TryJsonDeserialize<T>(
@@ -2618,6 +2453,431 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 PooledArrayBufferWriter.Rent(out PooledArrayBufferWriter bufferWriter);
             WriteJsonToBuffer(input, SerializerEncoding.FastJsonOptions, bufferWriter);
             return bufferWriter.ToArrayExact(ref buffer);
+        }
+
+        /// <summary>
+        /// Serializes an instance to a JSON string.
+        /// </summary>
+        /// <typeparam name="T">Instance type.</typeparam>
+        /// <param name="input">The instance to serialize.</param>
+        /// <param name="pretty">Write indented output when true.</param>
+        /// <returns>JSON text.</returns>
+        /// <example>
+        /// <code>
+        /// var json = Serializer.JsonStringify(save, pretty: true);
+        /// var roundtrip = Serializer.JsonDeserialize&lt;SaveData&gt;(json);
+        /// </code>
+        /// </example>
+        public static string JsonStringify<T>(T input, bool pretty = false)
+        {
+            JsonSerializerOptions options = pretty
+                ? SerializerEncoding.PrettyJsonOptions
+                : SerializerEncoding.NormalJsonOptions;
+
+            return JsonStringify(input, options);
+        }
+
+        /// <summary>
+        /// Serializes an instance to a JSON string using the provided <paramref name="options"/>.
+        /// </summary>
+        /// <typeparam name="T">Instance type.</typeparam>
+        /// <param name="input">The instance to serialize.</param>
+        /// <param name="options">Serializer options.</param>
+        /// <returns>JSON text.</returns>
+        public static string JsonStringify<T>(T input, JsonSerializerOptions options)
+        {
+            if (options == null)
+            {
+                throw new ArgumentNullException(nameof(options));
+            }
+
+            Type parameterType = typeof(T);
+            if (
+                parameterType.IsAbstract
+                || parameterType.IsInterface
+                || parameterType == typeof(object)
+            )
+            {
+                object data = input;
+                if (data == null)
+                {
+                    return "{}";
+                }
+
+                return SerializeValueAotSafe(data, null, options);
+            }
+
+            return SerializeValueAotSafe(input, parameterType, options);
+        }
+
+        /// <summary>
+        /// Reads JSON text from a file (UTF‑8) and deserializes to <typeparamref name="T"/>.
+        /// </summary>
+        /// <typeparam name="T">Target type.</typeparam>
+        /// <param name="path">File path.</param>
+        /// <returns>Decoded instance.</returns>
+        public static T ReadFromJsonFile<T>(string path)
+        {
+            byte[] settingsAsBytes = File.ReadAllBytes(path);
+            return JsonDeserialize<T>(settingsAsBytes);
+        }
+
+        /// <summary>
+        /// Asynchronously reads JSON text from a file (UTF‑8) and deserializes to <typeparamref name="T"/>.
+        /// </summary>
+        /// <typeparam name="T">Target type.</typeparam>
+        /// <param name="path">File path.</param>
+        /// <returns>Decoded instance.</returns>
+        public static async Task<T> ReadFromJsonFileAsync<T>(string path)
+        {
+            byte[] settingsAsBytes = await File.ReadAllBytesAsync(path);
+            return JsonDeserialize<T>(settingsAsBytes);
+        }
+
+        /// <summary>
+        /// Asynchronously reads JSON with cancellation.
+        /// </summary>
+        public static async Task<T> ReadFromJsonFileAsync<T>(
+            string path,
+            System.Threading.CancellationToken cancellationToken
+        )
+        {
+            using FileStream fs = new(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                4096,
+                useAsync: true
+            );
+            return await ReadJsonStreamAsync<T>(fs, cancellationToken);
+        }
+
+        /// <summary>
+        /// Writes an instance to a JSON file (UTF‑8).
+        /// </summary>
+        /// <typeparam name="T">Instance type.</typeparam>
+        /// <param name="input">The instance to serialize.</param>
+        /// <param name="path">Destination file path.</param>
+        /// <param name="pretty">Write indented output when true.</param>
+        /// <remarks>
+        /// The write is staged and swapped by <see cref="DurableFile"/>, so an interrupted write
+        /// leaves the previous document intact instead of truncating it.
+        /// </remarks>
+        public static void WriteToJsonFile<T>(T input, string path, bool pretty = true)
+        {
+            string jsonAsText = JsonStringify(input, pretty);
+            WriteTextDurably(path, jsonAsText);
+        }
+
+        /// <summary>
+        /// Asynchronously writes an instance to a JSON file (UTF‑8).
+        /// </summary>
+        /// <typeparam name="T">Instance type.</typeparam>
+        /// <param name="input">The instance to serialize.</param>
+        /// <param name="path">Destination file path.</param>
+        /// <param name="pretty">Write indented output when true.</param>
+        public static async Task WriteToJsonFileAsync<T>(T input, string path, bool pretty = true)
+        {
+            string jsonAsText = JsonStringify(input, pretty);
+            await WriteTextDurablyAsync(path, jsonAsText, System.Threading.CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Asynchronously writes an instance to a JSON file (UTF‑8) with cancellation.
+        /// </summary>
+        public static async Task WriteToJsonFileAsync<T>(
+            T input,
+            string path,
+            bool pretty,
+            System.Threading.CancellationToken cancellationToken
+        )
+        {
+            string jsonAsText = JsonStringify(input, pretty);
+            await WriteTextDurablyAsync(path, jsonAsText, cancellationToken);
+        }
+
+        /// <summary>
+        /// Writes an instance to a JSON file (UTF‑8) using the provided <paramref name="options"/>.
+        /// </summary>
+        /// <typeparam name="T">Instance type.</typeparam>
+        /// <param name="input">The instance to serialize.</param>
+        /// <param name="path">Destination file path.</param>
+        /// <param name="options">Serializer options.</param>
+        public static void WriteToJsonFile<T>(T input, string path, JsonSerializerOptions options)
+        {
+            string jsonAsText = JsonStringify(input, options);
+            WriteTextDurably(path, jsonAsText);
+        }
+
+        /// <summary>
+        /// Asynchronously writes an instance to a JSON file (UTF‑8) using the provided <paramref name="options"/>.
+        /// </summary>
+        /// <typeparam name="T">Instance type.</typeparam>
+        /// <param name="input">The instance to serialize.</param>
+        /// <param name="path">Destination file path.</param>
+        /// <param name="options">Serializer options.</param>
+        public static async Task WriteToJsonFileAsync<T>(
+            T input,
+            string path,
+            JsonSerializerOptions options
+        )
+        {
+            string jsonAsText = JsonStringify(input, options);
+            await WriteTextDurablyAsync(path, jsonAsText, System.Threading.CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Attempts to read JSON into an instance, returns false if file missing or invalid.
+        /// </summary>
+        public static bool TryReadFromJsonFile<T>(string path, out T value)
+        {
+            try
+            {
+                if (!File.Exists(path))
+                {
+                    value = default;
+                    return false;
+                }
+                string json = File.ReadAllText(path);
+                value = JsonDeserialize<T>(json);
+                return true;
+            }
+            catch
+            {
+                value = default;
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Attempts to write JSON to a file, returns false on failure.
+        /// </summary>
+        public static bool TryWriteToJsonFile<T>(T input, string path, bool pretty = true)
+        {
+            try
+            {
+                WriteToJsonFile(input, path, pretty);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Deserializes the valid prefix of a UTF-8 buffer without copying it into an exact-sized
+        /// array. The caller must keep the buffer alive and exclusively owned until this method
+        /// returns.
+        /// </summary>
+        internal static T JsonDeserializeUtf8Slice<T>(
+            byte[] data,
+            int length,
+            Type type = null,
+            JsonSerializerOptions options = null
+        )
+        {
+            return JsonDeserializeUtf8Slice<T>(data, length, type, options, null);
+        }
+
+        /// <summary>
+        /// Deserializes the valid prefix of a UTF-8 buffer, holding <paramref name="limits"/> when
+        /// the caller asked for them.
+        /// </summary>
+        /// <remarks>
+        /// Null limits mean no gate at all rather than the default profile, because the overloads
+        /// that predate them must not start paying for a pre-decode walk they never asked for. The
+        /// public limit-taking overloads resolve null to <c>WJsonReadLimits.Default</c> first.
+        /// </remarks>
+        internal static T JsonDeserializeUtf8Slice<T>(
+            byte[] data,
+            int length,
+            Type type,
+            JsonSerializerOptions options,
+            WJsonReadLimits limits
+        )
+        {
+            if (data == null)
+            {
+                SerializationFailureException.ThrowNullInput<T>(
+                    SerializationFormat.Json,
+                    SerializationOperation.Deserialize
+                );
+            }
+            if (length == 0)
+            {
+                SerializationFailureException.ThrowEmptyInput<T>(
+                    SerializationFormat.Json,
+                    SerializationOperation.Deserialize
+                );
+            }
+
+            try
+            {
+                ReadOnlySpan<byte> span = new(data, 0, length);
+                JsonSerializerOptions resolvedOptions =
+                    options ?? SerializerEncoding.NormalJsonOptions;
+                if (limits != null)
+                {
+                    WJsonReadBudget.Enforce(
+                        span,
+                        length,
+                        type ?? typeof(T),
+                        limits,
+                        resolvedOptions
+                    );
+                }
+
+                return (T)JsonSerializer.Deserialize(span, type ?? typeof(T), resolvedOptions);
+            }
+            catch (SerializationFailureException)
+            {
+                throw;
+            }
+            catch (Exception e)
+            {
+                SerializationFailureException.ThrowCorrupt<T>(
+                    SerializationFormat.Json,
+                    SerializationOperation.Deserialize,
+                    length,
+                    SerializationStage.Decode,
+                    e,
+                    "System.Text.Json rejected the payload."
+                );
+                return default;
+            }
+        }
+
+        /// <summary>
+        /// Reads one UTF-8 JSON document from <paramref name="input"/> without materializing an
+        /// exact-sized copy of the pooled stream before decoding it.
+        /// </summary>
+        internal static async Task<T> ReadJsonStreamAsync<T>(
+            Stream input,
+            System.Threading.CancellationToken cancellationToken
+        )
+        {
+            using Utils.PooledResource<PooledBufferStream> lease = PooledBufferStream.Rent(
+                out PooledBufferStream stream
+            );
+            using (
+                PooledArray<byte> bufferLease = SystemArrayPool<byte>.Get(8192, out byte[] buffer)
+            )
+            {
+                int read;
+                while (
+                    0
+                    < (
+                        read = await input.ReadAsync(
+                            buffer,
+                            0,
+                            bufferLease.length,
+                            cancellationToken
+                        )
+                    )
+                )
+                {
+                    stream.Write(buffer, 0, read);
+                }
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            ArraySegment<byte> seg = stream.GetWrittenSegment();
+            return JsonDeserializeUtf8Slice<T>(seg.Array, seg.Count);
+        }
+
+        // Require an explicit root when the declared contract and its includes cannot identify one unambiguously.
+        private static Type ResolveProtobufRootType(Type declared)
+        {
+            if (declared == null)
+            {
+                return null;
+            }
+
+            if (!declared.IsInterface && !declared.IsAbstract && declared != typeof(object))
+            {
+                return declared;
+            }
+
+            if (ExplicitProtobufRootCache.TryGetValue(declared, out Type explicitRoot))
+            {
+                return explicitRoot;
+            }
+
+            // Root inference is deterministic; publish one winning result for concurrent callers.
+            Type resolved = ProtobufRootCache.GetOrAdd(
+                declared,
+                static declaredType => ComputeProtobufRootType(declaredType)
+            );
+            return resolved == NoRootMarker ? null : resolved;
+        }
+
+        private static Type ComputeProtobufRootType(Type declared)
+        {
+            // An abstract contract without includes cannot construct a root; require registration.
+            if (
+                declared.IsAbstract
+                && ReflectionHelpers.HasAttributeSafe<ProtoContractAttribute>(declared)
+                && ReflectionHelpers.HasAttributeSafe<ProtoIncludeAttribute>(declared)
+            )
+            {
+                return declared;
+            }
+
+            // Keep inference within the declaring assembly to avoid load-order-dependent root selection.
+            if (declared.IsInterface && declared != typeof(object))
+            {
+                try
+                {
+                    Type[] types = ReflectionHelpers.GetTypesFromAssembly(declared.Assembly);
+                    using PooledResource<List<Type>> candidatesLease = Buffers<Type>.List.Get(
+                        out List<Type> candidates
+                    );
+                    foreach (Type t in types)
+                    {
+                        if (
+                            t.IsClass
+                            && t.IsAbstract
+                            && declared.IsAssignableFrom(t)
+                            && ReflectionHelpers.HasAttributeSafe<ProtoContractAttribute>(t)
+                            && ReflectionHelpers.HasAttributeSafe<ProtoIncludeAttribute>(t)
+                        )
+                        {
+                            candidates.Add(t);
+                        }
+                    }
+
+                    switch (candidates.Count)
+                    {
+                        case 1:
+                        {
+                            return candidates[0];
+                        }
+                        case > 1:
+                        {
+                            using PooledResource<List<Type>> includeCandidatesLease =
+                                Buffers<Type>.List.Get(out List<Type> includeCandidates);
+                            foreach (Type t in candidates)
+                            {
+                                if (ReflectionHelpers.HasAttributeSafe<ProtoIncludeAttribute>(t))
+                                {
+                                    includeCandidates.Add(t);
+                                }
+                            }
+
+                            if (includeCandidates.Count == 1)
+                            {
+                                return includeCandidates[0];
+                            }
+
+                            break;
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            return NoRootMarker;
         }
 
         private static void WriteJsonToStream<T>(
@@ -3016,18 +3276,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         }
 
         /// <summary>
-        /// Every runtime type this writer has already resolved, per options instance. The options
-        /// hold the converter list the answer depends on, and System.Text.Json makes an options
-        /// instance read-only the first time it is used to serialize, so an answer cannot go stale
-        /// under a caller who adds a converter later. The table holds the options weakly, so a
-        /// caller who builds options per call does not leak them.
-        /// </summary>
-        private static readonly ConditionalWeakTable<
-            JsonSerializerOptions,
-            ConcurrentDictionary<Type, Type>
-        > RuntimeWriteTypeCache = new();
-
-        /// <summary>
         /// Chooses the type a value is written as when its declaration is <see cref="object"/>, an
         /// interface, or abstract.
         /// </summary>
@@ -3140,73 +3388,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             return SerializerEncoding.Encoding.GetString(bufferWriter.WrittenSpan);
         }
 
-        /// <summary>
-        /// Serializes an instance to a JSON string.
-        /// </summary>
-        /// <typeparam name="T">Instance type.</typeparam>
-        /// <param name="input">The instance to serialize.</param>
-        /// <param name="pretty">Write indented output when true.</param>
-        /// <returns>JSON text.</returns>
-        /// <example>
-        /// <code>
-        /// var json = Serializer.JsonStringify(save, pretty: true);
-        /// var roundtrip = Serializer.JsonDeserialize&lt;SaveData&gt;(json);
-        /// </code>
-        /// </example>
-        public static string JsonStringify<T>(T input, bool pretty = false)
-        {
-            JsonSerializerOptions options = pretty
-                ? SerializerEncoding.PrettyJsonOptions
-                : SerializerEncoding.NormalJsonOptions;
-
-            return JsonStringify(input, options);
-        }
-
-        /// <summary>
-        /// Serializes an instance to a JSON string using the provided <paramref name="options"/>.
-        /// </summary>
-        /// <typeparam name="T">Instance type.</typeparam>
-        /// <param name="input">The instance to serialize.</param>
-        /// <param name="options">Serializer options.</param>
-        /// <returns>JSON text.</returns>
-        public static string JsonStringify<T>(T input, JsonSerializerOptions options)
-        {
-            if (options == null)
-            {
-                throw new ArgumentNullException(nameof(options));
-            }
-
-            Type parameterType = typeof(T);
-            if (
-                parameterType.IsAbstract
-                || parameterType.IsInterface
-                || parameterType == typeof(object)
-            )
-            {
-                object data = input;
-                if (data == null)
-                {
-                    return "{}";
-                }
-
-                return SerializeValueAotSafe(data, null, options);
-            }
-
-            return SerializeValueAotSafe(input, parameterType, options);
-        }
-
-        /// <summary>
-        /// Reads JSON text from a file (UTF‑8) and deserializes to <typeparamref name="T"/>.
-        /// </summary>
-        /// <typeparam name="T">Target type.</typeparam>
-        /// <param name="path">File path.</param>
-        /// <returns>Decoded instance.</returns>
-        public static T ReadFromJsonFile<T>(string path)
-        {
-            byte[] settingsAsBytes = File.ReadAllBytes(path);
-            return JsonDeserialize<T>(settingsAsBytes);
-        }
-
         private static void WriteJsonToBuffer<T>(
             T input,
             JsonSerializerOptions options,
@@ -3250,187 +3431,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     WriteValueAotSafe(writer, input, typeof(T), options);
                 }
                 writer.Flush();
-            }
-        }
-
-        /// <summary>
-        /// Asynchronously reads JSON text from a file (UTF‑8) and deserializes to <typeparamref name="T"/>.
-        /// </summary>
-        /// <typeparam name="T">Target type.</typeparam>
-        /// <param name="path">File path.</param>
-        /// <returns>Decoded instance.</returns>
-        public static async Task<T> ReadFromJsonFileAsync<T>(string path)
-        {
-            byte[] settingsAsBytes = await File.ReadAllBytesAsync(path);
-            return JsonDeserialize<T>(settingsAsBytes);
-        }
-
-        /// <summary>
-        /// Asynchronously reads JSON with cancellation.
-        /// </summary>
-        public static async Task<T> ReadFromJsonFileAsync<T>(
-            string path,
-            System.Threading.CancellationToken cancellationToken
-        )
-        {
-            using FileStream fs = new(
-                path,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.Read,
-                4096,
-                useAsync: true
-            );
-            return await ReadJsonStreamAsync<T>(fs, cancellationToken);
-        }
-
-        /// <summary>
-        /// Reads one UTF-8 JSON document from <paramref name="input"/> without materializing an
-        /// exact-sized copy of the pooled stream before decoding it.
-        /// </summary>
-        internal static async Task<T> ReadJsonStreamAsync<T>(
-            Stream input,
-            System.Threading.CancellationToken cancellationToken
-        )
-        {
-            using Utils.PooledResource<PooledBufferStream> lease = PooledBufferStream.Rent(
-                out PooledBufferStream stream
-            );
-            using (
-                PooledArray<byte> bufferLease = SystemArrayPool<byte>.Get(8192, out byte[] buffer)
-            )
-            {
-                int read;
-                while (
-                    0
-                    < (
-                        read = await input.ReadAsync(
-                            buffer,
-                            0,
-                            bufferLease.length,
-                            cancellationToken
-                        )
-                    )
-                )
-                {
-                    stream.Write(buffer, 0, read);
-                }
-            }
-            cancellationToken.ThrowIfCancellationRequested();
-            ArraySegment<byte> seg = stream.GetWrittenSegment();
-            return JsonDeserializeUtf8Slice<T>(seg.Array, seg.Count);
-        }
-
-        /// <summary>
-        /// Writes an instance to a JSON file (UTF‑8).
-        /// </summary>
-        /// <typeparam name="T">Instance type.</typeparam>
-        /// <param name="input">The instance to serialize.</param>
-        /// <param name="path">Destination file path.</param>
-        /// <param name="pretty">Write indented output when true.</param>
-        /// <remarks>
-        /// The write is staged and swapped by <see cref="DurableFile"/>, so an interrupted write
-        /// leaves the previous document intact instead of truncating it.
-        /// </remarks>
-        public static void WriteToJsonFile<T>(T input, string path, bool pretty = true)
-        {
-            string jsonAsText = JsonStringify(input, pretty);
-            WriteTextDurably(path, jsonAsText);
-        }
-
-        /// <summary>
-        /// Asynchronously writes an instance to a JSON file (UTF‑8).
-        /// </summary>
-        /// <typeparam name="T">Instance type.</typeparam>
-        /// <param name="input">The instance to serialize.</param>
-        /// <param name="path">Destination file path.</param>
-        /// <param name="pretty">Write indented output when true.</param>
-        public static async Task WriteToJsonFileAsync<T>(T input, string path, bool pretty = true)
-        {
-            string jsonAsText = JsonStringify(input, pretty);
-            await WriteTextDurablyAsync(path, jsonAsText, System.Threading.CancellationToken.None);
-        }
-
-        /// <summary>
-        /// Asynchronously writes an instance to a JSON file (UTF‑8) with cancellation.
-        /// </summary>
-        public static async Task WriteToJsonFileAsync<T>(
-            T input,
-            string path,
-            bool pretty,
-            System.Threading.CancellationToken cancellationToken
-        )
-        {
-            string jsonAsText = JsonStringify(input, pretty);
-            await WriteTextDurablyAsync(path, jsonAsText, cancellationToken);
-        }
-
-        /// <summary>
-        /// Writes an instance to a JSON file (UTF‑8) using the provided <paramref name="options"/>.
-        /// </summary>
-        /// <typeparam name="T">Instance type.</typeparam>
-        /// <param name="input">The instance to serialize.</param>
-        /// <param name="path">Destination file path.</param>
-        /// <param name="options">Serializer options.</param>
-        public static void WriteToJsonFile<T>(T input, string path, JsonSerializerOptions options)
-        {
-            string jsonAsText = JsonStringify(input, options);
-            WriteTextDurably(path, jsonAsText);
-        }
-
-        /// <summary>
-        /// Asynchronously writes an instance to a JSON file (UTF‑8) using the provided <paramref name="options"/>.
-        /// </summary>
-        /// <typeparam name="T">Instance type.</typeparam>
-        /// <param name="input">The instance to serialize.</param>
-        /// <param name="path">Destination file path.</param>
-        /// <param name="options">Serializer options.</param>
-        public static async Task WriteToJsonFileAsync<T>(
-            T input,
-            string path,
-            JsonSerializerOptions options
-        )
-        {
-            string jsonAsText = JsonStringify(input, options);
-            await WriteTextDurablyAsync(path, jsonAsText, System.Threading.CancellationToken.None);
-        }
-
-        /// <summary>
-        /// Attempts to read JSON into an instance, returns false if file missing or invalid.
-        /// </summary>
-        public static bool TryReadFromJsonFile<T>(string path, out T value)
-        {
-            try
-            {
-                if (!File.Exists(path))
-                {
-                    value = default;
-                    return false;
-                }
-                string json = File.ReadAllText(path);
-                value = JsonDeserialize<T>(json);
-                return true;
-            }
-            catch
-            {
-                value = default;
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Attempts to write JSON to a file, returns false on failure.
-        /// </summary>
-        public static bool TryWriteToJsonFile<T>(T input, string path, bool pretty = true)
-        {
-            try
-            {
-                WriteToJsonFile(input, path, pretty);
-                return true;
-            }
-            catch
-            {
-                return false;
             }
         }
 
@@ -3530,37 +3530,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             private const BindingFlags InstanceMethodFlags =
                 BindingFlags.Public | BindingFlags.Instance;
 
-            private static readonly ConcurrentDictionary<
-                Type,
-                (
-                    Func<object, object> GetItems,
-                    Action<object, object> SetItems,
-                    Func<object, object> GetKeys,
-                    Action<object, object> SetKeys,
-                    Func<object, object> GetValues,
-                    Action<object, object> SetValues,
-                    Action<object, object> SetPreserve,
-                    Action<object> OnBeforeSerialize,
-                    Action<object> OnAfterDeserialize
-                )
-            > TypeAccessors = new();
-
-            // Cache method-group delegates because C# 9 allocates the conversion on every call.
-            private static readonly Func<
-                Type,
-                (
-                    Func<object, object> GetItems,
-                    Action<object, object> SetItems,
-                    Func<object, object> GetKeys,
-                    Action<object, object> SetKeys,
-                    Func<object, object> GetValues,
-                    Action<object, object> SetValues,
-                    Action<object, object> SetPreserve,
-                    Action<object> OnBeforeSerialize,
-                    Action<object> OnAfterDeserialize
-                )
-            > CreateAccessorsFactory = CreateAccessors;
-
             /// <summary>
             /// Gets or creates cached accessors for the specified collection type.
             /// </summary>
@@ -3577,6 +3546,22 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             ) GetAccessors(Type collectionType)
             {
                 return TypeAccessors.GetOrAdd(collectionType, CreateAccessorsFactory);
+            }
+
+            internal static (
+                Func<object, object> GetItems,
+                Action<object, object> SetItems,
+                Func<object, object> GetKeys,
+                Action<object, object> SetKeys,
+                Func<object, object> GetValues,
+                Action<object, object> SetValues
+            ) GetWrapperAccessors(Type wrapperType, bool isSet)
+            {
+                return WrapperAccessors.GetOrAdd(
+                    wrapperType,
+                    static (type, forSet) => CreateWrapperAccessors(type, forSet),
+                    isSet
+                );
             }
 
             private static (
@@ -3672,37 +3657,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 );
             }
 
-            /// <summary>
-            /// Gets cached accessors for protobuf wrapper types.
-            /// </summary>
-            private static readonly ConcurrentDictionary<
-                Type,
-                (
-                    Func<object, object> GetItems,
-                    Action<object, object> SetItems,
-                    Func<object, object> GetKeys,
-                    Action<object, object> SetKeys,
-                    Func<object, object> GetValues,
-                    Action<object, object> SetValues
-                )
-            > WrapperAccessors = new();
-
-            internal static (
-                Func<object, object> GetItems,
-                Action<object, object> SetItems,
-                Func<object, object> GetKeys,
-                Action<object, object> SetKeys,
-                Func<object, object> GetValues,
-                Action<object, object> SetValues
-            ) GetWrapperAccessors(Type wrapperType, bool isSet)
-            {
-                return WrapperAccessors.GetOrAdd(
-                    wrapperType,
-                    static (type, forSet) => CreateWrapperAccessors(type, forSet),
-                    isSet
-                );
-            }
-
             private static (
                 Func<object, object> GetItems,
                 Action<object, object> SetItems,
@@ -3746,6 +3700,52 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
                 return (getItems, setItems, getKeys, setKeys, getValues, setValues);
             }
+
+            private static readonly ConcurrentDictionary<
+                Type,
+                (
+                    Func<object, object> GetItems,
+                    Action<object, object> SetItems,
+                    Func<object, object> GetKeys,
+                    Action<object, object> SetKeys,
+                    Func<object, object> GetValues,
+                    Action<object, object> SetValues,
+                    Action<object, object> SetPreserve,
+                    Action<object> OnBeforeSerialize,
+                    Action<object> OnAfterDeserialize
+                )
+            > TypeAccessors = new();
+
+            // Cache method-group delegates because C# 9 allocates the conversion on every call.
+            private static readonly Func<
+                Type,
+                (
+                    Func<object, object> GetItems,
+                    Action<object, object> SetItems,
+                    Func<object, object> GetKeys,
+                    Action<object, object> SetKeys,
+                    Func<object, object> GetValues,
+                    Action<object, object> SetValues,
+                    Action<object, object> SetPreserve,
+                    Action<object> OnBeforeSerialize,
+                    Action<object> OnAfterDeserialize
+                )
+            > CreateAccessorsFactory = CreateAccessors;
+
+            /// <summary>
+            /// Gets cached accessors for protobuf wrapper types.
+            /// </summary>
+            private static readonly ConcurrentDictionary<
+                Type,
+                (
+                    Func<object, object> GetItems,
+                    Action<object, object> SetItems,
+                    Func<object, object> GetKeys,
+                    Action<object, object> SetKeys,
+                    Func<object, object> GetValues,
+                    Action<object, object> SetValues
+                )
+            > WrapperAccessors = new();
         }
 
         // Cycle detection uses reference identity so distinct value-equal nodes are still written.
@@ -3771,20 +3771,27 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     {
         private const int DefaultInitialCapacity = 256;
 
-        private byte[] _buffer;
-        private int _length;
-        private int _position;
-        private bool _disposed;
-
         private static readonly Utils.WallstopGenericPool<PooledBufferStream> Pool = new(
             producer: () => new PooledBufferStream(),
             onRelease: stream => stream.ResetForReuse(),
             onDisposal: stream => stream.Dispose()
         );
 
-        public static Utils.PooledResource<PooledBufferStream> Rent(
-            out PooledBufferStream stream
-        ) => Pool.Get(out stream);
+        public override bool CanRead => false;
+        public override bool CanSeek => true;
+        public override bool CanWrite => true;
+        public override long Length => _length;
+
+        public override long Position
+        {
+            get => _position;
+            set => Seek(value, SeekOrigin.Begin);
+        }
+
+        private byte[] _buffer;
+        private int _length;
+        private int _position;
+        private bool _disposed;
 
         private PooledBufferStream(int initialCapacity = DefaultInitialCapacity)
         {
@@ -3798,28 +3805,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             _position = 0;
         }
 
-        internal ArraySegment<byte> GetWrittenSegment()
-        {
-            return new ArraySegment<byte>(_buffer, 0, _length);
-        }
-
-        private void ResetForReuse()
-        {
-            _length = 0;
-            _position = 0;
-            _disposed = false;
-        }
-
-        public override bool CanRead => false;
-        public override bool CanSeek => true;
-        public override bool CanWrite => true;
-        public override long Length => _length;
-
-        public override long Position
-        {
-            get => _position;
-            set => Seek(value, SeekOrigin.Begin);
-        }
+        public static Utils.PooledResource<PooledBufferStream> Rent(
+            out PooledBufferStream stream
+        ) => Pool.Get(out stream);
 
         public override void Flush() { }
 
@@ -3885,48 +3873,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             }
         }
 
-        private void EnsureCapacity(int required)
-        {
-            if (required <= _buffer.Length)
-            {
-                return;
-            }
-
-            int newSize = _buffer.Length;
-            if (newSize < DefaultInitialCapacity)
-            {
-                newSize = DefaultInitialCapacity;
-            }
-
-            while (newSize < required)
-            {
-                newSize = newSize < 1024 ? newSize * 2 : newSize + (newSize >> 1);
-            }
-            byte[] newBuf = ArrayPool<byte>.Shared.Rent(newSize);
-            if (0 < _length)
-            {
-                Array.Copy(_buffer, newBuf, _length);
-            }
-            ArrayPool<byte>.Shared.Return(_buffer);
-            _buffer = newBuf;
-        }
-
-        protected override void Dispose(bool disposing)
-        {
-            if (!_disposed)
-            {
-                if (_buffer != null)
-                {
-                    ArrayPool<byte>.Shared.Return(_buffer);
-                    _buffer = Array.Empty<byte>();
-                }
-                _length = 0;
-                _position = 0;
-                _disposed = true;
-            }
-            base.Dispose(disposing);
-        }
-
         public int ToArrayExact(ref byte[] buffer)
         {
             if (buffer == null || buffer.Length < _length)
@@ -3963,14 +3909,65 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             Write(source.Span);
             return new ValueTask();
         }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (_buffer != null)
+                {
+                    ArrayPool<byte>.Shared.Return(_buffer);
+                    _buffer = Array.Empty<byte>();
+                }
+                _length = 0;
+                _position = 0;
+                _disposed = true;
+            }
+            base.Dispose(disposing);
+        }
+
+        internal ArraySegment<byte> GetWrittenSegment()
+        {
+            return new ArraySegment<byte>(_buffer, 0, _length);
+        }
+
+        private void ResetForReuse()
+        {
+            _length = 0;
+            _position = 0;
+            _disposed = false;
+        }
+
+        private void EnsureCapacity(int required)
+        {
+            if (required <= _buffer.Length)
+            {
+                return;
+            }
+
+            int newSize = _buffer.Length;
+            if (newSize < DefaultInitialCapacity)
+            {
+                newSize = DefaultInitialCapacity;
+            }
+
+            while (newSize < required)
+            {
+                newSize = newSize < 1024 ? newSize * 2 : newSize + (newSize >> 1);
+            }
+            byte[] newBuf = ArrayPool<byte>.Shared.Rent(newSize);
+            if (0 < _length)
+            {
+                Array.Copy(_buffer, newBuf, _length);
+            }
+            ArrayPool<byte>.Shared.Return(_buffer);
+            _buffer = newBuf;
+        }
     }
 
     internal sealed class PooledArrayBufferWriter : IBufferWriter<byte>, IDisposable
     {
         private const int DefaultInitialCapacity = 256;
-        private byte[] _buffer;
-        private int _written;
-        private bool _disposed;
 
         private static readonly Utils.WallstopGenericPool<PooledArrayBufferWriter> Pool = new(
             producer: () => new PooledArrayBufferWriter(),
@@ -3980,14 +3977,73 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             }
         );
 
-        public static Utils.PooledResource<PooledArrayBufferWriter> Rent(
-            out PooledArrayBufferWriter writer
-        ) => Pool.Get(out writer);
+        public int WrittenCount => _written;
+
+        /// <summary>
+        /// The bytes written so far, without copying them out. Valid until the lease is returned.
+        /// </summary>
+        public ReadOnlySpan<byte> WrittenSpan => _buffer.AsSpan(0, _written);
+        private byte[] _buffer;
+        private int _written;
+        private bool _disposed;
 
         private PooledArrayBufferWriter(int initialCapacity = DefaultInitialCapacity)
         {
             _buffer = ArrayPool<byte>.Shared.Rent(initialCapacity);
             _written = 0;
+        }
+
+        public static Utils.PooledResource<PooledArrayBufferWriter> Rent(
+            out PooledArrayBufferWriter writer
+        ) => Pool.Get(out writer);
+
+        public void Advance(int count)
+        {
+            _written += count;
+        }
+
+        public Memory<byte> GetMemory(int sizeHint = 0)
+        {
+            EnsureCapacity(sizeHint);
+            return _buffer.AsMemory(_written);
+        }
+
+        public Span<byte> GetSpan(int sizeHint = 0)
+        {
+            EnsureCapacity(sizeHint);
+            return _buffer.AsSpan(_written);
+        }
+
+        public void Preallocate(int sizeHint)
+        {
+            EnsureCapacity(sizeHint);
+        }
+
+        public int ToArrayExact(ref byte[] buffer)
+        {
+            if (buffer == null || buffer.Length < _written)
+            {
+                buffer = new byte[_written];
+            }
+            if (0 < _written)
+            {
+                Buffer.BlockCopy(_buffer, 0, buffer, 0, _written);
+            }
+            return _written;
+        }
+
+        public void Dispose()
+        {
+            if (!_disposed)
+            {
+                if (_buffer != null)
+                {
+                    ArrayPool<byte>.Shared.Return(_buffer);
+                }
+                _buffer = Array.Empty<byte>();
+                _written = 0;
+                _disposed = true;
+            }
         }
 
         private void EnsureCapacity(int sizeHint)
@@ -4017,48 +4073,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             _buffer = newBuf;
         }
 
-        public void Advance(int count)
-        {
-            _written += count;
-        }
-
-        public Memory<byte> GetMemory(int sizeHint = 0)
-        {
-            EnsureCapacity(sizeHint);
-            return _buffer.AsMemory(_written);
-        }
-
-        public Span<byte> GetSpan(int sizeHint = 0)
-        {
-            EnsureCapacity(sizeHint);
-            return _buffer.AsSpan(_written);
-        }
-
-        public int WrittenCount => _written;
-
-        /// <summary>
-        /// The bytes written so far, without copying them out. Valid until the lease is returned.
-        /// </summary>
-        public ReadOnlySpan<byte> WrittenSpan => _buffer.AsSpan(0, _written);
-
-        public void Preallocate(int sizeHint)
-        {
-            EnsureCapacity(sizeHint);
-        }
-
-        public int ToArrayExact(ref byte[] buffer)
-        {
-            if (buffer == null || buffer.Length < _written)
-            {
-                buffer = new byte[_written];
-            }
-            if (0 < _written)
-            {
-                Buffer.BlockCopy(_buffer, 0, buffer, 0, _written);
-            }
-            return _written;
-        }
-
         private void Reset()
         {
             // Keep the rented buffer to avoid churn; just reset write cursor.
@@ -4069,28 +4083,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             _written = 0;
             _disposed = false;
         }
-
-        public void Dispose()
-        {
-            if (!_disposed)
-            {
-                if (_buffer != null)
-                {
-                    ArrayPool<byte>.Shared.Return(_buffer);
-                }
-                _buffer = Array.Empty<byte>();
-                _written = 0;
-                _disposed = true;
-            }
-        }
     }
 
     internal sealed class PooledReadOnlyMemoryStream : Stream
     {
-        private byte[] _buffer = Array.Empty<byte>();
-        private int _position;
-        private int _length;
-
         private static readonly Utils.WallstopGenericPool<PooledReadOnlyMemoryStream> Pool = new(
             producer: () => new PooledReadOnlyMemoryStream(),
             onRelease: s =>
@@ -4098,22 +4094,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 s.ResetForReuse();
             }
         );
-
-        public static Utils.PooledResource<PooledReadOnlyMemoryStream> Rent(
-            out PooledReadOnlyMemoryStream stream
-        ) => Pool.Get(out stream);
-
-        public void SetBuffer(byte[] buffer)
-        {
-            _buffer = buffer ?? Array.Empty<byte>();
-            _position = 0;
-            _length = _buffer.Length;
-        }
-
-        private void ResetForReuse()
-        {
-            SetBuffer(Array.Empty<byte>());
-        }
 
         public override bool CanRead => true;
         public override bool CanSeek => true;
@@ -4131,6 +4111,21 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 }
                 _position = (int)value;
             }
+        }
+
+        private byte[] _buffer = Array.Empty<byte>();
+        private int _position;
+        private int _length;
+
+        public static Utils.PooledResource<PooledReadOnlyMemoryStream> Rent(
+            out PooledReadOnlyMemoryStream stream
+        ) => Pool.Get(out stream);
+
+        public void SetBuffer(byte[] buffer)
+        {
+            _buffer = buffer ?? Array.Empty<byte>();
+            _position = 0;
+            _length = _buffer.Length;
         }
 
         public override void Flush() { }
@@ -4231,6 +4226,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         public override void WriteByte(byte value)
         {
             throw new NotSupportedException();
+        }
+
+        private void ResetForReuse()
+        {
+            SetBuffer(Array.Empty<byte>());
         }
     }
 }

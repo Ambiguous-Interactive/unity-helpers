@@ -29,6 +29,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             yield return int.MaxValue;
         }
 
+        private static void AssertUniformLowBits(ref NativePcgRandom random, string label)
+        {
+            const int Buckets = 8;
+            int[] counts = new int[Buckets];
+            for (int i = 0; i < DistributionSamples; i++)
+            {
+                counts[random.NextUint() & (Buckets - 1)]++;
+            }
+
+            double expected = (double)DistributionSamples / Buckets;
+            double chiSquare = 0;
+            for (int i = 0; i < Buckets; i++)
+            {
+                double delta = counts[i] - expected;
+                chiSquare += delta * delta / expected;
+            }
+
+            Assert.Less(
+                chiSquare,
+                50.0,
+                $"Low bits from {label} were not uniform (chi-square {chiSquare:F2})."
+            );
+        }
+
         // PCG needs an odd increment for full period; output statistics can miss this structural defect.
         [Test]
         [TestCaseSource(nameof(Seeds))]
@@ -444,30 +468,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             }
 
             Assert.IsTrue(diverged, "Two differently seeded generators produced identical output.");
-        }
-
-        private static void AssertUniformLowBits(ref NativePcgRandom random, string label)
-        {
-            const int Buckets = 8;
-            int[] counts = new int[Buckets];
-            for (int i = 0; i < DistributionSamples; i++)
-            {
-                counts[random.NextUint() & (Buckets - 1)]++;
-            }
-
-            double expected = (double)DistributionSamples / Buckets;
-            double chiSquare = 0;
-            for (int i = 0; i < Buckets; i++)
-            {
-                double delta = counts[i] - expected;
-                chiSquare += delta * delta / expected;
-            }
-
-            Assert.Less(
-                chiSquare,
-                50.0,
-                $"Low bits from {label} were not uniform (chi-square {chiSquare:F2})."
-            );
         }
     }
 }

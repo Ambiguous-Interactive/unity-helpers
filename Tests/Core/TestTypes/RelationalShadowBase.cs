@@ -10,10 +10,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
     /// </summary>
     public abstract class RelationalShadowBase : MonoBehaviour
     {
-        [SiblingComponent(Optional = true)]
-        protected BoxCollider _collider;
-
         /// <summary>The field this base declared, read through the base's own name binding.</summary>
         public BoxCollider BaseCollider => _collider;
+
+        [SiblingComponent(Optional = true)]
+        protected BoxCollider _collider;
     }
 }

@@ -14,13 +14,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes.Odin.ShowIf
     {
         public int value;
 
+        [WShowIf(nameof(IsPositive))]
+        public int dependentField;
+
         public bool IsPositive()
         {
             return 0 < value;
         }
-
-        [WShowIf(nameof(IsPositive))]
-        public int dependentField;
     }
 #endif
 }

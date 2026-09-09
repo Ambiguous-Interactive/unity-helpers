@@ -24,6 +24,24 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         private const float MinPreviewHeight = 40f;
         private const float DefaultMinInspectorWidth = 520f;
 
+        public WInLineEditorMode Mode { get; }
+
+        public float InspectorHeight { get; }
+
+        public bool DrawObjectField { get; }
+
+        public bool DrawHeader { get; }
+
+        public bool DrawPreview { get; }
+
+        public float PreviewHeight { get; }
+
+        public bool EnableScrolling { get; }
+
+        public float MinInspectorWidth { get; }
+
+        public bool HasExplicitMinInspectorWidth { get; }
+
         public WInLineEditorAttribute(
             WInLineEditorMode mode = WInLineEditorMode.UseSettings,
             float inspectorHeight = 200f,
@@ -49,23 +67,5 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             );
             MinInspectorWidth = sanitizedMinWidth;
         }
-
-        public WInLineEditorMode Mode { get; }
-
-        public float InspectorHeight { get; }
-
-        public bool DrawObjectField { get; }
-
-        public bool DrawHeader { get; }
-
-        public bool DrawPreview { get; }
-
-        public float PreviewHeight { get; }
-
-        public bool EnableScrolling { get; }
-
-        public float MinInspectorWidth { get; }
-
-        public bool HasExplicitMinInspectorWidth { get; }
     }
 }

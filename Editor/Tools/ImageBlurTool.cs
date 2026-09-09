@@ -20,6 +20,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
     {
         internal const string TemporaryTextureName = "ImageBlurTool Temporary Blur";
 
+        internal SerializedObject SerializedStateForTesting => _serializedObject;
+
         public List<Object> imageSources = new();
 
         private readonly List<Texture2D> _orderedTextures = new();
@@ -40,7 +42,335 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             GetWindow<ImageBlurTool>("Image Blur Tool");
         }
 
-        internal SerializedObject SerializedStateForTesting => _serializedObject;
+        internal static void TrySyncDirectory(string directory, List<Texture2D> output)
+        {
+            if (!AssetDatabase.IsValidFolder(directory))
+            {
+                return;
+            }
+
+            string[] guids = AssetDatabase.FindAssets("t:Texture2D", new[] { directory });
+            foreach (string guid in guids)
+            {
+                Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(
+                    AssetDatabase.GUIDToAssetPath(guid)
+                );
+                if (texture != null && !output.Contains(texture))
+                {
+                    output.Add(texture);
+                }
+            }
+        }
+
+        internal static Texture2D BlurredForTests(Texture2D original, int radius)
+        {
+            return CreateBlurredTexture(original, radius);
+        }
+
+        internal static float[] KernelForTests(int radius)
+        {
+            return GenerateGaussianKernel(radius);
+        }
+
+        private static Texture2D CreateBlurredTexture(Texture2D original, int radius)
+        {
+            Texture2D blurred = new(original.width, original.height, original.format, false)
+            {
+                name = TemporaryTextureName,
+            };
+            try
+            {
+                Color[] pixels = original.GetPixels();
+                int width = original.width;
+                int height = original.height;
+
+                // SetPixels accepts oversized buffers, unlike SetPixels32, so this destination can be pooled.
+                using PooledArray<Color> pooledBlurred = SystemArrayPool<Color>.Get(
+                    pixels.Length,
+                    out Color[] blurredPixels
+                );
+
+                // Premultiplied blending avoids transparent color bleed; retain straight RGB where alpha cannot be divided out.
+                using PooledArray<Color> pooledPremultiplied = SystemArrayPool<Color>.Get(
+                    pixels.Length,
+                    out Color[] premultiplied
+                );
+                for (int i = 0; i < pixels.Length; i++)
+                {
+                    premultiplied[i] = TextureResampling.Premultiply(pixels[i]);
+                }
+
+                using PooledArray<Color> pooledTemp = SystemArrayPool<Color>.Get(
+                    pixels.Length,
+                    out Color[] tempPixels
+                );
+                using PooledArray<Color> pooledTempStraight = SystemArrayPool<Color>.Get(
+                    pixels.Length,
+                    out Color[] tempStraight
+                );
+
+                float[] kernel = GenerateGaussianKernel(radius);
+
+                Parallel.For(
+                    0,
+                    height,
+                    y =>
+                    {
+                        int yOffset = y * width;
+                        for (int x = 0; x < width; x++)
+                        {
+                            Color weightedSum = Color.clear;
+                            Color straightSum = Color.clear;
+                            float weightTotal = 0f;
+
+                            for (int k = -radius; k <= radius; k++)
+                            {
+                                int currentX = x + k;
+                                if (0 <= currentX && currentX < width)
+                                {
+                                    float weight = kernel[k + radius];
+                                    weightedSum += premultiplied[yOffset + currentX] * weight;
+                                    straightSum += pixels[yOffset + currentX] * weight;
+                                    weightTotal += weight;
+                                }
+                            }
+                            tempPixels[yOffset + x] = weightedSum / weightTotal;
+                            tempStraight[yOffset + x] = straightSum / weightTotal;
+                        }
+                    }
+                );
+
+                Parallel.For(
+                    0,
+                    width,
+                    x =>
+                    {
+                        for (int y = 0; y < height; y++)
+                        {
+                            Color weightedSum = Color.clear;
+                            Color straightSum = Color.clear;
+                            float weightTotal = 0f;
+
+                            for (int k = -radius; k <= radius; k++)
+                            {
+                                int currentY = y + k;
+                                if (0 <= currentY && currentY < height)
+                                {
+                                    float weight = kernel[k + radius];
+                                    weightedSum += tempPixels[(currentY * width) + x] * weight;
+                                    straightSum += tempStraight[(currentY * width) + x] * weight;
+                                    weightTotal += weight;
+                                }
+                            }
+                            blurredPixels[(y * width) + x] = TextureResampling.Unpremultiply(
+                                weightedSum / weightTotal,
+                                straightSum / weightTotal
+                            );
+                        }
+                    }
+                );
+
+                blurred.SetPixels(blurredPixels);
+                blurred.Apply();
+                return blurred;
+            }
+            catch
+            {
+                DestroyImmediate(blurred);
+                throw;
+            }
+        }
+
+        private static float[] GenerateGaussianKernel(int radius)
+        {
+            int size = radius * 2 + 1;
+            float[] kernel = new float[size];
+            float sigma = radius / 3.0f;
+            float twoSigmaSquare = 2.0f * sigma * sigma;
+            float sum = 0f;
+
+            for (int i = 0; i < size; i++)
+            {
+                int distance = i - radius;
+                kernel[i] =
+                    Mathf.Exp(-(distance * distance) / twoSigmaSquare)
+                    / (Mathf.Sqrt(Mathf.PI * twoSigmaSquare));
+                sum += kernel[i];
+            }
+
+            for (int i = 0; i < size; i++)
+            {
+                kernel[i] /= sum;
+            }
+
+            return kernel;
+        }
+
+        internal void ApplyBlurToTextures(
+            IReadOnlyList<Texture2D> textures,
+            int radius,
+            Action<string, string> reportCompletion
+        )
+        {
+            if (textures == null || textures.Count == 0)
+            {
+                return;
+            }
+
+            int processedCount = 0;
+            int successfulCount = 0;
+            bool wroteOutput = false;
+            try
+            {
+                for (int i = 0; i < textures.Count; i++)
+                {
+                    Texture2D originalTexture = textures[i];
+                    if (originalTexture == null)
+                    {
+                        continue;
+                    }
+
+                    EditorUi.ShowProgress(
+                        "Applying Blur",
+                        $"Processing {originalTexture.name}...",
+                        (float)processedCount / textures.Count
+                    );
+                    try
+                    {
+                        if (TryWriteBlurredTexture(originalTexture, radius))
+                        {
+                            successfulCount++;
+                            wroteOutput = true;
+                        }
+                    }
+                    catch (Exception exception)
+                    {
+                        this.LogError(
+                            $"Failed to blur texture: {originalTexture.name}.",
+                            exception
+                        );
+                    }
+                    processedCount++;
+                }
+
+                if (wroteOutput)
+                {
+                    AssetDatabase.Refresh();
+                }
+            }
+            finally
+            {
+                EditorUi.ClearProgress();
+            }
+
+            reportCompletion?.Invoke(
+                "Blur Operation Complete",
+                $"Successfully blurred {successfulCount} of {processedCount} images."
+            );
+        }
+
+        internal bool TryWriteBlurredTexture(Texture2D originalTexture, int radius)
+        {
+            string assetPath = AssetDatabase.GetAssetPath(originalTexture);
+            if (string.IsNullOrWhiteSpace(assetPath))
+            {
+                this.LogError($"Texture is not a project asset: {originalTexture.name}.");
+                return false;
+            }
+
+            TextureImporter importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
+            bool importerSettingsChanged = false;
+            bool originalReadable = false;
+            TextureImporterCompression originalCompression = default;
+            Texture2D blurredTexture = null;
+            try
+            {
+                if (importer != null)
+                {
+                    originalReadable = importer.isReadable;
+                    originalCompression = importer.textureCompression;
+                    importerSettingsChanged =
+                        !originalReadable
+                        || originalCompression != TextureImporterCompression.Uncompressed;
+                    if (importerSettingsChanged)
+                    {
+                        Undo.RecordObject(importer, "Prepare Texture for Blur");
+                        importer.isReadable = true;
+                        importer.textureCompression = TextureImporterCompression.Uncompressed;
+                        importer.SaveAndReimport();
+                    }
+                }
+
+                Texture2D currentTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
+                if (currentTexture == null || !currentTexture.isReadable)
+                {
+                    this.LogError(
+                        $"Texture is null or could not be made readable: {assetPath}. Please check 'Read/Write Enabled' in its import settings if the issue persists. Skipping."
+                    );
+                    return false;
+                }
+
+                blurredTexture = CreateBlurredTexture(currentTexture, radius);
+                if (blurredTexture == null)
+                {
+                    this.LogError($"Failed to create blurred texture for: {originalTexture.name}.");
+                    return false;
+                }
+
+                string directory = Path.GetDirectoryName(assetPath);
+                if (string.IsNullOrWhiteSpace(directory))
+                {
+                    return false;
+                }
+
+                string fileName = Path.GetFileNameWithoutExtension(assetPath);
+                string sourceExtension = Path.GetExtension(assetPath);
+                bool encodeJpeg =
+                    string.Equals(sourceExtension, ".jpg", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(sourceExtension, ".jpeg", StringComparison.OrdinalIgnoreCase);
+                string outputExtension = encodeJpeg ? sourceExtension : ".png";
+                string newPathBase = Path.Combine(directory, $"{fileName}_blurred_{radius}");
+                string finalPath = newPathBase + outputExtension;
+                int counter = 0;
+                while (File.Exists(finalPath))
+                {
+                    counter++;
+                    finalPath = $"{newPathBase}_{counter}{outputExtension}";
+                }
+
+                byte[] bytes = encodeJpeg
+                    ? blurredTexture.EncodeToJPG(100)
+                    : blurredTexture.EncodeToPNG();
+                if (bytes == null)
+                {
+                    this.LogError($"Failed to encode texture: {currentTexture.name}.");
+                    return false;
+                }
+
+                File.WriteAllBytes(finalPath, bytes);
+                this.Log($"Saved blurred image to: {finalPath}");
+                return true;
+            }
+            finally
+            {
+                if (blurredTexture != null)
+                {
+                    DestroyImmediate(blurredTexture);
+                }
+
+                if (importerSettingsChanged)
+                {
+                    TextureImporter currentImporter =
+                        AssetImporter.GetAtPath(assetPath) as TextureImporter;
+                    if (currentImporter != null)
+                    {
+                        currentImporter.isReadable = originalReadable;
+                        currentImporter.textureCompression = originalCompression;
+                        currentImporter.SaveAndReimport();
+                    }
+                }
+            }
+        }
 
         private void BindSerializedState()
         {
@@ -242,26 +572,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
         }
 
-        internal static void TrySyncDirectory(string directory, List<Texture2D> output)
-        {
-            if (!AssetDatabase.IsValidFolder(directory))
-            {
-                return;
-            }
-
-            string[] guids = AssetDatabase.FindAssets("t:Texture2D", new[] { directory });
-            foreach (string guid in guids)
-            {
-                Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(
-                    AssetDatabase.GUIDToAssetPath(guid)
-                );
-                if (texture != null && !output.Contains(texture))
-                {
-                    output.Add(texture);
-                }
-            }
-        }
-
         private void ApplyBlurToSelectedTextures()
         {
             Texture2D[] toProcess;
@@ -293,316 +603,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 toProcess = combined.ToArray();
             }
             ApplyBlurToTextures(toProcess, _blurRadius, EditorUi.Info);
-        }
-
-        internal void ApplyBlurToTextures(
-            IReadOnlyList<Texture2D> textures,
-            int radius,
-            Action<string, string> reportCompletion
-        )
-        {
-            if (textures == null || textures.Count == 0)
-            {
-                return;
-            }
-
-            int processedCount = 0;
-            int successfulCount = 0;
-            bool wroteOutput = false;
-            try
-            {
-                for (int i = 0; i < textures.Count; i++)
-                {
-                    Texture2D originalTexture = textures[i];
-                    if (originalTexture == null)
-                    {
-                        continue;
-                    }
-
-                    EditorUi.ShowProgress(
-                        "Applying Blur",
-                        $"Processing {originalTexture.name}...",
-                        (float)processedCount / textures.Count
-                    );
-                    try
-                    {
-                        if (TryWriteBlurredTexture(originalTexture, radius))
-                        {
-                            successfulCount++;
-                            wroteOutput = true;
-                        }
-                    }
-                    catch (Exception exception)
-                    {
-                        this.LogError(
-                            $"Failed to blur texture: {originalTexture.name}.",
-                            exception
-                        );
-                    }
-                    processedCount++;
-                }
-
-                if (wroteOutput)
-                {
-                    AssetDatabase.Refresh();
-                }
-            }
-            finally
-            {
-                EditorUi.ClearProgress();
-            }
-
-            reportCompletion?.Invoke(
-                "Blur Operation Complete",
-                $"Successfully blurred {successfulCount} of {processedCount} images."
-            );
-        }
-
-        internal bool TryWriteBlurredTexture(Texture2D originalTexture, int radius)
-        {
-            string assetPath = AssetDatabase.GetAssetPath(originalTexture);
-            if (string.IsNullOrWhiteSpace(assetPath))
-            {
-                this.LogError($"Texture is not a project asset: {originalTexture.name}.");
-                return false;
-            }
-
-            TextureImporter importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
-            bool importerSettingsChanged = false;
-            bool originalReadable = false;
-            TextureImporterCompression originalCompression = default;
-            Texture2D blurredTexture = null;
-            try
-            {
-                if (importer != null)
-                {
-                    originalReadable = importer.isReadable;
-                    originalCompression = importer.textureCompression;
-                    importerSettingsChanged =
-                        !originalReadable
-                        || originalCompression != TextureImporterCompression.Uncompressed;
-                    if (importerSettingsChanged)
-                    {
-                        Undo.RecordObject(importer, "Prepare Texture for Blur");
-                        importer.isReadable = true;
-                        importer.textureCompression = TextureImporterCompression.Uncompressed;
-                        importer.SaveAndReimport();
-                    }
-                }
-
-                Texture2D currentTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
-                if (currentTexture == null || !currentTexture.isReadable)
-                {
-                    this.LogError(
-                        $"Texture is null or could not be made readable: {assetPath}. Please check 'Read/Write Enabled' in its import settings if the issue persists. Skipping."
-                    );
-                    return false;
-                }
-
-                blurredTexture = CreateBlurredTexture(currentTexture, radius);
-                if (blurredTexture == null)
-                {
-                    this.LogError($"Failed to create blurred texture for: {originalTexture.name}.");
-                    return false;
-                }
-
-                string directory = Path.GetDirectoryName(assetPath);
-                if (string.IsNullOrWhiteSpace(directory))
-                {
-                    return false;
-                }
-
-                string fileName = Path.GetFileNameWithoutExtension(assetPath);
-                string sourceExtension = Path.GetExtension(assetPath);
-                bool encodeJpeg =
-                    string.Equals(sourceExtension, ".jpg", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(sourceExtension, ".jpeg", StringComparison.OrdinalIgnoreCase);
-                string outputExtension = encodeJpeg ? sourceExtension : ".png";
-                string newPathBase = Path.Combine(directory, $"{fileName}_blurred_{radius}");
-                string finalPath = newPathBase + outputExtension;
-                int counter = 0;
-                while (File.Exists(finalPath))
-                {
-                    counter++;
-                    finalPath = $"{newPathBase}_{counter}{outputExtension}";
-                }
-
-                byte[] bytes = encodeJpeg
-                    ? blurredTexture.EncodeToJPG(100)
-                    : blurredTexture.EncodeToPNG();
-                if (bytes == null)
-                {
-                    this.LogError($"Failed to encode texture: {currentTexture.name}.");
-                    return false;
-                }
-
-                File.WriteAllBytes(finalPath, bytes);
-                this.Log($"Saved blurred image to: {finalPath}");
-                return true;
-            }
-            finally
-            {
-                if (blurredTexture != null)
-                {
-                    DestroyImmediate(blurredTexture);
-                }
-
-                if (importerSettingsChanged)
-                {
-                    TextureImporter currentImporter =
-                        AssetImporter.GetAtPath(assetPath) as TextureImporter;
-                    if (currentImporter != null)
-                    {
-                        currentImporter.isReadable = originalReadable;
-                        currentImporter.textureCompression = originalCompression;
-                        currentImporter.SaveAndReimport();
-                    }
-                }
-            }
-        }
-
-        internal static Texture2D BlurredForTests(Texture2D original, int radius)
-        {
-            return CreateBlurredTexture(original, radius);
-        }
-
-        internal static float[] KernelForTests(int radius)
-        {
-            return GenerateGaussianKernel(radius);
-        }
-
-        private static Texture2D CreateBlurredTexture(Texture2D original, int radius)
-        {
-            Texture2D blurred = new(original.width, original.height, original.format, false)
-            {
-                name = TemporaryTextureName,
-            };
-            try
-            {
-                Color[] pixels = original.GetPixels();
-                int width = original.width;
-                int height = original.height;
-
-                // SetPixels accepts oversized buffers, unlike SetPixels32, so this destination can be pooled.
-                using PooledArray<Color> pooledBlurred = SystemArrayPool<Color>.Get(
-                    pixels.Length,
-                    out Color[] blurredPixels
-                );
-
-                // Premultiplied blending avoids transparent color bleed; retain straight RGB where alpha cannot be divided out.
-                using PooledArray<Color> pooledPremultiplied = SystemArrayPool<Color>.Get(
-                    pixels.Length,
-                    out Color[] premultiplied
-                );
-                for (int i = 0; i < pixels.Length; i++)
-                {
-                    premultiplied[i] = TextureResampling.Premultiply(pixels[i]);
-                }
-
-                using PooledArray<Color> pooledTemp = SystemArrayPool<Color>.Get(
-                    pixels.Length,
-                    out Color[] tempPixels
-                );
-                using PooledArray<Color> pooledTempStraight = SystemArrayPool<Color>.Get(
-                    pixels.Length,
-                    out Color[] tempStraight
-                );
-
-                float[] kernel = GenerateGaussianKernel(radius);
-
-                Parallel.For(
-                    0,
-                    height,
-                    y =>
-                    {
-                        int yOffset = y * width;
-                        for (int x = 0; x < width; x++)
-                        {
-                            Color weightedSum = Color.clear;
-                            Color straightSum = Color.clear;
-                            float weightTotal = 0f;
-
-                            for (int k = -radius; k <= radius; k++)
-                            {
-                                int currentX = x + k;
-                                if (0 <= currentX && currentX < width)
-                                {
-                                    float weight = kernel[k + radius];
-                                    weightedSum += premultiplied[yOffset + currentX] * weight;
-                                    straightSum += pixels[yOffset + currentX] * weight;
-                                    weightTotal += weight;
-                                }
-                            }
-                            tempPixels[yOffset + x] = weightedSum / weightTotal;
-                            tempStraight[yOffset + x] = straightSum / weightTotal;
-                        }
-                    }
-                );
-
-                Parallel.For(
-                    0,
-                    width,
-                    x =>
-                    {
-                        for (int y = 0; y < height; y++)
-                        {
-                            Color weightedSum = Color.clear;
-                            Color straightSum = Color.clear;
-                            float weightTotal = 0f;
-
-                            for (int k = -radius; k <= radius; k++)
-                            {
-                                int currentY = y + k;
-                                if (0 <= currentY && currentY < height)
-                                {
-                                    float weight = kernel[k + radius];
-                                    weightedSum += tempPixels[(currentY * width) + x] * weight;
-                                    straightSum += tempStraight[(currentY * width) + x] * weight;
-                                    weightTotal += weight;
-                                }
-                            }
-                            blurredPixels[(y * width) + x] = TextureResampling.Unpremultiply(
-                                weightedSum / weightTotal,
-                                straightSum / weightTotal
-                            );
-                        }
-                    }
-                );
-
-                blurred.SetPixels(blurredPixels);
-                blurred.Apply();
-                return blurred;
-            }
-            catch
-            {
-                DestroyImmediate(blurred);
-                throw;
-            }
-        }
-
-        private static float[] GenerateGaussianKernel(int radius)
-        {
-            int size = radius * 2 + 1;
-            float[] kernel = new float[size];
-            float sigma = radius / 3.0f;
-            float twoSigmaSquare = 2.0f * sigma * sigma;
-            float sum = 0f;
-
-            for (int i = 0; i < size; i++)
-            {
-                int distance = i - radius;
-                kernel[i] =
-                    Mathf.Exp(-(distance * distance) / twoSigmaSquare)
-                    / (Mathf.Sqrt(Mathf.PI * twoSigmaSquare));
-                sum += kernel[i];
-            }
-
-            for (int i = 0; i < size; i++)
-            {
-                kernel[i] /= sum;
-            }
-
-            return kernel;
         }
     }
 }

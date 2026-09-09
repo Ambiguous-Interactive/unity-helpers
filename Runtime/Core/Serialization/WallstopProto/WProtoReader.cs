@@ -42,6 +42,27 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         /// </remarks>
         public const int MaxNestingDepth = 64;
 
+        /// <summary>
+        /// How many enclosing sub-messages this reader sits inside; 0 for a top-level message.
+        /// </summary>
+        public int Depth => _depth;
+
+        /// <summary>Bytes consumed so far.</summary>
+        public int Position => _position;
+
+        /// <summary>Bytes not yet consumed.</summary>
+        public int Remaining => _buffer.Length - _position;
+
+        /// <summary>Indicates whether every byte has been consumed.</summary>
+        public bool End => _buffer.Length <= _position;
+
+        /// <summary>
+        /// Indicates whether any read has failed. Once set, it stays set and refuses later reads.
+        /// </summary>
+        public bool Malformed => _malformed;
+
+        private WProtoReadLimits Limits => _limits ?? WProtoReadLimits.Default;
+
         private readonly ReadOnlySpan<byte> _buffer;
         private readonly int _depth;
         private readonly WProtoReadLimits _limits;
@@ -115,26 +136,33 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             _malformed = limits.MaximumMessageBytes < buffer.Length;
         }
 
-        private WProtoReadLimits Limits => _limits ?? WProtoReadLimits.Default;
+        internal static bool ReadCompleted(
+            bool formatterSucceeded,
+            in WProtoReader reader,
+            in WProtoReader expected
+        )
+        {
+            return formatterSucceeded
+                && !expected.Malformed
+                && ReferenceEquals(reader.Limits, expected.Limits)
+                && ReferenceEquals(reader._packedBudget, expected._packedBudget)
+                && !reader.Malformed
+                && reader.End
+                && reader.Depth == expected.Depth
+                && reader.Position == expected.Remaining
+                && reader._buffer.Length == expected._buffer.Length
+                && Unsafe.AreSame(
+                    ref MemoryMarshal.GetReference(reader._buffer),
+                    ref MemoryMarshal.GetReference(expected._buffer)
+                );
+        }
 
-        /// <summary>
-        /// How many enclosing sub-messages this reader sits inside; 0 for a top-level message.
-        /// </summary>
-        public int Depth => _depth;
-
-        /// <summary>Bytes consumed so far.</summary>
-        public int Position => _position;
-
-        /// <summary>Bytes not yet consumed.</summary>
-        public int Remaining => _buffer.Length - _position;
-
-        /// <summary>Indicates whether every byte has been consumed.</summary>
-        public bool End => _buffer.Length <= _position;
-
-        /// <summary>
-        /// Indicates whether any read has failed. Once set, it stays set and refuses later reads.
-        /// </summary>
-        public bool Malformed => _malformed;
+        private static PackedReadBudget CreatePackedBudget(WProtoReadLimits limits)
+        {
+            return limits != null && limits.MaximumPackedElementCount < int.MaxValue
+                ? new PackedReadBudget(limits.MaximumPackedElementCount)
+                : null;
+        }
 
         /// <summary>
         /// Reads the next field key.
@@ -649,47 +677,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                 : count;
         }
 
-        private int CountPackedElementsCore(int wireType)
-        {
-            if (_malformed)
-            {
-                return 0;
-            }
-
-            int remaining = Remaining;
-            if (remaining <= 0)
-            {
-                return 0;
-            }
-
-            if (wireType == WProtoWireType.Fixed64)
-            {
-                return remaining / 8;
-            }
-
-            if (wireType == WProtoWireType.Fixed32)
-            {
-                return remaining / 4;
-            }
-
-            if (wireType != WProtoWireType.Varint)
-            {
-                return 0;
-            }
-
-            // Offset indexing measured faster than slicing this varint scan.
-            int count = 0;
-            for (int index = _position; index < _buffer.Length; index++)
-            {
-                if ((_buffer[index] & 0x80) == 0)
-                {
-                    count++;
-                }
-            }
-
-            return count;
-        }
-
         /// <summary>
         /// Reads a length-delimited sub-message and decodes it with <paramref name="formatter"/>.
         /// </summary>
@@ -842,27 +829,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             return false;
         }
 
-        internal static bool ReadCompleted(
-            bool formatterSucceeded,
-            in WProtoReader reader,
-            in WProtoReader expected
-        )
-        {
-            return formatterSucceeded
-                && !expected.Malformed
-                && ReferenceEquals(reader.Limits, expected.Limits)
-                && ReferenceEquals(reader._packedBudget, expected._packedBudget)
-                && !reader.Malformed
-                && reader.End
-                && reader.Depth == expected.Depth
-                && reader.Position == expected.Remaining
-                && reader._buffer.Length == expected._buffer.Length
-                && Unsafe.AreSame(
-                    ref MemoryMarshal.GetReference(reader._buffer),
-                    ref MemoryMarshal.GetReference(expected._buffer)
-                );
-        }
-
         /// <summary>
         /// Reads a length prefix.
         /// </summary>
@@ -907,6 +873,47 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
         {
             // Groups and sub-messages share one nesting budget to prevent multiplied stack depth.
             return TrySkipField(fieldNumber, wireType, _depth);
+        }
+
+        private int CountPackedElementsCore(int wireType)
+        {
+            if (_malformed)
+            {
+                return 0;
+            }
+
+            int remaining = Remaining;
+            if (remaining <= 0)
+            {
+                return 0;
+            }
+
+            if (wireType == WProtoWireType.Fixed64)
+            {
+                return remaining / 8;
+            }
+
+            if (wireType == WProtoWireType.Fixed32)
+            {
+                return remaining / 4;
+            }
+
+            if (wireType != WProtoWireType.Varint)
+            {
+                return 0;
+            }
+
+            // Offset indexing measured faster than slicing this varint scan.
+            int count = 0;
+            for (int index = _position; index < _buffer.Length; index++)
+            {
+                if ((_buffer[index] & 0x80) == 0)
+                {
+                    count++;
+                }
+            }
+
+            return count;
         }
 
         private bool TrySkipField(int fieldNumber, int wireType, int depth)
@@ -1018,13 +1025,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             }
 
             return true;
-        }
-
-        private static PackedReadBudget CreatePackedBudget(WProtoReadLimits limits)
-        {
-            return limits != null && limits.MaximumPackedElementCount < int.MaxValue
-                ? new PackedReadBudget(limits.MaximumPackedElementCount)
-                : null;
         }
 
         private sealed class PackedReadBudget

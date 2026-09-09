@@ -26,6 +26,44 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         private const string Root = "Assets/Temp/ImageBlurToolIntegrationTests";
         private string _testRoot;
 
+        private static void AssertImporterSettings(
+            string relativePath,
+            bool isReadable,
+            TextureImporterCompression compression
+        )
+        {
+            TextureImporter importer = AssetImporter.GetAtPath(relativePath) as TextureImporter;
+            Assert.IsTrue(importer != null);
+            Assert.That(importer.isReadable, Is.EqualTo(isReadable));
+            Assert.That(importer.textureCompression, Is.EqualTo(compression));
+        }
+
+        private static int CountTemporaryTextures()
+        {
+            int count = 0;
+            Texture2D[] textures = Resources.FindObjectsOfTypeAll<Texture2D>();
+            foreach (Texture2D texture in textures)
+            {
+                if (texture != null && texture.name == ImageBlurTool.TemporaryTextureName)
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        private static string RelToFull(string relativePath)
+        {
+            return Path.Combine(
+                    Application.dataPath.Substring(
+                        0,
+                        Application.dataPath.Length - "Assets".Length
+                    ),
+                    relativePath
+                )
+                .SanitizePath();
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -178,44 +216,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 importer.textureCompression = compression;
                 importer.SaveAndReimport();
             });
-        }
-
-        private static void AssertImporterSettings(
-            string relativePath,
-            bool isReadable,
-            TextureImporterCompression compression
-        )
-        {
-            TextureImporter importer = AssetImporter.GetAtPath(relativePath) as TextureImporter;
-            Assert.IsTrue(importer != null);
-            Assert.That(importer.isReadable, Is.EqualTo(isReadable));
-            Assert.That(importer.textureCompression, Is.EqualTo(compression));
-        }
-
-        private static int CountTemporaryTextures()
-        {
-            int count = 0;
-            Texture2D[] textures = Resources.FindObjectsOfTypeAll<Texture2D>();
-            foreach (Texture2D texture in textures)
-            {
-                if (texture != null && texture.name == ImageBlurTool.TemporaryTextureName)
-                {
-                    count++;
-                }
-            }
-            return count;
-        }
-
-        private static string RelToFull(string relativePath)
-        {
-            return Path.Combine(
-                    Application.dataPath.Substring(
-                        0,
-                        Application.dataPath.Length - "Assets".Length
-                    ),
-                    relativePath
-                )
-                .SanitizePath();
         }
     }
 #endif

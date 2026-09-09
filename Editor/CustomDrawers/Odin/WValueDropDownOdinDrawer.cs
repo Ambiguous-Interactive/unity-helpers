@@ -22,6 +22,34 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
     /// </remarks>
     public sealed class WValueDropDownOdinDrawer : OdinAttributeDrawer<WValueDropDownAttribute>
     {
+        internal static int FindSelectedIndex(object currentValue, object[] options)
+        {
+            if (currentValue == null)
+            {
+                return -1;
+            }
+
+            for (int i = 0; i < options.Length; i++)
+            {
+                if (DropDownShared.ValuesMatch(currentValue, options[i]))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        internal static string[] GetDisplayOptions(object[] options)
+        {
+            string[] displayOptions = new string[options.Length];
+            for (int i = 0; i < options.Length; i++)
+            {
+                displayOptions[i] = DropDownShared.FormatOption(options[i]);
+            }
+            return displayOptions;
+        }
+
         /// <summary>
         /// Draws the property as a dropdown selector with the options provided by the attribute.
         /// </summary>
@@ -171,34 +199,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private void ApplySelection(object newValue)
         {
             Property.ValueEntry.WeakSmartValue = newValue;
-        }
-
-        internal static int FindSelectedIndex(object currentValue, object[] options)
-        {
-            if (currentValue == null)
-            {
-                return -1;
-            }
-
-            for (int i = 0; i < options.Length; i++)
-            {
-                if (DropDownShared.ValuesMatch(currentValue, options[i]))
-                {
-                    return i;
-                }
-            }
-
-            return -1;
-        }
-
-        internal static string[] GetDisplayOptions(object[] options)
-        {
-            string[] displayOptions = new string[options.Length];
-            for (int i = 0; i < options.Length; i++)
-            {
-                displayOptions[i] = DropDownShared.FormatOption(options[i]);
-            }
-            return displayOptions;
         }
     }
 #endif

@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     using System.Runtime.CompilerServices;
     using ProtoBuf;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
     using WallstopStudios.UnityHelpers.Utils;
 
@@ -32,16 +33,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private const int BitsPerLongShift = 6;
         private const int BitsPerLongMask = 63;
         private const int DefaultCapacity = 64;
-
-        [SerializeField]
-        [ProtoMember(1)]
-        [WProtoMember(1)]
-        private ulong[] _bits;
-
-        [SerializeField]
-        [ProtoMember(2)]
-        [WProtoMember(2)]
-        private int _capacity;
 
         public int Count => _capacity;
 
@@ -70,11 +61,15 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
         }
 
-        private BitSet()
-        {
-            _capacity = 0;
-            _bits = Array.Empty<ulong>();
-        }
+        [SerializeField]
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        private ulong[] _bits;
+
+        [SerializeField]
+        [ProtoMember(2)]
+        [WProtoMember(2)]
+        private int _capacity;
 
         /// <summary>
         /// Constructs a bit set with the specified initial capacity.
@@ -92,6 +87,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _capacity = initialCapacity;
             int arraySize = WordCountForCapacity(initialCapacity);
             _bits = new ulong[arraySize];
+        }
+
+        private BitSet()
+        {
+            _capacity = 0;
+            _bits = Array.Empty<ulong>();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -192,24 +193,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             int bitIndex = index & BitsPerLongMask;
             value = (_bits[arrayIndex] & (1UL << bitIndex)) != 0;
             return true;
-        }
-
-        // Capacity is an untrusted claim; only delivered words contain readable bits.
-        [ProtoAfterDeserialization]
-        [WProtoAfterDeserialization]
-        private void ClampCapacityToDeliveredWords()
-        {
-            long delivered = _bits == null ? 0L : (long)_bits.Length << BitsPerLongShift;
-            if (_capacity < 0)
-            {
-                _capacity = 0;
-                return;
-            }
-
-            if (delivered < _capacity)
-            {
-                _capacity = (int)delivered;
-            }
         }
 
         /// <summary>
@@ -426,7 +409,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             int count = 0;
             foreach (ulong bit in _bits)
             {
-                count += PopCount(bit);
+                count += BitOps.PopCount(bit);
             }
             return count;
         }
@@ -600,19 +583,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return new ImmutableBitSet(bitsCopy, _capacity);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static int PopCount(ulong value)
-        {
-            // Brian Kernighan's algorithm
-            int count = 0;
-            while (value != 0)
-            {
-                value &= value - 1;
-                count++;
-            }
-            return count;
-        }
-
         /// <summary>
         /// Returns an enumerator that iterates through all bit values (true/false) in order.
         /// Use foreach to iterate over all bits.
@@ -620,6 +590,24 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         public BitEnumerator GetEnumerator()
         {
             return new BitEnumerator(this);
+        }
+
+        // Capacity is an untrusted claim; only delivered words contain readable bits.
+        [ProtoAfterDeserialization]
+        [WProtoAfterDeserialization]
+        private void ClampCapacityToDeliveredWords()
+        {
+            long delivered = _bits == null ? 0L : (long)_bits.Length << BitsPerLongShift;
+            if (_capacity < 0)
+            {
+                _capacity = 0;
+                return;
+            }
+
+            if (delivered < _capacity)
+            {
+                _capacity = (int)delivered;
+            }
         }
 
         IEnumerator<bool> IEnumerable<bool>.GetEnumerator()
@@ -634,6 +622,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         public struct BitEnumerator : IEnumerator<bool>
         {
+            public bool Current => _current;
+
+            object IEnumerator.Current => Current;
+
             private readonly BitSet _bitSet;
             private int _index;
             private bool _current;
@@ -655,10 +647,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 _current = false;
                 return false;
             }
-
-            public bool Current => _current;
-
-            object IEnumerator.Current => Current;
 
             public void Reset()
             {

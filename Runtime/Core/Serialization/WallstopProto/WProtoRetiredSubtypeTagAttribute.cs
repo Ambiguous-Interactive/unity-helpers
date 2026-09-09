@@ -29,6 +29,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true, Inherited = false)]
     public sealed class WProtoRetiredSubtypeTagAttribute : Attribute
     {
+        /// <summary>The fully qualified name of the subtype that held this field number.</summary>
+        public string SubTypeName { get; }
+
+        /// <summary>The base whose field-number space the retired number belongs to.</summary>
+        public Type BaseType { get; }
+
+        /// <summary>The field number no other subtype of that base may take.</summary>
+        public int Tag { get; }
+
         /// <summary>
         /// Initializes the entry with the removed type's name and the number it held.
         /// </summary>
@@ -41,14 +50,5 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             BaseType = baseType;
             Tag = tag;
         }
-
-        /// <summary>The fully qualified name of the subtype that held this field number.</summary>
-        public string SubTypeName { get; }
-
-        /// <summary>The base whose field-number space the retired number belongs to.</summary>
-        public Type BaseType { get; }
-
-        /// <summary>The field number no other subtype of that base may take.</summary>
-        public int Tag { get; }
     }
 }

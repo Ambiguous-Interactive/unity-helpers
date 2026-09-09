@@ -30,6 +30,70 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [TestFixture]
     public sealed class DuplicateFieldDifferentialTests
     {
+        private static bool TryDecodeChain(int links)
+        {
+            List<byte> payload = new List<byte>();
+            for (int level = 0; level < links; level++)
+            {
+                List<byte> wrapped = new List<byte> { 0x12 };
+                int length = payload.Count;
+                while (0x7F < length)
+                {
+                    wrapped.Add((byte)((length & 0x7F) | 0x80));
+                    length >>= 7;
+                }
+
+                wrapped.Add((byte)length);
+                wrapped.AddRange(payload);
+                payload = wrapped;
+            }
+
+            WProtoReader reader = new WProtoReader(payload.ToArray());
+            return WProtoFormatterProvider
+                .Get<ChainContract>()
+                .TryRead(ref reader, out ChainContract _);
+        }
+
+        private static byte[] Parse(string hex)
+        {
+            byte[] bytes = new byte[hex.Length / 2];
+            for (int index = 0; index < bytes.Length; index++)
+            {
+                bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
+            }
+
+            return bytes;
+        }
+
+        private static T Decode<T>(string hex)
+        {
+            WProtoReader reader = new WProtoReader(Parse(hex));
+            Assert.IsTrue(WProtoFormatterProvider.Get<T>().TryRead(ref reader, out T value), hex);
+            return value;
+        }
+
+        private static bool OracleAccepts<T>(string hex)
+        {
+            try
+            {
+                OracleDecode<T>(hex);
+                return true;
+            }
+            catch (Exception)
+            {
+                // Compare rejection verdicts; the oracle throws where this API returns false.
+                return false;
+            }
+        }
+
+        private static T OracleDecode<T>(string hex)
+        {
+            using (MemoryStream stream = new MemoryStream(Parse(hex)))
+            {
+                return ProtoBuf.Serializer.Deserialize<T>(stream);
+            }
+        }
+
         [Test]
         public void ADuplicatedSubMessageMergesRatherThanReplacing()
         {
@@ -480,70 +544,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 Decode<SkipSeedParent>(values).Child.Values,
                 values
             );
-        }
-
-        private static bool TryDecodeChain(int links)
-        {
-            List<byte> payload = new List<byte>();
-            for (int level = 0; level < links; level++)
-            {
-                List<byte> wrapped = new List<byte> { 0x12 };
-                int length = payload.Count;
-                while (0x7F < length)
-                {
-                    wrapped.Add((byte)((length & 0x7F) | 0x80));
-                    length >>= 7;
-                }
-
-                wrapped.Add((byte)length);
-                wrapped.AddRange(payload);
-                payload = wrapped;
-            }
-
-            WProtoReader reader = new WProtoReader(payload.ToArray());
-            return WProtoFormatterProvider
-                .Get<ChainContract>()
-                .TryRead(ref reader, out ChainContract _);
-        }
-
-        private static byte[] Parse(string hex)
-        {
-            byte[] bytes = new byte[hex.Length / 2];
-            for (int index = 0; index < bytes.Length; index++)
-            {
-                bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
-            }
-
-            return bytes;
-        }
-
-        private static T Decode<T>(string hex)
-        {
-            WProtoReader reader = new WProtoReader(Parse(hex));
-            Assert.IsTrue(WProtoFormatterProvider.Get<T>().TryRead(ref reader, out T value), hex);
-            return value;
-        }
-
-        private static bool OracleAccepts<T>(string hex)
-        {
-            try
-            {
-                OracleDecode<T>(hex);
-                return true;
-            }
-            catch (Exception)
-            {
-                // Compare rejection verdicts; the oracle throws where this API returns false.
-                return false;
-            }
-        }
-
-        private static T OracleDecode<T>(string hex)
-        {
-            using (MemoryStream stream = new MemoryStream(Parse(hex)))
-            {
-                return ProtoBuf.Serializer.Deserialize<T>(stream);
-            }
         }
     }
 }

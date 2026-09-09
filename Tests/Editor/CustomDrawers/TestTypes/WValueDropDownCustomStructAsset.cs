@@ -16,14 +16,24 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers.TestTypes
     [Serializable]
     internal struct TestEquatableStruct : IEquatable<TestEquatableStruct>
     {
+        public static bool operator ==(TestEquatableStruct left, TestEquatableStruct right)
+        {
+            return left.Equals(right);
+        }
+
+        public static bool operator !=(TestEquatableStruct left, TestEquatableStruct right)
+        {
+            return !left.Equals(right);
+        }
+
+        public int Id => _id;
+        public string Name => _name ?? string.Empty;
+
         [SerializeField]
         private int _id;
 
         [SerializeField]
         private string _name;
-
-        public int Id => _id;
-        public string Name => _name ?? string.Empty;
 
         public TestEquatableStruct(int id, string name)
         {
@@ -49,16 +59,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers.TestTypes
         public override string ToString()
         {
             return $"{_name} ({_id})";
-        }
-
-        public static bool operator ==(TestEquatableStruct left, TestEquatableStruct right)
-        {
-            return left.Equals(right);
-        }
-
-        public static bool operator !=(TestEquatableStruct left, TestEquatableStruct right)
-        {
-            return !left.Equals(right);
         }
     }
 

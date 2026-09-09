@@ -26,31 +26,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
     {
         private UnityHelpersSettings.WGroupAutoIncludeConfiguration _previousConfiguration;
 
-        [SetUp]
-        public override void BaseSetUp()
-        {
-            base.BaseSetUp();
-            WGroupLayoutBuilder.ClearCache();
-
-            _previousConfiguration = UnityHelpersSettings.GetWGroupAutoIncludeConfiguration();
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
-                UnityHelpersSettings.WGroupAutoIncludeMode.None,
-                0
-            );
-        }
-
-        [TearDown]
-        public override void TearDown()
-        {
-            WGroupLayoutBuilder.ClearCache();
-
-            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
-                _previousConfiguration.Mode,
-                _previousConfiguration.RowCount
-            );
-            base.TearDown();
-        }
-
         /// <summary>
         /// Formats layout information for diagnostic output when tests fail.
         /// </summary>
@@ -94,6 +69,250 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
             lines.Add($"  [{string.Join(", ", layout.HiddenPropertyPaths)}]");
 
             return string.Join("\n", lines);
+        }
+
+        /// <summary>
+        /// Test cases for display name resolution behavior.
+        /// Tests various scenarios where display names are set on different fields.
+        /// </summary>
+        private static IEnumerable<TestCaseData> DisplayNameResolutionTestCases()
+        {
+            yield return new TestCaseData("GroupA", "Custom Display A", 3).SetName(
+                "DisplayName.FirstFieldHasCustomName.Preserved"
+            );
+
+            yield return new TestCaseData("GroupB", "Custom Display B", 3).SetName(
+                "DisplayName.SecondFieldHasCustomName.Wins"
+            );
+
+            yield return new TestCaseData("GroupC", "Custom Display C", 3).SetName(
+                "DisplayName.LastFieldHasCustomName.Wins"
+            );
+
+            yield return new TestCaseData("GroupD", "GroupD", 2).SetName(
+                "DisplayName.NoExplicitName.UsesGroupName"
+            );
+
+            yield return new TestCaseData("GroupE", "Second Display E", 2).SetName(
+                "DisplayName.ConflictingNames.LastExplicitWins"
+            );
+        }
+
+        /// <summary>
+        /// Test cases for auto-include mode behavior using WGroupAutoIncludeTestTarget.
+        /// The target has: [WGroup("Auto Group")] autoGroupFirst (uses UseGlobalAutoInclude),
+        /// then autoIncluded1, autoIncluded2, notAutoIncluded (no attributes).
+        ///
+        /// IMPORTANT: The attribute uses default autoIncludeCount (UseGlobalAutoInclude = -2)
+        /// which means the global WGroupAutoIncludeConfiguration controls how many
+        /// subsequent fields are captured. If an attribute explicitly specifies
+        /// autoIncludeCount (e.g., autoIncludeCount: 2), that value would override the
+        /// global setting entirely.
+        ///
+        /// Note: WGroupLayoutTestTarget is NOT suitable for these tests because it has
+        /// explicit [WGroup] attributes on most fields. Auto-include only captures
+        /// fields that don't have explicit group assignments.
+        ///
+        /// Each case specifies: mode, row count, expected property count for "Auto Group",
+        /// and whether notAutoIncluded should be in any group.
+        /// </summary>
+        private static IEnumerable<TestCaseData> AutoIncludeModeTestCases()
+        {
+            yield return new TestCaseData(
+                UnityHelpersSettings.WGroupAutoIncludeMode.None,
+                0,
+                1,
+                false
+            ).SetName("AutoInclude.None.OnlyExplicitFields");
+
+            yield return new TestCaseData(
+                UnityHelpersSettings.WGroupAutoIncludeMode.Infinite,
+                0,
+                4,
+                true
+            ).SetName("AutoInclude.Infinite.CapturesAllSubsequent");
+
+            yield return new TestCaseData(
+                UnityHelpersSettings.WGroupAutoIncludeMode.Finite,
+                1,
+                2,
+                false
+            ).SetName("AutoInclude.Finite1.CapturesOneExtra");
+
+            yield return new TestCaseData(
+                UnityHelpersSettings.WGroupAutoIncludeMode.Finite,
+                2,
+                3,
+                false
+            ).SetName("AutoInclude.Finite2.CapturesTwoExtra");
+
+            yield return new TestCaseData(
+                UnityHelpersSettings.WGroupAutoIncludeMode.Finite,
+                3,
+                4,
+                true
+            ).SetName("AutoInclude.Finite3.CapturesThreeExtra");
+        }
+
+        /// <summary>
+        /// Test cases for auto-include behavior using WGroupLayoutTestTarget.
+        /// This target has multiple groups with explicit [WGroup] attributes.
+        /// Auto-include only affects the single unattributed field: ungroupedField.
+        ///
+        /// Field layout:
+        /// - fieldA1, fieldA2: explicit Group A
+        /// - fieldB1, fieldB2: explicit Group B
+        /// - ungroupedField: NO attribute (can be auto-included)
+        /// - fieldC1: explicit Group C
+        ///
+        /// In infinite mode, the last active group (Group B) should capture ungroupedField.
+        /// </summary>
+        private static IEnumerable<TestCaseData> MultiGroupAutoIncludeTestCases()
+        {
+            yield return new TestCaseData(
+                UnityHelpersSettings.WGroupAutoIncludeMode.None,
+                0,
+                false,
+                2,
+                "Group B"
+            ).SetName("MultiGroup.None.UngroupedStaysUngrouped");
+
+            yield return new TestCaseData(
+                UnityHelpersSettings.WGroupAutoIncludeMode.Infinite,
+                0,
+                true,
+                3,
+                "Group B"
+            ).SetName("MultiGroup.Infinite.UngroupedCapturedByLastActiveGroup");
+
+            yield return new TestCaseData(
+                UnityHelpersSettings.WGroupAutoIncludeMode.Finite,
+                1,
+                true,
+                3,
+                "Group B"
+            ).SetName("MultiGroup.Finite1.UngroupedCapturedByGroupB");
+        }
+
+        /// <summary>
+        /// Test cases for explicit autoIncludeCount on the attribute.
+        /// When an attribute specifies an explicit count, it should override global settings entirely.
+        ///
+        /// Each case specifies: global mode, global row count, expected property count for the group.
+        /// The explicit count is always 2, so regardless of global settings, exactly 2 additional
+        /// fields should be captured.
+        /// </summary>
+        private static IEnumerable<TestCaseData> ExplicitAutoIncludeCountTestCases()
+        {
+            yield return new TestCaseData(
+                UnityHelpersSettings.WGroupAutoIncludeMode.None,
+                0,
+                3,
+                new[]
+                {
+                    nameof(WGroupExplicitAutoIncludeTestTarget.explicitGroupFirst),
+                    nameof(WGroupExplicitAutoIncludeTestTarget.captured1),
+                    nameof(WGroupExplicitAutoIncludeTestTarget.captured2),
+                }
+            ).SetName("ExplicitCount.OverridesGlobalNone");
+
+            yield return new TestCaseData(
+                UnityHelpersSettings.WGroupAutoIncludeMode.Infinite,
+                0,
+                3,
+                new[]
+                {
+                    nameof(WGroupExplicitAutoIncludeTestTarget.explicitGroupFirst),
+                    nameof(WGroupExplicitAutoIncludeTestTarget.captured1),
+                    nameof(WGroupExplicitAutoIncludeTestTarget.captured2),
+                }
+            ).SetName("ExplicitCount.OverridesGlobalInfinite");
+
+            yield return new TestCaseData(
+                UnityHelpersSettings.WGroupAutoIncludeMode.Finite,
+                5,
+                3,
+                new[]
+                {
+                    nameof(WGroupExplicitAutoIncludeTestTarget.explicitGroupFirst),
+                    nameof(WGroupExplicitAutoIncludeTestTarget.captured1),
+                    nameof(WGroupExplicitAutoIncludeTestTarget.captured2),
+                }
+            ).SetName("ExplicitCount.OverridesGlobalFiniteHigher");
+
+            yield return new TestCaseData(
+                UnityHelpersSettings.WGroupAutoIncludeMode.Finite,
+                1,
+                3,
+                new[]
+                {
+                    nameof(WGroupExplicitAutoIncludeTestTarget.explicitGroupFirst),
+                    nameof(WGroupExplicitAutoIncludeTestTarget.captured1),
+                    nameof(WGroupExplicitAutoIncludeTestTarget.captured2),
+                }
+            ).SetName("ExplicitCount.OverridesGlobalFiniteLower");
+        }
+
+        /// <summary>
+        /// Membership cases for reading-order auto-include (#455). A null expected group name
+        /// means the member must not belong to any group.
+        /// </summary>
+        private static IEnumerable<TestCaseData> ReadingOrderMembershipTestCases()
+        {
+            yield return new TestCaseData(
+                typeof(WGroupReopenedGroupTestTarget),
+                nameof(WGroupReopenedGroupTestTarget.alphaAuto),
+                "Alpha"
+            ).SetName("ReadingOrder.FirstGroupCapturesBeforeSecondOpens");
+
+            yield return new TestCaseData(
+                typeof(WGroupReopenedGroupTestTarget),
+                nameof(WGroupReopenedGroupTestTarget.betaAuto),
+                "Beta"
+            ).SetName("ReadingOrder.SecondGroupCaptures");
+
+            yield return new TestCaseData(
+                typeof(WGroupReopenedGroupTestTarget),
+                nameof(WGroupReopenedGroupTestTarget.alphaAfterReopen),
+                "Alpha"
+            ).SetName("ReadingOrder.ReopenedGroupRetargetsAutoInclude");
+
+            yield return new TestCaseData(
+                typeof(WGroupBareEndTestTarget),
+                nameof(WGroupBareEndTestTarget.alphaClosing),
+                "Alpha"
+            ).SetName("BareEnd.TerminatingMemberJoinsItsOwnGroup");
+
+            yield return new TestCaseData(
+                typeof(WGroupBareEndTestTarget),
+                nameof(WGroupBareEndTestTarget.ungrouped),
+                null
+            ).SetName("BareEnd.ClosesEveryActiveGroup");
+        }
+
+        [SetUp]
+        public override void BaseSetUp()
+        {
+            base.BaseSetUp();
+            WGroupLayoutBuilder.ClearCache();
+
+            _previousConfiguration = UnityHelpersSettings.GetWGroupAutoIncludeConfiguration();
+            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+                UnityHelpersSettings.WGroupAutoIncludeMode.None,
+                0
+            );
+        }
+
+        [TearDown]
+        public override void TearDown()
+        {
+            WGroupLayoutBuilder.ClearCache();
+
+            UnityHelpersSettings.SetWGroupAutoIncludeConfigurationForTests(
+                _previousConfiguration.Mode,
+                _previousConfiguration.RowCount
+            );
+            base.TearDown();
         }
 
         [Test]
@@ -238,33 +457,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 Is.EqualTo("Group C"),
                 () =>
                     $"Group C display name expected 'Group C' but was '{groupC.DisplayName}'.\n{FormatLayoutDiagnostics(layout)}"
-            );
-        }
-
-        /// <summary>
-        /// Test cases for display name resolution behavior.
-        /// Tests various scenarios where display names are set on different fields.
-        /// </summary>
-        private static IEnumerable<TestCaseData> DisplayNameResolutionTestCases()
-        {
-            yield return new TestCaseData("GroupA", "Custom Display A", 3).SetName(
-                "DisplayName.FirstFieldHasCustomName.Preserved"
-            );
-
-            yield return new TestCaseData("GroupB", "Custom Display B", 3).SetName(
-                "DisplayName.SecondFieldHasCustomName.Wins"
-            );
-
-            yield return new TestCaseData("GroupC", "Custom Display C", 3).SetName(
-                "DisplayName.LastFieldHasCustomName.Wins"
-            );
-
-            yield return new TestCaseData("GroupD", "GroupD", 2).SetName(
-                "DisplayName.NoExplicitName.UsesGroupName"
-            );
-
-            yield return new TestCaseData("GroupE", "Second Display E", 2).SetName(
-                "DisplayName.ConflictingNames.LastExplicitWins"
             );
         }
 
@@ -478,62 +670,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
             );
         }
 
-        /// <summary>
-        /// Test cases for auto-include mode behavior using WGroupAutoIncludeTestTarget.
-        /// The target has: [WGroup("Auto Group")] autoGroupFirst (uses UseGlobalAutoInclude),
-        /// then autoIncluded1, autoIncluded2, notAutoIncluded (no attributes).
-        ///
-        /// IMPORTANT: The attribute uses default autoIncludeCount (UseGlobalAutoInclude = -2)
-        /// which means the global WGroupAutoIncludeConfiguration controls how many
-        /// subsequent fields are captured. If an attribute explicitly specifies
-        /// autoIncludeCount (e.g., autoIncludeCount: 2), that value would override the
-        /// global setting entirely.
-        ///
-        /// Note: WGroupLayoutTestTarget is NOT suitable for these tests because it has
-        /// explicit [WGroup] attributes on most fields. Auto-include only captures
-        /// fields that don't have explicit group assignments.
-        ///
-        /// Each case specifies: mode, row count, expected property count for "Auto Group",
-        /// and whether notAutoIncluded should be in any group.
-        /// </summary>
-        private static IEnumerable<TestCaseData> AutoIncludeModeTestCases()
-        {
-            yield return new TestCaseData(
-                UnityHelpersSettings.WGroupAutoIncludeMode.None,
-                0,
-                1,
-                false
-            ).SetName("AutoInclude.None.OnlyExplicitFields");
-
-            yield return new TestCaseData(
-                UnityHelpersSettings.WGroupAutoIncludeMode.Infinite,
-                0,
-                4,
-                true
-            ).SetName("AutoInclude.Infinite.CapturesAllSubsequent");
-
-            yield return new TestCaseData(
-                UnityHelpersSettings.WGroupAutoIncludeMode.Finite,
-                1,
-                2,
-                false
-            ).SetName("AutoInclude.Finite1.CapturesOneExtra");
-
-            yield return new TestCaseData(
-                UnityHelpersSettings.WGroupAutoIncludeMode.Finite,
-                2,
-                3,
-                false
-            ).SetName("AutoInclude.Finite2.CapturesTwoExtra");
-
-            yield return new TestCaseData(
-                UnityHelpersSettings.WGroupAutoIncludeMode.Finite,
-                3,
-                4,
-                true
-            ).SetName("AutoInclude.Finite3.CapturesThreeExtra");
-        }
-
         [Test]
         [TestCaseSource(nameof(AutoIncludeModeTestCases))]
         public void AutoIncludeModeAffectsGroupCapture(
@@ -574,46 +710,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                 () =>
                     $"Mode={mode}, RowCount={rowCount}: notAutoIncluded expected in groups: {expectNotAutoIncludedInGroup}, actual: {notAutoIncludedInGroup}.\n{FormatLayoutDiagnostics(layout)}"
             );
-        }
-
-        /// <summary>
-        /// Test cases for auto-include behavior using WGroupLayoutTestTarget.
-        /// This target has multiple groups with explicit [WGroup] attributes.
-        /// Auto-include only affects the single unattributed field: ungroupedField.
-        ///
-        /// Field layout:
-        /// - fieldA1, fieldA2: explicit Group A
-        /// - fieldB1, fieldB2: explicit Group B
-        /// - ungroupedField: NO attribute (can be auto-included)
-        /// - fieldC1: explicit Group C
-        ///
-        /// In infinite mode, the last active group (Group B) should capture ungroupedField.
-        /// </summary>
-        private static IEnumerable<TestCaseData> MultiGroupAutoIncludeTestCases()
-        {
-            yield return new TestCaseData(
-                UnityHelpersSettings.WGroupAutoIncludeMode.None,
-                0,
-                false,
-                2,
-                "Group B"
-            ).SetName("MultiGroup.None.UngroupedStaysUngrouped");
-
-            yield return new TestCaseData(
-                UnityHelpersSettings.WGroupAutoIncludeMode.Infinite,
-                0,
-                true,
-                3,
-                "Group B"
-            ).SetName("MultiGroup.Infinite.UngroupedCapturedByLastActiveGroup");
-
-            yield return new TestCaseData(
-                UnityHelpersSettings.WGroupAutoIncludeMode.Finite,
-                1,
-                true,
-                3,
-                "Group B"
-            ).SetName("MultiGroup.Finite1.UngroupedCapturedByGroupB");
         }
 
         [Test]
@@ -665,65 +761,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                         $"Mode={mode}: ungroupedField expected in {expectedCapturingGroup}.\n{FormatLayoutDiagnostics(layout)}"
                 );
             }
-        }
-
-        /// <summary>
-        /// Test cases for explicit autoIncludeCount on the attribute.
-        /// When an attribute specifies an explicit count, it should override global settings entirely.
-        ///
-        /// Each case specifies: global mode, global row count, expected property count for the group.
-        /// The explicit count is always 2, so regardless of global settings, exactly 2 additional
-        /// fields should be captured.
-        /// </summary>
-        private static IEnumerable<TestCaseData> ExplicitAutoIncludeCountTestCases()
-        {
-            yield return new TestCaseData(
-                UnityHelpersSettings.WGroupAutoIncludeMode.None,
-                0,
-                3,
-                new[]
-                {
-                    nameof(WGroupExplicitAutoIncludeTestTarget.explicitGroupFirst),
-                    nameof(WGroupExplicitAutoIncludeTestTarget.captured1),
-                    nameof(WGroupExplicitAutoIncludeTestTarget.captured2),
-                }
-            ).SetName("ExplicitCount.OverridesGlobalNone");
-
-            yield return new TestCaseData(
-                UnityHelpersSettings.WGroupAutoIncludeMode.Infinite,
-                0,
-                3,
-                new[]
-                {
-                    nameof(WGroupExplicitAutoIncludeTestTarget.explicitGroupFirst),
-                    nameof(WGroupExplicitAutoIncludeTestTarget.captured1),
-                    nameof(WGroupExplicitAutoIncludeTestTarget.captured2),
-                }
-            ).SetName("ExplicitCount.OverridesGlobalInfinite");
-
-            yield return new TestCaseData(
-                UnityHelpersSettings.WGroupAutoIncludeMode.Finite,
-                5,
-                3,
-                new[]
-                {
-                    nameof(WGroupExplicitAutoIncludeTestTarget.explicitGroupFirst),
-                    nameof(WGroupExplicitAutoIncludeTestTarget.captured1),
-                    nameof(WGroupExplicitAutoIncludeTestTarget.captured2),
-                }
-            ).SetName("ExplicitCount.OverridesGlobalFiniteHigher");
-
-            yield return new TestCaseData(
-                UnityHelpersSettings.WGroupAutoIncludeMode.Finite,
-                1,
-                3,
-                new[]
-                {
-                    nameof(WGroupExplicitAutoIncludeTestTarget.explicitGroupFirst),
-                    nameof(WGroupExplicitAutoIncludeTestTarget.captured1),
-                    nameof(WGroupExplicitAutoIncludeTestTarget.captured2),
-                }
-            ).SetName("ExplicitCount.OverridesGlobalFiniteLower");
         }
 
         [Test]
@@ -1272,43 +1309,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
                     );
                 }
             }
-        }
-
-        /// <summary>
-        /// Membership cases for reading-order auto-include (#455). A null expected group name
-        /// means the member must not belong to any group.
-        /// </summary>
-        private static IEnumerable<TestCaseData> ReadingOrderMembershipTestCases()
-        {
-            yield return new TestCaseData(
-                typeof(WGroupReopenedGroupTestTarget),
-                nameof(WGroupReopenedGroupTestTarget.alphaAuto),
-                "Alpha"
-            ).SetName("ReadingOrder.FirstGroupCapturesBeforeSecondOpens");
-
-            yield return new TestCaseData(
-                typeof(WGroupReopenedGroupTestTarget),
-                nameof(WGroupReopenedGroupTestTarget.betaAuto),
-                "Beta"
-            ).SetName("ReadingOrder.SecondGroupCaptures");
-
-            yield return new TestCaseData(
-                typeof(WGroupReopenedGroupTestTarget),
-                nameof(WGroupReopenedGroupTestTarget.alphaAfterReopen),
-                "Alpha"
-            ).SetName("ReadingOrder.ReopenedGroupRetargetsAutoInclude");
-
-            yield return new TestCaseData(
-                typeof(WGroupBareEndTestTarget),
-                nameof(WGroupBareEndTestTarget.alphaClosing),
-                "Alpha"
-            ).SetName("BareEnd.TerminatingMemberJoinsItsOwnGroup");
-
-            yield return new TestCaseData(
-                typeof(WGroupBareEndTestTarget),
-                nameof(WGroupBareEndTestTarget.ungrouped),
-                null
-            ).SetName("BareEnd.ClosesEveryActiveGroup");
         }
 
         [Test]

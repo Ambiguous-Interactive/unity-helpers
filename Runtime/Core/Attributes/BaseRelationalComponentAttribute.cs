@@ -92,7 +92,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             get => _maxCount;
             set => _maxCount = value < 0 ? 0 : value;
         }
-        private int _maxCount;
 
         /// <summary>
         /// If set, only finds components on GameObjects with this tag.
@@ -110,6 +109,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// Set to false to match only the exact concrete type, including nonsealed types; interfaces and derived types are excluded.
         /// </summary>
         public bool AllowInterfaces { get; set; } = true;
+        private int _maxCount;
     }
 
     /// <summary>
@@ -117,12 +117,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     /// </summary>
     internal static class RelationalComponentProcessor
     {
-        private static readonly MethodInfo CreateFieldAccessorGenericMethod =
-            typeof(RelationalComponentProcessor).GetMethod(
-                nameof(CreateFieldAccessorGeneric),
-                BindingFlags.NonPublic | BindingFlags.Static
-            );
-
         /// <summary>
         /// Largest backing array a reused scratch list keeps between calls.
         /// </summary>
@@ -132,108 +126,11 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// </remarks>
         internal const int MaximumRetainedScratchCapacity = 4_096;
 
-        private static FieldKind MapFieldKind(AttributeMetadataCache.FieldKind cacheKind)
-        {
-            return cacheKind switch
-            {
-#pragma warning disable CS0618
-                AttributeMetadataCache.FieldKind.None => FieldKind.Single,
-#pragma warning restore CS0618
-                AttributeMetadataCache.FieldKind.Single => FieldKind.Single,
-                AttributeMetadataCache.FieldKind.Array => FieldKind.Array,
-                AttributeMetadataCache.FieldKind.List => FieldKind.List,
-                AttributeMetadataCache.FieldKind.HashSet => FieldKind.HashSet,
-                _ => FieldKind.Single,
-            };
-        }
-
-        /// <summary>
-        /// Picks between the element type the cache recorded and the one this field's own type
-        /// gives, preferring the cache except where it cannot be describing this field.
-        /// </summary>
-        /// <remarks>
-        /// The cache is keyed by component type and field name, so two same-named fields of
-        /// different types share one slot and the later write wins. A recorded type unrelated to
-        /// the live field's is therefore the other field's, and following it would search for the
-        /// wrong component type.
-        /// </remarks>
-        private static Type ChooseElementType(Type cached, Type live, Type fieldType)
-        {
-            if (cached == null)
-            {
-                return live ?? fieldType;
-            }
-
-            if (live == null)
-            {
-                return cached;
-            }
-
-            bool related =
-                cached == live || cached.IsAssignableFrom(live) || live.IsAssignableFrom(cached);
-            return related ? cached : live;
-        }
-
-        private static FieldKind GetFieldKind(Type fieldType, out Type elementType)
-        {
-            if (fieldType == null)
-            {
-                elementType = null;
-                return FieldKind.Single;
-            }
-
-            if (fieldType.IsArray)
-            {
-                elementType = fieldType.GetElementType();
-                return FieldKind.Array;
-            }
-
-            if (fieldType.IsGenericType)
-            {
-                Type genericType = fieldType.GetGenericTypeDefinition();
-                if (genericType == typeof(List<>))
-                {
-                    elementType = fieldType.GenericTypeArguments[0];
-                    return FieldKind.List;
-                }
-
-                if (genericType == typeof(HashSet<>))
-                {
-                    elementType = fieldType.GenericTypeArguments[0];
-                    return FieldKind.HashSet;
-                }
-            }
-
-            elementType = fieldType;
-            return FieldKind.Single;
-        }
-
-        private static FieldAccessor CreateFieldAccessor(Type componentType, FieldInfo field)
-        {
-            if (componentType == null || !typeof(Component).IsAssignableFrom(componentType))
-            {
-                return FieldAccessor.Null;
-            }
-
-            // Use the field declaration type so inherited fields share a compiled accessor.
-            Type declaringType = field.DeclaringType;
-            Type accessorComponentType =
-                declaringType != null && typeof(Component).IsAssignableFrom(declaringType)
-                    ? declaringType
-                    : componentType;
-
-            MethodInfo generic = CreateFieldAccessorGenericMethod.MakeGenericMethod(
-                accessorComponentType,
-                field.FieldType
+        private static readonly MethodInfo CreateFieldAccessorGenericMethod =
+            typeof(RelationalComponentProcessor).GetMethod(
+                nameof(CreateFieldAccessorGeneric),
+                BindingFlags.NonPublic | BindingFlags.Static
             );
-            return (FieldAccessor)generic.Invoke(null, new object[] { field });
-        }
-
-        private static FieldAccessor CreateFieldAccessorGeneric<TComponent, TValue>(FieldInfo field)
-            where TComponent : Component
-        {
-            return new FieldAccessor<TComponent, TValue>(field);
-        }
 
         /// <summary>
         /// Builds the typed array a collection field of <paramref name="elementType"/> holds, taking
@@ -449,31 +346,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             }
 
             return results.ToArray();
-        }
-
-        private static AttributeMetadataCache.RelationalAttributeKind GetRelationalKind<TAttribute>()
-            where TAttribute : BaseRelationalComponentAttribute
-        {
-            Type attributeType = typeof(TAttribute);
-
-            if (attributeType == typeof(ParentComponentAttribute))
-            {
-                return AttributeMetadataCache.RelationalAttributeKind.Parent;
-            }
-            else if (attributeType == typeof(ChildComponentAttribute))
-            {
-                return AttributeMetadataCache.RelationalAttributeKind.Child;
-            }
-            else if (attributeType == typeof(SiblingComponentAttribute))
-            {
-                return AttributeMetadataCache.RelationalAttributeKind.Sibling;
-            }
-
-#pragma warning disable CS0618
-
-            return AttributeMetadataCache.RelationalAttributeKind.Unknown;
-
-#pragma warning restore CS0618
         }
 
         internal static bool ShouldSkipAssignment<TAttribute>(
@@ -726,28 +598,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             return writeIndex;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        // The Boolean result avoids another native Unity aliveness check (#529).
-        private static bool TryFirstMatchingComponent(
-            List<Component> components,
-            FilterParameters filters,
-            bool filterDisabledComponents,
-            out Component match
-        )
-        {
-            foreach (Component candidate in components)
-            {
-                if (PassesStateAndFilters(candidate, filters, filterDisabledComponents))
-                {
-                    match = candidate;
-                    return true;
-                }
-            }
-
-            match = null;
-            return false;
-        }
-
         internal static bool TryResolveSingleComponent(
             Component component,
             FilterParameters filters,
@@ -844,6 +694,156 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             return buffer;
         }
 
+        private static FieldKind MapFieldKind(AttributeMetadataCache.FieldKind cacheKind)
+        {
+            return cacheKind switch
+            {
+#pragma warning disable CS0618
+                AttributeMetadataCache.FieldKind.None => FieldKind.Single,
+#pragma warning restore CS0618
+                AttributeMetadataCache.FieldKind.Single => FieldKind.Single,
+                AttributeMetadataCache.FieldKind.Array => FieldKind.Array,
+                AttributeMetadataCache.FieldKind.List => FieldKind.List,
+                AttributeMetadataCache.FieldKind.HashSet => FieldKind.HashSet,
+                _ => FieldKind.Single,
+            };
+        }
+
+        /// <summary>
+        /// Picks between the element type the cache recorded and the one this field's own type
+        /// gives, preferring the cache except where it cannot be describing this field.
+        /// </summary>
+        /// <remarks>
+        /// The cache is keyed by component type and field name, so two same-named fields of
+        /// different types share one slot and the later write wins. A recorded type unrelated to
+        /// the live field's is therefore the other field's, and following it would search for the
+        /// wrong component type.
+        /// </remarks>
+        private static Type ChooseElementType(Type cached, Type live, Type fieldType)
+        {
+            if (cached == null)
+            {
+                return live ?? fieldType;
+            }
+
+            if (live == null)
+            {
+                return cached;
+            }
+
+            bool related =
+                cached == live || cached.IsAssignableFrom(live) || live.IsAssignableFrom(cached);
+            return related ? cached : live;
+        }
+
+        private static FieldKind GetFieldKind(Type fieldType, out Type elementType)
+        {
+            if (fieldType == null)
+            {
+                elementType = null;
+                return FieldKind.Single;
+            }
+
+            if (fieldType.IsArray)
+            {
+                elementType = fieldType.GetElementType();
+                return FieldKind.Array;
+            }
+
+            if (fieldType.IsGenericType)
+            {
+                Type genericType = fieldType.GetGenericTypeDefinition();
+                if (genericType == typeof(List<>))
+                {
+                    elementType = fieldType.GenericTypeArguments[0];
+                    return FieldKind.List;
+                }
+
+                if (genericType == typeof(HashSet<>))
+                {
+                    elementType = fieldType.GenericTypeArguments[0];
+                    return FieldKind.HashSet;
+                }
+            }
+
+            elementType = fieldType;
+            return FieldKind.Single;
+        }
+
+        private static FieldAccessor CreateFieldAccessor(Type componentType, FieldInfo field)
+        {
+            if (componentType == null || !typeof(Component).IsAssignableFrom(componentType))
+            {
+                return FieldAccessor.Null;
+            }
+
+            // Use the field declaration type so inherited fields share a compiled accessor.
+            Type declaringType = field.DeclaringType;
+            Type accessorComponentType =
+                declaringType != null && typeof(Component).IsAssignableFrom(declaringType)
+                    ? declaringType
+                    : componentType;
+
+            MethodInfo generic = CreateFieldAccessorGenericMethod.MakeGenericMethod(
+                accessorComponentType,
+                field.FieldType
+            );
+            return (FieldAccessor)generic.Invoke(null, new object[] { field });
+        }
+
+        private static FieldAccessor CreateFieldAccessorGeneric<TComponent, TValue>(FieldInfo field)
+            where TComponent : Component
+        {
+            return new FieldAccessor<TComponent, TValue>(field);
+        }
+
+        private static AttributeMetadataCache.RelationalAttributeKind GetRelationalKind<TAttribute>()
+            where TAttribute : BaseRelationalComponentAttribute
+        {
+            Type attributeType = typeof(TAttribute);
+
+            if (attributeType == typeof(ParentComponentAttribute))
+            {
+                return AttributeMetadataCache.RelationalAttributeKind.Parent;
+            }
+            else if (attributeType == typeof(ChildComponentAttribute))
+            {
+                return AttributeMetadataCache.RelationalAttributeKind.Child;
+            }
+            else if (attributeType == typeof(SiblingComponentAttribute))
+            {
+                return AttributeMetadataCache.RelationalAttributeKind.Sibling;
+            }
+
+#pragma warning disable CS0618
+
+            return AttributeMetadataCache.RelationalAttributeKind.Unknown;
+
+#pragma warning restore CS0618
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        // The Boolean result avoids another native Unity aliveness check (#529).
+        private static bool TryFirstMatchingComponent(
+            List<Component> components,
+            FilterParameters filters,
+            bool filterDisabledComponents,
+            out Component match
+        )
+        {
+            foreach (Component candidate in components)
+            {
+                if (PassesStateAndFilters(candidate, filters, filterDisabledComponents))
+                {
+                    match = candidate;
+                    return true;
+                }
+            }
+
+            match = null;
+            return false;
+        }
+
         internal enum FieldKind : byte
         {
             Single = 0,
@@ -854,6 +854,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
         internal readonly struct FilterParameters
         {
+            internal bool RequiresPostProcessing => _checkHierarchy || _checkTag || _checkName;
+
             internal readonly bool _checkHierarchy;
             internal readonly bool _checkTag;
             internal readonly bool _checkName;
@@ -868,17 +870,17 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 _checkTag = _tag != null;
                 _checkName = _nameSubstring != null;
             }
-
-            internal bool RequiresPostProcessing => _checkHierarchy || _checkTag || _checkName;
         }
 
         internal readonly struct FieldMetadata<TAttribute>
             where TAttribute : BaseRelationalComponentAttribute
         {
+            public bool HasFilters => filters.RequiresPostProcessing;
+
+            public FilterParameters Filters => filters;
+
             public readonly FieldInfo field;
             public readonly TAttribute attribute;
-            private readonly FieldAccessor accessor;
-            private readonly FilterParameters filters;
             public readonly FieldKind kind;
             public readonly Type elementType;
             public readonly Func<int, Array> arrayCreator;
@@ -887,6 +889,8 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             public readonly Action<object, object> hashSetAdder;
             public readonly Action<object> hashSetClearer;
             public readonly bool isInterface;
+            private readonly FieldAccessor accessor;
+            private readonly FilterParameters filters;
 
             public FieldMetadata(
                 FieldInfo field,
@@ -916,10 +920,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 this.hashSetClearer = hashSetClearer;
                 this.isInterface = isInterface;
             }
-
-            public bool HasFilters => filters.RequiresPostProcessing;
-
-            public FilterParameters Filters => filters;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public object GetValue(Component component)

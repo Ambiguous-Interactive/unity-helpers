@@ -40,7 +40,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
         /// <summary>Minimum duration of a retained timing sample.</summary>
         public const double MinimumSampleMilliseconds = 10;
 
+        /// <summary>
+        /// Raw cycles each side contributes per batch. Fixed by the counterbalanced order.
+        /// </summary>
+        public const int CyclesPerBatch = 4;
+
+        /// <summary>
+        /// The spread above which a comparison is a reading of the machine. Predeclared rather
+        /// than tuned after the fact, and the same 3% the sister repository settled on.
+        /// </summary>
+        public const double DefaultSpreadLimit = 0.03;
+
         private static long _calibratedSink;
+
+        // false = reference, true = subject. A B B A B A A B.
+        private static readonly bool[] BatchSlots =
+        {
+            false,
+            true,
+            true,
+            false,
+            true,
+            false,
+            false,
+            true,
+        };
 
         /// <summary>Warms, calibrates, and retains 32 counterbalanced timings per arm.</summary>
         /// <remarks>
@@ -119,51 +143,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 subjectWarmupExecutions
             );
         }
-
-        private static double Warmup(Func<int, long> work, out int executions)
-        {
-            Stopwatch stopwatch = Stopwatch.StartNew();
-            executions = 0;
-            do
-            {
-                Interlocked.Exchange(ref _calibratedSink, work(1));
-                executions++;
-            } while (executions < 3 || stopwatch.Elapsed.TotalMilliseconds < 100);
-            return stopwatch.Elapsed.TotalMilliseconds;
-        }
-
-        private static double TimeWork(Func<int, long> work, int iterations)
-        {
-            long start = Stopwatch.GetTimestamp();
-            long checksum = work(iterations);
-            long elapsed = Stopwatch.GetTimestamp() - start;
-            Interlocked.Exchange(ref _calibratedSink, checksum);
-            return elapsed * (1000.0 / Stopwatch.Frequency);
-        }
-
-        /// <summary>
-        /// Raw cycles each side contributes per batch. Fixed by the counterbalanced order.
-        /// </summary>
-        public const int CyclesPerBatch = 4;
-
-        /// <summary>
-        /// The spread above which a comparison is a reading of the machine. Predeclared rather
-        /// than tuned after the fact, and the same 3% the sister repository settled on.
-        /// </summary>
-        public const double DefaultSpreadLimit = 0.03;
-
-        // false = reference, true = subject. A B B A B A A B.
-        private static readonly bool[] BatchSlots =
-        {
-            false,
-            true,
-            true,
-            false,
-            true,
-            false,
-            false,
-            true,
-        };
 
         /// <summary>
         /// The slot order one batch runs, as <c>'A'</c> (reference) and <c>'B'</c> (subject).
@@ -324,6 +303,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             }
 
             return (highest - lowest) / lowest;
+        }
+
+        private static double Warmup(Func<int, long> work, out int executions)
+        {
+            Stopwatch stopwatch = Stopwatch.StartNew();
+            executions = 0;
+            do
+            {
+                Interlocked.Exchange(ref _calibratedSink, work(1));
+                executions++;
+            } while (executions < 3 || stopwatch.Elapsed.TotalMilliseconds < 100);
+            return stopwatch.Elapsed.TotalMilliseconds;
+        }
+
+        private static double TimeWork(Func<int, long> work, int iterations)
+        {
+            long start = Stopwatch.GetTimestamp();
+            long checksum = work(iterations);
+            long elapsed = Stopwatch.GetTimestamp() - start;
+            Interlocked.Exchange(ref _calibratedSink, checksum);
+            return elapsed * (1000.0 / Stopwatch.Frequency);
         }
 
         private static bool IsMeasurable(double value)

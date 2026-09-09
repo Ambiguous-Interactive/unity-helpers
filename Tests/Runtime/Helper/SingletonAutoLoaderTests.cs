@@ -17,6 +17,37 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     [NUnit.Framework.Category("Fast")]
     public sealed class SingletonAutoLoaderTests : CommonTestBase
     {
+        private static readonly RuntimeInitializeLoadType[] RuntimeLoadTypes =
+        {
+            RuntimeInitializeLoadType.AfterAssembliesLoaded,
+            RuntimeInitializeLoadType.BeforeSplashScreen,
+            RuntimeInitializeLoadType.BeforeSceneLoad,
+            RuntimeInitializeLoadType.AfterSceneLoad,
+            RuntimeInitializeLoadType.SubsystemRegistration,
+        };
+
+        private static AttributeMetadataCache.AutoLoadSingletonEntry CreateRuntimeEntry<T>(
+            RuntimeInitializeLoadType loadType = RuntimeInitializeLoadType.BeforeSplashScreen
+        )
+        {
+            return new AttributeMetadataCache.AutoLoadSingletonEntry(
+                typeof(T).AssemblyQualifiedName,
+                SingletonAutoLoadKind.Runtime,
+                loadType
+            );
+        }
+
+        private static AttributeMetadataCache.AutoLoadSingletonEntry CreateScriptableEntry<T>(
+            RuntimeInitializeLoadType loadType = RuntimeInitializeLoadType.BeforeSplashScreen
+        )
+        {
+            return new AttributeMetadataCache.AutoLoadSingletonEntry(
+                typeof(T).AssemblyQualifiedName,
+                SingletonAutoLoadKind.ScriptableObject,
+                loadType
+            );
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -28,15 +59,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             RuntimeMismatchSingleton.ClearForTests();
             ScriptableMismatchSingleton.ClearForTests();
         }
-
-        private static readonly RuntimeInitializeLoadType[] RuntimeLoadTypes =
-        {
-            RuntimeInitializeLoadType.AfterAssembliesLoaded,
-            RuntimeInitializeLoadType.BeforeSplashScreen,
-            RuntimeInitializeLoadType.BeforeSceneLoad,
-            RuntimeInitializeLoadType.AfterSceneLoad,
-            RuntimeInitializeLoadType.SubsystemRegistration,
-        };
 
         [UnityTest]
         public IEnumerator AutoLoaderInitializesRuntimeSingletons()
@@ -250,28 +272,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
             Assert.AreEqual(1, AutoRuntimeSingleton.AwakenCount);
             Assert.AreEqual(0, RuntimeMismatchSingleton.AwakeCount);
-        }
-
-        private static AttributeMetadataCache.AutoLoadSingletonEntry CreateRuntimeEntry<T>(
-            RuntimeInitializeLoadType loadType = RuntimeInitializeLoadType.BeforeSplashScreen
-        )
-        {
-            return new AttributeMetadataCache.AutoLoadSingletonEntry(
-                typeof(T).AssemblyQualifiedName,
-                SingletonAutoLoadKind.Runtime,
-                loadType
-            );
-        }
-
-        private static AttributeMetadataCache.AutoLoadSingletonEntry CreateScriptableEntry<T>(
-            RuntimeInitializeLoadType loadType = RuntimeInitializeLoadType.BeforeSplashScreen
-        )
-        {
-            return new AttributeMetadataCache.AutoLoadSingletonEntry(
-                typeof(T).AssemblyQualifiedName,
-                SingletonAutoLoadKind.ScriptableObject,
-                loadType
-            );
         }
     }
 }

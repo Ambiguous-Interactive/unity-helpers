@@ -100,6 +100,139 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                   }
               }";
 
+        private static string FindRepositoryRoot()
+        {
+            DirectoryInfo directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
+            while (directory != null)
+            {
+                if (Directory.Exists(Path.Combine(directory.FullName, "Runtime")))
+                {
+                    return directory.FullName;
+                }
+
+                directory = directory.Parent;
+            }
+
+            throw new DirectoryNotFoundException(
+                "Could not find the repository root above the test directory"
+            );
+        }
+
+        private static Diagnostic Single(string body)
+        {
+            ImmutableArray<Diagnostic> reported = Analyze(body);
+            Assert.AreEqual(1, reported.Length, "Expected exactly one diagnostic");
+            return reported[0];
+        }
+
+        private static ImmutableArray<Diagnostic> Analyze(string body)
+        {
+            return Analyze(body, ReportDiagnostic.Warn);
+        }
+
+        /// <summary>
+        /// Compiles <paramref name="body"/> and runs the analyzer over it.
+        /// </summary>
+        /// <param name="body">Members of a static class in namespace <c>Consumer</c>.</param>
+        /// <param name="reportedAs">
+        /// What the compilation says about the diagnostic -- <see cref="ReportDiagnostic.Default"/>
+        /// for a consumer who configures nothing, or the ruleset / <c>.editorconfig</c> entry they
+        /// would write, expressed as the option Roslyn resolves both of them to.
+        /// <see cref="ReportDiagnostic.Warn"/> is the default here because WUH010 ships off.
+        /// </param>
+        /// <returns>Everything the analyzer reported.</returns>
+        private static ImmutableArray<Diagnostic> Analyze(string body, ReportDiagnostic reportedAs)
+        {
+            return Analyze(body, reportedAs, string.Empty);
+        }
+
+        private static ImmutableArray<Diagnostic> Analyze(
+            string body,
+            ReportDiagnostic reportedAs,
+            string extraTypes
+        )
+        {
+            string source =
+                "using System;\n"
+                + "using System.Collections.Generic;\n"
+                + "using System.Collections.Concurrent;\n"
+                + "using System.Text.RegularExpressions;\n"
+                + "using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;\n"
+                + "namespace Consumer { public static class Subject { "
+                + body
+                + " } }\n"
+                + PackageSerializableDictionary
+                + extraTypes;
+
+            HashSet<string> locations = new HashSet<string>(StringComparer.Ordinal);
+            List<MetadataReference> references = new List<MetadataReference>();
+            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (
+                    !assembly.IsDynamic
+                    && !string.IsNullOrEmpty(assembly.Location)
+                    && locations.Add(assembly.Location)
+                )
+                {
+                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
+                }
+            }
+
+            // These assemblies need explicit references because the host may not have loaded them.
+            foreach (
+                Type anchor in new[]
+                {
+                    typeof(object),
+                    typeof(Regex),
+                    typeof(ConcurrentDictionary<string, int>),
+                    typeof(SortedDictionary<string, int>),
+                }
+            )
+            {
+                if (locations.Add(anchor.Assembly.Location))
+                {
+                    references.Add(MetadataReference.CreateFromFile(anchor.Assembly.Location));
+                }
+            }
+
+            CSharpCompilation compilation = CSharpCompilation.Create(
+                "ConsumerAssembly",
+                new[]
+                {
+                    CSharpSyntaxTree.ParseText(
+                        source,
+                        new CSharpParseOptions(LanguageVersion.CSharp9)
+                    ),
+                },
+                references,
+                new CSharpCompilationOptions(
+                    OutputKind.DynamicallyLinkedLibrary
+                ).WithSpecificDiagnosticOptions(
+                    ImmutableDictionary<string, ReportDiagnostic>.Empty.Add(
+                        DiagnosticId,
+                        reportedAs
+                    )
+                )
+            );
+
+            ImmutableArray<Diagnostic> compileErrors = compilation
+                .GetDiagnostics()
+                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+                .ToImmutableArray();
+            Assert.IsEmpty(
+                compileErrors.Select(diagnostic => diagnostic.ToString()).ToArray(),
+                "The fixture must compile"
+            );
+
+            return compilation
+                .WithAnalyzers(
+                    ImmutableArray.Create<DiagnosticAnalyzer>(new DictionaryIndexerAnalyzer())
+                )
+                .GetAnalyzerDiagnosticsAsync()
+                .GetAwaiter()
+                .GetResult();
+        }
+
         /// <summary>
         /// Every dictionary the package or its consumers actually hold, plus the one whose indexer
         /// does something worse than throw.
@@ -425,139 +558,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                 source,
                 "and through IReadOnlyDictionary"
             );
-        }
-
-        private static string FindRepositoryRoot()
-        {
-            DirectoryInfo directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-            while (directory != null)
-            {
-                if (Directory.Exists(Path.Combine(directory.FullName, "Runtime")))
-                {
-                    return directory.FullName;
-                }
-
-                directory = directory.Parent;
-            }
-
-            throw new DirectoryNotFoundException(
-                "Could not find the repository root above the test directory"
-            );
-        }
-
-        private static Diagnostic Single(string body)
-        {
-            ImmutableArray<Diagnostic> reported = Analyze(body);
-            Assert.AreEqual(1, reported.Length, "Expected exactly one diagnostic");
-            return reported[0];
-        }
-
-        private static ImmutableArray<Diagnostic> Analyze(string body)
-        {
-            return Analyze(body, ReportDiagnostic.Warn);
-        }
-
-        /// <summary>
-        /// Compiles <paramref name="body"/> and runs the analyzer over it.
-        /// </summary>
-        /// <param name="body">Members of a static class in namespace <c>Consumer</c>.</param>
-        /// <param name="reportedAs">
-        /// What the compilation says about the diagnostic -- <see cref="ReportDiagnostic.Default"/>
-        /// for a consumer who configures nothing, or the ruleset / <c>.editorconfig</c> entry they
-        /// would write, expressed as the option Roslyn resolves both of them to.
-        /// <see cref="ReportDiagnostic.Warn"/> is the default here because WUH010 ships off.
-        /// </param>
-        /// <returns>Everything the analyzer reported.</returns>
-        private static ImmutableArray<Diagnostic> Analyze(string body, ReportDiagnostic reportedAs)
-        {
-            return Analyze(body, reportedAs, string.Empty);
-        }
-
-        private static ImmutableArray<Diagnostic> Analyze(
-            string body,
-            ReportDiagnostic reportedAs,
-            string extraTypes
-        )
-        {
-            string source =
-                "using System;\n"
-                + "using System.Collections.Generic;\n"
-                + "using System.Collections.Concurrent;\n"
-                + "using System.Text.RegularExpressions;\n"
-                + "using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;\n"
-                + "namespace Consumer { public static class Subject { "
-                + body
-                + " } }\n"
-                + PackageSerializableDictionary
-                + extraTypes;
-
-            HashSet<string> locations = new HashSet<string>(StringComparer.Ordinal);
-            List<MetadataReference> references = new List<MetadataReference>();
-            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                if (
-                    !assembly.IsDynamic
-                    && !string.IsNullOrEmpty(assembly.Location)
-                    && locations.Add(assembly.Location)
-                )
-                {
-                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
-                }
-            }
-
-            // These assemblies need explicit references because the host may not have loaded them.
-            foreach (
-                Type anchor in new[]
-                {
-                    typeof(object),
-                    typeof(Regex),
-                    typeof(ConcurrentDictionary<string, int>),
-                    typeof(SortedDictionary<string, int>),
-                }
-            )
-            {
-                if (locations.Add(anchor.Assembly.Location))
-                {
-                    references.Add(MetadataReference.CreateFromFile(anchor.Assembly.Location));
-                }
-            }
-
-            CSharpCompilation compilation = CSharpCompilation.Create(
-                "ConsumerAssembly",
-                new[]
-                {
-                    CSharpSyntaxTree.ParseText(
-                        source,
-                        new CSharpParseOptions(LanguageVersion.CSharp9)
-                    ),
-                },
-                references,
-                new CSharpCompilationOptions(
-                    OutputKind.DynamicallyLinkedLibrary
-                ).WithSpecificDiagnosticOptions(
-                    ImmutableDictionary<string, ReportDiagnostic>.Empty.Add(
-                        DiagnosticId,
-                        reportedAs
-                    )
-                )
-            );
-
-            ImmutableArray<Diagnostic> compileErrors = compilation
-                .GetDiagnostics()
-                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-                .ToImmutableArray();
-            Assert.IsEmpty(
-                compileErrors.Select(diagnostic => diagnostic.ToString()).ToArray(),
-                "The fixture must compile"
-            );
-
-            return compilation
-                .WithAnalyzers(
-                    ImmutableArray.Create<DiagnosticAnalyzer>(new DictionaryIndexerAnalyzer())
-                )
-                .GetAnalyzerDiagnosticsAsync()
-                .GetAwaiter()
-                .GetResult();
         }
     }
 }

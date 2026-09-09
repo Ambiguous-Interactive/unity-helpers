@@ -49,6 +49,10 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
         }
 #endif
 
+        private static bool _instanceFieldResolved;
+        private static Type _cachedSettingsType;
+        private static FieldInfo _cachedInstanceField;
+
         /// <summary>
         ///     Ensures a usable ReflexSettings.Instance exists for testing, creating a
         ///     reflection-built stand-in if Reflex is present and no live instance is set.
@@ -81,10 +85,6 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
             );
             instanceField.SetValue(null, settings);
         }
-
-        private static bool _instanceFieldResolved;
-        private static Type _cachedSettingsType;
-        private static FieldInfo _cachedInstanceField;
 
         private static FieldInfo ResolveInstanceField(out Type settingsType)
         {

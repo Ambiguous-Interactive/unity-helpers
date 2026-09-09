@@ -59,6 +59,28 @@ namespace WallstopStudios.UnityHelpers.Tags
             IComparable
     {
         /// <summary>
+        /// Determines whether two attribute modifications are not equal.
+        /// </summary>
+        /// <param name="lhs">The first modification to compare.</param>
+        /// <param name="rhs">The second modification to compare.</param>
+        /// <returns><c>true</c> if the modifications are not equal; otherwise, <c>false</c>.</returns>
+        public static bool operator !=(AttributeModification lhs, AttributeModification rhs)
+        {
+            return !(lhs == rhs);
+        }
+
+        /// <summary>
+        /// Determines whether two attribute modifications are equal.
+        /// </summary>
+        /// <param name="lhs">The first modification to compare.</param>
+        /// <param name="rhs">The second modification to compare.</param>
+        /// <returns><c>true</c> if the modifications are equal; otherwise, <c>false</c>.</returns>
+        public static bool operator ==(AttributeModification lhs, AttributeModification rhs)
+        {
+            return lhs.Equals(rhs);
+        }
+
+        /// <summary>
         /// The name of the attribute to modify. This should match a field name in an <see cref="AttributesComponent"/> subclass.
         /// </summary>
         [StringInList(typeof(AttributeUtilities), nameof(AttributeUtilities.GetAllAttributeNames))]
@@ -113,28 +135,6 @@ namespace WallstopStudios.UnityHelpers.Tags
         public int CompareTo(AttributeModification other)
         {
             return ((int)action).CompareTo((int)other.action);
-        }
-
-        /// <summary>
-        /// Determines whether two attribute modifications are not equal.
-        /// </summary>
-        /// <param name="lhs">The first modification to compare.</param>
-        /// <param name="rhs">The second modification to compare.</param>
-        /// <returns><c>true</c> if the modifications are not equal; otherwise, <c>false</c>.</returns>
-        public static bool operator !=(AttributeModification lhs, AttributeModification rhs)
-        {
-            return !(lhs == rhs);
-        }
-
-        /// <summary>
-        /// Determines whether two attribute modifications are equal.
-        /// </summary>
-        /// <param name="lhs">The first modification to compare.</param>
-        /// <param name="rhs">The second modification to compare.</param>
-        /// <returns><c>true</c> if the modifications are equal; otherwise, <c>false</c>.</returns>
-        public static bool operator ==(AttributeModification lhs, AttributeModification rhs)
-        {
-            return lhs.Equals(rhs);
         }
 
         /// <summary>

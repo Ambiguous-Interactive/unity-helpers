@@ -123,39 +123,6 @@ namespace WallstopStudios.UnityHelpers.Tags
         }
 
         /// <summary>
-        /// Recalculates the current value by applying all active modifications to the base value.
-        /// Modifications are sorted and applied in order: Addition, Multiplication, then Override.
-        /// </summary>
-        internal void CalculateCurrentValue()
-        {
-            float calculatedValue = _baseValue;
-            if (0 < _modifications.Count)
-            {
-                // Skip absent operation passes, but preserve addition/multiplication/override order and float accumulation order.
-                RemainingActions remaining = ApplyModificationsInOrder(
-                    ModificationAction.Addition,
-                    ref calculatedValue
-                );
-                if (remaining.hasMultiplication)
-                {
-                    _ = ApplyModificationsInOrder(
-                        ModificationAction.Multiplication,
-                        ref calculatedValue
-                    );
-                }
-
-                if (remaining.hasOverride)
-                {
-                    _ = ApplyModificationsInOrder(ModificationAction.Override, ref calculatedValue);
-                }
-            }
-
-            _currentValue = calculatedValue;
-            _currentValueCalculated = true;
-            _calculatedFromBaseValue = _baseValue;
-        }
-
-        /// <summary>
         /// Implicitly converts an Attribute to its current float value.
         /// </summary>
         /// <param name="attribute">The attribute to convert.</param>
@@ -168,6 +135,50 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// <param name="value">The base value for the attribute.</param>
         /// <returns>A new Attribute with the specified base value.</returns>
         public static implicit operator Attribute(float value) => new(value);
+
+        private static void ValidateInput(float value, [CallerMemberName] string caller = null)
+        {
+            if (!float.IsFinite(value))
+            {
+                throw new ArgumentException(
+                    $"Cannot {caller?.ToLowerInvariant()} by infinity or NaN.",
+                    nameof(value)
+                );
+            }
+        }
+
+        private static void ApplyAttributeModification(
+            AttributeModification attributeModification,
+            ref float value
+        )
+        {
+            switch (attributeModification.action)
+            {
+                case ModificationAction.Addition:
+                {
+                    value += attributeModification.value;
+                    break;
+                }
+                case ModificationAction.Multiplication:
+                {
+                    value *= attributeModification.value;
+                    break;
+                }
+                case ModificationAction.Override:
+                {
+                    value = attributeModification.value;
+                    break;
+                }
+                default:
+                {
+                    throw new InvalidEnumArgumentException(
+                        nameof(attributeModification.action),
+                        (int)attributeModification.action,
+                        typeof(ModificationAction)
+                    );
+                }
+            }
+        }
 
         /// <summary>
         /// Applies a temporary additive modification to the attribute.
@@ -294,57 +305,6 @@ namespace WallstopStudios.UnityHelpers.Tags
             _currentValueCalculated = false;
         }
 
-        private RemainingActions ApplyModificationsInOrder(
-            ModificationAction action,
-            ref float value
-        )
-        {
-            bool hasMultiplication = false;
-            bool hasOverride = false;
-            foreach (
-                KeyValuePair<EffectHandle, List<AttributeModification>> entry in _modifications
-            )
-            {
-                List<AttributeModification> modifications = entry.Value;
-                foreach (AttributeModification modification in modifications)
-                {
-                    ModificationAction modificationAction = modification.action;
-                    if (modificationAction == action)
-                    {
-                        ApplyAttributeModification(modification, ref value);
-                        continue;
-                    }
-
-                    switch (modificationAction)
-                    {
-                        case ModificationAction.Multiplication:
-                        {
-                            hasMultiplication = true;
-                            break;
-                        }
-                        case ModificationAction.Override:
-                        {
-                            hasOverride = true;
-                            break;
-                        }
-                    }
-                }
-            }
-
-            return new RemainingActions(hasMultiplication, hasOverride);
-        }
-
-        private static void ValidateInput(float value, [CallerMemberName] string caller = null)
-        {
-            if (!float.IsFinite(value))
-            {
-                throw new ArgumentException(
-                    $"Cannot {caller?.ToLowerInvariant()} by infinity or NaN.",
-                    nameof(value)
-                );
-            }
-        }
-
         /// <summary>
         /// Applies an attribute modification to this attribute.
         /// If a handle is provided, the modification is temporary and can be removed.
@@ -384,39 +344,6 @@ namespace WallstopStudios.UnityHelpers.Tags
             }
 
             return removed;
-        }
-
-        private static void ApplyAttributeModification(
-            AttributeModification attributeModification,
-            ref float value
-        )
-        {
-            switch (attributeModification.action)
-            {
-                case ModificationAction.Addition:
-                {
-                    value += attributeModification.value;
-                    break;
-                }
-                case ModificationAction.Multiplication:
-                {
-                    value *= attributeModification.value;
-                    break;
-                }
-                case ModificationAction.Override:
-                {
-                    value = attributeModification.value;
-                    break;
-                }
-                default:
-                {
-                    throw new InvalidEnumArgumentException(
-                        nameof(attributeModification.action),
-                        (int)attributeModification.action,
-                        typeof(ModificationAction)
-                    );
-                }
-            }
         }
 
         /// <summary>
@@ -512,6 +439,79 @@ namespace WallstopStudios.UnityHelpers.Tags
         public override string ToString()
         {
             return ((float)this).ToString(CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>
+        /// Recalculates the current value by applying all active modifications to the base value.
+        /// Modifications are sorted and applied in order: Addition, Multiplication, then Override.
+        /// </summary>
+        internal void CalculateCurrentValue()
+        {
+            float calculatedValue = _baseValue;
+            if (0 < _modifications.Count)
+            {
+                // Skip absent operation passes, but preserve addition/multiplication/override order and float accumulation order.
+                RemainingActions remaining = ApplyModificationsInOrder(
+                    ModificationAction.Addition,
+                    ref calculatedValue
+                );
+                if (remaining.hasMultiplication)
+                {
+                    _ = ApplyModificationsInOrder(
+                        ModificationAction.Multiplication,
+                        ref calculatedValue
+                    );
+                }
+
+                if (remaining.hasOverride)
+                {
+                    _ = ApplyModificationsInOrder(ModificationAction.Override, ref calculatedValue);
+                }
+            }
+
+            _currentValue = calculatedValue;
+            _currentValueCalculated = true;
+            _calculatedFromBaseValue = _baseValue;
+        }
+
+        private RemainingActions ApplyModificationsInOrder(
+            ModificationAction action,
+            ref float value
+        )
+        {
+            bool hasMultiplication = false;
+            bool hasOverride = false;
+            foreach (
+                KeyValuePair<EffectHandle, List<AttributeModification>> entry in _modifications
+            )
+            {
+                List<AttributeModification> modifications = entry.Value;
+                foreach (AttributeModification modification in modifications)
+                {
+                    ModificationAction modificationAction = modification.action;
+                    if (modificationAction == action)
+                    {
+                        ApplyAttributeModification(modification, ref value);
+                        continue;
+                    }
+
+                    switch (modificationAction)
+                    {
+                        case ModificationAction.Multiplication:
+                        {
+                            hasMultiplication = true;
+                            break;
+                        }
+                        case ModificationAction.Override:
+                        {
+                            hasOverride = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            return new RemainingActions(hasMultiplication, hasOverride);
         }
 
         private readonly struct RemainingActions

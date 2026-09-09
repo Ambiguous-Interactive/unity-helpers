@@ -1983,12 +1983,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         internal sealed class CaseInsensitiveDictionaryKey
             : IEquatable<CaseInsensitiveDictionaryKey>
         {
+            public string Token { get; }
+
             public CaseInsensitiveDictionaryKey(string token)
             {
                 Token = token;
             }
-
-            public string Token { get; }
 
             public bool Equals(CaseInsensitiveDictionaryKey other)
             {

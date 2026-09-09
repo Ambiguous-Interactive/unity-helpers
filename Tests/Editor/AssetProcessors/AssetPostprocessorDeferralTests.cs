@@ -23,26 +23,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     [TestFixture]
     public sealed class AssetPostprocessorDeferralTests
     {
-        [SetUp]
-        public void SetUp()
-        {
-            // Reset before an inconclusive skip so inherited state cannot roll forward to another fixture.
-            AssetPostprocessorDeferral.ResetForTesting();
-            SkipIfDeferralDisabled();
-        }
-
-        [TearDown]
-        public void TearDown()
-        {
-            // Cap-hit tests deliberately leave a drain queued.
-            AssetPostprocessorDeferral.ResetForTesting();
-            /*
-                LogAssert state is process-global, so an un-consumed expectation leaks into the
-                next test unless an unmatched log fails here.
-            */
-            LogAssert.NoUnexpectedReceived();
-        }
-
         /// <summary>
         /// Mirrors <c>AssetPostprocessorLogHygieneTests.SkipIfDeferralDisabled</c>.
         /// When <see cref="UnityHelpersSettings.GetDeferAssetPostprocessorCallbacks"/>
@@ -62,6 +42,26 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                         + "This fixture only exercises the deferred path; re-enable the setting to run it."
                 );
             }
+        }
+
+        [SetUp]
+        public void SetUp()
+        {
+            // Reset before an inconclusive skip so inherited state cannot roll forward to another fixture.
+            AssetPostprocessorDeferral.ResetForTesting();
+            SkipIfDeferralDisabled();
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            // Cap-hit tests deliberately leave a drain queued.
+            AssetPostprocessorDeferral.ResetForTesting();
+            /*
+                LogAssert state is process-global, so an un-consumed expectation leaks into the
+                next test unless an unmatched log fails here.
+            */
+            LogAssert.NoUnexpectedReceived();
         }
 
         /// <summary>

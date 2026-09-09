@@ -22,6 +22,50 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     public static partial class IListExtensions
     {
         /// <summary>
+        /// Partitions the list into two lists based on a predicate: elements that match and elements that don't.
+        /// </summary>
+        /// <typeparam name="T">The type of elements in the list.</typeparam>
+        /// <param name="list">The list to partition.</param>
+        /// <param name="predicate">The function to test each element.</param>
+        /// <returns>A tuple containing two lists: matching elements and non-matching elements.</returns>
+        /// <remarks>
+        /// <para>Null handling: Throws ArgumentNullException if predicate is null. Throws NullReferenceException if list is null.</para>
+        /// <para>Thread safety: Thread-safe for read-only access. Not thread-safe if list is modified during execution. No Unity main thread requirement.</para>
+        /// <para>Performance: O(n) where n is the number of elements.</para>
+        /// <para>Allocations: Allocates two new Lists. Total size equals original list size.</para>
+        /// <para>Edge cases: One of the returned lists may be empty if all elements match or none match.</para>
+        /// </remarks>
+        /// <exception cref="ArgumentNullException">Thrown when predicate is null.</exception>
+        public static (List<T> matching, List<T> notMatching) Partition<T>(
+            this IList<T> list,
+            Func<T, bool> predicate
+        )
+        {
+            if (predicate == null)
+            {
+                throw new ArgumentNullException(nameof(predicate));
+            }
+
+            List<T> matching = new();
+            List<T> notMatching = new();
+
+            for (int i = 0; i < list.Count; ++i)
+            {
+                T element = list[i];
+                if (predicate(element))
+                {
+                    matching.Add(element);
+                }
+                else
+                {
+                    notMatching.Add(element);
+                }
+            }
+
+            return (matching, notMatching);
+        }
+
+        /// <summary>
         /// Randomly shuffles the elements of a list in-place using the Fisher-Yates algorithm.
         /// </summary>
         /// <typeparam name="T">The type of elements in the list.</typeparam>
@@ -519,50 +563,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         public static void RotateRight<T>(this IList<T> list, int positions = 1)
         {
             list.Shift(positions);
-        }
-
-        /// <summary>
-        /// Partitions the list into two lists based on a predicate: elements that match and elements that don't.
-        /// </summary>
-        /// <typeparam name="T">The type of elements in the list.</typeparam>
-        /// <param name="list">The list to partition.</param>
-        /// <param name="predicate">The function to test each element.</param>
-        /// <returns>A tuple containing two lists: matching elements and non-matching elements.</returns>
-        /// <remarks>
-        /// <para>Null handling: Throws ArgumentNullException if predicate is null. Throws NullReferenceException if list is null.</para>
-        /// <para>Thread safety: Thread-safe for read-only access. Not thread-safe if list is modified during execution. No Unity main thread requirement.</para>
-        /// <para>Performance: O(n) where n is the number of elements.</para>
-        /// <para>Allocations: Allocates two new Lists. Total size equals original list size.</para>
-        /// <para>Edge cases: One of the returned lists may be empty if all elements match or none match.</para>
-        /// </remarks>
-        /// <exception cref="ArgumentNullException">Thrown when predicate is null.</exception>
-        public static (List<T> matching, List<T> notMatching) Partition<T>(
-            this IList<T> list,
-            Func<T, bool> predicate
-        )
-        {
-            if (predicate == null)
-            {
-                throw new ArgumentNullException(nameof(predicate));
-            }
-
-            List<T> matching = new();
-            List<T> notMatching = new();
-
-            for (int i = 0; i < list.Count; ++i)
-            {
-                T element = list[i];
-                if (predicate(element))
-                {
-                    matching.Add(element);
-                }
-                else
-                {
-                    notMatching.Add(element);
-                }
-            }
-
-            return (matching, notMatching);
         }
 
         /// <summary>

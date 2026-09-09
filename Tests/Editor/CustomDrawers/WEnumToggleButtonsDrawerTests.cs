@@ -23,6 +23,127 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
     [NUnit.Framework.Category("Integration")]
     public sealed class WEnumToggleButtonsDrawerTests : CommonTestBase
     {
+        // Negative enum members previously overflowed Convert.ToUInt64 and broke inspector drawing.
+        private static IEnumerable<TestCaseData> SignedUnderlyingTypeCases()
+        {
+            yield return new TestCaseData(
+                nameof(ToggleTestAsset.signedByteMode),
+                new object[]
+                {
+                    ToggleTestAsset.SignedByteExampleEnum.MinusTwo,
+                    ToggleTestAsset.SignedByteExampleEnum.MinusOne,
+                    ToggleTestAsset.SignedByteExampleEnum.Zero,
+                    ToggleTestAsset.SignedByteExampleEnum.One,
+                },
+                (Func<ScriptableObject, object>)(asset => ((ToggleTestAsset)asset).signedByteMode)
+            ).SetName("SignedByteMembersBelowZero");
+
+            yield return new TestCaseData(
+                nameof(ToggleTestAsset.signedShortMode),
+                new object[]
+                {
+                    ToggleTestAsset.SignedShortExampleEnum.Minimum,
+                    ToggleTestAsset.SignedShortExampleEnum.MinusOne,
+                    ToggleTestAsset.SignedShortExampleEnum.Zero,
+                    ToggleTestAsset.SignedShortExampleEnum.Maximum,
+                },
+                (Func<ScriptableObject, object>)(asset => ((ToggleTestAsset)asset).signedShortMode)
+            ).SetName("SignedShortMembersSpanningTheFullRange");
+        }
+
+        private static SummaryResult InvokeSummary(
+            ToggleSet toggleSet,
+            SerializedProperty property,
+            int startIndex,
+            int visibleCount,
+            bool usePagination
+        )
+        {
+            EnumShared.SelectionSummary summary = WEnumToggleButtonsDrawer.BuildSelectionSummary(
+                toggleSet,
+                property,
+                startIndex,
+                visibleCount,
+                usePagination
+            );
+            return new SummaryResult(summary.HasSummary, summary.Content ?? GUIContent.none);
+        }
+
+        private static ToggleOption GetFlagOption(
+            ToggleSet toggleSet,
+            ToggleTestAsset.ExampleFlags flag
+        )
+        {
+            ulong target = Convert.ToUInt64(flag);
+            for (int index = 0; index < toggleSet.Options.Count; index += 1)
+            {
+                ToggleOption option = toggleSet.Options[index];
+                if (option.FlagValue == target)
+                {
+                    return option;
+                }
+            }
+
+            Assert.Fail("Expected flag option was not located.");
+            return default;
+        }
+
+        private static ToggleOption GetEnumOption(
+            ToggleSet toggleSet,
+            ToggleTestAsset.ExampleEnum value
+        )
+        {
+            for (int index = 0; index < toggleSet.Options.Count; index += 1)
+            {
+                ToggleOption option = toggleSet.Options[index];
+                if (
+                    option.Value is ToggleTestAsset.ExampleEnum enumValue
+                    && enumValue.Equals(value)
+                )
+                {
+                    return option;
+                }
+            }
+
+            Assert.Fail("Expected enum option was not located.");
+            return default;
+        }
+
+        private static ToggleOption GetOptionByValue(ToggleSet toggleSet, object value)
+        {
+            for (int index = 0; index < toggleSet.Options.Count; index += 1)
+            {
+                ToggleOption option = toggleSet.Options[index];
+                if (Equals(option.Value, value))
+                {
+                    return option;
+                }
+            }
+
+            Assert.Fail($"Expected option for {value} was not located.");
+            return default;
+        }
+
+        private static ToggleOption GetOptionByLabel(ToggleSet toggleSet, string label)
+        {
+            for (int index = 0; index < toggleSet.Options.Count; index += 1)
+            {
+                ToggleOption option = toggleSet.Options[index];
+                if (string.Equals(option.Label, label, StringComparison.Ordinal))
+                {
+                    return option;
+                }
+            }
+
+            Assert.Fail("Expected label was not located: " + label);
+            return default;
+        }
+
+        private static FieldInfo GetFieldInfo(string fieldName)
+        {
+            return PropertyDrawerTestHelper.GetFieldInfoOrFail(typeof(ToggleTestAsset), fieldName);
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -176,34 +297,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             WEnumToggleButtonsUtility.ApplyOption(property, toggleSet, thirdOption, true);
             serializedObject.ApplyModifiedProperties();
             Assert.AreEqual(ToggleTestAsset.ExampleEnum.Third, asset.mode);
-        }
-
-        // Negative enum members previously overflowed Convert.ToUInt64 and broke inspector drawing.
-        private static IEnumerable<TestCaseData> SignedUnderlyingTypeCases()
-        {
-            yield return new TestCaseData(
-                nameof(ToggleTestAsset.signedByteMode),
-                new object[]
-                {
-                    ToggleTestAsset.SignedByteExampleEnum.MinusTwo,
-                    ToggleTestAsset.SignedByteExampleEnum.MinusOne,
-                    ToggleTestAsset.SignedByteExampleEnum.Zero,
-                    ToggleTestAsset.SignedByteExampleEnum.One,
-                },
-                (Func<ScriptableObject, object>)(asset => ((ToggleTestAsset)asset).signedByteMode)
-            ).SetName("SignedByteMembersBelowZero");
-
-            yield return new TestCaseData(
-                nameof(ToggleTestAsset.signedShortMode),
-                new object[]
-                {
-                    ToggleTestAsset.SignedShortExampleEnum.Minimum,
-                    ToggleTestAsset.SignedShortExampleEnum.MinusOne,
-                    ToggleTestAsset.SignedShortExampleEnum.Zero,
-                    ToggleTestAsset.SignedShortExampleEnum.Maximum,
-                },
-                (Func<ScriptableObject, object>)(asset => ((ToggleTestAsset)asset).signedShortMode)
-            ).SetName("SignedShortMembersSpanningTheFullRange");
         }
 
         [TestCaseSource(nameof(SignedUnderlyingTypeCases))]
@@ -606,110 +699,17 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.False(summary.HasSummary);
         }
 
-        private static SummaryResult InvokeSummary(
-            ToggleSet toggleSet,
-            SerializedProperty property,
-            int startIndex,
-            int visibleCount,
-            bool usePagination
-        )
-        {
-            EnumShared.SelectionSummary summary = WEnumToggleButtonsDrawer.BuildSelectionSummary(
-                toggleSet,
-                property,
-                startIndex,
-                visibleCount,
-                usePagination
-            );
-            return new SummaryResult(summary.HasSummary, summary.Content ?? GUIContent.none);
-        }
-
-        private static ToggleOption GetFlagOption(
-            ToggleSet toggleSet,
-            ToggleTestAsset.ExampleFlags flag
-        )
-        {
-            ulong target = Convert.ToUInt64(flag);
-            for (int index = 0; index < toggleSet.Options.Count; index += 1)
-            {
-                ToggleOption option = toggleSet.Options[index];
-                if (option.FlagValue == target)
-                {
-                    return option;
-                }
-            }
-
-            Assert.Fail("Expected flag option was not located.");
-            return default;
-        }
-
-        private static ToggleOption GetEnumOption(
-            ToggleSet toggleSet,
-            ToggleTestAsset.ExampleEnum value
-        )
-        {
-            for (int index = 0; index < toggleSet.Options.Count; index += 1)
-            {
-                ToggleOption option = toggleSet.Options[index];
-                if (
-                    option.Value is ToggleTestAsset.ExampleEnum enumValue
-                    && enumValue.Equals(value)
-                )
-                {
-                    return option;
-                }
-            }
-
-            Assert.Fail("Expected enum option was not located.");
-            return default;
-        }
-
-        private static ToggleOption GetOptionByValue(ToggleSet toggleSet, object value)
-        {
-            for (int index = 0; index < toggleSet.Options.Count; index += 1)
-            {
-                ToggleOption option = toggleSet.Options[index];
-                if (Equals(option.Value, value))
-                {
-                    return option;
-                }
-            }
-
-            Assert.Fail($"Expected option for {value} was not located.");
-            return default;
-        }
-
-        private static ToggleOption GetOptionByLabel(ToggleSet toggleSet, string label)
-        {
-            for (int index = 0; index < toggleSet.Options.Count; index += 1)
-            {
-                ToggleOption option = toggleSet.Options[index];
-                if (string.Equals(option.Label, label, StringComparison.Ordinal))
-                {
-                    return option;
-                }
-            }
-
-            Assert.Fail("Expected label was not located: " + label);
-            return default;
-        }
-
-        private static FieldInfo GetFieldInfo(string fieldName)
-        {
-            return PropertyDrawerTestHelper.GetFieldInfoOrFail(typeof(ToggleTestAsset), fieldName);
-        }
-
         private readonly struct SummaryResult
         {
+            internal bool HasSummary { get; }
+
+            internal GUIContent Content { get; }
+
             internal SummaryResult(bool hasSummary, GUIContent content)
             {
                 HasSummary = hasSummary;
                 Content = content;
             }
-
-            internal bool HasSummary { get; }
-
-            internal GUIContent Content { get; }
         }
     }
 }

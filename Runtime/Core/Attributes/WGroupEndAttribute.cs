@@ -37,6 +37,11 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     public sealed class WGroupEndAttribute : Attribute
     {
         /// <summary>
+        /// Gets the normalized group names that should stop auto inclusion. An empty collection instructs the drawer to close all active groups.
+        /// </summary>
+        public IReadOnlyList<string> GroupNames { get; }
+
+        /// <summary>
         /// Creates a new end marker optionally targeting one or more specific groups.
         /// </summary>
         /// <param name="groupNames">
@@ -59,10 +64,5 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             GroupNames = normalized;
         }
-
-        /// <summary>
-        /// Gets the normalized group names that should stop auto inclusion. An empty collection instructs the drawer to close all active groups.
-        /// </summary>
-        public IReadOnlyList<string> GroupNames { get; }
     }
 }

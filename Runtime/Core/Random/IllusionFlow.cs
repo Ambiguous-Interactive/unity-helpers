@@ -179,33 +179,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
         }
 
-        public override uint NextUint()
-        {
-            unchecked
-            {
-                uint result = _b + _e;
-                ++_a;
-                if (_a == 0U)
-                {
-                    _c += _e;
-                    _d ^= _b;
-                    _b += _c;
-                    _e ^= _d;
-                    return result;
-                }
-
-                _b = ((_b << 17) | (_b >> 15)) ^ _d;
-                _d += 1111111111U;
-                _e = (result << 13) | (result >> 19);
-                return result;
-            }
-        }
-
-        public override IRandom Copy()
-        {
-            return new IllusionFlow(InternalState);
-        }
-
         private static bool TryReadStatePayload(RandomState state, out uint value)
         {
             IReadOnlyList<byte> payload = state.PayloadBytes;
@@ -263,6 +236,33 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         {
             uint candidate = unchecked((uint)(state1 ^ state2 ^ 0xA5A5A5A5UL));
             return candidate != 0 ? candidate : 0x1F123BB5U;
+        }
+
+        public override uint NextUint()
+        {
+            unchecked
+            {
+                uint result = _b + _e;
+                ++_a;
+                if (_a == 0U)
+                {
+                    _c += _e;
+                    _d ^= _b;
+                    _b += _c;
+                    _e ^= _d;
+                    return result;
+                }
+
+                _b = ((_b << 17) | (_b >> 15)) ^ _d;
+                _d += 1111111111U;
+                _e = (result << 13) | (result >> 19);
+                return result;
+            }
+        }
+
+        public override IRandom Copy()
+        {
+            return new IllusionFlow(InternalState);
         }
     }
 }

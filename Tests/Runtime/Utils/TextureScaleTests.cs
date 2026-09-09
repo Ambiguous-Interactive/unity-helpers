@@ -18,6 +18,66 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
         private TextureTestHelper _textureHelper;
 
+        private static void InvokeScale(Texture2D texture, int width, int height, bool useBilinear)
+        {
+            if (useBilinear)
+            {
+                TextureScale.Bilinear(texture, width, height);
+            }
+            else
+            {
+                TextureScale.Point(texture, width, height);
+            }
+        }
+
+        private static bool ContainsColor(Color[] source, Color color)
+        {
+            foreach (UnityEngine.Color sourceElement in source)
+            {
+                if (
+                    Mathf.Abs(sourceElement.r - color.r) <= Tolerance
+                    && Mathf.Abs(sourceElement.g - color.g) <= Tolerance
+                    && Mathf.Abs(sourceElement.b - color.b) <= Tolerance
+                    && Mathf.Abs(sourceElement.a - color.a) <= Tolerance
+                )
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static float MinChannel(Color[] pixels)
+        {
+            float min = float.PositiveInfinity;
+            foreach (UnityEngine.Color pixelsElement in pixels)
+            {
+                min = Mathf.Min(min, pixelsElement.r);
+            }
+
+            return min;
+        }
+
+        private static float MaxChannel(Color[] pixels)
+        {
+            float max = float.NegativeInfinity;
+            foreach (UnityEngine.Color pixelsElement in pixels)
+            {
+                max = Mathf.Max(max, pixelsElement.r);
+            }
+
+            return max;
+        }
+
+        private static void AssertColor(Color actual, Color expected, float tolerance = 1e-5f)
+        {
+            Assert.That(actual.r, Is.EqualTo(expected.r).Within(tolerance));
+            Assert.That(actual.g, Is.EqualTo(expected.g).Within(tolerance));
+            Assert.That(actual.b, Is.EqualTo(expected.b).Within(tolerance));
+            Assert.That(actual.a, Is.EqualTo(expected.a).Within(tolerance));
+        }
+
         [SetUp]
         public void SetUp()
         {
@@ -407,36 +467,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             }
         }
 
-        private static void InvokeScale(Texture2D texture, int width, int height, bool useBilinear)
-        {
-            if (useBilinear)
-            {
-                TextureScale.Bilinear(texture, width, height);
-            }
-            else
-            {
-                TextureScale.Point(texture, width, height);
-            }
-        }
-
-        private static bool ContainsColor(Color[] source, Color color)
-        {
-            foreach (UnityEngine.Color sourceElement in source)
-            {
-                if (
-                    Mathf.Abs(sourceElement.r - color.r) <= Tolerance
-                    && Mathf.Abs(sourceElement.g - color.g) <= Tolerance
-                    && Mathf.Abs(sourceElement.b - color.b) <= Tolerance
-                    && Mathf.Abs(sourceElement.a - color.a) <= Tolerance
-                )
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
         private Texture2D CreateRamp(int width, int height)
         {
             int last = Mathf.Max(width * height - 1, 1);
@@ -446,36 +476,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 (x, y) => new Color(((y * width) + x) / (float)last, 0f, 0f, 1f),
                 TextureFormat.RGBAFloat
             );
-        }
-
-        private static float MinChannel(Color[] pixels)
-        {
-            float min = float.PositiveInfinity;
-            foreach (UnityEngine.Color pixelsElement in pixels)
-            {
-                min = Mathf.Min(min, pixelsElement.r);
-            }
-
-            return min;
-        }
-
-        private static float MaxChannel(Color[] pixels)
-        {
-            float max = float.NegativeInfinity;
-            foreach (UnityEngine.Color pixelsElement in pixels)
-            {
-                max = Mathf.Max(max, pixelsElement.r);
-            }
-
-            return max;
-        }
-
-        private static void AssertColor(Color actual, Color expected, float tolerance = 1e-5f)
-        {
-            Assert.That(actual.r, Is.EqualTo(expected.r).Within(tolerance));
-            Assert.That(actual.g, Is.EqualTo(expected.g).Within(tolerance));
-            Assert.That(actual.b, Is.EqualTo(expected.b).Within(tolerance));
-            Assert.That(actual.a, Is.EqualTo(expected.a).Within(tolerance));
         }
     }
 }

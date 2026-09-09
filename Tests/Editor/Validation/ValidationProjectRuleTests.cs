@@ -15,6 +15,40 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     [TestFixture]
     public sealed class ValidationProjectRuleTests : CommonTestBase
     {
+        private static ValidationWorkspaceSettings.RuleDefinition Definition()
+        {
+            return new ValidationWorkspaceSettings.RuleDefinition
+            {
+                id = "project.test",
+                pathFilter = string.Empty,
+                message = "Scale exceeds one",
+                checks = new List<ValidationWorkspaceSettings.RuleCondition>
+                {
+                    new ValidationWorkspaceSettings.RuleCondition
+                    {
+                        property = "Transform.localScale.y",
+                        comparison = ">",
+                        value = "1",
+                    },
+                },
+            };
+        }
+
+        private static List<ValidationFinding> Validate(
+            ValidationProjectRule rule,
+            GameObject subject
+        )
+        {
+            ValidationTarget target = new ValidationTarget(
+                "guid",
+                "Assets/Test.prefab",
+                typeof(GameObject)
+            );
+            List<ValidationFinding> findings = new List<ValidationFinding>();
+            rule.Validate(in target, subject, findings);
+            return findings;
+        }
+
         [TestCase(1.5, ">", "1", true)]
         [TestCase(1.5, "<", "1", false)]
         [TestCase(1.5, "==", "1.50", true)]
@@ -464,40 +498,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 hasEditorRoot: true
             );
             Assert.That(normalized, Does.Contain("\"m_Shader\":\"stable-shader\""));
-        }
-
-        private static ValidationWorkspaceSettings.RuleDefinition Definition()
-        {
-            return new ValidationWorkspaceSettings.RuleDefinition
-            {
-                id = "project.test",
-                pathFilter = string.Empty,
-                message = "Scale exceeds one",
-                checks = new List<ValidationWorkspaceSettings.RuleCondition>
-                {
-                    new ValidationWorkspaceSettings.RuleCondition
-                    {
-                        property = "Transform.localScale.y",
-                        comparison = ">",
-                        value = "1",
-                    },
-                },
-            };
-        }
-
-        private static List<ValidationFinding> Validate(
-            ValidationProjectRule rule,
-            GameObject subject
-        )
-        {
-            ValidationTarget target = new ValidationTarget(
-                "guid",
-                "Assets/Test.prefab",
-                typeof(GameObject)
-            );
-            List<ValidationFinding> findings = new List<ValidationFinding>();
-            rule.Validate(in target, subject, findings);
-            return findings;
         }
     }
 }

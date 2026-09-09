@@ -38,6 +38,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         private static readonly List<Include> None = new List<Include>();
 
+        /// <summary>The committed field numbers the tag-less declarations were resolved from.</summary>
+        internal SubtypeTagManifest Manifest { get; }
+
+        internal IEnumerable<INamedTypeSymbol> Bases => _byBase.Keys;
+
         private readonly Dictionary<INamedTypeSymbol, List<Include>> _byBase;
 
         private SubtypeMap(
@@ -48,9 +53,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             _byBase = byBase;
             Manifest = manifest;
         }
-
-        /// <summary>The committed field numbers the tag-less declarations were resolved from.</summary>
-        internal SubtypeTagManifest Manifest { get; }
 
         /// <summary>
         /// Indexes every usable subtype declaration among <paramref name="contracts"/>.
@@ -297,30 +299,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return false;
         }
 
-        /// <summary>
-        /// Whether a base could hold this subtype in its dispatch chain at all, contract or not.
-        /// </summary>
-        /// <param name="baseType">The candidate base.</param>
-        /// <param name="subType">The type that derives from it.</param>
-        /// <returns><c>true</c> when the relationship is structurally expressible.</returns>
-        /// <remarks>
-        /// The structural half, kept apart from <see cref="IsSerializedContract"/> so the walk can
-        /// step through an IMPLICIT base -- one that carries no attribute of its own -- without
-        /// asking whether that base is a contract before it has been classified.
-        /// </remarks>
-        private static bool CanCarrySubtype(INamedTypeSymbol baseType, INamedTypeSymbol subType)
-        {
-            return SymbolEqualityComparer.Default.Equals(subType.BaseType, baseType)
-                && baseType.OriginalDefinition.TypeParameters.Length == 0
-                && subType.OriginalDefinition.TypeParameters.Length == 0
-                && (
-                    SymbolEqualityComparer.Default.Equals(
-                        baseType.ContainingAssembly,
-                        subType.ContainingAssembly
-                    ) || SupportsReplacement(baseType)
-                );
-        }
-
         internal static bool SupportsReplacement(INamedTypeSymbol baseType)
         {
             foreach (
@@ -335,84 +313,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 }
             }
             return false;
-        }
-
-        internal IEnumerable<INamedTypeSymbol> Bases => _byBase.Keys;
-
-        private static bool HasNotSerialized(INamedTypeSymbol symbol)
-        {
-            foreach (AttributeData attribute in symbol.GetAttributes())
-            {
-                if (attribute.AttributeClass?.ToDisplayString() == NotSerializedAttribute)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        /// <summary>
-        /// Whether <paramref name="baseType"/> already names <paramref name="subType"/> in an
-        /// <c>[WProtoInclude]</c>.
-        /// </summary>
-        /// <param name="baseType">The base to read.</param>
-        /// <param name="subType">The subtype to look for.</param>
-        /// <returns><c>true</c> when the relationship is declared from the base's end.</returns>
-        /// <remarks>
-        /// The third way a relationship can already exist, and the one an implicit include must not
-        /// duplicate: a type the base names carries the base's own number, not a manifest entry, so
-        /// synthesizing one would claim a second number for one type and demanding one would refuse
-        /// a contract that is perfectly well declared.
-        /// </remarks>
-        private static bool DeclaredByInclude(INamedTypeSymbol baseType, INamedTypeSymbol subType)
-        {
-            foreach (AttributeData attribute in baseType.GetAttributes())
-            {
-                if (
-                    attribute.AttributeClass?.ToDisplayString() != IncludeAttribute
-                    || attribute.ConstructorArguments.Length < 2
-                )
-                {
-                    continue;
-                }
-
-                if (
-                    attribute.ConstructorArguments[1].Value is INamedTypeSymbol named
-                    && SymbolEqualityComparer.Default.Equals(
-                        named.OriginalDefinition,
-                        subType.OriginalDefinition
-                    )
-                )
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool HasContract(INamedTypeSymbol symbol)
-        {
-            foreach (AttributeData attribute in symbol.GetAttributes())
-            {
-                if (attribute.AttributeClass?.ToDisplayString() == ContractAttribute)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        /// <summary>
-        /// The subtypes that declared themselves against <paramref name="baseType"/>.
-        /// </summary>
-        /// <param name="baseType">The contract whose include set is being built.</param>
-        /// <returns>The declarations, ordered by field number; never <c>null</c>.</returns>
-        internal List<Include> For(INamedTypeSymbol baseType)
-        {
-            return _byBase.TryGetValue(baseType, out List<Include> declared) ? declared : None;
         }
 
         /// <summary>
@@ -557,6 +457,117 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             string named = "typeof(" + (baseType == null ? "?" : baseType.Name) + ")";
             return tagless ? named : named + ", " + tag;
+        }
+
+        /// <summary>
+        /// Explains why a retired field number cannot be handed to another subtype.
+        /// </summary>
+        /// <param name="tag">The field number being claimed.</param>
+        /// <param name="baseType">The base it lives on.</param>
+        /// <param name="retiredBy">The fully qualified name of the type that held it.</param>
+        /// <returns>The clause a subtype or include diagnostic appends.</returns>
+        internal static string RetiredProblem(int tag, INamedTypeSymbol baseType, string retiredBy)
+        {
+            return "field number "
+                + tag
+                + " on '"
+                + (baseType == null ? "?" : baseType.Name)
+                + "' is retired, having belonged to '"
+                + retiredBy
+                + "'. Payloads written before that type was removed still carry it under this "
+                + "number, so handing it to another type reads those saves back as the wrong "
+                + "type. Give this one a free number, or restore the deleted type under its own "
+                + "name";
+        }
+
+        /// <summary>
+        /// Whether a base could hold this subtype in its dispatch chain at all, contract or not.
+        /// </summary>
+        /// <param name="baseType">The candidate base.</param>
+        /// <param name="subType">The type that derives from it.</param>
+        /// <returns><c>true</c> when the relationship is structurally expressible.</returns>
+        /// <remarks>
+        /// The structural half, kept apart from <see cref="IsSerializedContract"/> so the walk can
+        /// step through an IMPLICIT base -- one that carries no attribute of its own -- without
+        /// asking whether that base is a contract before it has been classified.
+        /// </remarks>
+        private static bool CanCarrySubtype(INamedTypeSymbol baseType, INamedTypeSymbol subType)
+        {
+            return SymbolEqualityComparer.Default.Equals(subType.BaseType, baseType)
+                && baseType.OriginalDefinition.TypeParameters.Length == 0
+                && subType.OriginalDefinition.TypeParameters.Length == 0
+                && (
+                    SymbolEqualityComparer.Default.Equals(
+                        baseType.ContainingAssembly,
+                        subType.ContainingAssembly
+                    ) || SupportsReplacement(baseType)
+                );
+        }
+
+        private static bool HasNotSerialized(INamedTypeSymbol symbol)
+        {
+            foreach (AttributeData attribute in symbol.GetAttributes())
+            {
+                if (attribute.AttributeClass?.ToDisplayString() == NotSerializedAttribute)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Whether <paramref name="baseType"/> already names <paramref name="subType"/> in an
+        /// <c>[WProtoInclude]</c>.
+        /// </summary>
+        /// <param name="baseType">The base to read.</param>
+        /// <param name="subType">The subtype to look for.</param>
+        /// <returns><c>true</c> when the relationship is declared from the base's end.</returns>
+        /// <remarks>
+        /// The third way a relationship can already exist, and the one an implicit include must not
+        /// duplicate: a type the base names carries the base's own number, not a manifest entry, so
+        /// synthesizing one would claim a second number for one type and demanding one would refuse
+        /// a contract that is perfectly well declared.
+        /// </remarks>
+        private static bool DeclaredByInclude(INamedTypeSymbol baseType, INamedTypeSymbol subType)
+        {
+            foreach (AttributeData attribute in baseType.GetAttributes())
+            {
+                if (
+                    attribute.AttributeClass?.ToDisplayString() != IncludeAttribute
+                    || attribute.ConstructorArguments.Length < 2
+                )
+                {
+                    continue;
+                }
+
+                if (
+                    attribute.ConstructorArguments[1].Value is INamedTypeSymbol named
+                    && SymbolEqualityComparer.Default.Equals(
+                        named.OriginalDefinition,
+                        subType.OriginalDefinition
+                    )
+                )
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasContract(INamedTypeSymbol symbol)
+        {
+            foreach (AttributeData attribute in symbol.GetAttributes())
+            {
+                if (attribute.AttributeClass?.ToDisplayString() == ContractAttribute)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -733,27 +744,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         }
 
         /// <summary>
-        /// Explains why a retired field number cannot be handed to another subtype.
-        /// </summary>
-        /// <param name="tag">The field number being claimed.</param>
-        /// <param name="baseType">The base it lives on.</param>
-        /// <param name="retiredBy">The fully qualified name of the type that held it.</param>
-        /// <returns>The clause a subtype or include diagnostic appends.</returns>
-        internal static string RetiredProblem(int tag, INamedTypeSymbol baseType, string retiredBy)
-        {
-            return "field number "
-                + tag
-                + " on '"
-                + (baseType == null ? "?" : baseType.Name)
-                + "' is retired, having belonged to '"
-                + retiredBy
-                + "'. Payloads written before that type was removed still carry it under this "
-                + "number, so handing it to another type reads those saves back as the wrong "
-                + "type. Give this one a free number, or restore the deleted type under its own "
-                + "name";
-        }
-
-        /// <summary>
         /// Reports whether <paramref name="type"/> or anything enclosing it takes type arguments.
         /// </summary>
         /// <param name="type">The type to inspect.</param>
@@ -785,6 +775,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     ? Location.None
                     : subType.Locations[0]
                 : reference.GetSyntax().GetLocation();
+        }
+
+        /// <summary>
+        /// The subtypes that declared themselves against <paramref name="baseType"/>.
+        /// </summary>
+        /// <param name="baseType">The contract whose include set is being built.</param>
+        /// <returns>The declarations, ordered by field number; never <c>null</c>.</returns>
+        internal List<Include> For(INamedTypeSymbol baseType)
+        {
+            return _byBase.TryGetValue(baseType, out List<Include> declared) ? declared : None;
         }
     }
 }

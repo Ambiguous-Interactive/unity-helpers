@@ -114,6 +114,41 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// </summary>
         public const float OverflowCenteringRatio = 0.5f;
 
+        private const string SummaryStyleKey = "EnumToggleButtons/SummaryStyle";
+
+        /// <summary>
+        /// Content for navigating to first page.
+        /// </summary>
+        public static GUIContent FirstPageContent =>
+            _firstPageContent ??= EditorGUIUtility.TrTextContent("<<", "First Page");
+
+        /// <summary>
+        /// Content for navigating to last page.
+        /// </summary>
+        public static GUIContent LastPageContent =>
+            _lastPageContent ??= EditorGUIUtility.TrTextContent(">>", "Last Page");
+
+        /// <summary>
+        /// Gets the style used for displaying selection summary text.
+        /// </summary>
+        public static GUIStyle SummaryStyle
+        {
+            get
+            {
+                if (_summaryStyle != null)
+                {
+                    return _summaryStyle;
+                }
+
+                _summaryStyle = EditorCacheHelper.GetOrCreateStyle(
+                    SummaryStyleKey,
+                    CreateSummaryStyle
+                );
+
+                return _summaryStyle;
+            }
+        }
+
         /// <summary>
         /// Content for navigating to previous page.
         /// </summary>
@@ -153,18 +188,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         private static GUIContent _firstPageContent;
         private static GUIContent _lastPageContent;
 
-        /// <summary>
-        /// Content for navigating to first page.
-        /// </summary>
-        public static GUIContent FirstPageContent =>
-            _firstPageContent ??= EditorGUIUtility.TrTextContent("<<", "First Page");
-
-        /// <summary>
-        /// Content for navigating to last page.
-        /// </summary>
-        public static GUIContent LastPageContent =>
-            _lastPageContent ??= EditorGUIUtility.TrTextContent(">>", "Last Page");
-
         private static readonly EditorCacheHelper.ColorComparer ColorEquality = new();
 
         private static readonly Dictionary<ButtonStyleCacheKey, GUIStyle> ButtonStyleCache = new(
@@ -172,34 +195,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         );
 
         private static GUIStyle _summaryStyle;
-
-        private const string SummaryStyleKey = "EnumToggleButtons/SummaryStyle";
-
-        /// <summary>
-        /// Gets the style used for displaying selection summary text.
-        /// </summary>
-        public static GUIStyle SummaryStyle
-        {
-            get
-            {
-                if (_summaryStyle != null)
-                {
-                    return _summaryStyle;
-                }
-
-                _summaryStyle = EditorCacheHelper.GetOrCreateStyle(
-                    SummaryStyleKey,
-                    CreateSummaryStyle
-                );
-
-                return _summaryStyle;
-            }
-        }
-
-        private static GUIStyle CreateSummaryStyle()
-        {
-            return new GUIStyle(EditorStyles.wordWrappedMiniLabel) { fontStyle = FontStyle.Italic };
-        }
 
         /// <summary>
         /// Determines which segment style a button should use based on its position.
@@ -331,10 +326,9 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// </summary>
         /// <param name="value">The value to check.</param>
         /// <returns>True if the value is a power of two and not zero; otherwise, false.</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsPowerOfTwo(ulong value)
         {
-            return value != 0UL && (value & (value - 1UL)) == 0UL;
+            return BitOps.IsPowerOfTwo(value);
         }
 
         /// <summary>
@@ -571,6 +565,11 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
             ButtonStyleCache.Clear();
 
             _summaryStyle = null;
+        }
+
+        private static GUIStyle CreateSummaryStyle()
+        {
+            return new GUIStyle(EditorStyles.wordWrappedMiniLabel) { fontStyle = FontStyle.Italic };
         }
 
         /// <summary>
@@ -900,8 +899,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         /// </summary>
         public sealed class PaginationState
         {
-            private int _pageIndex;
-
             /// <summary>
             /// Gets or sets the number of items per page.
             /// </summary>
@@ -974,6 +971,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
                     return Mathf.Clamp(TotalItems - start, 0, PageSize);
                 }
             }
+
+            private int _pageIndex;
         }
     }
 

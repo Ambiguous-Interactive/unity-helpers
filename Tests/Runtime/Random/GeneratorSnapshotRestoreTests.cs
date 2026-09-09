@@ -30,6 +30,35 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         private const int DrawsBeforeSnapshot = 37;
         private const int ComparedDraws = 64;
 
+        private static IEnumerable<Type> GeneratorTypes()
+        {
+            Assembly runtime = typeof(IRandom).Assembly;
+            Type[] types;
+            try
+            {
+                types = runtime.GetTypes();
+            }
+            catch (ReflectionTypeLoadException partial)
+            {
+                types = partial.Types.Where(type => type != null).ToArray();
+            }
+
+            foreach (Type type in types)
+            {
+                if (
+                    type.IsAbstract
+                    || type.IsInterface
+                    || type.IsGenericTypeDefinition
+                    || !typeof(IRandom).IsAssignableFrom(type)
+                )
+                {
+                    continue;
+                }
+
+                yield return type;
+            }
+        }
+
         [Test]
         public void EveryGeneratorResumesItsStreamFromItsOwnSnapshot()
         {
@@ -92,35 +121,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                 "The sweep is matching fewer generators than the package ships."
             );
             Assert.IsEmpty(diverged, string.Join(Environment.NewLine, diverged));
-        }
-
-        private static IEnumerable<Type> GeneratorTypes()
-        {
-            Assembly runtime = typeof(IRandom).Assembly;
-            Type[] types;
-            try
-            {
-                types = runtime.GetTypes();
-            }
-            catch (ReflectionTypeLoadException partial)
-            {
-                types = partial.Types.Where(type => type != null).ToArray();
-            }
-
-            foreach (Type type in types)
-            {
-                if (
-                    type.IsAbstract
-                    || type.IsInterface
-                    || type.IsGenericTypeDefinition
-                    || !typeof(IRandom).IsAssignableFrom(type)
-                )
-                {
-                    continue;
-                }
-
-                yield return type;
-            }
         }
     }
 }

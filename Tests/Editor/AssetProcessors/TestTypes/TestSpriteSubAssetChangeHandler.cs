@@ -23,12 +23,12 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         /// </summary>
         public const string WatchedFolder = "Assets/__DetectAssetChangePrefabGuardTests__";
 
-        private static readonly List<AssetChangeContext> Recorded = new();
-
         /// <summary>
         /// Change contexts recorded for assets under <see cref="WatchedFolder"/>.
         /// </summary>
         public static IReadOnlyList<AssetChangeContext> RecordedContexts => Recorded;
+
+        private static readonly List<AssetChangeContext> Recorded = new();
 
         /// <summary>
         /// Clears every recorded context.

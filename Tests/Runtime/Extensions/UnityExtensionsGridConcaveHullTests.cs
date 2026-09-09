@@ -24,52 +24,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             return new FastVector3Int(x, y, 0);
         }
 
-        [Test]
-        public void BuildConcaveHullEdgeSplitMatchesConvexHullForRectangle()
-        {
-            Grid grid = CreateGrid(out GameObject owner);
-            Track(owner);
-
-            List<FastVector3Int> rectangle = CreatePointList((0, 0), (0, 3), (4, 3), (4, 0));
-
-            List<FastVector3Int> convex = rectangle.BuildConvexHull(
-                grid,
-                includeColinearPoints: false
-            );
-            List<FastVector3Int> hull = rectangle.BuildConcaveHullEdgeSplit(grid);
-
-            AssertHullSubset(rectangle, hull);
-            CollectionAssert.AreEquivalent(convex, hull);
-        }
-
-        [Test]
-        public void BuildConcaveHullKnnCapturesConcaveVertices()
-        {
-            Grid grid = CreateGrid(out GameObject owner);
-            Track(owner);
-
-            List<FastVector3Int> concaveLShape = CreatePointList(
-                (0, 0),
-                (0, 4),
-                (2, 4),
-                (2, 2),
-                (4, 2),
-                (4, 0)
-            );
-            FastVector3Int elbow = FV(2, 2);
-
-            List<FastVector3Int> hull = concaveLShape.BuildConcaveHullKnn(
-                grid,
-                nearestNeighbors: 3
-            );
-
-            AssertHullSubset(concaveLShape, hull);
-            Assert.IsTrue(
-                hull.Contains(elbow),
-                "KNN concave hull should retain concave vertices when they exist in the point set."
-            );
-        }
-
         private static IEnumerable<TestCaseData> ConvexShapeCases()
         {
             yield return new TestCaseData(
@@ -82,34 +36,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             ).SetName("ConcaveHullTriangleFallsBackToConvex");
             yield return new TestCaseData("Line", CreatePointList((0, 0), (0, 5))).SetName(
                 "ConcaveHullLineFallsBackToConvex"
-            );
-        }
-
-        [TestCaseSource(nameof(ConvexShapeCases))]
-        public void ConcaveHullFallbacksToConvexForTrivialShapes(
-            string label,
-            List<FastVector3Int> points
-        )
-        {
-            Grid grid = CreateGrid(out GameObject owner);
-            Track(owner);
-
-            List<FastVector3Int> convexHull = points.BuildConvexHull(
-                grid,
-                includeColinearPoints: false
-            );
-            List<FastVector3Int> edgeSplit = points.BuildConcaveHullEdgeSplit(grid);
-            List<FastVector3Int> knn = points.BuildConcaveHullKnn(grid);
-
-            CollectionAssert.AreEquivalent(
-                convexHull,
-                edgeSplit,
-                $"{label}: edge-split hull should fall back to convex hull."
-            );
-            CollectionAssert.AreEquivalent(
-                convexHull,
-                knn,
-                $"{label}: knn hull should fall back to convex hull."
             );
         }
 
@@ -132,32 +58,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 new[] { FV(1, 2), FV(2, 1) },
                 new[] { FV(1, 2), FV(2, 1) }
             ).SetName("ConcaveHullAlgorithmsAgreeStaircase");
-        }
-
-        [TestCaseSource(nameof(ConcaveComparisonCases))]
-        public void ConcaveHullAlgorithmsAgreeOnVertices(
-            string label,
-            List<FastVector3Int> points,
-            float angleThreshold,
-            int nearestNeighbors,
-            FastVector3Int[] requiredEdgeSplit,
-            FastVector3Int[] requiredKnn
-        )
-        {
-            Grid grid = CreateGrid(out GameObject owner);
-            Track(owner);
-
-            List<FastVector3Int> edgeSplit = points.BuildConcaveHullEdgeSplit(
-                grid,
-                bucketSize: 8,
-                angleThreshold: angleThreshold
-            );
-            List<FastVector3Int> knn = points.BuildConcaveHullKnn(grid, nearestNeighbors);
-
-            AssertHullSubset(points, edgeSplit);
-            AssertHullSubset(points, knn);
-            AssertRequiredVertices($"{label} edge-split", requiredEdgeSplit, edgeSplit);
-            AssertRequiredVertices($"{label} knn", requiredKnn, knn);
         }
 
         private static IEnumerable<TestCaseData> AxisCornerCases()
@@ -237,6 +137,333 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 new[] { FV(1, 1), FV(4, 1) },
                 1
             ).SetName("ConcaveHullGridRecoversAxisCornersWithAxisPath");
+        }
+
+        private static IEnumerable<TestCaseData> EdgeSplitBucketCases()
+        {
+            yield return new TestCaseData(1, false).SetName(
+                "EdgeSplitFallsBackWhenBucketSizeTooSmall"
+            );
+            yield return new TestCaseData(16, true).SetName(
+                "EdgeSplitCapturesConcavityWhenBucketSizeAdequate"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> CavityShapeCases()
+        {
+            yield return new TestCaseData(
+                "SingleRectangularCavity",
+                36,
+                36,
+                new[] { new CavityRect(9, 27, 9, 27) },
+                new[] { FV(8, 8), FV(8, 28), FV(28, 8), FV(28, 28) },
+                20,
+                220f
+            ).SetName("ConcaveHullCavityShape.SingleRectangular");
+
+            yield return new TestCaseData(
+                "MultipleDisjointCavities",
+                48,
+                48,
+                new[] { new CavityRect(7, 16, 7, 16), new CavityRect(31, 40, 31, 40) },
+                new[]
+                {
+                    FV(6, 6),
+                    FV(6, 17),
+                    FV(17, 6),
+                    FV(17, 17),
+                    FV(30, 30),
+                    FV(30, 41),
+                    FV(41, 30),
+                    FV(41, 41),
+                },
+                24,
+                240f
+            ).SetName("ConcaveHullCavityShape.MultipleDisjoint");
+
+            yield return new TestCaseData(
+                "LShapedCavity",
+                36,
+                36,
+                new[] { new CavityRect(7, 14, 7, 25), new CavityRect(7, 25, 7, 14) },
+                new[] { FV(6, 6), FV(6, 26), FV(15, 26), FV(15, 15), FV(26, 15), FV(26, 6) },
+                20,
+                230f
+            ).SetName("ConcaveHullCavityShape.LShaped");
+
+            yield return new TestCaseData(
+                "UShapedCavity",
+                44,
+                36,
+                new[]
+                {
+                    new CavityRect(7, 14, 7, 25),
+                    new CavityRect(7, 36, 7, 14),
+                    new CavityRect(29, 36, 7, 25),
+                },
+                new[]
+                {
+                    FV(6, 6),
+                    FV(6, 26),
+                    FV(15, 26),
+                    FV(15, 15),
+                    FV(28, 15),
+                    FV(28, 26),
+                    FV(37, 26),
+                    FV(37, 6),
+                },
+                24,
+                235f
+            ).SetName("ConcaveHullCavityShape.UShaped");
+
+            yield return new TestCaseData(
+                "IrregularStaircaseCavity",
+                36,
+                36,
+                new[]
+                {
+                    new CavityRect(7, 10, 7, 29),
+                    new CavityRect(10, 14, 11, 29),
+                    new CavityRect(14, 18, 15, 29),
+                    new CavityRect(18, 22, 19, 29),
+                },
+                new[]
+                {
+                    FV(6, 6),
+                    FV(6, 30),
+                    FV(11, 30),
+                    FV(11, 10),
+                    FV(15, 10),
+                    FV(15, 14),
+                    FV(19, 14),
+                    FV(19, 18),
+                    FV(23, 18),
+                    FV(23, 30),
+                },
+                20,
+                225f
+            ).SetName("ConcaveHullCavityShape.IrregularStaircase");
+
+            yield return new TestCaseData(
+                "ConcentricFrameCavity",
+                44,
+                44,
+                new[] { new CavityRect(13, 31, 13, 31) },
+                new[] { FV(12, 12), FV(12, 32), FV(32, 12), FV(32, 32) },
+                24,
+                220f
+            ).SetName("ConcaveHullCavityShape.ConcentricFrame");
+
+            yield return new TestCaseData(
+                "TShapedCavity",
+                44,
+                36,
+                new[] { new CavityRect(7, 36, 22, 29), new CavityRect(19, 25, 7, 29) },
+                new[]
+                {
+                    FV(6, 21),
+                    FV(6, 30),
+                    FV(18, 30),
+                    FV(18, 6),
+                    FV(26, 6),
+                    FV(26, 30),
+                    FV(37, 30),
+                    FV(37, 21),
+                },
+                24,
+                230f
+            ).SetName("ConcaveHullCavityShape.TShaped");
+
+            yield return new TestCaseData(
+                "CrossShapedCavity",
+                44,
+                44,
+                new[] { new CavityRect(15, 29, 7, 36), new CavityRect(7, 36, 15, 29) },
+                new[]
+                {
+                    FV(14, 6),
+                    FV(14, 14),
+                    FV(6, 14),
+                    FV(6, 30),
+                    FV(14, 30),
+                    FV(14, 37),
+                    FV(30, 37),
+                    FV(30, 30),
+                    FV(37, 30),
+                    FV(37, 14),
+                    FV(30, 14),
+                    FV(30, 6),
+                },
+                24,
+                235f
+            ).SetName("ConcaveHullCavityShape.CrossShaped");
+        }
+
+        private static IEnumerable<TestCaseData> ConcaveHullRepairStressCases()
+        {
+            yield return new TestCaseData(
+                "LargeSingleCavity",
+                120,
+                120,
+                new[] { new CavityRect(31, 89, 31, 89) },
+                new[] { FV(30, 30), FV(30, 90), FV(90, 30), FV(90, 90) },
+                48,
+                220f,
+                10000
+            ).SetName("ConcaveHullRepairStressSamples.SingleLargeCavity");
+
+            yield return new TestCaseData(
+                "LargeMultipleCavities",
+                150,
+                150,
+                new[] { new CavityRect(26, 54, 26, 54), new CavityRect(96, 124, 71, 119) },
+                new[]
+                {
+                    FV(25, 25),
+                    FV(25, 55),
+                    FV(55, 25),
+                    FV(55, 55),
+                    FV(95, 70),
+                    FV(95, 120),
+                    FV(125, 70),
+                    FV(125, 120),
+                },
+                64,
+                240f,
+                20000
+            ).SetName("ConcaveHullRepairStressSamples.MultipleLargeCavities");
+        }
+
+        private static List<FastVector3Int> CreatePointList(params (int x, int y)[] coords)
+        {
+            return coords.Select(tuple => FV(tuple.x, tuple.y)).ToList();
+        }
+
+        private static void AssertHullSubset(
+            IReadOnlyCollection<FastVector3Int> source,
+            IEnumerable<FastVector3Int> hull
+        )
+        {
+            HashSet<FastVector3Int> sourceSet = new(source);
+            foreach (FastVector3Int vertex in hull)
+            {
+                Assert.IsTrue(
+                    sourceSet.Contains(vertex),
+                    $"Hull introduced vertex {vertex} that was not part of the input set."
+                );
+            }
+        }
+
+        private static void AssertRequiredVertices(
+            string label,
+            IEnumerable<FastVector3Int> required,
+            IReadOnlyCollection<FastVector3Int> hull
+        )
+        {
+            foreach (FastVector3Int vertex in required)
+            {
+                Assert.IsTrue(hull.Contains(vertex), $"{label}: hull should contain {vertex}.");
+            }
+        }
+
+        [Test]
+        public void BuildConcaveHullEdgeSplitMatchesConvexHullForRectangle()
+        {
+            Grid grid = CreateGrid(out GameObject owner);
+            Track(owner);
+
+            List<FastVector3Int> rectangle = CreatePointList((0, 0), (0, 3), (4, 3), (4, 0));
+
+            List<FastVector3Int> convex = rectangle.BuildConvexHull(
+                grid,
+                includeColinearPoints: false
+            );
+            List<FastVector3Int> hull = rectangle.BuildConcaveHullEdgeSplit(grid);
+
+            AssertHullSubset(rectangle, hull);
+            CollectionAssert.AreEquivalent(convex, hull);
+        }
+
+        [Test]
+        public void BuildConcaveHullKnnCapturesConcaveVertices()
+        {
+            Grid grid = CreateGrid(out GameObject owner);
+            Track(owner);
+
+            List<FastVector3Int> concaveLShape = CreatePointList(
+                (0, 0),
+                (0, 4),
+                (2, 4),
+                (2, 2),
+                (4, 2),
+                (4, 0)
+            );
+            FastVector3Int elbow = FV(2, 2);
+
+            List<FastVector3Int> hull = concaveLShape.BuildConcaveHullKnn(
+                grid,
+                nearestNeighbors: 3
+            );
+
+            AssertHullSubset(concaveLShape, hull);
+            Assert.IsTrue(
+                hull.Contains(elbow),
+                "KNN concave hull should retain concave vertices when they exist in the point set."
+            );
+        }
+
+        [TestCaseSource(nameof(ConvexShapeCases))]
+        public void ConcaveHullFallbacksToConvexForTrivialShapes(
+            string label,
+            List<FastVector3Int> points
+        )
+        {
+            Grid grid = CreateGrid(out GameObject owner);
+            Track(owner);
+
+            List<FastVector3Int> convexHull = points.BuildConvexHull(
+                grid,
+                includeColinearPoints: false
+            );
+            List<FastVector3Int> edgeSplit = points.BuildConcaveHullEdgeSplit(grid);
+            List<FastVector3Int> knn = points.BuildConcaveHullKnn(grid);
+
+            CollectionAssert.AreEquivalent(
+                convexHull,
+                edgeSplit,
+                $"{label}: edge-split hull should fall back to convex hull."
+            );
+            CollectionAssert.AreEquivalent(
+                convexHull,
+                knn,
+                $"{label}: knn hull should fall back to convex hull."
+            );
+        }
+
+        [TestCaseSource(nameof(ConcaveComparisonCases))]
+        public void ConcaveHullAlgorithmsAgreeOnVertices(
+            string label,
+            List<FastVector3Int> points,
+            float angleThreshold,
+            int nearestNeighbors,
+            FastVector3Int[] requiredEdgeSplit,
+            FastVector3Int[] requiredKnn
+        )
+        {
+            Grid grid = CreateGrid(out GameObject owner);
+            Track(owner);
+
+            List<FastVector3Int> edgeSplit = points.BuildConcaveHullEdgeSplit(
+                grid,
+                bucketSize: 8,
+                angleThreshold: angleThreshold
+            );
+            List<FastVector3Int> knn = points.BuildConcaveHullKnn(grid, nearestNeighbors);
+
+            AssertHullSubset(points, edgeSplit);
+            AssertHullSubset(points, knn);
+            AssertRequiredVertices($"{label} edge-split", requiredEdgeSplit, edgeSplit);
+            AssertRequiredVertices($"{label} knn", requiredKnn, knn);
         }
 
         [TestCaseSource(nameof(AxisCornerCases))]
@@ -485,16 +712,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.IsTrue(
                 hull.Contains(elbow),
                 "High angle thresholds should reintroduce the concave elbow."
-            );
-        }
-
-        private static IEnumerable<TestCaseData> EdgeSplitBucketCases()
-        {
-            yield return new TestCaseData(1, false).SetName(
-                "EdgeSplitFallsBackWhenBucketSizeTooSmall"
-            );
-            yield return new TestCaseData(16, true).SetName(
-                "EdgeSplitCapturesConcavityWhenBucketSizeAdequate"
             );
         }
 
@@ -836,191 +1053,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 #endif
         }
 
-        private static IEnumerable<TestCaseData> CavityShapeCases()
-        {
-            yield return new TestCaseData(
-                "SingleRectangularCavity",
-                36,
-                36,
-                new[] { new CavityRect(9, 27, 9, 27) },
-                new[] { FV(8, 8), FV(8, 28), FV(28, 8), FV(28, 28) },
-                20,
-                220f
-            ).SetName("ConcaveHullCavityShape.SingleRectangular");
-
-            yield return new TestCaseData(
-                "MultipleDisjointCavities",
-                48,
-                48,
-                new[] { new CavityRect(7, 16, 7, 16), new CavityRect(31, 40, 31, 40) },
-                new[]
-                {
-                    FV(6, 6),
-                    FV(6, 17),
-                    FV(17, 6),
-                    FV(17, 17),
-                    FV(30, 30),
-                    FV(30, 41),
-                    FV(41, 30),
-                    FV(41, 41),
-                },
-                24,
-                240f
-            ).SetName("ConcaveHullCavityShape.MultipleDisjoint");
-
-            yield return new TestCaseData(
-                "LShapedCavity",
-                36,
-                36,
-                new[] { new CavityRect(7, 14, 7, 25), new CavityRect(7, 25, 7, 14) },
-                new[] { FV(6, 6), FV(6, 26), FV(15, 26), FV(15, 15), FV(26, 15), FV(26, 6) },
-                20,
-                230f
-            ).SetName("ConcaveHullCavityShape.LShaped");
-
-            yield return new TestCaseData(
-                "UShapedCavity",
-                44,
-                36,
-                new[]
-                {
-                    new CavityRect(7, 14, 7, 25),
-                    new CavityRect(7, 36, 7, 14),
-                    new CavityRect(29, 36, 7, 25),
-                },
-                new[]
-                {
-                    FV(6, 6),
-                    FV(6, 26),
-                    FV(15, 26),
-                    FV(15, 15),
-                    FV(28, 15),
-                    FV(28, 26),
-                    FV(37, 26),
-                    FV(37, 6),
-                },
-                24,
-                235f
-            ).SetName("ConcaveHullCavityShape.UShaped");
-
-            yield return new TestCaseData(
-                "IrregularStaircaseCavity",
-                36,
-                36,
-                new[]
-                {
-                    new CavityRect(7, 10, 7, 29),
-                    new CavityRect(10, 14, 11, 29),
-                    new CavityRect(14, 18, 15, 29),
-                    new CavityRect(18, 22, 19, 29),
-                },
-                new[]
-                {
-                    FV(6, 6),
-                    FV(6, 30),
-                    FV(11, 30),
-                    FV(11, 10),
-                    FV(15, 10),
-                    FV(15, 14),
-                    FV(19, 14),
-                    FV(19, 18),
-                    FV(23, 18),
-                    FV(23, 30),
-                },
-                20,
-                225f
-            ).SetName("ConcaveHullCavityShape.IrregularStaircase");
-
-            yield return new TestCaseData(
-                "ConcentricFrameCavity",
-                44,
-                44,
-                new[] { new CavityRect(13, 31, 13, 31) },
-                new[] { FV(12, 12), FV(12, 32), FV(32, 12), FV(32, 32) },
-                24,
-                220f
-            ).SetName("ConcaveHullCavityShape.ConcentricFrame");
-
-            yield return new TestCaseData(
-                "TShapedCavity",
-                44,
-                36,
-                new[] { new CavityRect(7, 36, 22, 29), new CavityRect(19, 25, 7, 29) },
-                new[]
-                {
-                    FV(6, 21),
-                    FV(6, 30),
-                    FV(18, 30),
-                    FV(18, 6),
-                    FV(26, 6),
-                    FV(26, 30),
-                    FV(37, 30),
-                    FV(37, 21),
-                },
-                24,
-                230f
-            ).SetName("ConcaveHullCavityShape.TShaped");
-
-            yield return new TestCaseData(
-                "CrossShapedCavity",
-                44,
-                44,
-                new[] { new CavityRect(15, 29, 7, 36), new CavityRect(7, 36, 15, 29) },
-                new[]
-                {
-                    FV(14, 6),
-                    FV(14, 14),
-                    FV(6, 14),
-                    FV(6, 30),
-                    FV(14, 30),
-                    FV(14, 37),
-                    FV(30, 37),
-                    FV(30, 30),
-                    FV(37, 30),
-                    FV(37, 14),
-                    FV(30, 14),
-                    FV(30, 6),
-                },
-                24,
-                235f
-            ).SetName("ConcaveHullCavityShape.CrossShaped");
-        }
-
-        private static IEnumerable<TestCaseData> ConcaveHullRepairStressCases()
-        {
-            yield return new TestCaseData(
-                "LargeSingleCavity",
-                120,
-                120,
-                new[] { new CavityRect(31, 89, 31, 89) },
-                new[] { FV(30, 30), FV(30, 90), FV(90, 30), FV(90, 90) },
-                48,
-                220f,
-                10000
-            ).SetName("ConcaveHullRepairStressSamples.SingleLargeCavity");
-
-            yield return new TestCaseData(
-                "LargeMultipleCavities",
-                150,
-                150,
-                new[] { new CavityRect(26, 54, 26, 54), new CavityRect(96, 124, 71, 119) },
-                new[]
-                {
-                    FV(25, 25),
-                    FV(25, 55),
-                    FV(55, 25),
-                    FV(55, 55),
-                    FV(95, 70),
-                    FV(95, 120),
-                    FV(125, 70),
-                    FV(125, 120),
-                },
-                64,
-                240f,
-                20000
-            ).SetName("ConcaveHullRepairStressSamples.MultipleLargeCavities");
-        }
-
         [TestCaseSource(nameof(CavityShapeCases))]
         public void ConcaveHullHandlesVariousCavityShapes(
             string label,
@@ -1073,38 +1105,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 $"{label}: Repair must not exceed the source point budget."
             );
 #endif
-        }
-
-        private static List<FastVector3Int> CreatePointList(params (int x, int y)[] coords)
-        {
-            return coords.Select(tuple => FV(tuple.x, tuple.y)).ToList();
-        }
-
-        private static void AssertHullSubset(
-            IReadOnlyCollection<FastVector3Int> source,
-            IEnumerable<FastVector3Int> hull
-        )
-        {
-            HashSet<FastVector3Int> sourceSet = new(source);
-            foreach (FastVector3Int vertex in hull)
-            {
-                Assert.IsTrue(
-                    sourceSet.Contains(vertex),
-                    $"Hull introduced vertex {vertex} that was not part of the input set."
-                );
-            }
-        }
-
-        private static void AssertRequiredVertices(
-            string label,
-            IEnumerable<FastVector3Int> required,
-            IReadOnlyCollection<FastVector3Int> hull
-        )
-        {
-            foreach (FastVector3Int vertex in required)
-            {
-                Assert.IsTrue(hull.Contains(vertex), $"{label}: hull should contain {vertex}.");
-            }
         }
 
 #if ENABLE_CONCAVE_HULL_STATS

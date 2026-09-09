@@ -21,84 +21,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     [NUnit.Framework.Category("Fast")]
     public sealed class ComparableNullOrderingTests
     {
-        [Test]
-        public void EveryComparableOrdersNullFirst()
-        {
-            List<string> failures = new();
-            List<string> checkedTypes = new();
-
-            foreach (Type type in ComparableTypes())
-            {
-                object instance;
-                try
-                {
-                    instance = CreateProbe(type);
-                }
-                catch (Exception creation)
-                {
-                    failures.Add(
-                        $"{type.FullName}: could not be constructed ({creation.GetType().Name})"
-                    );
-                    continue;
-                }
-
-                checkedTypes.Add(type.Name);
-                foreach (MethodInfo nullAccepting in NullAcceptingCompareMethods(type))
-                {
-                    string label = $"{type.Name} via {Describe(nullAccepting.DeclaringType)}";
-
-                    object result;
-                    try
-                    {
-                        result = nullAccepting.Invoke(instance, new object[] { null });
-                    }
-                    catch (TargetInvocationException invocation)
-                    {
-                        failures.Add($"{label} threw {invocation.InnerException?.GetType().Name}");
-                        continue;
-                    }
-
-                    if ((int)result <= 0)
-                    {
-                        failures.Add($"{label} returned {result}, expected a positive value");
-                    }
-                }
-            }
-
-            // Assert discovery so an empty filter cannot produce a false pass.
-            Assert.That(
-                checkedTypes,
-                Has.Count.GreaterThanOrEqualTo(15),
-                $"Discovered only {checkedTypes.Count} hand-written comparable types; the sweep is matching less than it did."
-            );
-            string[] known =
-            {
-                "Attribute",
-                "AttributeModification",
-                "EffectHandle",
-                "FastVector2Int",
-                "FastVector3Int",
-                "FlurryBurstRandom",
-                "PcgRandom",
-                "PhotonSpinRandom",
-                "RomuDuo",
-                "SplitMix64",
-                "StormDropRandom",
-                "StringWrapper",
-                "WDoomRandom",
-                "WGuid",
-                "XoroShiroRandom",
-                "Xoshiro128StarStar",
-                "Xoshiro256StarStar",
-            };
-            foreach (string expected in known)
-            {
-                CollectionAssert.Contains(checkedTypes, expected);
-            }
-
-            Assert.IsEmpty(failures, string.Join(Environment.NewLine, failures));
-        }
-
         private static IEnumerable<Type> ComparableTypes()
         {
             foreach (Type type in RuntimeTypes())
@@ -208,6 +130,84 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 contract.GetGenericArguments().Select(argument => argument.Name)
             );
             return $"{contract.Name.Split('`')[0]}<{arguments}>";
+        }
+
+        [Test]
+        public void EveryComparableOrdersNullFirst()
+        {
+            List<string> failures = new();
+            List<string> checkedTypes = new();
+
+            foreach (Type type in ComparableTypes())
+            {
+                object instance;
+                try
+                {
+                    instance = CreateProbe(type);
+                }
+                catch (Exception creation)
+                {
+                    failures.Add(
+                        $"{type.FullName}: could not be constructed ({creation.GetType().Name})"
+                    );
+                    continue;
+                }
+
+                checkedTypes.Add(type.Name);
+                foreach (MethodInfo nullAccepting in NullAcceptingCompareMethods(type))
+                {
+                    string label = $"{type.Name} via {Describe(nullAccepting.DeclaringType)}";
+
+                    object result;
+                    try
+                    {
+                        result = nullAccepting.Invoke(instance, new object[] { null });
+                    }
+                    catch (TargetInvocationException invocation)
+                    {
+                        failures.Add($"{label} threw {invocation.InnerException?.GetType().Name}");
+                        continue;
+                    }
+
+                    if ((int)result <= 0)
+                    {
+                        failures.Add($"{label} returned {result}, expected a positive value");
+                    }
+                }
+            }
+
+            // Assert discovery so an empty filter cannot produce a false pass.
+            Assert.That(
+                checkedTypes,
+                Has.Count.GreaterThanOrEqualTo(15),
+                $"Discovered only {checkedTypes.Count} hand-written comparable types; the sweep is matching less than it did."
+            );
+            string[] known =
+            {
+                "Attribute",
+                "AttributeModification",
+                "EffectHandle",
+                "FastVector2Int",
+                "FastVector3Int",
+                "FlurryBurstRandom",
+                "PcgRandom",
+                "PhotonSpinRandom",
+                "RomuDuo",
+                "SplitMix64",
+                "StormDropRandom",
+                "StringWrapper",
+                "WDoomRandom",
+                "WGuid",
+                "XoroShiroRandom",
+                "Xoshiro128StarStar",
+                "Xoshiro256StarStar",
+            };
+            foreach (string expected in known)
+            {
+                CollectionAssert.Contains(checkedTypes, expected);
+            }
+
+            Assert.IsEmpty(failures, string.Join(Environment.NewLine, failures));
         }
     }
 }

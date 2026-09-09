@@ -59,49 +59,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             }
         }
 
-        [TestCaseSource(nameof(FilterModeMatchingCases))]
-        public void DetectsFilterModeChangeCorrectly(
-            FilterMode spriteFilterMode,
-            FilterMode configuredFilterMode,
-            bool expectedResult
-        )
-        {
-            SpriteSettingsApplierAPI.TextureSettingsState state = new(
-                100,
-                new Vector2(0.5f, 0.5f),
-                false,
-                false,
-                TextureImporterCompression.Compressed,
-                TextureImporterType.Sprite,
-                SpriteImportMode.Single,
-                (int)SpriteAlignment.Custom,
-                true,
-                true,
-                (int)SpriteImportMode.Single,
-                1,
-                TextureWrapMode.Clamp,
-                spriteFilterMode
-            );
-
-            SpriteSettings profile = new()
-            {
-                matchBy = SpriteSettings.MatchMode.Any,
-                priority = 1,
-                applyFilterMode = true,
-                filterMode = configuredFilterMode,
-            };
-
-            bool willChange = SpriteSettingsApplierAPI.WouldTextureSettingsChange(
-                in state,
-                profile
-            );
-            Assert.AreEqual(
-                expectedResult,
-                willChange,
-                $"FilterMode sprite={spriteFilterMode} config={configuredFilterMode}"
-            );
-        }
-
         private static IEnumerable<TestCaseData> WrapModeMatchingCases()
         {
             yield return new TestCaseData(
@@ -146,49 +103,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             ).SetName("WrapMode.Differ.MirrorToMirrorOnce.ReturnsTrue");
         }
 
-        [TestCaseSource(nameof(WrapModeMatchingCases))]
-        public void DetectsWrapModeChangeCorrectly(
-            TextureWrapMode spriteWrapMode,
-            TextureWrapMode configuredWrapMode,
-            bool expectedResult
-        )
-        {
-            SpriteSettingsApplierAPI.TextureSettingsState state = new(
-                100,
-                new Vector2(0.5f, 0.5f),
-                false,
-                false,
-                TextureImporterCompression.Compressed,
-                TextureImporterType.Sprite,
-                SpriteImportMode.Single,
-                (int)SpriteAlignment.Custom,
-                true,
-                true,
-                (int)SpriteImportMode.Single,
-                1,
-                spriteWrapMode,
-                FilterMode.Point
-            );
-
-            SpriteSettings profile = new()
-            {
-                matchBy = SpriteSettings.MatchMode.Any,
-                priority = 1,
-                applyWrapMode = true,
-                wrapMode = configuredWrapMode,
-            };
-
-            bool willChange = SpriteSettingsApplierAPI.WouldTextureSettingsChange(
-                in state,
-                profile
-            );
-            Assert.AreEqual(
-                expectedResult,
-                willChange,
-                $"WrapMode sprite={spriteWrapMode} config={configuredWrapMode}"
-            );
-        }
-
         private static IEnumerable<TestCaseData> PixelsPerUnitMatchingCases()
         {
             yield return new TestCaseData(100, 100, false).SetName(
@@ -202,45 +116,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             yield return new TestCaseData(32, 100, true).SetName("PPU.Differ.32To100.ReturnsTrue");
             yield return new TestCaseData(100, 1, true).SetName("PPU.Differ.100To1.ReturnsTrue");
             yield return new TestCaseData(16, 256, true).SetName("PPU.Differ.16To256.ReturnsTrue");
-        }
-
-        [TestCaseSource(nameof(PixelsPerUnitMatchingCases))]
-        public void DetectsPpuChangeCorrectly(int spritePpu, int configuredPpu, bool expectedResult)
-        {
-            SpriteSettingsApplierAPI.TextureSettingsState state = new(
-                spritePpu,
-                new Vector2(0.5f, 0.5f),
-                false,
-                false,
-                TextureImporterCompression.Compressed,
-                TextureImporterType.Sprite,
-                SpriteImportMode.Single,
-                (int)SpriteAlignment.Custom,
-                true,
-                true,
-                (int)SpriteImportMode.Single,
-                1,
-                TextureWrapMode.Clamp,
-                FilterMode.Point
-            );
-
-            SpriteSettings profile = new()
-            {
-                matchBy = SpriteSettings.MatchMode.Any,
-                priority = 1,
-                applyPixelsPerUnit = true,
-                pixelsPerUnit = configuredPpu,
-            };
-
-            bool willChange = SpriteSettingsApplierAPI.WouldTextureSettingsChange(
-                in state,
-                profile
-            );
-            Assert.AreEqual(
-                expectedResult,
-                willChange,
-                $"PPU sprite={spritePpu} config={configuredPpu}"
-            );
         }
 
         private static IEnumerable<TestCaseData> CompressionMatchingCases()
@@ -287,49 +162,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             ).SetName("Compression.Differ.HQToLQ.ReturnsTrue");
         }
 
-        [TestCaseSource(nameof(CompressionMatchingCases))]
-        public void DetectsCompressionChangeCorrectly(
-            TextureImporterCompression spriteCompression,
-            TextureImporterCompression configuredCompression,
-            bool expectedResult
-        )
-        {
-            SpriteSettingsApplierAPI.TextureSettingsState state = new(
-                100,
-                new Vector2(0.5f, 0.5f),
-                false,
-                false,
-                spriteCompression,
-                TextureImporterType.Sprite,
-                SpriteImportMode.Single,
-                (int)SpriteAlignment.Custom,
-                true,
-                true,
-                (int)SpriteImportMode.Single,
-                1,
-                TextureWrapMode.Clamp,
-                FilterMode.Point
-            );
-
-            SpriteSettings profile = new()
-            {
-                matchBy = SpriteSettings.MatchMode.Any,
-                priority = 1,
-                applyCompression = true,
-                compressionLevel = configuredCompression,
-            };
-
-            bool willChange = SpriteSettingsApplierAPI.WouldTextureSettingsChange(
-                in state,
-                profile
-            );
-            Assert.AreEqual(
-                expectedResult,
-                willChange,
-                $"Compression sprite={spriteCompression} config={configuredCompression}"
-            );
-        }
-
         private static IEnumerable<TestCaseData> MipMapMatchingCases()
         {
             yield return new TestCaseData(true, true, false).SetName(
@@ -343,49 +175,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             );
             yield return new TestCaseData(false, true, true).SetName(
                 "MipMaps.Differ.DisabledToEnabled.ReturnsTrue"
-            );
-        }
-
-        [TestCaseSource(nameof(MipMapMatchingCases))]
-        public void DetectsMipMapsChangeCorrectly(
-            bool spriteMipMaps,
-            bool configuredMipMaps,
-            bool expectedResult
-        )
-        {
-            SpriteSettingsApplierAPI.TextureSettingsState state = new(
-                100,
-                new Vector2(0.5f, 0.5f),
-                spriteMipMaps,
-                false,
-                TextureImporterCompression.Compressed,
-                TextureImporterType.Sprite,
-                SpriteImportMode.Single,
-                (int)SpriteAlignment.Custom,
-                true,
-                true,
-                (int)SpriteImportMode.Single,
-                1,
-                TextureWrapMode.Clamp,
-                FilterMode.Point
-            );
-
-            SpriteSettings profile = new()
-            {
-                matchBy = SpriteSettings.MatchMode.Any,
-                priority = 1,
-                applyGenerateMipMaps = true,
-                generateMipMaps = configuredMipMaps,
-            };
-
-            bool willChange = SpriteSettingsApplierAPI.WouldTextureSettingsChange(
-                in state,
-                profile
-            );
-            Assert.AreEqual(
-                expectedResult,
-                willChange,
-                $"MipMaps sprite={spriteMipMaps} config={configuredMipMaps}"
             );
         }
 
@@ -405,49 +194,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             );
         }
 
-        [TestCaseSource(nameof(CrunchCompressionMatchingCases))]
-        public void DetectsCrunchCompressionChangeCorrectly(
-            bool spriteCrunch,
-            bool configuredCrunch,
-            bool expectedResult
-        )
-        {
-            SpriteSettingsApplierAPI.TextureSettingsState state = new(
-                100,
-                new Vector2(0.5f, 0.5f),
-                false,
-                spriteCrunch,
-                TextureImporterCompression.Compressed,
-                TextureImporterType.Sprite,
-                SpriteImportMode.Single,
-                (int)SpriteAlignment.Custom,
-                true,
-                true,
-                (int)SpriteImportMode.Single,
-                1,
-                TextureWrapMode.Clamp,
-                FilterMode.Point
-            );
-
-            SpriteSettings profile = new()
-            {
-                matchBy = SpriteSettings.MatchMode.Any,
-                priority = 1,
-                applyCrunchCompression = true,
-                useCrunchCompression = configuredCrunch,
-            };
-
-            bool willChange = SpriteSettingsApplierAPI.WouldTextureSettingsChange(
-                in state,
-                profile
-            );
-            Assert.AreEqual(
-                expectedResult,
-                willChange,
-                $"CrunchCompression sprite={spriteCrunch} config={configuredCrunch}"
-            );
-        }
-
         private static IEnumerable<TestCaseData> ReadWriteMatchingCases()
         {
             yield return new TestCaseData(true, true, false).SetName(
@@ -464,49 +210,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             );
         }
 
-        [TestCaseSource(nameof(ReadWriteMatchingCases))]
-        public void DetectsReadWriteChangeCorrectly(
-            bool spriteReadWrite,
-            bool configuredReadWrite,
-            bool expectedResult
-        )
-        {
-            SpriteSettingsApplierAPI.TextureSettingsState state = new(
-                100,
-                new Vector2(0.5f, 0.5f),
-                false,
-                false,
-                TextureImporterCompression.Compressed,
-                TextureImporterType.Sprite,
-                SpriteImportMode.Single,
-                (int)SpriteAlignment.Custom,
-                true,
-                spriteReadWrite,
-                (int)SpriteImportMode.Single,
-                1,
-                TextureWrapMode.Clamp,
-                FilterMode.Point
-            );
-
-            SpriteSettings profile = new()
-            {
-                matchBy = SpriteSettings.MatchMode.Any,
-                priority = 1,
-                applyReadWriteEnabled = true,
-                readWriteEnabled = configuredReadWrite,
-            };
-
-            bool willChange = SpriteSettingsApplierAPI.WouldTextureSettingsChange(
-                in state,
-                profile
-            );
-            Assert.AreEqual(
-                expectedResult,
-                willChange,
-                $"ReadWrite sprite={spriteReadWrite} config={configuredReadWrite}"
-            );
-        }
-
         private static IEnumerable<TestCaseData> AlphaTransparencyMatchingCases()
         {
             yield return new TestCaseData(true, true, false).SetName(
@@ -520,49 +223,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             );
             yield return new TestCaseData(false, true, true).SetName(
                 "AlphaTransparency.Differ.DisabledToEnabled.ReturnsTrue"
-            );
-        }
-
-        [TestCaseSource(nameof(AlphaTransparencyMatchingCases))]
-        public void DetectsAlphaTransparencyChangeCorrectly(
-            bool spriteAlpha,
-            bool configuredAlpha,
-            bool expectedResult
-        )
-        {
-            SpriteSettingsApplierAPI.TextureSettingsState state = new(
-                100,
-                new Vector2(0.5f, 0.5f),
-                false,
-                false,
-                TextureImporterCompression.Compressed,
-                TextureImporterType.Sprite,
-                SpriteImportMode.Single,
-                (int)SpriteAlignment.Custom,
-                spriteAlpha,
-                true,
-                (int)SpriteImportMode.Single,
-                1,
-                TextureWrapMode.Clamp,
-                FilterMode.Point
-            );
-
-            SpriteSettings profile = new()
-            {
-                matchBy = SpriteSettings.MatchMode.Any,
-                priority = 1,
-                applyAlphaIsTransparency = true,
-                alphaIsTransparency = configuredAlpha,
-            };
-
-            bool willChange = SpriteSettingsApplierAPI.WouldTextureSettingsChange(
-                in state,
-                profile
-            );
-            Assert.AreEqual(
-                expectedResult,
-                willChange,
-                $"AlphaTransparency sprite={spriteAlpha} config={configuredAlpha}"
             );
         }
 
@@ -603,49 +263,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 SpriteImportMode.Multiple,
                 true
             ).SetName("SpriteMode.Differ.PolygonToMultiple.ReturnsTrue");
-        }
-
-        [TestCaseSource(nameof(SpriteModeMatchingCases))]
-        public void DetectsSpriteModeChangeCorrectly(
-            SpriteImportMode spriteSpriteMode,
-            SpriteImportMode configuredSpriteMode,
-            bool expectedResult
-        )
-        {
-            SpriteSettingsApplierAPI.TextureSettingsState state = new(
-                100,
-                new Vector2(0.5f, 0.5f),
-                false,
-                false,
-                TextureImporterCompression.Compressed,
-                TextureImporterType.Sprite,
-                spriteSpriteMode,
-                (int)SpriteAlignment.Custom,
-                true,
-                true,
-                (int)spriteSpriteMode,
-                1,
-                TextureWrapMode.Clamp,
-                FilterMode.Point
-            );
-
-            SpriteSettings profile = new()
-            {
-                matchBy = SpriteSettings.MatchMode.Any,
-                priority = 1,
-                applySpriteMode = true,
-                spriteMode = configuredSpriteMode,
-            };
-
-            bool willChange = SpriteSettingsApplierAPI.WouldTextureSettingsChange(
-                in state,
-                profile
-            );
-            Assert.AreEqual(
-                expectedResult,
-                willChange,
-                $"SpriteMode sprite={spriteSpriteMode} config={configuredSpriteMode}"
-            );
         }
 
         private static IEnumerable<TestCaseData> TextureTypeMatchingCases()
@@ -692,49 +309,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             ).SetName("TextureType.Differ.SpriteToGUI.ReturnsTrue");
         }
 
-        [TestCaseSource(nameof(TextureTypeMatchingCases))]
-        public void DetectsTextureTypeChangeCorrectly(
-            TextureImporterType spriteTextureType,
-            TextureImporterType configuredTextureType,
-            bool expectedResult
-        )
-        {
-            SpriteSettingsApplierAPI.TextureSettingsState state = new(
-                100,
-                new Vector2(0.5f, 0.5f),
-                false,
-                false,
-                TextureImporterCompression.Compressed,
-                spriteTextureType,
-                SpriteImportMode.Single,
-                (int)SpriteAlignment.Custom,
-                true,
-                true,
-                (int)SpriteImportMode.Single,
-                1,
-                TextureWrapMode.Clamp,
-                FilterMode.Point
-            );
-
-            SpriteSettings profile = new()
-            {
-                matchBy = SpriteSettings.MatchMode.Any,
-                priority = 1,
-                applyTextureType = true,
-                textureType = configuredTextureType,
-            };
-
-            bool willChange = SpriteSettingsApplierAPI.WouldTextureSettingsChange(
-                in state,
-                profile
-            );
-            Assert.AreEqual(
-                expectedResult,
-                willChange,
-                $"TextureType sprite={spriteTextureType} config={configuredTextureType}"
-            );
-        }
-
         private static IEnumerable<TestCaseData> ExtrudeEdgesMatchingCases()
         {
             yield return new TestCaseData((uint)0, (uint)0, false).SetName(
@@ -760,49 +334,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             );
             yield return new TestCaseData((uint)16, (uint)32, true).SetName(
                 "ExtrudeEdges.Differ.16To32.ReturnsTrue"
-            );
-        }
-
-        [TestCaseSource(nameof(ExtrudeEdgesMatchingCases))]
-        public void DetectsExtrudeEdgesChangeCorrectly(
-            uint spriteExtrude,
-            uint configuredExtrude,
-            bool expectedResult
-        )
-        {
-            SpriteSettingsApplierAPI.TextureSettingsState state = new(
-                100,
-                new Vector2(0.5f, 0.5f),
-                false,
-                false,
-                TextureImporterCompression.Compressed,
-                TextureImporterType.Sprite,
-                SpriteImportMode.Single,
-                (int)SpriteAlignment.Custom,
-                true,
-                true,
-                (int)SpriteImportMode.Single,
-                spriteExtrude,
-                TextureWrapMode.Clamp,
-                FilterMode.Point
-            );
-
-            SpriteSettings profile = new()
-            {
-                matchBy = SpriteSettings.MatchMode.Any,
-                priority = 1,
-                applyExtrudeEdges = true,
-                extrudeEdges = configuredExtrude,
-            };
-
-            bool willChange = SpriteSettingsApplierAPI.WouldTextureSettingsChange(
-                in state,
-                profile
-            );
-            Assert.AreEqual(
-                expectedResult,
-                willChange,
-                $"ExtrudeEdges sprite={spriteExtrude} config={configuredExtrude}"
             );
         }
 
@@ -872,6 +403,475 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 new Vector2(0.5f, 1f),
                 true
             ).SetName("Pivot.Differ.BottomCenterToTopCenter.ReturnsTrue");
+        }
+
+        [TestCaseSource(nameof(FilterModeMatchingCases))]
+        public void DetectsFilterModeChangeCorrectly(
+            FilterMode spriteFilterMode,
+            FilterMode configuredFilterMode,
+            bool expectedResult
+        )
+        {
+            SpriteSettingsApplierAPI.TextureSettingsState state = new(
+                100,
+                new Vector2(0.5f, 0.5f),
+                false,
+                false,
+                TextureImporterCompression.Compressed,
+                TextureImporterType.Sprite,
+                SpriteImportMode.Single,
+                (int)SpriteAlignment.Custom,
+                true,
+                true,
+                (int)SpriteImportMode.Single,
+                1,
+                TextureWrapMode.Clamp,
+                spriteFilterMode
+            );
+
+            SpriteSettings profile = new()
+            {
+                matchBy = SpriteSettings.MatchMode.Any,
+                priority = 1,
+                applyFilterMode = true,
+                filterMode = configuredFilterMode,
+            };
+
+            bool willChange = SpriteSettingsApplierAPI.WouldTextureSettingsChange(
+                in state,
+                profile
+            );
+            Assert.AreEqual(
+                expectedResult,
+                willChange,
+                $"FilterMode sprite={spriteFilterMode} config={configuredFilterMode}"
+            );
+        }
+
+        [TestCaseSource(nameof(WrapModeMatchingCases))]
+        public void DetectsWrapModeChangeCorrectly(
+            TextureWrapMode spriteWrapMode,
+            TextureWrapMode configuredWrapMode,
+            bool expectedResult
+        )
+        {
+            SpriteSettingsApplierAPI.TextureSettingsState state = new(
+                100,
+                new Vector2(0.5f, 0.5f),
+                false,
+                false,
+                TextureImporterCompression.Compressed,
+                TextureImporterType.Sprite,
+                SpriteImportMode.Single,
+                (int)SpriteAlignment.Custom,
+                true,
+                true,
+                (int)SpriteImportMode.Single,
+                1,
+                spriteWrapMode,
+                FilterMode.Point
+            );
+
+            SpriteSettings profile = new()
+            {
+                matchBy = SpriteSettings.MatchMode.Any,
+                priority = 1,
+                applyWrapMode = true,
+                wrapMode = configuredWrapMode,
+            };
+
+            bool willChange = SpriteSettingsApplierAPI.WouldTextureSettingsChange(
+                in state,
+                profile
+            );
+            Assert.AreEqual(
+                expectedResult,
+                willChange,
+                $"WrapMode sprite={spriteWrapMode} config={configuredWrapMode}"
+            );
+        }
+
+        [TestCaseSource(nameof(PixelsPerUnitMatchingCases))]
+        public void DetectsPpuChangeCorrectly(int spritePpu, int configuredPpu, bool expectedResult)
+        {
+            SpriteSettingsApplierAPI.TextureSettingsState state = new(
+                spritePpu,
+                new Vector2(0.5f, 0.5f),
+                false,
+                false,
+                TextureImporterCompression.Compressed,
+                TextureImporterType.Sprite,
+                SpriteImportMode.Single,
+                (int)SpriteAlignment.Custom,
+                true,
+                true,
+                (int)SpriteImportMode.Single,
+                1,
+                TextureWrapMode.Clamp,
+                FilterMode.Point
+            );
+
+            SpriteSettings profile = new()
+            {
+                matchBy = SpriteSettings.MatchMode.Any,
+                priority = 1,
+                applyPixelsPerUnit = true,
+                pixelsPerUnit = configuredPpu,
+            };
+
+            bool willChange = SpriteSettingsApplierAPI.WouldTextureSettingsChange(
+                in state,
+                profile
+            );
+            Assert.AreEqual(
+                expectedResult,
+                willChange,
+                $"PPU sprite={spritePpu} config={configuredPpu}"
+            );
+        }
+
+        [TestCaseSource(nameof(CompressionMatchingCases))]
+        public void DetectsCompressionChangeCorrectly(
+            TextureImporterCompression spriteCompression,
+            TextureImporterCompression configuredCompression,
+            bool expectedResult
+        )
+        {
+            SpriteSettingsApplierAPI.TextureSettingsState state = new(
+                100,
+                new Vector2(0.5f, 0.5f),
+                false,
+                false,
+                spriteCompression,
+                TextureImporterType.Sprite,
+                SpriteImportMode.Single,
+                (int)SpriteAlignment.Custom,
+                true,
+                true,
+                (int)SpriteImportMode.Single,
+                1,
+                TextureWrapMode.Clamp,
+                FilterMode.Point
+            );
+
+            SpriteSettings profile = new()
+            {
+                matchBy = SpriteSettings.MatchMode.Any,
+                priority = 1,
+                applyCompression = true,
+                compressionLevel = configuredCompression,
+            };
+
+            bool willChange = SpriteSettingsApplierAPI.WouldTextureSettingsChange(
+                in state,
+                profile
+            );
+            Assert.AreEqual(
+                expectedResult,
+                willChange,
+                $"Compression sprite={spriteCompression} config={configuredCompression}"
+            );
+        }
+
+        [TestCaseSource(nameof(MipMapMatchingCases))]
+        public void DetectsMipMapsChangeCorrectly(
+            bool spriteMipMaps,
+            bool configuredMipMaps,
+            bool expectedResult
+        )
+        {
+            SpriteSettingsApplierAPI.TextureSettingsState state = new(
+                100,
+                new Vector2(0.5f, 0.5f),
+                spriteMipMaps,
+                false,
+                TextureImporterCompression.Compressed,
+                TextureImporterType.Sprite,
+                SpriteImportMode.Single,
+                (int)SpriteAlignment.Custom,
+                true,
+                true,
+                (int)SpriteImportMode.Single,
+                1,
+                TextureWrapMode.Clamp,
+                FilterMode.Point
+            );
+
+            SpriteSettings profile = new()
+            {
+                matchBy = SpriteSettings.MatchMode.Any,
+                priority = 1,
+                applyGenerateMipMaps = true,
+                generateMipMaps = configuredMipMaps,
+            };
+
+            bool willChange = SpriteSettingsApplierAPI.WouldTextureSettingsChange(
+                in state,
+                profile
+            );
+            Assert.AreEqual(
+                expectedResult,
+                willChange,
+                $"MipMaps sprite={spriteMipMaps} config={configuredMipMaps}"
+            );
+        }
+
+        [TestCaseSource(nameof(CrunchCompressionMatchingCases))]
+        public void DetectsCrunchCompressionChangeCorrectly(
+            bool spriteCrunch,
+            bool configuredCrunch,
+            bool expectedResult
+        )
+        {
+            SpriteSettingsApplierAPI.TextureSettingsState state = new(
+                100,
+                new Vector2(0.5f, 0.5f),
+                false,
+                spriteCrunch,
+                TextureImporterCompression.Compressed,
+                TextureImporterType.Sprite,
+                SpriteImportMode.Single,
+                (int)SpriteAlignment.Custom,
+                true,
+                true,
+                (int)SpriteImportMode.Single,
+                1,
+                TextureWrapMode.Clamp,
+                FilterMode.Point
+            );
+
+            SpriteSettings profile = new()
+            {
+                matchBy = SpriteSettings.MatchMode.Any,
+                priority = 1,
+                applyCrunchCompression = true,
+                useCrunchCompression = configuredCrunch,
+            };
+
+            bool willChange = SpriteSettingsApplierAPI.WouldTextureSettingsChange(
+                in state,
+                profile
+            );
+            Assert.AreEqual(
+                expectedResult,
+                willChange,
+                $"CrunchCompression sprite={spriteCrunch} config={configuredCrunch}"
+            );
+        }
+
+        [TestCaseSource(nameof(ReadWriteMatchingCases))]
+        public void DetectsReadWriteChangeCorrectly(
+            bool spriteReadWrite,
+            bool configuredReadWrite,
+            bool expectedResult
+        )
+        {
+            SpriteSettingsApplierAPI.TextureSettingsState state = new(
+                100,
+                new Vector2(0.5f, 0.5f),
+                false,
+                false,
+                TextureImporterCompression.Compressed,
+                TextureImporterType.Sprite,
+                SpriteImportMode.Single,
+                (int)SpriteAlignment.Custom,
+                true,
+                spriteReadWrite,
+                (int)SpriteImportMode.Single,
+                1,
+                TextureWrapMode.Clamp,
+                FilterMode.Point
+            );
+
+            SpriteSettings profile = new()
+            {
+                matchBy = SpriteSettings.MatchMode.Any,
+                priority = 1,
+                applyReadWriteEnabled = true,
+                readWriteEnabled = configuredReadWrite,
+            };
+
+            bool willChange = SpriteSettingsApplierAPI.WouldTextureSettingsChange(
+                in state,
+                profile
+            );
+            Assert.AreEqual(
+                expectedResult,
+                willChange,
+                $"ReadWrite sprite={spriteReadWrite} config={configuredReadWrite}"
+            );
+        }
+
+        [TestCaseSource(nameof(AlphaTransparencyMatchingCases))]
+        public void DetectsAlphaTransparencyChangeCorrectly(
+            bool spriteAlpha,
+            bool configuredAlpha,
+            bool expectedResult
+        )
+        {
+            SpriteSettingsApplierAPI.TextureSettingsState state = new(
+                100,
+                new Vector2(0.5f, 0.5f),
+                false,
+                false,
+                TextureImporterCompression.Compressed,
+                TextureImporterType.Sprite,
+                SpriteImportMode.Single,
+                (int)SpriteAlignment.Custom,
+                spriteAlpha,
+                true,
+                (int)SpriteImportMode.Single,
+                1,
+                TextureWrapMode.Clamp,
+                FilterMode.Point
+            );
+
+            SpriteSettings profile = new()
+            {
+                matchBy = SpriteSettings.MatchMode.Any,
+                priority = 1,
+                applyAlphaIsTransparency = true,
+                alphaIsTransparency = configuredAlpha,
+            };
+
+            bool willChange = SpriteSettingsApplierAPI.WouldTextureSettingsChange(
+                in state,
+                profile
+            );
+            Assert.AreEqual(
+                expectedResult,
+                willChange,
+                $"AlphaTransparency sprite={spriteAlpha} config={configuredAlpha}"
+            );
+        }
+
+        [TestCaseSource(nameof(SpriteModeMatchingCases))]
+        public void DetectsSpriteModeChangeCorrectly(
+            SpriteImportMode spriteSpriteMode,
+            SpriteImportMode configuredSpriteMode,
+            bool expectedResult
+        )
+        {
+            SpriteSettingsApplierAPI.TextureSettingsState state = new(
+                100,
+                new Vector2(0.5f, 0.5f),
+                false,
+                false,
+                TextureImporterCompression.Compressed,
+                TextureImporterType.Sprite,
+                spriteSpriteMode,
+                (int)SpriteAlignment.Custom,
+                true,
+                true,
+                (int)spriteSpriteMode,
+                1,
+                TextureWrapMode.Clamp,
+                FilterMode.Point
+            );
+
+            SpriteSettings profile = new()
+            {
+                matchBy = SpriteSettings.MatchMode.Any,
+                priority = 1,
+                applySpriteMode = true,
+                spriteMode = configuredSpriteMode,
+            };
+
+            bool willChange = SpriteSettingsApplierAPI.WouldTextureSettingsChange(
+                in state,
+                profile
+            );
+            Assert.AreEqual(
+                expectedResult,
+                willChange,
+                $"SpriteMode sprite={spriteSpriteMode} config={configuredSpriteMode}"
+            );
+        }
+
+        [TestCaseSource(nameof(TextureTypeMatchingCases))]
+        public void DetectsTextureTypeChangeCorrectly(
+            TextureImporterType spriteTextureType,
+            TextureImporterType configuredTextureType,
+            bool expectedResult
+        )
+        {
+            SpriteSettingsApplierAPI.TextureSettingsState state = new(
+                100,
+                new Vector2(0.5f, 0.5f),
+                false,
+                false,
+                TextureImporterCompression.Compressed,
+                spriteTextureType,
+                SpriteImportMode.Single,
+                (int)SpriteAlignment.Custom,
+                true,
+                true,
+                (int)SpriteImportMode.Single,
+                1,
+                TextureWrapMode.Clamp,
+                FilterMode.Point
+            );
+
+            SpriteSettings profile = new()
+            {
+                matchBy = SpriteSettings.MatchMode.Any,
+                priority = 1,
+                applyTextureType = true,
+                textureType = configuredTextureType,
+            };
+
+            bool willChange = SpriteSettingsApplierAPI.WouldTextureSettingsChange(
+                in state,
+                profile
+            );
+            Assert.AreEqual(
+                expectedResult,
+                willChange,
+                $"TextureType sprite={spriteTextureType} config={configuredTextureType}"
+            );
+        }
+
+        [TestCaseSource(nameof(ExtrudeEdgesMatchingCases))]
+        public void DetectsExtrudeEdgesChangeCorrectly(
+            uint spriteExtrude,
+            uint configuredExtrude,
+            bool expectedResult
+        )
+        {
+            SpriteSettingsApplierAPI.TextureSettingsState state = new(
+                100,
+                new Vector2(0.5f, 0.5f),
+                false,
+                false,
+                TextureImporterCompression.Compressed,
+                TextureImporterType.Sprite,
+                SpriteImportMode.Single,
+                (int)SpriteAlignment.Custom,
+                true,
+                true,
+                (int)SpriteImportMode.Single,
+                spriteExtrude,
+                TextureWrapMode.Clamp,
+                FilterMode.Point
+            );
+
+            SpriteSettings profile = new()
+            {
+                matchBy = SpriteSettings.MatchMode.Any,
+                priority = 1,
+                applyExtrudeEdges = true,
+                extrudeEdges = configuredExtrude,
+            };
+
+            bool willChange = SpriteSettingsApplierAPI.WouldTextureSettingsChange(
+                in state,
+                profile
+            );
+            Assert.AreEqual(
+                expectedResult,
+                willChange,
+                $"ExtrudeEdges sprite={spriteExtrude} config={configuredExtrude}"
+            );
         }
 
         [TestCaseSource(nameof(PivotMatchingCases))]

@@ -89,6 +89,133 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                   }
               }";
 
+        private static string ReadShipped(string directory, string fileName)
+        {
+            string path = Path.Combine(directory, fileName);
+            Assert.IsTrue(File.Exists(path), $"expected the shipped adapter at {path}");
+            return File.ReadAllText(path);
+        }
+
+        private static string FindRepositoryRoot()
+        {
+            DirectoryInfo directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
+            while (directory != null)
+            {
+                if (Directory.Exists(Path.Combine(directory.FullName, "Runtime")))
+                {
+                    return directory.FullName;
+                }
+
+                directory = directory.Parent;
+            }
+
+            throw new DirectoryNotFoundException(
+                "Could not find the repository root above the test directory"
+            );
+        }
+
+        private static Diagnostic Single(string body)
+        {
+            ImmutableArray<Diagnostic> reported = Analyze(body);
+            Assert.AreEqual(1, reported.Length, "Expected exactly one diagnostic");
+            return reported[0];
+        }
+
+        private static ImmutableArray<Diagnostic> Analyze(string body)
+        {
+            return Analyze(body, ReportDiagnostic.Default);
+        }
+
+        private static ImmutableArray<Diagnostic> Analyze(string body, ReportDiagnostic reportedAs)
+        {
+            return Analyze(body, reportedAs, "UnityEngine.MonoBehaviour");
+        }
+
+        private static ImmutableArray<Diagnostic> AnalyzeInPlainClass(string body)
+        {
+            return Analyze(body, ReportDiagnostic.Default, null);
+        }
+
+        /// <summary>
+        /// Compiles <paramref name="body"/> and runs the analyzer over it.
+        /// </summary>
+        /// <param name="body">Members of a class in namespace <c>Consumer</c>.</param>
+        /// <param name="reportedAs">
+        /// What the compilation says about the diagnostic -- <see cref="ReportDiagnostic.Default"/>
+        /// for a consumer who configures nothing, or anything else for the ruleset /
+        /// <c>.editorconfig</c> entry they would write.
+        /// </param>
+        /// <param name="baseType">Base of the containing class, or null for a plain class.</param>
+        /// <returns>Everything the analyzer reported.</returns>
+        private static ImmutableArray<Diagnostic> Analyze(
+            string body,
+            ReportDiagnostic reportedAs,
+            string baseType
+        )
+        {
+            string declaration =
+                baseType == null ? "public class Subject" : $"public class Subject : {baseType}";
+            string source =
+                "using System;\n"
+                + "using System.Collections.Generic;\n"
+                + "using UnityEngine;\n"
+                + "using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;\n"
+                + "namespace Consumer { "
+                + declaration
+                + " { "
+                + body
+                + " } }\n"
+                + UnityStub
+                + "\n"
+                + PackageAdapters;
+
+            List<MetadataReference> references = new List<MetadataReference>();
+            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
+                {
+                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
+                }
+            }
+
+            CSharpCompilation compilation = CSharpCompilation.Create(
+                "ConsumerAssembly",
+                new[]
+                {
+                    CSharpSyntaxTree.ParseText(
+                        source,
+                        new CSharpParseOptions(LanguageVersion.CSharp9)
+                    ),
+                },
+                references,
+                new CSharpCompilationOptions(
+                    OutputKind.DynamicallyLinkedLibrary
+                ).WithSpecificDiagnosticOptions(
+                    ImmutableDictionary<string, ReportDiagnostic>.Empty.Add(
+                        DiagnosticId,
+                        reportedAs
+                    )
+                )
+            );
+
+            ImmutableArray<Diagnostic> compileErrors = compilation
+                .GetDiagnostics()
+                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+                .ToImmutableArray();
+            Assert.IsEmpty(
+                compileErrors.Select(diagnostic => diagnostic.ToString()).ToArray(),
+                "The fixture must compile"
+            );
+
+            return compilation
+                .WithAnalyzers(
+                    ImmutableArray.Create<DiagnosticAnalyzer>(new NestedCollectionAnalyzer())
+                )
+                .GetAnalyzerDiagnosticsAsync()
+                .GetAwaiter()
+                .GetResult();
+        }
+
         [Test]
         public void ADictionaryWithACollectionValueIsReported()
         {
@@ -341,133 +468,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                 ReadShipped(adapters, "SerializableList.cs"),
                 "the wrapper's whole job is to hold the List the outer collection may not"
             );
-        }
-
-        private static string ReadShipped(string directory, string fileName)
-        {
-            string path = Path.Combine(directory, fileName);
-            Assert.IsTrue(File.Exists(path), $"expected the shipped adapter at {path}");
-            return File.ReadAllText(path);
-        }
-
-        private static string FindRepositoryRoot()
-        {
-            DirectoryInfo directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-            while (directory != null)
-            {
-                if (Directory.Exists(Path.Combine(directory.FullName, "Runtime")))
-                {
-                    return directory.FullName;
-                }
-
-                directory = directory.Parent;
-            }
-
-            throw new DirectoryNotFoundException(
-                "Could not find the repository root above the test directory"
-            );
-        }
-
-        private static Diagnostic Single(string body)
-        {
-            ImmutableArray<Diagnostic> reported = Analyze(body);
-            Assert.AreEqual(1, reported.Length, "Expected exactly one diagnostic");
-            return reported[0];
-        }
-
-        private static ImmutableArray<Diagnostic> Analyze(string body)
-        {
-            return Analyze(body, ReportDiagnostic.Default);
-        }
-
-        private static ImmutableArray<Diagnostic> Analyze(string body, ReportDiagnostic reportedAs)
-        {
-            return Analyze(body, reportedAs, "UnityEngine.MonoBehaviour");
-        }
-
-        private static ImmutableArray<Diagnostic> AnalyzeInPlainClass(string body)
-        {
-            return Analyze(body, ReportDiagnostic.Default, null);
-        }
-
-        /// <summary>
-        /// Compiles <paramref name="body"/> and runs the analyzer over it.
-        /// </summary>
-        /// <param name="body">Members of a class in namespace <c>Consumer</c>.</param>
-        /// <param name="reportedAs">
-        /// What the compilation says about the diagnostic -- <see cref="ReportDiagnostic.Default"/>
-        /// for a consumer who configures nothing, or anything else for the ruleset /
-        /// <c>.editorconfig</c> entry they would write.
-        /// </param>
-        /// <param name="baseType">Base of the containing class, or null for a plain class.</param>
-        /// <returns>Everything the analyzer reported.</returns>
-        private static ImmutableArray<Diagnostic> Analyze(
-            string body,
-            ReportDiagnostic reportedAs,
-            string baseType
-        )
-        {
-            string declaration =
-                baseType == null ? "public class Subject" : $"public class Subject : {baseType}";
-            string source =
-                "using System;\n"
-                + "using System.Collections.Generic;\n"
-                + "using UnityEngine;\n"
-                + "using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;\n"
-                + "namespace Consumer { "
-                + declaration
-                + " { "
-                + body
-                + " } }\n"
-                + UnityStub
-                + "\n"
-                + PackageAdapters;
-
-            List<MetadataReference> references = new List<MetadataReference>();
-            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
-                {
-                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
-                }
-            }
-
-            CSharpCompilation compilation = CSharpCompilation.Create(
-                "ConsumerAssembly",
-                new[]
-                {
-                    CSharpSyntaxTree.ParseText(
-                        source,
-                        new CSharpParseOptions(LanguageVersion.CSharp9)
-                    ),
-                },
-                references,
-                new CSharpCompilationOptions(
-                    OutputKind.DynamicallyLinkedLibrary
-                ).WithSpecificDiagnosticOptions(
-                    ImmutableDictionary<string, ReportDiagnostic>.Empty.Add(
-                        DiagnosticId,
-                        reportedAs
-                    )
-                )
-            );
-
-            ImmutableArray<Diagnostic> compileErrors = compilation
-                .GetDiagnostics()
-                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-                .ToImmutableArray();
-            Assert.IsEmpty(
-                compileErrors.Select(diagnostic => diagnostic.ToString()).ToArray(),
-                "The fixture must compile"
-            );
-
-            return compilation
-                .WithAnalyzers(
-                    ImmutableArray.Create<DiagnosticAnalyzer>(new NestedCollectionAnalyzer())
-                )
-                .GetAnalyzerDiagnosticsAsync()
-                .GetAwaiter()
-                .GetResult();
         }
     }
 }

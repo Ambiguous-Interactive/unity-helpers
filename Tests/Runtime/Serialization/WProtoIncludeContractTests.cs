@@ -27,6 +27,52 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [NUnit.Framework.Category("Serialization")]
     public sealed class WProtoIncludeContractTests
     {
+        private static byte[] Parse(string hex)
+        {
+            byte[] bytes = new byte[hex.Length / 2];
+            for (int index = 0; index < bytes.Length; index++)
+            {
+                bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
+            }
+
+            return bytes;
+        }
+
+        private static T Decode<T>(string hex)
+        {
+            WProtoReader reader = new(Parse(hex));
+            Assert.IsTrue(WProtoFormatterProvider.Get<T>().TryRead(ref reader, out T value), hex);
+            return value;
+        }
+
+        private static string Encode<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+
+            StringBuilder builder = new(writer.Position * 2);
+            foreach (byte current in writer.Written)
+            {
+                builder.Append(current.ToString("X2"));
+            }
+
+            return builder.ToString();
+        }
+
+        private static T RoundTrip<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+
+            WProtoReader reader = new(buffer);
+            Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
+            return restored;
+        }
+
         [Test]
         public void TheIncludeIsWrittenBeforeTheBaseMembersWhateverItsTagNumber()
         {
@@ -335,52 +381,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 Assert.IsTrue(formatter.Write(ref writer, value), value.GetType().Name);
                 Assert.AreEqual(predicted, writer.Position, value.GetType().Name);
             }
-        }
-
-        private static byte[] Parse(string hex)
-        {
-            byte[] bytes = new byte[hex.Length / 2];
-            for (int index = 0; index < bytes.Length; index++)
-            {
-                bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
-            }
-
-            return bytes;
-        }
-
-        private static T Decode<T>(string hex)
-        {
-            WProtoReader reader = new(Parse(hex));
-            Assert.IsTrue(WProtoFormatterProvider.Get<T>().TryRead(ref reader, out T value), hex);
-            return value;
-        }
-
-        private static string Encode<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-
-            StringBuilder builder = new(writer.Position * 2);
-            foreach (byte current in writer.Written)
-            {
-                builder.Append(current.ToString("X2"));
-            }
-
-            return builder.ToString();
-        }
-
-        private static T RoundTrip<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-
-            WProtoReader reader = new(buffer);
-            Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
-            return restored;
         }
     }
 }

@@ -16,6 +16,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
     [NUnit.Framework.Category("Fast")]
     public sealed class DropDownAttributeTests
     {
+        private static void AssertOptions<T>(
+            WValueDropDownAttribute attribute,
+            Type expectedType,
+            T[] expectedValues
+        )
+        {
+            Assert.AreEqual(expectedType, attribute.ValueType);
+            object[] options = attribute.Options;
+            Assert.AreEqual(expectedValues.Length, options.Length);
+
+            for (int index = 0; index < expectedValues.Length; index += 1)
+            {
+                Assert.IsInstanceOf<T>(options[index]);
+                Assert.AreEqual(expectedValues[index], (T)options[index]);
+            }
+        }
+
         [UnityTearDown]
         public IEnumerator VerifyNoUnexpectedLogs()
         {
@@ -951,23 +968,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             );
         }
 
-        private static void AssertOptions<T>(
-            WValueDropDownAttribute attribute,
-            Type expectedType,
-            T[] expectedValues
-        )
-        {
-            Assert.AreEqual(expectedType, attribute.ValueType);
-            object[] options = attribute.Options;
-            Assert.AreEqual(expectedValues.Length, options.Length);
-
-            for (int index = 0; index < expectedValues.Length; index += 1)
-            {
-                Assert.IsInstanceOf<T>(options[index]);
-                Assert.AreEqual(expectedValues[index], (T)options[index]);
-            }
-        }
-
         private static class StringProviders
         {
             public static string[] GetStringValues()
@@ -1070,42 +1070,47 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
 
         private readonly struct DropDownItem
         {
+            public string Name { get; }
+
             public DropDownItem(string name)
             {
                 Name = name;
             }
-
-            public string Name { get; }
         }
 
         private sealed class CustomReference
         {
+            public string Identifier { get; }
+
             public CustomReference(string identifier)
             {
                 Identifier = identifier;
             }
-
-            public string Identifier { get; }
         }
 
         private sealed class InstanceStringProvider
         {
             public string Prefix { get; set; } = "Default";
 
-            public string[] BuildStates()
-            {
-                return new[] { $"{Prefix}_A", $"{Prefix}_B" };
-            }
-
             public static IEnumerable<string> StaticStates()
             {
                 return new[] { "Static_X", "Static_Y" };
+            }
+
+            public string[] BuildStates()
+            {
+                return new[] { $"{Prefix}_A", $"{Prefix}_B" };
             }
         }
 
         private sealed class InstanceIntProvider
         {
             public int Multiplier { get; set; } = 1;
+
+            public static int[] GetStaticValues()
+            {
+                return new[] { 100, 200, 300 };
+            }
 
             public int[] GetDynamicValues()
             {
@@ -1115,11 +1120,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             public IEnumerable<int> GetEnumerableValues()
             {
                 return new List<int> { 5 * Multiplier, 15 * Multiplier };
-            }
-
-            public static int[] GetStaticValues()
-            {
-                return new[] { 100, 200, 300 };
             }
         }
 

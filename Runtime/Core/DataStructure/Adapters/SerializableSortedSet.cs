@@ -34,6 +34,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         where T : IComparable<T>
     {
         /// <summary>
+        /// Gets the smallest value stored in the set.
+        /// </summary>
+        public T Min => Set.Min;
+
+        /// <summary>
+        /// Gets the largest value stored in the set.
+        /// </summary>
+        public T Max => Set.Max;
+
+        protected override bool SupportsSorting => true;
+
+        /// <summary>
         /// Initializes an empty sorted set that can participate in Unity and ProtoBuf serialization.
         /// </summary>
         public SerializableSortedSet()
@@ -86,16 +98,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         }
 
         /// <summary>
-        /// Gets the smallest value stored in the set.
-        /// </summary>
-        public T Min => Set.Min;
-
-        /// <summary>
-        /// Gets the largest value stored in the set.
-        /// </summary>
-        public T Max => Set.Max;
-
-        /// <summary>
         /// Enumerates the set in descending order without allocating a copy.
         /// </summary>
         /// <returns>Lazy enumerable that yields items from greatest to least.</returns>
@@ -141,8 +143,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         {
             return Set.TryGetValue(equalValue, out actualValue);
         }
-
-        protected override bool SupportsSorting => true;
 
         private sealed class StorageSet : SortedSet<T>
         {

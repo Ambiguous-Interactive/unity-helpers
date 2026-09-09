@@ -44,6 +44,94 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         private const string CollectionInterface = "System.Collections.Generic.ICollection<T>";
 
+        /// <summary>The closed-type dispatch used when the element type is a type parameter.</summary>
+        private string Generic => Proto + ".WProtoGeneric<" + _elementQualified + ">";
+
+        private string IndexLocal => "index" + Tag;
+
+        private string ElementLocal => "element" + Tag;
+
+        private string Accumulator => "repeated" + Tag;
+
+        /// <summary>
+        /// Whether <c>SkipConstructor</c> suppresses this member's seed outright.
+        /// </summary>
+        /// <remarks>
+        /// Only when the instance can never have come from a caller. Where it can, the answer is
+        /// decided at run time by <see cref="Member.SeedGuard"/> instead: a collection on an
+        /// instance a parent's constructor built is one the oracle appends to.
+        /// </remarks>
+        private bool SeedSuppressed => SkipConstructor && SeedGuard == null;
+
+        /// <summary>The run-time guard on this member's seed, or <c>null</c> when it has none.</summary>
+        private string Guard => SkipConstructor ? SeedGuard : null;
+
+        /// <summary>The list a deferred read collects into before it knows what to commit onto.</summary>
+        private string Pending => "pending" + Tag;
+
+        /// <summary>
+        /// Whether the read collects elements aside and commits them once the instance is final.
+        /// </summary>
+        /// <remarks>
+        /// Read in three places that must agree -- the locals, the seed and the epilogue -- so it is
+        /// named once rather than tested three times. Splitting it is how a half-reverted version
+        /// would still compile and read from a <c>null</c> instance.
+        /// </remarks>
+        private bool DeferSeeding => Deferred;
+
+        /// <summary>Where a decoded element goes: the pending list when deferred, else the member's own accumulator.</summary>
+        private string Target => DeferSeeding ? Pending : Accumulator;
+
+        private string PendingType => ListType + "<" + _elementQualified + ">";
+
+        private string SeenFlag => "seen" + Tag;
+
+        /// <summary>The type the read loop accumulates into before committing it.</summary>
+        private string AccumulatorType =>
+            _form.AccumulatorType(_elementQualified, _collectionQualified);
+
+        /// <summary>
+        /// Whether this member is written as a single packed run rather than one field per element.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Packed is proto3's default and roughly HALVES a repeated scalar: unpacked pays a field key
+        /// per element, packed pays one key and one length for the whole run. Measured on
+        /// <c>int[]</c>: 200 bytes unpacked against 102 packed at 100 elements, 2872 against 1875 at
+        /// 1000.
+        /// </para>
+        /// <para>
+        /// This is a deliberate divergence from protobuf-net's OUTPUT at CompatibilityLevel 200,
+        /// which writes unpacked, and it is safe because wire compatibility is about what the other
+        /// side can READ. Measured against protobuf-net 3.2.56: a packed run decodes into a field it
+        /// declares unpacked, exactly, for every packable element type -- int, long, ulong, bool,
+        /// enum, float, double, short -- and into both arrays and List&lt;T&gt;. The reader here
+        /// already accepted both forms, so old data keeps working in the other direction too.
+        /// </para>
+        /// <para>
+        /// A generic element cannot take this path: whether <c>T</c> packs is a property of the
+        /// closure, so its run is decided at runtime by <c>WProtoGeneric&lt;T&gt;</c> instead.
+        /// </para>
+        /// </remarks>
+        private bool WritesPacked => !_elementIsGeneric && _shape.Packable;
+
+        /// <summary>Whether the member is walked by index rather than with <c>foreach</c>.</summary>
+        private bool IsArray => _form.WalksByIndex;
+
+        /// <summary>The element count, however this collection spells it.</summary>
+        private string CountAccess => Access + "." + _form.CountMember;
+
+        /// <summary>
+        /// Whether the packed write can decide emptiness from a count rather than by discovering it.
+        /// </summary>
+        private bool HasCount => _form.CountMember != null;
+
+        private string WroteFlag => "wrotePacked" + Tag;
+
+        private string PayloadSize => "packedSize" + Tag;
+
+        private string PackedToken => "packedToken" + Tag;
+
         private readonly Shape _shape;
         private readonly CollectionForm _form;
         private readonly string _contractName;
@@ -369,131 +457,29 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return false;
         }
 
-        /// <summary>The closed-type dispatch used when the element type is a type parameter.</summary>
-        private string Generic => Proto + ".WProtoGeneric<" + _elementQualified + ">";
-
-        private string IndexLocal => "index" + Tag;
-
-        private string ElementLocal => "element" + Tag;
-
-        private string Accumulator => "repeated" + Tag;
-
-        /// <summary>
-        /// Whether <c>SkipConstructor</c> suppresses this member's seed outright.
-        /// </summary>
-        /// <remarks>
-        /// Only when the instance can never have come from a caller. Where it can, the answer is
-        /// decided at run time by <see cref="Member.SeedGuard"/> instead: a collection on an
-        /// instance a parent's constructor built is one the oracle appends to.
-        /// </remarks>
-        private bool SeedSuppressed => SkipConstructor && SeedGuard == null;
-
-        /// <summary>The run-time guard on this member's seed, or <c>null</c> when it has none.</summary>
-        private string Guard => SkipConstructor ? SeedGuard : null;
-
-        /// <summary>The list a deferred read collects into before it knows what to commit onto.</summary>
-        private string Pending => "pending" + Tag;
-
-        /// <summary>
-        /// Whether the read collects elements aside and commits them once the instance is final.
-        /// </summary>
-        /// <remarks>
-        /// Read in three places that must agree -- the locals, the seed and the epilogue -- so it is
-        /// named once rather than tested three times. Splitting it is how a half-reverted version
-        /// would still compile and read from a <c>null</c> instance.
-        /// </remarks>
-        private bool DeferSeeding => Deferred;
-
-        /// <summary>Where a decoded element goes: the pending list when deferred, else the member's own accumulator.</summary>
-        private string Target => DeferSeeding ? Pending : Accumulator;
-
-        private string PendingType => ListType + "<" + _elementQualified + ">";
-
-        private string SeenFlag => "seen" + Tag;
-
-        /// <summary>The type the read loop accumulates into before committing it.</summary>
-        private string AccumulatorType =>
-            _form.AccumulatorType(_elementQualified, _collectionQualified);
-
-        /// <summary>
-        /// The statement that sizes what this read fills for a whole packed run at once, or
-        /// <c>null</c> when the form has no way to be sized.
-        /// </summary>
-        /// <param name="packed">The reader scoped to the run.</param>
-        /// <param name="wireType">The expression naming one element's wire type.</param>
-        /// <remarks>
-        /// Only the packed spelling gets this. An unpacked run is a sequence of separate fields that
-        /// may be interleaved with other members, so its length is not knowable until it ends --
-        /// which is exactly the case that has to keep growing, and does.
-        /// </remarks>
-        private string ReserveFor(string packed, string wireType)
+        private static void EmitReserve(Writer writer, string statement)
         {
-            string count = packed + ".CountPackedElements(" + wireType + ")";
-            return DeferSeeding
-                ? CollectionForm.ReservePendingStatement(Pending, count)
-                : _form.ReserveStatement(Accumulator, count);
+            if (statement == null)
+            {
+                return;
+            }
+
+            writer.Line(statement);
+            writer.Blank();
         }
 
-        /// <summary>The statement that appends one decoded element to <paramref name="target"/>.</summary>
-        private string AddTo(string target, string value)
+        private static void CloseAll(Writer writer, int count)
         {
-            return target + "." + _form.AddMethod + "(" + value + ");";
+            for (int closed = 0; closed < count; closed++)
+            {
+                Close(writer);
+            }
         }
 
-        /// <summary>
-        /// The statement that appends one decoded element to whatever this read is collecting into.
-        /// </summary>
-        /// <remarks>
-        /// A deferred read always collects into a plain list, whose method is <c>Add</c> whatever the
-        /// member's own is -- using the member's method there would emit <c>pending.Enqueue(...)</c>
-        /// on a <c>List&lt;T&gt;</c>.
-        /// </remarks>
-        private string AddToTarget(string value)
+        private static string Join(string left, string right)
         {
-            return DeferSeeding ? Pending + ".Add(" + value + ");" : AddTo(Accumulator, value);
+            return left.Length == 0 ? right : left + " && " + right;
         }
-
-        /// <summary>
-        /// Whether this member is written as a single packed run rather than one field per element.
-        /// </summary>
-        /// <remarks>
-        /// <para>
-        /// Packed is proto3's default and roughly HALVES a repeated scalar: unpacked pays a field key
-        /// per element, packed pays one key and one length for the whole run. Measured on
-        /// <c>int[]</c>: 200 bytes unpacked against 102 packed at 100 elements, 2872 against 1875 at
-        /// 1000.
-        /// </para>
-        /// <para>
-        /// This is a deliberate divergence from protobuf-net's OUTPUT at CompatibilityLevel 200,
-        /// which writes unpacked, and it is safe because wire compatibility is about what the other
-        /// side can READ. Measured against protobuf-net 3.2.56: a packed run decodes into a field it
-        /// declares unpacked, exactly, for every packable element type -- int, long, ulong, bool,
-        /// enum, float, double, short -- and into both arrays and List&lt;T&gt;. The reader here
-        /// already accepted both forms, so old data keeps working in the other direction too.
-        /// </para>
-        /// <para>
-        /// A generic element cannot take this path: whether <c>T</c> packs is a property of the
-        /// closure, so its run is decided at runtime by <c>WProtoGeneric&lt;T&gt;</c> instead.
-        /// </para>
-        /// </remarks>
-        private bool WritesPacked => !_elementIsGeneric && _shape.Packable;
-
-        /// <summary>Whether the member is walked by index rather than with <c>foreach</c>.</summary>
-        private bool IsArray => _form.WalksByIndex;
-
-        /// <summary>The element count, however this collection spells it.</summary>
-        private string CountAccess => Access + "." + _form.CountMember;
-
-        /// <summary>
-        /// Whether the packed write can decide emptiness from a count rather than by discovering it.
-        /// </summary>
-        private bool HasCount => _form.CountMember != null;
-
-        private string WroteFlag => "wrotePacked" + Tag;
-
-        private string PayloadSize => "packedSize" + Tag;
-
-        private string PackedToken => "packedToken" + Tag;
 
         /// <inheritdoc />
         internal override void EmitMeasure(Writer writer)
@@ -521,80 +507,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     + ";"
             );
             CloseAll(writer, open);
-            writer.Blank();
-        }
-
-        /// <summary>
-        /// Sizes a generic run, choosing packed or unpacked once the closure is known.
-        /// </summary>
-        /// <remarks>
-        /// Both forms are emitted and the branch is taken at runtime, because whether <c>T</c> packs
-        /// is a property of the closure: <c>Deque&lt;int&gt;</c> packs and <c>Deque&lt;string&gt;</c>
-        /// cannot. The generated code costs one static bool read per member to decide.
-        /// </remarks>
-        private void EmitGenericMeasure(Writer writer)
-        {
-            writer.Line("if (" + Generic + ".Packable)" + Writer.Open);
-            writer.Indent();
-            writer.Line("int " + PayloadSize + " = 0;");
-            int packedOpen = OpenLoop(writer);
-            writer.Line(PayloadSize + " += " + Generic + ".MeasureValue(" + ElementLocal + ");");
-            CloseAll(writer, packedOpen);
-            writer.Blank();
-            writer.Line("if (0 < " + PayloadSize + ")" + Writer.Open);
-            writer.Indent();
-            writer.Line(
-                "size += "
-                    + Proto
-                    + ".WProtoSizes.TagSize("
-                    + Tag
-                    + ") + "
-                    + Proto
-                    + ".WProtoSizes.LengthDelimitedSize("
-                    + PayloadSize
-                    + ");"
-            );
-            Close(writer);
-            Close(writer);
-            writer.Line("else" + Writer.Open);
-            writer.Indent();
-            int looseOpen = OpenLoop(writer);
-            writer.Line(
-                "size += " + Generic + ".MeasureElement(" + Tag + ", " + ElementLocal + ");"
-            );
-            CloseAll(writer, looseOpen);
-            Close(writer);
-            writer.Blank();
-        }
-
-        /// <summary>
-        /// Sizes the run: one key and one length prefix for the whole member, and the bare values.
-        /// </summary>
-        private void EmitPackedMeasure(Writer writer)
-        {
-            writer.Line("int " + PayloadSize + " = 0;");
-            int open = OpenLoop(writer);
-            writer.Line(
-                PayloadSize + " += " + Shape.Fill(_shape.SizeExpression, ElementLocal) + ";"
-            );
-            CloseAll(writer, open);
-            writer.Blank();
-
-            // Every packable element occupies bytes, so a zero measured payload means an empty collection.
-            writer.Line("if (0 < " + PayloadSize + ")" + Writer.Open);
-            writer.Indent();
-            writer.Line(
-                "size += "
-                    + Proto
-                    + ".WProtoSizes.TagSize("
-                    + Tag
-                    + ") + "
-                    + Proto
-                    + ".WProtoSizes.LengthDelimitedSize("
-                    + PayloadSize
-                    + ");"
-            );
-            Close(writer);
             writer.Blank();
         }
 
@@ -634,124 +546,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             Close(writer);
             CloseAll(writer, open);
             writer.Blank();
-        }
-
-        /// <summary>
-        /// Emits the presence guard and the loop header shared by measuring and writing, and returns
-        /// how many blocks the caller has to close.
-        /// </summary>
-        /// <remarks>
-        /// An array is walked by index because that is what the compiler would do anyway and it
-        /// keeps the bounds check visible; every other collection is walked with <c>foreach</c> over
-        /// its declared type, which binds to the concrete enumerator. That matters for a struct
-        /// collection: enumerating it through <c>IEnumerable&lt;T&gt;</c> would box it on every
-        /// serialization, which is exactly the cost a struct collection exists to avoid.
-        /// </remarks>
-        /// <param name="guarded">
-        /// Whether to emit the collection's null guard. The packed path passes <c>false</c> because
-        /// it has already tested both null and emptiness in one condition, and a second identical
-        /// guard inside it would be dead.
-        /// </param>
-        private int OpenLoop(Writer writer, bool guarded = true)
-        {
-            int open = 0;
-
-            // Struct collections are always present; generated null comparisons would fail compilation.
-            if (guarded && !_collectionIsValueType)
-            {
-                writer.Line("if (" + Access + " != null)" + Writer.Open);
-                writer.Indent();
-                open++;
-            }
-
-            if (IsArray)
-            {
-                writer.Line(
-                    "for (int "
-                        + IndexLocal
-                        + " = 0; "
-                        + IndexLocal
-                        + " < "
-                        + Access
-                        + ".Length; "
-                        + IndexLocal
-                        + "++)"
-                        + Writer.Open
-                );
-                writer.Indent();
-                open++;
-                writer.Line(
-                    _elementQualified
-                        + " "
-                        + ElementLocal
-                        + " = "
-                        + Access
-                        + "["
-                        + IndexLocal
-                        + "];"
-                );
-            }
-            else
-            {
-                writer.Line(
-                    "foreach ("
-                        + _elementQualified
-                        + " "
-                        + ElementLocal
-                        + " in "
-                        + Access
-                        + ")"
-                        + Writer.Open
-                );
-                writer.Indent();
-                open++;
-            }
-
-            if (_elementIsReference)
-            {
-                writer.Line("if (" + ElementLocal + " == null)" + Writer.Open);
-                writer.Indent();
-
-                // A shared wrapper serves multiple members, so diagnostics name its common collection type.
-                writer.Line(
-                    "throw "
-                        + Proto
-                        + (
-                            WrapsWholeValue
-                                ? ".WProtoRepeated.NullNestedElement(\""
-                                    + _contractName
-                                    + "\", \""
-                                    + _collectionDisplay
-                                : ".WProtoRepeated.NullElement(\"" + _contractName + "\", \"" + Name
-                        )
-                        + "\", \""
-                        + _elementDisplay
-                        + "\");"
-                );
-                Close(writer);
-            }
-
-            writer.Blank();
-            return open;
-        }
-
-        private static void EmitReserve(Writer writer, string statement)
-        {
-            if (statement == null)
-            {
-                return;
-            }
-
-            writer.Line(statement);
-            writer.Blank();
-        }
-
-        private static void CloseAll(Writer writer, int count)
-        {
-            for (int closed = 0; closed < count; closed++)
-            {
-                Close(writer);
-            }
         }
 
         /// <inheritdoc />
@@ -952,6 +746,267 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             Close(writer);
         }
 
+        /// <inheritdoc />
+        internal override void EmitPresentSeed(Writer writer)
+        {
+            EmitSeed(writer);
+        }
+
+        /// <inheritdoc />
+        internal override void EmitReadEpilogue(Writer writer, string qualifiedContract)
+        {
+            /*
+             * Absent fields must preserve constructor values; assignment is also needed when a reference
+             * member began null.
+             */
+            writer.Line("if (" + SeenFlag + ")" + Writer.Open);
+            writer.Indent();
+
+            if (DeferSeeding)
+            {
+                /*
+                 * Seed only the final subtype instance, avoiding include-last duplication of constructor
+                 * entries.
+                 */
+                writer.Line(AccumulatorType + " " + Accumulator + " = " + DeferredSeed() + ";");
+                if (_form.AccumulatesAside)
+                {
+                    writer.Line(Accumulator + "." + _form.BulkAddMethod + "(" + Pending + ");");
+                }
+                else
+                {
+                    writer.Line(
+                        "foreach ("
+                            + _elementQualified
+                            + " "
+                            + ElementLocal
+                            + " in "
+                            + Pending
+                            + ")"
+                            + Writer.Open
+                    );
+                    writer.Indent();
+                    writer.Line(AddTo(Accumulator, ElementLocal));
+                    Close(writer);
+                }
+            }
+
+            EmitCommit(writer);
+            Close(writer);
+            writer.Blank();
+        }
+
+        /// <summary>
+        /// The statement that sizes what this read fills for a whole packed run at once, or
+        /// <c>null</c> when the form has no way to be sized.
+        /// </summary>
+        /// <param name="packed">The reader scoped to the run.</param>
+        /// <param name="wireType">The expression naming one element's wire type.</param>
+        /// <remarks>
+        /// Only the packed spelling gets this. An unpacked run is a sequence of separate fields that
+        /// may be interleaved with other members, so its length is not knowable until it ends --
+        /// which is exactly the case that has to keep growing, and does.
+        /// </remarks>
+        private string ReserveFor(string packed, string wireType)
+        {
+            string count = packed + ".CountPackedElements(" + wireType + ")";
+            return DeferSeeding
+                ? CollectionForm.ReservePendingStatement(Pending, count)
+                : _form.ReserveStatement(Accumulator, count);
+        }
+
+        /// <summary>The statement that appends one decoded element to <paramref name="target"/>.</summary>
+        private string AddTo(string target, string value)
+        {
+            return target + "." + _form.AddMethod + "(" + value + ");";
+        }
+
+        /// <summary>
+        /// The statement that appends one decoded element to whatever this read is collecting into.
+        /// </summary>
+        /// <remarks>
+        /// A deferred read always collects into a plain list, whose method is <c>Add</c> whatever the
+        /// member's own is -- using the member's method there would emit <c>pending.Enqueue(...)</c>
+        /// on a <c>List&lt;T&gt;</c>.
+        /// </remarks>
+        private string AddToTarget(string value)
+        {
+            return DeferSeeding ? Pending + ".Add(" + value + ");" : AddTo(Accumulator, value);
+        }
+
+        /// <summary>
+        /// Sizes a generic run, choosing packed or unpacked once the closure is known.
+        /// </summary>
+        /// <remarks>
+        /// Both forms are emitted and the branch is taken at runtime, because whether <c>T</c> packs
+        /// is a property of the closure: <c>Deque&lt;int&gt;</c> packs and <c>Deque&lt;string&gt;</c>
+        /// cannot. The generated code costs one static bool read per member to decide.
+        /// </remarks>
+        private void EmitGenericMeasure(Writer writer)
+        {
+            writer.Line("if (" + Generic + ".Packable)" + Writer.Open);
+            writer.Indent();
+            writer.Line("int " + PayloadSize + " = 0;");
+            int packedOpen = OpenLoop(writer);
+            writer.Line(PayloadSize + " += " + Generic + ".MeasureValue(" + ElementLocal + ");");
+            CloseAll(writer, packedOpen);
+            writer.Blank();
+            writer.Line("if (0 < " + PayloadSize + ")" + Writer.Open);
+            writer.Indent();
+            writer.Line(
+                "size += "
+                    + Proto
+                    + ".WProtoSizes.TagSize("
+                    + Tag
+                    + ") + "
+                    + Proto
+                    + ".WProtoSizes.LengthDelimitedSize("
+                    + PayloadSize
+                    + ");"
+            );
+            Close(writer);
+            Close(writer);
+            writer.Line("else" + Writer.Open);
+            writer.Indent();
+            int looseOpen = OpenLoop(writer);
+            writer.Line(
+                "size += " + Generic + ".MeasureElement(" + Tag + ", " + ElementLocal + ");"
+            );
+            CloseAll(writer, looseOpen);
+            Close(writer);
+            writer.Blank();
+        }
+
+        /// <summary>
+        /// Sizes the run: one key and one length prefix for the whole member, and the bare values.
+        /// </summary>
+        private void EmitPackedMeasure(Writer writer)
+        {
+            writer.Line("int " + PayloadSize + " = 0;");
+            int open = OpenLoop(writer);
+            writer.Line(
+                PayloadSize + " += " + Shape.Fill(_shape.SizeExpression, ElementLocal) + ";"
+            );
+            CloseAll(writer, open);
+            writer.Blank();
+
+            // Every packable element occupies bytes, so a zero measured payload means an empty collection.
+            writer.Line("if (0 < " + PayloadSize + ")" + Writer.Open);
+            writer.Indent();
+            writer.Line(
+                "size += "
+                    + Proto
+                    + ".WProtoSizes.TagSize("
+                    + Tag
+                    + ") + "
+                    + Proto
+                    + ".WProtoSizes.LengthDelimitedSize("
+                    + PayloadSize
+                    + ");"
+            );
+            Close(writer);
+            writer.Blank();
+        }
+
+        /// <summary>
+        /// Emits the presence guard and the loop header shared by measuring and writing, and returns
+        /// how many blocks the caller has to close.
+        /// </summary>
+        /// <remarks>
+        /// An array is walked by index because that is what the compiler would do anyway and it
+        /// keeps the bounds check visible; every other collection is walked with <c>foreach</c> over
+        /// its declared type, which binds to the concrete enumerator. That matters for a struct
+        /// collection: enumerating it through <c>IEnumerable&lt;T&gt;</c> would box it on every
+        /// serialization, which is exactly the cost a struct collection exists to avoid.
+        /// </remarks>
+        /// <param name="guarded">
+        /// Whether to emit the collection's null guard. The packed path passes <c>false</c> because
+        /// it has already tested both null and emptiness in one condition, and a second identical
+        /// guard inside it would be dead.
+        /// </param>
+        private int OpenLoop(Writer writer, bool guarded = true)
+        {
+            int open = 0;
+
+            // Struct collections are always present; generated null comparisons would fail compilation.
+            if (guarded && !_collectionIsValueType)
+            {
+                writer.Line("if (" + Access + " != null)" + Writer.Open);
+                writer.Indent();
+                open++;
+            }
+
+            if (IsArray)
+            {
+                writer.Line(
+                    "for (int "
+                        + IndexLocal
+                        + " = 0; "
+                        + IndexLocal
+                        + " < "
+                        + Access
+                        + ".Length; "
+                        + IndexLocal
+                        + "++)"
+                        + Writer.Open
+                );
+                writer.Indent();
+                open++;
+                writer.Line(
+                    _elementQualified
+                        + " "
+                        + ElementLocal
+                        + " = "
+                        + Access
+                        + "["
+                        + IndexLocal
+                        + "];"
+                );
+            }
+            else
+            {
+                writer.Line(
+                    "foreach ("
+                        + _elementQualified
+                        + " "
+                        + ElementLocal
+                        + " in "
+                        + Access
+                        + ")"
+                        + Writer.Open
+                );
+                writer.Indent();
+                open++;
+            }
+
+            if (_elementIsReference)
+            {
+                writer.Line("if (" + ElementLocal + " == null)" + Writer.Open);
+                writer.Indent();
+
+                // A shared wrapper serves multiple members, so diagnostics name its common collection type.
+                writer.Line(
+                    "throw "
+                        + Proto
+                        + (
+                            WrapsWholeValue
+                                ? ".WProtoRepeated.NullNestedElement(\""
+                                    + _contractName
+                                    + "\", \""
+                                    + _collectionDisplay
+                                : ".WProtoRepeated.NullElement(\"" + _contractName + "\", \"" + Name
+                        )
+                        + "\", \""
+                        + _elementDisplay
+                        + "\");"
+                );
+                Close(writer);
+            }
+
+            writer.Blank();
+            return open;
+        }
+
         /// <summary>
         /// Writes a generic run, choosing packed or unpacked once the closure is known.
         /// </summary>
@@ -1124,11 +1179,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return guard.Length == 0 ? null : guard;
         }
 
-        private static string Join(string left, string right)
-        {
-            return left.Length == 0 ? right : left + " && " + right;
-        }
-
         /// <summary>
         /// Emits the one-time creation of the accumulator, which is also what makes a
         /// present-but-empty packed run produce an empty collection rather than leave the
@@ -1206,56 +1256,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 );
             }
 
-            Close(writer);
-            writer.Blank();
-        }
-
-        /// <inheritdoc />
-        internal override void EmitPresentSeed(Writer writer)
-        {
-            EmitSeed(writer);
-        }
-
-        /// <inheritdoc />
-        internal override void EmitReadEpilogue(Writer writer, string qualifiedContract)
-        {
-            /*
-             * Absent fields must preserve constructor values; assignment is also needed when a reference
-             * member began null.
-             */
-            writer.Line("if (" + SeenFlag + ")" + Writer.Open);
-            writer.Indent();
-
-            if (DeferSeeding)
-            {
-                /*
-                 * Seed only the final subtype instance, avoiding include-last duplication of constructor
-                 * entries.
-                 */
-                writer.Line(AccumulatorType + " " + Accumulator + " = " + DeferredSeed() + ";");
-                if (_form.AccumulatesAside)
-                {
-                    writer.Line(Accumulator + "." + _form.BulkAddMethod + "(" + Pending + ");");
-                }
-                else
-                {
-                    writer.Line(
-                        "foreach ("
-                            + _elementQualified
-                            + " "
-                            + ElementLocal
-                            + " in "
-                            + Pending
-                            + ")"
-                            + Writer.Open
-                    );
-                    writer.Indent();
-                    writer.Line(AddTo(Accumulator, ElementLocal));
-                    Close(writer);
-                }
-            }
-
-            EmitCommit(writer);
             Close(writer);
             writer.Blank();
         }

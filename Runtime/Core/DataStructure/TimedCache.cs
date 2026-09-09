@@ -52,6 +52,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
         }
 
+        private float CurrentTime => _timeProvider();
+
         private readonly Func<T> _valueProducer;
         private readonly float _cacheTtl;
 
@@ -95,8 +97,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _jitterAmount = float.IsFinite(jitter) ? Mathf.Max(0f, jitter) : 0f;
             _timeProvider = timeProvider ?? (() => Time.time);
         }
-
-        private float CurrentTime => _timeProvider();
 
         /// <summary>
         /// Forces the cache to recompute the value and resets the TTL timer.

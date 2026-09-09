@@ -22,32 +22,6 @@ namespace WallstopStudios.UnityHelpers.Utils
     {
         private static readonly T[] Values = InitializeValues();
 
-        private static T[] InitializeValues()
-        {
-            Array enumValues = Enum.GetValues(typeof(T));
-            T[] result = new T[enumValues.Length];
-            for (int i = 0; i < enumValues.Length; i++)
-            {
-                result[i] = (T)enumValues.GetValue(i);
-            }
-            return result;
-        }
-
-        [JsonIgnore]
-        [IgnoreDataMember]
-        private readonly HashSet<string> _availableBools = new();
-
-        /// <summary>
-        /// Backing animator that exposes the boolean parameters backing the enum state.
-        /// </summary>
-        [JsonIgnore]
-        [IgnoreDataMember]
-        public readonly Animator Animator;
-
-        [JsonIgnore]
-        [IgnoreDataMember]
-        private T _value;
-
         /// <summary>
         /// Gets or sets the currently active enum value. Setting the value toggles the underlying
         /// boolean parameters so that only the matching state remains true.
@@ -80,6 +54,21 @@ namespace WallstopStudios.UnityHelpers.Utils
         private string Type => typeof(T).Name;
 
         /// <summary>
+        /// Backing animator that exposes the boolean parameters backing the enum state.
+        /// </summary>
+        [JsonIgnore]
+        [IgnoreDataMember]
+        public readonly Animator Animator;
+
+        [JsonIgnore]
+        [IgnoreDataMember]
+        private readonly HashSet<string> _availableBools = new();
+
+        [JsonIgnore]
+        [IgnoreDataMember]
+        private T _value;
+
+        /// <summary>
         /// Creates a state machine wrapper around the provided <see cref="Animator"/> and optionally
         /// initializes it with a default enum value.
         /// </summary>
@@ -109,6 +98,17 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             _value = defaultValue;
+        }
+
+        private static T[] InitializeValues()
+        {
+            Array enumValues = Enum.GetValues(typeof(T));
+            T[] result = new T[enumValues.Length];
+            for (int i = 0; i < enumValues.Length; i++)
+            {
+                result[i] = (T)enumValues.GetValue(i);
+            }
+            return result;
         }
 
         /// <summary>

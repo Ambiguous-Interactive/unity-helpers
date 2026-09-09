@@ -63,14 +63,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers.TestTypes
     [Serializable]
     public sealed class PrivateComplexValue
     {
-        [FormerlySerializedAs("primary")]
-        [SerializeField]
-        internal Color _primary = Color.white;
-
-        [FormerlySerializedAs("secondary")]
-        [SerializeField]
-        internal Color _secondary = Color.black;
-
         public Color Primary
         {
             get => _primary;
@@ -82,6 +74,14 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers.TestTypes
             get => _secondary;
             set => _secondary = value;
         }
+
+        [FormerlySerializedAs("primary")]
+        [SerializeField]
+        internal Color _primary = Color.white;
+
+        [FormerlySerializedAs("secondary")]
+        [SerializeField]
+        internal Color _secondary = Color.black;
     }
 
     /// <summary>
@@ -90,12 +90,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers.TestTypes
     [Serializable]
     public sealed class PrivateCtorKey
     {
+        // ReSharper disable once UnusedMember.Global
+        public string Token => _token;
+
         [FormerlySerializedAs("token")]
         [SerializeField]
         private string _token;
-
-        // ReSharper disable once UnusedMember.Global
-        public string Token => _token;
 
         private PrivateCtorKey()
         {
@@ -109,6 +109,12 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers.TestTypes
     [Serializable]
     public sealed class PrivateCtorValue
     {
+        // ReSharper disable once UnusedMember.Global
+        public Color Accent => _accent;
+
+        // ReSharper disable once UnusedMember.Global
+        public float Intensity => _intensity;
+
         [FormerlySerializedAs("accent")]
         [SerializeField]
         private Color _accent = Color.magenta;
@@ -118,12 +124,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers.TestTypes
         private float _intensity = 1f;
 
         private PrivateCtorValue() { }
-
-        // ReSharper disable once UnusedMember.Global
-        public Color Accent => _accent;
-
-        // ReSharper disable once UnusedMember.Global
-        public float Intensity => _intensity;
     }
 
     /// <summary>

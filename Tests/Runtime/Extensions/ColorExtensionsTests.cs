@@ -48,6 +48,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             new object[] { ColorAveragingMethod.Weighted, 0f, 0f, 0f, 0f },
         };
 
+        private static void AssertColorsApproximatelyEqual(
+            Color expected,
+            Color actual,
+            float tolerance,
+            string context = null
+        )
+        {
+            Assert.AreEqual(expected.r, actual.r, tolerance, $"{context} R");
+            Assert.AreEqual(expected.g, actual.g, tolerance, $"{context} G");
+            Assert.AreEqual(expected.b, actual.b, tolerance, $"{context} B");
+            Assert.AreEqual(expected.a, actual.a, tolerance, $"{context} A");
+        }
+
         [Test]
         public void ToHexFormatsCorrectly()
         {
@@ -562,19 +575,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             );
         }
 
-        private static void AssertColorsApproximatelyEqual(
-            Color expected,
-            Color actual,
-            float tolerance,
-            string context = null
-        )
-        {
-            Assert.AreEqual(expected.r, actual.r, tolerance, $"{context} R");
-            Assert.AreEqual(expected.g, actual.g, tolerance, $"{context} G");
-            Assert.AreEqual(expected.b, actual.b, tolerance, $"{context} B");
-            Assert.AreEqual(expected.a, actual.a, tolerance, $"{context} A");
-        }
-
         /// <summary>
         /// A test double for <see cref="AbstractRandom"/>, and never serialized.
         /// </summary>
@@ -588,9 +588,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         [WProtoNotSerialized]
         private sealed class StubRandom : AbstractRandom
         {
-            private readonly Queue<float> _floatValues = new();
-
             public int RemainingSamples => _floatValues.Count;
+
+            public override RandomState InternalState => default;
+
+            private readonly Queue<float> _floatValues = new();
 
             public void EnqueueFloat(float value)
             {
@@ -608,8 +610,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
                 return _floatValues.Dequeue();
             }
-
-            public override RandomState InternalState => default;
 
             public override uint NextUint()
             {

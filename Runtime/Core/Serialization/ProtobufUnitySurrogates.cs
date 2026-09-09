@@ -669,6 +669,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     internal static class ProtobufUnityModel
     {
         /// <summary>
+        /// The types whose surrogate was refused, as a view a caller cannot mutate.
+        /// </summary>
+        internal static IReadOnlyList<string> Refused => RefusedView;
+
+        /// <summary>
+        /// Every type this model routes through a surrogate, in registration order.
+        /// </summary>
+        internal static IReadOnlyList<Type> Surrogated => SurrogatedView;
+
+        /// <summary>
         /// The types whose surrogate could not be registered, in the order they were refused.
         /// </summary>
         /// <remarks>
@@ -681,21 +691,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         private static readonly ReadOnlyCollection<string> RefusedView =
             new ReadOnlyCollection<string>(RegistrationFailures);
 
-        /// <summary>
-        /// The types whose surrogate was refused, as a view a caller cannot mutate.
-        /// </summary>
-        internal static IReadOnlyList<string> Refused => RefusedView;
-
         private static readonly List<Type> SurrogatedList = new List<Type>();
 
         // Record refused registrations too: WallstopProto still needs the complete surrogate roster.
         private static readonly ReadOnlyCollection<Type> SurrogatedView =
             new ReadOnlyCollection<Type>(SurrogatedList);
-
-        /// <summary>
-        /// Every type this model routes through a surrogate, in registration order.
-        /// </summary>
-        internal static IReadOnlyList<Type> Surrogated => SurrogatedView;
 
         static ProtobufUnityModel()
         {
@@ -731,6 +731,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
             // Collection wrappers bypass protobuf-net IgnoreListHandling failures; see https://github.com/protobuf-net/protobuf-net/issues/1185.
         }
+
+        internal static void EnsureInitialized() { }
 
         /// <summary>
         /// Points protobuf-net at <typeparamref name="TSurrogate"/> for <typeparamref name="TReal"/>.
@@ -782,7 +784,5 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 #endif
             }
         }
-
-        internal static void EnsureInitialized() { }
     }
 }

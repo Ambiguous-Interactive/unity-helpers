@@ -24,6 +24,25 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// </summary>
     public static class Buffers
     {
+        public const int WaitInstructionDefaultMaxDistinctEntries = 512;
+
+        /// <summary>
+        /// The default bound on distinct comparers held by the comparer-keyed pool caches.
+        /// </summary>
+        /// <remarks>
+        /// Sized for the shape that reaches this cache with a per-instance comparer:
+        /// <c>SerializableDictionary</c>, <c>SerializableHashSet</c> and
+        /// <c>SerializedStringComparer</c> each contribute one entry per field that carries its own
+        /// comparer. A default comparer is a singleton and costs one entry for the whole process,
+        /// so only authored comparers count -- but a scene can carry a lot of those, and a bound
+        /// below the live set turns every access into a pool construction. Bounded is the
+        /// requirement; this number only decides where the cliff is.
+        /// </remarks>
+        public const int ComparerPoolDefaultMaxDistinctEntries = 256;
+        private const int WaitInstructionLimitWarningInterval = 25;
+        private const string WaitForSecondsCacheName = "WaitForSeconds";
+        private const string WaitForSecondsRealtimeCacheName = "WaitForSecondsRealtime";
+
         /// <summary>
         /// Gets or sets the quantization step (in seconds) applied to pooled WaitForSeconds/WaitForSecondsRealtime durations.
         /// Values less than or equal to zero disable quantization.
@@ -117,61 +136,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             set => CacheResizeRegistry.ResizeAndPublish(value);
         }
 
-        internal static Cache<TKey, TValue> CreateCache<TKey, TValue>()
-        {
-            int maximumSize = ComparerPoolMaxDistinctEntries;
-            CacheBuilder<TKey, TValue> builder = CacheBuilder<TKey, TValue>
-                .NewBuilder()
-                .InitialCapacity(16);
-            Cache<TKey, TValue> cache =
-                maximumSize <= 0
-                    ? builder.Unbounded().Build()
-                    : builder.MaximumSize(maximumSize).Build();
-            CacheResizeRegistry.Register(cache.Resize);
-            return cache;
-        }
-
-        private static readonly Dictionary<
-            float,
-            WaitInstructionCacheEntry<WaitForSeconds>
-        > WaitForSeconds = new();
-        private static readonly Dictionary<
-            float,
-            WaitInstructionCacheEntry<WaitForSecondsRealtime>
-        > WaitForSecondsRealtime = new();
-        private static readonly LinkedList<float> WaitForSecondsOrder = new();
-        private static readonly LinkedList<float> WaitForSecondsRealtimeOrder = new();
-
-        public const int WaitInstructionDefaultMaxDistinctEntries = 512;
-
-        /// <summary>
-        /// The default bound on distinct comparers held by the comparer-keyed pool caches.
-        /// </summary>
-        /// <remarks>
-        /// Sized for the shape that reaches this cache with a per-instance comparer:
-        /// <c>SerializableDictionary</c>, <c>SerializableHashSet</c> and
-        /// <c>SerializedStringComparer</c> each contribute one entry per field that carries its own
-        /// comparer. A default comparer is a singleton and costs one entry for the whole process,
-        /// so only authored comparers count -- but a scene can carry a lot of those, and a bound
-        /// below the live set turns every access into a pool construction. Bounded is the
-        /// requirement; this number only decides where the cliff is.
-        /// </remarks>
-        public const int ComparerPoolDefaultMaxDistinctEntries = 256;
-        private const int WaitInstructionLimitWarningInterval = 25;
-        private const string WaitForSecondsCacheName = "WaitForSeconds";
-        private const string WaitForSecondsRealtimeCacheName = "WaitForSecondsRealtime";
-
-        private static float _waitInstructionQuantizationStepSeconds;
-        private static int _waitInstructionMaxDistinctEntries =
-            WaitInstructionDefaultMaxDistinctEntries;
-        private static int _waitInstructionUseLruEvictionFlag;
-        private static int _comparerPoolMaxDistinctEntries = ComparerPoolDefaultMaxDistinctEntries;
-        private static int _waitForSecondsLimitHits;
-        private static int _waitForSecondsRealtimeLimitHits;
-        private static int _waitForSecondsEvictions;
-        private static int _waitForSecondsRealtimeEvictions;
-        private static readonly object WaitInstructionCacheLock = new();
-
         /// <summary>
         /// Reusable WaitForFixedUpdate instance to avoid repeated allocations in coroutines.
         /// Use this when waiting for the next fixed update frame.
@@ -192,6 +156,28 @@ namespace WallstopStudios.UnityHelpers.Utils
             () => new StringBuilder(),
             onRelease: builder => builder.Clear()
         );
+
+        private static readonly Dictionary<
+            float,
+            WaitInstructionCacheEntry<WaitForSeconds>
+        > WaitForSeconds = new();
+        private static readonly Dictionary<
+            float,
+            WaitInstructionCacheEntry<WaitForSecondsRealtime>
+        > WaitForSecondsRealtime = new();
+        private static readonly LinkedList<float> WaitForSecondsOrder = new();
+        private static readonly LinkedList<float> WaitForSecondsRealtimeOrder = new();
+
+        private static float _waitInstructionQuantizationStepSeconds;
+        private static int _waitInstructionMaxDistinctEntries =
+            WaitInstructionDefaultMaxDistinctEntries;
+        private static int _waitInstructionUseLruEvictionFlag;
+        private static int _comparerPoolMaxDistinctEntries = ComparerPoolDefaultMaxDistinctEntries;
+        private static int _waitForSecondsLimitHits;
+        private static int _waitForSecondsRealtimeLimitHits;
+        private static int _waitForSecondsEvictions;
+        private static int _waitForSecondsRealtimeEvictions;
+        private static readonly object WaitInstructionCacheLock = new();
 
         /// <summary>
         /// Gets a pooled StringBuilder with at least the requested capacity.
@@ -294,6 +280,47 @@ namespace WallstopStudios.UnityHelpers.Utils
                 WaitForSecondsRealtimeCacheName,
                 allowEviction: false
             );
+        }
+
+        internal static Cache<TKey, TValue> CreateCache<TKey, TValue>()
+        {
+            int maximumSize = ComparerPoolMaxDistinctEntries;
+            CacheBuilder<TKey, TValue> builder = CacheBuilder<TKey, TValue>
+                .NewBuilder()
+                .InitialCapacity(16);
+            Cache<TKey, TValue> cache =
+                maximumSize <= 0
+                    ? builder.Unbounded().Build()
+                    : builder.MaximumSize(maximumSize).Build();
+            CacheResizeRegistry.Register(cache.Resize);
+            return cache;
+        }
+
+        internal static void ResetWaitInstructionCachesForTesting()
+        {
+#if !SINGLE_THREADED
+            lock (WaitInstructionCacheLock)
+            {
+#endif
+                WaitForSeconds.Clear();
+                WaitForSecondsRealtime.Clear();
+                WaitForSecondsOrder.Clear();
+                WaitForSecondsRealtimeOrder.Clear();
+#if !SINGLE_THREADED
+            }
+#endif
+            WaitInstructionQuantizationStepSeconds = 0f;
+            WaitInstructionMaxDistinctEntries = WaitInstructionDefaultMaxDistinctEntries;
+            WaitInstructionUseLruEviction = false;
+            Volatile.Write(ref _waitForSecondsLimitHits, 0);
+            Volatile.Write(ref _waitForSecondsRealtimeLimitHits, 0);
+            Volatile.Write(ref _waitForSecondsEvictions, 0);
+            Volatile.Write(ref _waitForSecondsRealtimeEvictions, 0);
+        }
+
+        internal static IDisposable BeginWaitInstructionTestScope()
+        {
+            return new WaitInstructionTestScope();
         }
 
         private static WaitForSeconds CreateWaitForSeconds(float seconds)
@@ -466,33 +493,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             );
         }
 
-        internal static void ResetWaitInstructionCachesForTesting()
-        {
-#if !SINGLE_THREADED
-            lock (WaitInstructionCacheLock)
-            {
-#endif
-                WaitForSeconds.Clear();
-                WaitForSecondsRealtime.Clear();
-                WaitForSecondsOrder.Clear();
-                WaitForSecondsRealtimeOrder.Clear();
-#if !SINGLE_THREADED
-            }
-#endif
-            WaitInstructionQuantizationStepSeconds = 0f;
-            WaitInstructionMaxDistinctEntries = WaitInstructionDefaultMaxDistinctEntries;
-            WaitInstructionUseLruEviction = false;
-            Volatile.Write(ref _waitForSecondsLimitHits, 0);
-            Volatile.Write(ref _waitForSecondsRealtimeLimitHits, 0);
-            Volatile.Write(ref _waitForSecondsEvictions, 0);
-            Volatile.Write(ref _waitForSecondsRealtimeEvictions, 0);
-        }
-
-        internal static IDisposable BeginWaitInstructionTestScope()
-        {
-            return new WaitInstructionTestScope();
-        }
-
         private sealed class WaitInstructionTestScope : IDisposable
         {
             private readonly WaitInstructionCacheSnapshot<WaitForSeconds> _waitForSecondsSnapshot;
@@ -526,36 +526,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 );
 
                 ResetWaitInstructionCachesForTesting();
-            }
-
-            public void Dispose()
-            {
-                if (_disposed)
-                {
-                    return;
-                }
-                _disposed = true;
-
-                WaitInstructionQuantizationStepSeconds = _quantizationStepSnapshot;
-                WaitInstructionMaxDistinctEntries = _maxDistinctEntriesSnapshot;
-                WaitInstructionUseLruEviction = _useLruSnapshot;
-                Volatile.Write(ref _waitForSecondsLimitHits, _waitForSecondsLimitHitsSnapshot);
-                Volatile.Write(
-                    ref _waitForSecondsRealtimeLimitHits,
-                    _waitForSecondsRealtimeLimitHitsSnapshot
-                );
-                Volatile.Write(ref _waitForSecondsEvictions, _waitForSecondsEvictionsSnapshot);
-                Volatile.Write(
-                    ref _waitForSecondsRealtimeEvictions,
-                    _waitForSecondsRealtimeEvictionsSnapshot
-                );
-
-                RestoreCache(WaitForSeconds, WaitForSecondsOrder, _waitForSecondsSnapshot);
-                RestoreCache(
-                    WaitForSecondsRealtime,
-                    WaitForSecondsRealtimeOrder,
-                    _waitForSecondsRealtimeSnapshot
-                );
             }
 
             private static WaitInstructionCacheSnapshot<TInstruction> SnapshotCache<TInstruction>(
@@ -627,9 +597,43 @@ namespace WallstopStudios.UnityHelpers.Utils
 #endif
             }
 
+            public void Dispose()
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+                _disposed = true;
+
+                WaitInstructionQuantizationStepSeconds = _quantizationStepSnapshot;
+                WaitInstructionMaxDistinctEntries = _maxDistinctEntriesSnapshot;
+                WaitInstructionUseLruEviction = _useLruSnapshot;
+                Volatile.Write(ref _waitForSecondsLimitHits, _waitForSecondsLimitHitsSnapshot);
+                Volatile.Write(
+                    ref _waitForSecondsRealtimeLimitHits,
+                    _waitForSecondsRealtimeLimitHitsSnapshot
+                );
+                Volatile.Write(ref _waitForSecondsEvictions, _waitForSecondsEvictionsSnapshot);
+                Volatile.Write(
+                    ref _waitForSecondsRealtimeEvictions,
+                    _waitForSecondsRealtimeEvictionsSnapshot
+                );
+
+                RestoreCache(WaitForSeconds, WaitForSecondsOrder, _waitForSecondsSnapshot);
+                RestoreCache(
+                    WaitForSecondsRealtime,
+                    WaitForSecondsRealtimeOrder,
+                    _waitForSecondsRealtimeSnapshot
+                );
+            }
+
             private readonly struct WaitInstructionCacheSnapshot<TInstruction>
                 where TInstruction : class
             {
+                internal Dictionary<float, TInstruction> Entries { get; }
+
+                internal List<float> Order { get; }
+
                 internal WaitInstructionCacheSnapshot(
                     Dictionary<float, TInstruction> entries,
                     List<float> order
@@ -638,10 +642,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                     Entries = entries;
                     Order = order;
                 }
-
-                internal Dictionary<float, TInstruction> Entries { get; }
-
-                internal List<float> Order { get; }
             }
         }
 
@@ -723,6 +723,22 @@ namespace WallstopStudios.UnityHelpers.Utils
 
     public readonly struct WaitInstructionCacheDiagnostics
     {
+        public string CacheName { get; }
+
+        public int DistinctEntries { get; }
+
+        public int MaxDistinctEntries { get; }
+
+        public int LimitRefusals { get; }
+
+        public int Evictions { get; }
+
+        public float QuantizationStepSeconds { get; }
+
+        public bool IsQuantized => 0f < QuantizationStepSeconds;
+
+        public bool IsLruEnabled { get; }
+
         public WaitInstructionCacheDiagnostics(
             string cacheName,
             int distinctEntries,
@@ -741,22 +757,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             QuantizationStepSeconds = quantizationStepSeconds;
             IsLruEnabled = lruEnabled;
         }
-
-        public string CacheName { get; }
-
-        public int DistinctEntries { get; }
-
-        public int MaxDistinctEntries { get; }
-
-        public int LimitRefusals { get; }
-
-        public int Evictions { get; }
-
-        public float QuantizationStepSeconds { get; }
-
-        public bool IsQuantized => 0f < QuantizationStepSeconds;
-
-        public bool IsLruEnabled { get; }
 
         public override string ToString()
         {
@@ -778,19 +778,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             () => new List<T>(),
             onRelease: list => list.Clear()
         );
-
-        /// <summary>
-        /// Gets a pooled List with at least the requested capacity.
-        /// </summary>
-        public static PooledResource<List<T>> GetList(int capacity, out List<T> list)
-        {
-            PooledResource<List<T>> pooled = List.Get(out list);
-            if (list.Capacity < capacity)
-            {
-                list.Capacity = capacity;
-            }
-            return pooled;
-        }
 
         /// <summary>
         /// Generic pool for HashSet&lt;T&gt; instances. Sets are automatically cleared when returned to the pool.
@@ -815,6 +802,19 @@ namespace WallstopStudios.UnityHelpers.Utils
             () => new Stack<T>(),
             onRelease: stack => stack.Clear()
         );
+
+        /// <summary>
+        /// Gets a pooled List with at least the requested capacity.
+        /// </summary>
+        public static PooledResource<List<T>> GetList(int capacity, out List<T> list)
+        {
+            PooledResource<List<T>> pooled = List.Get(out list);
+            if (list.Capacity < capacity)
+            {
+                list.Capacity = capacity;
+            }
+            return pooled;
+        }
     }
 
     public static class StopwatchBuffers
@@ -833,6 +833,10 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// <typeparam name="T">The element type for the sets.</typeparam>
     public static class SetBuffers<T>
     {
+        internal static int HashSetPoolCount => HashSetCache.Count;
+
+        internal static int SortedSetPoolCount => SortedSetCache.Count;
+
         /// <summary>
         /// Generic pool for SortedSet&lt;T&gt; instances using the default comparer.
         /// Sets are automatically cleared when returned to the pool.
@@ -853,16 +857,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             IEqualityComparer<T>,
             WallstopGenericPool<HashSet<T>>
         >();
-
-        internal static int HashSetPoolCount => HashSetCache.Count;
-
-        internal static int SortedSetPoolCount => SortedSetCache.Count;
-
-        internal static void ClearPoolsForTesting()
-        {
-            HashSetCache.Clear();
-            SortedSetCache.Clear();
-        }
 
         /// <summary>
         /// Gets or creates a pool for SortedSet&lt;T&gt; instances that use the specified comparer.
@@ -977,6 +971,12 @@ namespace WallstopStudios.UnityHelpers.Utils
             pool.Dispose();
             return true;
         }
+
+        internal static void ClearPoolsForTesting()
+        {
+            HashSetCache.Clear();
+            SortedSetCache.Clear();
+        }
     }
 
     /// <summary>
@@ -1002,6 +1002,10 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// <typeparam name="TValue">The value type for the dictionaries.</typeparam>
     public static class DictionaryBuffer<TKey, TValue>
     {
+        internal static int DictionaryPoolCount => DictionaryCache.Count;
+
+        internal static int SortedDictionaryPoolCount => SortedDictionaryCache.Count;
+
         /// <summary>
         /// Generic pool for Dictionary&lt;TKey, TValue&gt; instances using the default equality comparer.
         /// Dictionaries are automatically cleared when returned to the pool.
@@ -1036,16 +1040,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             IComparer<TKey>,
             WallstopGenericPool<SortedDictionary<TKey, TValue>>
         >();
-
-        internal static int DictionaryPoolCount => DictionaryCache.Count;
-
-        internal static int SortedDictionaryPoolCount => SortedDictionaryCache.Count;
-
-        internal static void ClearPoolsForTesting()
-        {
-            DictionaryCache.Clear();
-            SortedDictionaryCache.Clear();
-        }
 
         /// <summary>
         /// Gets or creates a pool for Dictionary&lt;TKey, TValue&gt; instances that use the specified equality comparer.
@@ -1174,6 +1168,12 @@ namespace WallstopStudios.UnityHelpers.Utils
             pool.Dispose();
             return true;
         }
+
+        internal static void ClearPoolsForTesting()
+        {
+            DictionaryCache.Clear();
+            SortedDictionaryCache.Clear();
+        }
     }
 
 #if SINGLE_THREADED
@@ -1224,15 +1224,14 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// </remarks>
     public sealed class WallstopGenericPool<T> : IDisposable, GlobalPoolRegistry.IPoolStatistics
     {
-        /// <summary>
-        /// Gets the current number of instances in the pool.
-        /// </summary>
-        internal int Count => _pool.Count;
+        private const float MinAutoPurgeIntervalSeconds = 1.0f;
+
+        // Stopwatch avoids Unity timing APIs that can block during early editor initialization.
+        private static readonly System.Diagnostics.Stopwatch PoolStopwatch =
+            System.Diagnostics.Stopwatch.StartNew();
 
         /// <inheritdoc />
         public int CurrentPooledCount => _pool.Count;
-
-        internal int CurrentlyRented => _usageTracker.CurrentlyRented;
 
         /// <inheritdoc />
         public float LastAccessTime => _lastAccessTime;
@@ -1313,6 +1312,13 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </summary>
         public bool HasPendingPurges => _hasPendingPurges;
 
+        /// <summary>
+        /// Gets the current number of instances in the pool.
+        /// </summary>
+        internal int Count => _pool.Count;
+
+        internal int CurrentlyRented => _usageTracker.CurrentlyRented;
+
         private readonly Func<T> _producer;
         private readonly Action<T> _onGet;
         private readonly Action<T> _onRelease;
@@ -1323,8 +1329,6 @@ namespace WallstopStudios.UnityHelpers.Utils
         private readonly PoolUsageTracker _usageTracker;
 
         private readonly List<PooledEntry> _pool = new();
-
-        private const float MinAutoPurgeIntervalSeconds = 1.0f;
 
         private long _rentCount;
         private long _returnCount;
@@ -1425,10 +1429,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             GlobalPoolRegistry.Register(this);
         }
 
-        // Stopwatch avoids Unity timing APIs that can block during early editor initialization.
-        private static readonly System.Diagnostics.Stopwatch PoolStopwatch =
-            System.Diagnostics.Stopwatch.StartNew();
-
         private static float DefaultTimeProvider()
         {
             return (float)PoolStopwatch.Elapsed.TotalSeconds;
@@ -1505,69 +1505,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             _onGet?.Invoke(rented);
             value = rented;
             return new PooledResource<T>(rented, _returnAction);
-        }
-
-        private void ReturnToPool(T value)
-        {
-            if (_disposed)
-            {
-                _usageTracker.RecordRetiredReturn();
-                InvokeOnDispose(value);
-                return;
-            }
-
-            float currentTime;
-            try
-            {
-                _onRelease?.Invoke(value);
-                currentTime = _timeProvider();
-            }
-            catch
-            {
-                _usageTracker.RecordRetiredReturn();
-                InvokeOnDispose(value);
-                throw;
-            }
-            if (_disposed)
-            {
-                _usageTracker.RecordRetiredReturn();
-                InvokeOnDispose(value);
-                return;
-            }
-
-            _pool.Add(new PooledEntry { Value = value, ReturnTime = currentTime });
-            _returnCount++;
-            _usageTracker.RecordReturn(currentTime);
-
-            int currentCount = _pool.Count;
-            if (_peakSize < currentCount)
-            {
-                _peakSize = currentCount;
-            }
-
-            if ((Triggers & PurgeTrigger.OnReturn) != 0)
-            {
-                PurgeInternal(false, currentTime);
-            }
-
-            if ((Triggers & PurgeTrigger.Periodic) != 0)
-            {
-                TryPeriodicPurge(currentTime);
-            }
-        }
-
-        private void TryPeriodicPurge(float currentTime)
-        {
-            if (PurgeIntervalSeconds <= 0f)
-            {
-                return;
-            }
-
-            if (PurgeIntervalSeconds <= currentTime - _lastPeriodicPurge)
-            {
-                _lastPeriodicPurge = currentTime;
-                PurgeInternal(false, currentTime);
-            }
         }
 
         /// <summary>
@@ -1737,6 +1674,124 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             return purged;
+        }
+
+        /// <summary>
+        /// Gets the current pool statistics.
+        /// </summary>
+        /// <returns>A snapshot of pool statistics.</returns>
+        public PoolStatistics GetStatistics()
+        {
+            float currentTime = _timeProvider();
+            PoolFrequencyStatistics freqStats = _usageTracker.GetFrequencyStatistics(currentTime);
+
+            return new PoolStatistics(
+                currentSize: _pool.Count,
+                peakSize: _peakSize,
+                rentCount: _rentCount,
+                returnCount: _returnCount,
+                purgeCount: _purgeCount,
+                idleTimeoutPurges: _idleTimeoutPurges,
+                capacityPurges: _capacityPurges,
+                fullPurgeOperations: _fullPurgeOperations,
+                partialPurgeOperations: _partialPurgeOperations,
+                rentalsPerMinute: freqStats.RentalsPerMinute,
+                averageInterRentalTimeSeconds: freqStats.AverageInterRentalTimeSeconds,
+                lastAccessTime: freqStats.LastAccessTime,
+                isHighFrequency: freqStats.IsHighFrequency,
+                isLowFrequency: freqStats.IsLowFrequency,
+                isUnused: freqStats.IsUnused
+            );
+        }
+
+        /// <summary>
+        /// Disposes the pool. If an onDisposal callback was provided, it is invoked for each pooled instance.
+        /// Otherwise, the pool is simply cleared.
+        /// </summary>
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            GlobalPoolRegistry.Unregister(this);
+
+            if (_onDispose == null)
+            {
+                _pool.Clear();
+                return;
+            }
+
+            foreach (PooledEntry entry in _pool)
+            {
+                InvokeOnDispose(entry.Value);
+            }
+            _pool.Clear();
+        }
+
+        private void ReturnToPool(T value)
+        {
+            if (_disposed)
+            {
+                _usageTracker.RecordRetiredReturn();
+                InvokeOnDispose(value);
+                return;
+            }
+
+            float currentTime;
+            try
+            {
+                _onRelease?.Invoke(value);
+                currentTime = _timeProvider();
+            }
+            catch
+            {
+                _usageTracker.RecordRetiredReturn();
+                InvokeOnDispose(value);
+                throw;
+            }
+            if (_disposed)
+            {
+                _usageTracker.RecordRetiredReturn();
+                InvokeOnDispose(value);
+                return;
+            }
+
+            _pool.Add(new PooledEntry { Value = value, ReturnTime = currentTime });
+            _returnCount++;
+            _usageTracker.RecordReturn(currentTime);
+
+            int currentCount = _pool.Count;
+            if (_peakSize < currentCount)
+            {
+                _peakSize = currentCount;
+            }
+
+            if ((Triggers & PurgeTrigger.OnReturn) != 0)
+            {
+                PurgeInternal(false, currentTime);
+            }
+
+            if ((Triggers & PurgeTrigger.Periodic) != 0)
+            {
+                TryPeriodicPurge(currentTime);
+            }
+        }
+
+        private void TryPeriodicPurge(float currentTime)
+        {
+            if (PurgeIntervalSeconds <= 0f)
+            {
+                return;
+            }
+
+            if (PurgeIntervalSeconds <= currentTime - _lastPeriodicPurge)
+            {
+                _lastPeriodicPurge = currentTime;
+                PurgeInternal(false, currentTime);
+            }
         }
 
         private int PurgeInternal(bool isExplicit, float currentTime)
@@ -1980,34 +2035,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             return purged;
         }
 
-        /// <summary>
-        /// Gets the current pool statistics.
-        /// </summary>
-        /// <returns>A snapshot of pool statistics.</returns>
-        public PoolStatistics GetStatistics()
-        {
-            float currentTime = _timeProvider();
-            PoolFrequencyStatistics freqStats = _usageTracker.GetFrequencyStatistics(currentTime);
-
-            return new PoolStatistics(
-                currentSize: _pool.Count,
-                peakSize: _peakSize,
-                rentCount: _rentCount,
-                returnCount: _returnCount,
-                purgeCount: _purgeCount,
-                idleTimeoutPurges: _idleTimeoutPurges,
-                capacityPurges: _capacityPurges,
-                fullPurgeOperations: _fullPurgeOperations,
-                partialPurgeOperations: _partialPurgeOperations,
-                rentalsPerMinute: freqStats.RentalsPerMinute,
-                averageInterRentalTimeSeconds: freqStats.AverageInterRentalTimeSeconds,
-                lastAccessTime: freqStats.LastAccessTime,
-                isHighFrequency: freqStats.IsHighFrequency,
-                isLowFrequency: freqStats.IsLowFrequency,
-                isUnused: freqStats.IsUnused
-            );
-        }
-
         private void InvokeOnPurge(T value, PurgeReason reason)
         {
             if (OnPurge == null)
@@ -2034,33 +2061,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 _onDispose(value);
             }
             catch { }
-        }
-
-        /// <summary>
-        /// Disposes the pool. If an onDisposal callback was provided, it is invoked for each pooled instance.
-        /// Otherwise, the pool is simply cleared.
-        /// </summary>
-        public void Dispose()
-        {
-            if (_disposed)
-            {
-                return;
-            }
-
-            _disposed = true;
-            GlobalPoolRegistry.Unregister(this);
-
-            if (_onDispose == null)
-            {
-                _pool.Clear();
-                return;
-            }
-
-            foreach (PooledEntry entry in _pool)
-            {
-                InvokeOnDispose(entry.Value);
-            }
-            _pool.Clear();
         }
 
         private struct PooledEntry
@@ -2117,19 +2117,11 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// </remarks>
     public sealed class WallstopGenericPool<T> : IDisposable, GlobalPoolRegistry.IPoolStatistics
     {
-        /// <summary>
-        /// Gets the current number of instances in the pool.
-        /// </summary>
-        internal int Count
-        {
-            get
-            {
-                lock (_lock)
-                {
-                    return _pool.Count;
-                }
-            }
-        }
+        private const float MinAutoPurgeIntervalSeconds = 1.0f;
+
+        // Stopwatch avoids Unity timing APIs that can block during early editor initialization.
+        private static readonly System.Diagnostics.Stopwatch PoolStopwatch =
+            System.Diagnostics.Stopwatch.StartNew();
 
         /// <inheritdoc />
         public int CurrentPooledCount
@@ -2142,8 +2134,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
         }
-
-        internal int CurrentlyRented => _usageTracker.CurrentlyRented;
 
         /// <inheritdoc />
         public float LastAccessTime => Volatile.Read(ref _lastAccessTime);
@@ -2257,6 +2247,22 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </summary>
         public bool HasPendingPurges => Volatile.Read(ref _hasPendingPurges) != 0;
 
+        /// <summary>
+        /// Gets the current number of instances in the pool.
+        /// </summary>
+        internal int Count
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _pool.Count;
+                }
+            }
+        }
+
+        internal int CurrentlyRented => _usageTracker.CurrentlyRented;
+
         private readonly Func<T> _producer;
         private readonly Action<T> _onGet;
         private readonly Action<T> _onRelease;
@@ -2269,8 +2275,6 @@ namespace WallstopStudios.UnityHelpers.Utils
         private Action<T, PurgeReason> _onPurge;
 
         private readonly List<PooledEntry> _pool = new();
-
-        private const float MinAutoPurgeIntervalSeconds = 1.0f;
 
         private int _maxPoolSize;
         private int _minRetainCount;
@@ -2379,10 +2383,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             GlobalPoolRegistry.Register(this);
         }
 
-        // Stopwatch avoids Unity timing APIs that can block during early editor initialization.
-        private static readonly System.Diagnostics.Stopwatch PoolStopwatch =
-            System.Diagnostics.Stopwatch.StartNew();
-
         private static float DefaultTimeProvider()
         {
             return (float)PoolStopwatch.Elapsed.TotalSeconds;
@@ -2470,100 +2470,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             _onGet?.Invoke(created);
             value = created;
             return new PooledResource<T>(created, _returnAction);
-        }
-
-        private void ReturnToPool(T value)
-        {
-            if (Volatile.Read(ref _disposed) != 0)
-            {
-                _usageTracker.RecordRetiredReturn();
-                InvokeOnDispose(value);
-                return;
-            }
-
-            float currentTime;
-            try
-            {
-                _onRelease?.Invoke(value);
-                currentTime = _timeProvider();
-            }
-            catch
-            {
-                _usageTracker.RecordRetiredReturn();
-                InvokeOnDispose(value);
-                throw;
-            }
-            bool disposeReturnedValue;
-
-            lock (_lock)
-            {
-                disposeReturnedValue = Volatile.Read(ref _disposed) != 0;
-                if (!disposeReturnedValue)
-                {
-                    _usageTracker.RecordReturn(currentTime);
-                    _pool.Add(new PooledEntry { Value = value, ReturnTime = currentTime });
-                    Interlocked.Increment(ref _returnCount);
-
-                    int currentCount = _pool.Count;
-                    int peak = _peakSize;
-                    while (peak < currentCount)
-                    {
-                        int original = Interlocked.CompareExchange(
-                            ref _peakSize,
-                            currentCount,
-                            peak
-                        );
-                        if (original == peak)
-                        {
-                            break;
-                        }
-                        peak = original;
-                    }
-                }
-            }
-
-            if (disposeReturnedValue)
-            {
-                _usageTracker.RecordRetiredReturn();
-                InvokeOnDispose(value);
-                return;
-            }
-
-            PurgeTrigger currentTriggers = Triggers;
-
-            if ((currentTriggers & PurgeTrigger.OnReturn) != 0)
-            {
-                PurgeInternal(false, currentTime);
-            }
-
-            if ((currentTriggers & PurgeTrigger.Periodic) != 0)
-            {
-                TryPeriodicPurge(currentTime);
-            }
-        }
-
-        private void TryPeriodicPurge(float currentTime)
-        {
-            float interval = PurgeIntervalSeconds;
-            if (interval <= 0f)
-            {
-                return;
-            }
-
-            float lastPurge = Volatile.Read(ref _lastPeriodicPurge);
-
-            if (interval <= currentTime - lastPurge)
-            {
-                float original = Interlocked.CompareExchange(
-                    ref _lastPeriodicPurge,
-                    currentTime,
-                    lastPurge
-                );
-                if (original == lastPurge)
-                {
-                    PurgeInternal(false, currentTime);
-                }
-            }
         }
 
         /// <summary>
@@ -2767,6 +2673,166 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             return purged;
+        }
+
+        /// <summary>
+        /// Gets the current pool statistics.
+        /// This method is thread-safe.
+        /// </summary>
+        /// <returns>A snapshot of pool statistics.</returns>
+        public PoolStatistics GetStatistics()
+        {
+            int currentSize;
+            lock (_lock)
+            {
+                currentSize = _pool.Count;
+            }
+
+            float currentTime = _timeProvider();
+            PoolFrequencyStatistics freqStats = _usageTracker.GetFrequencyStatistics(currentTime);
+
+            return new PoolStatistics(
+                currentSize: currentSize,
+                peakSize: Volatile.Read(ref _peakSize),
+                rentCount: Interlocked.Read(ref _rentCount),
+                returnCount: Interlocked.Read(ref _returnCount),
+                purgeCount: Interlocked.Read(ref _purgeCount),
+                idleTimeoutPurges: Interlocked.Read(ref _idleTimeoutPurges),
+                capacityPurges: Interlocked.Read(ref _capacityPurges),
+                fullPurgeOperations: Interlocked.Read(ref _fullPurgeOperations),
+                partialPurgeOperations: Interlocked.Read(ref _partialPurgeOperations),
+                rentalsPerMinute: freqStats.RentalsPerMinute,
+                averageInterRentalTimeSeconds: freqStats.AverageInterRentalTimeSeconds,
+                lastAccessTime: freqStats.LastAccessTime,
+                isHighFrequency: freqStats.IsHighFrequency,
+                isLowFrequency: freqStats.IsLowFrequency,
+                isUnused: freqStats.IsUnused
+            );
+        }
+
+        /// <summary>
+        /// Disposes the pool. If an onDisposal callback was provided, it is invoked for each pooled instance.
+        /// Otherwise, the pool is simply cleared.
+        /// </summary>
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            {
+                return;
+            }
+
+            GlobalPoolRegistry.Unregister(this);
+
+            List<PooledEntry> toDispose;
+            lock (_lock)
+            {
+                toDispose = new List<PooledEntry>(_pool);
+                _pool.Clear();
+            }
+
+            if (_onDispose == null)
+            {
+                return;
+            }
+
+            foreach (PooledEntry entry in toDispose)
+            {
+                InvokeOnDispose(entry.Value);
+            }
+        }
+
+        private void ReturnToPool(T value)
+        {
+            if (Volatile.Read(ref _disposed) != 0)
+            {
+                _usageTracker.RecordRetiredReturn();
+                InvokeOnDispose(value);
+                return;
+            }
+
+            float currentTime;
+            try
+            {
+                _onRelease?.Invoke(value);
+                currentTime = _timeProvider();
+            }
+            catch
+            {
+                _usageTracker.RecordRetiredReturn();
+                InvokeOnDispose(value);
+                throw;
+            }
+            bool disposeReturnedValue;
+
+            lock (_lock)
+            {
+                disposeReturnedValue = Volatile.Read(ref _disposed) != 0;
+                if (!disposeReturnedValue)
+                {
+                    _usageTracker.RecordReturn(currentTime);
+                    _pool.Add(new PooledEntry { Value = value, ReturnTime = currentTime });
+                    Interlocked.Increment(ref _returnCount);
+
+                    int currentCount = _pool.Count;
+                    int peak = _peakSize;
+                    while (peak < currentCount)
+                    {
+                        int original = Interlocked.CompareExchange(
+                            ref _peakSize,
+                            currentCount,
+                            peak
+                        );
+                        if (original == peak)
+                        {
+                            break;
+                        }
+                        peak = original;
+                    }
+                }
+            }
+
+            if (disposeReturnedValue)
+            {
+                _usageTracker.RecordRetiredReturn();
+                InvokeOnDispose(value);
+                return;
+            }
+
+            PurgeTrigger currentTriggers = Triggers;
+
+            if ((currentTriggers & PurgeTrigger.OnReturn) != 0)
+            {
+                PurgeInternal(false, currentTime);
+            }
+
+            if ((currentTriggers & PurgeTrigger.Periodic) != 0)
+            {
+                TryPeriodicPurge(currentTime);
+            }
+        }
+
+        private void TryPeriodicPurge(float currentTime)
+        {
+            float interval = PurgeIntervalSeconds;
+            if (interval <= 0f)
+            {
+                return;
+            }
+
+            float lastPurge = Volatile.Read(ref _lastPeriodicPurge);
+
+            if (interval <= currentTime - lastPurge)
+            {
+                float original = Interlocked.CompareExchange(
+                    ref _lastPeriodicPurge,
+                    currentTime,
+                    lastPurge
+                );
+                if (original == lastPurge)
+                {
+                    PurgeInternal(false, currentTime);
+                }
+            }
         }
 
         private int PurgeInternal(bool isExplicit, float currentTime)
@@ -3040,41 +3106,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             return purged;
         }
 
-        /// <summary>
-        /// Gets the current pool statistics.
-        /// This method is thread-safe.
-        /// </summary>
-        /// <returns>A snapshot of pool statistics.</returns>
-        public PoolStatistics GetStatistics()
-        {
-            int currentSize;
-            lock (_lock)
-            {
-                currentSize = _pool.Count;
-            }
-
-            float currentTime = _timeProvider();
-            PoolFrequencyStatistics freqStats = _usageTracker.GetFrequencyStatistics(currentTime);
-
-            return new PoolStatistics(
-                currentSize: currentSize,
-                peakSize: Volatile.Read(ref _peakSize),
-                rentCount: Interlocked.Read(ref _rentCount),
-                returnCount: Interlocked.Read(ref _returnCount),
-                purgeCount: Interlocked.Read(ref _purgeCount),
-                idleTimeoutPurges: Interlocked.Read(ref _idleTimeoutPurges),
-                capacityPurges: Interlocked.Read(ref _capacityPurges),
-                fullPurgeOperations: Interlocked.Read(ref _fullPurgeOperations),
-                partialPurgeOperations: Interlocked.Read(ref _partialPurgeOperations),
-                rentalsPerMinute: freqStats.RentalsPerMinute,
-                averageInterRentalTimeSeconds: freqStats.AverageInterRentalTimeSeconds,
-                lastAccessTime: freqStats.LastAccessTime,
-                isHighFrequency: freqStats.IsHighFrequency,
-                isLowFrequency: freqStats.IsLowFrequency,
-                isUnused: freqStats.IsUnused
-            );
-        }
-
         private void InvokeOnPurge(T value, PurgeReason reason)
         {
             if (OnPurge == null)
@@ -3101,37 +3132,6 @@ namespace WallstopStudios.UnityHelpers.Utils
                 _onDispose(value);
             }
             catch { }
-        }
-
-        /// <summary>
-        /// Disposes the pool. If an onDisposal callback was provided, it is invoked for each pooled instance.
-        /// Otherwise, the pool is simply cleared.
-        /// </summary>
-        public void Dispose()
-        {
-            if (Interlocked.Exchange(ref _disposed, 1) != 0)
-            {
-                return;
-            }
-
-            GlobalPoolRegistry.Unregister(this);
-
-            List<PooledEntry> toDispose;
-            lock (_lock)
-            {
-                toDispose = new List<PooledEntry>(_pool);
-                _pool.Clear();
-            }
-
-            if (_onDispose == null)
-            {
-                return;
-            }
-
-            foreach (PooledEntry entry in toDispose)
-            {
-                InvokeOnDispose(entry.Value);
-            }
         }
 
         private struct PooledEntry
@@ -3643,11 +3643,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             return new PooledArray<T>(rented, size, OnRelease);
         }
 
-        private static void Release(T[] resource)
-        {
-            Pool.Bucket(resource.Length).Return(resource);
-        }
-
         /// <summary>
         /// Clears all pooled arrays for testing purposes. Internal visibility for test assemblies.
         /// Thread-safe implementation.
@@ -3655,6 +3650,11 @@ namespace WallstopStudios.UnityHelpers.Utils
         internal static void ClearForTesting()
         {
             Pool.ClearAll();
+        }
+
+        private static void Release(T[] resource)
+        {
+            Pool.Bucket(resource.Length).Return(resource);
         }
     }
 
@@ -3669,6 +3669,12 @@ namespace WallstopStudios.UnityHelpers.Utils
     /// </remarks>
     public readonly struct PooledResource<T> : IDisposable
     {
+        /// <summary>
+        /// Whether this resource is still outstanding, so a holder keeping a safety net can drop
+        /// what the consumer has already returned rather than retaining it to the end.
+        /// </summary>
+        internal bool IsHeld => _lease.IsHeld;
+
         /// <summary>
         /// The pooled resource instance. Access this to use the resource.
         /// </summary>
@@ -3687,12 +3693,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             _onDispose = onDispose;
             _lease = DisposalLeases.Acquire();
         }
-
-        /// <summary>
-        /// Whether this resource is still outstanding, so a holder keeping a safety net can drop
-        /// what the consumer has already returned rather than retaining it to the end.
-        /// </summary>
-        internal bool IsHeld => _lease.IsHeld;
 
         /// <summary>
         /// Disposes the resource by invoking the disposal action, typically returning it to the pool.

@@ -32,7 +32,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
     )]
     public sealed class UnityHelpersSettings : ScriptableSingleton<UnityHelpersSettings>
     {
-        internal static event Action OnSettingsSaved;
         public const int MinPageSize = 5;
         public const int MaxPageSize = 500;
         public const int MaxSerializableDictionaryPageSize = 250;
@@ -58,18 +57,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         public const float MinDetectAssetChangeLoopWindowSeconds = 1f;
         public const float MaxDetectAssetChangeLoopWindowSeconds = 120f;
         public const bool DefaultDeferAssetPostprocessorCallbacks = true;
-        private static readonly Color DefaultLightThemeGroupBackground = new(
-            0.82f,
-            0.82f,
-            0.82f,
-            1f
-        );
-        private static readonly Color DefaultDarkThemeGroupBackground = new(
-            0.215f,
-            0.215f,
-            0.215f,
-            1f
-        );
 
         [Obsolete("Use DefaultWButtonColorKey instead.")]
         public const string DefaultWButtonPriority = DefaultWButtonColorKey;
@@ -149,6 +136,36 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         /// Default relative output directory for failed test results (empty = project root).
         /// </summary>
         public const string DefaultFailedTestsOutputDirectory = "";
+        private const float SettingsLabelWidth = 260f;
+        private const float SettingsMinFieldWidth = 110f;
+        private const float CustomColorDrawerMinColorFieldWidth = 42f;
+        private const float CustomColorDrawerLabelWidthRatio = 0.38f;
+        private const float CustomColorDrawerMinLabelWidth = 28f;
+        private const float CustomColorDrawerMaxLabelWidth = 90f;
+        private const string WaitInstructionBufferFoldoutKey = "Buffers";
+        private const string WaitInstructionBufferDefaultsHelpText =
+            "Configure the global defaults for Buffers.WaitInstruction pooling. These values are applied automatically on domain reload and when the player starts if Auto Apply is enabled.";
+        private const string PoolPurgingHelpText =
+            "Configure intelligent pool purging defaults. These settings control how pools automatically trim idle items based on usage patterns.";
+        private const string FailedTestsExporterHelpText =
+            "When enabled, the Failed Tests Exporter hooks into the Unity Test Runner to capture test failures and export them to a text file in a configurable directory (defaults to the project root).";
+
+        private const string PoolPurgingFoldoutKey = "PoolPurging";
+        private const string FailedTestsExporterFoldoutKey = "FailedTestsExporter";
+
+        internal static event Action OnSettingsSaved;
+        private static readonly Color DefaultLightThemeGroupBackground = new(
+            0.82f,
+            0.82f,
+            0.82f,
+            1f
+        );
+        private static readonly Color DefaultDarkThemeGroupBackground = new(
+            0.215f,
+            0.215f,
+            0.215f,
+            1f
+        );
         private static readonly Color DefaultColorKeyButtonColor = new(0.243f, 0.525f, 0.988f, 1f);
         private static readonly Color DefaultLightThemeButtonColor = new(0.78f, 0.78f, 0.78f, 1f);
         private static readonly Color DefaultDarkThemeButtonColor = new(0.35f, 0.35f, 0.35f, 1f);
@@ -170,13 +187,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         private static readonly Color DefaultClearHistoryButtonTextColor = Color.white;
         private static readonly Dictionary<int, bool> SettingsGroupFoldoutStates = new();
         private static SerializedObject _cachedSettingsSerializedObject;
-        private const float SettingsLabelWidth = 260f;
-        private const float SettingsMinFieldWidth = 110f;
-        private const float CustomColorDrawerMinColorFieldWidth = 42f;
-        private const float CustomColorDrawerLabelWidthRatio = 0.38f;
-        private const float CustomColorDrawerMinLabelWidth = 28f;
-        private const float CustomColorDrawerMaxLabelWidth = 90f;
-        private const string WaitInstructionBufferFoldoutKey = "Buffers";
         private static UnityHelpersBufferSettingsAsset _waitInstructionBufferSettingsAsset;
         private static readonly GUIContent StringInListPageSizeContent =
             EditorGUIUtility.TrTextContent(
@@ -314,8 +324,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 "Foldout Speed",
                 "Animation speed used when expanding or collapsing SerializableSortedSet manual entry foldouts."
             );
-        private const string WaitInstructionBufferDefaultsHelpText =
-            "Configure the global defaults for Buffers.WaitInstruction pooling. These values are applied automatically on domain reload and when the player starts if Auto Apply is enabled.";
         private static readonly GUIContent WaitInstructionBufferApplyOnLoadContent =
             EditorGUIUtility.TrTextContent(
                 "Auto Apply",
@@ -395,10 +403,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 "Foldout Speed",
                 "Animation speed used when expanding or collapsing WGroup foldouts."
             );
-        private const string PoolPurgingHelpText =
-            "Configure intelligent pool purging defaults. These settings control how pools automatically trim idle items based on usage patterns.";
-        private const string FailedTestsExporterHelpText =
-            "When enabled, the Failed Tests Exporter hooks into the Unity Test Runner to capture test failures and export them to a text file in a configurable directory (defaults to the project root).";
         private static readonly GUIContent FailedTestsExporterEnabledContent =
             EditorGUIUtility.TrTextContent(
                 "Enable Failed Tests Exporter",
@@ -465,6 +469,441 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             EditorGUIUtility.TrTextContent("Per-Type Pool Configurations");
         private static readonly GUIContent PoolApplyNowButtonContent =
             EditorGUIUtility.TrTextContent("Apply Settings Now");
+
+        /// <summary>
+        /// Retrieves the effective page size for StringInList drawers, clamped to safe bounds.
+        /// </summary>
+        public int StringInListPageSize
+        {
+            get => Mathf.Clamp(_stringInListPageSize, MinPageSize, MaxPageSize);
+            set
+            {
+                int clamped = Mathf.Clamp(value, MinPageSize, MaxPageSize);
+                if (clamped == _stringInListPageSize)
+                {
+                    return;
+                }
+
+                _stringInListPageSize = clamped;
+                SaveSettings();
+            }
+        }
+
+        /// <summary>
+        /// Retrieves the configured page size for SerializableSet inspectors.
+        /// </summary>
+        public int SerializableSetPageSize
+        {
+            get => Mathf.Clamp(_serializableSetPageSize, MinPageSize, MaxPageSize);
+            set
+            {
+                int clamped = Mathf.Clamp(value, MinPageSize, MaxPageSize);
+                if (clamped == _serializableSetPageSize)
+                {
+                    return;
+                }
+
+                _serializableSetPageSize = clamped;
+                SaveSettings();
+            }
+        }
+
+        /// <summary>
+        /// Configures whether SerializableSet inspectors start collapsed by default.
+        /// </summary>
+        public bool SerializableSetStartCollapsed
+        {
+            get => _serializableSetStartCollapsed;
+            set
+            {
+                if (_serializableSetStartCollapsed == value)
+                {
+                    return;
+                }
+
+                _serializableSetStartCollapsed = value;
+                SaveSettings();
+            }
+        }
+
+        /// <summary>
+        /// Retrieves the configured page size for SerializableDictionary inspectors.
+        /// </summary>
+        public int SerializableDictionaryPageSize
+        {
+            get =>
+                Mathf.Clamp(
+                    _serializableDictionaryPageSize,
+                    MinPageSize,
+                    MaxSerializableDictionaryPageSize
+                );
+            set
+            {
+                int clamped = Mathf.Clamp(value, MinPageSize, MaxSerializableDictionaryPageSize);
+                if (clamped == _serializableDictionaryPageSize)
+                {
+                    return;
+                }
+
+                _serializableDictionaryPageSize = clamped;
+                SaveSettings();
+            }
+        }
+
+        /// <summary>
+        /// Configures whether SerializableDictionary inspectors start collapsed by default.
+        /// </summary>
+        public bool SerializableDictionaryStartCollapsed
+        {
+            get => _serializableDictionaryStartCollapsed;
+            set
+            {
+                if (_serializableDictionaryStartCollapsed == value)
+                {
+                    return;
+                }
+
+                _serializableDictionaryStartCollapsed = value;
+                SaveSettings();
+            }
+        }
+
+        /// <summary>
+        /// Configures whether collapsible WGroup headers start closed when their attribute does not specify a preference.
+        /// </summary>
+        public bool WGroupFoldoutsStartCollapsed
+        {
+            get => _wgroupFoldoutsStartCollapsed;
+            set
+            {
+                if (_wgroupFoldoutsStartCollapsed == value)
+                {
+                    return;
+                }
+
+                _wgroupFoldoutsStartCollapsed = value;
+                WGroupLayoutBuilder.ClearCache();
+                SaveSettings();
+            }
+        }
+
+        /// <summary>
+        /// Configures whether WGroup foldouts animate when expanding or collapsing.
+        /// </summary>
+        public bool WGroupFoldoutTweenEnabled
+        {
+            get => _wgroupFoldoutTweenEnabled;
+            set
+            {
+                if (_wgroupFoldoutTweenEnabled == value)
+                {
+                    return;
+                }
+
+                _wgroupFoldoutTweenEnabled = value;
+                SaveSettings();
+            }
+        }
+
+        /// <summary>
+        /// Configures the animation speed for WGroup foldout transitions.
+        /// </summary>
+        public float WGroupFoldoutSpeed
+        {
+            get => Mathf.Clamp(_wgroupFoldoutSpeed, MinFoldoutSpeed, MaxFoldoutSpeed);
+            set
+            {
+                float clamped = Mathf.Clamp(value, MinFoldoutSpeed, MaxFoldoutSpeed);
+                if (Mathf.Approximately(clamped, _wgroupFoldoutSpeed))
+                {
+                    return;
+                }
+
+                _wgroupFoldoutSpeed = clamped;
+                SaveSettings();
+            }
+        }
+
+        /// <summary>
+        /// Configures whether WInLineEditor foldouts animate when expanding or collapsing.
+        /// </summary>
+        public bool InlineEditorFoldoutTweenEnabled
+        {
+            get => _inlineEditorFoldoutTweenEnabled;
+            set
+            {
+                if (_inlineEditorFoldoutTweenEnabled == value)
+                {
+                    return;
+                }
+
+                _inlineEditorFoldoutTweenEnabled = value;
+                SaveSettings();
+            }
+        }
+
+        /// <summary>
+        /// Configures the animation speed for WInLineEditor foldout transitions.
+        /// </summary>
+        public float InlineEditorFoldoutSpeed
+        {
+            get => Mathf.Clamp(_inlineEditorFoldoutSpeed, MinFoldoutSpeed, MaxFoldoutSpeed);
+            set
+            {
+                float clamped = Mathf.Clamp(value, MinFoldoutSpeed, MaxFoldoutSpeed);
+                if (Mathf.Approximately(clamped, _inlineEditorFoldoutSpeed))
+                {
+                    return;
+                }
+
+                _inlineEditorFoldoutSpeed = clamped;
+                SaveSettings();
+            }
+        }
+
+        /// <summary>
+        /// Gets the configured page size for WEnumToggleButtons groups.
+        /// </summary>
+        public int EnumToggleButtonsPageSize
+        {
+            get => Mathf.Clamp(_enumToggleButtonsPageSize, MinPageSize, MaxPageSize);
+            set
+            {
+                int clamped = Mathf.Clamp(value, MinPageSize, MaxPageSize);
+                if (clamped == _enumToggleButtonsPageSize)
+                {
+                    return;
+                }
+
+                _enumToggleButtonsPageSize = clamped;
+                SaveSettings();
+            }
+        }
+
+        /// <summary>
+        /// Retrieves the configured page size for WButton groups.
+        /// </summary>
+        public int WButtonPageSize
+        {
+            get => Mathf.Clamp(_wbuttonPageSize, MinPageSize, MaxPageSize);
+            set
+            {
+                int clamped = Mathf.Clamp(value, MinPageSize, MaxPageSize);
+                if (clamped == _wbuttonPageSize)
+                {
+                    return;
+                }
+
+                _wbuttonPageSize = clamped;
+                SaveSettings();
+            }
+        }
+
+        /// <summary>
+        /// Retrieves the number of results retained per WButton method.
+        /// </summary>
+        public int WButtonHistorySize
+        {
+            get => Mathf.Clamp(_wbuttonHistorySize, MinWButtonHistorySize, MaxWButtonHistorySize);
+            set
+            {
+                int clamped = Mathf.Clamp(value, MinWButtonHistorySize, MaxWButtonHistorySize);
+                if (clamped == _wbuttonHistorySize)
+                {
+                    return;
+                }
+
+                _wbuttonHistorySize = clamped;
+                SaveSettings();
+            }
+        }
+
+        /// <summary>
+        /// Current duplicate-row animation mode used by dictionary inspectors.
+        /// </summary>
+        public DuplicateRowAnimationMode DuplicateRowAnimation
+        {
+            get => _duplicateRowAnimationMode;
+            set
+            {
+                if (_duplicateRowAnimationMode == value)
+                {
+                    return;
+                }
+
+                _duplicateRowAnimationMode = value;
+                SaveSettings();
+            }
+        }
+
+        /// <summary>
+        /// Number of tween cycles configured for duplicate rows. Negative values loop indefinitely.
+        /// </summary>
+        public int DuplicateRowTweenCycles
+        {
+            get => _duplicateRowTweenCycles;
+            set
+            {
+                if (_duplicateRowTweenCycles == value)
+                {
+                    return;
+                }
+
+                _duplicateRowTweenCycles = value;
+                SaveSettings();
+            }
+        }
+
+        /// <summary>
+        /// Duration used to detect repeated DetectAssetChanged callbacks before loop suppression activates.
+        /// </summary>
+        public float DetectAssetChangeLoopWindowSeconds
+        {
+            get =>
+                Mathf.Clamp(
+                    _detectAssetChangeLoopWindowSeconds <= 0f
+                        ? DefaultDetectAssetChangeLoopWindowSeconds
+                        : _detectAssetChangeLoopWindowSeconds,
+                    MinDetectAssetChangeLoopWindowSeconds,
+                    MaxDetectAssetChangeLoopWindowSeconds
+                );
+            set
+            {
+                float clamped = Mathf.Clamp(
+                    value <= 0f ? DefaultDetectAssetChangeLoopWindowSeconds : value,
+                    MinDetectAssetChangeLoopWindowSeconds,
+                    MaxDetectAssetChangeLoopWindowSeconds
+                );
+                if (Mathf.Approximately(clamped, _detectAssetChangeLoopWindowSeconds))
+                {
+                    return;
+                }
+
+                _detectAssetChangeLoopWindowSeconds = clamped;
+                SaveSettings();
+            }
+        }
+
+        /// <summary>
+        /// When true, DetectAssetChanged and related editor asset-processor callbacks are
+        /// deferred out of Unity's asset-import phase. Prevents spurious
+        /// "SendMessage cannot be called during Awake, CheckConsistency, or OnValidate"
+        /// warnings that Unity emits when our processors call
+        /// <c>AssetDatabase.LoadAllAssetsAtPath</c> / <c>GetComponentsInChildren</c>
+        /// synchronously from <c>OnPostprocessAllAssets</c>.
+        /// </summary>
+        public bool DeferAssetPostprocessorCallbacks
+        {
+            get => _deferAssetPostprocessorCallbacks;
+            set
+            {
+                if (_deferAssetPostprocessorCallbacks == value)
+                {
+                    return;
+                }
+
+                _deferAssetPostprocessorCallbacks = value;
+                SaveSettings();
+            }
+        }
+
+        internal HashSet<string> WButtonCustomColorSkipAutoSuggest
+        {
+            get => _wbuttonCustomColorSkipAutoSuggest;
+            set => _wbuttonCustomColorSkipAutoSuggest = value;
+        }
+
+        [SerializeField]
+        [Tooltip(
+            "Enable intelligent pool purging globally. When enabled, pools automatically trim idle items based on usage patterns."
+        )]
+        [WGroup(
+            PoolPurgingFoldoutKey,
+            displayName: "Pool Purging",
+            autoIncludeCount: 6,
+            collapsible: true,
+            startCollapsed: true
+        )]
+        internal bool _poolPurgingEnabled = DefaultPoolIntelligentPurgingEnabled;
+
+        [SerializeField]
+        [Tooltip(
+            "Default idle timeout in seconds. Items idle longer than this are eligible for purging."
+        )]
+        [Min(0f)]
+        internal float _poolIdleTimeoutSeconds = DefaultPoolIntelligentIdleTimeoutSeconds;
+
+        [SerializeField]
+        [Tooltip("Minimum number of items to always retain in pools during purge operations.")]
+        [Min(0)]
+        internal int _poolMinRetainCount = DefaultPoolMinRetainCount;
+
+        [SerializeField]
+        [Tooltip("Number of items to keep warm in active pools to avoid cold-start allocations.")]
+        [Min(0)]
+        internal int _poolWarmRetainCount = DefaultPoolWarmRetainCount;
+
+        [SerializeField]
+        [Tooltip("Maximum pool size (0 = unbounded). Items exceeding this limit will be purged.")]
+        [Min(0)]
+        internal int _poolMaxSize = DefaultPoolMaxSize;
+
+        [SerializeField]
+        [Tooltip(
+            "Buffer multiplier for comfortable pool size calculation. Comfortable size = max(MinRetainCount, rollingHighWaterMark * BufferMultiplier)."
+        )]
+        [Min(1f)]
+        internal float _poolBufferMultiplier = DefaultPoolBufferMultiplier;
+
+        [SerializeField]
+        [Tooltip("Rolling window duration in seconds for high water mark tracking.")]
+        [Min(1f)]
+        internal float _poolRollingWindowSeconds = DefaultPoolRollingWindowSeconds;
+
+        [SerializeField]
+        [Tooltip(
+            "Hysteresis duration in seconds. Purging is suppressed for this duration after a usage spike."
+        )]
+        [Min(0f)]
+        internal float _poolHysteresisSeconds = DefaultPoolHysteresisSeconds;
+
+        [SerializeField]
+        [Tooltip(
+            "Spike threshold multiplier. A spike is detected when concurrent rentals exceed the rolling average by this factor."
+        )]
+        [Min(1f)]
+        [WGroupEnd(PoolPurgingFoldoutKey)]
+        internal float _poolSpikeThresholdMultiplier = DefaultPoolSpikeThresholdMultiplier;
+
+        [SerializeField]
+        [Tooltip("Per-type pool purging configurations.")]
+        [WGroup(
+            "PoolTypeConfigurations",
+            displayName: "Per-Type Pool Settings",
+            collapsible: true,
+            startCollapsed: true
+        )]
+        internal List<PoolTypeConfiguration> _poolTypeConfigurations = new();
+
+        [SerializeField]
+        [Tooltip(
+            "When enabled, the Failed Tests Exporter automatically captures test failures from the Unity Test Runner."
+        )]
+        [WGroup(
+            FailedTestsExporterFoldoutKey,
+            displayName: "Failed Tests Exporter",
+            collapsible: true,
+            startCollapsed: true
+        )]
+        internal bool _failedTestsExporterEnabled = DefaultFailedTestsExporterEnabled;
+
+        [SerializeField]
+        [Tooltip(
+            "Relative directory path from the project root where failed test result files are saved. Leave empty to use the project root."
+        )]
+        [WShowIf(nameof(_failedTestsExporterEnabled))]
+        [WGroupEnd(FailedTestsExporterFoldoutKey)]
+        internal string _failedTestsOutputDirectory = DefaultFailedTestsOutputDirectory;
 
         [FormerlySerializedAs("waitInstructionBufferApplyOnLoad")]
         [SerializeField]
@@ -893,495 +1332,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         [Range(MinFoldoutSpeed, MaxFoldoutSpeed)]
         private float _inlineEditorFoldoutSpeed = DefaultFoldoutSpeed;
 
-        private const string PoolPurgingFoldoutKey = "PoolPurging";
-        private const string FailedTestsExporterFoldoutKey = "FailedTestsExporter";
-
-        [SerializeField]
-        [Tooltip(
-            "Enable intelligent pool purging globally. When enabled, pools automatically trim idle items based on usage patterns."
-        )]
-        [WGroup(
-            PoolPurgingFoldoutKey,
-            displayName: "Pool Purging",
-            autoIncludeCount: 6,
-            collapsible: true,
-            startCollapsed: true
-        )]
-        internal bool _poolPurgingEnabled = DefaultPoolIntelligentPurgingEnabled;
-
-        [SerializeField]
-        [Tooltip(
-            "Default idle timeout in seconds. Items idle longer than this are eligible for purging."
-        )]
-        [Min(0f)]
-        internal float _poolIdleTimeoutSeconds = DefaultPoolIntelligentIdleTimeoutSeconds;
-
-        [SerializeField]
-        [Tooltip("Minimum number of items to always retain in pools during purge operations.")]
-        [Min(0)]
-        internal int _poolMinRetainCount = DefaultPoolMinRetainCount;
-
-        [SerializeField]
-        [Tooltip("Number of items to keep warm in active pools to avoid cold-start allocations.")]
-        [Min(0)]
-        internal int _poolWarmRetainCount = DefaultPoolWarmRetainCount;
-
-        [SerializeField]
-        [Tooltip("Maximum pool size (0 = unbounded). Items exceeding this limit will be purged.")]
-        [Min(0)]
-        internal int _poolMaxSize = DefaultPoolMaxSize;
-
-        [SerializeField]
-        [Tooltip(
-            "Buffer multiplier for comfortable pool size calculation. Comfortable size = max(MinRetainCount, rollingHighWaterMark * BufferMultiplier)."
-        )]
-        [Min(1f)]
-        internal float _poolBufferMultiplier = DefaultPoolBufferMultiplier;
-
-        [SerializeField]
-        [Tooltip("Rolling window duration in seconds for high water mark tracking.")]
-        [Min(1f)]
-        internal float _poolRollingWindowSeconds = DefaultPoolRollingWindowSeconds;
-
-        [SerializeField]
-        [Tooltip(
-            "Hysteresis duration in seconds. Purging is suppressed for this duration after a usage spike."
-        )]
-        [Min(0f)]
-        internal float _poolHysteresisSeconds = DefaultPoolHysteresisSeconds;
-
-        [SerializeField]
-        [Tooltip(
-            "Spike threshold multiplier. A spike is detected when concurrent rentals exceed the rolling average by this factor."
-        )]
-        [Min(1f)]
-        [WGroupEnd(PoolPurgingFoldoutKey)]
-        internal float _poolSpikeThresholdMultiplier = DefaultPoolSpikeThresholdMultiplier;
-
-        [SerializeField]
-        [Tooltip("Per-type pool purging configurations.")]
-        [WGroup(
-            "PoolTypeConfigurations",
-            displayName: "Per-Type Pool Settings",
-            collapsible: true,
-            startCollapsed: true
-        )]
-        internal List<PoolTypeConfiguration> _poolTypeConfigurations = new();
-
-        [SerializeField]
-        [Tooltip(
-            "When enabled, the Failed Tests Exporter automatically captures test failures from the Unity Test Runner."
-        )]
-        [WGroup(
-            FailedTestsExporterFoldoutKey,
-            displayName: "Failed Tests Exporter",
-            collapsible: true,
-            startCollapsed: true
-        )]
-        internal bool _failedTestsExporterEnabled = DefaultFailedTestsExporterEnabled;
-
-        [SerializeField]
-        [Tooltip(
-            "Relative directory path from the project root where failed test result files are saved. Leave empty to use the project root."
-        )]
-        [WShowIf(nameof(_failedTestsExporterEnabled))]
-        [WGroupEnd(FailedTestsExporterFoldoutKey)]
-        internal string _failedTestsOutputDirectory = DefaultFailedTestsOutputDirectory;
-
-        internal HashSet<string> WButtonCustomColorSkipAutoSuggest
-        {
-            get => _wbuttonCustomColorSkipAutoSuggest;
-            set => _wbuttonCustomColorSkipAutoSuggest = value;
-        }
-
-        /// <summary>
-        /// Retrieves the effective page size for StringInList drawers, clamped to safe bounds.
-        /// </summary>
-        public int StringInListPageSize
-        {
-            get => Mathf.Clamp(_stringInListPageSize, MinPageSize, MaxPageSize);
-            set
-            {
-                int clamped = Mathf.Clamp(value, MinPageSize, MaxPageSize);
-                if (clamped == _stringInListPageSize)
-                {
-                    return;
-                }
-
-                _stringInListPageSize = clamped;
-                SaveSettings();
-            }
-        }
-
-        /// <summary>
-        /// Retrieves the configured page size for SerializableSet inspectors.
-        /// </summary>
-        public int SerializableSetPageSize
-        {
-            get => Mathf.Clamp(_serializableSetPageSize, MinPageSize, MaxPageSize);
-            set
-            {
-                int clamped = Mathf.Clamp(value, MinPageSize, MaxPageSize);
-                if (clamped == _serializableSetPageSize)
-                {
-                    return;
-                }
-
-                _serializableSetPageSize = clamped;
-                SaveSettings();
-            }
-        }
-
-        /// <summary>
-        /// Configures whether SerializableSet inspectors start collapsed by default.
-        /// </summary>
-        public bool SerializableSetStartCollapsed
-        {
-            get => _serializableSetStartCollapsed;
-            set
-            {
-                if (_serializableSetStartCollapsed == value)
-                {
-                    return;
-                }
-
-                _serializableSetStartCollapsed = value;
-                SaveSettings();
-            }
-        }
-
-        /// <summary>
-        /// Retrieves the configured page size for SerializableDictionary inspectors.
-        /// </summary>
-        public int SerializableDictionaryPageSize
-        {
-            get =>
-                Mathf.Clamp(
-                    _serializableDictionaryPageSize,
-                    MinPageSize,
-                    MaxSerializableDictionaryPageSize
-                );
-            set
-            {
-                int clamped = Mathf.Clamp(value, MinPageSize, MaxSerializableDictionaryPageSize);
-                if (clamped == _serializableDictionaryPageSize)
-                {
-                    return;
-                }
-
-                _serializableDictionaryPageSize = clamped;
-                SaveSettings();
-            }
-        }
-
-        /// <summary>
-        /// Configures whether SerializableDictionary inspectors start collapsed by default.
-        /// </summary>
-        public bool SerializableDictionaryStartCollapsed
-        {
-            get => _serializableDictionaryStartCollapsed;
-            set
-            {
-                if (_serializableDictionaryStartCollapsed == value)
-                {
-                    return;
-                }
-
-                _serializableDictionaryStartCollapsed = value;
-                SaveSettings();
-            }
-        }
-
-        /// <summary>
-        /// Configures whether collapsible WGroup headers start closed when their attribute does not specify a preference.
-        /// </summary>
-        public bool WGroupFoldoutsStartCollapsed
-        {
-            get => _wgroupFoldoutsStartCollapsed;
-            set
-            {
-                if (_wgroupFoldoutsStartCollapsed == value)
-                {
-                    return;
-                }
-
-                _wgroupFoldoutsStartCollapsed = value;
-                WGroupLayoutBuilder.ClearCache();
-                SaveSettings();
-            }
-        }
-
-        /// <summary>
-        /// Configures whether WGroup foldouts animate when expanding or collapsing.
-        /// </summary>
-        public bool WGroupFoldoutTweenEnabled
-        {
-            get => _wgroupFoldoutTweenEnabled;
-            set
-            {
-                if (_wgroupFoldoutTweenEnabled == value)
-                {
-                    return;
-                }
-
-                _wgroupFoldoutTweenEnabled = value;
-                SaveSettings();
-            }
-        }
-
-        /// <summary>
-        /// Configures the animation speed for WGroup foldout transitions.
-        /// </summary>
-        public float WGroupFoldoutSpeed
-        {
-            get => Mathf.Clamp(_wgroupFoldoutSpeed, MinFoldoutSpeed, MaxFoldoutSpeed);
-            set
-            {
-                float clamped = Mathf.Clamp(value, MinFoldoutSpeed, MaxFoldoutSpeed);
-                if (Mathf.Approximately(clamped, _wgroupFoldoutSpeed))
-                {
-                    return;
-                }
-
-                _wgroupFoldoutSpeed = clamped;
-                SaveSettings();
-            }
-        }
-
-        /// <summary>
-        /// Configures whether WInLineEditor foldouts animate when expanding or collapsing.
-        /// </summary>
-        public bool InlineEditorFoldoutTweenEnabled
-        {
-            get => _inlineEditorFoldoutTweenEnabled;
-            set
-            {
-                if (_inlineEditorFoldoutTweenEnabled == value)
-                {
-                    return;
-                }
-
-                _inlineEditorFoldoutTweenEnabled = value;
-                SaveSettings();
-            }
-        }
-
-        /// <summary>
-        /// Configures the animation speed for WInLineEditor foldout transitions.
-        /// </summary>
-        public float InlineEditorFoldoutSpeed
-        {
-            get => Mathf.Clamp(_inlineEditorFoldoutSpeed, MinFoldoutSpeed, MaxFoldoutSpeed);
-            set
-            {
-                float clamped = Mathf.Clamp(value, MinFoldoutSpeed, MaxFoldoutSpeed);
-                if (Mathf.Approximately(clamped, _inlineEditorFoldoutSpeed))
-                {
-                    return;
-                }
-
-                _inlineEditorFoldoutSpeed = clamped;
-                SaveSettings();
-            }
-        }
-
-        /// <summary>
-        /// Gets the configured page size for WEnumToggleButtons groups.
-        /// </summary>
-        public int EnumToggleButtonsPageSize
-        {
-            get => Mathf.Clamp(_enumToggleButtonsPageSize, MinPageSize, MaxPageSize);
-            set
-            {
-                int clamped = Mathf.Clamp(value, MinPageSize, MaxPageSize);
-                if (clamped == _enumToggleButtonsPageSize)
-                {
-                    return;
-                }
-
-                _enumToggleButtonsPageSize = clamped;
-                SaveSettings();
-            }
-        }
-
-        /// <summary>
-        /// Retrieves the configured page size for WButton groups.
-        /// </summary>
-        public int WButtonPageSize
-        {
-            get => Mathf.Clamp(_wbuttonPageSize, MinPageSize, MaxPageSize);
-            set
-            {
-                int clamped = Mathf.Clamp(value, MinPageSize, MaxPageSize);
-                if (clamped == _wbuttonPageSize)
-                {
-                    return;
-                }
-
-                _wbuttonPageSize = clamped;
-                SaveSettings();
-            }
-        }
-
-        /// <summary>
-        /// Retrieves the number of results retained per WButton method.
-        /// </summary>
-        public int WButtonHistorySize
-        {
-            get => Mathf.Clamp(_wbuttonHistorySize, MinWButtonHistorySize, MaxWButtonHistorySize);
-            set
-            {
-                int clamped = Mathf.Clamp(value, MinWButtonHistorySize, MaxWButtonHistorySize);
-                if (clamped == _wbuttonHistorySize)
-                {
-                    return;
-                }
-
-                _wbuttonHistorySize = clamped;
-                SaveSettings();
-            }
-        }
-
-        /// <summary>
-        /// Current duplicate-row animation mode used by dictionary inspectors.
-        /// </summary>
-        public DuplicateRowAnimationMode DuplicateRowAnimation
-        {
-            get => _duplicateRowAnimationMode;
-            set
-            {
-                if (_duplicateRowAnimationMode == value)
-                {
-                    return;
-                }
-
-                _duplicateRowAnimationMode = value;
-                SaveSettings();
-            }
-        }
-
-        /// <summary>
-        /// Number of tween cycles configured for duplicate rows. Negative values loop indefinitely.
-        /// </summary>
-        public int DuplicateRowTweenCycles
-        {
-            get => _duplicateRowTweenCycles;
-            set
-            {
-                if (_duplicateRowTweenCycles == value)
-                {
-                    return;
-                }
-
-                _duplicateRowTweenCycles = value;
-                SaveSettings();
-            }
-        }
-
-        /// <summary>
-        /// Duration used to detect repeated DetectAssetChanged callbacks before loop suppression activates.
-        /// </summary>
-        public float DetectAssetChangeLoopWindowSeconds
-        {
-            get =>
-                Mathf.Clamp(
-                    _detectAssetChangeLoopWindowSeconds <= 0f
-                        ? DefaultDetectAssetChangeLoopWindowSeconds
-                        : _detectAssetChangeLoopWindowSeconds,
-                    MinDetectAssetChangeLoopWindowSeconds,
-                    MaxDetectAssetChangeLoopWindowSeconds
-                );
-            set
-            {
-                float clamped = Mathf.Clamp(
-                    value <= 0f ? DefaultDetectAssetChangeLoopWindowSeconds : value,
-                    MinDetectAssetChangeLoopWindowSeconds,
-                    MaxDetectAssetChangeLoopWindowSeconds
-                );
-                if (Mathf.Approximately(clamped, _detectAssetChangeLoopWindowSeconds))
-                {
-                    return;
-                }
-
-                _detectAssetChangeLoopWindowSeconds = clamped;
-                SaveSettings();
-            }
-        }
-
-        /// <summary>
-        /// When true, DetectAssetChanged and related editor asset-processor callbacks are
-        /// deferred out of Unity's asset-import phase. Prevents spurious
-        /// "SendMessage cannot be called during Awake, CheckConsistency, or OnValidate"
-        /// warnings that Unity emits when our processors call
-        /// <c>AssetDatabase.LoadAllAssetsAtPath</c> / <c>GetComponentsInChildren</c>
-        /// synchronously from <c>OnPostprocessAllAssets</c>.
-        /// </summary>
-        public bool DeferAssetPostprocessorCallbacks
-        {
-            get => _deferAssetPostprocessorCallbacks;
-            set
-            {
-                if (_deferAssetPostprocessorCallbacks == value)
-                {
-                    return;
-                }
-
-                _deferAssetPostprocessorCallbacks = value;
-                SaveSettings();
-            }
-        }
-
-        internal IReadOnlyList<string> GetSerializableTypeIgnorePatterns()
-        {
-            if (
-                _serializableTypeIgnorePatterns == null
-                || _serializableTypeIgnorePatterns.Count == 0
-            )
-            {
-                _serializableTypeIgnorePatternCache = Array.Empty<string>();
-                _serializableTypeIgnorePatternCacheVersion = 0;
-                return _serializableTypeIgnorePatternCache;
-            }
-
-            int version = ComputeSerializableTypePatternVersion();
-            if (version == _serializableTypeIgnorePatternCacheVersion)
-            {
-                return _serializableTypeIgnorePatternCache;
-            }
-
-            using PooledResource<List<string>> patternsLease = Buffers<string>.List.Get(
-                out List<string> patterns
-            );
-            using PooledResource<HashSet<string>> seenLease = Buffers<string>.HashSet.Get(
-                out HashSet<string> seen
-            );
-
-            foreach (SerializableTypeIgnorePattern entry in _serializableTypeIgnorePatterns)
-            {
-                if (entry == null)
-                {
-                    continue;
-                }
-
-                string pattern = entry.Pattern;
-                if (string.IsNullOrWhiteSpace(pattern))
-                {
-                    continue;
-                }
-
-                string trimmed = pattern.Trim();
-                if (seen.Add(trimmed))
-                {
-                    patterns.Add(trimmed);
-                }
-            }
-
-            _serializableTypeIgnorePatternCache =
-                patterns.Count == 0 ? Array.Empty<string>() : patterns.ToArray();
-            _serializableTypeIgnorePatternCacheVersion = version;
-            return _serializableTypeIgnorePatternCache;
-        }
-
         /// <summary>
         /// Returns the configured page size, falling back to defaults if unset.
         /// </summary>
@@ -1402,33 +1352,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         {
             UnityHelpersSettings settings = instance;
             return settings == null || settings._serializableSetStartCollapsed;
-        }
-
-        private void InvalidateSerializableTypePatternCache()
-        {
-            _serializableTypeIgnorePatternCache = Array.Empty<string>();
-            _serializableTypeIgnorePatternCacheVersion = int.MinValue;
-        }
-
-        private int ComputeSerializableTypePatternVersion()
-        {
-            if (
-                _serializableTypeIgnorePatterns == null
-                || _serializableTypeIgnorePatterns.Count == 0
-            )
-            {
-                return 0;
-            }
-
-            HashCode hash = new HashCode();
-            hash.Add(_serializableTypeIgnorePatterns.Count);
-            foreach (SerializableTypeIgnorePattern entry in _serializableTypeIgnorePatterns)
-            {
-                string trimmed = entry?.Pattern?.Trim() ?? string.Empty;
-                hash.Add(trimmed);
-            }
-
-            return hash.ToHashCode();
         }
 
         public static int GetSerializableDictionaryPageSize()
@@ -1464,11 +1387,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         public static bool ShouldTweenWGroupFoldouts()
         {
             return instance._wgroupFoldoutTweenEnabled;
-        }
-
-        internal static void SetWGroupFoldoutTweenEnabled(bool value)
-        {
-            instance._wgroupFoldoutTweenEnabled = value;
         }
 
         /// <summary>
@@ -1535,29 +1453,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             return new WGroupAutoIncludeConfiguration(settings._wgroupAutoIncludeMode, clamped);
         }
 
-        internal static void SetWGroupAutoIncludeConfigurationForTests(
-            WGroupAutoIncludeMode mode,
-            int rowCount
-        )
-        {
-            UnityHelpersSettings settings = instance;
-            settings._wgroupAutoIncludeMode = mode;
-            settings._wgroupAutoIncludeRowCount = Mathf.Clamp(
-                rowCount,
-                MinWGroupAutoIncludeRowCount,
-                MaxWGroupAutoIncludeRowCount
-            );
-            settings.SaveSettings();
-        }
-
         public static WButtonPaletteEntry ResolveWButtonPalette(string colorKey)
         {
             return instance.GetWButtonPaletteEntry(colorKey);
-        }
-
-        internal static bool HasWButtonPaletteColorKey(string colorKey)
-        {
-            return instance.ContainsColorKey(colorKey);
         }
 
         public static WEnumToggleButtonsPaletteEntry ResolveWEnumToggleButtonsPalette(
@@ -1565,11 +1463,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         )
         {
             return instance.GetWEnumToggleButtonsPaletteEntry(colorKey);
-        }
-
-        internal static bool HasWEnumToggleButtonsPaletteColorKey(string colorKey)
-        {
-            return instance.ContainsWEnumToggleButtonsColorKey(colorKey);
         }
 
         public static WButtonActionsPlacement GetWButtonActionsPlacement()
@@ -1615,11 +1508,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             return instance._serializableDictionaryFoldoutTweenEnabled;
         }
 
-        internal static void SetSerializableDictionaryFoldoutTweenEnabled(bool value)
-        {
-            instance._serializableDictionaryFoldoutTweenEnabled = value;
-        }
-
         public static float GetSerializableDictionaryFoldoutSpeed()
         {
             return Mathf.Clamp(
@@ -1632,11 +1520,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         public static bool ShouldTweenSerializableSortedDictionaryFoldouts()
         {
             return instance._serializableSortedDictionaryFoldoutTweenEnabled;
-        }
-
-        internal static void SetSerializableSortedDictionaryFoldoutTweenEnabled(bool value)
-        {
-            instance._serializableSortedDictionaryFoldoutTweenEnabled = value;
         }
 
         public static float GetSerializableSortedDictionaryFoldoutSpeed()
@@ -1653,11 +1536,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             return instance._serializableSetFoldoutTweenEnabled;
         }
 
-        internal static void SetSerializableSetFoldoutTweenEnabled(bool value)
-        {
-            instance._serializableSetFoldoutTweenEnabled = value;
-        }
-
         public static float GetSerializableSetFoldoutSpeed()
         {
             return Mathf.Clamp(
@@ -1670,11 +1548,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         public static bool ShouldTweenSerializableSortedSetFoldouts()
         {
             return instance._serializableSortedSetFoldoutTweenEnabled;
-        }
-
-        internal static void SetSerializableSortedSetFoldoutTweenEnabled(bool value)
-        {
-            instance._serializableSortedSetFoldoutTweenEnabled = value;
         }
 
         public static float GetSerializableSortedSetFoldoutSpeed()
@@ -1715,11 +1588,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         public static InlineEditorFoldoutBehavior GetInlineEditorFoldoutBehavior()
         {
             return instance._inlineEditorFoldoutBehavior;
-        }
-
-        internal static void SetInlineEditorFoldoutBehavior(InlineEditorFoldoutBehavior value)
-        {
-            instance._inlineEditorFoldoutBehavior = value;
         }
 
         /// <summary>
@@ -1924,6 +1792,112 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             ApplyPoolTypeConfigurationsToRuntime(settings._poolTypeConfigurations);
         }
 
+        internal static void SetWGroupFoldoutTweenEnabled(bool value)
+        {
+            instance._wgroupFoldoutTweenEnabled = value;
+        }
+
+        internal static void SetWGroupAutoIncludeConfigurationForTests(
+            WGroupAutoIncludeMode mode,
+            int rowCount
+        )
+        {
+            UnityHelpersSettings settings = instance;
+            settings._wgroupAutoIncludeMode = mode;
+            settings._wgroupAutoIncludeRowCount = Mathf.Clamp(
+                rowCount,
+                MinWGroupAutoIncludeRowCount,
+                MaxWGroupAutoIncludeRowCount
+            );
+            settings.SaveSettings();
+        }
+
+        internal static bool HasWButtonPaletteColorKey(string colorKey)
+        {
+            return instance.ContainsColorKey(colorKey);
+        }
+
+        internal static bool HasWEnumToggleButtonsPaletteColorKey(string colorKey)
+        {
+            return instance.ContainsWEnumToggleButtonsColorKey(colorKey);
+        }
+
+        internal static void SetSerializableDictionaryFoldoutTweenEnabled(bool value)
+        {
+            instance._serializableDictionaryFoldoutTweenEnabled = value;
+        }
+
+        internal static void SetSerializableSortedDictionaryFoldoutTweenEnabled(bool value)
+        {
+            instance._serializableSortedDictionaryFoldoutTweenEnabled = value;
+        }
+
+        internal static void SetSerializableSetFoldoutTweenEnabled(bool value)
+        {
+            instance._serializableSetFoldoutTweenEnabled = value;
+        }
+
+        internal static void SetSerializableSortedSetFoldoutTweenEnabled(bool value)
+        {
+            instance._serializableSortedSetFoldoutTweenEnabled = value;
+        }
+
+        internal static void SetInlineEditorFoldoutBehavior(InlineEditorFoldoutBehavior value)
+        {
+            instance._inlineEditorFoldoutBehavior = value;
+        }
+
+        internal static void RegisterPaletteManualEdit(string propertyPath, string key)
+        {
+            if (string.IsNullOrWhiteSpace(propertyPath) || string.IsNullOrWhiteSpace(key))
+            {
+                return;
+            }
+
+            UnityHelpersSettings settings = instance;
+            if (settings != null)
+            {
+                settings.RegisterPaletteManualEditInternal(propertyPath, key);
+            }
+        }
+
+        /// <summary>
+        /// Returns a cached SerializedObject for the settings instance, creating one if needed.
+        /// Caching the SerializedObject preserves property expansion states (isExpanded)
+        /// across frames, preventing foldouts from unexpectedly re-expanding.
+        /// </summary>
+        internal static SerializedObject GetOrCreateCachedSerializedObject(
+            UnityHelpersSettings settings
+        )
+        {
+            if (settings == null)
+            {
+                _cachedSettingsSerializedObject = null;
+                return null;
+            }
+
+            if (
+                _cachedSettingsSerializedObject == null
+                || _cachedSettingsSerializedObject.targetObject == null
+                || _cachedSettingsSerializedObject.targetObject != settings
+            )
+            {
+                _cachedSettingsSerializedObject?.Dispose();
+                _cachedSettingsSerializedObject = new SerializedObject(settings);
+            }
+
+            return _cachedSettingsSerializedObject;
+        }
+
+        /// <summary>
+        /// Clears the cached SerializedObject for testing purposes.
+        /// </summary>
+        internal static void ClearCachedSerializedObjectForTests()
+        {
+            _cachedSettingsSerializedObject?.Dispose();
+            _cachedSettingsSerializedObject = null;
+        }
+
         private static void ApplyPoolTypeConfigurationsToRuntime(
             List<PoolTypeConfiguration> configurations
         )
@@ -2007,420 +1981,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             catch { }
         }
 
-        internal static void RegisterPaletteManualEdit(string propertyPath, string key)
-        {
-            if (string.IsNullOrWhiteSpace(propertyPath) || string.IsNullOrWhiteSpace(key))
-            {
-                return;
-            }
-
-            UnityHelpersSettings settings = instance;
-            if (settings != null)
-            {
-                settings.RegisterPaletteManualEditInternal(propertyPath, key);
-            }
-        }
-
-        /// <summary>
-        /// Ensures persisted data stays within valid range.
-        /// </summary>
-        internal void OnEnable()
-        {
-            _stringInListPageSize = Mathf.Clamp(
-                _stringInListPageSize <= 0 ? DefaultStringInListPageSize : _stringInListPageSize,
-                MinPageSize,
-                MaxPageSize
-            );
-            _serializableSetPageSize = Mathf.Clamp(
-                _serializableSetPageSize <= 0
-                    ? DefaultSerializableSetPageSize
-                    : _serializableSetPageSize,
-                MinPageSize,
-                MaxPageSize
-            );
-            _serializableDictionaryPageSize = Mathf.Clamp(
-                _serializableDictionaryPageSize <= 0
-                    ? DefaultSerializableDictionaryPageSize
-                    : _serializableDictionaryPageSize,
-                MinPageSize,
-                MaxSerializableDictionaryPageSize
-            );
-            _enumToggleButtonsPageSize = Mathf.Clamp(
-                _enumToggleButtonsPageSize <= 0
-                    ? DefaultEnumToggleButtonsPageSize
-                    : _enumToggleButtonsPageSize,
-                MinPageSize,
-                MaxPageSize
-            );
-            _wbuttonPageSize = Mathf.Clamp(
-                _wbuttonPageSize <= 0 ? DefaultWButtonPageSize : _wbuttonPageSize,
-                MinPageSize,
-                MaxPageSize
-            );
-            _wbuttonHistorySize = Mathf.Clamp(
-                _wbuttonHistorySize <= 0 ? DefaultWButtonHistorySize : _wbuttonHistorySize,
-                MinWButtonHistorySize,
-                MaxWButtonHistorySize
-            );
-            if (!Enum.IsDefined(typeof(WButtonActionsPlacement), _wbuttonActionsPlacement))
-            {
-                _wbuttonActionsPlacement = WButtonActionsPlacement.Top;
-            }
-
-            if (!Enum.IsDefined(typeof(WButtonFoldoutBehavior), _wbuttonFoldoutBehavior))
-            {
-                _wbuttonFoldoutBehavior = WButtonFoldoutBehavior.StartExpanded;
-            }
-            if (!Enum.IsDefined(typeof(WGroupAutoIncludeMode), _wgroupAutoIncludeMode))
-            {
-                _wgroupAutoIncludeMode = WGroupAutoIncludeMode.Infinite;
-            }
-            if (_wgroupAutoIncludeRowCount < MinWGroupAutoIncludeRowCount)
-            {
-                _wgroupAutoIncludeRowCount = DefaultWGroupAutoIncludeRowCount;
-            }
-            _wgroupAutoIncludeRowCount = Mathf.Clamp(
-                _wgroupAutoIncludeRowCount,
-                MinWGroupAutoIncludeRowCount,
-                MaxWGroupAutoIncludeRowCount
-            );
-            _wgroupFoldoutSpeed = Mathf.Clamp(
-                _wgroupFoldoutSpeed <= 0f ? DefaultFoldoutSpeed : _wgroupFoldoutSpeed,
-                MinFoldoutSpeed,
-                MaxFoldoutSpeed
-            );
-            _inlineEditorFoldoutSpeed = Mathf.Clamp(
-                _inlineEditorFoldoutSpeed <= 0f ? DefaultFoldoutSpeed : _inlineEditorFoldoutSpeed,
-                MinFoldoutSpeed,
-                MaxFoldoutSpeed
-            );
-            _wbuttonFoldoutSpeed = Mathf.Clamp(
-                _wbuttonFoldoutSpeed <= 0f ? DefaultFoldoutSpeed : _wbuttonFoldoutSpeed,
-                MinFoldoutSpeed,
-                MaxFoldoutSpeed
-            );
-            _serializableDictionaryFoldoutSpeed = Mathf.Clamp(
-                _serializableDictionaryFoldoutSpeed <= 0f
-                    ? DefaultFoldoutSpeed
-                    : _serializableDictionaryFoldoutSpeed,
-                MinFoldoutSpeed,
-                MaxFoldoutSpeed
-            );
-            _serializableSortedDictionaryFoldoutSpeed = Mathf.Clamp(
-                _serializableSortedDictionaryFoldoutSpeed <= 0f
-                    ? DefaultFoldoutSpeed
-                    : _serializableSortedDictionaryFoldoutSpeed,
-                MinFoldoutSpeed,
-                MaxFoldoutSpeed
-            );
-            _serializableSetFoldoutSpeed = Mathf.Clamp(
-                _serializableSetFoldoutSpeed <= 0f
-                    ? DefaultFoldoutSpeed
-                    : _serializableSetFoldoutSpeed,
-                MinFoldoutSpeed,
-                MaxFoldoutSpeed
-            );
-            _serializableSortedSetFoldoutSpeed = Mathf.Clamp(
-                _serializableSortedSetFoldoutSpeed <= 0f
-                    ? DefaultFoldoutSpeed
-                    : _serializableSortedSetFoldoutSpeed,
-                MinFoldoutSpeed,
-                MaxFoldoutSpeed
-            );
-            _detectAssetChangeLoopWindowSeconds = Mathf.Clamp(
-                _detectAssetChangeLoopWindowSeconds <= 0f
-                    ? DefaultDetectAssetChangeLoopWindowSeconds
-                    : _detectAssetChangeLoopWindowSeconds,
-                MinDetectAssetChangeLoopWindowSeconds,
-                MaxDetectAssetChangeLoopWindowSeconds
-            );
-
-            if (!string.IsNullOrEmpty(_failedTestsOutputDirectory))
-            {
-                string validatedDirectory = GetFailedTestsOutputDirectory();
-                if (
-                    !string.Equals(
-                        _failedTestsOutputDirectory,
-                        validatedDirectory,
-                        StringComparison.Ordinal
-                    )
-                )
-                {
-                    _failedTestsOutputDirectory = validatedDirectory;
-                    SaveSettings();
-                }
-            }
-            if (EnsureFoldoutTweenDefaults())
-            {
-                SaveSettings();
-            }
-            if (EnsureWButtonCustomColorDefaults())
-            {
-                SaveSettings();
-            }
-            if (EnsureWEnumToggleButtonsCustomColorDefaults())
-            {
-                SaveSettings();
-            }
-
-            bool shouldApplyRuntimeConfig = true;
-            if (EnsureSerializableTypePatternDefaults())
-            {
-                SaveSettings();
-                shouldApplyRuntimeConfig = false;
-            }
-            if (EnsureSerializableSetTweenDefaults())
-            {
-                SaveSettings();
-                shouldApplyRuntimeConfig = false;
-            }
-            if (shouldApplyRuntimeConfig)
-            {
-                ApplyRuntimeConfiguration();
-            }
-        }
-
-        /// <summary>
-        /// Persists any modifications to disk.
-        /// </summary>
-        public void SaveSettings()
-        {
-            EnsureWButtonCustomColorDefaults();
-            EnsureWEnumToggleButtonsCustomColorDefaults();
-            ApplyRuntimeConfiguration();
-            Save(true);
-            OnSettingsSaved?.Invoke();
-        }
-
-        private void ApplyRuntimeConfiguration()
-        {
-            IReadOnlyList<string> patterns = GetSerializableTypeIgnorePatterns();
-            SerializableTypeCatalog.ConfigureTypeNameIgnorePatterns(patterns);
-            SerializableTypeCatalog.WarmPatternStats(patterns);
-
-            ApplyPoolPurgingSettingsToRuntime();
-        }
-
-        private bool EnsureSerializableTypePatternDefaults()
-        {
-            _serializableTypeIgnorePatterns ??= new List<SerializableTypeIgnorePattern>();
-
-            if (_serializableTypePatternsInitialized)
-            {
-                return false;
-            }
-
-            if (_serializableTypeIgnorePatterns.Count == 0)
-            {
-                IReadOnlyList<string> defaults = SerializableTypeCatalog.GetDefaultIgnorePatterns();
-                for (int index = 0; index < defaults.Count; index++)
-                {
-                    _serializableTypeIgnorePatterns.Add(
-                        new SerializableTypeIgnorePattern(defaults[index])
-                    );
-                }
-                InvalidateSerializableTypePatternCache();
-            }
-
-            bool changed = !_serializableTypePatternsInitialized;
-            _serializableTypePatternsInitialized = true;
-            return changed;
-        }
-
-        private bool EnsureFoldoutTweenDefaults()
-        {
-            if (_foldoutTweenSettingsInitialized)
-            {
-                return false;
-            }
-
-            if (!_wbuttonFoldoutTweenEnabled)
-            {
-                _wbuttonFoldoutTweenEnabled = true;
-            }
-
-            if (!_serializableDictionaryFoldoutTweenEnabled)
-            {
-                _serializableDictionaryFoldoutTweenEnabled = true;
-            }
-
-            if (!_serializableSortedDictionaryFoldoutTweenEnabled)
-            {
-                _serializableSortedDictionaryFoldoutTweenEnabled = true;
-            }
-
-            if (!_serializableSetFoldoutTweenEnabled)
-            {
-                _serializableSetFoldoutTweenEnabled = true;
-            }
-
-            if (!_serializableSortedSetFoldoutTweenEnabled)
-            {
-                _serializableSortedSetFoldoutTweenEnabled = true;
-            }
-
-            _foldoutTweenSettingsInitialized = true;
-            return true;
-        }
-
-        private bool EnsureSerializableSetTweenDefaults()
-        {
-            if (_serializableSetDuplicateTweenSettingsInitialized)
-            {
-                return false;
-            }
-
-            _serializableSetDuplicateTweenEnabled =
-                _duplicateRowAnimationMode == DuplicateRowAnimationMode.Tween;
-            _serializableSetDuplicateTweenCycles =
-                _duplicateRowTweenCycles != 0
-                    ? _duplicateRowTweenCycles
-                    : DefaultDuplicateTweenCycles;
-            _serializableSetDuplicateTweenSettingsInitialized = true;
-            return true;
-        }
-
-        internal bool EnsureWButtonCustomColorDefaults()
-        {
-            _wbuttonCustomColors ??= new WButtonCustomColorDictionary();
-
-            bool changed = false;
-            changed |= MigrateLegacyWButtonPalette();
-
-            // Migrate explicit-color flags before deriving colors can overwrite authored choices.
-            foreach (WButtonCustomColor stored in _wbuttonCustomColors.Values)
-            {
-                if (stored != null)
-                {
-                    changed |= stored.MigrateChosenTextColor();
-                }
-            }
-
-            if (
-                _wbuttonCustomColors.TryGetValue(
-                    DefaultWButtonColorKey,
-                    out WButtonCustomColor legacyDefault
-                )
-            )
-            {
-                _wbuttonCustomColors.TryAdd(WButtonLegacyColorKey, legacyDefault);
-                _wbuttonCustomColors.Remove(DefaultWButtonColorKey);
-                changed = true;
-            }
-
-            if (!_wbuttonCustomColors.ContainsKey(WButtonLegacyColorKey))
-            {
-                WButtonCustomColor legacyColor = new()
-                {
-                    ButtonColor = DefaultColorKeyButtonColor,
-                    TextColor = WButtonColorUtility.GetReadableTextColor(
-                        DefaultColorKeyButtonColor
-                    ),
-                };
-                _wbuttonCustomColors[WButtonLegacyColorKey] = legacyColor;
-                changed = true;
-            }
-
-            changed |= EnsureWButtonThemeEntry(
-                WButtonLightThemeColorKey,
-                DefaultLightThemeButtonColor,
-                Color.black
-            );
-            changed |= EnsureWButtonThemeEntry(
-                WButtonDarkThemeColorKey,
-                DefaultDarkThemeButtonColor,
-                Color.white
-            );
-
-            int paletteIndex = 0;
-            foreach (
-                KeyValuePair<string, WButtonCustomColor> entry in _wbuttonCustomColors.ToArray()
-            )
-            {
-                WButtonCustomColor value = entry.Value;
-                if (value == null)
-                {
-                    value = new WButtonCustomColor();
-                    _wbuttonCustomColors[entry.Key] = value;
-                    value.ButtonColor = DefaultColorKeyButtonColor;
-                    value.EnsureReadableText();
-                    changed = true;
-                }
-
-                if (IsReservedWButtonColorKey(entry.Key))
-                {
-                    value.EnsureReadableText();
-                    continue;
-                }
-
-                if (ShouldSkipWButtonAutoSuggest(entry.Key))
-                {
-                    continue;
-                }
-
-                // Only entirely zero color means unset; opaque black is a valid authored choice.
-                bool needsSuggestion =
-                    value.ButtonColor == default
-                    || (
-                        ColorsApproximatelyEqual(value.ButtonColor, Color.white)
-                        && (
-                            !value.HasChosenTextColor
-                            || ColorsApproximatelyEqual(value.TextColor, Color.black)
-                        )
-                    );
-
-                if (needsSuggestion)
-                {
-                    Color suggested = WButtonColorUtility.SuggestPaletteColor(paletteIndex);
-                    value.ButtonColor = suggested;
-                    value.TextColor = WButtonColorUtility.GetReadableTextColor(suggested);
-                    changed = true;
-                }
-                else
-                {
-                    Color previousText = value.TextColor;
-                    value.EnsureReadableText();
-                    if (!ColorsApproximatelyEqual(value.TextColor, previousText))
-                    {
-                        changed = true;
-                    }
-                }
-
-                paletteIndex++;
-            }
-
-            return changed;
-        }
-
-        private bool ShouldSkipWButtonAutoSuggest(string key)
-        {
-            return ShouldSkipAutoSuggest(_wbuttonCustomColorSkipAutoSuggest, key);
-        }
-
-        // Nullable defaults distinguish absent choices from explicitly supplied black.
-        private bool EnsureWButtonThemeEntry(string key, Color buttonColor, Color? defaultTextColor)
-        {
-            if (
-                _wbuttonCustomColors.TryGetValue(key, out WButtonCustomColor existing)
-                && existing != null
-            )
-            {
-                existing.EnsureReadableText();
-                return false;
-            }
-
-            Color textColor =
-                defaultTextColor ?? WButtonColorUtility.GetReadableTextColor(buttonColor);
-            WButtonCustomColor themeColor = new()
-            {
-                ButtonColor = buttonColor,
-                TextColor = textColor,
-            };
-            themeColor.EnsureReadableText();
-            _wbuttonCustomColors[key] = themeColor;
-            return true;
-        }
-
         private static bool IsReservedWButtonColorKey(string key)
         {
             if (string.IsNullOrWhiteSpace(key))
@@ -2432,167 +1992,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 || string.Equals(key, WButtonLightThemeColorKey, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(key, WButtonDarkThemeColorKey, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(key, WButtonLegacyColorKey, StringComparison.OrdinalIgnoreCase);
-        }
-
-        private bool MigrateLegacyWButtonPalette()
-        {
-#pragma warning disable CS0618 // Type or member is obsolete
-            if (_legacyWButtonPriorityColors == null || _legacyWButtonPriorityColors.Count == 0)
-            {
-                return false;
-            }
-
-            bool changed = false;
-            foreach (WButtonPriorityColor legacy in _legacyWButtonPriorityColors)
-            {
-#pragma warning restore CS0618 // Type or member is obsolete
-                if (legacy == null)
-                {
-                    continue;
-                }
-
-                string normalizedKey = NormalizeColorKey(legacy.Priority);
-                WButtonCustomColor color = new()
-                {
-                    ButtonColor = legacy.ButtonColor,
-                    // Legacy entries lack a presence flag, so only entirely zero color can mean unset.
-                    TextColor =
-                        legacy.TextColor == default
-                            ? WButtonColorUtility.GetReadableTextColor(legacy.ButtonColor)
-                            : legacy.TextColor,
-                };
-                _wbuttonCustomColors[normalizedKey] = color;
-                changed = true;
-            }
-
-            _legacyWButtonPriorityColors.Clear();
-            return changed;
-        }
-
-        private bool EnsureWEnumToggleButtonsCustomColorDefaults()
-        {
-            if (_wenumToggleButtonsCustomColors == null)
-            {
-                _wenumToggleButtonsCustomColors = new WEnumToggleButtonsCustomColorDictionary();
-            }
-
-            bool changed = false;
-
-            // Migrate before deriving colors to preserve authored choices.
-            foreach (WEnumToggleButtonsCustomColor stored in _wenumToggleButtonsCustomColors.Values)
-            {
-                if (stored != null)
-                {
-                    changed |= stored.MigrateChosenTextColors();
-                }
-            }
-
-            if (!_wenumToggleButtonsCustomColors.ContainsKey(DefaultWEnumToggleButtonsColorKey))
-            {
-                bool proSkin = EditorGUIUtility.isProSkin;
-                WEnumToggleButtonsCustomColor defaultColor = new()
-                {
-                    SelectedBackgroundColor = proSkin
-                        ? DefaultDarkThemeEnumSelectedColor
-                        : DefaultLightThemeEnumSelectedColor,
-                    SelectedTextColor = proSkin
-                        ? DefaultDarkThemeEnumSelectedTextColor
-                        : DefaultLightThemeEnumSelectedTextColor,
-                    InactiveBackgroundColor = proSkin
-                        ? DefaultDarkThemeEnumInactiveColor
-                        : DefaultLightThemeEnumInactiveColor,
-                    InactiveTextColor = proSkin
-                        ? DefaultDarkThemeEnumInactiveTextColor
-                        : DefaultLightThemeEnumInactiveTextColor,
-                };
-                defaultColor.EnsureReadableText();
-                _wenumToggleButtonsCustomColors[DefaultWEnumToggleButtonsColorKey] = defaultColor;
-                changed = true;
-            }
-
-            changed |= EnsureWEnumToggleButtonsThemeEntry(
-                WEnumToggleButtonsLightThemeColorKey,
-                DefaultLightThemeEnumSelectedColor,
-                DefaultLightThemeEnumSelectedTextColor,
-                DefaultLightThemeEnumInactiveColor,
-                DefaultLightThemeEnumInactiveTextColor
-            );
-            changed |= EnsureWEnumToggleButtonsThemeEntry(
-                WEnumToggleButtonsDarkThemeColorKey,
-                DefaultDarkThemeEnumSelectedColor,
-                DefaultDarkThemeEnumSelectedTextColor,
-                DefaultDarkThemeEnumInactiveColor,
-                DefaultDarkThemeEnumInactiveTextColor
-            );
-
-            foreach (
-                KeyValuePair<
-                    string,
-                    WEnumToggleButtonsCustomColor
-                > entry in _wenumToggleButtonsCustomColors
-            )
-            {
-                WEnumToggleButtonsCustomColor value = entry.Value;
-                if (value == null)
-                {
-                    value = new WEnumToggleButtonsCustomColor();
-                    _wenumToggleButtonsCustomColors[entry.Key] = value;
-                    changed = true;
-                }
-
-                Color previousSelectedText = value.SelectedTextColor;
-                Color previousInactiveText = value.InactiveTextColor;
-                value.EnsureReadableText();
-
-                if (!ColorsApproximatelyEqual(value.SelectedTextColor, previousSelectedText))
-                {
-                    changed = true;
-                }
-
-                if (!ColorsApproximatelyEqual(value.InactiveTextColor, previousInactiveText))
-                {
-                    changed = true;
-                }
-            }
-
-            return changed;
-        }
-
-        private bool EnsureWEnumToggleButtonsThemeEntry(
-            string key,
-            Color selectedBackground,
-            Color? selectedTextDefault,
-            Color inactiveBackground,
-            Color? inactiveTextDefault
-        )
-        {
-            if (
-                _wenumToggleButtonsCustomColors.TryGetValue(
-                    key,
-                    out WEnumToggleButtonsCustomColor existing
-                )
-                && existing != null
-            )
-            {
-                existing.EnsureReadableText();
-                return false;
-            }
-
-            Color resolvedSelectedText =
-                selectedTextDefault ?? WButtonColorUtility.GetReadableTextColor(selectedBackground);
-            Color resolvedInactiveText =
-                inactiveTextDefault ?? WButtonColorUtility.GetReadableTextColor(inactiveBackground);
-
-            WEnumToggleButtonsCustomColor themeColor = new()
-            {
-                SelectedBackgroundColor = selectedBackground,
-                SelectedTextColor = resolvedSelectedText,
-                InactiveBackgroundColor = inactiveBackground,
-                InactiveTextColor = resolvedInactiveText,
-            };
-            themeColor.EnsureReadableText();
-            _wenumToggleButtonsCustomColors[key] = themeColor;
-            return true;
         }
 
         private static bool ShouldSkipAutoSuggest(HashSet<string> skipSet, string key)
@@ -2627,421 +2026,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                     WEnumToggleButtonsDarkThemeColorKey,
                     StringComparison.OrdinalIgnoreCase
                 );
-        }
-
-        private bool ContainsColorKey(string colorKey)
-        {
-            if (string.IsNullOrWhiteSpace(colorKey))
-            {
-                return true;
-            }
-
-            if (IsReservedWButtonColorKey(colorKey))
-            {
-                return true;
-            }
-
-            if (_wbuttonCustomColors == null || _wbuttonCustomColors.Count == 0)
-            {
-                return false;
-            }
-
-            string normalized = string.IsNullOrWhiteSpace(colorKey)
-                ? DefaultWButtonColorKey
-                : colorKey.Trim();
-
-            return _wbuttonCustomColors.ContainsKey(normalized);
-        }
-
-        private bool ContainsWEnumToggleButtonsColorKey(string colorKey)
-        {
-            if (string.IsNullOrWhiteSpace(colorKey))
-            {
-                return true;
-            }
-
-            if (IsReservedWEnumToggleButtonsColorKey(colorKey))
-            {
-                return true;
-            }
-
-            if (
-                _wenumToggleButtonsCustomColors == null
-                || _wenumToggleButtonsCustomColors.Count == 0
-            )
-            {
-                return false;
-            }
-
-            string normalized = colorKey.Trim();
-
-            return _wenumToggleButtonsCustomColors.ContainsKey(normalized);
-        }
-
-        private string NormalizeColorKey(string colorKey)
-        {
-            if (string.IsNullOrWhiteSpace(colorKey))
-            {
-                return DefaultWButtonColorKey;
-            }
-
-            if (IsReservedWButtonColorKey(colorKey))
-            {
-                if (
-                    string.Equals(
-                        colorKey,
-                        WButtonLightThemeColorKey,
-                        StringComparison.OrdinalIgnoreCase
-                    )
-                )
-                {
-                    return WButtonLightThemeColorKey;
-                }
-
-                if (
-                    string.Equals(
-                        colorKey,
-                        WButtonDarkThemeColorKey,
-                        StringComparison.OrdinalIgnoreCase
-                    )
-                )
-                {
-                    return WButtonDarkThemeColorKey;
-                }
-
-                if (
-                    string.Equals(
-                        colorKey,
-                        WButtonLegacyColorKey,
-                        StringComparison.OrdinalIgnoreCase
-                    )
-                )
-                {
-                    return WButtonLegacyColorKey;
-                }
-
-                return DefaultWButtonColorKey;
-            }
-
-            string normalized = colorKey.Trim();
-
-            // Case-insensitive dictionary lookup already resolves differently cased keys.
-            return normalized;
-        }
-
-        private void RegisterPaletteManualEditInternal(string propertyPath, string key)
-        {
-            string trimmedKey = key?.Trim();
-            if (string.IsNullOrWhiteSpace(trimmedKey))
-            {
-                return;
-            }
-
-            if (
-                string.Equals(
-                    propertyPath,
-                    SerializedPropertyNames.WButtonCustomColors,
-                    StringComparison.Ordinal
-                )
-            )
-            {
-                _wbuttonCustomColorSkipAutoSuggest ??= new HashSet<string>(
-                    StringComparer.OrdinalIgnoreCase
-                );
-                _wbuttonCustomColorSkipAutoSuggest.Add(trimmedKey);
-            }
-        }
-
-        private string NormalizeWEnumToggleButtonsColorKey(string colorKey)
-        {
-            if (string.IsNullOrWhiteSpace(colorKey))
-            {
-                return DefaultWEnumToggleButtonsColorKey;
-            }
-
-            if (IsReservedWEnumToggleButtonsColorKey(colorKey))
-            {
-                if (
-                    string.Equals(
-                        colorKey,
-                        WEnumToggleButtonsLightThemeColorKey,
-                        StringComparison.OrdinalIgnoreCase
-                    )
-                )
-                {
-                    return WEnumToggleButtonsLightThemeColorKey;
-                }
-
-                if (
-                    string.Equals(
-                        colorKey,
-                        WEnumToggleButtonsDarkThemeColorKey,
-                        StringComparison.OrdinalIgnoreCase
-                    )
-                )
-                {
-                    return WEnumToggleButtonsDarkThemeColorKey;
-                }
-
-                return DefaultWEnumToggleButtonsColorKey;
-            }
-
-            // Case-insensitive dictionary lookup already resolves differently cased keys.
-            return colorKey.Trim();
-        }
-
-        private WButtonPaletteEntry GetWButtonPaletteEntry(string colorKey)
-        {
-            EnsureWButtonCustomColorDefaults();
-
-            string normalized = NormalizeColorKey(colorKey);
-
-            if (
-                string.Equals(
-                    normalized,
-                    DefaultWButtonColorKey,
-                    StringComparison.OrdinalIgnoreCase
-                )
-            )
-            {
-                return GetThemeAwareDefaultWButtonPalette();
-            }
-
-            if (
-                string.Equals(
-                    normalized,
-                    WButtonLightThemeColorKey,
-                    StringComparison.OrdinalIgnoreCase
-                )
-            )
-            {
-                return GetWButtonThemePaletteEntry(
-                    WButtonLightThemeColorKey,
-                    DefaultLightThemeButtonColor,
-                    Color.black
-                );
-            }
-
-            if (
-                string.Equals(
-                    normalized,
-                    WButtonDarkThemeColorKey,
-                    StringComparison.OrdinalIgnoreCase
-                )
-            )
-            {
-                return GetWButtonThemePaletteEntry(
-                    WButtonDarkThemeColorKey,
-                    DefaultDarkThemeButtonColor,
-                    Color.white
-                );
-            }
-
-            if (
-                string.Equals(normalized, WButtonLegacyColorKey, StringComparison.OrdinalIgnoreCase)
-            )
-            {
-                if (
-                    _wbuttonCustomColors != null
-                    && _wbuttonCustomColors.TryGetValue(
-                        WButtonLegacyColorKey,
-                        out WButtonCustomColor legacy
-                    )
-                    && legacy != null
-                )
-                {
-                    legacy.EnsureReadableText();
-                    return new WButtonPaletteEntry(legacy.ButtonColor, legacy.TextColor);
-                }
-
-                Color fallbackButton = DefaultColorKeyButtonColor;
-                Color fallbackText = WButtonColorUtility.GetReadableTextColor(fallbackButton);
-                return new WButtonPaletteEntry(fallbackButton, fallbackText);
-            }
-
-            if (_wbuttonCustomColors is not { Count: > 0 })
-            {
-                return GetThemeAwareDefaultWButtonPalette();
-            }
-
-            if (
-                _wbuttonCustomColors.TryGetValue(normalized, out WButtonCustomColor directValue)
-                && directValue != null
-            )
-            {
-                directValue.EnsureReadableText();
-                return new WButtonPaletteEntry(directValue.ButtonColor, directValue.TextColor);
-            }
-
-            return GetThemeAwareDefaultWButtonPalette();
-        }
-
-        private WButtonPaletteEntry GetThemeAwareDefaultWButtonPalette()
-        {
-            string themeKey = EditorGUIUtility.isProSkin
-                ? WButtonDarkThemeColorKey
-                : WButtonLightThemeColorKey;
-            Color fallbackButton = EditorGUIUtility.isProSkin
-                ? DefaultDarkThemeButtonColor
-                : DefaultLightThemeButtonColor;
-            Color fallbackText = EditorGUIUtility.isProSkin ? Color.white : Color.black;
-            return GetWButtonThemePaletteEntry(themeKey, fallbackButton, fallbackText);
-        }
-
-        private WButtonPaletteEntry GetWButtonThemePaletteEntry(
-            string key,
-            Color buttonColor,
-            Color? defaultTextColor
-        )
-        {
-            EnsureWButtonCustomColorDefaults();
-
-            if (
-                _wbuttonCustomColors != null
-                && _wbuttonCustomColors.TryGetValue(key, out WButtonCustomColor value)
-                && value != null
-            )
-            {
-                value.EnsureReadableText();
-                return new WButtonPaletteEntry(value.ButtonColor, value.TextColor);
-            }
-
-            Color textColor =
-                defaultTextColor ?? WButtonColorUtility.GetReadableTextColor(buttonColor);
-            return new WButtonPaletteEntry(buttonColor, textColor);
-        }
-
-        private WEnumToggleButtonsPaletteEntry GetWEnumToggleButtonsPaletteEntry(string colorKey)
-        {
-            EnsureWEnumToggleButtonsCustomColorDefaults();
-
-            string normalized = NormalizeWEnumToggleButtonsColorKey(colorKey);
-
-            if (
-                string.Equals(
-                    normalized,
-                    DefaultWEnumToggleButtonsColorKey,
-                    StringComparison.OrdinalIgnoreCase
-                )
-            )
-            {
-                return GetThemeAwareDefaultWEnumToggleButtonsPalette();
-            }
-
-            if (
-                string.Equals(
-                    normalized,
-                    WEnumToggleButtonsLightThemeColorKey,
-                    StringComparison.OrdinalIgnoreCase
-                )
-            )
-            {
-                return GetWEnumToggleButtonsThemePaletteEntry(
-                    WEnumToggleButtonsLightThemeColorKey,
-                    DefaultLightThemeEnumSelectedColor,
-                    DefaultLightThemeEnumSelectedTextColor,
-                    DefaultLightThemeEnumInactiveColor,
-                    DefaultLightThemeEnumInactiveTextColor
-                );
-            }
-
-            if (
-                string.Equals(
-                    normalized,
-                    WEnumToggleButtonsDarkThemeColorKey,
-                    StringComparison.OrdinalIgnoreCase
-                )
-            )
-            {
-                return GetWEnumToggleButtonsThemePaletteEntry(
-                    WEnumToggleButtonsDarkThemeColorKey,
-                    DefaultDarkThemeEnumSelectedColor,
-                    DefaultDarkThemeEnumSelectedTextColor,
-                    DefaultDarkThemeEnumInactiveColor,
-                    DefaultDarkThemeEnumInactiveTextColor
-                );
-            }
-
-            if (
-                _wenumToggleButtonsCustomColors != null
-                && _wenumToggleButtonsCustomColors.TryGetValue(
-                    normalized,
-                    out WEnumToggleButtonsCustomColor directValue
-                )
-                && directValue != null
-            )
-            {
-                directValue.EnsureReadableText();
-                return new WEnumToggleButtonsPaletteEntry(
-                    directValue.SelectedBackgroundColor,
-                    directValue.SelectedTextColor,
-                    directValue.InactiveBackgroundColor,
-                    directValue.InactiveTextColor
-                );
-            }
-
-            return GetThemeAwareDefaultWEnumToggleButtonsPalette();
-        }
-
-        private WEnumToggleButtonsPaletteEntry GetThemeAwareDefaultWEnumToggleButtonsPalette()
-        {
-            bool proSkin = EditorGUIUtility.isProSkin;
-            return proSkin
-                ? GetWEnumToggleButtonsThemePaletteEntry(
-                    WEnumToggleButtonsDarkThemeColorKey,
-                    DefaultDarkThemeEnumSelectedColor,
-                    DefaultDarkThemeEnumSelectedTextColor,
-                    DefaultDarkThemeEnumInactiveColor,
-                    DefaultDarkThemeEnumInactiveTextColor
-                )
-                : GetWEnumToggleButtonsThemePaletteEntry(
-                    WEnumToggleButtonsLightThemeColorKey,
-                    DefaultLightThemeEnumSelectedColor,
-                    DefaultLightThemeEnumSelectedTextColor,
-                    DefaultLightThemeEnumInactiveColor,
-                    DefaultLightThemeEnumInactiveTextColor
-                );
-        }
-
-        private WEnumToggleButtonsPaletteEntry GetWEnumToggleButtonsThemePaletteEntry(
-            string key,
-            Color selectedBackground,
-            Color? selectedTextDefault,
-            Color inactiveBackground,
-            Color? inactiveTextDefault
-        )
-        {
-            EnsureWEnumToggleButtonsCustomColorDefaults();
-
-            if (
-                _wenumToggleButtonsCustomColors != null
-                && _wenumToggleButtonsCustomColors.TryGetValue(
-                    key,
-                    out WEnumToggleButtonsCustomColor value
-                )
-                && value != null
-            )
-            {
-                value.EnsureReadableText();
-                return new WEnumToggleButtonsPaletteEntry(
-                    value.SelectedBackgroundColor,
-                    value.SelectedTextColor,
-                    value.InactiveBackgroundColor,
-                    value.InactiveTextColor
-                );
-            }
-
-            Color resolvedSelectedText =
-                selectedTextDefault ?? WButtonColorUtility.GetReadableTextColor(selectedBackground);
-            Color resolvedInactiveText =
-                inactiveTextDefault ?? WButtonColorUtility.GetReadableTextColor(inactiveBackground);
-
-            return new WEnumToggleButtonsPaletteEntry(
-                selectedBackground,
-                resolvedSelectedText,
-                inactiveBackground,
-                resolvedInactiveText
-            );
         }
 
         private static bool DrawSerializableTypeIgnorePatterns(
@@ -3441,43 +2425,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                     }
                 }
             }
-        }
-
-        /// <summary>
-        /// Returns a cached SerializedObject for the settings instance, creating one if needed.
-        /// Caching the SerializedObject preserves property expansion states (isExpanded)
-        /// across frames, preventing foldouts from unexpectedly re-expanding.
-        /// </summary>
-        internal static SerializedObject GetOrCreateCachedSerializedObject(
-            UnityHelpersSettings settings
-        )
-        {
-            if (settings == null)
-            {
-                _cachedSettingsSerializedObject = null;
-                return null;
-            }
-
-            if (
-                _cachedSettingsSerializedObject == null
-                || _cachedSettingsSerializedObject.targetObject == null
-                || _cachedSettingsSerializedObject.targetObject != settings
-            )
-            {
-                _cachedSettingsSerializedObject?.Dispose();
-                _cachedSettingsSerializedObject = new SerializedObject(settings);
-            }
-
-            return _cachedSettingsSerializedObject;
-        }
-
-        /// <summary>
-        /// Clears the cached SerializedObject for testing purposes.
-        /// </summary>
-        internal static void ClearCachedSerializedObjectForTests()
-        {
-            _cachedSettingsSerializedObject?.Dispose();
-            _cachedSettingsSerializedObject = null;
         }
 
         [SettingsProvider]
@@ -4813,6 +3760,1101 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             };
         }
 
+        /// <remarks>
+        /// One definition of "the same colour", shared with the style caches and the change notifier.
+        /// The 0.01 tolerance this used to apply is about two and a half 8-bit steps, so a colour the
+        /// user had visibly moved away from white still counted as an untouched factory default and
+        /// was overwritten by the auto-suggested palette.
+        /// </remarks>
+        private static bool ColorsApproximatelyEqual(Color left, Color right)
+        {
+            return ColorQuantization.AreSameColor(left, right);
+        }
+
+        private static UnityHelpersBufferSettingsAsset EnsureWaitInstructionBufferSettingsAsset()
+        {
+            if (_waitInstructionBufferSettingsAsset != null)
+            {
+                return _waitInstructionBufferSettingsAsset;
+            }
+
+            _waitInstructionBufferSettingsAsset =
+                AssetDatabase.LoadAssetAtPath<UnityHelpersBufferSettingsAsset>(
+                    UnityHelpersBufferSettingsAsset.AssetPath
+                );
+            if (_waitInstructionBufferSettingsAsset != null)
+            {
+                return _waitInstructionBufferSettingsAsset;
+            }
+
+            // Create parent folders through AssetDatabase so CreateAsset sees registered directories.
+            AssetDatabaseBatchHelper.EnsureAssetParentFolder(
+                UnityHelpersBufferSettingsAsset.AssetPath
+            );
+
+            UnityHelpersBufferSettingsAsset created =
+                CreateInstance<UnityHelpersBufferSettingsAsset>();
+            created.SyncFromRuntime();
+            AssetDatabase.CreateAsset(created, UnityHelpersBufferSettingsAsset.AssetPath);
+            AssetDatabase.SaveAssets();
+            _waitInstructionBufferSettingsAsset = created;
+            return _waitInstructionBufferSettingsAsset;
+        }
+
+        /// <summary>
+        /// Persists any modifications to disk.
+        /// </summary>
+        public void SaveSettings()
+        {
+            EnsureWButtonCustomColorDefaults();
+            EnsureWEnumToggleButtonsCustomColorDefaults();
+            ApplyRuntimeConfiguration();
+            Save(true);
+            OnSettingsSaved?.Invoke();
+        }
+
+        internal IReadOnlyList<string> GetSerializableTypeIgnorePatterns()
+        {
+            if (
+                _serializableTypeIgnorePatterns == null
+                || _serializableTypeIgnorePatterns.Count == 0
+            )
+            {
+                _serializableTypeIgnorePatternCache = Array.Empty<string>();
+                _serializableTypeIgnorePatternCacheVersion = 0;
+                return _serializableTypeIgnorePatternCache;
+            }
+
+            int version = ComputeSerializableTypePatternVersion();
+            if (version == _serializableTypeIgnorePatternCacheVersion)
+            {
+                return _serializableTypeIgnorePatternCache;
+            }
+
+            using PooledResource<List<string>> patternsLease = Buffers<string>.List.Get(
+                out List<string> patterns
+            );
+            using PooledResource<HashSet<string>> seenLease = Buffers<string>.HashSet.Get(
+                out HashSet<string> seen
+            );
+
+            foreach (SerializableTypeIgnorePattern entry in _serializableTypeIgnorePatterns)
+            {
+                if (entry == null)
+                {
+                    continue;
+                }
+
+                string pattern = entry.Pattern;
+                if (string.IsNullOrWhiteSpace(pattern))
+                {
+                    continue;
+                }
+
+                string trimmed = pattern.Trim();
+                if (seen.Add(trimmed))
+                {
+                    patterns.Add(trimmed);
+                }
+            }
+
+            _serializableTypeIgnorePatternCache =
+                patterns.Count == 0 ? Array.Empty<string>() : patterns.ToArray();
+            _serializableTypeIgnorePatternCacheVersion = version;
+            return _serializableTypeIgnorePatternCache;
+        }
+
+        /// <summary>
+        /// Ensures persisted data stays within valid range.
+        /// </summary>
+        internal void OnEnable()
+        {
+            _stringInListPageSize = Mathf.Clamp(
+                _stringInListPageSize <= 0 ? DefaultStringInListPageSize : _stringInListPageSize,
+                MinPageSize,
+                MaxPageSize
+            );
+            _serializableSetPageSize = Mathf.Clamp(
+                _serializableSetPageSize <= 0
+                    ? DefaultSerializableSetPageSize
+                    : _serializableSetPageSize,
+                MinPageSize,
+                MaxPageSize
+            );
+            _serializableDictionaryPageSize = Mathf.Clamp(
+                _serializableDictionaryPageSize <= 0
+                    ? DefaultSerializableDictionaryPageSize
+                    : _serializableDictionaryPageSize,
+                MinPageSize,
+                MaxSerializableDictionaryPageSize
+            );
+            _enumToggleButtonsPageSize = Mathf.Clamp(
+                _enumToggleButtonsPageSize <= 0
+                    ? DefaultEnumToggleButtonsPageSize
+                    : _enumToggleButtonsPageSize,
+                MinPageSize,
+                MaxPageSize
+            );
+            _wbuttonPageSize = Mathf.Clamp(
+                _wbuttonPageSize <= 0 ? DefaultWButtonPageSize : _wbuttonPageSize,
+                MinPageSize,
+                MaxPageSize
+            );
+            _wbuttonHistorySize = Mathf.Clamp(
+                _wbuttonHistorySize <= 0 ? DefaultWButtonHistorySize : _wbuttonHistorySize,
+                MinWButtonHistorySize,
+                MaxWButtonHistorySize
+            );
+            if (!Enum.IsDefined(typeof(WButtonActionsPlacement), _wbuttonActionsPlacement))
+            {
+                _wbuttonActionsPlacement = WButtonActionsPlacement.Top;
+            }
+
+            if (!Enum.IsDefined(typeof(WButtonFoldoutBehavior), _wbuttonFoldoutBehavior))
+            {
+                _wbuttonFoldoutBehavior = WButtonFoldoutBehavior.StartExpanded;
+            }
+            if (!Enum.IsDefined(typeof(WGroupAutoIncludeMode), _wgroupAutoIncludeMode))
+            {
+                _wgroupAutoIncludeMode = WGroupAutoIncludeMode.Infinite;
+            }
+            if (_wgroupAutoIncludeRowCount < MinWGroupAutoIncludeRowCount)
+            {
+                _wgroupAutoIncludeRowCount = DefaultWGroupAutoIncludeRowCount;
+            }
+            _wgroupAutoIncludeRowCount = Mathf.Clamp(
+                _wgroupAutoIncludeRowCount,
+                MinWGroupAutoIncludeRowCount,
+                MaxWGroupAutoIncludeRowCount
+            );
+            _wgroupFoldoutSpeed = Mathf.Clamp(
+                _wgroupFoldoutSpeed <= 0f ? DefaultFoldoutSpeed : _wgroupFoldoutSpeed,
+                MinFoldoutSpeed,
+                MaxFoldoutSpeed
+            );
+            _inlineEditorFoldoutSpeed = Mathf.Clamp(
+                _inlineEditorFoldoutSpeed <= 0f ? DefaultFoldoutSpeed : _inlineEditorFoldoutSpeed,
+                MinFoldoutSpeed,
+                MaxFoldoutSpeed
+            );
+            _wbuttonFoldoutSpeed = Mathf.Clamp(
+                _wbuttonFoldoutSpeed <= 0f ? DefaultFoldoutSpeed : _wbuttonFoldoutSpeed,
+                MinFoldoutSpeed,
+                MaxFoldoutSpeed
+            );
+            _serializableDictionaryFoldoutSpeed = Mathf.Clamp(
+                _serializableDictionaryFoldoutSpeed <= 0f
+                    ? DefaultFoldoutSpeed
+                    : _serializableDictionaryFoldoutSpeed,
+                MinFoldoutSpeed,
+                MaxFoldoutSpeed
+            );
+            _serializableSortedDictionaryFoldoutSpeed = Mathf.Clamp(
+                _serializableSortedDictionaryFoldoutSpeed <= 0f
+                    ? DefaultFoldoutSpeed
+                    : _serializableSortedDictionaryFoldoutSpeed,
+                MinFoldoutSpeed,
+                MaxFoldoutSpeed
+            );
+            _serializableSetFoldoutSpeed = Mathf.Clamp(
+                _serializableSetFoldoutSpeed <= 0f
+                    ? DefaultFoldoutSpeed
+                    : _serializableSetFoldoutSpeed,
+                MinFoldoutSpeed,
+                MaxFoldoutSpeed
+            );
+            _serializableSortedSetFoldoutSpeed = Mathf.Clamp(
+                _serializableSortedSetFoldoutSpeed <= 0f
+                    ? DefaultFoldoutSpeed
+                    : _serializableSortedSetFoldoutSpeed,
+                MinFoldoutSpeed,
+                MaxFoldoutSpeed
+            );
+            _detectAssetChangeLoopWindowSeconds = Mathf.Clamp(
+                _detectAssetChangeLoopWindowSeconds <= 0f
+                    ? DefaultDetectAssetChangeLoopWindowSeconds
+                    : _detectAssetChangeLoopWindowSeconds,
+                MinDetectAssetChangeLoopWindowSeconds,
+                MaxDetectAssetChangeLoopWindowSeconds
+            );
+
+            if (!string.IsNullOrEmpty(_failedTestsOutputDirectory))
+            {
+                string validatedDirectory = GetFailedTestsOutputDirectory();
+                if (
+                    !string.Equals(
+                        _failedTestsOutputDirectory,
+                        validatedDirectory,
+                        StringComparison.Ordinal
+                    )
+                )
+                {
+                    _failedTestsOutputDirectory = validatedDirectory;
+                    SaveSettings();
+                }
+            }
+            if (EnsureFoldoutTweenDefaults())
+            {
+                SaveSettings();
+            }
+            if (EnsureWButtonCustomColorDefaults())
+            {
+                SaveSettings();
+            }
+            if (EnsureWEnumToggleButtonsCustomColorDefaults())
+            {
+                SaveSettings();
+            }
+
+            bool shouldApplyRuntimeConfig = true;
+            if (EnsureSerializableTypePatternDefaults())
+            {
+                SaveSettings();
+                shouldApplyRuntimeConfig = false;
+            }
+            if (EnsureSerializableSetTweenDefaults())
+            {
+                SaveSettings();
+                shouldApplyRuntimeConfig = false;
+            }
+            if (shouldApplyRuntimeConfig)
+            {
+                ApplyRuntimeConfiguration();
+            }
+        }
+
+        internal bool EnsureWButtonCustomColorDefaults()
+        {
+            _wbuttonCustomColors ??= new WButtonCustomColorDictionary();
+
+            bool changed = false;
+            changed |= MigrateLegacyWButtonPalette();
+
+            // Migrate explicit-color flags before deriving colors can overwrite authored choices.
+            foreach (WButtonCustomColor stored in _wbuttonCustomColors.Values)
+            {
+                if (stored != null)
+                {
+                    changed |= stored.MigrateChosenTextColor();
+                }
+            }
+
+            if (
+                _wbuttonCustomColors.TryGetValue(
+                    DefaultWButtonColorKey,
+                    out WButtonCustomColor legacyDefault
+                )
+            )
+            {
+                _wbuttonCustomColors.TryAdd(WButtonLegacyColorKey, legacyDefault);
+                _wbuttonCustomColors.Remove(DefaultWButtonColorKey);
+                changed = true;
+            }
+
+            if (!_wbuttonCustomColors.ContainsKey(WButtonLegacyColorKey))
+            {
+                WButtonCustomColor legacyColor = new()
+                {
+                    ButtonColor = DefaultColorKeyButtonColor,
+                    TextColor = WButtonColorUtility.GetReadableTextColor(
+                        DefaultColorKeyButtonColor
+                    ),
+                };
+                _wbuttonCustomColors[WButtonLegacyColorKey] = legacyColor;
+                changed = true;
+            }
+
+            changed |= EnsureWButtonThemeEntry(
+                WButtonLightThemeColorKey,
+                DefaultLightThemeButtonColor,
+                Color.black
+            );
+            changed |= EnsureWButtonThemeEntry(
+                WButtonDarkThemeColorKey,
+                DefaultDarkThemeButtonColor,
+                Color.white
+            );
+
+            int paletteIndex = 0;
+            foreach (
+                KeyValuePair<string, WButtonCustomColor> entry in _wbuttonCustomColors.ToArray()
+            )
+            {
+                WButtonCustomColor value = entry.Value;
+                if (value == null)
+                {
+                    value = new WButtonCustomColor();
+                    _wbuttonCustomColors[entry.Key] = value;
+                    value.ButtonColor = DefaultColorKeyButtonColor;
+                    value.EnsureReadableText();
+                    changed = true;
+                }
+
+                if (IsReservedWButtonColorKey(entry.Key))
+                {
+                    value.EnsureReadableText();
+                    continue;
+                }
+
+                if (ShouldSkipWButtonAutoSuggest(entry.Key))
+                {
+                    continue;
+                }
+
+                // Only entirely zero color means unset; opaque black is a valid authored choice.
+                bool needsSuggestion =
+                    value.ButtonColor == default
+                    || (
+                        ColorsApproximatelyEqual(value.ButtonColor, Color.white)
+                        && (
+                            !value.HasChosenTextColor
+                            || ColorsApproximatelyEqual(value.TextColor, Color.black)
+                        )
+                    );
+
+                if (needsSuggestion)
+                {
+                    Color suggested = WButtonColorUtility.SuggestPaletteColor(paletteIndex);
+                    value.ButtonColor = suggested;
+                    value.TextColor = WButtonColorUtility.GetReadableTextColor(suggested);
+                    changed = true;
+                }
+                else
+                {
+                    Color previousText = value.TextColor;
+                    value.EnsureReadableText();
+                    if (!ColorsApproximatelyEqual(value.TextColor, previousText))
+                    {
+                        changed = true;
+                    }
+                }
+
+                paletteIndex++;
+            }
+
+            return changed;
+        }
+
+        private void InvalidateSerializableTypePatternCache()
+        {
+            _serializableTypeIgnorePatternCache = Array.Empty<string>();
+            _serializableTypeIgnorePatternCacheVersion = int.MinValue;
+        }
+
+        private int ComputeSerializableTypePatternVersion()
+        {
+            if (
+                _serializableTypeIgnorePatterns == null
+                || _serializableTypeIgnorePatterns.Count == 0
+            )
+            {
+                return 0;
+            }
+
+            HashCode hash = new HashCode();
+            hash.Add(_serializableTypeIgnorePatterns.Count);
+            foreach (SerializableTypeIgnorePattern entry in _serializableTypeIgnorePatterns)
+            {
+                string trimmed = entry?.Pattern?.Trim() ?? string.Empty;
+                hash.Add(trimmed);
+            }
+
+            return hash.ToHashCode();
+        }
+
+        private void ApplyRuntimeConfiguration()
+        {
+            IReadOnlyList<string> patterns = GetSerializableTypeIgnorePatterns();
+            SerializableTypeCatalog.ConfigureTypeNameIgnorePatterns(patterns);
+            SerializableTypeCatalog.WarmPatternStats(patterns);
+
+            ApplyPoolPurgingSettingsToRuntime();
+        }
+
+        private bool EnsureSerializableTypePatternDefaults()
+        {
+            _serializableTypeIgnorePatterns ??= new List<SerializableTypeIgnorePattern>();
+
+            if (_serializableTypePatternsInitialized)
+            {
+                return false;
+            }
+
+            if (_serializableTypeIgnorePatterns.Count == 0)
+            {
+                IReadOnlyList<string> defaults = SerializableTypeCatalog.GetDefaultIgnorePatterns();
+                for (int index = 0; index < defaults.Count; index++)
+                {
+                    _serializableTypeIgnorePatterns.Add(
+                        new SerializableTypeIgnorePattern(defaults[index])
+                    );
+                }
+                InvalidateSerializableTypePatternCache();
+            }
+
+            bool changed = !_serializableTypePatternsInitialized;
+            _serializableTypePatternsInitialized = true;
+            return changed;
+        }
+
+        private bool EnsureFoldoutTweenDefaults()
+        {
+            if (_foldoutTweenSettingsInitialized)
+            {
+                return false;
+            }
+
+            if (!_wbuttonFoldoutTweenEnabled)
+            {
+                _wbuttonFoldoutTweenEnabled = true;
+            }
+
+            if (!_serializableDictionaryFoldoutTweenEnabled)
+            {
+                _serializableDictionaryFoldoutTweenEnabled = true;
+            }
+
+            if (!_serializableSortedDictionaryFoldoutTweenEnabled)
+            {
+                _serializableSortedDictionaryFoldoutTweenEnabled = true;
+            }
+
+            if (!_serializableSetFoldoutTweenEnabled)
+            {
+                _serializableSetFoldoutTweenEnabled = true;
+            }
+
+            if (!_serializableSortedSetFoldoutTweenEnabled)
+            {
+                _serializableSortedSetFoldoutTweenEnabled = true;
+            }
+
+            _foldoutTweenSettingsInitialized = true;
+            return true;
+        }
+
+        private bool EnsureSerializableSetTweenDefaults()
+        {
+            if (_serializableSetDuplicateTweenSettingsInitialized)
+            {
+                return false;
+            }
+
+            _serializableSetDuplicateTweenEnabled =
+                _duplicateRowAnimationMode == DuplicateRowAnimationMode.Tween;
+            _serializableSetDuplicateTweenCycles =
+                _duplicateRowTweenCycles != 0
+                    ? _duplicateRowTweenCycles
+                    : DefaultDuplicateTweenCycles;
+            _serializableSetDuplicateTweenSettingsInitialized = true;
+            return true;
+        }
+
+        private bool ShouldSkipWButtonAutoSuggest(string key)
+        {
+            return ShouldSkipAutoSuggest(_wbuttonCustomColorSkipAutoSuggest, key);
+        }
+
+        // Nullable defaults distinguish absent choices from explicitly supplied black.
+        private bool EnsureWButtonThemeEntry(string key, Color buttonColor, Color? defaultTextColor)
+        {
+            if (
+                _wbuttonCustomColors.TryGetValue(key, out WButtonCustomColor existing)
+                && existing != null
+            )
+            {
+                existing.EnsureReadableText();
+                return false;
+            }
+
+            Color textColor =
+                defaultTextColor ?? WButtonColorUtility.GetReadableTextColor(buttonColor);
+            WButtonCustomColor themeColor = new()
+            {
+                ButtonColor = buttonColor,
+                TextColor = textColor,
+            };
+            themeColor.EnsureReadableText();
+            _wbuttonCustomColors[key] = themeColor;
+            return true;
+        }
+
+        private bool MigrateLegacyWButtonPalette()
+        {
+#pragma warning disable CS0618 // Type or member is obsolete
+            if (_legacyWButtonPriorityColors == null || _legacyWButtonPriorityColors.Count == 0)
+            {
+                return false;
+            }
+
+            bool changed = false;
+            foreach (WButtonPriorityColor legacy in _legacyWButtonPriorityColors)
+            {
+#pragma warning restore CS0618 // Type or member is obsolete
+                if (legacy == null)
+                {
+                    continue;
+                }
+
+                string normalizedKey = NormalizeColorKey(legacy.Priority);
+                WButtonCustomColor color = new()
+                {
+                    ButtonColor = legacy.ButtonColor,
+                    // Legacy entries lack a presence flag, so only entirely zero color can mean unset.
+                    TextColor =
+                        legacy.TextColor == default
+                            ? WButtonColorUtility.GetReadableTextColor(legacy.ButtonColor)
+                            : legacy.TextColor,
+                };
+                _wbuttonCustomColors[normalizedKey] = color;
+                changed = true;
+            }
+
+            _legacyWButtonPriorityColors.Clear();
+            return changed;
+        }
+
+        private bool EnsureWEnumToggleButtonsCustomColorDefaults()
+        {
+            if (_wenumToggleButtonsCustomColors == null)
+            {
+                _wenumToggleButtonsCustomColors = new WEnumToggleButtonsCustomColorDictionary();
+            }
+
+            bool changed = false;
+
+            // Migrate before deriving colors to preserve authored choices.
+            foreach (WEnumToggleButtonsCustomColor stored in _wenumToggleButtonsCustomColors.Values)
+            {
+                if (stored != null)
+                {
+                    changed |= stored.MigrateChosenTextColors();
+                }
+            }
+
+            if (!_wenumToggleButtonsCustomColors.ContainsKey(DefaultWEnumToggleButtonsColorKey))
+            {
+                bool proSkin = EditorGUIUtility.isProSkin;
+                WEnumToggleButtonsCustomColor defaultColor = new()
+                {
+                    SelectedBackgroundColor = proSkin
+                        ? DefaultDarkThemeEnumSelectedColor
+                        : DefaultLightThemeEnumSelectedColor,
+                    SelectedTextColor = proSkin
+                        ? DefaultDarkThemeEnumSelectedTextColor
+                        : DefaultLightThemeEnumSelectedTextColor,
+                    InactiveBackgroundColor = proSkin
+                        ? DefaultDarkThemeEnumInactiveColor
+                        : DefaultLightThemeEnumInactiveColor,
+                    InactiveTextColor = proSkin
+                        ? DefaultDarkThemeEnumInactiveTextColor
+                        : DefaultLightThemeEnumInactiveTextColor,
+                };
+                defaultColor.EnsureReadableText();
+                _wenumToggleButtonsCustomColors[DefaultWEnumToggleButtonsColorKey] = defaultColor;
+                changed = true;
+            }
+
+            changed |= EnsureWEnumToggleButtonsThemeEntry(
+                WEnumToggleButtonsLightThemeColorKey,
+                DefaultLightThemeEnumSelectedColor,
+                DefaultLightThemeEnumSelectedTextColor,
+                DefaultLightThemeEnumInactiveColor,
+                DefaultLightThemeEnumInactiveTextColor
+            );
+            changed |= EnsureWEnumToggleButtonsThemeEntry(
+                WEnumToggleButtonsDarkThemeColorKey,
+                DefaultDarkThemeEnumSelectedColor,
+                DefaultDarkThemeEnumSelectedTextColor,
+                DefaultDarkThemeEnumInactiveColor,
+                DefaultDarkThemeEnumInactiveTextColor
+            );
+
+            foreach (
+                KeyValuePair<
+                    string,
+                    WEnumToggleButtonsCustomColor
+                > entry in _wenumToggleButtonsCustomColors
+            )
+            {
+                WEnumToggleButtonsCustomColor value = entry.Value;
+                if (value == null)
+                {
+                    value = new WEnumToggleButtonsCustomColor();
+                    _wenumToggleButtonsCustomColors[entry.Key] = value;
+                    changed = true;
+                }
+
+                Color previousSelectedText = value.SelectedTextColor;
+                Color previousInactiveText = value.InactiveTextColor;
+                value.EnsureReadableText();
+
+                if (!ColorsApproximatelyEqual(value.SelectedTextColor, previousSelectedText))
+                {
+                    changed = true;
+                }
+
+                if (!ColorsApproximatelyEqual(value.InactiveTextColor, previousInactiveText))
+                {
+                    changed = true;
+                }
+            }
+
+            return changed;
+        }
+
+        private bool EnsureWEnumToggleButtonsThemeEntry(
+            string key,
+            Color selectedBackground,
+            Color? selectedTextDefault,
+            Color inactiveBackground,
+            Color? inactiveTextDefault
+        )
+        {
+            if (
+                _wenumToggleButtonsCustomColors.TryGetValue(
+                    key,
+                    out WEnumToggleButtonsCustomColor existing
+                )
+                && existing != null
+            )
+            {
+                existing.EnsureReadableText();
+                return false;
+            }
+
+            Color resolvedSelectedText =
+                selectedTextDefault ?? WButtonColorUtility.GetReadableTextColor(selectedBackground);
+            Color resolvedInactiveText =
+                inactiveTextDefault ?? WButtonColorUtility.GetReadableTextColor(inactiveBackground);
+
+            WEnumToggleButtonsCustomColor themeColor = new()
+            {
+                SelectedBackgroundColor = selectedBackground,
+                SelectedTextColor = resolvedSelectedText,
+                InactiveBackgroundColor = inactiveBackground,
+                InactiveTextColor = resolvedInactiveText,
+            };
+            themeColor.EnsureReadableText();
+            _wenumToggleButtonsCustomColors[key] = themeColor;
+            return true;
+        }
+
+        private bool ContainsColorKey(string colorKey)
+        {
+            if (string.IsNullOrWhiteSpace(colorKey))
+            {
+                return true;
+            }
+
+            if (IsReservedWButtonColorKey(colorKey))
+            {
+                return true;
+            }
+
+            if (_wbuttonCustomColors == null || _wbuttonCustomColors.Count == 0)
+            {
+                return false;
+            }
+
+            string normalized = string.IsNullOrWhiteSpace(colorKey)
+                ? DefaultWButtonColorKey
+                : colorKey.Trim();
+
+            return _wbuttonCustomColors.ContainsKey(normalized);
+        }
+
+        private bool ContainsWEnumToggleButtonsColorKey(string colorKey)
+        {
+            if (string.IsNullOrWhiteSpace(colorKey))
+            {
+                return true;
+            }
+
+            if (IsReservedWEnumToggleButtonsColorKey(colorKey))
+            {
+                return true;
+            }
+
+            if (
+                _wenumToggleButtonsCustomColors == null
+                || _wenumToggleButtonsCustomColors.Count == 0
+            )
+            {
+                return false;
+            }
+
+            string normalized = colorKey.Trim();
+
+            return _wenumToggleButtonsCustomColors.ContainsKey(normalized);
+        }
+
+        private string NormalizeColorKey(string colorKey)
+        {
+            if (string.IsNullOrWhiteSpace(colorKey))
+            {
+                return DefaultWButtonColorKey;
+            }
+
+            if (IsReservedWButtonColorKey(colorKey))
+            {
+                if (
+                    string.Equals(
+                        colorKey,
+                        WButtonLightThemeColorKey,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
+                {
+                    return WButtonLightThemeColorKey;
+                }
+
+                if (
+                    string.Equals(
+                        colorKey,
+                        WButtonDarkThemeColorKey,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
+                {
+                    return WButtonDarkThemeColorKey;
+                }
+
+                if (
+                    string.Equals(
+                        colorKey,
+                        WButtonLegacyColorKey,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
+                {
+                    return WButtonLegacyColorKey;
+                }
+
+                return DefaultWButtonColorKey;
+            }
+
+            string normalized = colorKey.Trim();
+
+            // Case-insensitive dictionary lookup already resolves differently cased keys.
+            return normalized;
+        }
+
+        private void RegisterPaletteManualEditInternal(string propertyPath, string key)
+        {
+            string trimmedKey = key?.Trim();
+            if (string.IsNullOrWhiteSpace(trimmedKey))
+            {
+                return;
+            }
+
+            if (
+                string.Equals(
+                    propertyPath,
+                    SerializedPropertyNames.WButtonCustomColors,
+                    StringComparison.Ordinal
+                )
+            )
+            {
+                _wbuttonCustomColorSkipAutoSuggest ??= new HashSet<string>(
+                    StringComparer.OrdinalIgnoreCase
+                );
+                _wbuttonCustomColorSkipAutoSuggest.Add(trimmedKey);
+            }
+        }
+
+        private string NormalizeWEnumToggleButtonsColorKey(string colorKey)
+        {
+            if (string.IsNullOrWhiteSpace(colorKey))
+            {
+                return DefaultWEnumToggleButtonsColorKey;
+            }
+
+            if (IsReservedWEnumToggleButtonsColorKey(colorKey))
+            {
+                if (
+                    string.Equals(
+                        colorKey,
+                        WEnumToggleButtonsLightThemeColorKey,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
+                {
+                    return WEnumToggleButtonsLightThemeColorKey;
+                }
+
+                if (
+                    string.Equals(
+                        colorKey,
+                        WEnumToggleButtonsDarkThemeColorKey,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
+                {
+                    return WEnumToggleButtonsDarkThemeColorKey;
+                }
+
+                return DefaultWEnumToggleButtonsColorKey;
+            }
+
+            // Case-insensitive dictionary lookup already resolves differently cased keys.
+            return colorKey.Trim();
+        }
+
+        private WButtonPaletteEntry GetWButtonPaletteEntry(string colorKey)
+        {
+            EnsureWButtonCustomColorDefaults();
+
+            string normalized = NormalizeColorKey(colorKey);
+
+            if (
+                string.Equals(
+                    normalized,
+                    DefaultWButtonColorKey,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+            {
+                return GetThemeAwareDefaultWButtonPalette();
+            }
+
+            if (
+                string.Equals(
+                    normalized,
+                    WButtonLightThemeColorKey,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+            {
+                return GetWButtonThemePaletteEntry(
+                    WButtonLightThemeColorKey,
+                    DefaultLightThemeButtonColor,
+                    Color.black
+                );
+            }
+
+            if (
+                string.Equals(
+                    normalized,
+                    WButtonDarkThemeColorKey,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+            {
+                return GetWButtonThemePaletteEntry(
+                    WButtonDarkThemeColorKey,
+                    DefaultDarkThemeButtonColor,
+                    Color.white
+                );
+            }
+
+            if (
+                string.Equals(normalized, WButtonLegacyColorKey, StringComparison.OrdinalIgnoreCase)
+            )
+            {
+                if (
+                    _wbuttonCustomColors != null
+                    && _wbuttonCustomColors.TryGetValue(
+                        WButtonLegacyColorKey,
+                        out WButtonCustomColor legacy
+                    )
+                    && legacy != null
+                )
+                {
+                    legacy.EnsureReadableText();
+                    return new WButtonPaletteEntry(legacy.ButtonColor, legacy.TextColor);
+                }
+
+                Color fallbackButton = DefaultColorKeyButtonColor;
+                Color fallbackText = WButtonColorUtility.GetReadableTextColor(fallbackButton);
+                return new WButtonPaletteEntry(fallbackButton, fallbackText);
+            }
+
+            if (_wbuttonCustomColors is not { Count: > 0 })
+            {
+                return GetThemeAwareDefaultWButtonPalette();
+            }
+
+            if (
+                _wbuttonCustomColors.TryGetValue(normalized, out WButtonCustomColor directValue)
+                && directValue != null
+            )
+            {
+                directValue.EnsureReadableText();
+                return new WButtonPaletteEntry(directValue.ButtonColor, directValue.TextColor);
+            }
+
+            return GetThemeAwareDefaultWButtonPalette();
+        }
+
+        private WButtonPaletteEntry GetThemeAwareDefaultWButtonPalette()
+        {
+            string themeKey = EditorGUIUtility.isProSkin
+                ? WButtonDarkThemeColorKey
+                : WButtonLightThemeColorKey;
+            Color fallbackButton = EditorGUIUtility.isProSkin
+                ? DefaultDarkThemeButtonColor
+                : DefaultLightThemeButtonColor;
+            Color fallbackText = EditorGUIUtility.isProSkin ? Color.white : Color.black;
+            return GetWButtonThemePaletteEntry(themeKey, fallbackButton, fallbackText);
+        }
+
+        private WButtonPaletteEntry GetWButtonThemePaletteEntry(
+            string key,
+            Color buttonColor,
+            Color? defaultTextColor
+        )
+        {
+            EnsureWButtonCustomColorDefaults();
+
+            if (
+                _wbuttonCustomColors != null
+                && _wbuttonCustomColors.TryGetValue(key, out WButtonCustomColor value)
+                && value != null
+            )
+            {
+                value.EnsureReadableText();
+                return new WButtonPaletteEntry(value.ButtonColor, value.TextColor);
+            }
+
+            Color textColor =
+                defaultTextColor ?? WButtonColorUtility.GetReadableTextColor(buttonColor);
+            return new WButtonPaletteEntry(buttonColor, textColor);
+        }
+
+        private WEnumToggleButtonsPaletteEntry GetWEnumToggleButtonsPaletteEntry(string colorKey)
+        {
+            EnsureWEnumToggleButtonsCustomColorDefaults();
+
+            string normalized = NormalizeWEnumToggleButtonsColorKey(colorKey);
+
+            if (
+                string.Equals(
+                    normalized,
+                    DefaultWEnumToggleButtonsColorKey,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+            {
+                return GetThemeAwareDefaultWEnumToggleButtonsPalette();
+            }
+
+            if (
+                string.Equals(
+                    normalized,
+                    WEnumToggleButtonsLightThemeColorKey,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+            {
+                return GetWEnumToggleButtonsThemePaletteEntry(
+                    WEnumToggleButtonsLightThemeColorKey,
+                    DefaultLightThemeEnumSelectedColor,
+                    DefaultLightThemeEnumSelectedTextColor,
+                    DefaultLightThemeEnumInactiveColor,
+                    DefaultLightThemeEnumInactiveTextColor
+                );
+            }
+
+            if (
+                string.Equals(
+                    normalized,
+                    WEnumToggleButtonsDarkThemeColorKey,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+            {
+                return GetWEnumToggleButtonsThemePaletteEntry(
+                    WEnumToggleButtonsDarkThemeColorKey,
+                    DefaultDarkThemeEnumSelectedColor,
+                    DefaultDarkThemeEnumSelectedTextColor,
+                    DefaultDarkThemeEnumInactiveColor,
+                    DefaultDarkThemeEnumInactiveTextColor
+                );
+            }
+
+            if (
+                _wenumToggleButtonsCustomColors != null
+                && _wenumToggleButtonsCustomColors.TryGetValue(
+                    normalized,
+                    out WEnumToggleButtonsCustomColor directValue
+                )
+                && directValue != null
+            )
+            {
+                directValue.EnsureReadableText();
+                return new WEnumToggleButtonsPaletteEntry(
+                    directValue.SelectedBackgroundColor,
+                    directValue.SelectedTextColor,
+                    directValue.InactiveBackgroundColor,
+                    directValue.InactiveTextColor
+                );
+            }
+
+            return GetThemeAwareDefaultWEnumToggleButtonsPalette();
+        }
+
+        private WEnumToggleButtonsPaletteEntry GetThemeAwareDefaultWEnumToggleButtonsPalette()
+        {
+            bool proSkin = EditorGUIUtility.isProSkin;
+            return proSkin
+                ? GetWEnumToggleButtonsThemePaletteEntry(
+                    WEnumToggleButtonsDarkThemeColorKey,
+                    DefaultDarkThemeEnumSelectedColor,
+                    DefaultDarkThemeEnumSelectedTextColor,
+                    DefaultDarkThemeEnumInactiveColor,
+                    DefaultDarkThemeEnumInactiveTextColor
+                )
+                : GetWEnumToggleButtonsThemePaletteEntry(
+                    WEnumToggleButtonsLightThemeColorKey,
+                    DefaultLightThemeEnumSelectedColor,
+                    DefaultLightThemeEnumSelectedTextColor,
+                    DefaultLightThemeEnumInactiveColor,
+                    DefaultLightThemeEnumInactiveTextColor
+                );
+        }
+
+        private WEnumToggleButtonsPaletteEntry GetWEnumToggleButtonsThemePaletteEntry(
+            string key,
+            Color selectedBackground,
+            Color? selectedTextDefault,
+            Color inactiveBackground,
+            Color? inactiveTextDefault
+        )
+        {
+            EnsureWEnumToggleButtonsCustomColorDefaults();
+
+            if (
+                _wenumToggleButtonsCustomColors != null
+                && _wenumToggleButtonsCustomColors.TryGetValue(
+                    key,
+                    out WEnumToggleButtonsCustomColor value
+                )
+                && value != null
+            )
+            {
+                value.EnsureReadableText();
+                return new WEnumToggleButtonsPaletteEntry(
+                    value.SelectedBackgroundColor,
+                    value.SelectedTextColor,
+                    value.InactiveBackgroundColor,
+                    value.InactiveTextColor
+                );
+            }
+
+            Color resolvedSelectedText =
+                selectedTextDefault ?? WButtonColorUtility.GetReadableTextColor(selectedBackground);
+            Color resolvedInactiveText =
+                inactiveTextDefault ?? WButtonColorUtility.GetReadableTextColor(inactiveBackground);
+
+            return new WEnumToggleButtonsPaletteEntry(
+                selectedBackground,
+                resolvedSelectedText,
+                inactiveBackground,
+                resolvedInactiveText
+            );
+        }
+
         private void EnsureWaitInstructionBufferDefaultsInitialized()
         {
             if (_waitInstructionBufferDefaultsInitialized)
@@ -4933,47 +4975,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             }
         }
 
-        /// <remarks>
-        /// One definition of "the same colour", shared with the style caches and the change notifier.
-        /// The 0.01 tolerance this used to apply is about two and a half 8-bit steps, so a colour the
-        /// user had visibly moved away from white still counted as an untouched factory default and
-        /// was overwritten by the auto-suggested palette.
-        /// </remarks>
-        private static bool ColorsApproximatelyEqual(Color left, Color right)
-        {
-            return ColorQuantization.AreSameColor(left, right);
-        }
-
-        private static UnityHelpersBufferSettingsAsset EnsureWaitInstructionBufferSettingsAsset()
-        {
-            if (_waitInstructionBufferSettingsAsset != null)
-            {
-                return _waitInstructionBufferSettingsAsset;
-            }
-
-            _waitInstructionBufferSettingsAsset =
-                AssetDatabase.LoadAssetAtPath<UnityHelpersBufferSettingsAsset>(
-                    UnityHelpersBufferSettingsAsset.AssetPath
-                );
-            if (_waitInstructionBufferSettingsAsset != null)
-            {
-                return _waitInstructionBufferSettingsAsset;
-            }
-
-            // Create parent folders through AssetDatabase so CreateAsset sees registered directories.
-            AssetDatabaseBatchHelper.EnsureAssetParentFolder(
-                UnityHelpersBufferSettingsAsset.AssetPath
-            );
-
-            UnityHelpersBufferSettingsAsset created =
-                CreateInstance<UnityHelpersBufferSettingsAsset>();
-            created.SyncFromRuntime();
-            AssetDatabase.CreateAsset(created, UnityHelpersBufferSettingsAsset.AssetPath);
-            AssetDatabase.SaveAssets();
-            _waitInstructionBufferSettingsAsset = created;
-            return _waitInstructionBufferSettingsAsset;
-        }
-
         public enum WButtonActionsPlacement
         {
             Top = 0,
@@ -5003,32 +5004,40 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
 
         public readonly struct WGroupAutoIncludeConfiguration
         {
+            public WGroupAutoIncludeMode Mode { get; }
+
+            public int RowCount { get; }
+
             public WGroupAutoIncludeConfiguration(WGroupAutoIncludeMode mode, int rowCount)
             {
                 Mode = mode;
                 RowCount = rowCount < 0 ? 0 : rowCount;
             }
-
-            public WGroupAutoIncludeMode Mode { get; }
-
-            public int RowCount { get; }
         }
 
         public readonly struct WButtonPaletteEntry
         {
+            public Color ButtonColor { get; }
+
+            public Color TextColor { get; }
+
             public WButtonPaletteEntry(Color buttonColor, Color textColor)
             {
                 ButtonColor = buttonColor;
                 TextColor = textColor;
             }
-
-            public Color ButtonColor { get; }
-
-            public Color TextColor { get; }
         }
 
         public readonly struct WEnumToggleButtonsPaletteEntry
         {
+            public Color SelectedBackgroundColor { get; }
+
+            public Color SelectedTextColor { get; }
+
+            public Color InactiveBackgroundColor { get; }
+
+            public Color InactiveTextColor { get; }
+
             public WEnumToggleButtonsPaletteEntry(
                 Color selectedBackgroundColor,
                 Color selectedTextColor,
@@ -5041,14 +5050,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 InactiveBackgroundColor = inactiveBackgroundColor;
                 InactiveTextColor = inactiveTextColor;
             }
-
-            public Color SelectedBackgroundColor { get; }
-
-            public Color SelectedTextColor { get; }
-
-            public Color InactiveBackgroundColor { get; }
-
-            public Color InactiveTextColor { get; }
         }
 
         public enum DuplicateRowAnimationMode
@@ -5062,6 +5063,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         [Serializable]
         internal sealed class SerializableTypeIgnorePattern
         {
+            public string Pattern
+            {
+                get => _pattern ?? string.Empty;
+                set => _pattern = value ?? string.Empty;
+            }
+
             [FormerlySerializedAs("pattern")]
             [SerializeField]
             internal string _pattern = string.Empty;
@@ -5072,29 +5079,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             {
                 Pattern = pattern;
             }
-
-            public string Pattern
-            {
-                get => _pattern ?? string.Empty;
-                set => _pattern = value ?? string.Empty;
-            }
         }
 
         [Serializable]
         internal sealed class WButtonCustomColor
         {
-            [FormerlySerializedAs("buttonColor")]
-            [SerializeField]
-            internal Color _buttonColor = Color.white;
-
-            [FormerlySerializedAs("textColor")]
-            [SerializeField]
-            internal Color _textColor;
-
-            // Track presence separately because every Color value, including black and transparent, can be an authored choice.
-            [SerializeField]
-            internal bool _hasTextColor;
-
             public Color ButtonColor
             {
                 get => _buttonColor;
@@ -5113,6 +5102,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
 
             /// <summary>Whether someone chose this entry's text colour rather than deriving it.</summary>
             internal bool HasChosenTextColor => _hasTextColor;
+
+            [FormerlySerializedAs("buttonColor")]
+            [SerializeField]
+            internal Color _buttonColor = Color.white;
+
+            [FormerlySerializedAs("textColor")]
+            [SerializeField]
+            internal Color _textColor;
+
+            // Track presence separately because every Color value, including black and transparent, can be an authored choice.
+            [SerializeField]
+            internal bool _hasTextColor;
 
             /// <summary>Derives a readable text colour for an entry that has not chosen one.</summary>
             /// <remarks>
@@ -5164,30 +5165,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         [Serializable]
         internal sealed class WEnumToggleButtonsCustomColor
         {
-            [FormerlySerializedAs("selectedBackgroundColor")]
-            [SerializeField]
-            internal Color _selectedBackgroundColor = DefaultColorKeyButtonColor;
-
-            [FormerlySerializedAs("selectedTextColor")]
-            [SerializeField]
-            internal Color _selectedTextColor;
-
-            /// <summary>Whether the selected text colour was chosen rather than derived.</summary>
-            [SerializeField]
-            internal bool _hasSelectedTextColor;
-
-            [FormerlySerializedAs("inactiveBackgroundColor")]
-            [SerializeField]
-            internal Color _inactiveBackgroundColor = DefaultLightThemeButtonColor;
-
-            [FormerlySerializedAs("inactiveTextColor")]
-            [SerializeField]
-            internal Color _inactiveTextColor;
-
-            /// <summary>Whether the inactive text colour was chosen rather than derived.</summary>
-            [SerializeField]
-            internal bool _hasInactiveTextColor;
-
             public Color SelectedBackgroundColor
             {
                 get => _selectedBackgroundColor;
@@ -5219,6 +5196,30 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                     _hasInactiveTextColor = true;
                 }
             }
+
+            [FormerlySerializedAs("selectedBackgroundColor")]
+            [SerializeField]
+            internal Color _selectedBackgroundColor = DefaultColorKeyButtonColor;
+
+            [FormerlySerializedAs("selectedTextColor")]
+            [SerializeField]
+            internal Color _selectedTextColor;
+
+            /// <summary>Whether the selected text colour was chosen rather than derived.</summary>
+            [SerializeField]
+            internal bool _hasSelectedTextColor;
+
+            [FormerlySerializedAs("inactiveBackgroundColor")]
+            [SerializeField]
+            internal Color _inactiveBackgroundColor = DefaultLightThemeButtonColor;
+
+            [FormerlySerializedAs("inactiveTextColor")]
+            [SerializeField]
+            internal Color _inactiveTextColor;
+
+            /// <summary>Whether the inactive text colour was chosen rather than derived.</summary>
+            [SerializeField]
+            internal bool _hasInactiveTextColor;
 
             /// <summary>Derives readable text colours for the halves that chose none.</summary>
             public void EnsureReadableText()
@@ -5275,27 +5276,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         [Obsolete("Use WButtonCustomColorDictionary for serialization instead.")]
         private sealed class WButtonPriorityColor
         {
-            [FormerlySerializedAs("priority")]
-            [SerializeField]
-            internal string _priority = DefaultWButtonColorKey;
-
-            [FormerlySerializedAs("buttonColor")]
-            [SerializeField]
-            private Color _buttonColor = Color.white;
-
-            [FormerlySerializedAs("textColor")]
-            [SerializeField]
-            private Color _textColor = Color.black;
-
-            public WButtonPriorityColor() { }
-
-            public WButtonPriorityColor(string priority, Color buttonColor, Color textColor)
-            {
-                Priority = priority;
-                ButtonColor = buttonColor;
-                TextColor = textColor;
-            }
-
             public string Priority
             {
                 get =>
@@ -5318,6 +5298,27 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             {
                 get => _textColor;
                 set => _textColor = value;
+            }
+
+            [FormerlySerializedAs("priority")]
+            [SerializeField]
+            internal string _priority = DefaultWButtonColorKey;
+
+            [FormerlySerializedAs("buttonColor")]
+            [SerializeField]
+            private Color _buttonColor = Color.white;
+
+            [FormerlySerializedAs("textColor")]
+            [SerializeField]
+            private Color _textColor = Color.black;
+
+            public WButtonPriorityColor() { }
+
+            public WButtonPriorityColor(string priority, Color buttonColor, Color textColor)
+            {
+                Priority = priority;
+                ButtonColor = buttonColor;
+                TextColor = textColor;
             }
         }
 

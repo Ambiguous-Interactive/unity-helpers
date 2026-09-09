@@ -244,39 +244,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         }
 
         /// <summary>
-        /// Reduces one side of an enum comparison to the 64 bits both sides are compared on.
-        /// </summary>
-        /// <param name="value">The operand, an enum or any convertible the caller passed.</param>
-        /// <param name="result">The bit pattern, or 0 when the operand cannot be reduced.</param>
-        /// <returns><c>true</c> when a bit pattern was produced.</returns>
-        private static bool TryConvertOperandToUInt64(object value, out ulong result)
-        {
-            if (value is Enum boxedEnum)
-            {
-                return boxedEnum.TryConvertToUInt64(out result);
-            }
-
-            switch (Type.GetTypeCode(value.GetType()))
-            {
-                case TypeCode.Byte:
-                case TypeCode.UInt16:
-                case TypeCode.UInt32:
-                case TypeCode.UInt64:
-                {
-                    result = ((IConvertible)value).ToUInt64(CultureInfo.InvariantCulture);
-                    return true;
-                }
-                default:
-                {
-                    // Preserve legacy conversions while comparing both operands in the same unsigned bit domain.
-                    long signed = Convert.ToInt64(value, CultureInfo.InvariantCulture);
-                    result = unchecked((ulong)signed);
-                    return true;
-                }
-            }
-        }
-
-        /// <summary>
         /// Evaluates a relational comparison between two values.
         /// </summary>
         /// <param name="actual">The actual value.</param>
@@ -393,40 +360,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
         {
             success = TryConvertValue(targetType, value, out object converted);
             return converted;
-        }
-
-        private static bool TryConvertValue(Type targetType, object value, out object converted)
-        {
-            if (value == null)
-            {
-                converted = null;
-                return !targetType.IsValueType || Nullable.GetUnderlyingType(targetType) != null;
-            }
-
-            if (targetType.IsInstanceOfType(value))
-            {
-                converted = value;
-                return true;
-            }
-
-            try
-            {
-                if (targetType.IsEnum)
-                {
-                    Type underlyingType = Enum.GetUnderlyingType(targetType);
-                    object numericValue = Convert.ChangeType(value, underlyingType);
-                    converted = Enum.ToObject(targetType, numericValue);
-                    return true;
-                }
-
-                converted = Convert.ChangeType(value, targetType);
-                return true;
-            }
-            catch
-            {
-                converted = null;
-                return false;
-            }
         }
 
         /// <summary>
@@ -619,6 +552,73 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers.Utils
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Reduces one side of an enum comparison to the 64 bits both sides are compared on.
+        /// </summary>
+        /// <param name="value">The operand, an enum or any convertible the caller passed.</param>
+        /// <param name="result">The bit pattern, or 0 when the operand cannot be reduced.</param>
+        /// <returns><c>true</c> when a bit pattern was produced.</returns>
+        private static bool TryConvertOperandToUInt64(object value, out ulong result)
+        {
+            if (value is Enum boxedEnum)
+            {
+                return boxedEnum.TryConvertToUInt64(out result);
+            }
+
+            switch (Type.GetTypeCode(value.GetType()))
+            {
+                case TypeCode.Byte:
+                case TypeCode.UInt16:
+                case TypeCode.UInt32:
+                case TypeCode.UInt64:
+                {
+                    result = ((IConvertible)value).ToUInt64(CultureInfo.InvariantCulture);
+                    return true;
+                }
+                default:
+                {
+                    // Preserve legacy conversions while comparing both operands in the same unsigned bit domain.
+                    long signed = Convert.ToInt64(value, CultureInfo.InvariantCulture);
+                    result = unchecked((ulong)signed);
+                    return true;
+                }
+            }
+        }
+
+        private static bool TryConvertValue(Type targetType, object value, out object converted)
+        {
+            if (value == null)
+            {
+                converted = null;
+                return !targetType.IsValueType || Nullable.GetUnderlyingType(targetType) != null;
+            }
+
+            if (targetType.IsInstanceOfType(value))
+            {
+                converted = value;
+                return true;
+            }
+
+            try
+            {
+                if (targetType.IsEnum)
+                {
+                    Type underlyingType = Enum.GetUnderlyingType(targetType);
+                    object numericValue = Convert.ChangeType(value, underlyingType);
+                    converted = Enum.ToObject(targetType, numericValue);
+                    return true;
+                }
+
+                converted = Convert.ChangeType(value, targetType);
+                return true;
+            }
+            catch
+            {
+                converted = null;
+                return false;
+            }
         }
     }
 #endif

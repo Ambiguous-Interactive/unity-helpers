@@ -49,6 +49,80 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
             }
         }
 
+        /// <summary>
+        /// Captures one entry while tolerating the single benign error this technique provokes.
+        /// Driving a panel outside an editor view makes every drawer that asks for a cursor rect
+        /// log one; the Unity Test Framework fails a test on any unexpected error, so the
+        /// tolerance is scoped to the capture call and the result is then asserted to contain
+        /// nothing but that message.
+        /// </summary>
+        private static EditorSurfaceCaptureResult CaptureToleratingCursorRectErrors(
+            DocumentationImage image,
+            string outputPath
+        )
+        {
+            bool previousIgnore = LogAssert.ignoreFailingMessages;
+            LogAssert.ignoreFailingMessages = true;
+            try
+            {
+                return WButtonDocumentationImageCatalog.Capture(image, outputPath);
+            }
+            finally
+            {
+                LogAssert.ignoreFailingMessages = previousIgnore;
+            }
+        }
+
+        private static bool IsReferencedByAnyPage(string[] pages, string fileName)
+        {
+            foreach (string pagesElement in pages)
+            {
+                string page = File.ReadAllText(pagesElement);
+                if (0 <= page.IndexOf(fileName, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static void SkipWithoutGraphicsDevice()
+        {
+            if (!EditorSurfaceCapture.IsSupported)
+            {
+                Assert.Ignore(EditorSurfaceCapture.UnsupportedReason);
+            }
+        }
+
+        private static string ResolvePackageRootOrSkip()
+        {
+            string packageRoot = WButtonDocumentationImageCatalog.ResolvePackageRoot();
+            if (string.IsNullOrEmpty(packageRoot) || !Directory.Exists(packageRoot))
+            {
+                Assert.Ignore(
+                    "The package root could not be located from the test sources, so there is no "
+                        + "docs/ tree to compare against."
+                );
+            }
+
+            return packageRoot;
+        }
+
+        private static string ResolveOutputPathOrSkip(DocumentationImage image)
+        {
+            string path = WButtonDocumentationImageCatalog.ResolveOutputPath(image);
+            if (string.IsNullOrEmpty(path))
+            {
+                Assert.Ignore(
+                    "The package root could not be located from the test sources, so there is no "
+                        + "docs/ tree to write to."
+                );
+            }
+
+            return path;
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -334,80 +408,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
                 // The operator running this [Explicit] regeneration needs to see what was written.
                 Debug.Log($"[documentation-capture] {result}");
             }
-        }
-
-        /// <summary>
-        /// Captures one entry while tolerating the single benign error this technique provokes.
-        /// Driving a panel outside an editor view makes every drawer that asks for a cursor rect
-        /// log one; the Unity Test Framework fails a test on any unexpected error, so the
-        /// tolerance is scoped to the capture call and the result is then asserted to contain
-        /// nothing but that message.
-        /// </summary>
-        private static EditorSurfaceCaptureResult CaptureToleratingCursorRectErrors(
-            DocumentationImage image,
-            string outputPath
-        )
-        {
-            bool previousIgnore = LogAssert.ignoreFailingMessages;
-            LogAssert.ignoreFailingMessages = true;
-            try
-            {
-                return WButtonDocumentationImageCatalog.Capture(image, outputPath);
-            }
-            finally
-            {
-                LogAssert.ignoreFailingMessages = previousIgnore;
-            }
-        }
-
-        private static bool IsReferencedByAnyPage(string[] pages, string fileName)
-        {
-            foreach (string pagesElement in pages)
-            {
-                string page = File.ReadAllText(pagesElement);
-                if (0 <= page.IndexOf(fileName, StringComparison.Ordinal))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static void SkipWithoutGraphicsDevice()
-        {
-            if (!EditorSurfaceCapture.IsSupported)
-            {
-                Assert.Ignore(EditorSurfaceCapture.UnsupportedReason);
-            }
-        }
-
-        private static string ResolvePackageRootOrSkip()
-        {
-            string packageRoot = WButtonDocumentationImageCatalog.ResolvePackageRoot();
-            if (string.IsNullOrEmpty(packageRoot) || !Directory.Exists(packageRoot))
-            {
-                Assert.Ignore(
-                    "The package root could not be located from the test sources, so there is no "
-                        + "docs/ tree to compare against."
-                );
-            }
-
-            return packageRoot;
-        }
-
-        private static string ResolveOutputPathOrSkip(DocumentationImage image)
-        {
-            string path = WButtonDocumentationImageCatalog.ResolveOutputPath(image);
-            if (string.IsNullOrEmpty(path))
-            {
-                Assert.Ignore(
-                    "The package root could not be located from the test sources, so there is no "
-                        + "docs/ tree to write to."
-                );
-            }
-
-            return path;
         }
     }
 #endif

@@ -112,10 +112,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
         private const int MaxPaginationCacheSize = 1000;
         private const int MaxGUIStyleCacheSize = 500;
 
-        // Lazy construction avoids Cache/PRNG initialization deadlocks while Unity opens a scene.
-        private static Cache<int, string> _intToStringCache;
-        private static Cache<(int, int), string> _paginationLabelCache;
-
         /// <summary>
         /// LRU cache for integer-to-string conversions.
         /// Used by GetCachedIntString() and pagination labels across all editor UI.
@@ -134,6 +130,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
                 .NewBuilder()
                 .MaximumSize(MaxPaginationCacheSize)
                 .Build();
+
+        // Lazy construction avoids Cache/PRNG initialization deadlocks while Unity opens a scene.
+        private static Cache<int, string> _intToStringCache;
+        private static Cache<(int, int), string> _paginationLabelCache;
 
         private static readonly Dictionary<Color, Texture2D> SolidTextureCache = new(
             new ColorComparer()
@@ -260,51 +260,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
         }
 
         /// <summary>
-        /// Builds, once per enum type, a map from each member's 64-bit pattern to its display name.
-        /// </summary>
-        /// <param name="enumType">The enum type to map.</param>
-        /// <returns>The cached map, or an empty map when <paramref name="enumType"/> is not an enum.</returns>
-        /// <remarks>
-        /// Aliases (two members sharing a value) keep the FIRST declared name, matching what
-        /// <c>Array.IndexOf</c> returned before this was cached, so display output is unchanged.
-        /// </remarks>
-        private static Dictionary<ulong, string> GetEnumDisplayNamesByValue(Type enumType)
-        {
-            if (
-                EnumDisplayNameByValueCache.TryGetValue(
-                    enumType,
-                    out Dictionary<ulong, string> cached
-                )
-            )
-            {
-                return cached;
-            }
-
-            string[] names = GetEnumDisplayNames(enumType);
-            Dictionary<ulong, string> map = new(names.Length);
-
-            if (0 < names.Length)
-            {
-                Array values = Enum.GetValues(enumType);
-                int count = Math.Min(values.Length, names.Length);
-                for (int i = 0; i < count; i++)
-                {
-                    if (
-                        values.GetValue(i) is Enum member
-                        && member.TryConvertToUInt64(out ulong key)
-                        && !map.ContainsKey(key)
-                    )
-                    {
-                        map[key] = names[i];
-                    }
-                }
-            }
-
-            EnumDisplayNameByValueCache[enumType] = map;
-            return map;
-        }
-
-        /// <summary>
         /// Gets all cached display names for an enum type.
         /// </summary>
         /// <param name="enumType">The enum type to get display names for.</param>
@@ -407,27 +362,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
             }
 
             return style;
-        }
-
-        /// <summary>
-        /// Gets or creates the LRU order tracker for a given dictionary.
-        /// </summary>
-        /// <typeparam name="TKey">The type of dictionary key.</typeparam>
-        /// <typeparam name="TValue">The type of dictionary value.</typeparam>
-        /// <param name="cache">The dictionary to get the tracker for.</param>
-        /// <returns>The LRU order tracker associated with this dictionary.</returns>
-        private static LRUOrderTracker<TKey> GetOrCreateLRUTracker<TKey, TValue>(
-            Dictionary<TKey, TValue> cache
-        )
-        {
-            if (!LRUOrderTracking.TryGetValue(cache, out object trackerObj))
-            {
-                LRUOrderTracker<TKey> newTracker = new();
-                LRUOrderTracking.Add(cache, newTracker);
-                return newTracker;
-            }
-
-            return (LRUOrderTracker<TKey>)trackerObj;
         }
 
         /// <summary>
@@ -563,24 +497,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
         }
 
         /// <summary>
-        /// Gets the current count of entries in the IntToString cache.
-        /// </summary>
-        /// <returns>The number of cached integer-to-string conversions.</returns>
-        internal static int GetIntToStringCacheCount()
-        {
-            return IntToStringCache.Count;
-        }
-
-        /// <summary>
-        /// Gets the current count of entries in the PaginationLabel cache.
-        /// </summary>
-        /// <returns>The number of cached pagination labels.</returns>
-        internal static int GetPaginationLabelCacheCount()
-        {
-            return PaginationLabelCache.Count;
-        }
-
-        /// <summary>
         /// Compares two colors for approximate equality.
         /// </summary>
         /// <param name="x">The first color.</param>
@@ -609,6 +525,90 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
                 ColorQuantization.ToByte(color.b),
                 ColorQuantization.ToByte(color.a)
             );
+        }
+
+        /// <summary>
+        /// Gets the current count of entries in the IntToString cache.
+        /// </summary>
+        /// <returns>The number of cached integer-to-string conversions.</returns>
+        internal static int GetIntToStringCacheCount()
+        {
+            return IntToStringCache.Count;
+        }
+
+        /// <summary>
+        /// Gets the current count of entries in the PaginationLabel cache.
+        /// </summary>
+        /// <returns>The number of cached pagination labels.</returns>
+        internal static int GetPaginationLabelCacheCount()
+        {
+            return PaginationLabelCache.Count;
+        }
+
+        /// <summary>
+        /// Builds, once per enum type, a map from each member's 64-bit pattern to its display name.
+        /// </summary>
+        /// <param name="enumType">The enum type to map.</param>
+        /// <returns>The cached map, or an empty map when <paramref name="enumType"/> is not an enum.</returns>
+        /// <remarks>
+        /// Aliases (two members sharing a value) keep the FIRST declared name, matching what
+        /// <c>Array.IndexOf</c> returned before this was cached, so display output is unchanged.
+        /// </remarks>
+        private static Dictionary<ulong, string> GetEnumDisplayNamesByValue(Type enumType)
+        {
+            if (
+                EnumDisplayNameByValueCache.TryGetValue(
+                    enumType,
+                    out Dictionary<ulong, string> cached
+                )
+            )
+            {
+                return cached;
+            }
+
+            string[] names = GetEnumDisplayNames(enumType);
+            Dictionary<ulong, string> map = new(names.Length);
+
+            if (0 < names.Length)
+            {
+                Array values = Enum.GetValues(enumType);
+                int count = Math.Min(values.Length, names.Length);
+                for (int i = 0; i < count; i++)
+                {
+                    if (
+                        values.GetValue(i) is Enum member
+                        && member.TryConvertToUInt64(out ulong key)
+                        && !map.ContainsKey(key)
+                    )
+                    {
+                        map[key] = names[i];
+                    }
+                }
+            }
+
+            EnumDisplayNameByValueCache[enumType] = map;
+            return map;
+        }
+
+        /// <summary>
+        /// Gets or creates the LRU order tracker for a given dictionary.
+        /// </summary>
+        /// <typeparam name="TKey">The type of dictionary key.</typeparam>
+        /// <typeparam name="TValue">The type of dictionary value.</typeparam>
+        /// <param name="cache">The dictionary to get the tracker for.</param>
+        /// <returns>The LRU order tracker associated with this dictionary.</returns>
+        private static LRUOrderTracker<TKey> GetOrCreateLRUTracker<TKey, TValue>(
+            Dictionary<TKey, TValue> cache
+        )
+        {
+            if (!LRUOrderTracking.TryGetValue(cache, out object trackerObj))
+            {
+                LRUOrderTracker<TKey> newTracker = new();
+                LRUOrderTracking.Add(cache, newTracker);
+                return newTracker;
+            }
+
+            return (LRUOrderTracker<TKey>)trackerObj;
         }
 
         /// <summary>

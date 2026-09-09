@@ -33,6 +33,108 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [NUnit.Framework.Category("Serialization")]
     public sealed class WProtoRectangularArrayTests
     {
+        private static WProtoRectangularArrayContract Bare(
+            Action<WProtoRectangularArrayContract> set
+        )
+        {
+            WProtoRectangularArrayContract value = new WProtoRectangularArrayContract();
+            set(value);
+            return value;
+        }
+
+        private static string Encode<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new WProtoWriter(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+            Assert.AreEqual(buffer.Length, writer.Position, "Measure disagreed with Write");
+            return ToHex(buffer);
+        }
+
+        private static T RoundTrip<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new WProtoWriter(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+
+            WProtoReader reader = new WProtoReader(buffer);
+            Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
+            return restored;
+        }
+
+        private static WProtoRectangularArrayContract Decode(string hex)
+        {
+            WProtoReader reader = new WProtoReader(Parse(hex));
+            Assert.IsTrue(
+                WProtoFormatterProvider
+                    .Get<WProtoRectangularArrayContract>()
+                    .TryRead(ref reader, out WProtoRectangularArrayContract value),
+                hex
+            );
+            return value;
+        }
+
+        private static string ToHex(byte[] bytes)
+        {
+            StringBuilder builder = new StringBuilder(bytes.Length * 2);
+            foreach (byte current in bytes)
+            {
+                builder.Append(current.ToString("X2"));
+            }
+
+            return builder.ToString();
+        }
+
+        /// <summary>
+        /// Builds a wrapper message for the contract member at <paramref name="tag"/>, from the
+        /// dimension header's bytes and the element run's bytes.
+        /// </summary>
+        /// <remarks>
+        /// Every length prefix is computed rather than typed. A prefix that disagrees with its
+        /// content makes the reader refuse the payload for being malformed, which is a different
+        /// answer from the one these tests are about -- and a test that gets the right verdict for
+        /// the wrong reason proves nothing.
+        /// </remarks>
+        private static byte[] Wrapper(int tag, string dimensionsHex, string valuesHex)
+        {
+            List<byte> payload = new List<byte>();
+            Append(payload, 1, dimensionsHex);
+            Append(payload, 2, valuesHex);
+
+            Assert.Less(payload.Count, 128, "the builder writes single-byte length prefixes");
+
+            List<byte> message = new List<byte> { (byte)((tag << 3) | 2), (byte)payload.Count };
+            message.AddRange(payload);
+            return message.ToArray();
+        }
+
+        private static void Append(List<byte> payload, int field, string hex)
+        {
+            if (hex == null)
+            {
+                return;
+            }
+
+            byte[] content = Parse(hex);
+            Assert.Less(content.Length, 128, "the builder writes single-byte length prefixes");
+            payload.Add((byte)((field << 3) | 2));
+            payload.Add((byte)content.Length);
+            payload.AddRange(content);
+        }
+
+        private static byte[] Parse(string hex)
+        {
+            byte[] bytes = new byte[hex.Length / 2];
+            for (int index = 0; index < bytes.Length; index++)
+            {
+                bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
+            }
+
+            return bytes;
+        }
+
         [Test]
         public void EveryRectangularShapeMatchesItsGoldenBytes()
         {
@@ -377,108 +479,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             WProtoRectangularArrayContract restored = Decode("0A0C0A0202021204010203041807");
 
             Assert.AreEqual(4, restored.Grid[1, 1]);
-        }
-
-        private static WProtoRectangularArrayContract Bare(
-            Action<WProtoRectangularArrayContract> set
-        )
-        {
-            WProtoRectangularArrayContract value = new WProtoRectangularArrayContract();
-            set(value);
-            return value;
-        }
-
-        private static string Encode<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new WProtoWriter(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-            Assert.AreEqual(buffer.Length, writer.Position, "Measure disagreed with Write");
-            return ToHex(buffer);
-        }
-
-        private static T RoundTrip<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new WProtoWriter(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-
-            WProtoReader reader = new WProtoReader(buffer);
-            Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
-            return restored;
-        }
-
-        private static WProtoRectangularArrayContract Decode(string hex)
-        {
-            WProtoReader reader = new WProtoReader(Parse(hex));
-            Assert.IsTrue(
-                WProtoFormatterProvider
-                    .Get<WProtoRectangularArrayContract>()
-                    .TryRead(ref reader, out WProtoRectangularArrayContract value),
-                hex
-            );
-            return value;
-        }
-
-        private static string ToHex(byte[] bytes)
-        {
-            StringBuilder builder = new StringBuilder(bytes.Length * 2);
-            foreach (byte current in bytes)
-            {
-                builder.Append(current.ToString("X2"));
-            }
-
-            return builder.ToString();
-        }
-
-        /// <summary>
-        /// Builds a wrapper message for the contract member at <paramref name="tag"/>, from the
-        /// dimension header's bytes and the element run's bytes.
-        /// </summary>
-        /// <remarks>
-        /// Every length prefix is computed rather than typed. A prefix that disagrees with its
-        /// content makes the reader refuse the payload for being malformed, which is a different
-        /// answer from the one these tests are about -- and a test that gets the right verdict for
-        /// the wrong reason proves nothing.
-        /// </remarks>
-        private static byte[] Wrapper(int tag, string dimensionsHex, string valuesHex)
-        {
-            List<byte> payload = new List<byte>();
-            Append(payload, 1, dimensionsHex);
-            Append(payload, 2, valuesHex);
-
-            Assert.Less(payload.Count, 128, "the builder writes single-byte length prefixes");
-
-            List<byte> message = new List<byte> { (byte)((tag << 3) | 2), (byte)payload.Count };
-            message.AddRange(payload);
-            return message.ToArray();
-        }
-
-        private static void Append(List<byte> payload, int field, string hex)
-        {
-            if (hex == null)
-            {
-                return;
-            }
-
-            byte[] content = Parse(hex);
-            Assert.Less(content.Length, 128, "the builder writes single-byte length prefixes");
-            payload.Add((byte)((field << 3) | 2));
-            payload.Add((byte)content.Length);
-            payload.AddRange(content);
-        }
-
-        private static byte[] Parse(string hex)
-        {
-            byte[] bytes = new byte[hex.Length / 2];
-            for (int index = 0; index < bytes.Length; index++)
-            {
-                bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
-            }
-
-            return bytes;
         }
     }
 }

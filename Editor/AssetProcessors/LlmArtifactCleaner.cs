@@ -12,6 +12,11 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
         private const string PackagePathPrefix = "Packages/com.wallstop-studios.unity-helpers/";
         private const string LlmPrefix = "_llm_";
 
+        internal static int PendingDeletionCountForTesting
+        {
+            get { return PendingDeletions.Count; }
+        }
+
         private static readonly string[] BlockedSegments = { LlmPrefix };
         private static readonly HashSet<string> PendingDeletions = new(
             StringComparer.OrdinalIgnoreCase
@@ -21,32 +26,10 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
         private static bool _isDeleting;
         private static Action<string> DeleteAssetOverrideForTesting;
 
-        private static void OnPostprocessAllAssets(
-            string[] importedAssets,
-            string[] deletedAssets,
-            string[] movedAssets,
-            string[] movedFromAssetPaths
-        )
-        {
-            EnqueueBlockedAssets(importedAssets);
-            EnqueueBlockedAssets(movedAssets);
-            if (PendingDeletions.Count == 0)
-            {
-                return;
-            }
-
-            AssetPostprocessorDeferral.Schedule(DrainAction);
-        }
-
         internal static void DeleteBlockedAssets(string[] assetPaths)
         {
             EnqueueBlockedAssets(assetPaths);
             DrainPendingDeletions();
-        }
-
-        internal static int PendingDeletionCountForTesting
-        {
-            get { return PendingDeletions.Count; }
         }
 
         internal static void ResetForTesting()
@@ -94,6 +77,23 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             }
 
             return false;
+        }
+
+        private static void OnPostprocessAllAssets(
+            string[] importedAssets,
+            string[] deletedAssets,
+            string[] movedAssets,
+            string[] movedFromAssetPaths
+        )
+        {
+            EnqueueBlockedAssets(importedAssets);
+            EnqueueBlockedAssets(movedAssets);
+            if (PendingDeletions.Count == 0)
+            {
+                return;
+            }
+
+            AssetPostprocessorDeferral.Schedule(DrainAction);
         }
 
         private static void EnqueueBlockedAssets(string[] assetPaths)

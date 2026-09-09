@@ -32,6 +32,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
     [CustomPropertyDrawer(typeof(SerializableSortedSet<>), true)]
     public sealed class SerializableSetPropertyDrawer : PropertyDrawer
     {
+        internal const float WGroupFoldoutAlignmentOffset = 2.5f;
+
         private const float SectionSpacing = 4f;
         private const float ButtonSpacing = 4f;
         private const float PaginationButtonWidth = 28f;
@@ -43,6 +45,73 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private const float InspectorHeightPadding = 2.5f;
         private const float PaginationLabelVerticalOffset = -2f;
         private const float PaginationButtonsVerticalOffset = 0f;
+        private const float ManualEntrySectionPadding = 6f;
+        private const float ManualEntrySectionPaddingSettings = 2f;
+        private const float ManualEntryFoldoutToggleOffsetInspector = 16f;
+        private const float ManualEntryFoldoutToggleOffsetSettings = 6f;
+        private const float ManualEntryFoldoutLabelPadding = 0f;
+        private const float ManualEntryFoldoutLabelContentOffset = 0f;
+        private const float ManualEntryButtonWidth = 110f;
+        private const float ManualEntryResetWidth = 70f;
+        private const float ManualEntryFoldoutValueLeftShift = 2.5f;
+        private const float ManualEntryFoldoutValueRightShift = 3f;
+        private const float ManualEntryExpandableValueFoldoutGutter = 7f;
+        private const float DuplicateShakeAmplitude = 2f;
+        private const float DuplicateShakeFrequency = 7f;
+        private const float DuplicateOutlineThickness = 1f;
+
+        // Static animation state survives drawer recreation; target instance IDs prevent cross-object collisions.
+        /// <remarks>
+        /// The key carries the inspected object's instance id, so every object a session
+        /// touches adds an entry that nothing removes.
+        /// Each value holds a <see cref="RequestRepaint"/> listener the clear paths deliberately
+        /// unsubscribe, so eviction has to do the same -- a dropped animation that kept its
+        /// listener would repaint every view for the life of the editor. A re-created animation
+        /// starts at its target rather than resuming, so an eviction mid-tween SNAPS the foldout
+        /// -- which needs the bound's worth of distinct keys touched inside one tween to reach,
+        /// because the least recently used entry is by definition not the foldout being drawn.
+        /// </remarks>
+        private const int MaxFoldoutAnimations = 256;
+
+        private const int MaxSingleTargetPropertyKeyCacheSize = 512;
+        internal static bool HasLastManualEntryHeaderRect { get; private set; }
+        internal static Rect LastManualEntryHeaderRect { get; private set; }
+        internal static Rect LastManualEntryToggleRect { get; private set; }
+        internal static bool HasLastMainFoldoutRect { get; private set; }
+        internal static Rect LastMainFoldoutRect { get; private set; }
+        internal static bool HasLastManualEntryValueRect { get; private set; }
+        internal static Rect LastManualEntryValueRect { get; private set; }
+        internal static bool LastManualEntryValueUsedFoldoutLabel { get; private set; }
+        internal static float LastManualEntryValueFoldoutOffset { get; private set; }
+        internal static bool HasLastRowContentRect { get; private set; }
+        internal static Rect LastRowContentRect { get; private set; }
+
+        internal static float LastFooterWGroupLeftPadding { get; private set; }
+        internal static float LastFooterWGroupRightPadding { get; private set; }
+        internal static float LastFooterAvailableWidth { get; private set; }
+        internal static float LastFooterRangeWidth { get; private set; }
+        internal static bool LastFooterRangeLabelWasDrawn { get; private set; }
+        internal static Rect LastFooterRangeLabelRect { get; private set; }
+
+        private static GUIStyle AddButtonStyle =>
+            _addButtonStyle ??= BuildButtonStyle(new Color(0.22f, 0.62f, 0.29f));
+        private static GUIStyle ClearAllActiveButtonStyle =>
+            _clearAllActiveButtonStyle ??= BuildButtonStyle(new Color(0.82f, 0.27f, 0.27f));
+        private static GUIStyle ClearAllInactiveButtonStyle =>
+            _clearAllInactiveButtonStyle ??= BuildButtonStyle(new Color(0.55f, 0.55f, 0.55f));
+        private static GUIStyle RemoveButtonStyle =>
+            _removeButtonStyle ??= BuildRemoveButtonStyle(new Color(0.86f, 0.23f, 0.23f));
+        private static GUIStyle MoveButtonStyle =>
+            _moveButtonStyle ??= BuildMoveButtonStyle(new Color(0.98f, 0.95f, 0.65f));
+
+        private static GUIContent ManualEntryFoldoutContent =>
+            _manualEntryFoldoutContent ??= EditorGUIUtility.TrTextContent("New Entry");
+
+        private static GUIContent ManualEntryValueContent =>
+            _manualEntryValueContent ??= EditorGUIUtility.TrTextContent("Value");
+
+        private static GUIContent ManualEntryAddContent =>
+            _manualEntryAddContent ??= EditorGUIUtility.TrTextContent("Add");
 
         private static readonly GUIContent AddEntryContent = new("Add");
         private static readonly GUIContent ClearAllContent = new("Clear All");
@@ -67,54 +136,19 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private static GUIStyle _clearAllInactiveButtonStyle;
         private static GUIStyle _removeButtonStyle;
         private static GUIStyle _moveButtonStyle;
-
-        private static GUIStyle AddButtonStyle =>
-            _addButtonStyle ??= BuildButtonStyle(new Color(0.22f, 0.62f, 0.29f));
-        private static GUIStyle ClearAllActiveButtonStyle =>
-            _clearAllActiveButtonStyle ??= BuildButtonStyle(new Color(0.82f, 0.27f, 0.27f));
-        private static GUIStyle ClearAllInactiveButtonStyle =>
-            _clearAllInactiveButtonStyle ??= BuildButtonStyle(new Color(0.55f, 0.55f, 0.55f));
-        private static GUIStyle RemoveButtonStyle =>
-            _removeButtonStyle ??= BuildRemoveButtonStyle(new Color(0.86f, 0.23f, 0.23f));
-        private static GUIStyle MoveButtonStyle =>
-            _moveButtonStyle ??= BuildMoveButtonStyle(new Color(0.98f, 0.95f, 0.65f));
         private static readonly Color DuplicatePrimaryColor = new(0.99f, 0.82f, 0.35f, 0.55f);
         private static readonly Color DuplicateSecondaryColor = new(0.96f, 0.45f, 0.45f, 0.65f);
         private static readonly Color DuplicateOutlineColor = new(0.65f, 0.18f, 0.18f, 0.9f);
         private static readonly Color LightRowColor = new(0.97f, 0.97f, 0.97f, 1f);
         private static readonly Color DarkRowColor = new(0.16f, 0.16f, 0.16f, 0.45f);
         private static readonly Color NullEntryHighlightColor = new(0.84f, 0.2f, 0.2f, 0.6f);
-        internal const float WGroupFoldoutAlignmentOffset = 2.5f;
-        private const float ManualEntrySectionPadding = 6f;
-        private const float ManualEntrySectionPaddingSettings = 2f;
-        private const float ManualEntryFoldoutToggleOffsetInspector = 16f;
-        private const float ManualEntryFoldoutToggleOffsetSettings = 6f;
-        private const float ManualEntryFoldoutLabelPadding = 0f;
-        private const float ManualEntryFoldoutLabelContentOffset = 0f;
-        private const float ManualEntryButtonWidth = 110f;
-        private const float ManualEntryResetWidth = 70f;
-        private const float ManualEntryFoldoutValueLeftShift = 2.5f;
-        private const float ManualEntryFoldoutValueRightShift = 3f;
-        private const float ManualEntryExpandableValueFoldoutGutter = 7f;
 
         // Delay EditorGUIUtility access until rendering; initialization during scene opening can hang Unity.
         private static GUIContent _manualEntryFoldoutContent;
         private static GUIContent _manualEntryValueContent;
         private static GUIContent _manualEntryAddContent;
-
-        private static GUIContent ManualEntryFoldoutContent =>
-            _manualEntryFoldoutContent ??= EditorGUIUtility.TrTextContent("New Entry");
-
-        private static GUIContent ManualEntryValueContent =>
-            _manualEntryValueContent ??= EditorGUIUtility.TrTextContent("Value");
-
-        private static GUIContent ManualEntryAddContent =>
-            _manualEntryAddContent ??= EditorGUIUtility.TrTextContent("Add");
         private static readonly GUIContent ManualEntryResetContent = new("Reset");
         private static GUIStyle _manualEntryFoldoutLabelStyle;
-        private const float DuplicateShakeAmplitude = 2f;
-        private const float DuplicateShakeFrequency = 7f;
-        private const float DuplicateOutlineThickness = 1f;
         private static readonly GUIContent NullEntryTooltipContent = new();
         private static readonly GUIContent FoldoutLabelContent = new();
         private static readonly GUIContent UnsupportedTypeContent = new();
@@ -128,19 +162,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private static readonly ConcurrentDictionary<Type, byte> UnsupportedParameterlessTypes =
             new();
 
-        // Static animation state survives drawer recreation; target instance IDs prevent cross-object collisions.
-        /// <remarks>
-        /// The key carries the inspected object's instance id, so every object a session
-        /// touches adds an entry that nothing removes.
-        /// Each value holds a <see cref="RequestRepaint"/> listener the clear paths deliberately
-        /// unsubscribe, so eviction has to do the same -- a dropped animation that kept its
-        /// listener would repaint every view for the life of the editor. A re-created animation
-        /// starts at its target rather than resuming, so an eviction mid-tween SNAPS the foldout
-        /// -- which needs the bound's worth of distinct keys touched inside one tween to reach,
-        /// because the least recently used entry is by definition not the foldout being drawn.
-        /// </remarks>
-        private const int MaxFoldoutAnimations = 256;
-
         private static readonly Cache<MainFoldoutCacheKey, AnimBool> MainFoldoutAnimations =
             CacheBuilder<MainFoldoutCacheKey, AnimBool>
                 .NewBuilder()
@@ -151,21 +172,17 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 .Build();
 
         /// <summary>
-        /// Computes the cache key for main foldout animations.
-        /// Includes the target object's instance ID to prevent collisions between different objects.
+        /// Frame number when a child property drawer signaled that its height changed.
+        /// When this matches the current frame, the row render cache should be invalidated.
         /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static MainFoldoutCacheKey GetMainFoldoutCacheKey(
-            SerializedObject serializedObject,
-            string propertyPath
-        )
-        {
-            long instanceId =
-                serializedObject?.targetObject != null
-                    ? serializedObject.targetObject.GetUnityObjectId()
-                    : 0;
-            return new MainFoldoutCacheKey(instanceId, propertyPath);
-        }
+        private static int _childHeightChangedFrame = -1;
+
+        private static readonly Dictionary<PropertyCacheKey, string> SingleTargetPropertyKeyCache =
+            new();
+
+        internal Rect LastResolvedPosition { get; private set; }
+        internal Rect LastItemsContainerRect { get; private set; }
+        internal bool HasItemsContainerRect { get; private set; }
 
         private readonly Dictionary<string, PaginationState> _paginationStates = new();
         private readonly Dictionary<string, DuplicateState> _duplicateStates = new();
@@ -188,33 +205,850 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private int _lastRowRenderCacheFrame = -1;
         private int _lastItemsPropertyCacheFrame = -1;
 
-        internal Rect LastResolvedPosition { get; private set; }
-        internal Rect LastItemsContainerRect { get; private set; }
-        internal bool HasItemsContainerRect { get; private set; }
-        internal static bool HasLastManualEntryHeaderRect { get; private set; }
-        internal static Rect LastManualEntryHeaderRect { get; private set; }
-        internal static Rect LastManualEntryToggleRect { get; private set; }
-        internal static bool HasLastMainFoldoutRect { get; private set; }
-        internal static Rect LastMainFoldoutRect { get; private set; }
-        internal static bool HasLastManualEntryValueRect { get; private set; }
-        internal static Rect LastManualEntryValueRect { get; private set; }
-        internal static bool LastManualEntryValueUsedFoldoutLabel { get; private set; }
-        internal static float LastManualEntryValueFoldoutOffset { get; private set; }
-        internal static bool HasLastRowContentRect { get; private set; }
-        internal static Rect LastRowContentRect { get; private set; }
+        /// <summary>
+        /// Resolves the content rect for testing purposes, applying WGroup padding and indentation
+        /// without requiring a full OnGUI context.
+        /// </summary>
+        /// <param name="position">The original position rect.</param>
+        /// <param name="skipIndentation">Whether to skip standard Unity indentation.</param>
+        /// <returns>The resolved content rect.</returns>
+        internal static Rect ResolveContentRectForTests(Rect position, bool skipIndentation = false)
+        {
+            return ResolveContentRect(position, skipIndentation);
+        }
 
-        internal static float LastFooterWGroupLeftPadding { get; private set; }
-        internal static float LastFooterWGroupRightPadding { get; private set; }
-        internal static float LastFooterAvailableWidth { get; private set; }
-        internal static float LastFooterRangeWidth { get; private set; }
-        internal static bool LastFooterRangeLabelWasDrawn { get; private set; }
-        internal static Rect LastFooterRangeLabelRect { get; private set; }
+        internal static void ResetLayoutTrackingForTests()
+        {
+            HasLastManualEntryHeaderRect = false;
+            LastManualEntryHeaderRect = default;
+            LastManualEntryToggleRect = default;
+            HasLastMainFoldoutRect = false;
+            LastMainFoldoutRect = default;
+            HasLastManualEntryValueRect = false;
+            LastManualEntryValueRect = default;
+            LastManualEntryValueUsedFoldoutLabel = false;
+            LastManualEntryValueFoldoutOffset = 0f;
+            HasLastRowContentRect = false;
+            LastRowContentRect = default;
+
+            LastFooterWGroupLeftPadding = 0f;
+            LastFooterWGroupRightPadding = 0f;
+            LastFooterAvailableWidth = 0f;
+            LastFooterRangeWidth = 0f;
+            LastFooterRangeLabelWasDrawn = false;
+            LastFooterRangeLabelRect = default;
+
+            MainFoldoutAnimations.Clear();
+        }
+
+        internal static bool TryToggleManualEntryFoldoutLabelForTests(
+            Event currentEvent,
+            Rect labelHitRect,
+            ref bool expanded
+        )
+        {
+            return TryToggleManualEntryFoldoutLabel(currentEvent, labelHitRect, ref expanded);
+        }
+
+        internal static EventType GetEffectiveMouseEventTypeForTests(
+            EventType eventType,
+            EventType rawEventType
+        )
+        {
+            return GetEffectiveMouseEventType(eventType, rawEventType);
+        }
 
         /// <summary>
-        /// Frame number when a child property drawer signaled that its height changed.
-        /// When this matches the current frame, the row render cache should be invalidated.
+        /// Signals that a child property drawer's height has changed and the parent
+        /// SerializableSetPropertyDrawer should invalidate its row height cache.
+        /// This should be called when nested foldouts or expandable sections change state.
         /// </summary>
-        private static int _childHeightChangedFrame = -1;
+        internal static void SignalChildHeightChanged()
+        {
+            _childHeightChangedFrame = Time.frameCount;
+            InternalEditorUtility.RepaintAllViews();
+        }
+
+        /// <summary>
+        /// Gets the frame number when the child height changed signal was last set.
+        /// For testing purposes only.
+        /// </summary>
+        internal static int GetChildHeightChangedFrameForTests()
+        {
+            return _childHeightChangedFrame;
+        }
+
+        /// <summary>
+        /// Resets the child height changed frame to -1 for testing purposes.
+        /// </summary>
+        internal static void ResetChildHeightChangedFrameForTests()
+        {
+            _childHeightChangedFrame = -1;
+        }
+
+        internal static bool HasDroppedItemsArrayForTests(
+            bool hasInspector,
+            SerializedProperty itemsProperty
+        )
+        {
+            return HasDroppedItemsArray(hasInspector, itemsProperty);
+        }
+
+        internal static PendingWrapperContext EnsurePendingWrapper(
+            PendingEntry pending,
+            Type elementType
+        )
+        {
+            if (pending == null || elementType == null)
+            {
+                return PendingWrapperContext.Empty;
+            }
+
+            PendingValueWrapper wrapper = pending.valueWrapper;
+            SerializedObject serialized = pending.valueWrapperSerialized;
+            SerializedProperty property = pending.valueWrapperProperty;
+
+            bool initialized = false;
+            try
+            {
+                if (wrapper == null)
+                {
+                    ReleasePendingWrapper(pending);
+                    wrapper = ScriptableObject.CreateInstance<PendingValueWrapper>();
+                    pending.valueWrapper = wrapper;
+                    wrapper.hideFlags = HideFlags.HideAndDontSave;
+                    serialized = null;
+                    property = null;
+                }
+
+                if (serialized == null)
+                {
+                    serialized = new SerializedObject(wrapper);
+                    pending.valueWrapperSerialized = serialized;
+                    property = wrapper.FindValueProperty(serialized);
+                    pending.valueWrapperProperty = property;
+                }
+
+                if (property == null)
+                {
+                    return PendingWrapperContext.Empty;
+                }
+
+                serialized.Update();
+                initialized = true;
+                return new PendingWrapperContext(wrapper, serialized, property);
+            }
+            finally
+            {
+                if (!initialized)
+                {
+                    ReleasePendingWrapper(pending);
+                }
+            }
+        }
+
+        internal static void ReleasePendingWrapper(PendingEntry pending)
+        {
+            if (pending == null)
+            {
+                return;
+            }
+
+            PendingValueWrapper wrapper = pending.valueWrapper;
+            SerializedObject serialized = pending.valueWrapperSerialized;
+            SerializedProperty property = pending.valueWrapperProperty;
+            pending.valueWrapper = null;
+            pending.valueWrapperSerialized = null;
+            pending.valueWrapperProperty = null;
+            pending.valueWrapperDirty = true;
+            try
+            {
+                property?.Dispose();
+            }
+            finally
+            {
+                try
+                {
+                    serialized?.Dispose();
+                }
+                finally
+                {
+                    if (wrapper != null)
+                    {
+                        Object.DestroyImmediate(wrapper);
+                    }
+                }
+            }
+        }
+
+        internal static bool IsTweeningEnabledForTests(bool isSortedSet)
+        {
+            return ShouldTweenManualEntryFoldout(isSortedSet);
+        }
+
+        /// <summary>
+        /// Returns the expected static foldout progress without animation.
+        /// This static method cannot access instance animation state.
+        /// Use <see cref="GetPendingFoldoutProgressFromInstance"/> for actual animation testing.
+        /// </summary>
+        internal static float GetPendingFoldoutProgressForTests(
+            SerializedProperty property,
+            bool expanded,
+            bool isSorted
+        )
+        {
+            return expanded ? 1f : 0f;
+        }
+
+        /// <summary>
+        /// Clears the main foldout animation cache. Used for testing purposes.
+        /// </summary>
+        internal static void ClearMainFoldoutAnimCacheForTests()
+        {
+            MainFoldoutAnimations.Clear();
+        }
+
+        /// <summary>
+        /// Returns true if a main foldout AnimBool exists for the given property path and target object.
+        /// </summary>
+        internal static bool HasMainFoldoutAnimBoolForTests(
+            SerializedObject serializedObject,
+            string propertyPath
+        )
+        {
+            MainFoldoutCacheKey cacheKey = GetMainFoldoutCacheKey(serializedObject, propertyPath);
+            return MainFoldoutAnimations.ContainsKey(cacheKey);
+        }
+
+        /// <summary>
+        /// Gets the main foldout progress for testing purposes.
+        /// </summary>
+        internal static float GetMainFoldoutProgressForTests(
+            SerializedObject serializedObject,
+            string propertyPath,
+            bool isExpanded,
+            bool isSortedSet
+        )
+        {
+            return GetMainFoldoutProgress(serializedObject, propertyPath, isExpanded, isSortedSet);
+        }
+
+        /// <summary>
+        /// Gets the main foldout cache key for testing purposes.
+        /// Returns the string representation of the struct key.
+        /// </summary>
+        internal static string GetMainFoldoutCacheKeyForTests(
+            SerializedObject serializedObject,
+            string propertyPath
+        )
+        {
+            return GetMainFoldoutCacheKey(serializedObject, propertyPath).ToString();
+        }
+
+        internal static object DrawFieldForType(
+            Rect rect,
+            GUIContent content,
+            object current,
+            Type type,
+            PendingEntry pending
+        )
+        {
+            if (TryDrawComplexTypeField(rect, content, ref current, type, pending))
+            {
+                return current;
+            }
+
+            if (!IsTypeSupported(type))
+            {
+                EditorGUI.LabelField(rect, content, GetUnsupportedTypeContent(type));
+                return current;
+            }
+
+            if (EditorUi.Suppress)
+            {
+                EditorGUI.LabelField(rect, content, GetSuppressedFieldValueContent(current));
+                return current;
+            }
+
+            if (type == typeof(string))
+            {
+                return EditorGUI.TextField(rect, content, current as string ?? string.Empty);
+            }
+
+            if (type == typeof(int))
+            {
+                return EditorGUI.IntField(rect, content, current is int i ? i : default);
+            }
+
+            if (type == typeof(float))
+            {
+                return EditorGUI.FloatField(rect, content, current is float f ? f : default);
+            }
+
+            if (type == typeof(double))
+            {
+                return EditorGUI.DoubleField(rect, content, current is double d ? d : default);
+            }
+
+            if (type == typeof(long))
+            {
+                return EditorGUI.LongField(rect, content, current is long l ? l : default);
+            }
+
+            if (type == typeof(bool))
+            {
+                return EditorGUI.Toggle(rect, content, current is true);
+            }
+
+            if (type == typeof(Vector2))
+            {
+                return EditorGUI.Vector2Field(
+                    rect,
+                    content.text,
+                    current is Vector2 v2 ? v2 : Vector2.zero
+                );
+            }
+
+            if (type == typeof(Vector3))
+            {
+                return EditorGUI.Vector3Field(
+                    rect,
+                    content.text,
+                    current is Vector3 v3 ? v3 : Vector3.zero
+                );
+            }
+
+            if (type == typeof(Vector4))
+            {
+                return EditorGUI.Vector4Field(
+                    rect,
+                    content.text,
+                    current is Vector4 v4 ? v4 : Vector4.zero
+                );
+            }
+
+            if (type == typeof(Vector2Int))
+            {
+                Vector2Int value = current is Vector2Int v2int ? v2int : default;
+                return EditorGUI.Vector2IntField(rect, content.text, value);
+            }
+
+            if (type == typeof(Vector3Int))
+            {
+                Vector3Int value = current is Vector3Int v3int ? v3int : default;
+                return EditorGUI.Vector3IntField(rect, content.text, value);
+            }
+
+            if (type == typeof(Rect))
+            {
+                Rect value = current is Rect rectValue ? rectValue : default;
+                return EditorGUI.RectField(rect, content.text, value);
+            }
+
+            if (type == typeof(RectInt))
+            {
+                RectInt value = current is RectInt rectInt ? rectInt : default;
+                return EditorGUI.RectIntField(rect, content.text, value);
+            }
+
+            if (type == typeof(Bounds))
+            {
+                Bounds value = current is Bounds bounds ? bounds : default;
+                return EditorGUI.BoundsField(rect, content.text, value);
+            }
+
+            if (type == typeof(BoundsInt))
+            {
+                BoundsInt value = current is BoundsInt boundsInt ? boundsInt : default;
+                return EditorGUI.BoundsIntField(rect, content.text, value);
+            }
+
+            if (type == typeof(Color))
+            {
+                Color value = current is Color color ? color : Color.clear;
+                return EditorGUI.ColorField(rect, content.text, value);
+            }
+
+            if (type == typeof(AnimationCurve))
+            {
+                AnimationCurve value = current as AnimationCurve ?? new AnimationCurve();
+                return EditorGUI.CurveField(rect, content.text, value);
+            }
+
+            if (type.IsEnum)
+            {
+                Enum enumValue = current as Enum ?? (Enum)Enum.ToObject(type, 0);
+                return EditorGUI.EnumPopup(rect, content, enumValue);
+            }
+
+            if (typeof(Object).IsAssignableFrom(type))
+            {
+                Object obj = current as Object;
+                return EditorGUI.ObjectField(rect, content, obj, type, allowSceneObjects: false);
+            }
+
+            EditorGUI.LabelField(rect, content, GetUnsupportedTypeContent(type));
+            return current;
+        }
+
+        internal static bool PageEntriesNeedSorting(
+            ListPageCache cache,
+            SerializedProperty itemsProperty,
+            bool allowSort
+        )
+        {
+            if (cache?.entries is not { Count: > 1 } || !CanSortElements(itemsProperty, allowSort))
+            {
+                return false;
+            }
+
+            SetElementData previous = default;
+            bool hasPrevious = false;
+
+            foreach (PageEntry entry in cache.entries)
+            {
+                if (entry == null)
+                {
+                    continue;
+                }
+
+                int arrayIndex = entry.arrayIndex;
+                if (arrayIndex < 0 || itemsProperty.arraySize <= arrayIndex)
+                {
+                    continue;
+                }
+
+                SerializedProperty elementProperty = itemsProperty.GetArrayElementAtIndex(
+                    arrayIndex
+                );
+                SetElementData current = ReadElementData(elementProperty);
+
+                if (hasPrevious)
+                {
+                    int comparison = CompareComparableValues(
+                        previous.comparable,
+                        current.comparable
+                    );
+                    if (0 < comparison)
+                    {
+                        return true;
+                    }
+
+                    if (comparison == 0)
+                    {
+                        string previousFallback =
+                            previous.value != null ? previous.value.ToString() : string.Empty;
+                        string currentFallback =
+                            current.value != null ? current.value.ToString() : string.Empty;
+                        if (0 < string.CompareOrdinal(previousFallback, currentFallback))
+                        {
+                            return true;
+                        }
+                    }
+                }
+
+                previous = current;
+                hasPrevious = true;
+            }
+
+            return false;
+        }
+
+        internal static object CloneComplexValue(object source, Type type)
+        {
+            if (source == null)
+            {
+                if (type == null)
+                {
+                    return null;
+                }
+
+                if (type.IsValueType)
+                {
+                    return TryInvokeParameterlessConstructor(type, out object value) ? value : null;
+                }
+
+                return null;
+            }
+
+            if (
+                type == null
+                || type.IsValueType
+                || type == typeof(string)
+                || typeof(Object).IsAssignableFrom(type)
+            )
+            {
+                return source;
+            }
+
+            if (!ShouldDeepClone(type))
+            {
+                return source;
+            }
+
+            if (!TryCreateDefaultInstance(type, out object clone))
+            {
+                return source;
+            }
+
+            try
+            {
+                string json = JsonUtility.ToJson(source);
+                JsonUtility.FromJsonOverwrite(json, clone);
+                return clone;
+            }
+            catch
+            {
+                return source;
+            }
+        }
+
+        internal static float EvaluateDuplicateShakeOffset(
+            int arrayIndex,
+            double startTime,
+            double currentTime,
+            int cycleLimit
+        )
+        {
+            if (cycleLimit == 0)
+            {
+                return 0f;
+            }
+
+            if (currentTime < startTime)
+            {
+                startTime = currentTime;
+            }
+
+            double elapsed = currentTime - startTime;
+
+            if (0 < cycleLimit)
+            {
+                double cycleDuration = (2d * Math.PI) / DuplicateShakeFrequency;
+                double maxDuration = cycleDuration * cycleLimit;
+                if (maxDuration <= elapsed)
+                {
+                    return 0f;
+                }
+            }
+
+            float phase = (float)(elapsed * DuplicateShakeFrequency);
+            float seed = arrayIndex * 0.35f;
+            return Mathf.Sin(phase + seed) * DuplicateShakeAmplitude;
+        }
+
+        internal static Rect ExpandRowRectVertically(Rect rect)
+        {
+            rect.yMin -= 1f;
+            rect.yMax += 1f;
+            return rect;
+        }
+
+        /// <summary>
+        /// Determines whether a pending value is strictly valid for the given element type.
+        /// Returns false for null Unity objects, null reference types, and empty strings.
+        /// </summary>
+        internal static bool ValueIsValid(Type elementType, object value)
+        {
+            if (elementType == null)
+            {
+                return false;
+            }
+
+            if (elementType == typeof(string))
+            {
+                return !string.IsNullOrEmpty(value as string);
+            }
+
+            if (typeof(Object).IsAssignableFrom(elementType))
+            {
+                return value is Object obj && obj != null;
+            }
+
+            return value != null || elementType.IsValueType;
+        }
+
+        /// <summary>
+        /// Determines whether the pending value represents a blank (empty or whitespace-only) string.
+        /// Used to show warning-style UI when adding empty/whitespace string values.
+        /// </summary>
+        internal static bool IsBlankStringValue(Type elementType, object value)
+        {
+            if (elementType != typeof(string))
+            {
+                return false;
+            }
+
+            string stringValue = value as string;
+            return string.IsNullOrWhiteSpace(stringValue);
+        }
+
+        /// <summary>
+        /// Determines whether the pending value represents a null Unity object reference.
+        /// Used to show warning-style UI when adding null object references.
+        /// </summary>
+        internal static bool IsNullUnityObjectValue(Type elementType, object value)
+        {
+            if (elementType == null || !typeof(Object).IsAssignableFrom(elementType))
+            {
+                return false;
+            }
+
+            if (value == null)
+            {
+                return true;
+            }
+
+            return value is Object obj && obj == null;
+        }
+
+        internal static bool ShouldShowSortButton(
+            bool isSortedSet,
+            Type elementType,
+            SerializedProperty itemsProperty
+        )
+        {
+            bool allowSort = isSortedSet || ElementSupportsManualSorting(elementType);
+            return NeedsSorting(itemsProperty, allowSort);
+        }
+
+        internal static void RemoveEntry(SerializedProperty itemsProperty, int index)
+        {
+            if (itemsProperty == null || !itemsProperty.isArray)
+            {
+                return;
+            }
+
+            if (index < 0 || itemsProperty.arraySize <= index)
+            {
+                return;
+            }
+
+            itemsProperty.DeleteArrayElementAtIndex(index);
+
+            if (
+                index < itemsProperty.arraySize
+                && itemsProperty.GetArrayElementAtIndex(index).propertyType
+                    == SerializedPropertyType.ObjectReference
+                && itemsProperty.GetArrayElementAtIndex(index).objectReferenceValue == null
+            )
+            {
+                itemsProperty.DeleteArrayElementAtIndex(index);
+            }
+        }
+
+        internal static bool IsSortedSet(SerializedProperty property)
+        {
+            if (property == null)
+            {
+                return false;
+            }
+
+            string propertyTypeName = property.type ?? string.Empty;
+            if (
+                0 <= propertyTypeName.IndexOf("SerializableSortedSet", StringComparison.Ordinal)
+                || 0 <= propertyTypeName.IndexOf("SortedSet", StringComparison.Ordinal)
+            )
+            {
+                return true;
+            }
+
+            Type fieldType = property.GetManagedType();
+            if (TypeMatchesGenericDefinition(fieldType, typeof(SerializableSortedSet<>)))
+            {
+                return true;
+            }
+
+            Type declaredType = TryResolveDeclaredSetType(property);
+            if (TypeMatchesGenericDefinition(declaredType, typeof(SerializableSortedSet<>)))
+            {
+                return true;
+            }
+
+            Type unityResolvedType = ResolveUnityPropertyType(property);
+            if (TypeMatchesGenericDefinition(unityResolvedType, typeof(SerializableSortedSet<>)))
+            {
+                return true;
+            }
+
+            object instance = GetSetInstance(property, property.propertyPath);
+            if (instance == null)
+            {
+                SerializedObject serializedObject = property.serializedObject;
+                if (serializedObject != null)
+                {
+                    Object target = serializedObject.targetObject;
+                    if (target != null)
+                    {
+                        instance = GetMemberValue(target, property.name);
+                    }
+                }
+            }
+
+            if (instance is ISerializableSetInspector { SupportsSorting: true })
+            {
+                return true;
+            }
+
+            Type instanceType = instance?.GetType();
+            return TypeMatchesGenericDefinition(instanceType, typeof(SerializableSortedSet<>));
+        }
+
+        internal static void SyncRuntimeSet(SerializedProperty setProperty)
+        {
+            if (setProperty == null)
+            {
+                return;
+            }
+
+            SerializedObject sharedSerializedObject = setProperty.serializedObject;
+            Object[] targets = sharedSerializedObject.targetObjects;
+            string propertyPath = setProperty.propertyPath;
+
+            foreach (Object target in targets)
+            {
+                bool isScriptableSingletonTarget = IsScriptableSingletonType(target);
+                bool calledSave = false;
+
+                using SerializedObject targetSerializedObject = new(target);
+                targetSerializedObject.UpdateIfRequiredOrScript();
+                SerializedProperty targetSetProperty = targetSerializedObject.FindProperty(
+                    propertyPath
+                );
+                if (targetSetProperty == null)
+                {
+                    continue;
+                }
+
+                SerializedProperty targetItemsProperty = targetSetProperty.FindPropertyRelative(
+                    SerializableHashSetSerializedPropertyNames.Items
+                );
+
+                object setInstance = GetTargetObjectOfProperty(target, propertyPath);
+                bool isInspector = setInstance is ISerializableSetInspector;
+
+                if (setInstance is not ISerializableSetInspector inspector)
+                {
+                    PaletteSerializationDiagnostics.ReportSyncRuntimeSet(
+                        sharedSerializedObject,
+                        propertyPath,
+                        setInstance,
+                        isInspector,
+                        calledSave
+                    );
+                    continue;
+                }
+
+                // ScriptableSingleton managed fields may lag SerializedProperties; use current serialized data to rebuild runtime state.
+                Array snapshot = BuildSnapshotArray(targetItemsProperty, inspector.ElementType);
+                inspector.SetSerializedItemsSnapshot(snapshot, preserveSerializedEntries: true);
+
+                if (setInstance is ISerializableSetEditorSync editorSync)
+                {
+                    editorSync.EditorAfterDeserialize();
+                }
+
+                inspector.SynchronizeSerializedState();
+                EditorUtility.SetDirty(target);
+
+                if (isScriptableSingletonTarget)
+                {
+                    if (target is UnityHelpersSettings unitySettings)
+                    {
+                        unitySettings.SaveSettings();
+                    }
+                    else
+                    {
+                        SaveScriptableSingleton(target);
+                    }
+                    calledSave = true;
+                }
+
+                PaletteSerializationDiagnostics.ReportSyncRuntimeSet(
+                    sharedSerializedObject,
+                    propertyPath,
+                    setInstance,
+                    isInspector,
+                    calledSave
+                );
+            }
+
+            sharedSerializedObject.UpdateIfRequiredOrScript();
+        }
+
+        /// <summary>
+        /// Checks if the target is a ScriptableSingleton type.
+        /// ScriptableSingletons have issues with ApplyModifiedProperties not persisting changes.
+        /// </summary>
+        internal static bool IsScriptableSingletonType(Object target)
+        {
+            if (target == null)
+            {
+                return false;
+            }
+
+            Type scriptableSingletonGenericType = typeof(ScriptableSingleton<>);
+            Type type = target.GetType();
+            while (type != null)
+            {
+                if (
+                    type.IsGenericType
+                    && type.GetGenericTypeDefinition() == scriptableSingletonGenericType
+                )
+                {
+                    return true;
+                }
+                type = type.BaseType;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Saves a ScriptableSingleton by calling its Save(true) method via reflection.
+        /// </summary>
+        internal static void SaveScriptableSingleton(Object target)
+        {
+            if (target == null)
+            {
+                return;
+            }
+
+            Type type = target.GetType();
+            MethodInfo saveMethod = null;
+            while (type != null && saveMethod == null)
+            {
+                saveMethod = type.GetMethod(
+                    "Save",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                    null,
+                    new[] { typeof(bool) },
+                    null
+                );
+                type = type.BaseType;
+            }
+
+            if (saveMethod != null)
+            {
+                saveMethod.Invoke(target, new object[] { true });
+            }
+        }
+
+        /// <summary>
+        /// Computes the cache key for main foldout animations.
+        /// Includes the target object's instance ID to prevent collisions between different objects.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static MainFoldoutCacheKey GetMainFoldoutCacheKey(
+            SerializedObject serializedObject,
+            string propertyPath
+        )
+        {
+            long instanceId =
+                serializedObject?.targetObject != null
+                    ? serializedObject.targetObject.GetUnityObjectId()
+                    : 0;
+            return new MainFoldoutCacheKey(instanceId, propertyPath);
+        }
 
         private static float GetFooterHeight()
         {
@@ -225,107 +1059,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         private static float GetPaginationHeaderHeight()
         {
             return EditorGUIUtility.singleLineHeight + PaginationHeaderHeightPadding;
-        }
-
-        private void DrawEmptySetDrawer(
-            Rect rect,
-            SerializedProperty property,
-            string propertyPath,
-            SerializedProperty itemsProperty,
-            PaginationState pagination
-        )
-        {
-            GUI.Box(rect, GUIContent.none, EditorStyles.helpBox);
-
-            float padding = 6f;
-            float lineHeight = EditorGUIUtility.singleLineHeight;
-            float verticalSpacing = EditorGUIUtility.standardVerticalSpacing;
-
-            Rect messageRect = new(
-                rect.x + padding,
-                rect.y + padding,
-                rect.width - padding * 2f,
-                lineHeight
-            );
-            EditorGUI.LabelField(messageRect, "List is empty.", EditorStyles.miniLabel);
-
-            Rect buttonsRect = new(
-                messageRect.x,
-                messageRect.yMax + verticalSpacing,
-                messageRect.width,
-                lineHeight
-            );
-
-            SerializedProperty propertyRef = property;
-            SerializedProperty itemsPropertyRef = itemsProperty;
-            if (!TryGetSetInspector(propertyRef, propertyPath, out _))
-            {
-                return;
-            }
-
-            if (itemsPropertyRef == null)
-            {
-                return;
-            }
-
-            int totalCount = itemsPropertyRef is { isArray: true } ? itemsPropertyRef.arraySize : 0;
-            float rightCursor = buttonsRect.xMax;
-
-            Rect addRect = new(rightCursor - 60f, buttonsRect.y, 60f, lineHeight);
-            if (GUI.Button(addRect, AddEntryContent, AddButtonStyle))
-            {
-                if (
-                    TryAddNewElement(
-                        ref propertyRef,
-                        propertyPath,
-                        ref itemsPropertyRef,
-                        pagination
-                    )
-                )
-                {
-                    itemsPropertyRef = propertyRef.FindPropertyRelative(
-                        SerializableHashSetSerializedPropertyNames.Items
-                    );
-                    totalCount = itemsPropertyRef is { isArray: true }
-                        ? itemsPropertyRef.arraySize
-                        : 0;
-                    EnsurePaginationBounds(pagination, totalCount);
-                }
-            }
-            rightCursor = addRect.x - ButtonSpacing;
-
-            Rect clearRect = new(rightCursor - 80f, buttonsRect.y, 80f, lineHeight);
-            bool canClear = 0 < totalCount;
-            GUIStyle clearStyle = canClear
-                ? ClearAllActiveButtonStyle
-                : ClearAllInactiveButtonStyle;
-            using (new EditorGUI.DisabledScope(!canClear))
-            {
-                if (GUI.Button(clearRect, ClearAllContent, clearStyle) && canClear)
-                {
-                    bool confirmed = EditorUtility.DisplayDialog(
-                        "Clear Set",
-                        "Remove all entries from this set?",
-                        "Clear",
-                        "Cancel"
-                    );
-                    if (
-                        confirmed
-                        && TryClearSet(ref propertyRef, propertyPath, ref itemsPropertyRef)
-                    )
-                    {
-                        pagination.page = 0;
-                        pagination.selectedIndex = -1;
-                        itemsPropertyRef = propertyRef.FindPropertyRelative(
-                            SerializableHashSetSerializedPropertyNames.Items
-                        );
-                        totalCount = itemsPropertyRef is { isArray: true }
-                            ? itemsPropertyRef.arraySize
-                            : 0;
-                        EnsurePaginationBounds(pagination, totalCount);
-                    }
-                }
-            }
         }
 
         private static float GetEmptySetDrawerHeight()
@@ -456,6 +1189,2604 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             return color;
+        }
+
+        private static Rect ResolveContentRect(Rect position, bool skipIndentation = false)
+        {
+            float leftPadding = GroupGUIWidthUtility.CurrentLeftPadding;
+            float rightPadding = GroupGUIWidthUtility.CurrentRightPadding;
+            int indentLevel = EditorGUI.indentLevel;
+            bool isInsideWGroupProperty = GroupGUIWidthUtility.IsInsideWGroupPropertyDraw;
+
+            // WGroup layout already positions and indents this rect; apply only the alignment correction.
+            if (isInsideWGroupProperty)
+            {
+                const float WGroupAlignmentOffset = -4f;
+                Rect alignedPosition = position;
+
+                alignedPosition.xMin += WGroupAlignmentOffset;
+                return alignedPosition;
+            }
+
+            // GUILayout supplies normal indentation, but WGroup padding still requires explicit application.
+            if (skipIndentation)
+            {
+                Rect result = position;
+
+                if (0f < leftPadding || 0f < rightPadding)
+                {
+                    result.xMin += leftPadding;
+                    result.xMax -= rightPadding;
+                    if (result.width < 0f || float.IsNaN(result.width))
+                    {
+                        result.width = 0f;
+                    }
+                }
+
+                return result;
+            }
+
+            Rect padded = GroupGUIWidthUtility.ApplyCurrentPadding(position);
+            if (
+                (0f < leftPadding || 0f < rightPadding)
+                && Mathf.Approximately(padded.xMin, position.xMin)
+                && Mathf.Approximately(padded.width, position.width)
+            )
+            {
+                padded.xMin += leftPadding;
+                padded.xMax -= rightPadding;
+                if (padded.width < 0f || float.IsNaN(padded.width))
+                {
+                    padded.width = 0f;
+                }
+            }
+
+            // IndentedRect changes width at zero indentation in some Unity versions; bypass it for consistent layout.
+            Rect indentedResult = 0 < indentLevel ? EditorGUI.IndentedRect(padded) : padded;
+
+            // High indentation can make the remaining width negative.
+            if (indentedResult.width < 0f || float.IsNaN(indentedResult.width))
+            {
+                indentedResult.width = 0f;
+            }
+
+            Rect final = indentedResult;
+
+            int scopeDepth = GroupGUIWidthUtility.CurrentScopeDepth;
+            if (scopeDepth == 0)
+            {
+                // Align ungrouped content with Unity's default list rendering.
+                const float UnityListAlignmentOffset = -1.25f;
+
+                final.xMin += UnityListAlignmentOffset;
+
+                if (final.xMin < 0f)
+                {
+                    final.xMin = 0f;
+                }
+            }
+
+            return final;
+        }
+
+        private static bool TryToggleManualEntryFoldoutLabel(
+            Event currentEvent,
+            Rect labelHitRect,
+            ref bool expanded
+        )
+        {
+            if (currentEvent == null)
+            {
+                return false;
+            }
+
+            EventType effectiveEventType = GetEffectiveMouseEventType(currentEvent);
+            if (
+                effectiveEventType != EventType.MouseDown
+                || currentEvent.button != 0
+                || !labelHitRect.Contains(currentEvent.mousePosition)
+            )
+            {
+                return false;
+            }
+
+            expanded = !expanded;
+            GUI.changed = true;
+            if (currentEvent.type != EventType.Used)
+            {
+                currentEvent.Use();
+            }
+
+            return true;
+        }
+
+        private static EventType GetEffectiveMouseEventType(Event currentEvent)
+        {
+            if (currentEvent == null)
+            {
+                return EventType.Ignore;
+            }
+
+            return GetEffectiveMouseEventType(currentEvent.type, currentEvent.rawType);
+        }
+
+        private static EventType GetEffectiveMouseEventType(
+            EventType eventType,
+            EventType rawEventType
+        )
+        {
+            if (eventType == EventType.Used)
+            {
+                return rawEventType;
+            }
+
+            return eventType;
+        }
+
+        private static string BuildPropertyCacheKey(SerializedProperty property)
+        {
+            if (property == null)
+            {
+                return string.Empty;
+            }
+
+            SerializedObject serializedObject = property.serializedObject;
+            string propertyPath = property.propertyPath ?? string.Empty;
+
+            if (serializedObject == null)
+            {
+                return propertyPath;
+            }
+
+            Object[] targets = serializedObject.targetObjects;
+            if (targets == null || targets.Length == 0)
+            {
+                int fallbackId = RuntimeHelpers.GetHashCode(serializedObject);
+                return $"{fallbackId}_{propertyPath}";
+            }
+
+            if (targets.Length == 1 && targets[0] != null)
+            {
+                long instanceId = targets[0].GetUnityObjectId();
+                PropertyCacheKey cacheKey = new(instanceId, propertyPath);
+
+                if (SingleTargetPropertyKeyCache.TryGetValue(cacheKey, out string cached))
+                {
+                    return cached;
+                }
+
+                using PooledResource<StringBuilder> lease = Buffers.GetStringBuilder(
+                    propertyPath.Length + 16,
+                    out StringBuilder builder
+                );
+                builder.Clear();
+                builder.Append(instanceId);
+                builder.Append('_');
+                builder.Append(propertyPath);
+                string result = builder.ToString();
+
+                if (SingleTargetPropertyKeyCache.Count < MaxSingleTargetPropertyKeyCacheSize)
+                {
+                    SingleTargetPropertyKeyCache[cacheKey] = result;
+                }
+
+                return result;
+            }
+
+            using PooledResource<StringBuilder> keyBuilderLease = Buffers.GetStringBuilder(
+                propertyPath.Length + Math.Max(32, targets.Length * 12),
+                out StringBuilder keyBuilder
+            );
+            keyBuilder.Append(propertyPath);
+            keyBuilder.Append('|');
+
+            for (int index = 0; index < targets.Length; index++)
+            {
+                long id = targets[index] != null ? targets[index].GetUnityObjectId() : 0;
+                keyBuilder.Append(id);
+                if (index < targets.Length - 1)
+                {
+                    keyBuilder.Append(',');
+                }
+            }
+
+            return keyBuilder.ToString();
+        }
+
+        // A resolved set with no items array indicates refused element serialization; an unresolved property remains unknown.
+        private static bool HasDroppedItemsArray(
+            bool hasInspector,
+            SerializedProperty itemsProperty
+        )
+        {
+            return hasInspector && itemsProperty == null;
+        }
+
+        // Height measurement has no rect, so wrap the rare serialization error using Inspector width.
+        private static float GetDroppedBackingArrayHeight(string message)
+        {
+            float wrapWidth = Mathf.Max(
+                EditorGUIUtility.currentViewWidth - (EditorGUIUtility.singleLineHeight * 2f),
+                120f
+            );
+            return Mathf.Max(
+                EditorStyles.helpBox.CalcHeight(new GUIContent(message), wrapWidth),
+                EditorGUIUtility.singleLineHeight * 2f
+            );
+        }
+
+        private static RowFoldoutKey BuildRowFoldoutKey(string cacheKey, int globalIndex)
+        {
+            return new RowFoldoutKey(cacheKey, globalIndex);
+        }
+
+        private static void EnsurePaginationBounds(PaginationState state, int totalCount)
+        {
+            int pageSize = state.pageSize;
+            if (totalCount <= 0)
+            {
+                state.page = 0;
+                state.selectedIndex = -1;
+                return;
+            }
+
+            if (totalCount <= state.selectedIndex)
+            {
+                state.selectedIndex = totalCount - 1;
+            }
+
+            if (state.selectedIndex < 0)
+            {
+                state.selectedIndex = -1;
+            }
+
+            int pageCount = 0 < pageSize ? Mathf.Max(1, (totalCount + pageSize - 1) / pageSize) : 1;
+
+            if (pageCount <= state.page)
+            {
+                state.page = pageCount - 1;
+            }
+
+            if (state.page < 0)
+            {
+                state.page = 0;
+            }
+
+            if (0 <= state.selectedIndex)
+            {
+                int selectedPage = Mathf.Clamp(state.selectedIndex / pageSize, 0, pageCount - 1);
+                state.page = selectedPage;
+            }
+        }
+
+        private static bool RelativeIndexIsValid(ListPageCache cache, int relativeIndex)
+        {
+            return cache != null && 0 <= relativeIndex && relativeIndex < cache.entries.Count;
+        }
+
+        private static int GetRelativeIndex(ListPageCache cache, int globalIndex)
+        {
+            if (cache == null || globalIndex < 0)
+            {
+                return -1;
+            }
+
+            for (int i = 0; i < cache.entries.Count; i++)
+            {
+                if (cache.entries[i].arrayIndex == globalIndex)
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        private static void SyncListSelectionWithPagination(
+            ReorderableList list,
+            PaginationState pagination,
+            ListPageCache cache
+        )
+        {
+            if (list == null || pagination == null || cache == null)
+            {
+                return;
+            }
+
+            int relativeIndex = GetRelativeIndex(cache, pagination.selectedIndex);
+            list.index = relativeIndex;
+        }
+
+        private static string GetManualEntryInfoMessage(
+            bool inspectorAvailable,
+            bool typeSupported,
+            bool valueValid,
+            bool isDangerValue,
+            bool isBlankStringValue,
+            bool isNullObjectValue,
+            string pendingValueString,
+            bool duplicateExists,
+            Type elementType
+        )
+        {
+            if (!inspectorAvailable)
+            {
+                return "Set inspector unavailable.";
+            }
+
+            if (!typeSupported)
+            {
+                if (elementType == null)
+                {
+                    return "Unsupported element type.";
+                }
+
+                using PooledResource<StringBuilder> lease = Buffers.GetStringBuilder(
+                    32 + elementType.Name.Length,
+                    out StringBuilder builder
+                );
+                builder.Clear();
+                builder.Append("Unsupported type (");
+                builder.Append(elementType.Name);
+                builder.Append(").");
+                return builder.ToString();
+            }
+
+            if (!valueValid && !isDangerValue)
+            {
+                return "Value required.";
+            }
+
+            if (duplicateExists)
+            {
+                return "Value already exists.";
+            }
+
+            if (isBlankStringValue)
+            {
+                string descriptor = string.IsNullOrEmpty(pendingValueString)
+                    ? "empty"
+                    : "whitespace-only";
+                return $"Adding {descriptor} string value.";
+            }
+
+            if (isNullObjectValue)
+            {
+                return "Adding null object reference.";
+            }
+
+            return string.Empty;
+        }
+
+        private static float ResolveManualEntryFoldoutToggleOffset(SerializedProperty property)
+        {
+            SerializedObject serializedObject = property?.serializedObject;
+            return TargetsUnityHelpersSettings(serializedObject)
+                ? ManualEntryFoldoutToggleOffsetSettings
+                : ManualEntryFoldoutToggleOffsetInspector;
+        }
+
+        private static float ResolveManualEntrySectionPadding(SerializedProperty property)
+        {
+            SerializedObject serializedObject = property?.serializedObject;
+            return TargetsUnityHelpersSettings(serializedObject)
+                ? ManualEntrySectionPaddingSettings
+                : ManualEntrySectionPadding;
+        }
+
+        private static GUIStyle GetManualEntryFoldoutLabelStyle()
+        {
+            if (_manualEntryFoldoutLabelStyle != null)
+            {
+                return _manualEntryFoldoutLabelStyle;
+            }
+
+            _manualEntryFoldoutLabelStyle = new GUIStyle(EditorStyles.boldLabel)
+            {
+                alignment = TextAnchor.MiddleLeft,
+                padding = new RectOffset(0, 0, 0, 0),
+                margin = new RectOffset(0, 0, 0, 0),
+                wordWrap = false,
+            };
+            return _manualEntryFoldoutLabelStyle;
+        }
+
+        private static bool ManualEntryValueSupportsFoldout(PendingEntry pending)
+        {
+            if (pending == null || pending.elementType == null)
+            {
+                return false;
+            }
+
+            // New elements can temporarily report no visible children; trust types known to support expansion.
+            Type elementType = pending.elementType;
+            bool typeSupportsComplex =
+                TypeSupportsComplexEditing(elementType)
+                && !typeof(Object).IsAssignableFrom(elementType);
+
+            SerializedProperty property = pending.valueWrapperProperty;
+            if (property != null)
+            {
+                return typeSupportsComplex || SerializedPropertySupportsFoldout(property);
+            }
+
+            PendingWrapperContext context = EnsurePendingWrapper(pending, elementType);
+            property = context.Property;
+
+            return typeSupportsComplex || SerializedPropertySupportsFoldout(property);
+        }
+
+        private static bool TargetsUnityHelpersSettings(SerializedObject serializedObject)
+        {
+            if (serializedObject == null)
+            {
+                return false;
+            }
+
+            if (serializedObject.targetObject is UnityHelpersSettings)
+            {
+                return true;
+            }
+
+            Object[] targets = serializedObject.targetObjects;
+            if (targets == null || targets.Length == 0)
+            {
+                return false;
+            }
+
+            foreach (Object target in targets)
+            {
+                if (target is UnityHelpersSettings)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static void ResetPendingEntry(PendingEntry pending, bool collapseFoldout = true)
+        {
+            if (pending == null)
+            {
+                return;
+            }
+
+            if (pending.elementType != null)
+            {
+                pending.value = CloneComplexValue(
+                    SerializableDictionaryPropertyDrawer.GetDefaultValue(pending.elementType),
+                    pending.elementType
+                );
+            }
+            else
+            {
+                pending.value = null;
+            }
+
+            pending.errorMessage = null;
+            if (collapseFoldout)
+            {
+                pending.isExpanded = false;
+            }
+            SyncPendingWrapperValue(pending);
+            pending.valueWrapperDirty = true;
+        }
+
+        private static void SyncPendingWrapperValue(PendingEntry pending)
+        {
+            if (
+                pending?.valueWrapper == null
+                || pending.valueWrapperSerialized == null
+                || pending.valueWrapperProperty == null
+            )
+            {
+                return;
+            }
+
+            object currentValue = pending.valueWrapper.GetValue();
+            if (!pending.valueWrapperDirty && ValuesEqual(currentValue, pending.value))
+            {
+                return;
+            }
+
+            pending.valueWrapper.SetValue(CloneComplexValue(pending.value, pending.elementType));
+            pending.valueWrapperSerialized.Update();
+            pending.valueWrapperSerialized.ApplyModifiedPropertiesWithoutUndo();
+            pending.valueWrapperDirty = false;
+        }
+
+        private static bool ShouldTweenMainFoldout(bool isSortedSet)
+        {
+            return isSortedSet
+                ? UnityHelpersSettings.ShouldTweenSerializableSortedSetFoldouts()
+                : UnityHelpersSettings.ShouldTweenSerializableSetFoldouts();
+        }
+
+        private static float GetMainFoldoutAnimationSpeed(bool isSortedSet)
+        {
+            return isSortedSet
+                ? UnityHelpersSettings.GetSerializableSortedSetFoldoutSpeed()
+                : UnityHelpersSettings.GetSerializableSetFoldoutSpeed();
+        }
+
+        private static AnimBool EnsureMainFoldoutAnim(
+            SerializedObject serializedObject,
+            string propertyPath,
+            bool isExpanded,
+            bool isSortedSet
+        )
+        {
+            bool shouldTween = ShouldTweenMainFoldout(isSortedSet);
+            float speed = GetMainFoldoutAnimationSpeed(isSortedSet);
+            MainFoldoutCacheKey cacheKey = GetMainFoldoutCacheKey(serializedObject, propertyPath);
+
+            SerializableCollectionTweenDiagnostics.LogTweenSettingsQuery(
+                "EnsureMainFoldoutAnim",
+                propertyPath ?? "(unknown)",
+                isSortedSet,
+                shouldTween,
+                speed
+            );
+
+            if (!shouldTween)
+            {
+                if (MainFoldoutAnimations.TryRemove(cacheKey, out AnimBool existing))
+                {
+                    Unsubscribe(existing);
+
+                    SerializableCollectionTweenDiagnostics.LogAnimBoolDestroyed(
+                        propertyPath,
+                        "MainFoldout_TweeningDisabled"
+                    );
+                }
+
+                return null;
+            }
+
+            if (!MainFoldoutAnimations.TryGet(cacheKey, out AnimBool anim) || anim == null)
+            {
+                anim = new AnimBool(isExpanded) { speed = speed };
+                anim.valueChanged.AddListener(RequestRepaint);
+                MainFoldoutAnimations.Set(cacheKey, anim);
+
+                SerializableCollectionTweenDiagnostics.LogAnimBoolCreation(
+                    propertyPath,
+                    isExpanded,
+                    isSortedSet,
+                    speed
+                );
+            }
+            else
+            {
+                anim.speed = speed;
+            }
+
+            anim.target = isExpanded;
+            return anim;
+        }
+
+        private static float GetMainFoldoutProgress(
+            SerializedObject serializedObject,
+            string propertyPath,
+            bool isExpanded,
+            bool isSortedSet
+        )
+        {
+            bool shouldTween = ShouldTweenMainFoldout(isSortedSet);
+            if (!shouldTween)
+            {
+                float immediateProgress = isExpanded ? 1f : 0f;
+
+                SerializableCollectionTweenDiagnostics.LogFoldoutProgressCalculation(
+                    "GetMainFoldoutProgress_NoTween",
+                    propertyPath ?? "(unknown)",
+                    false,
+                    isExpanded,
+                    immediateProgress,
+                    false
+                );
+
+                return immediateProgress;
+            }
+
+            AnimBool anim = EnsureMainFoldoutAnim(
+                serializedObject,
+                propertyPath,
+                isExpanded,
+                isSortedSet
+            );
+            if (anim == null)
+            {
+                float fallbackProgress = isExpanded ? 1f : 0f;
+
+                SerializableCollectionTweenDiagnostics.LogFoldoutProgressCalculation(
+                    "GetMainFoldoutProgress_NoAnimBool",
+                    propertyPath ?? "(unknown)",
+                    true,
+                    isExpanded,
+                    fallbackProgress,
+                    false
+                );
+
+                return fallbackProgress;
+            }
+
+            if (anim.isAnimating)
+            {
+                RequestRepaint();
+            }
+
+            float animatedProgress = anim.faded;
+
+            SerializableCollectionTweenDiagnostics.LogFoldoutProgressCalculation(
+                "GetMainFoldoutProgress_Animated",
+                propertyPath ?? "(unknown)",
+                true,
+                isExpanded,
+                animatedProgress,
+                true
+            );
+
+            return animatedProgress;
+        }
+
+        private static bool ShouldTweenManualEntryFoldout(bool isSortedSet)
+        {
+            return isSortedSet
+                ? UnityHelpersSettings.ShouldTweenSerializableSortedSetFoldouts()
+                : UnityHelpersSettings.ShouldTweenSerializableSetFoldouts();
+        }
+
+        private static float GetManualEntryFoldoutSpeed(bool isSortedSet)
+        {
+            return isSortedSet
+                ? UnityHelpersSettings.GetSerializableSortedSetFoldoutSpeed()
+                : UnityHelpersSettings.GetSerializableSetFoldoutSpeed();
+        }
+
+        private static AnimBool CreateManualEntryFoldoutAnim(
+            bool initialValue,
+            bool isSortedSet,
+            string propertyPath = null
+        )
+        {
+            float speed = GetManualEntryFoldoutSpeed(isSortedSet);
+            AnimBool anim = new(initialValue) { speed = speed };
+            anim.valueChanged.AddListener(RequestRepaint);
+
+            SerializableCollectionTweenDiagnostics.LogAnimBoolCreation(
+                propertyPath ?? "(unknown)",
+                initialValue,
+                isSortedSet,
+                speed
+            );
+
+            return anim;
+        }
+
+        private static AnimBool EnsureManualEntryFoldoutAnim(
+            PendingEntry pending,
+            string propertyPath = null
+        )
+        {
+            if (pending == null)
+            {
+                return null;
+            }
+
+            bool shouldTween = ShouldTweenManualEntryFoldout(pending.isSorted);
+            float speed = GetManualEntryFoldoutSpeed(pending.isSorted);
+
+            SerializableCollectionTweenDiagnostics.LogTweenSettingsQuery(
+                "EnsureManualEntryFoldoutAnim",
+                propertyPath ?? "(unknown)",
+                pending.isSorted,
+                shouldTween,
+                speed
+            );
+
+            if (!shouldTween)
+            {
+                if (pending.foldoutAnim != null)
+                {
+                    pending.foldoutAnim.valueChanged.RemoveListener(RequestRepaint);
+                    pending.foldoutAnim = null;
+
+                    SerializableCollectionTweenDiagnostics.LogAnimBoolDestroyed(
+                        propertyPath ?? "(unknown)",
+                        "TweeningDisabled"
+                    );
+                }
+
+                return null;
+            }
+
+            if (pending.foldoutAnim == null)
+            {
+                pending.foldoutAnim = CreateManualEntryFoldoutAnim(
+                    pending.isExpanded,
+                    pending.isSorted,
+                    propertyPath
+                );
+            }
+            else
+            {
+                pending.foldoutAnim.speed = speed;
+
+                if (pending.foldoutAnim.target != pending.isExpanded)
+                {
+                    pending.foldoutAnim.target = pending.isExpanded;
+                }
+            }
+
+            return pending.foldoutAnim;
+        }
+
+        private static float GetPendingFoldoutProgress(
+            PendingEntry pending,
+            string propertyPath = null
+        )
+        {
+            if (pending == null)
+            {
+                return 0f;
+            }
+
+            bool shouldTween = ShouldTweenManualEntryFoldout(pending.isSorted);
+
+            // EnsureManualEntryFoldoutAnim also cleans up animation state when tweening is disabled.
+            AnimBool anim = EnsureManualEntryFoldoutAnim(pending, propertyPath);
+
+            if (!shouldTween)
+            {
+                float immediateProgress = pending.isExpanded ? 1f : 0f;
+
+                SerializableCollectionTweenDiagnostics.LogFoldoutProgressCalculation(
+                    "GetPendingFoldoutProgress_NoTween",
+                    propertyPath ?? "(unknown)",
+                    false,
+                    pending.isExpanded,
+                    immediateProgress,
+                    pending.foldoutAnim != null
+                );
+
+                return immediateProgress;
+            }
+
+            if (anim == null)
+            {
+                float fallbackProgress = pending.isExpanded ? 1f : 0f;
+
+                SerializableCollectionTweenDiagnostics.LogFoldoutProgressCalculation(
+                    "GetPendingFoldoutProgress_NoAnimBool",
+                    propertyPath ?? "(unknown)",
+                    true,
+                    pending.isExpanded,
+                    fallbackProgress,
+                    false
+                );
+
+                return fallbackProgress;
+            }
+
+            anim.target = pending.isExpanded;
+            float animatedProgress = anim.faded;
+
+            SerializableCollectionTweenDiagnostics.LogFoldoutProgressCalculation(
+                "GetPendingFoldoutProgress_Animated",
+                propertyPath ?? "(unknown)",
+                true,
+                pending.isExpanded,
+                animatedProgress,
+                true
+            );
+
+            return animatedProgress;
+        }
+
+        private static float GetPendingSectionHeight(PendingEntry pending)
+        {
+            return GetPendingSectionHeight(pending, null);
+        }
+
+        private static float GetPendingSectionHeight(
+            PendingEntry pending,
+            SerializedProperty property
+        )
+        {
+            if (pending == null)
+            {
+                return 0f;
+            }
+
+            float resolvedSectionPadding = ResolveManualEntrySectionPadding(property);
+            float collapsedHeight = EditorGUIUtility.singleLineHeight + resolvedSectionPadding * 2f;
+            float spacing = EditorGUIUtility.standardVerticalSpacing;
+            float expandedExtra = EditorGUIUtility.singleLineHeight * 2f + spacing * 3f;
+
+            if (!string.IsNullOrEmpty(pending.errorMessage))
+            {
+                expandedExtra += GetWarningBarHeight() + spacing;
+            }
+
+            string propertyPath = property?.propertyPath;
+            float progress = GetPendingFoldoutProgress(pending, propertyPath);
+            float finalHeight = collapsedHeight + expandedExtra * Mathf.Clamp01(progress);
+
+            SerializableCollectionTweenDiagnostics.LogPendingSectionHeightCalc(
+                propertyPath ?? "(unknown)",
+                collapsedHeight,
+                expandedExtra,
+                progress,
+                finalHeight
+            );
+
+            return finalHeight;
+        }
+
+        private static void RequestRepaint()
+        {
+            // Repaint all views because SettingsProvider and Inspector can both host this drawer.
+            InternalEditorUtility.RepaintAllViews();
+        }
+
+        private static void Unsubscribe(AnimBool anim)
+        {
+            if (anim != null)
+            {
+                anim.valueChanged.RemoveListener(RequestRepaint);
+            }
+        }
+
+        private static GUIContent GetUnsupportedTypeContent(Type type)
+        {
+            string typeName = type?.Name ?? "Unknown";
+            if (type == null || !UnsupportedTypeMessageCache.TryGetValue(type, out string message))
+            {
+                message = "Unsupported type (" + typeName + ")";
+                if (type != null)
+                {
+                    UnsupportedTypeMessageCache[type] = message;
+                }
+            }
+            UnsupportedTypeContent.text = message;
+            return UnsupportedTypeContent;
+        }
+
+        private static GUIContent GetSuppressedFieldValueContent(object current)
+        {
+            string text = string.Empty;
+            if (current is Object unityObject)
+            {
+                if (unityObject != null)
+                {
+                    text = unityObject.name;
+                }
+            }
+            else if (current != null)
+            {
+                text = current.ToString() ?? string.Empty;
+            }
+
+            SuppressedFieldValueContent.text = text;
+            return SuppressedFieldValueContent;
+        }
+
+        private static bool TryDrawComplexTypeField(
+            Rect rect,
+            GUIContent content,
+            ref object current,
+            Type type,
+            PendingEntry pending
+        )
+        {
+            if (
+                pending == null
+                || type == null
+                || !TypeSupportsComplexEditing(type)
+                || (type.IsValueType && !typeof(Object).IsAssignableFrom(type))
+                || typeof(Object).IsAssignableFrom(type)
+                || type == typeof(string)
+            )
+            {
+                return false;
+            }
+
+            PendingWrapperContext context = EnsurePendingWrapper(pending, type);
+            if (context.Property == null)
+            {
+                return false;
+            }
+
+            object targetValue =
+                current
+                ?? CloneComplexValue(
+                    SerializableDictionaryPropertyDrawer.GetDefaultValue(type),
+                    type
+                );
+            object wrapperValue = context.Wrapper.GetValue();
+            if (!ValuesEqual(wrapperValue, targetValue))
+            {
+                context.Wrapper.SetValue(CloneComplexValue(targetValue, type));
+                context.Serialized.Update();
+                context.Serialized.ApplyModifiedPropertiesWithoutUndo();
+            }
+
+            if (type.IsClass && context.Wrapper.GetValue() == null)
+            {
+                context.Wrapper.SetValue(
+                    CloneComplexValue(
+                        SerializableDictionaryPropertyDrawer.GetDefaultValue(type),
+                        type
+                    )
+                );
+                context.Serialized.Update();
+                context.Serialized.ApplyModifiedPropertiesWithoutUndo();
+            }
+
+            EditorGUI.BeginChangeCheck();
+            EditorGUI.PropertyField(rect, context.Property, content, includeChildren: true);
+            if (EditorGUI.EndChangeCheck())
+            {
+                context.Serialized.ApplyModifiedProperties();
+                context.Serialized.Update();
+                object updated = context.Wrapper.GetValue();
+                current = CloneComplexValue(updated, type);
+            }
+
+            return true;
+        }
+
+        private static bool TypeSupportsComplexEditing(Type type)
+        {
+            while (true)
+            {
+                if (type == null)
+                {
+                    return false;
+                }
+
+                if (typeof(Object).IsAssignableFrom(type))
+                {
+                    return true;
+                }
+
+                if (IsSimplePendingFieldType(type))
+                {
+                    return false;
+                }
+
+                if (type.IsArray)
+                {
+                    type = type.GetElementType();
+                    continue;
+                }
+
+                if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(List<>))
+                {
+                    type = type.GetGenericArguments()[0];
+                    continue;
+                }
+
+                return type.IsSerializable;
+            }
+        }
+
+        private static bool IsSimplePendingFieldType(Type type)
+        {
+            if (type == null)
+            {
+                return false;
+            }
+
+            if (type.IsPrimitive || type.IsEnum)
+            {
+                return true;
+            }
+
+            return type == typeof(string)
+                || type == typeof(decimal)
+                || type == typeof(Vector2)
+                || type == typeof(Vector3)
+                || type == typeof(Vector4)
+                || type == typeof(Vector2Int)
+                || type == typeof(Vector3Int)
+                || type == typeof(Rect)
+                || type == typeof(RectInt)
+                || type == typeof(Bounds)
+                || type == typeof(BoundsInt)
+                || type == typeof(Color)
+                || type == typeof(AnimationCurve);
+        }
+
+        private static bool IsTypeSupported(Type type)
+        {
+            if (type == null)
+            {
+                return false;
+            }
+
+            return type == typeof(string)
+                || type == typeof(int)
+                || type == typeof(float)
+                || type == typeof(double)
+                || type == typeof(long)
+                || type == typeof(bool)
+                || type == typeof(Vector2)
+                || type == typeof(Vector3)
+                || type == typeof(Vector4)
+                || type == typeof(Vector2Int)
+                || type == typeof(Vector3Int)
+                || type == typeof(Rect)
+                || type == typeof(RectInt)
+                || type == typeof(Bounds)
+                || type == typeof(BoundsInt)
+                || type == typeof(Color)
+                || type == typeof(AnimationCurve)
+                || type.IsEnum
+                || typeof(Object).IsAssignableFrom(type)
+                || TypeSupportsComplexEditing(type);
+        }
+
+        private static bool TryCreateDefaultInstance(Type type, out object instance)
+        {
+            if (type == null)
+            {
+                instance = null;
+                return false;
+            }
+
+            if (type.IsAbstract || type.IsInterface)
+            {
+                instance = null;
+                return false;
+            }
+
+            if (typeof(Object).IsAssignableFrom(type))
+            {
+                instance = null;
+                return false;
+            }
+
+            return TryInvokeParameterlessConstructor(type, out instance);
+        }
+
+        private static bool TryInvokeParameterlessConstructor(Type type, out object value)
+        {
+            if (!TryGetParameterlessFactory(type, out Func<object> factory))
+            {
+                value = null;
+                return false;
+            }
+
+            object created = factory();
+            if (created != null)
+            {
+                value = created;
+                return true;
+            }
+
+            ParameterlessFactoryCache.TryRemove(type, out _);
+            UnsupportedParameterlessTypes.TryAdd(type, 0);
+            value = null;
+            return false;
+        }
+
+        private static bool ShouldDeepClone(Type type)
+        {
+            return type != null
+                && !type.IsValueType
+                && type != typeof(string)
+                && !typeof(Object).IsAssignableFrom(type);
+        }
+
+        private static bool ValuesEqual(object left, object right)
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return true;
+            }
+
+            if (left == null || right == null)
+            {
+                return false;
+            }
+
+            if (left is Object leftObject && right is Object rightObject)
+            {
+                return leftObject == rightObject;
+            }
+
+            return left.Equals(right);
+        }
+
+        private static void SnapSelectionToPage(PaginationState pagination, int totalCount)
+        {
+            if (totalCount <= 0)
+            {
+                pagination.selectedIndex = -1;
+                return;
+            }
+
+            int pageSize = Mathf.Max(1, pagination.pageSize);
+            int pageStart = pagination.page * pageSize;
+            if (totalCount <= pageStart)
+            {
+                pageStart = Mathf.Max(0, totalCount - 1);
+            }
+
+            pagination.selectedIndex = Mathf.Clamp(pageStart, 0, totalCount - 1);
+        }
+
+        /// <summary>
+        /// Gets high-resolution time in seconds using <see cref="Stopwatch"/> for accurate animation timing.
+        /// This is more reliable than <see cref="EditorApplication.timeSinceStartup"/> for animations
+        /// that need consistent frame-to-frame timing.
+        /// </summary>
+        private static double GetHighResolutionTime()
+        {
+            return (double)Stopwatch.GetTimestamp() / Stopwatch.Frequency;
+        }
+
+        private static void DrawDuplicateOutline(Rect rect)
+        {
+            Rect top = new(rect.x, rect.y, rect.width, DuplicateOutlineThickness);
+            Rect bottom = new(
+                rect.x,
+                rect.yMax - DuplicateOutlineThickness,
+                rect.width,
+                DuplicateOutlineThickness
+            );
+            Rect left = new(rect.x, rect.y, DuplicateOutlineThickness, rect.height);
+            Rect right = new(
+                rect.xMax - DuplicateOutlineThickness,
+                rect.y,
+                DuplicateOutlineThickness,
+                rect.height
+            );
+
+            EditorGUI.DrawRect(top, DuplicateOutlineColor);
+            EditorGUI.DrawRect(bottom, DuplicateOutlineColor);
+            EditorGUI.DrawRect(left, DuplicateOutlineColor);
+            EditorGUI.DrawRect(right, DuplicateOutlineColor);
+        }
+
+        private static float GetWarningBarHeight()
+        {
+            return EditorGUIUtility.singleLineHeight * 1.6f;
+        }
+
+        private static void DrawNullEntryTooltip(Rect rect, string tooltip)
+        {
+            if (string.IsNullOrEmpty(tooltip) || Event.current.type != EventType.Repaint)
+            {
+                return;
+            }
+
+            NullEntryTooltipContent.text = string.Empty;
+            NullEntryTooltipContent.image = null;
+            NullEntryTooltipContent.tooltip = tooltip;
+            GUI.Label(rect, NullEntryTooltipContent, GUIStyle.none);
+        }
+
+        private static bool ElementTypeSupportsNull(Type type)
+        {
+            return type != null && (!type.IsValueType || typeof(Object).IsAssignableFrom(type));
+        }
+
+        private static bool ElementSupportsManualSorting(Type elementType)
+        {
+            if (elementType == null)
+            {
+                return false;
+            }
+
+            Type candidate = Nullable.GetUnderlyingType(elementType) ?? elementType;
+            if (typeof(Object).IsAssignableFrom(candidate))
+            {
+                return true;
+            }
+
+            if (typeof(IComparable).IsAssignableFrom(candidate))
+            {
+                return true;
+            }
+
+            Type genericComparable = typeof(IComparable<>).MakeGenericType(candidate);
+            return genericComparable.IsAssignableFrom(candidate);
+        }
+
+        private static string BuildNullEntrySummary(List<int> indices)
+        {
+            if (indices == null || indices.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            indices.Sort();
+
+            if (indices.Count == 1)
+            {
+                return $"Null entry detected at index {indices[0]}. Value will be ignored at runtime.";
+            }
+
+            const int maxDisplay = 5;
+            int displayCount = Math.Min(indices.Count, maxDisplay);
+
+            using PooledResource<StringBuilder> builderLease = Buffers.GetStringBuilder(
+                Math.Max(indices.Count * 6 + 64, 64),
+                out StringBuilder builder
+            );
+            builder.Clear();
+            builder.Append("Null entries detected at indices ");
+
+            for (int i = 0; i < displayCount; i++)
+            {
+                if (0 < i)
+                {
+                    builder.Append(", ");
+                }
+
+                builder.Append(indices[i]);
+            }
+
+            if (maxDisplay < indices.Count)
+            {
+                builder.Append(", ... (");
+                builder.Append(indices.Count - maxDisplay);
+                builder.Append(" more)");
+            }
+
+            builder.Append(". Values will be ignored at runtime.");
+            return builder.ToString();
+        }
+
+        private static string BuildNullEntryTooltip(int index)
+        {
+            using PooledResource<StringBuilder> lease = Buffers.GetStringBuilder(
+                64,
+                out StringBuilder builder
+            );
+            builder.Clear();
+            builder.Append("Null entry detected at index ");
+            builder.Append(index);
+            builder.Append(". Value will be ignored at runtime.");
+            return builder.ToString();
+        }
+
+        private static List<int> RentGroupingList(DuplicateState state)
+        {
+            PooledResource<List<int>> lease = Buffers<int>.List.Get(out List<int> list);
+            state.groupingLeases[list] = lease;
+            return list;
+        }
+
+        private static void ReleaseGroupingList(DuplicateState state, List<int> list)
+        {
+            if (list == null)
+            {
+                return;
+            }
+
+            list.Clear();
+            if (!state.groupingLeases.Remove(list, out PooledResource<List<int>> lease))
+            {
+                return;
+            }
+
+            lease.Dispose();
+        }
+
+        private static void ReleaseAllGroupingLists(DuplicateState state)
+        {
+            if (state.grouping.Count == 0)
+            {
+                if (0 < state.groupingLeases.Count)
+                {
+                    foreach (
+                        KeyValuePair<
+                            List<int>,
+                            PooledResource<List<int>>
+                        > leaseEntry in state.groupingLeases
+                    )
+                    {
+                        leaseEntry.Key?.Clear();
+                        leaseEntry.Value.Dispose();
+                    }
+
+                    state.groupingLeases.Clear();
+                }
+
+                return;
+            }
+
+            state.groupingKeysScratch.Clear();
+            foreach (KeyValuePair<object, List<int>> bucket in state.grouping)
+            {
+                ReleaseGroupingList(state, bucket.Value);
+                state.groupingKeysScratch.Add(bucket.Key);
+            }
+
+            foreach (object groupingKeysScratchElement in state.groupingKeysScratch)
+            {
+                state.grouping.Remove(groupingKeysScratchElement);
+            }
+
+            state.groupingKeysScratch.Clear();
+        }
+
+        private static string ConvertDuplicateKeyToString(object key)
+        {
+            if (key == NullComparable || key == null)
+            {
+                return "null";
+            }
+
+            return key switch
+            {
+                Object obj => obj != null ? obj.name : "null object",
+                _ => key.ToString(),
+            };
+        }
+
+        private static void AppendIndexList(StringBuilder builder, List<int> indices)
+        {
+            for (int i = 0; i < indices.Count; i++)
+            {
+                if (0 < i)
+                {
+                    builder.Append(", ");
+                }
+                builder.Append(indices[i]);
+            }
+        }
+
+        private static bool TryGetParameterlessFactory(Type type, out Func<object> factory)
+        {
+            if (type == null)
+            {
+                factory = null;
+                return false;
+            }
+
+            if (ParameterlessFactoryCache.TryGetValue(type, out Func<object> cached))
+            {
+                factory = cached;
+                return cached != null;
+            }
+
+            if (UnsupportedParameterlessTypes.ContainsKey(type))
+            {
+                factory = null;
+                return false;
+            }
+
+            Func<object> resolved = TryResolveFactory(type);
+            if (resolved == null)
+            {
+                resolved = TryBuildFormatterFactory(type);
+            }
+
+            if (resolved != null)
+            {
+                factory = ParameterlessFactoryCache.GetOrAdd(type, resolved);
+                return true;
+            }
+
+            UnsupportedParameterlessTypes.TryAdd(type, 0);
+            factory = null;
+            return false;
+        }
+
+        private static Func<object> TryResolveFactory(Type type)
+        {
+            try
+            {
+                return ReflectionHelpers.GetParameterlessConstructor(type);
+            }
+            catch (ArgumentException)
+            {
+                ConstructorInfo ctor = type.GetConstructor(
+                    BindingFlags.Instance | BindingFlags.NonPublic,
+                    binder: null,
+                    Type.EmptyTypes,
+                    modifiers: null
+                );
+                if (ctor == null)
+                {
+                    return null;
+                }
+
+                return () =>
+                {
+                    try
+                    {
+                        return ctor.Invoke(null);
+                    }
+                    catch
+                    {
+                        return null;
+                    }
+                };
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static Func<object> TryBuildFormatterFactory(Type type)
+        {
+            if (!type.IsSerializable)
+            {
+                return null;
+            }
+
+            return () =>
+            {
+                try
+                {
+                    return FormatterServices.GetUninitializedObject(type);
+                }
+                catch
+                {
+                    return null;
+                }
+            };
+        }
+
+        private static Type TryResolveDeclaredSetType(SerializedProperty property)
+        {
+            if (property == null)
+            {
+                return null;
+            }
+
+            SerializedObject serializedObject = property.serializedObject;
+            if (serializedObject == null)
+            {
+                return null;
+            }
+
+            Object targetObject = serializedObject.targetObject;
+            if (targetObject == null)
+            {
+                return null;
+            }
+
+            string propertyPath = property.propertyPath;
+            if (string.IsNullOrEmpty(propertyPath))
+            {
+                return null;
+            }
+
+            string[] segments = propertyPath.Split('.');
+            return ResolveDeclaredType(targetObject.GetType(), segments, 0);
+        }
+
+        private static Type ResolveDeclaredType(Type type, string[] segments, int index)
+        {
+            while (type != null && segments != null && index < segments.Length)
+            {
+                string segment = segments[index];
+                if (segment == "Array")
+                {
+                    if (segments.Length <= index + 1)
+                    {
+                        break;
+                    }
+
+                    string next = segments[index + 1];
+                    if (!next.StartsWith("data[", StringComparison.Ordinal))
+                    {
+                        break;
+                    }
+
+                    if (type.IsArray)
+                    {
+                        type = type.GetElementType();
+                        index += 2;
+                        continue;
+                    }
+
+                    if (type.IsGenericType)
+                    {
+                        Type[] arguments = type.GetGenericArguments();
+                        if (arguments.Length == 1)
+                        {
+                            type = arguments[0];
+                            index += 2;
+                            continue;
+                        }
+                    }
+
+                    break;
+                }
+
+                FieldInfo field = type.GetField(
+                    segment,
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+                );
+                if (field != null)
+                {
+                    type = field.FieldType;
+                    index += 1;
+                    continue;
+                }
+
+                PropertyInfo propertyInfo = type.GetProperty(
+                    segment,
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+                );
+                if (propertyInfo != null)
+                {
+                    type = propertyInfo.PropertyType;
+                    index += 1;
+                    continue;
+                }
+
+                break;
+            }
+
+            return type;
+        }
+
+        private static bool TypeMatchesGenericDefinition(Type candidate, Type openGeneric)
+        {
+            Type current = candidate;
+            string openGenericName = openGeneric.Name;
+            int tickIndex = openGenericName.IndexOf('`');
+            if (0 <= tickIndex)
+            {
+                openGenericName = openGenericName.Substring(0, tickIndex);
+            }
+
+            while (current != null)
+            {
+                if (current.IsGenericType && current.GetGenericTypeDefinition() == openGeneric)
+                {
+                    return true;
+                }
+
+                string currentName = current.FullName ?? current.Name;
+                if (
+                    !string.IsNullOrEmpty(currentName)
+                    && 0 <= currentName.IndexOf(openGenericName, StringComparison.Ordinal)
+                    && typeof(ISerializableSetInspector).IsAssignableFrom(current)
+                )
+                {
+                    return true;
+                }
+
+                current = current.BaseType;
+            }
+
+            return false;
+        }
+
+        private static Type ResolveUnityPropertyType(SerializedProperty property)
+        {
+            string typeName = property?.type;
+            if (string.IsNullOrEmpty(typeName))
+            {
+                return null;
+            }
+
+            if (!PropertyTypeResolutionCache.TryGetValue(typeName, out Type cached))
+            {
+                cached = FindTypeByUnityName(typeName);
+                PropertyTypeResolutionCache[typeName] = cached;
+            }
+
+            return cached;
+        }
+
+        private static Type FindTypeByUnityName(string typeName)
+        {
+            foreach (Assembly assembly in ReflectionHelpers.GetAllLoadedAssemblies())
+            {
+                Type match = FindTypeByName(assembly, typeName);
+                if (match != null)
+                {
+                    return match;
+                }
+            }
+
+            return null;
+        }
+
+        private static Type FindTypeByName(Assembly assembly, string typeName)
+        {
+            if (string.IsNullOrEmpty(typeName))
+            {
+                return null;
+            }
+
+            string trimmedName = typeName.Replace("+", ".").Trim();
+            bool hasNamespace = typeName.Contains(".");
+
+            Type[] types = ReflectionHelpers.GetTypesFromAssembly(assembly) ?? Array.Empty<Type>();
+
+            foreach (Type candidate in types)
+            {
+                if (
+                    candidate != null
+                    && (
+                        string.Equals(candidate.Name, typeName, StringComparison.Ordinal)
+                        || string.Equals(candidate.FullName, typeName, StringComparison.Ordinal)
+                        || string.Equals(candidate.FullName, trimmedName, StringComparison.Ordinal)
+                        || (
+                            !hasNamespace
+                            && (
+                                candidate.FullName?.EndsWith(
+                                    "." + typeName,
+                                    StringComparison.Ordinal
+                                ) == true
+                                || candidate.FullName?.EndsWith(
+                                    "+" + typeName,
+                                    StringComparison.Ordinal
+                                ) == true
+                            )
+                        )
+                    )
+                )
+                {
+                    return candidate;
+                }
+            }
+
+            return null;
+        }
+
+        private static bool CanSortElements(SerializedProperty itemsProperty, bool allowSort)
+        {
+            if (!allowSort)
+            {
+                return false;
+            }
+
+            if (itemsProperty is not { isArray: true } || itemsProperty.arraySize <= 1)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool NeedsSorting(SerializedProperty itemsProperty, bool allowSort)
+        {
+            if (!CanSortElements(itemsProperty, allowSort))
+            {
+                return false;
+            }
+
+            int count = itemsProperty.arraySize;
+            SetElementData previous = default;
+            bool hasPrevious = false;
+
+            for (int index = 0; index < count; index++)
+            {
+                SerializedProperty elementProperty = itemsProperty.GetArrayElementAtIndex(index);
+                SetElementData current = ReadElementData(elementProperty);
+
+                if (hasPrevious)
+                {
+                    int comparison = CompareComparableValues(
+                        previous.comparable,
+                        current.comparable
+                    );
+                    if (0 < comparison)
+                    {
+                        return true;
+                    }
+
+                    if (comparison == 0)
+                    {
+                        string previousFallback =
+                            previous.value != null ? previous.value.ToString() : string.Empty;
+                        string currentFallback =
+                            current.value != null ? current.value.ToString() : string.Empty;
+                        if (0 < string.CompareOrdinal(previousFallback, currentFallback))
+                        {
+                            return true;
+                        }
+                    }
+                }
+
+                previous = current;
+                hasPrevious = true;
+            }
+
+            return false;
+        }
+
+        private static void RefreshPageCache(
+            ListPageCache cache,
+            SerializedProperty itemsProperty,
+            PaginationState pagination
+        )
+        {
+            cache.entries.Clear();
+
+            if (itemsProperty is not { isArray: true })
+            {
+                cache.itemCount = 0;
+                cache.pageIndex = pagination.page;
+                cache.pageSize = pagination.pageSize;
+                cache.dirty = false;
+                return;
+            }
+
+            cache.itemCount = itemsProperty.arraySize;
+            cache.pageIndex = pagination.page;
+            int effectivePageSize = Mathf.Clamp(pagination.pageSize, 1, MaxPageSize);
+            cache.pageSize = effectivePageSize;
+            pagination.pageSize = effectivePageSize;
+            cache.dirty = false;
+
+            if (cache.itemCount <= 0)
+            {
+                return;
+            }
+
+            int startIndex = pagination.page * effectivePageSize;
+            startIndex = Mathf.Clamp(startIndex, 0, cache.itemCount);
+            int endIndex = Mathf.Min(startIndex + effectivePageSize, cache.itemCount);
+
+            for (int i = startIndex; i < endIndex; i++)
+            {
+                PageEntry entry = new() { arrayIndex = i };
+                cache.entries.Add(entry);
+            }
+        }
+
+        private static bool SerializedPropertySupportsFoldout(SerializedProperty property)
+        {
+            return property != null && property.hasVisibleChildren;
+        }
+
+        private static bool ShouldUseElementFoldout(Type elementType, SerializedProperty property)
+        {
+            if (property == null)
+            {
+                return false;
+            }
+
+            // New elements can temporarily report no visible children; trust types known to support expansion.
+            bool typeSupports =
+                elementType == null
+                    ? property.hasVisibleChildren
+                    : TypeSupportsComplexEditing(elementType)
+                        && !typeof(Object).IsAssignableFrom(elementType);
+
+            return typeSupports || SerializedPropertySupportsFoldout(property);
+        }
+
+        private static bool DrawSetRowFoldoutValue(
+            Rect valueRect,
+            SerializedProperty valueProperty,
+            out float renderedHeight
+        )
+        {
+            if (valueProperty == null)
+            {
+                renderedHeight = EditorGUIUtility.singleLineHeight;
+                return false;
+            }
+
+            bool changed = false;
+            float headerHeight = EditorGUIUtility.singleLineHeight;
+            Rect headerRect = new(valueRect.x, valueRect.y, valueRect.width, headerHeight);
+
+            EditorGUI.BeginChangeCheck();
+            EditorGUI.PropertyField(
+                headerRect,
+                valueProperty,
+                GUIContent.none,
+                includeChildren: false
+            );
+            if (EditorGUI.EndChangeCheck())
+            {
+                changed = true;
+            }
+
+            float childY = headerRect.yMax + EditorGUIUtility.standardVerticalSpacing;
+            if (valueProperty.isExpanded && valueProperty.hasVisibleChildren)
+            {
+                SerializedProperty iterator = valueProperty.Copy();
+                SerializedProperty endProperty = iterator.GetEndProperty();
+                bool enterChildren = true;
+                int baseDepth = valueProperty.depth;
+                using IndentLevelScope indentScope = IndentLevelScope.Indent();
+
+                while (
+                    iterator.NextVisible(enterChildren)
+                    && !SerializedProperty.EqualContents(iterator, endProperty)
+                )
+                {
+                    enterChildren = false;
+                    if (iterator.depth <= baseDepth)
+                    {
+                        break;
+                    }
+
+                    float childHeight = EditorGUI.GetPropertyHeight(iterator, true);
+                    Rect childRect = new(valueRect.x, childY, valueRect.width, childHeight);
+                    EditorGUI.PropertyField(childRect, iterator, true);
+                    childY = childRect.yMax + EditorGUIUtility.standardVerticalSpacing;
+                }
+            }
+
+            renderedHeight = Mathf.Max(
+                headerHeight,
+                (childY - EditorGUIUtility.standardVerticalSpacing) - valueRect.y
+            );
+            return changed;
+        }
+
+        private static void ApplySliceOrder(
+            SerializedProperty itemsProperty,
+            List<int> orderedIndices,
+            int pageStart
+        )
+        {
+            if (itemsProperty == null || orderedIndices == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < orderedIndices.Count; i++)
+            {
+                int desiredIndex = pageStart + i;
+                int currentIndex = orderedIndices[i];
+                if (currentIndex == desiredIndex)
+                {
+                    continue;
+                }
+
+                itemsProperty.MoveArrayElement(currentIndex, desiredIndex);
+
+                if (currentIndex < desiredIndex)
+                {
+                    for (int j = i + 1; j < orderedIndices.Count; j++)
+                    {
+                        if (currentIndex < orderedIndices[j] && orderedIndices[j] <= desiredIndex)
+                        {
+                            orderedIndices[j]--;
+                        }
+                    }
+                }
+                else
+                {
+                    for (int j = i + 1; j < orderedIndices.Count; j++)
+                    {
+                        if (desiredIndex <= orderedIndices[j] && orderedIndices[j] < currentIndex)
+                        {
+                            orderedIndices[j]++;
+                        }
+                    }
+                }
+
+                orderedIndices[i] = desiredIndex;
+            }
+        }
+
+        private static object GetSetInstance(SerializedProperty property, string propertyPath)
+        {
+            return GetTargetObjectOfProperty(property.serializedObject.targetObject, propertyPath);
+        }
+
+        private static IEnumerable<object> GenerateCandidateValues(
+            Type elementType,
+            int existingCount
+        )
+        {
+            if (elementType == typeof(string))
+            {
+                yield return string.Empty;
+                for (int i = 1; i < MaxAutoAddAttempts; i++)
+                {
+                    yield return $"New Entry {i}";
+                }
+                yield break;
+            }
+
+            if (IsSignedIntegral(elementType))
+            {
+                for (long i = 0; i < MaxAutoAddAttempts; i++)
+                {
+                    yield return Convert.ChangeType(i, elementType);
+                    if (0 < i)
+                    {
+                        yield return Convert.ChangeType(-i, elementType);
+                    }
+                }
+                yield break;
+            }
+
+            if (IsUnsignedIntegral(elementType))
+            {
+                for (long i = 0; i < MaxAutoAddAttempts; i++)
+                {
+                    yield return Convert.ChangeType(i, elementType);
+                }
+                yield break;
+            }
+
+            if (
+                elementType == typeof(float)
+                || elementType == typeof(double)
+                || elementType == typeof(decimal)
+            )
+            {
+                for (int i = 0; i < MaxAutoAddAttempts; i++)
+                {
+                    yield return Convert.ChangeType(i, elementType);
+                }
+                yield break;
+            }
+
+            if (elementType == typeof(bool))
+            {
+                yield return false;
+                yield return true;
+                yield break;
+            }
+
+            if (elementType == typeof(char))
+            {
+                for (int i = 0; i < MaxAutoAddAttempts; i++)
+                {
+                    yield return (char)('A' + (i % 26));
+                }
+                yield break;
+            }
+
+            if (elementType.IsEnum)
+            {
+                foreach (object value in Enum.GetValues(elementType))
+                {
+                    yield return value;
+                }
+                yield break;
+            }
+
+            if (elementType == typeof(Vector2))
+            {
+                for (int i = 0; i < MaxAutoAddAttempts; i++)
+                {
+                    yield return new Vector2(i + 1f, 0f);
+                }
+                yield break;
+            }
+
+            if (elementType == typeof(Vector3))
+            {
+                for (int i = 0; i < MaxAutoAddAttempts; i++)
+                {
+                    yield return new Vector3(i + 1f, 0f, 0f);
+                }
+                yield break;
+            }
+
+            if (elementType == typeof(Vector4))
+            {
+                for (int i = 0; i < MaxAutoAddAttempts; i++)
+                {
+                    yield return new Vector4(i + 1f, 0f, 0f, 0f);
+                }
+                yield break;
+            }
+
+            if (elementType == typeof(Vector2Int))
+            {
+                for (int i = 0; i < MaxAutoAddAttempts; i++)
+                {
+                    yield return new Vector2Int(i + 1, 0);
+                }
+                yield break;
+            }
+
+            if (elementType == typeof(Vector3Int))
+            {
+                for (int i = 0; i < MaxAutoAddAttempts; i++)
+                {
+                    yield return new Vector3Int(i + 1, 0, 0);
+                }
+                yield break;
+            }
+
+            if (elementType == typeof(Rect))
+            {
+                for (int i = 0; i < MaxAutoAddAttempts; i++)
+                {
+                    yield return new Rect(i + 1f, 0f, 1f, 1f);
+                }
+                yield break;
+            }
+
+            if (elementType == typeof(RectInt))
+            {
+                for (int i = 0; i < MaxAutoAddAttempts; i++)
+                {
+                    yield return new RectInt(i + 1, 0, 1, 1);
+                }
+                yield break;
+            }
+
+            if (elementType == typeof(Bounds))
+            {
+                for (int i = 0; i < MaxAutoAddAttempts; i++)
+                {
+                    Bounds bounds = new(new Vector3(i + 1f, 0f, 0f), Vector3.one);
+                    yield return bounds;
+                }
+                yield break;
+            }
+
+            if (elementType == typeof(BoundsInt))
+            {
+                for (int i = 0; i < MaxAutoAddAttempts; i++)
+                {
+                    BoundsInt bounds = new(new Vector3Int(i + 1, 0, 0), Vector3Int.one);
+                    yield return bounds;
+                }
+                yield break;
+            }
+
+            if (elementType == typeof(Color))
+            {
+                for (int i = 0; i < MaxAutoAddAttempts; i++)
+                {
+                    float hue =
+                        (existingCount + i) % MaxAutoAddAttempts / (float)MaxAutoAddAttempts;
+                    yield return Color.HSVToRGB(hue, 0.8f, 1f);
+                }
+                yield break;
+            }
+
+            if (elementType == typeof(Quaternion))
+            {
+                for (int i = 0; i < MaxAutoAddAttempts; i++)
+                {
+                    yield return Quaternion.Euler((existingCount + i) * 10f, 0f, 0f);
+                }
+                yield break;
+            }
+
+            if (elementType == typeof(Hash128))
+            {
+                for (uint i = 1; i <= MaxAutoAddAttempts; i++)
+                {
+                    yield return new Hash128(i, 0u, 0u, 0u);
+                }
+                yield break;
+            }
+
+            if (typeof(Object).IsAssignableFrom(elementType))
+            {
+                yield return null;
+                yield break;
+            }
+
+            if (
+                !elementType.IsAbstract
+                && TryGetParameterlessFactory(elementType, out Func<object> elementFactory)
+            )
+            {
+                for (int i = 0; i < MaxAutoAddAttempts; i++)
+                {
+                    yield return elementFactory();
+                }
+                yield break;
+            }
+
+            if (
+                elementType.IsValueType
+                && TryGetParameterlessFactory(elementType, out Func<object> valueFactory)
+            )
+            {
+                yield return valueFactory();
+            }
+            else
+            {
+                yield return null;
+            }
+        }
+
+        private static bool IsSignedIntegral(Type type)
+        {
+            return type == typeof(int)
+                || type == typeof(long)
+                || type == typeof(short)
+                || type == typeof(sbyte);
+        }
+
+        private static bool IsUnsignedIntegral(Type type)
+        {
+            return type == typeof(uint)
+                || type == typeof(ulong)
+                || type == typeof(ushort)
+                || type == typeof(byte);
+        }
+
+        private static object GetTargetObjectOfProperty(object target, string propertyPath)
+        {
+            if (target == null || string.IsNullOrEmpty(propertyPath))
+            {
+                return null;
+            }
+
+            object currentTarget = target;
+            string[] elements = propertyPath.Replace(".Array.data[", "[").Split('.');
+            foreach (string element in elements)
+            {
+                if (currentTarget == null)
+                {
+                    return null;
+                }
+
+                if (element.Contains("["))
+                {
+                    int leftBracket = element.IndexOf('[');
+                    string elementName = element.Substring(0, leftBracket);
+                    string indexPart = element
+                        .Substring(leftBracket)
+                        .Replace("[", string.Empty)
+                        .Replace("]", string.Empty);
+                    if (!int.TryParse(indexPart, out int index))
+                    {
+                        return null;
+                    }
+
+                    currentTarget = GetIndexedValue(currentTarget, elementName, index);
+                }
+                else
+                {
+                    currentTarget = GetMemberValue(currentTarget, element);
+                }
+            }
+
+            return currentTarget;
+        }
+
+        private static object GetMemberValue(object source, string name)
+        {
+            if (source == null)
+            {
+                return null;
+            }
+
+            Type type = source.GetType();
+
+            FieldInfo field = type.GetField(
+                name,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            );
+            if (field != null)
+            {
+                return field.GetValue(source);
+            }
+
+            PropertyInfo property = type.GetProperty(
+                name,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            );
+            return property?.GetValue(source);
+        }
+
+        private static object GetIndexedValue(object source, string name, int index)
+        {
+            object collection = GetMemberValue(source, name);
+            if (collection is not IEnumerable enumerable)
+            {
+                return null;
+            }
+
+            IEnumerator enumerator = enumerable.GetEnumerator();
+            try
+            {
+                for (int i = 0; i <= index; i++)
+                {
+                    if (!enumerator.MoveNext())
+                    {
+                        return null;
+                    }
+                }
+
+                return enumerator.Current;
+            }
+            finally
+            {
+                if (enumerator is IDisposable disposable)
+                {
+                    disposable.Dispose();
+                }
+            }
+        }
+
+        private static int CompareComparableValues(object left, object right)
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return 0;
+            }
+
+            if (left == null || left == NullComparable)
+            {
+                return right == null || right == NullComparable ? 0 : -1;
+            }
+
+            if (right == null || right == NullComparable)
+            {
+                return 1;
+            }
+
+            if (left is Object || right is Object)
+            {
+                Object leftObject = left as Object;
+                Object rightObject = right as Object;
+                return UnityObjectNameComparer<Object>.Instance.Compare(leftObject, rightObject);
+            }
+
+            if (left is IComparable comparable)
+            {
+                return comparable.CompareTo(right);
+            }
+
+            if (right is IComparable comparableRight)
+            {
+                return -comparableRight.CompareTo(left);
+            }
+
+            string leftString = left.ToString();
+            string rightString = right.ToString();
+            return string.CompareOrdinal(leftString, rightString);
+        }
+
+        private static SetElementData ReadElementData(SerializedProperty property)
+        {
+            SetElementData data = new()
+            {
+                propertyType = property.propertyType,
+                comparable = null,
+                value = null,
+            };
+
+            switch (property.propertyType)
+            {
+                case SerializedPropertyType.Integer:
+                case SerializedPropertyType.LayerMask:
+                case SerializedPropertyType.Enum:
+                case SerializedPropertyType.Character:
+                case SerializedPropertyType.ArraySize:
+                    long longValue = property.longValue;
+                    data.value = longValue;
+                    data.comparable = longValue;
+                    break;
+                case SerializedPropertyType.Boolean:
+                    bool boolValue = property.boolValue;
+                    data.value = boolValue;
+                    data.comparable = boolValue ? 1 : 0;
+                    break;
+                case SerializedPropertyType.Float:
+                    double doubleValue = property.doubleValue;
+                    data.value = doubleValue;
+                    data.comparable = doubleValue;
+                    break;
+                case SerializedPropertyType.String:
+                    string stringValue = property.stringValue ?? string.Empty;
+                    data.value = stringValue;
+                    data.comparable = stringValue;
+                    break;
+                case SerializedPropertyType.Color:
+                    Color colorValue = property.colorValue;
+                    data.value = colorValue;
+                    data.comparable = colorValue;
+                    break;
+                case SerializedPropertyType.Vector2:
+                    Vector2 vector2Value = property.vector2Value;
+                    data.value = vector2Value;
+                    data.comparable = vector2Value;
+                    break;
+                case SerializedPropertyType.Vector3:
+                    Vector3 vector3Value = property.vector3Value;
+                    data.value = vector3Value;
+                    data.comparable = vector3Value;
+                    break;
+                case SerializedPropertyType.Vector4:
+                    Vector4 vector4Value = property.vector4Value;
+                    data.value = vector4Value;
+                    data.comparable = vector4Value;
+                    break;
+                case SerializedPropertyType.Rect:
+                    Rect rectValue = property.rectValue;
+                    data.value = rectValue;
+                    data.comparable = rectValue;
+                    break;
+                case SerializedPropertyType.Bounds:
+                    Bounds boundsValue = property.boundsValue;
+                    data.value = boundsValue;
+                    data.comparable = boundsValue;
+                    break;
+                case SerializedPropertyType.Vector2Int:
+                    Vector2Int vector2IntValue = property.vector2IntValue;
+                    data.value = vector2IntValue;
+                    data.comparable = vector2IntValue;
+                    break;
+                case SerializedPropertyType.Vector3Int:
+                    Vector3Int vector3IntValue = property.vector3IntValue;
+                    data.value = vector3IntValue;
+                    data.comparable = vector3IntValue;
+                    break;
+                case SerializedPropertyType.RectInt:
+                    RectInt rectIntValue = property.rectIntValue;
+                    data.value = rectIntValue;
+                    data.comparable = rectIntValue;
+                    break;
+                case SerializedPropertyType.BoundsInt:
+                    BoundsInt boundsIntValue = property.boundsIntValue;
+                    data.value = boundsIntValue;
+                    data.comparable = boundsIntValue;
+                    break;
+                case SerializedPropertyType.Hash128:
+                    Hash128 hashValue = property.hash128Value;
+                    data.value = hashValue;
+                    data.comparable = hashValue;
+                    break;
+                case SerializedPropertyType.Quaternion:
+                    Quaternion quaternionValue = property.quaternionValue;
+                    data.value = quaternionValue;
+                    data.comparable = quaternionValue;
+                    break;
+                case SerializedPropertyType.ObjectReference:
+                    Object objectReferenceValue = property.objectReferenceValue;
+                    data.value = objectReferenceValue;
+                    data.comparable =
+                        objectReferenceValue != null ? objectReferenceValue : NullComparable;
+                    break;
+                case SerializedPropertyType.AnimationCurve:
+                    AnimationCurve curveValue = property.animationCurveValue;
+                    data.value = curveValue;
+                    data.comparable = curveValue?.length ?? 0;
+                    break;
+                case SerializedPropertyType.ManagedReference:
+                case SerializedPropertyType.Generic:
+#if UNITY_2022_1_OR_NEWER
+                    // Before Unity 2022.1, unavailable boxedValue requires degraded property-path identity.
+                    try
+                    {
+                        object boxed = property.boxedValue;
+                        data.value = boxed;
+                        data.comparable = boxed ?? NullComparable;
+                    }
+                    catch (Exception)
+                    {
+                        data.value = property.propertyPath;
+                        data.comparable = property.propertyPath;
+                    }
+#else
+                    data.value = property.propertyPath;
+                    data.comparable = property.propertyPath;
+#endif
+                    break;
+                default:
+                    data.value = property.propertyPath;
+                    data.comparable = property.propertyPath;
+                    break;
+            }
+
+            return data;
+        }
+
+        private static Array BuildSnapshotArray(SerializedProperty itemsProperty, Type elementType)
+        {
+            elementType ??= typeof(object);
+
+            if (itemsProperty == null || !itemsProperty.isArray)
+            {
+                return Array.CreateInstance(elementType, 0);
+            }
+
+            int count = itemsProperty.arraySize;
+            Array snapshot = Array.CreateInstance(elementType, count);
+
+            for (int index = 0; index < count; index++)
+            {
+                SerializedProperty element = itemsProperty.GetArrayElementAtIndex(index);
+                SetElementData elementData = ReadElementData(element);
+                object value = ConvertSnapshotValue(elementType, elementData.value);
+                // Unity 2021.3 cannot reconstruct complex boxed values; leave incompatible snapshot slots default instead of throwing.
+                if (value != null && !elementType.IsInstanceOfType(value))
+                {
+                    continue;
+                }
+                snapshot.SetValue(value, index);
+            }
+
+            return snapshot;
+        }
+
+        private static object ConvertSnapshotValue(Type elementType, object value)
+        {
+            if (value == null)
+            {
+                return null;
+            }
+
+            if (elementType == null)
+            {
+                return value;
+            }
+
+            Type nullableUnderlying = Nullable.GetUnderlyingType(elementType);
+            if (nullableUnderlying != null)
+            {
+                return ConvertSnapshotValue(nullableUnderlying, value);
+            }
+
+            if (elementType.IsInstanceOfType(value))
+            {
+                return value;
+            }
+
+            Type targetType = elementType;
+
+            try
+            {
+                if (targetType.IsEnum)
+                {
+                    if (value is string enumName)
+                    {
+                        return Enum.Parse(targetType, enumName, ignoreCase: true);
+                    }
+
+                    return Enum.ToObject(targetType, value);
+                }
+
+                if (value is IConvertible && typeof(IConvertible).IsAssignableFrom(targetType))
+                {
+                    return Convert.ChangeType(value, targetType, CultureInfo.InvariantCulture);
+                }
+            }
+            catch (Exception)
+            {
+                return value;
+            }
+
+            return value;
+        }
+
+        private static void WriteElementValue(SerializedProperty property, SetElementData data)
+        {
+            switch (data.propertyType)
+            {
+                case SerializedPropertyType.Integer:
+                case SerializedPropertyType.LayerMask:
+                case SerializedPropertyType.Enum:
+                case SerializedPropertyType.Character:
+                case SerializedPropertyType.ArraySize:
+                    property.longValue = Convert.ToInt64(data.value);
+                    break;
+                case SerializedPropertyType.Boolean:
+                    property.boolValue = Convert.ToBoolean(data.value);
+                    break;
+                case SerializedPropertyType.Float:
+                    property.doubleValue = Convert.ToDouble(data.value);
+                    break;
+                case SerializedPropertyType.String:
+                    property.stringValue = data.value as string ?? string.Empty;
+                    break;
+                case SerializedPropertyType.Color:
+                    property.colorValue = data.value is Color color ? color : Color.white;
+                    break;
+                case SerializedPropertyType.Vector2:
+                    property.vector2Value = data.value is Vector2 vector2 ? vector2 : Vector2.zero;
+                    break;
+                case SerializedPropertyType.Vector3:
+                    property.vector3Value = data.value is Vector3 vector3 ? vector3 : Vector3.zero;
+                    break;
+                case SerializedPropertyType.Vector4:
+                    property.vector4Value = data.value is Vector4 vector4 ? vector4 : Vector4.zero;
+                    break;
+                case SerializedPropertyType.Rect:
+                    property.rectValue = data.value is Rect rect ? rect : default;
+                    break;
+                case SerializedPropertyType.Bounds:
+                    property.boundsValue = data.value is Bounds bounds ? bounds : default;
+                    break;
+                case SerializedPropertyType.Vector2Int:
+                    property.vector2IntValue = data.value is Vector2Int vector2Int
+                        ? vector2Int
+                        : default;
+                    break;
+                case SerializedPropertyType.Vector3Int:
+                    property.vector3IntValue = data.value is Vector3Int vector3Int
+                        ? vector3Int
+                        : default;
+                    break;
+                case SerializedPropertyType.RectInt:
+                    property.rectIntValue = data.value is RectInt rectInt ? rectInt : default;
+                    break;
+                case SerializedPropertyType.BoundsInt:
+                    property.boundsIntValue = data.value is BoundsInt boundsInt
+                        ? boundsInt
+                        : default;
+                    break;
+                case SerializedPropertyType.Quaternion:
+                    property.quaternionValue = data.value is Quaternion quaternion
+                        ? quaternion
+                        : Quaternion.identity;
+                    break;
+                case SerializedPropertyType.Hash128:
+                    property.hash128Value = data.value is Hash128 hash ? hash : default;
+                    break;
+                case SerializedPropertyType.ObjectReference:
+                    property.objectReferenceValue = data.value as Object;
+                    break;
+                case SerializedPropertyType.AnimationCurve:
+                    property.animationCurveValue = data.value as AnimationCurve;
+                    break;
+                case SerializedPropertyType.ManagedReference:
+                case SerializedPropertyType.Generic:
+#if UNITY_2022_1_OR_NEWER
+                    // Before Unity 2022.1, unavailable boxedValue prevents writing generic managed values back.
+                    try
+                    {
+                        property.boxedValue = data.value;
+                    }
+                    catch (Exception) { }
+#endif
+                    break;
+            }
+        }
+
+        private static GUIContent GetFoldoutLabelContent(GUIContent label)
+        {
+            string text = label != null ? label.text : "Serialized HashSet";
+            string tooltip = label != null ? label.tooltip : null;
+            FoldoutLabelContent.text = text;
+            FoldoutLabelContent.tooltip = tooltip;
+            FoldoutLabelContent.image = label?.image;
+            return FoldoutLabelContent;
+        }
+
+        /// <summary>
+        /// Gets a cached pagination label in the format "Page X / Y".
+        /// Delegates to <see cref="EditorCacheHelper.GetPaginationLabel"/> for shared LRU caching.
+        /// </summary>
+        private static string GetPaginationLabel(int currentPage, int pageCount)
+        {
+            return EditorCacheHelper.GetPaginationLabel(currentPage, pageCount);
+        }
+
+        private static string GetRangeLabel(int start, int end, int total)
+        {
+            (int, int, int) key = (start, end, total);
+            if (RangeLabelCache.TryGetValue(key, out string cached))
+            {
+                return cached;
+            }
+
+            using PooledResource<StringBuilder> lease = Buffers.GetStringBuilder(
+                32,
+                out StringBuilder builder
+            );
+            builder.Clear();
+            builder.Append(start);
+            builder.Append('-');
+            builder.Append(end);
+            builder.Append(" of ");
+            builder.Append(total);
+            string result = builder.ToString();
+
+            if (RangeLabelCache.Count < 10000)
+            {
+                RangeLabelCache[key] = result;
+            }
+
+            return result;
         }
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
@@ -774,219 +4105,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
         }
 
-        private static Rect ResolveContentRect(Rect position, bool skipIndentation = false)
-        {
-            float leftPadding = GroupGUIWidthUtility.CurrentLeftPadding;
-            float rightPadding = GroupGUIWidthUtility.CurrentRightPadding;
-            int indentLevel = EditorGUI.indentLevel;
-            bool isInsideWGroupProperty = GroupGUIWidthUtility.IsInsideWGroupPropertyDraw;
-
-            // WGroup layout already positions and indents this rect; apply only the alignment correction.
-            if (isInsideWGroupProperty)
-            {
-                const float WGroupAlignmentOffset = -4f;
-                Rect alignedPosition = position;
-
-                alignedPosition.xMin += WGroupAlignmentOffset;
-                return alignedPosition;
-            }
-
-            // GUILayout supplies normal indentation, but WGroup padding still requires explicit application.
-            if (skipIndentation)
-            {
-                Rect result = position;
-
-                if (0f < leftPadding || 0f < rightPadding)
-                {
-                    result.xMin += leftPadding;
-                    result.xMax -= rightPadding;
-                    if (result.width < 0f || float.IsNaN(result.width))
-                    {
-                        result.width = 0f;
-                    }
-                }
-
-                return result;
-            }
-
-            Rect padded = GroupGUIWidthUtility.ApplyCurrentPadding(position);
-            if (
-                (0f < leftPadding || 0f < rightPadding)
-                && Mathf.Approximately(padded.xMin, position.xMin)
-                && Mathf.Approximately(padded.width, position.width)
-            )
-            {
-                padded.xMin += leftPadding;
-                padded.xMax -= rightPadding;
-                if (padded.width < 0f || float.IsNaN(padded.width))
-                {
-                    padded.width = 0f;
-                }
-            }
-
-            // IndentedRect changes width at zero indentation in some Unity versions; bypass it for consistent layout.
-            Rect indentedResult = 0 < indentLevel ? EditorGUI.IndentedRect(padded) : padded;
-
-            // High indentation can make the remaining width negative.
-            if (indentedResult.width < 0f || float.IsNaN(indentedResult.width))
-            {
-                indentedResult.width = 0f;
-            }
-
-            Rect final = indentedResult;
-
-            int scopeDepth = GroupGUIWidthUtility.CurrentScopeDepth;
-            if (scopeDepth == 0)
-            {
-                // Align ungrouped content with Unity's default list rendering.
-                const float UnityListAlignmentOffset = -1.25f;
-
-                final.xMin += UnityListAlignmentOffset;
-
-                if (final.xMin < 0f)
-                {
-                    final.xMin = 0f;
-                }
-            }
-
-            return final;
-        }
-
-        /// <summary>
-        /// Resolves the content rect for testing purposes, applying WGroup padding and indentation
-        /// without requiring a full OnGUI context.
-        /// </summary>
-        /// <param name="position">The original position rect.</param>
-        /// <param name="skipIndentation">Whether to skip standard Unity indentation.</param>
-        /// <returns>The resolved content rect.</returns>
-        internal static Rect ResolveContentRectForTests(Rect position, bool skipIndentation = false)
-        {
-            return ResolveContentRect(position, skipIndentation);
-        }
-
-        internal static void ResetLayoutTrackingForTests()
-        {
-            HasLastManualEntryHeaderRect = false;
-            LastManualEntryHeaderRect = default;
-            LastManualEntryToggleRect = default;
-            HasLastMainFoldoutRect = false;
-            LastMainFoldoutRect = default;
-            HasLastManualEntryValueRect = false;
-            LastManualEntryValueRect = default;
-            LastManualEntryValueUsedFoldoutLabel = false;
-            LastManualEntryValueFoldoutOffset = 0f;
-            HasLastRowContentRect = false;
-            LastRowContentRect = default;
-
-            LastFooterWGroupLeftPadding = 0f;
-            LastFooterWGroupRightPadding = 0f;
-            LastFooterAvailableWidth = 0f;
-            LastFooterRangeWidth = 0f;
-            LastFooterRangeLabelWasDrawn = false;
-            LastFooterRangeLabelRect = default;
-
-            MainFoldoutAnimations.Clear();
-        }
-
-        internal static bool TryToggleManualEntryFoldoutLabelForTests(
-            Event currentEvent,
-            Rect labelHitRect,
-            ref bool expanded
-        )
-        {
-            return TryToggleManualEntryFoldoutLabel(currentEvent, labelHitRect, ref expanded);
-        }
-
-        private static bool TryToggleManualEntryFoldoutLabel(
-            Event currentEvent,
-            Rect labelHitRect,
-            ref bool expanded
-        )
-        {
-            if (currentEvent == null)
-            {
-                return false;
-            }
-
-            EventType effectiveEventType = GetEffectiveMouseEventType(currentEvent);
-            if (
-                effectiveEventType != EventType.MouseDown
-                || currentEvent.button != 0
-                || !labelHitRect.Contains(currentEvent.mousePosition)
-            )
-            {
-                return false;
-            }
-
-            expanded = !expanded;
-            GUI.changed = true;
-            if (currentEvent.type != EventType.Used)
-            {
-                currentEvent.Use();
-            }
-
-            return true;
-        }
-
-        private static EventType GetEffectiveMouseEventType(Event currentEvent)
-        {
-            if (currentEvent == null)
-            {
-                return EventType.Ignore;
-            }
-
-            return GetEffectiveMouseEventType(currentEvent.type, currentEvent.rawType);
-        }
-
-        internal static EventType GetEffectiveMouseEventTypeForTests(
-            EventType eventType,
-            EventType rawEventType
-        )
-        {
-            return GetEffectiveMouseEventType(eventType, rawEventType);
-        }
-
-        private static EventType GetEffectiveMouseEventType(
-            EventType eventType,
-            EventType rawEventType
-        )
-        {
-            if (eventType == EventType.Used)
-            {
-                return rawEventType;
-            }
-
-            return eventType;
-        }
-
-        /// <summary>
-        /// Signals that a child property drawer's height has changed and the parent
-        /// SerializableSetPropertyDrawer should invalidate its row height cache.
-        /// This should be called when nested foldouts or expandable sections change state.
-        /// </summary>
-        internal static void SignalChildHeightChanged()
-        {
-            _childHeightChangedFrame = Time.frameCount;
-            InternalEditorUtility.RepaintAllViews();
-        }
-
-        /// <summary>
-        /// Gets the frame number when the child height changed signal was last set.
-        /// For testing purposes only.
-        /// </summary>
-        internal static int GetChildHeightChangedFrameForTests()
-        {
-            return _childHeightChangedFrame;
-        }
-
-        /// <summary>
-        /// Resets the child height changed frame to -1 for testing purposes.
-        /// </summary>
-        internal static void ResetChildHeightChangedFrameForTests()
-        {
-            _childHeightChangedFrame = -1;
-        }
-
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
             float baseHeight = EditorGUIUtility.singleLineHeight;
@@ -1166,37 +4284,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             return finalHeight;
         }
 
-        private void CacheHeight(
-            string cacheKey,
-            float height,
-            int arraySize,
-            int pageIndex,
-            bool isExpanded,
-            bool hasNullEntries,
-            bool hasDuplicates,
-            bool pendingIsExpanded,
-            float pendingFoldoutProgress,
-            float mainFoldoutProgress,
-            int frameNumber
-        )
-        {
-            if (!_heightCache.TryGetValue(cacheKey, out HeightCacheEntry entry))
-            {
-                entry = new HeightCacheEntry();
-                _heightCache[cacheKey] = entry;
-            }
-            entry.height = height;
-            entry.arraySize = arraySize;
-            entry.pageIndex = pageIndex;
-            entry.isExpanded = isExpanded;
-            entry.hasNullEntries = hasNullEntries;
-            entry.hasDuplicates = hasDuplicates;
-            entry.pendingIsExpanded = pendingIsExpanded;
-            entry.pendingFoldoutProgress = pendingFoldoutProgress;
-            entry.mainFoldoutProgress = mainFoldoutProgress;
-            entry.frameNumber = frameNumber;
-        }
-
         internal PaginationState GetOrCreatePaginationState(SerializedProperty property)
         {
             string key = GetPropertyCacheKey(property);
@@ -1292,114 +4379,952 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             return key;
         }
 
-        private static readonly Dictionary<PropertyCacheKey, string> SingleTargetPropertyKeyCache =
-            new();
-
-        private const int MaxSingleTargetPropertyKeyCacheSize = 512;
-
-        private static string BuildPropertyCacheKey(SerializedProperty property)
-        {
-            if (property == null)
-            {
-                return string.Empty;
-            }
-
-            SerializedObject serializedObject = property.serializedObject;
-            string propertyPath = property.propertyPath ?? string.Empty;
-
-            if (serializedObject == null)
-            {
-                return propertyPath;
-            }
-
-            Object[] targets = serializedObject.targetObjects;
-            if (targets == null || targets.Length == 0)
-            {
-                int fallbackId = RuntimeHelpers.GetHashCode(serializedObject);
-                return $"{fallbackId}_{propertyPath}";
-            }
-
-            if (targets.Length == 1 && targets[0] != null)
-            {
-                long instanceId = targets[0].GetUnityObjectId();
-                PropertyCacheKey cacheKey = new(instanceId, propertyPath);
-
-                if (SingleTargetPropertyKeyCache.TryGetValue(cacheKey, out string cached))
-                {
-                    return cached;
-                }
-
-                using PooledResource<StringBuilder> lease = Buffers.GetStringBuilder(
-                    propertyPath.Length + 16,
-                    out StringBuilder builder
-                );
-                builder.Clear();
-                builder.Append(instanceId);
-                builder.Append('_');
-                builder.Append(propertyPath);
-                string result = builder.ToString();
-
-                if (SingleTargetPropertyKeyCache.Count < MaxSingleTargetPropertyKeyCacheSize)
-                {
-                    SingleTargetPropertyKeyCache[cacheKey] = result;
-                }
-
-                return result;
-            }
-
-            using PooledResource<StringBuilder> keyBuilderLease = Buffers.GetStringBuilder(
-                propertyPath.Length + Math.Max(32, targets.Length * 12),
-                out StringBuilder keyBuilder
-            );
-            keyBuilder.Append(propertyPath);
-            keyBuilder.Append('|');
-
-            for (int index = 0; index < targets.Length; index++)
-            {
-                long id = targets[index] != null ? targets[index].GetUnityObjectId() : 0;
-                keyBuilder.Append(id);
-                if (index < targets.Length - 1)
-                {
-                    keyBuilder.Append(',');
-                }
-            }
-
-            return keyBuilder.ToString();
-        }
-
         internal string GetListKey(SerializedProperty property)
         {
             return GetPropertyCacheKey(property);
         }
 
-        // A resolved set with no items array indicates refused element serialization; an unresolved property remains unknown.
-        private static bool HasDroppedItemsArray(
-            bool hasInspector,
+        internal PendingEntry GetOrCreatePendingEntry(
+            SerializedProperty property,
+            string propertyPath,
+            Type elementType,
+            bool isSortedSet
+        )
+        {
+            string pendingKey = GetPropertyCacheKey(property);
+            PendingEntry entry = _pendingEntries.GetOrAdd(pendingKey);
+            entry.isSorted = isSortedSet;
+
+            if (entry.elementType != elementType)
+            {
+                entry.elementType = elementType;
+                ReleasePendingWrapper(entry);
+                entry.valueWrapperDirty = true;
+                if (elementType != null)
+                {
+                    entry.value = CloneComplexValue(
+                        SerializableDictionaryPropertyDrawer.GetDefaultValue(elementType),
+                        elementType
+                    );
+                }
+                else
+                {
+                    entry.value = null;
+                }
+
+                entry.errorMessage = null;
+                entry.isExpanded = false;
+            }
+            else if (entry.value == null && elementType != null)
+            {
+                entry.value = CloneComplexValue(
+                    SerializableDictionaryPropertyDrawer.GetDefaultValue(elementType),
+                    elementType
+                );
+                entry.valueWrapperDirty = true;
+            }
+
+            entry.valueWrapperDirty = true;
+            SyncPendingWrapperValue(entry);
+            return entry;
+        }
+
+        internal bool TryCommitPendingEntry(
+            PendingEntry pending,
+            SerializedProperty property,
+            string propertyPath,
+            ref SerializedProperty itemsProperty,
+            PaginationState pagination,
+            ISerializableSetInspector inspector
+        )
+        {
+            SerializedObject serializedObject = property.serializedObject;
+            int itemsSizeBefore = itemsProperty is { isArray: true } ? itemsProperty.arraySize : 0;
+
+            PaletteSerializationDiagnostics.ReportSetCommitStart(
+                serializedObject,
+                propertyPath,
+                itemsSizeBefore,
+                pending?.value
+            );
+
+            if (pending == null)
+            {
+                PaletteSerializationDiagnostics.ReportSetAddResult(
+                    serializedObject,
+                    propertyPath,
+                    false,
+                    "pending is null"
+                );
+                return false;
+            }
+
+            Type elementType = pending.elementType;
+            if (elementType == null)
+            {
+                pending.errorMessage = "Unknown element type.";
+                PaletteSerializationDiagnostics.ReportSetAddResult(
+                    serializedObject,
+                    propertyPath,
+                    false,
+                    pending.errorMessage
+                );
+                return false;
+            }
+
+            if (inspector == null)
+            {
+                pending.errorMessage = "Set inspector unavailable.";
+                PaletteSerializationDiagnostics.ReportSetAddResult(
+                    serializedObject,
+                    propertyPath,
+                    false,
+                    pending.errorMessage
+                );
+                return false;
+            }
+
+            if (!IsTypeSupported(elementType))
+            {
+                pending.errorMessage = $"Unsupported type ({elementType.Name}).";
+                PaletteSerializationDiagnostics.ReportSetAddResult(
+                    serializedObject,
+                    propertyPath,
+                    false,
+                    pending.errorMessage
+                );
+                return false;
+            }
+
+            if (pending.value == null && !ElementTypeSupportsNull(elementType))
+            {
+                pending.errorMessage = "Value cannot be null.";
+                PaletteSerializationDiagnostics.ReportSetAddResult(
+                    serializedObject,
+                    propertyPath,
+                    false,
+                    pending.errorMessage
+                );
+                return false;
+            }
+
+            object normalizedCandidate = ConvertSnapshotValue(elementType, pending.value);
+            if (inspector.ContainsElement(normalizedCandidate))
+            {
+                pending.errorMessage = "Value already exists in this set.";
+                PaletteSerializationDiagnostics.ReportSetAddResult(
+                    serializedObject,
+                    propertyPath,
+                    false,
+                    pending.errorMessage
+                );
+                return false;
+            }
+
+            Object[] targets = serializedObject.targetObjects;
+            if (0 < targets.Length)
+            {
+                Undo.RecordObjects(targets, "Add Set Entry");
+            }
+
+            if (!inspector.TryAddElement(normalizedCandidate, out object normalizedValue))
+            {
+                pending.errorMessage = "Unable to add value to set.";
+                PaletteSerializationDiagnostics.ReportSetAddResult(
+                    serializedObject,
+                    propertyPath,
+                    false,
+                    pending.errorMessage
+                );
+                return false;
+            }
+
+            Array snapshot = BuildSnapshotArray(itemsProperty, elementType);
+            int originalLength = snapshot?.Length ?? 0;
+            Array updated = Array.CreateInstance(elementType, originalLength + 1);
+            if (snapshot != null && 0 < originalLength)
+            {
+                snapshot.CopyTo(updated, 0);
+            }
+            updated.SetValue(normalizedValue, originalLength);
+
+            inspector.SetSerializedItemsSnapshot(updated, preserveSerializedEntries: true);
+            inspector.SynchronizeSerializedState();
+            Undo.FlushUndoRecordObjects();
+
+            serializedObject.Update();
+            property = serializedObject.FindProperty(propertyPath);
+            itemsProperty = property?.FindPropertyRelative(
+                SerializableHashSetSerializedPropertyNames.Items
+            );
+            int totalCount = itemsProperty is { isArray: true } ? itemsProperty.arraySize : 0;
+
+            EnsurePaginationBounds(pagination, totalCount);
+            EvaluateDuplicateState(property, itemsProperty, force: true);
+            EvaluateNullEntryState(property, itemsProperty);
+            SyncRuntimeSet(property);
+            if (0 < totalCount)
+            {
+                pagination.selectedIndex = totalCount - 1;
+            }
+
+            MarkListCacheDirty(GetPropertyCacheKey(property));
+            pending.errorMessage = null;
+            bool wasExpanded = pending.isExpanded;
+            ResetPendingEntry(pending);
+            pending.isExpanded = wasExpanded;
+            RequestRepaint();
+
+            PaletteSerializationDiagnostics.ReportSetAddResult(
+                serializedObject,
+                propertyPath,
+                true,
+                null
+            );
+            PaletteSerializationDiagnostics.ReportSetCommitComplete(
+                serializedObject,
+                propertyPath,
+                totalCount
+            );
+
+            return true;
+        }
+
+        /// <summary>
+        /// Gets the actual animated foldout progress from the drawer instance's pending entry.
+        /// Use this for testing that animations are actually progressing over time.
+        /// </summary>
+        /// <param name="property">The serialized property for the set.</param>
+        /// <returns>
+        /// The current animation progress (0 to 1), or -1 if no pending entry exists for this property.
+        /// When tweening is disabled, returns 0 or 1 immediately based on expanded state.
+        /// </returns>
+        internal float GetPendingFoldoutProgressFromInstance(SerializedProperty property)
+        {
+            if (property == null)
+            {
+                return -1f;
+            }
+
+            string cacheKey = GetPropertyCacheKey(property);
+            if (!_pendingEntries.TryGetValue(cacheKey, out PendingEntry pending) || pending == null)
+            {
+                return -1f;
+            }
+
+            return GetPendingFoldoutProgress(pending);
+        }
+
+        /// <summary>
+        /// Gets the pending entry's expanded state and animation information for testing.
+        /// </summary>
+        /// <param name="property">The serialized property for the set.</param>
+        /// <param name="isExpanded">Output: whether the pending section is logically expanded.</param>
+        /// <param name="animProgress">Output: the current animation progress (0 to 1).</param>
+        /// <param name="hasAnimBool">Output: whether an AnimBool is active for this entry.</param>
+        /// <returns>True if a pending entry was found, false otherwise.</returns>
+        internal bool TryGetPendingAnimationStateForTests(
+            SerializedProperty property,
+            out bool isExpanded,
+            out float animProgress,
+            out bool hasAnimBool
+        )
+        {
+            if (property == null)
+            {
+                isExpanded = false;
+                animProgress = 0f;
+                hasAnimBool = false;
+                return false;
+            }
+
+            string cacheKey = GetPropertyCacheKey(property);
+            if (!_pendingEntries.TryGetValue(cacheKey, out PendingEntry pending) || pending == null)
+            {
+                isExpanded = false;
+                animProgress = 0f;
+                hasAnimBool = false;
+                return false;
+            }
+
+            isExpanded = pending.isExpanded;
+            hasAnimBool = pending.foldoutAnim != null;
+            animProgress = GetPendingFoldoutProgress(pending);
+            return true;
+        }
+
+        /// <summary>
+        /// Sets the pending entry's expanded state for testing purposes.
+        /// This properly triggers animation state updates.
+        /// </summary>
+        internal void SetPendingExpandedStateForTests(SerializedProperty property, bool expanded)
+        {
+            if (property == null)
+            {
+                return;
+            }
+
+            string cacheKey = GetPropertyCacheKey(property);
+            if (!_pendingEntries.TryGetValue(cacheKey, out PendingEntry pending) || pending == null)
+            {
+                return;
+            }
+
+            pending.isExpanded = expanded;
+            AnimBool anim = EnsureManualEntryFoldoutAnim(pending, property.propertyPath);
+            if (anim != null)
+            {
+                anim.target = expanded;
+            }
+        }
+
+        internal NullEntryState EvaluateNullEntryState(
+            SerializedProperty property,
+            SerializedProperty itemsProperty,
+            bool force = false
+        )
+        {
+            string key = GetPropertyCacheKey(property);
+            NullEntryState state = _nullEntryStates.GetOrAdd(key);
+
+            int currentFrame = Time.frameCount;
+            bool alreadyRefreshedThisFrame = _lastNullEntryRefreshFrame == currentFrame;
+
+            if (!force)
+            {
+                _lastNullEntryRefreshFrame = currentFrame;
+                if (alreadyRefreshedThisFrame)
+                {
+                    return state;
+                }
+            }
+
+            bool hasEvent = Event.current != null;
+            EventType eventType = hasEvent ? Event.current.type : EventType.Repaint;
+            if (!force && eventType != EventType.Repaint)
+            {
+                return state;
+            }
+
+            state.nullIndices.Clear();
+            state.tooltips.Clear();
+            state.summary = string.Empty;
+            state.hasNullEntries = false;
+            state.scratch.Clear();
+
+            if (
+                itemsProperty == null
+                || !itemsProperty.isArray
+                || itemsProperty.arraySize == 0
+                || !TryGetSetInspector(
+                    property,
+                    property.propertyPath,
+                    out ISerializableSetInspector inspector
+                )
+            )
+            {
+                return state;
+            }
+
+            Type elementType = inspector.ElementType;
+            if (!ElementTypeSupportsNull(elementType))
+            {
+                return state;
+            }
+
+            int count = itemsProperty.arraySize;
+            for (int index = 0; index < count; index++)
+            {
+                SerializedProperty element = itemsProperty.GetArrayElementAtIndex(index);
+                SetElementData data = ReadElementData(element);
+                if (ReferenceEquals(data.value, null))
+                {
+                    state.nullIndices.Add(index);
+                    state.tooltips[index] = BuildNullEntryTooltip(index);
+                    state.scratch.Add(index);
+                }
+            }
+
+            if (0 < state.nullIndices.Count)
+            {
+                state.hasNullEntries = true;
+                state.summary = BuildNullEntrySummary(state.scratch);
+            }
+            else
+            {
+                _nullEntryStates.Remove(key);
+            }
+
+            return state;
+        }
+
+        internal DuplicateState EvaluateDuplicateState(
+            SerializedProperty property,
+            SerializedProperty itemsProperty,
+            bool force = false
+        )
+        {
+            string key = GetPropertyCacheKey(property);
+            DuplicateState state = _duplicateStates.GetOrAdd(key);
+
+            int currentFrame = Time.frameCount;
+            bool alreadyRefreshedThisFrame = _lastDuplicateRefreshFrame == currentFrame;
+
+            if (!force)
+            {
+                _lastDuplicateRefreshFrame = currentFrame;
+                if (alreadyRefreshedThisFrame && !state.IsDirty)
+                {
+                    return state;
+                }
+            }
+
+            ReleaseAllGroupingLists(state);
+
+            bool hasEvent = Event.current != null;
+            EventType eventType = hasEvent ? Event.current.type : EventType.Repaint;
+            bool shouldRefresh = eventType == EventType.Repaint || state.IsDirty || force;
+
+            if (!shouldRefresh)
+            {
+                return state;
+            }
+
+            state.duplicateIndices.Clear();
+            state.primaryFlags.Clear();
+            state.summary = string.Empty;
+            state.hasDuplicates = false;
+
+            if (itemsProperty == null || !itemsProperty.isArray)
+            {
+                state.ClearAnimationTracking();
+                return state;
+            }
+
+            int currentArraySize = itemsProperty.arraySize;
+            if (currentArraySize <= 1)
+            {
+                state.UpdateArraySize(currentArraySize);
+                state.animationStartTimes.Clear();
+                state.UpdateLastHadDuplicates(false);
+                return state;
+            }
+
+            if (!force && state.ShouldSkipRefresh(currentArraySize))
+            {
+                state.UpdateArraySize(currentArraySize);
+                return state;
+            }
+
+            state.UpdateArraySize(currentArraySize);
+
+            int count = currentArraySize;
+            using PooledResource<StringBuilder> summaryBuilderLease = Buffers.GetStringBuilder(
+                Math.Max(count * 8, 64),
+                out StringBuilder summaryBuilder
+            );
+            summaryBuilder.Clear();
+
+            for (int index = 0; index < count; index++)
+            {
+                SerializedProperty element = itemsProperty.GetArrayElementAtIndex(index);
+                SetElementData data = ReadElementData(element);
+                object keyValue = data.comparable ?? NullComparable;
+
+                if (!state.grouping.TryGetValue(keyValue, out List<int> list))
+                {
+                    list = RentGroupingList(state);
+                    state.grouping[keyValue] = list;
+                }
+
+                list.Add(index);
+            }
+
+            UnityHelpersSettings.DuplicateRowAnimationMode animationMode =
+                UnityHelpersSettings.GetDuplicateRowAnimationMode();
+            bool animateDuplicates =
+                animationMode == UnityHelpersSettings.DuplicateRowAnimationMode.Tween;
+            double now = animateDuplicates ? GetHighResolutionTime() : 0d;
+
+            int duplicateGroupCount = 0;
+            state.groupingKeysScratch.Clear();
+            state.groupingKeysScratch.AddRange(state.grouping.Keys);
+
+            foreach (object groupingKey in state.groupingKeysScratch)
+            {
+                if (!state.grouping.TryGetValue(groupingKey, out List<int> indices))
+                {
+                    continue;
+                }
+
+                if (indices.Count <= 1)
+                {
+                    ReleaseGroupingList(state, indices);
+                    state.grouping.Remove(groupingKey);
+                    continue;
+                }
+
+                indices.Sort();
+                duplicateGroupCount++;
+                state.hasDuplicates = true;
+                bool isPrimary = true;
+                foreach (int duplicateIndex in indices)
+                {
+                    state.duplicateIndices.Add(duplicateIndex);
+                    state.primaryFlags[duplicateIndex] = isPrimary;
+                    isPrimary = false;
+                    if (
+                        animateDuplicates
+                        && (force || !state.animationStartTimes.ContainsKey(duplicateIndex))
+                    )
+                    {
+                        state.animationStartTimes[duplicateIndex] = now;
+                    }
+                }
+
+                if (0 < summaryBuilder.Length)
+                {
+                    summaryBuilder.AppendLine();
+                }
+
+                if (duplicateGroupCount <= 5)
+                {
+                    summaryBuilder.Append("Duplicate entry ");
+                    summaryBuilder.Append(ConvertDuplicateKeyToString(groupingKey));
+                    summaryBuilder.Append(" at indices ");
+                    AppendIndexList(summaryBuilder, indices);
+                }
+
+                ReleaseGroupingList(state, indices);
+                state.grouping.Remove(groupingKey);
+            }
+
+            state.groupingKeysScratch.Clear();
+
+            if (5 < duplicateGroupCount)
+            {
+                if (0 < summaryBuilder.Length)
+                {
+                    summaryBuilder.AppendLine();
+                }
+
+                summaryBuilder.Append("Additional duplicate groups omitted for brevity.");
+            }
+
+            if (0 < state.animationStartTimes.Count)
+            {
+                state.animationKeysScratch.Clear();
+                state.animationKeysScratch.AddRange(state.animationStartTimes.Keys);
+                foreach (int trackedIndex in state.animationKeysScratch)
+                {
+                    if (!state.duplicateIndices.Contains(trackedIndex) || !animateDuplicates)
+                    {
+                        state.animationStartTimes.Remove(trackedIndex);
+                    }
+                }
+                state.animationKeysScratch.Clear();
+            }
+
+            if (!animateDuplicates)
+            {
+                state.animationStartTimes.Clear();
+            }
+
+            if (state.hasDuplicates)
+            {
+                state.summary =
+                    0 < summaryBuilder.Length
+                        ? summaryBuilder.ToString()
+                        : "Duplicate values detected.";
+            }
+            else
+            {
+                state.summary = string.Empty;
+            }
+
+            state.UpdateLastHadDuplicates(state.hasDuplicates, forceReset: force);
+            ReleaseAllGroupingLists(state);
+
+            if (state.hasDuplicates && animateDuplicates)
+            {
+                int tweenCycleLimit =
+                    UnityHelpersSettings.GetSerializableSetDuplicateTweenCycleLimit();
+                double currentTime = GetHighResolutionTime();
+                state.CheckAnimationCompletion(currentTime, tweenCycleLimit);
+
+                if (state.IsAnimating)
+                {
+                    EditorWindow focusedWindow = EditorWindow.focusedWindow;
+                    if (focusedWindow != null)
+                    {
+                        focusedWindow.Repaint();
+                    }
+                }
+            }
+
+            return state;
+        }
+
+        internal bool TryAddNewElement(
+            ref SerializedProperty property,
+            string propertyPath,
+            ref SerializedProperty itemsProperty,
+            PaginationState pagination
+        )
+        {
+            if (
+                !TryGetSetInspector(property, propertyPath, out ISerializableSetInspector inspector)
+            )
+            {
+                return false;
+            }
+
+            Type elementType = inspector.ElementType;
+            if (elementType == null)
+            {
+                return false;
+            }
+
+            if (ElementTypeSupportsNull(elementType) && elementType != typeof(string))
+            {
+                if (
+                    AppendNullPlaceholderEntry(
+                        ref property,
+                        propertyPath,
+                        ref itemsProperty,
+                        pagination,
+                        inspector
+                    )
+                )
+                {
+                    return true;
+                }
+            }
+
+            Array snapshot = null;
+            bool hasSerializedArray = itemsProperty is { isArray: true };
+            int estimatedCount = hasSerializedArray ? Math.Max(0, itemsProperty.arraySize) : 0;
+            if (!hasSerializedArray)
+            {
+                snapshot = inspector.GetSerializedItemsSnapshot();
+                estimatedCount = snapshot?.Length ?? 0;
+            }
+
+            using PooledResource<List<object>> existingValuesLease = Buffers<object>.GetList(
+                Math.Max(estimatedCount, 4),
+                out List<object> existingValues
+            );
+
+            existingValues.Clear();
+            if (hasSerializedArray)
+            {
+                for (int index = 0; index < itemsProperty.arraySize; index++)
+                {
+                    SerializedProperty element = itemsProperty.GetArrayElementAtIndex(index);
+                    existingValues.Add(ReadElementData(element).value);
+                }
+            }
+            else if (snapshot is { Length: > 0 })
+            {
+                foreach (object value in snapshot)
+                {
+                    existingValues.Add(value);
+                }
+            }
+
+            SerializedObject serializedObject = property.serializedObject;
+            Object[] targets = serializedObject.targetObjects;
+
+            foreach (
+                object candidate in GenerateCandidateValues(elementType, inspector.UniqueCount)
+            )
+            {
+                if (inspector.ContainsElement(candidate))
+                {
+                    continue;
+                }
+
+                if (0 < targets.Length)
+                {
+                    Undo.RecordObjects(targets, "Add Set Entry");
+                }
+
+                if (!inspector.TryAddElement(candidate, out object normalizedValue))
+                {
+                    continue;
+                }
+
+                existingValues.Add(normalizedValue);
+
+                Array updated = Array.CreateInstance(elementType, existingValues.Count);
+                for (int index = 0; index < existingValues.Count; index++)
+                {
+                    object coerced = ConvertSnapshotValue(elementType, existingValues[index]);
+                    updated.SetValue(coerced, index);
+                }
+
+                inspector.SetSerializedItemsSnapshot(updated, preserveSerializedEntries: true);
+                inspector.SynchronizeSerializedState();
+                Undo.FlushUndoRecordObjects();
+
+                serializedObject.Update();
+                property = serializedObject.FindProperty(propertyPath);
+                itemsProperty = property?.FindPropertyRelative(
+                    SerializableHashSetSerializedPropertyNames.Items
+                );
+                int totalCount = itemsProperty is { isArray: true } ? itemsProperty.arraySize : 0;
+                EnsurePaginationBounds(pagination, totalCount);
+                EvaluateDuplicateState(property, itemsProperty, force: true);
+                EvaluateNullEntryState(property, itemsProperty);
+                SyncRuntimeSet(property);
+                if (0 < totalCount)
+                {
+                    pagination.selectedIndex = totalCount - 1;
+                }
+                MarkListCacheDirty(GetPropertyCacheKey(property));
+                return true;
+            }
+
+            if (ElementTypeSupportsNull(elementType))
+            {
+                if (
+                    AppendNullPlaceholderEntry(
+                        ref property,
+                        propertyPath,
+                        ref itemsProperty,
+                        pagination,
+                        inspector
+                    )
+                )
+                {
+                    return true;
+                }
+            }
+
+            Debug.LogWarning("Unable to generate a unique value for this set element type.");
+            return false;
+        }
+
+        internal ListPageCache EnsurePageCache(
+            string cacheKey,
+            SerializedProperty itemsProperty,
+            PaginationState pagination
+        )
+        {
+            ListPageCache cache = GetOrCreatePageCache(cacheKey);
+            int itemCount = itemsProperty is { isArray: true } ? itemsProperty.arraySize : 0;
+            if (
+                cache.dirty
+                || cache.pageIndex != pagination.page
+                || cache.pageSize != pagination.pageSize
+                || cache.itemCount != itemCount
+            )
+            {
+                RefreshPageCache(cache, itemsProperty, pagination);
+            }
+
+            return cache;
+        }
+
+        internal void RemoveValueFromSet(
+            SerializedProperty property,
+            string propertyPath,
+            object value
+        )
+        {
+            if (
+                !TryGetSetInspector(property, propertyPath, out ISerializableSetInspector inspector)
+            )
+            {
+                return;
+            }
+
+            if (inspector.RemoveElement(value))
+            {
+                inspector.SynchronizeSerializedState();
+            }
+        }
+
+        internal void SortElements(SerializedProperty property, SerializedProperty itemsProperty)
+        {
+            TrySortElements(ref property, property.propertyPath, itemsProperty);
+        }
+
+        internal bool InvokeTryClearSet(
+            ref SerializedProperty property,
+            string propertyPath,
+            ref SerializedProperty itemsProperty
+        )
+        {
+            return TryClearSet(ref property, propertyPath, ref itemsProperty);
+        }
+
+        internal void InvokeTryMoveSelectedEntry(
+            ref SerializedProperty property,
+            string propertyPath,
+            ref SerializedProperty itemsProperty,
+            PaginationState pagination,
+            int direction
+        )
+        {
+            TryMoveSelectedEntry(
+                ref property,
+                propertyPath,
+                ref itemsProperty,
+                pagination,
+                direction
+            );
+        }
+
+        internal void InvokeTryRemoveSelectedEntry(
+            ref SerializedProperty property,
+            string propertyPath,
+            ref SerializedProperty itemsProperty,
+            PaginationState pagination
+        )
+        {
+            TryRemoveSelectedEntry(ref property, propertyPath, ref itemsProperty, pagination);
+        }
+
+        internal bool InvokeTrySortElements(
+            ref SerializedProperty property,
+            string propertyPath,
             SerializedProperty itemsProperty
         )
         {
-            return hasInspector && itemsProperty == null;
+            return TrySortElements(ref property, propertyPath, itemsProperty);
         }
 
-        internal static bool HasDroppedItemsArrayForTests(
-            bool hasInspector,
-            SerializedProperty itemsProperty
+        private void DrawEmptySetDrawer(
+            Rect rect,
+            SerializedProperty property,
+            string propertyPath,
+            SerializedProperty itemsProperty,
+            PaginationState pagination
         )
         {
-            return HasDroppedItemsArray(hasInspector, itemsProperty);
+            GUI.Box(rect, GUIContent.none, EditorStyles.helpBox);
+
+            float padding = 6f;
+            float lineHeight = EditorGUIUtility.singleLineHeight;
+            float verticalSpacing = EditorGUIUtility.standardVerticalSpacing;
+
+            Rect messageRect = new(
+                rect.x + padding,
+                rect.y + padding,
+                rect.width - padding * 2f,
+                lineHeight
+            );
+            EditorGUI.LabelField(messageRect, "List is empty.", EditorStyles.miniLabel);
+
+            Rect buttonsRect = new(
+                messageRect.x,
+                messageRect.yMax + verticalSpacing,
+                messageRect.width,
+                lineHeight
+            );
+
+            SerializedProperty propertyRef = property;
+            SerializedProperty itemsPropertyRef = itemsProperty;
+            if (!TryGetSetInspector(propertyRef, propertyPath, out _))
+            {
+                return;
+            }
+
+            if (itemsPropertyRef == null)
+            {
+                return;
+            }
+
+            int totalCount = itemsPropertyRef is { isArray: true } ? itemsPropertyRef.arraySize : 0;
+            float rightCursor = buttonsRect.xMax;
+
+            Rect addRect = new(rightCursor - 60f, buttonsRect.y, 60f, lineHeight);
+            if (GUI.Button(addRect, AddEntryContent, AddButtonStyle))
+            {
+                if (
+                    TryAddNewElement(
+                        ref propertyRef,
+                        propertyPath,
+                        ref itemsPropertyRef,
+                        pagination
+                    )
+                )
+                {
+                    itemsPropertyRef = propertyRef.FindPropertyRelative(
+                        SerializableHashSetSerializedPropertyNames.Items
+                    );
+                    totalCount = itemsPropertyRef is { isArray: true }
+                        ? itemsPropertyRef.arraySize
+                        : 0;
+                    EnsurePaginationBounds(pagination, totalCount);
+                }
+            }
+            rightCursor = addRect.x - ButtonSpacing;
+
+            Rect clearRect = new(rightCursor - 80f, buttonsRect.y, 80f, lineHeight);
+            bool canClear = 0 < totalCount;
+            GUIStyle clearStyle = canClear
+                ? ClearAllActiveButtonStyle
+                : ClearAllInactiveButtonStyle;
+            using (new EditorGUI.DisabledScope(!canClear))
+            {
+                if (GUI.Button(clearRect, ClearAllContent, clearStyle) && canClear)
+                {
+                    bool confirmed = EditorUtility.DisplayDialog(
+                        "Clear Set",
+                        "Remove all entries from this set?",
+                        "Clear",
+                        "Cancel"
+                    );
+                    if (
+                        confirmed
+                        && TryClearSet(ref propertyRef, propertyPath, ref itemsPropertyRef)
+                    )
+                    {
+                        pagination.page = 0;
+                        pagination.selectedIndex = -1;
+                        itemsPropertyRef = propertyRef.FindPropertyRelative(
+                            SerializableHashSetSerializedPropertyNames.Items
+                        );
+                        totalCount = itemsPropertyRef is { isArray: true }
+                            ? itemsPropertyRef.arraySize
+                            : 0;
+                        EnsurePaginationBounds(pagination, totalCount);
+                    }
+                }
+            }
         }
 
-        // Height measurement has no rect, so wrap the rare serialization error using Inspector width.
-        private static float GetDroppedBackingArrayHeight(string message)
+        private void CacheHeight(
+            string cacheKey,
+            float height,
+            int arraySize,
+            int pageIndex,
+            bool isExpanded,
+            bool hasNullEntries,
+            bool hasDuplicates,
+            bool pendingIsExpanded,
+            float pendingFoldoutProgress,
+            float mainFoldoutProgress,
+            int frameNumber
+        )
         {
-            float wrapWidth = Mathf.Max(
-                EditorGUIUtility.currentViewWidth - (EditorGUIUtility.singleLineHeight * 2f),
-                120f
-            );
-            return Mathf.Max(
-                EditorStyles.helpBox.CalcHeight(new GUIContent(message), wrapWidth),
-                EditorGUIUtility.singleLineHeight * 2f
-            );
+            if (!_heightCache.TryGetValue(cacheKey, out HeightCacheEntry entry))
+            {
+                entry = new HeightCacheEntry();
+                _heightCache[cacheKey] = entry;
+            }
+            entry.height = height;
+            entry.arraySize = arraySize;
+            entry.pageIndex = pageIndex;
+            entry.isExpanded = isExpanded;
+            entry.hasNullEntries = hasNullEntries;
+            entry.hasDuplicates = hasDuplicates;
+            entry.pendingIsExpanded = pendingIsExpanded;
+            entry.pendingFoldoutProgress = pendingFoldoutProgress;
+            entry.mainFoldoutProgress = mainFoldoutProgress;
+            entry.frameNumber = frameNumber;
         }
 
         private CachedItemsProperty GetOrCreateCachedItemsProperty(
@@ -1427,11 +5352,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             };
             _cachedItemsProperties[listKey] = entry;
             return entry;
-        }
-
-        private static RowFoldoutKey BuildRowFoldoutKey(string cacheKey, int globalIndex)
-        {
-            return new RowFoldoutKey(cacheKey, globalIndex);
         }
 
         private bool EnsureRowFoldoutState(RowFoldoutKey foldoutKey, SerializedProperty element)
@@ -1468,83 +5388,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             {
                 _rowFoldoutStates.Remove(key);
             }
-        }
-
-        private static void EnsurePaginationBounds(PaginationState state, int totalCount)
-        {
-            int pageSize = state.pageSize;
-            if (totalCount <= 0)
-            {
-                state.page = 0;
-                state.selectedIndex = -1;
-                return;
-            }
-
-            if (totalCount <= state.selectedIndex)
-            {
-                state.selectedIndex = totalCount - 1;
-            }
-
-            if (state.selectedIndex < 0)
-            {
-                state.selectedIndex = -1;
-            }
-
-            int pageCount = 0 < pageSize ? Mathf.Max(1, (totalCount + pageSize - 1) / pageSize) : 1;
-
-            if (pageCount <= state.page)
-            {
-                state.page = pageCount - 1;
-            }
-
-            if (state.page < 0)
-            {
-                state.page = 0;
-            }
-
-            if (0 <= state.selectedIndex)
-            {
-                int selectedPage = Mathf.Clamp(state.selectedIndex / pageSize, 0, pageCount - 1);
-                state.page = selectedPage;
-            }
-        }
-
-        private static bool RelativeIndexIsValid(ListPageCache cache, int relativeIndex)
-        {
-            return cache != null && 0 <= relativeIndex && relativeIndex < cache.entries.Count;
-        }
-
-        private static int GetRelativeIndex(ListPageCache cache, int globalIndex)
-        {
-            if (cache == null || globalIndex < 0)
-            {
-                return -1;
-            }
-
-            for (int i = 0; i < cache.entries.Count; i++)
-            {
-                if (cache.entries[i].arrayIndex == globalIndex)
-                {
-                    return i;
-                }
-            }
-
-            return -1;
-        }
-
-        private static void SyncListSelectionWithPagination(
-            ReorderableList list,
-            PaginationState pagination,
-            ListPageCache cache
-        )
-        {
-            if (list == null || pagination == null || cache == null)
-            {
-                return;
-            }
-
-            int relativeIndex = GetRelativeIndex(cache, pagination.selectedIndex);
-            list.index = relativeIndex;
         }
 
         private void UpdateListContext(
@@ -2454,2269 +6297,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
         }
 
-        private static string GetManualEntryInfoMessage(
-            bool inspectorAvailable,
-            bool typeSupported,
-            bool valueValid,
-            bool isDangerValue,
-            bool isBlankStringValue,
-            bool isNullObjectValue,
-            string pendingValueString,
-            bool duplicateExists,
-            Type elementType
-        )
-        {
-            if (!inspectorAvailable)
-            {
-                return "Set inspector unavailable.";
-            }
-
-            if (!typeSupported)
-            {
-                if (elementType == null)
-                {
-                    return "Unsupported element type.";
-                }
-
-                using PooledResource<StringBuilder> lease = Buffers.GetStringBuilder(
-                    32 + elementType.Name.Length,
-                    out StringBuilder builder
-                );
-                builder.Clear();
-                builder.Append("Unsupported type (");
-                builder.Append(elementType.Name);
-                builder.Append(").");
-                return builder.ToString();
-            }
-
-            if (!valueValid && !isDangerValue)
-            {
-                return "Value required.";
-            }
-
-            if (duplicateExists)
-            {
-                return "Value already exists.";
-            }
-
-            if (isBlankStringValue)
-            {
-                string descriptor = string.IsNullOrEmpty(pendingValueString)
-                    ? "empty"
-                    : "whitespace-only";
-                return $"Adding {descriptor} string value.";
-            }
-
-            if (isNullObjectValue)
-            {
-                return "Adding null object reference.";
-            }
-
-            return string.Empty;
-        }
-
-        private static float ResolveManualEntryFoldoutToggleOffset(SerializedProperty property)
-        {
-            SerializedObject serializedObject = property?.serializedObject;
-            return TargetsUnityHelpersSettings(serializedObject)
-                ? ManualEntryFoldoutToggleOffsetSettings
-                : ManualEntryFoldoutToggleOffsetInspector;
-        }
-
-        private static float ResolveManualEntrySectionPadding(SerializedProperty property)
-        {
-            SerializedObject serializedObject = property?.serializedObject;
-            return TargetsUnityHelpersSettings(serializedObject)
-                ? ManualEntrySectionPaddingSettings
-                : ManualEntrySectionPadding;
-        }
-
-        private static GUIStyle GetManualEntryFoldoutLabelStyle()
-        {
-            if (_manualEntryFoldoutLabelStyle != null)
-            {
-                return _manualEntryFoldoutLabelStyle;
-            }
-
-            _manualEntryFoldoutLabelStyle = new GUIStyle(EditorStyles.boldLabel)
-            {
-                alignment = TextAnchor.MiddleLeft,
-                padding = new RectOffset(0, 0, 0, 0),
-                margin = new RectOffset(0, 0, 0, 0),
-                wordWrap = false,
-            };
-            return _manualEntryFoldoutLabelStyle;
-        }
-
-        private static bool ManualEntryValueSupportsFoldout(PendingEntry pending)
-        {
-            if (pending == null || pending.elementType == null)
-            {
-                return false;
-            }
-
-            // New elements can temporarily report no visible children; trust types known to support expansion.
-            Type elementType = pending.elementType;
-            bool typeSupportsComplex =
-                TypeSupportsComplexEditing(elementType)
-                && !typeof(Object).IsAssignableFrom(elementType);
-
-            SerializedProperty property = pending.valueWrapperProperty;
-            if (property != null)
-            {
-                return typeSupportsComplex || SerializedPropertySupportsFoldout(property);
-            }
-
-            PendingWrapperContext context = EnsurePendingWrapper(pending, elementType);
-            property = context.Property;
-
-            return typeSupportsComplex || SerializedPropertySupportsFoldout(property);
-        }
-
-        private static bool TargetsUnityHelpersSettings(SerializedObject serializedObject)
-        {
-            if (serializedObject == null)
-            {
-                return false;
-            }
-
-            if (serializedObject.targetObject is UnityHelpersSettings)
-            {
-                return true;
-            }
-
-            Object[] targets = serializedObject.targetObjects;
-            if (targets == null || targets.Length == 0)
-            {
-                return false;
-            }
-
-            foreach (Object target in targets)
-            {
-                if (target is UnityHelpersSettings)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        internal PendingEntry GetOrCreatePendingEntry(
-            SerializedProperty property,
-            string propertyPath,
-            Type elementType,
-            bool isSortedSet
-        )
-        {
-            string pendingKey = GetPropertyCacheKey(property);
-            PendingEntry entry = _pendingEntries.GetOrAdd(pendingKey);
-            entry.isSorted = isSortedSet;
-
-            if (entry.elementType != elementType)
-            {
-                entry.elementType = elementType;
-                ReleasePendingWrapper(entry);
-                entry.valueWrapperDirty = true;
-                if (elementType != null)
-                {
-                    entry.value = CloneComplexValue(
-                        SerializableDictionaryPropertyDrawer.GetDefaultValue(elementType),
-                        elementType
-                    );
-                }
-                else
-                {
-                    entry.value = null;
-                }
-
-                entry.errorMessage = null;
-                entry.isExpanded = false;
-            }
-            else if (entry.value == null && elementType != null)
-            {
-                entry.value = CloneComplexValue(
-                    SerializableDictionaryPropertyDrawer.GetDefaultValue(elementType),
-                    elementType
-                );
-                entry.valueWrapperDirty = true;
-            }
-
-            entry.valueWrapperDirty = true;
-            SyncPendingWrapperValue(entry);
-            return entry;
-        }
-
-        private static void ResetPendingEntry(PendingEntry pending, bool collapseFoldout = true)
-        {
-            if (pending == null)
-            {
-                return;
-            }
-
-            if (pending.elementType != null)
-            {
-                pending.value = CloneComplexValue(
-                    SerializableDictionaryPropertyDrawer.GetDefaultValue(pending.elementType),
-                    pending.elementType
-                );
-            }
-            else
-            {
-                pending.value = null;
-            }
-
-            pending.errorMessage = null;
-            if (collapseFoldout)
-            {
-                pending.isExpanded = false;
-            }
-            SyncPendingWrapperValue(pending);
-            pending.valueWrapperDirty = true;
-        }
-
-        private static void SyncPendingWrapperValue(PendingEntry pending)
-        {
-            if (
-                pending?.valueWrapper == null
-                || pending.valueWrapperSerialized == null
-                || pending.valueWrapperProperty == null
-            )
-            {
-                return;
-            }
-
-            object currentValue = pending.valueWrapper.GetValue();
-            if (!pending.valueWrapperDirty && ValuesEqual(currentValue, pending.value))
-            {
-                return;
-            }
-
-            pending.valueWrapper.SetValue(CloneComplexValue(pending.value, pending.elementType));
-            pending.valueWrapperSerialized.Update();
-            pending.valueWrapperSerialized.ApplyModifiedPropertiesWithoutUndo();
-            pending.valueWrapperDirty = false;
-        }
-
-        internal static PendingWrapperContext EnsurePendingWrapper(
-            PendingEntry pending,
-            Type elementType
-        )
-        {
-            if (pending == null || elementType == null)
-            {
-                return PendingWrapperContext.Empty;
-            }
-
-            PendingValueWrapper wrapper = pending.valueWrapper;
-            SerializedObject serialized = pending.valueWrapperSerialized;
-            SerializedProperty property = pending.valueWrapperProperty;
-
-            bool initialized = false;
-            try
-            {
-                if (wrapper == null)
-                {
-                    ReleasePendingWrapper(pending);
-                    wrapper = ScriptableObject.CreateInstance<PendingValueWrapper>();
-                    pending.valueWrapper = wrapper;
-                    wrapper.hideFlags = HideFlags.HideAndDontSave;
-                    serialized = null;
-                    property = null;
-                }
-
-                if (serialized == null)
-                {
-                    serialized = new SerializedObject(wrapper);
-                    pending.valueWrapperSerialized = serialized;
-                    property = wrapper.FindValueProperty(serialized);
-                    pending.valueWrapperProperty = property;
-                }
-
-                if (property == null)
-                {
-                    return PendingWrapperContext.Empty;
-                }
-
-                serialized.Update();
-                initialized = true;
-                return new PendingWrapperContext(wrapper, serialized, property);
-            }
-            finally
-            {
-                if (!initialized)
-                {
-                    ReleasePendingWrapper(pending);
-                }
-            }
-        }
-
-        internal static void ReleasePendingWrapper(PendingEntry pending)
-        {
-            if (pending == null)
-            {
-                return;
-            }
-
-            PendingValueWrapper wrapper = pending.valueWrapper;
-            SerializedObject serialized = pending.valueWrapperSerialized;
-            SerializedProperty property = pending.valueWrapperProperty;
-            pending.valueWrapper = null;
-            pending.valueWrapperSerialized = null;
-            pending.valueWrapperProperty = null;
-            pending.valueWrapperDirty = true;
-            try
-            {
-                property?.Dispose();
-            }
-            finally
-            {
-                try
-                {
-                    serialized?.Dispose();
-                }
-                finally
-                {
-                    if (wrapper != null)
-                    {
-                        Object.DestroyImmediate(wrapper);
-                    }
-                }
-            }
-        }
-
-        internal bool TryCommitPendingEntry(
-            PendingEntry pending,
-            SerializedProperty property,
-            string propertyPath,
-            ref SerializedProperty itemsProperty,
-            PaginationState pagination,
-            ISerializableSetInspector inspector
-        )
-        {
-            SerializedObject serializedObject = property.serializedObject;
-            int itemsSizeBefore = itemsProperty is { isArray: true } ? itemsProperty.arraySize : 0;
-
-            PaletteSerializationDiagnostics.ReportSetCommitStart(
-                serializedObject,
-                propertyPath,
-                itemsSizeBefore,
-                pending?.value
-            );
-
-            if (pending == null)
-            {
-                PaletteSerializationDiagnostics.ReportSetAddResult(
-                    serializedObject,
-                    propertyPath,
-                    false,
-                    "pending is null"
-                );
-                return false;
-            }
-
-            Type elementType = pending.elementType;
-            if (elementType == null)
-            {
-                pending.errorMessage = "Unknown element type.";
-                PaletteSerializationDiagnostics.ReportSetAddResult(
-                    serializedObject,
-                    propertyPath,
-                    false,
-                    pending.errorMessage
-                );
-                return false;
-            }
-
-            if (inspector == null)
-            {
-                pending.errorMessage = "Set inspector unavailable.";
-                PaletteSerializationDiagnostics.ReportSetAddResult(
-                    serializedObject,
-                    propertyPath,
-                    false,
-                    pending.errorMessage
-                );
-                return false;
-            }
-
-            if (!IsTypeSupported(elementType))
-            {
-                pending.errorMessage = $"Unsupported type ({elementType.Name}).";
-                PaletteSerializationDiagnostics.ReportSetAddResult(
-                    serializedObject,
-                    propertyPath,
-                    false,
-                    pending.errorMessage
-                );
-                return false;
-            }
-
-            if (pending.value == null && !ElementTypeSupportsNull(elementType))
-            {
-                pending.errorMessage = "Value cannot be null.";
-                PaletteSerializationDiagnostics.ReportSetAddResult(
-                    serializedObject,
-                    propertyPath,
-                    false,
-                    pending.errorMessage
-                );
-                return false;
-            }
-
-            object normalizedCandidate = ConvertSnapshotValue(elementType, pending.value);
-            if (inspector.ContainsElement(normalizedCandidate))
-            {
-                pending.errorMessage = "Value already exists in this set.";
-                PaletteSerializationDiagnostics.ReportSetAddResult(
-                    serializedObject,
-                    propertyPath,
-                    false,
-                    pending.errorMessage
-                );
-                return false;
-            }
-
-            Object[] targets = serializedObject.targetObjects;
-            if (0 < targets.Length)
-            {
-                Undo.RecordObjects(targets, "Add Set Entry");
-            }
-
-            if (!inspector.TryAddElement(normalizedCandidate, out object normalizedValue))
-            {
-                pending.errorMessage = "Unable to add value to set.";
-                PaletteSerializationDiagnostics.ReportSetAddResult(
-                    serializedObject,
-                    propertyPath,
-                    false,
-                    pending.errorMessage
-                );
-                return false;
-            }
-
-            Array snapshot = BuildSnapshotArray(itemsProperty, elementType);
-            int originalLength = snapshot?.Length ?? 0;
-            Array updated = Array.CreateInstance(elementType, originalLength + 1);
-            if (snapshot != null && 0 < originalLength)
-            {
-                snapshot.CopyTo(updated, 0);
-            }
-            updated.SetValue(normalizedValue, originalLength);
-
-            inspector.SetSerializedItemsSnapshot(updated, preserveSerializedEntries: true);
-            inspector.SynchronizeSerializedState();
-            Undo.FlushUndoRecordObjects();
-
-            serializedObject.Update();
-            property = serializedObject.FindProperty(propertyPath);
-            itemsProperty = property?.FindPropertyRelative(
-                SerializableHashSetSerializedPropertyNames.Items
-            );
-            int totalCount = itemsProperty is { isArray: true } ? itemsProperty.arraySize : 0;
-
-            EnsurePaginationBounds(pagination, totalCount);
-            EvaluateDuplicateState(property, itemsProperty, force: true);
-            EvaluateNullEntryState(property, itemsProperty);
-            SyncRuntimeSet(property);
-            if (0 < totalCount)
-            {
-                pagination.selectedIndex = totalCount - 1;
-            }
-
-            MarkListCacheDirty(GetPropertyCacheKey(property));
-            pending.errorMessage = null;
-            bool wasExpanded = pending.isExpanded;
-            ResetPendingEntry(pending);
-            pending.isExpanded = wasExpanded;
-            RequestRepaint();
-
-            PaletteSerializationDiagnostics.ReportSetAddResult(
-                serializedObject,
-                propertyPath,
-                true,
-                null
-            );
-            PaletteSerializationDiagnostics.ReportSetCommitComplete(
-                serializedObject,
-                propertyPath,
-                totalCount
-            );
-
-            return true;
-        }
-
-        internal static bool IsTweeningEnabledForTests(bool isSortedSet)
-        {
-            return ShouldTweenManualEntryFoldout(isSortedSet);
-        }
-
-        /// <summary>
-        /// Returns the expected static foldout progress without animation.
-        /// This static method cannot access instance animation state.
-        /// Use <see cref="GetPendingFoldoutProgressFromInstance"/> for actual animation testing.
-        /// </summary>
-        internal static float GetPendingFoldoutProgressForTests(
-            SerializedProperty property,
-            bool expanded,
-            bool isSorted
-        )
-        {
-            return expanded ? 1f : 0f;
-        }
-
-        /// <summary>
-        /// Gets the actual animated foldout progress from the drawer instance's pending entry.
-        /// Use this for testing that animations are actually progressing over time.
-        /// </summary>
-        /// <param name="property">The serialized property for the set.</param>
-        /// <returns>
-        /// The current animation progress (0 to 1), or -1 if no pending entry exists for this property.
-        /// When tweening is disabled, returns 0 or 1 immediately based on expanded state.
-        /// </returns>
-        internal float GetPendingFoldoutProgressFromInstance(SerializedProperty property)
-        {
-            if (property == null)
-            {
-                return -1f;
-            }
-
-            string cacheKey = GetPropertyCacheKey(property);
-            if (!_pendingEntries.TryGetValue(cacheKey, out PendingEntry pending) || pending == null)
-            {
-                return -1f;
-            }
-
-            return GetPendingFoldoutProgress(pending);
-        }
-
-        /// <summary>
-        /// Gets the pending entry's expanded state and animation information for testing.
-        /// </summary>
-        /// <param name="property">The serialized property for the set.</param>
-        /// <param name="isExpanded">Output: whether the pending section is logically expanded.</param>
-        /// <param name="animProgress">Output: the current animation progress (0 to 1).</param>
-        /// <param name="hasAnimBool">Output: whether an AnimBool is active for this entry.</param>
-        /// <returns>True if a pending entry was found, false otherwise.</returns>
-        internal bool TryGetPendingAnimationStateForTests(
-            SerializedProperty property,
-            out bool isExpanded,
-            out float animProgress,
-            out bool hasAnimBool
-        )
-        {
-            if (property == null)
-            {
-                isExpanded = false;
-                animProgress = 0f;
-                hasAnimBool = false;
-                return false;
-            }
-
-            string cacheKey = GetPropertyCacheKey(property);
-            if (!_pendingEntries.TryGetValue(cacheKey, out PendingEntry pending) || pending == null)
-            {
-                isExpanded = false;
-                animProgress = 0f;
-                hasAnimBool = false;
-                return false;
-            }
-
-            isExpanded = pending.isExpanded;
-            hasAnimBool = pending.foldoutAnim != null;
-            animProgress = GetPendingFoldoutProgress(pending);
-            return true;
-        }
-
-        /// <summary>
-        /// Sets the pending entry's expanded state for testing purposes.
-        /// This properly triggers animation state updates.
-        /// </summary>
-        internal void SetPendingExpandedStateForTests(SerializedProperty property, bool expanded)
-        {
-            if (property == null)
-            {
-                return;
-            }
-
-            string cacheKey = GetPropertyCacheKey(property);
-            if (!_pendingEntries.TryGetValue(cacheKey, out PendingEntry pending) || pending == null)
-            {
-                return;
-            }
-
-            pending.isExpanded = expanded;
-            AnimBool anim = EnsureManualEntryFoldoutAnim(pending, property.propertyPath);
-            if (anim != null)
-            {
-                anim.target = expanded;
-            }
-        }
-
-        private static bool ShouldTweenMainFoldout(bool isSortedSet)
-        {
-            return isSortedSet
-                ? UnityHelpersSettings.ShouldTweenSerializableSortedSetFoldouts()
-                : UnityHelpersSettings.ShouldTweenSerializableSetFoldouts();
-        }
-
-        private static float GetMainFoldoutAnimationSpeed(bool isSortedSet)
-        {
-            return isSortedSet
-                ? UnityHelpersSettings.GetSerializableSortedSetFoldoutSpeed()
-                : UnityHelpersSettings.GetSerializableSetFoldoutSpeed();
-        }
-
-        private static AnimBool EnsureMainFoldoutAnim(
-            SerializedObject serializedObject,
-            string propertyPath,
-            bool isExpanded,
-            bool isSortedSet
-        )
-        {
-            bool shouldTween = ShouldTweenMainFoldout(isSortedSet);
-            float speed = GetMainFoldoutAnimationSpeed(isSortedSet);
-            MainFoldoutCacheKey cacheKey = GetMainFoldoutCacheKey(serializedObject, propertyPath);
-
-            SerializableCollectionTweenDiagnostics.LogTweenSettingsQuery(
-                "EnsureMainFoldoutAnim",
-                propertyPath ?? "(unknown)",
-                isSortedSet,
-                shouldTween,
-                speed
-            );
-
-            if (!shouldTween)
-            {
-                if (MainFoldoutAnimations.TryRemove(cacheKey, out AnimBool existing))
-                {
-                    Unsubscribe(existing);
-
-                    SerializableCollectionTweenDiagnostics.LogAnimBoolDestroyed(
-                        propertyPath,
-                        "MainFoldout_TweeningDisabled"
-                    );
-                }
-
-                return null;
-            }
-
-            if (!MainFoldoutAnimations.TryGet(cacheKey, out AnimBool anim) || anim == null)
-            {
-                anim = new AnimBool(isExpanded) { speed = speed };
-                anim.valueChanged.AddListener(RequestRepaint);
-                MainFoldoutAnimations.Set(cacheKey, anim);
-
-                SerializableCollectionTweenDiagnostics.LogAnimBoolCreation(
-                    propertyPath,
-                    isExpanded,
-                    isSortedSet,
-                    speed
-                );
-            }
-            else
-            {
-                anim.speed = speed;
-            }
-
-            anim.target = isExpanded;
-            return anim;
-        }
-
-        private static float GetMainFoldoutProgress(
-            SerializedObject serializedObject,
-            string propertyPath,
-            bool isExpanded,
-            bool isSortedSet
-        )
-        {
-            bool shouldTween = ShouldTweenMainFoldout(isSortedSet);
-            if (!shouldTween)
-            {
-                float immediateProgress = isExpanded ? 1f : 0f;
-
-                SerializableCollectionTweenDiagnostics.LogFoldoutProgressCalculation(
-                    "GetMainFoldoutProgress_NoTween",
-                    propertyPath ?? "(unknown)",
-                    false,
-                    isExpanded,
-                    immediateProgress,
-                    false
-                );
-
-                return immediateProgress;
-            }
-
-            AnimBool anim = EnsureMainFoldoutAnim(
-                serializedObject,
-                propertyPath,
-                isExpanded,
-                isSortedSet
-            );
-            if (anim == null)
-            {
-                float fallbackProgress = isExpanded ? 1f : 0f;
-
-                SerializableCollectionTweenDiagnostics.LogFoldoutProgressCalculation(
-                    "GetMainFoldoutProgress_NoAnimBool",
-                    propertyPath ?? "(unknown)",
-                    true,
-                    isExpanded,
-                    fallbackProgress,
-                    false
-                );
-
-                return fallbackProgress;
-            }
-
-            if (anim.isAnimating)
-            {
-                RequestRepaint();
-            }
-
-            float animatedProgress = anim.faded;
-
-            SerializableCollectionTweenDiagnostics.LogFoldoutProgressCalculation(
-                "GetMainFoldoutProgress_Animated",
-                propertyPath ?? "(unknown)",
-                true,
-                isExpanded,
-                animatedProgress,
-                true
-            );
-
-            return animatedProgress;
-        }
-
-        /// <summary>
-        /// Clears the main foldout animation cache. Used for testing purposes.
-        /// </summary>
-        internal static void ClearMainFoldoutAnimCacheForTests()
-        {
-            MainFoldoutAnimations.Clear();
-        }
-
-        /// <summary>
-        /// Returns true if a main foldout AnimBool exists for the given property path and target object.
-        /// </summary>
-        internal static bool HasMainFoldoutAnimBoolForTests(
-            SerializedObject serializedObject,
-            string propertyPath
-        )
-        {
-            MainFoldoutCacheKey cacheKey = GetMainFoldoutCacheKey(serializedObject, propertyPath);
-            return MainFoldoutAnimations.ContainsKey(cacheKey);
-        }
-
-        /// <summary>
-        /// Gets the main foldout progress for testing purposes.
-        /// </summary>
-        internal static float GetMainFoldoutProgressForTests(
-            SerializedObject serializedObject,
-            string propertyPath,
-            bool isExpanded,
-            bool isSortedSet
-        )
-        {
-            return GetMainFoldoutProgress(serializedObject, propertyPath, isExpanded, isSortedSet);
-        }
-
-        /// <summary>
-        /// Gets the main foldout cache key for testing purposes.
-        /// Returns the string representation of the struct key.
-        /// </summary>
-        internal static string GetMainFoldoutCacheKeyForTests(
-            SerializedObject serializedObject,
-            string propertyPath
-        )
-        {
-            return GetMainFoldoutCacheKey(serializedObject, propertyPath).ToString();
-        }
-
-        private static bool ShouldTweenManualEntryFoldout(bool isSortedSet)
-        {
-            return isSortedSet
-                ? UnityHelpersSettings.ShouldTweenSerializableSortedSetFoldouts()
-                : UnityHelpersSettings.ShouldTweenSerializableSetFoldouts();
-        }
-
-        private static float GetManualEntryFoldoutSpeed(bool isSortedSet)
-        {
-            return isSortedSet
-                ? UnityHelpersSettings.GetSerializableSortedSetFoldoutSpeed()
-                : UnityHelpersSettings.GetSerializableSetFoldoutSpeed();
-        }
-
-        private static AnimBool CreateManualEntryFoldoutAnim(
-            bool initialValue,
-            bool isSortedSet,
-            string propertyPath = null
-        )
-        {
-            float speed = GetManualEntryFoldoutSpeed(isSortedSet);
-            AnimBool anim = new(initialValue) { speed = speed };
-            anim.valueChanged.AddListener(RequestRepaint);
-
-            SerializableCollectionTweenDiagnostics.LogAnimBoolCreation(
-                propertyPath ?? "(unknown)",
-                initialValue,
-                isSortedSet,
-                speed
-            );
-
-            return anim;
-        }
-
-        private static AnimBool EnsureManualEntryFoldoutAnim(
-            PendingEntry pending,
-            string propertyPath = null
-        )
-        {
-            if (pending == null)
-            {
-                return null;
-            }
-
-            bool shouldTween = ShouldTweenManualEntryFoldout(pending.isSorted);
-            float speed = GetManualEntryFoldoutSpeed(pending.isSorted);
-
-            SerializableCollectionTweenDiagnostics.LogTweenSettingsQuery(
-                "EnsureManualEntryFoldoutAnim",
-                propertyPath ?? "(unknown)",
-                pending.isSorted,
-                shouldTween,
-                speed
-            );
-
-            if (!shouldTween)
-            {
-                if (pending.foldoutAnim != null)
-                {
-                    pending.foldoutAnim.valueChanged.RemoveListener(RequestRepaint);
-                    pending.foldoutAnim = null;
-
-                    SerializableCollectionTweenDiagnostics.LogAnimBoolDestroyed(
-                        propertyPath ?? "(unknown)",
-                        "TweeningDisabled"
-                    );
-                }
-
-                return null;
-            }
-
-            if (pending.foldoutAnim == null)
-            {
-                pending.foldoutAnim = CreateManualEntryFoldoutAnim(
-                    pending.isExpanded,
-                    pending.isSorted,
-                    propertyPath
-                );
-            }
-            else
-            {
-                pending.foldoutAnim.speed = speed;
-
-                if (pending.foldoutAnim.target != pending.isExpanded)
-                {
-                    pending.foldoutAnim.target = pending.isExpanded;
-                }
-            }
-
-            return pending.foldoutAnim;
-        }
-
-        private static float GetPendingFoldoutProgress(
-            PendingEntry pending,
-            string propertyPath = null
-        )
-        {
-            if (pending == null)
-            {
-                return 0f;
-            }
-
-            bool shouldTween = ShouldTweenManualEntryFoldout(pending.isSorted);
-
-            // EnsureManualEntryFoldoutAnim also cleans up animation state when tweening is disabled.
-            AnimBool anim = EnsureManualEntryFoldoutAnim(pending, propertyPath);
-
-            if (!shouldTween)
-            {
-                float immediateProgress = pending.isExpanded ? 1f : 0f;
-
-                SerializableCollectionTweenDiagnostics.LogFoldoutProgressCalculation(
-                    "GetPendingFoldoutProgress_NoTween",
-                    propertyPath ?? "(unknown)",
-                    false,
-                    pending.isExpanded,
-                    immediateProgress,
-                    pending.foldoutAnim != null
-                );
-
-                return immediateProgress;
-            }
-
-            if (anim == null)
-            {
-                float fallbackProgress = pending.isExpanded ? 1f : 0f;
-
-                SerializableCollectionTweenDiagnostics.LogFoldoutProgressCalculation(
-                    "GetPendingFoldoutProgress_NoAnimBool",
-                    propertyPath ?? "(unknown)",
-                    true,
-                    pending.isExpanded,
-                    fallbackProgress,
-                    false
-                );
-
-                return fallbackProgress;
-            }
-
-            anim.target = pending.isExpanded;
-            float animatedProgress = anim.faded;
-
-            SerializableCollectionTweenDiagnostics.LogFoldoutProgressCalculation(
-                "GetPendingFoldoutProgress_Animated",
-                propertyPath ?? "(unknown)",
-                true,
-                pending.isExpanded,
-                animatedProgress,
-                true
-            );
-
-            return animatedProgress;
-        }
-
-        private static float GetPendingSectionHeight(PendingEntry pending)
-        {
-            return GetPendingSectionHeight(pending, null);
-        }
-
-        private static float GetPendingSectionHeight(
-            PendingEntry pending,
-            SerializedProperty property
-        )
-        {
-            if (pending == null)
-            {
-                return 0f;
-            }
-
-            float resolvedSectionPadding = ResolveManualEntrySectionPadding(property);
-            float collapsedHeight = EditorGUIUtility.singleLineHeight + resolvedSectionPadding * 2f;
-            float spacing = EditorGUIUtility.standardVerticalSpacing;
-            float expandedExtra = EditorGUIUtility.singleLineHeight * 2f + spacing * 3f;
-
-            if (!string.IsNullOrEmpty(pending.errorMessage))
-            {
-                expandedExtra += GetWarningBarHeight() + spacing;
-            }
-
-            string propertyPath = property?.propertyPath;
-            float progress = GetPendingFoldoutProgress(pending, propertyPath);
-            float finalHeight = collapsedHeight + expandedExtra * Mathf.Clamp01(progress);
-
-            SerializableCollectionTweenDiagnostics.LogPendingSectionHeightCalc(
-                propertyPath ?? "(unknown)",
-                collapsedHeight,
-                expandedExtra,
-                progress,
-                finalHeight
-            );
-
-            return finalHeight;
-        }
-
-        private static void RequestRepaint()
-        {
-            // Repaint all views because SettingsProvider and Inspector can both host this drawer.
-            InternalEditorUtility.RepaintAllViews();
-        }
-
-        private static void Unsubscribe(AnimBool anim)
-        {
-            if (anim != null)
-            {
-                anim.valueChanged.RemoveListener(RequestRepaint);
-            }
-        }
-
-        private static GUIContent GetUnsupportedTypeContent(Type type)
-        {
-            string typeName = type?.Name ?? "Unknown";
-            if (type == null || !UnsupportedTypeMessageCache.TryGetValue(type, out string message))
-            {
-                message = "Unsupported type (" + typeName + ")";
-                if (type != null)
-                {
-                    UnsupportedTypeMessageCache[type] = message;
-                }
-            }
-            UnsupportedTypeContent.text = message;
-            return UnsupportedTypeContent;
-        }
-
-        private static GUIContent GetSuppressedFieldValueContent(object current)
-        {
-            string text = string.Empty;
-            if (current is Object unityObject)
-            {
-                if (unityObject != null)
-                {
-                    text = unityObject.name;
-                }
-            }
-            else if (current != null)
-            {
-                text = current.ToString() ?? string.Empty;
-            }
-
-            SuppressedFieldValueContent.text = text;
-            return SuppressedFieldValueContent;
-        }
-
-        internal static object DrawFieldForType(
-            Rect rect,
-            GUIContent content,
-            object current,
-            Type type,
-            PendingEntry pending
-        )
-        {
-            if (TryDrawComplexTypeField(rect, content, ref current, type, pending))
-            {
-                return current;
-            }
-
-            if (!IsTypeSupported(type))
-            {
-                EditorGUI.LabelField(rect, content, GetUnsupportedTypeContent(type));
-                return current;
-            }
-
-            if (EditorUi.Suppress)
-            {
-                EditorGUI.LabelField(rect, content, GetSuppressedFieldValueContent(current));
-                return current;
-            }
-
-            if (type == typeof(string))
-            {
-                return EditorGUI.TextField(rect, content, current as string ?? string.Empty);
-            }
-
-            if (type == typeof(int))
-            {
-                return EditorGUI.IntField(rect, content, current is int i ? i : default);
-            }
-
-            if (type == typeof(float))
-            {
-                return EditorGUI.FloatField(rect, content, current is float f ? f : default);
-            }
-
-            if (type == typeof(double))
-            {
-                return EditorGUI.DoubleField(rect, content, current is double d ? d : default);
-            }
-
-            if (type == typeof(long))
-            {
-                return EditorGUI.LongField(rect, content, current is long l ? l : default);
-            }
-
-            if (type == typeof(bool))
-            {
-                return EditorGUI.Toggle(rect, content, current is true);
-            }
-
-            if (type == typeof(Vector2))
-            {
-                return EditorGUI.Vector2Field(
-                    rect,
-                    content.text,
-                    current is Vector2 v2 ? v2 : Vector2.zero
-                );
-            }
-
-            if (type == typeof(Vector3))
-            {
-                return EditorGUI.Vector3Field(
-                    rect,
-                    content.text,
-                    current is Vector3 v3 ? v3 : Vector3.zero
-                );
-            }
-
-            if (type == typeof(Vector4))
-            {
-                return EditorGUI.Vector4Field(
-                    rect,
-                    content.text,
-                    current is Vector4 v4 ? v4 : Vector4.zero
-                );
-            }
-
-            if (type == typeof(Vector2Int))
-            {
-                Vector2Int value = current is Vector2Int v2int ? v2int : default;
-                return EditorGUI.Vector2IntField(rect, content.text, value);
-            }
-
-            if (type == typeof(Vector3Int))
-            {
-                Vector3Int value = current is Vector3Int v3int ? v3int : default;
-                return EditorGUI.Vector3IntField(rect, content.text, value);
-            }
-
-            if (type == typeof(Rect))
-            {
-                Rect value = current is Rect rectValue ? rectValue : default;
-                return EditorGUI.RectField(rect, content.text, value);
-            }
-
-            if (type == typeof(RectInt))
-            {
-                RectInt value = current is RectInt rectInt ? rectInt : default;
-                return EditorGUI.RectIntField(rect, content.text, value);
-            }
-
-            if (type == typeof(Bounds))
-            {
-                Bounds value = current is Bounds bounds ? bounds : default;
-                return EditorGUI.BoundsField(rect, content.text, value);
-            }
-
-            if (type == typeof(BoundsInt))
-            {
-                BoundsInt value = current is BoundsInt boundsInt ? boundsInt : default;
-                return EditorGUI.BoundsIntField(rect, content.text, value);
-            }
-
-            if (type == typeof(Color))
-            {
-                Color value = current is Color color ? color : Color.clear;
-                return EditorGUI.ColorField(rect, content.text, value);
-            }
-
-            if (type == typeof(AnimationCurve))
-            {
-                AnimationCurve value = current as AnimationCurve ?? new AnimationCurve();
-                return EditorGUI.CurveField(rect, content.text, value);
-            }
-
-            if (type.IsEnum)
-            {
-                Enum enumValue = current as Enum ?? (Enum)Enum.ToObject(type, 0);
-                return EditorGUI.EnumPopup(rect, content, enumValue);
-            }
-
-            if (typeof(Object).IsAssignableFrom(type))
-            {
-                Object obj = current as Object;
-                return EditorGUI.ObjectField(rect, content, obj, type, allowSceneObjects: false);
-            }
-
-            EditorGUI.LabelField(rect, content, GetUnsupportedTypeContent(type));
-            return current;
-        }
-
-        private static bool TryDrawComplexTypeField(
-            Rect rect,
-            GUIContent content,
-            ref object current,
-            Type type,
-            PendingEntry pending
-        )
-        {
-            if (
-                pending == null
-                || type == null
-                || !TypeSupportsComplexEditing(type)
-                || (type.IsValueType && !typeof(Object).IsAssignableFrom(type))
-                || typeof(Object).IsAssignableFrom(type)
-                || type == typeof(string)
-            )
-            {
-                return false;
-            }
-
-            PendingWrapperContext context = EnsurePendingWrapper(pending, type);
-            if (context.Property == null)
-            {
-                return false;
-            }
-
-            object targetValue =
-                current
-                ?? CloneComplexValue(
-                    SerializableDictionaryPropertyDrawer.GetDefaultValue(type),
-                    type
-                );
-            object wrapperValue = context.Wrapper.GetValue();
-            if (!ValuesEqual(wrapperValue, targetValue))
-            {
-                context.Wrapper.SetValue(CloneComplexValue(targetValue, type));
-                context.Serialized.Update();
-                context.Serialized.ApplyModifiedPropertiesWithoutUndo();
-            }
-
-            if (type.IsClass && context.Wrapper.GetValue() == null)
-            {
-                context.Wrapper.SetValue(
-                    CloneComplexValue(
-                        SerializableDictionaryPropertyDrawer.GetDefaultValue(type),
-                        type
-                    )
-                );
-                context.Serialized.Update();
-                context.Serialized.ApplyModifiedPropertiesWithoutUndo();
-            }
-
-            EditorGUI.BeginChangeCheck();
-            EditorGUI.PropertyField(rect, context.Property, content, includeChildren: true);
-            if (EditorGUI.EndChangeCheck())
-            {
-                context.Serialized.ApplyModifiedProperties();
-                context.Serialized.Update();
-                object updated = context.Wrapper.GetValue();
-                current = CloneComplexValue(updated, type);
-            }
-
-            return true;
-        }
-
-        private static bool TypeSupportsComplexEditing(Type type)
-        {
-            while (true)
-            {
-                if (type == null)
-                {
-                    return false;
-                }
-
-                if (typeof(Object).IsAssignableFrom(type))
-                {
-                    return true;
-                }
-
-                if (IsSimplePendingFieldType(type))
-                {
-                    return false;
-                }
-
-                if (type.IsArray)
-                {
-                    type = type.GetElementType();
-                    continue;
-                }
-
-                if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(List<>))
-                {
-                    type = type.GetGenericArguments()[0];
-                    continue;
-                }
-
-                return type.IsSerializable;
-            }
-        }
-
-        private static bool IsSimplePendingFieldType(Type type)
-        {
-            if (type == null)
-            {
-                return false;
-            }
-
-            if (type.IsPrimitive || type.IsEnum)
-            {
-                return true;
-            }
-
-            return type == typeof(string)
-                || type == typeof(decimal)
-                || type == typeof(Vector2)
-                || type == typeof(Vector3)
-                || type == typeof(Vector4)
-                || type == typeof(Vector2Int)
-                || type == typeof(Vector3Int)
-                || type == typeof(Rect)
-                || type == typeof(RectInt)
-                || type == typeof(Bounds)
-                || type == typeof(BoundsInt)
-                || type == typeof(Color)
-                || type == typeof(AnimationCurve);
-        }
-
-        private static bool IsTypeSupported(Type type)
-        {
-            if (type == null)
-            {
-                return false;
-            }
-
-            return type == typeof(string)
-                || type == typeof(int)
-                || type == typeof(float)
-                || type == typeof(double)
-                || type == typeof(long)
-                || type == typeof(bool)
-                || type == typeof(Vector2)
-                || type == typeof(Vector3)
-                || type == typeof(Vector4)
-                || type == typeof(Vector2Int)
-                || type == typeof(Vector3Int)
-                || type == typeof(Rect)
-                || type == typeof(RectInt)
-                || type == typeof(Bounds)
-                || type == typeof(BoundsInt)
-                || type == typeof(Color)
-                || type == typeof(AnimationCurve)
-                || type.IsEnum
-                || typeof(Object).IsAssignableFrom(type)
-                || TypeSupportsComplexEditing(type);
-        }
-
-        private static bool TryCreateDefaultInstance(Type type, out object instance)
-        {
-            if (type == null)
-            {
-                instance = null;
-                return false;
-            }
-
-            if (type.IsAbstract || type.IsInterface)
-            {
-                instance = null;
-                return false;
-            }
-
-            if (typeof(Object).IsAssignableFrom(type))
-            {
-                instance = null;
-                return false;
-            }
-
-            return TryInvokeParameterlessConstructor(type, out instance);
-        }
-
-        private static bool TryInvokeParameterlessConstructor(Type type, out object value)
-        {
-            if (!TryGetParameterlessFactory(type, out Func<object> factory))
-            {
-                value = null;
-                return false;
-            }
-
-            object created = factory();
-            if (created != null)
-            {
-                value = created;
-                return true;
-            }
-
-            ParameterlessFactoryCache.TryRemove(type, out _);
-            UnsupportedParameterlessTypes.TryAdd(type, 0);
-            value = null;
-            return false;
-        }
-
-        internal static bool PageEntriesNeedSorting(
-            ListPageCache cache,
-            SerializedProperty itemsProperty,
-            bool allowSort
-        )
-        {
-            if (cache?.entries is not { Count: > 1 } || !CanSortElements(itemsProperty, allowSort))
-            {
-                return false;
-            }
-
-            SetElementData previous = default;
-            bool hasPrevious = false;
-
-            foreach (PageEntry entry in cache.entries)
-            {
-                if (entry == null)
-                {
-                    continue;
-                }
-
-                int arrayIndex = entry.arrayIndex;
-                if (arrayIndex < 0 || itemsProperty.arraySize <= arrayIndex)
-                {
-                    continue;
-                }
-
-                SerializedProperty elementProperty = itemsProperty.GetArrayElementAtIndex(
-                    arrayIndex
-                );
-                SetElementData current = ReadElementData(elementProperty);
-
-                if (hasPrevious)
-                {
-                    int comparison = CompareComparableValues(
-                        previous.comparable,
-                        current.comparable
-                    );
-                    if (0 < comparison)
-                    {
-                        return true;
-                    }
-
-                    if (comparison == 0)
-                    {
-                        string previousFallback =
-                            previous.value != null ? previous.value.ToString() : string.Empty;
-                        string currentFallback =
-                            current.value != null ? current.value.ToString() : string.Empty;
-                        if (0 < string.CompareOrdinal(previousFallback, currentFallback))
-                        {
-                            return true;
-                        }
-                    }
-                }
-
-                previous = current;
-                hasPrevious = true;
-            }
-
-            return false;
-        }
-
-        private static bool ShouldDeepClone(Type type)
-        {
-            return type != null
-                && !type.IsValueType
-                && type != typeof(string)
-                && !typeof(Object).IsAssignableFrom(type);
-        }
-
-        internal static object CloneComplexValue(object source, Type type)
-        {
-            if (source == null)
-            {
-                if (type == null)
-                {
-                    return null;
-                }
-
-                if (type.IsValueType)
-                {
-                    return TryInvokeParameterlessConstructor(type, out object value) ? value : null;
-                }
-
-                return null;
-            }
-
-            if (
-                type == null
-                || type.IsValueType
-                || type == typeof(string)
-                || typeof(Object).IsAssignableFrom(type)
-            )
-            {
-                return source;
-            }
-
-            if (!ShouldDeepClone(type))
-            {
-                return source;
-            }
-
-            if (!TryCreateDefaultInstance(type, out object clone))
-            {
-                return source;
-            }
-
-            try
-            {
-                string json = JsonUtility.ToJson(source);
-                JsonUtility.FromJsonOverwrite(json, clone);
-                return clone;
-            }
-            catch
-            {
-                return source;
-            }
-        }
-
-        private static bool ValuesEqual(object left, object right)
-        {
-            if (ReferenceEquals(left, right))
-            {
-                return true;
-            }
-
-            if (left == null || right == null)
-            {
-                return false;
-            }
-
-            if (left is Object leftObject && right is Object rightObject)
-            {
-                return leftObject == rightObject;
-            }
-
-            return left.Equals(right);
-        }
-
-        private static void SnapSelectionToPage(PaginationState pagination, int totalCount)
-        {
-            if (totalCount <= 0)
-            {
-                pagination.selectedIndex = -1;
-                return;
-            }
-
-            int pageSize = Mathf.Max(1, pagination.pageSize);
-            int pageStart = pagination.page * pageSize;
-            if (totalCount <= pageStart)
-            {
-                pageStart = Mathf.Max(0, totalCount - 1);
-            }
-
-            pagination.selectedIndex = Mathf.Clamp(pageStart, 0, totalCount - 1);
-        }
-
-        internal static float EvaluateDuplicateShakeOffset(
-            int arrayIndex,
-            double startTime,
-            double currentTime,
-            int cycleLimit
-        )
-        {
-            if (cycleLimit == 0)
-            {
-                return 0f;
-            }
-
-            if (currentTime < startTime)
-            {
-                startTime = currentTime;
-            }
-
-            double elapsed = currentTime - startTime;
-
-            if (0 < cycleLimit)
-            {
-                double cycleDuration = (2d * Math.PI) / DuplicateShakeFrequency;
-                double maxDuration = cycleDuration * cycleLimit;
-                if (maxDuration <= elapsed)
-                {
-                    return 0f;
-                }
-            }
-
-            float phase = (float)(elapsed * DuplicateShakeFrequency);
-            float seed = arrayIndex * 0.35f;
-            return Mathf.Sin(phase + seed) * DuplicateShakeAmplitude;
-        }
-
-        internal static Rect ExpandRowRectVertically(Rect rect)
-        {
-            rect.yMin -= 1f;
-            rect.yMax += 1f;
-            return rect;
-        }
-
-        /// <summary>
-        /// Gets high-resolution time in seconds using <see cref="Stopwatch"/> for accurate animation timing.
-        /// This is more reliable than <see cref="EditorApplication.timeSinceStartup"/> for animations
-        /// that need consistent frame-to-frame timing.
-        /// </summary>
-        private static double GetHighResolutionTime()
-        {
-            return (double)Stopwatch.GetTimestamp() / Stopwatch.Frequency;
-        }
-
-        private static void DrawDuplicateOutline(Rect rect)
-        {
-            Rect top = new(rect.x, rect.y, rect.width, DuplicateOutlineThickness);
-            Rect bottom = new(
-                rect.x,
-                rect.yMax - DuplicateOutlineThickness,
-                rect.width,
-                DuplicateOutlineThickness
-            );
-            Rect left = new(rect.x, rect.y, DuplicateOutlineThickness, rect.height);
-            Rect right = new(
-                rect.xMax - DuplicateOutlineThickness,
-                rect.y,
-                DuplicateOutlineThickness,
-                rect.height
-            );
-
-            EditorGUI.DrawRect(top, DuplicateOutlineColor);
-            EditorGUI.DrawRect(bottom, DuplicateOutlineColor);
-            EditorGUI.DrawRect(left, DuplicateOutlineColor);
-            EditorGUI.DrawRect(right, DuplicateOutlineColor);
-        }
-
-        private static float GetWarningBarHeight()
-        {
-            return EditorGUIUtility.singleLineHeight * 1.6f;
-        }
-
-        private static void DrawNullEntryTooltip(Rect rect, string tooltip)
-        {
-            if (string.IsNullOrEmpty(tooltip) || Event.current.type != EventType.Repaint)
-            {
-                return;
-            }
-
-            NullEntryTooltipContent.text = string.Empty;
-            NullEntryTooltipContent.image = null;
-            NullEntryTooltipContent.tooltip = tooltip;
-            GUI.Label(rect, NullEntryTooltipContent, GUIStyle.none);
-        }
-
-        private static bool ElementTypeSupportsNull(Type type)
-        {
-            return type != null && (!type.IsValueType || typeof(Object).IsAssignableFrom(type));
-        }
-
-        /// <summary>
-        /// Determines whether a pending value is strictly valid for the given element type.
-        /// Returns false for null Unity objects, null reference types, and empty strings.
-        /// </summary>
-        internal static bool ValueIsValid(Type elementType, object value)
-        {
-            if (elementType == null)
-            {
-                return false;
-            }
-
-            if (elementType == typeof(string))
-            {
-                return !string.IsNullOrEmpty(value as string);
-            }
-
-            if (typeof(Object).IsAssignableFrom(elementType))
-            {
-                return value is Object obj && obj != null;
-            }
-
-            return value != null || elementType.IsValueType;
-        }
-
-        /// <summary>
-        /// Determines whether the pending value represents a blank (empty or whitespace-only) string.
-        /// Used to show warning-style UI when adding empty/whitespace string values.
-        /// </summary>
-        internal static bool IsBlankStringValue(Type elementType, object value)
-        {
-            if (elementType != typeof(string))
-            {
-                return false;
-            }
-
-            string stringValue = value as string;
-            return string.IsNullOrWhiteSpace(stringValue);
-        }
-
-        /// <summary>
-        /// Determines whether the pending value represents a null Unity object reference.
-        /// Used to show warning-style UI when adding null object references.
-        /// </summary>
-        internal static bool IsNullUnityObjectValue(Type elementType, object value)
-        {
-            if (elementType == null || !typeof(Object).IsAssignableFrom(elementType))
-            {
-                return false;
-            }
-
-            if (value == null)
-            {
-                return true;
-            }
-
-            return value is Object obj && obj == null;
-        }
-
-        private static bool ElementSupportsManualSorting(Type elementType)
-        {
-            if (elementType == null)
-            {
-                return false;
-            }
-
-            Type candidate = Nullable.GetUnderlyingType(elementType) ?? elementType;
-            if (typeof(Object).IsAssignableFrom(candidate))
-            {
-                return true;
-            }
-
-            if (typeof(IComparable).IsAssignableFrom(candidate))
-            {
-                return true;
-            }
-
-            Type genericComparable = typeof(IComparable<>).MakeGenericType(candidate);
-            return genericComparable.IsAssignableFrom(candidate);
-        }
-
-        internal static bool ShouldShowSortButton(
-            bool isSortedSet,
-            Type elementType,
-            SerializedProperty itemsProperty
-        )
-        {
-            bool allowSort = isSortedSet || ElementSupportsManualSorting(elementType);
-            return NeedsSorting(itemsProperty, allowSort);
-        }
-
-        private static string BuildNullEntrySummary(List<int> indices)
-        {
-            if (indices == null || indices.Count == 0)
-            {
-                return string.Empty;
-            }
-
-            indices.Sort();
-
-            if (indices.Count == 1)
-            {
-                return $"Null entry detected at index {indices[0]}. Value will be ignored at runtime.";
-            }
-
-            const int maxDisplay = 5;
-            int displayCount = Math.Min(indices.Count, maxDisplay);
-
-            using PooledResource<StringBuilder> builderLease = Buffers.GetStringBuilder(
-                Math.Max(indices.Count * 6 + 64, 64),
-                out StringBuilder builder
-            );
-            builder.Clear();
-            builder.Append("Null entries detected at indices ");
-
-            for (int i = 0; i < displayCount; i++)
-            {
-                if (0 < i)
-                {
-                    builder.Append(", ");
-                }
-
-                builder.Append(indices[i]);
-            }
-
-            if (maxDisplay < indices.Count)
-            {
-                builder.Append(", ... (");
-                builder.Append(indices.Count - maxDisplay);
-                builder.Append(" more)");
-            }
-
-            builder.Append(". Values will be ignored at runtime.");
-            return builder.ToString();
-        }
-
-        private static string BuildNullEntryTooltip(int index)
-        {
-            using PooledResource<StringBuilder> lease = Buffers.GetStringBuilder(
-                64,
-                out StringBuilder builder
-            );
-            builder.Clear();
-            builder.Append("Null entry detected at index ");
-            builder.Append(index);
-            builder.Append(". Value will be ignored at runtime.");
-            return builder.ToString();
-        }
-
-        internal static void RemoveEntry(SerializedProperty itemsProperty, int index)
-        {
-            if (itemsProperty == null || !itemsProperty.isArray)
-            {
-                return;
-            }
-
-            if (index < 0 || itemsProperty.arraySize <= index)
-            {
-                return;
-            }
-
-            itemsProperty.DeleteArrayElementAtIndex(index);
-
-            if (
-                index < itemsProperty.arraySize
-                && itemsProperty.GetArrayElementAtIndex(index).propertyType
-                    == SerializedPropertyType.ObjectReference
-                && itemsProperty.GetArrayElementAtIndex(index).objectReferenceValue == null
-            )
-            {
-                itemsProperty.DeleteArrayElementAtIndex(index);
-            }
-        }
-
-        internal NullEntryState EvaluateNullEntryState(
-            SerializedProperty property,
-            SerializedProperty itemsProperty,
-            bool force = false
-        )
-        {
-            string key = GetPropertyCacheKey(property);
-            NullEntryState state = _nullEntryStates.GetOrAdd(key);
-
-            int currentFrame = Time.frameCount;
-            bool alreadyRefreshedThisFrame = _lastNullEntryRefreshFrame == currentFrame;
-
-            if (!force)
-            {
-                _lastNullEntryRefreshFrame = currentFrame;
-                if (alreadyRefreshedThisFrame)
-                {
-                    return state;
-                }
-            }
-
-            bool hasEvent = Event.current != null;
-            EventType eventType = hasEvent ? Event.current.type : EventType.Repaint;
-            if (!force && eventType != EventType.Repaint)
-            {
-                return state;
-            }
-
-            state.nullIndices.Clear();
-            state.tooltips.Clear();
-            state.summary = string.Empty;
-            state.hasNullEntries = false;
-            state.scratch.Clear();
-
-            if (
-                itemsProperty == null
-                || !itemsProperty.isArray
-                || itemsProperty.arraySize == 0
-                || !TryGetSetInspector(
-                    property,
-                    property.propertyPath,
-                    out ISerializableSetInspector inspector
-                )
-            )
-            {
-                return state;
-            }
-
-            Type elementType = inspector.ElementType;
-            if (!ElementTypeSupportsNull(elementType))
-            {
-                return state;
-            }
-
-            int count = itemsProperty.arraySize;
-            for (int index = 0; index < count; index++)
-            {
-                SerializedProperty element = itemsProperty.GetArrayElementAtIndex(index);
-                SetElementData data = ReadElementData(element);
-                if (ReferenceEquals(data.value, null))
-                {
-                    state.nullIndices.Add(index);
-                    state.tooltips[index] = BuildNullEntryTooltip(index);
-                    state.scratch.Add(index);
-                }
-            }
-
-            if (0 < state.nullIndices.Count)
-            {
-                state.hasNullEntries = true;
-                state.summary = BuildNullEntrySummary(state.scratch);
-            }
-            else
-            {
-                _nullEntryStates.Remove(key);
-            }
-
-            return state;
-        }
-
-        private static List<int> RentGroupingList(DuplicateState state)
-        {
-            PooledResource<List<int>> lease = Buffers<int>.List.Get(out List<int> list);
-            state.groupingLeases[list] = lease;
-            return list;
-        }
-
-        private static void ReleaseGroupingList(DuplicateState state, List<int> list)
-        {
-            if (list == null)
-            {
-                return;
-            }
-
-            list.Clear();
-            if (!state.groupingLeases.Remove(list, out PooledResource<List<int>> lease))
-            {
-                return;
-            }
-
-            lease.Dispose();
-        }
-
-        private static void ReleaseAllGroupingLists(DuplicateState state)
-        {
-            if (state.grouping.Count == 0)
-            {
-                if (0 < state.groupingLeases.Count)
-                {
-                    foreach (
-                        KeyValuePair<
-                            List<int>,
-                            PooledResource<List<int>>
-                        > leaseEntry in state.groupingLeases
-                    )
-                    {
-                        leaseEntry.Key?.Clear();
-                        leaseEntry.Value.Dispose();
-                    }
-
-                    state.groupingLeases.Clear();
-                }
-
-                return;
-            }
-
-            state.groupingKeysScratch.Clear();
-            foreach (KeyValuePair<object, List<int>> bucket in state.grouping)
-            {
-                ReleaseGroupingList(state, bucket.Value);
-                state.groupingKeysScratch.Add(bucket.Key);
-            }
-
-            foreach (object groupingKeysScratchElement in state.groupingKeysScratch)
-            {
-                state.grouping.Remove(groupingKeysScratchElement);
-            }
-
-            state.groupingKeysScratch.Clear();
-        }
-
-        internal DuplicateState EvaluateDuplicateState(
-            SerializedProperty property,
-            SerializedProperty itemsProperty,
-            bool force = false
-        )
-        {
-            string key = GetPropertyCacheKey(property);
-            DuplicateState state = _duplicateStates.GetOrAdd(key);
-
-            int currentFrame = Time.frameCount;
-            bool alreadyRefreshedThisFrame = _lastDuplicateRefreshFrame == currentFrame;
-
-            if (!force)
-            {
-                _lastDuplicateRefreshFrame = currentFrame;
-                if (alreadyRefreshedThisFrame && !state.IsDirty)
-                {
-                    return state;
-                }
-            }
-
-            ReleaseAllGroupingLists(state);
-
-            bool hasEvent = Event.current != null;
-            EventType eventType = hasEvent ? Event.current.type : EventType.Repaint;
-            bool shouldRefresh = eventType == EventType.Repaint || state.IsDirty || force;
-
-            if (!shouldRefresh)
-            {
-                return state;
-            }
-
-            state.duplicateIndices.Clear();
-            state.primaryFlags.Clear();
-            state.summary = string.Empty;
-            state.hasDuplicates = false;
-
-            if (itemsProperty == null || !itemsProperty.isArray)
-            {
-                state.ClearAnimationTracking();
-                return state;
-            }
-
-            int currentArraySize = itemsProperty.arraySize;
-            if (currentArraySize <= 1)
-            {
-                state.UpdateArraySize(currentArraySize);
-                state.animationStartTimes.Clear();
-                state.UpdateLastHadDuplicates(false);
-                return state;
-            }
-
-            if (!force && state.ShouldSkipRefresh(currentArraySize))
-            {
-                state.UpdateArraySize(currentArraySize);
-                return state;
-            }
-
-            state.UpdateArraySize(currentArraySize);
-
-            int count = currentArraySize;
-            using PooledResource<StringBuilder> summaryBuilderLease = Buffers.GetStringBuilder(
-                Math.Max(count * 8, 64),
-                out StringBuilder summaryBuilder
-            );
-            summaryBuilder.Clear();
-
-            for (int index = 0; index < count; index++)
-            {
-                SerializedProperty element = itemsProperty.GetArrayElementAtIndex(index);
-                SetElementData data = ReadElementData(element);
-                object keyValue = data.comparable ?? NullComparable;
-
-                if (!state.grouping.TryGetValue(keyValue, out List<int> list))
-                {
-                    list = RentGroupingList(state);
-                    state.grouping[keyValue] = list;
-                }
-
-                list.Add(index);
-            }
-
-            UnityHelpersSettings.DuplicateRowAnimationMode animationMode =
-                UnityHelpersSettings.GetDuplicateRowAnimationMode();
-            bool animateDuplicates =
-                animationMode == UnityHelpersSettings.DuplicateRowAnimationMode.Tween;
-            double now = animateDuplicates ? GetHighResolutionTime() : 0d;
-
-            int duplicateGroupCount = 0;
-            state.groupingKeysScratch.Clear();
-            state.groupingKeysScratch.AddRange(state.grouping.Keys);
-
-            foreach (object groupingKey in state.groupingKeysScratch)
-            {
-                if (!state.grouping.TryGetValue(groupingKey, out List<int> indices))
-                {
-                    continue;
-                }
-
-                if (indices.Count <= 1)
-                {
-                    ReleaseGroupingList(state, indices);
-                    state.grouping.Remove(groupingKey);
-                    continue;
-                }
-
-                indices.Sort();
-                duplicateGroupCount++;
-                state.hasDuplicates = true;
-                bool isPrimary = true;
-                foreach (int duplicateIndex in indices)
-                {
-                    state.duplicateIndices.Add(duplicateIndex);
-                    state.primaryFlags[duplicateIndex] = isPrimary;
-                    isPrimary = false;
-                    if (
-                        animateDuplicates
-                        && (force || !state.animationStartTimes.ContainsKey(duplicateIndex))
-                    )
-                    {
-                        state.animationStartTimes[duplicateIndex] = now;
-                    }
-                }
-
-                if (0 < summaryBuilder.Length)
-                {
-                    summaryBuilder.AppendLine();
-                }
-
-                if (duplicateGroupCount <= 5)
-                {
-                    summaryBuilder.Append("Duplicate entry ");
-                    summaryBuilder.Append(ConvertDuplicateKeyToString(groupingKey));
-                    summaryBuilder.Append(" at indices ");
-                    AppendIndexList(summaryBuilder, indices);
-                }
-
-                ReleaseGroupingList(state, indices);
-                state.grouping.Remove(groupingKey);
-            }
-
-            state.groupingKeysScratch.Clear();
-
-            if (5 < duplicateGroupCount)
-            {
-                if (0 < summaryBuilder.Length)
-                {
-                    summaryBuilder.AppendLine();
-                }
-
-                summaryBuilder.Append("Additional duplicate groups omitted for brevity.");
-            }
-
-            if (0 < state.animationStartTimes.Count)
-            {
-                state.animationKeysScratch.Clear();
-                state.animationKeysScratch.AddRange(state.animationStartTimes.Keys);
-                foreach (int trackedIndex in state.animationKeysScratch)
-                {
-                    if (!state.duplicateIndices.Contains(trackedIndex) || !animateDuplicates)
-                    {
-                        state.animationStartTimes.Remove(trackedIndex);
-                    }
-                }
-                state.animationKeysScratch.Clear();
-            }
-
-            if (!animateDuplicates)
-            {
-                state.animationStartTimes.Clear();
-            }
-
-            if (state.hasDuplicates)
-            {
-                state.summary =
-                    0 < summaryBuilder.Length
-                        ? summaryBuilder.ToString()
-                        : "Duplicate values detected.";
-            }
-            else
-            {
-                state.summary = string.Empty;
-            }
-
-            state.UpdateLastHadDuplicates(state.hasDuplicates, forceReset: force);
-            ReleaseAllGroupingLists(state);
-
-            if (state.hasDuplicates && animateDuplicates)
-            {
-                int tweenCycleLimit =
-                    UnityHelpersSettings.GetSerializableSetDuplicateTweenCycleLimit();
-                double currentTime = GetHighResolutionTime();
-                state.CheckAnimationCompletion(currentTime, tweenCycleLimit);
-
-                if (state.IsAnimating)
-                {
-                    EditorWindow focusedWindow = EditorWindow.focusedWindow;
-                    if (focusedWindow != null)
-                    {
-                        focusedWindow.Repaint();
-                    }
-                }
-            }
-
-            return state;
-        }
-
-        private static string ConvertDuplicateKeyToString(object key)
-        {
-            if (key == NullComparable || key == null)
-            {
-                return "null";
-            }
-
-            return key switch
-            {
-                Object obj => obj != null ? obj.name : "null object",
-                _ => key.ToString(),
-            };
-        }
-
-        private static void AppendIndexList(StringBuilder builder, List<int> indices)
-        {
-            for (int i = 0; i < indices.Count; i++)
-            {
-                if (0 < i)
-                {
-                    builder.Append(", ");
-                }
-                builder.Append(indices[i]);
-            }
-        }
-
-        private static bool TryGetParameterlessFactory(Type type, out Func<object> factory)
-        {
-            if (type == null)
-            {
-                factory = null;
-                return false;
-            }
-
-            if (ParameterlessFactoryCache.TryGetValue(type, out Func<object> cached))
-            {
-                factory = cached;
-                return cached != null;
-            }
-
-            if (UnsupportedParameterlessTypes.ContainsKey(type))
-            {
-                factory = null;
-                return false;
-            }
-
-            Func<object> resolved = TryResolveFactory(type);
-            if (resolved == null)
-            {
-                resolved = TryBuildFormatterFactory(type);
-            }
-
-            if (resolved != null)
-            {
-                factory = ParameterlessFactoryCache.GetOrAdd(type, resolved);
-                return true;
-            }
-
-            UnsupportedParameterlessTypes.TryAdd(type, 0);
-            factory = null;
-            return false;
-        }
-
-        private static Func<object> TryResolveFactory(Type type)
-        {
-            try
-            {
-                return ReflectionHelpers.GetParameterlessConstructor(type);
-            }
-            catch (ArgumentException)
-            {
-                ConstructorInfo ctor = type.GetConstructor(
-                    BindingFlags.Instance | BindingFlags.NonPublic,
-                    binder: null,
-                    Type.EmptyTypes,
-                    modifiers: null
-                );
-                if (ctor == null)
-                {
-                    return null;
-                }
-
-                return () =>
-                {
-                    try
-                    {
-                        return ctor.Invoke(null);
-                    }
-                    catch
-                    {
-                        return null;
-                    }
-                };
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        private static Func<object> TryBuildFormatterFactory(Type type)
-        {
-            if (!type.IsSerializable)
-            {
-                return null;
-            }
-
-            return () =>
-            {
-                try
-                {
-                    return FormatterServices.GetUninitializedObject(type);
-                }
-                catch
-                {
-                    return null;
-                }
-            };
-        }
-
         private bool IsSortedSetCached(SerializedProperty property)
         {
             if (property == null)
@@ -4743,468 +6323,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             entry.isSorted = IsSortedSet(property);
             entry.frameNumber = currentFrame;
             return entry.isSorted;
-        }
-
-        internal static bool IsSortedSet(SerializedProperty property)
-        {
-            if (property == null)
-            {
-                return false;
-            }
-
-            string propertyTypeName = property.type ?? string.Empty;
-            if (
-                0 <= propertyTypeName.IndexOf("SerializableSortedSet", StringComparison.Ordinal)
-                || 0 <= propertyTypeName.IndexOf("SortedSet", StringComparison.Ordinal)
-            )
-            {
-                return true;
-            }
-
-            Type fieldType = property.GetManagedType();
-            if (TypeMatchesGenericDefinition(fieldType, typeof(SerializableSortedSet<>)))
-            {
-                return true;
-            }
-
-            Type declaredType = TryResolveDeclaredSetType(property);
-            if (TypeMatchesGenericDefinition(declaredType, typeof(SerializableSortedSet<>)))
-            {
-                return true;
-            }
-
-            Type unityResolvedType = ResolveUnityPropertyType(property);
-            if (TypeMatchesGenericDefinition(unityResolvedType, typeof(SerializableSortedSet<>)))
-            {
-                return true;
-            }
-
-            object instance = GetSetInstance(property, property.propertyPath);
-            if (instance == null)
-            {
-                SerializedObject serializedObject = property.serializedObject;
-                if (serializedObject != null)
-                {
-                    Object target = serializedObject.targetObject;
-                    if (target != null)
-                    {
-                        instance = GetMemberValue(target, property.name);
-                    }
-                }
-            }
-
-            if (instance is ISerializableSetInspector { SupportsSorting: true })
-            {
-                return true;
-            }
-
-            Type instanceType = instance?.GetType();
-            return TypeMatchesGenericDefinition(instanceType, typeof(SerializableSortedSet<>));
-        }
-
-        private static Type TryResolveDeclaredSetType(SerializedProperty property)
-        {
-            if (property == null)
-            {
-                return null;
-            }
-
-            SerializedObject serializedObject = property.serializedObject;
-            if (serializedObject == null)
-            {
-                return null;
-            }
-
-            Object targetObject = serializedObject.targetObject;
-            if (targetObject == null)
-            {
-                return null;
-            }
-
-            string propertyPath = property.propertyPath;
-            if (string.IsNullOrEmpty(propertyPath))
-            {
-                return null;
-            }
-
-            string[] segments = propertyPath.Split('.');
-            return ResolveDeclaredType(targetObject.GetType(), segments, 0);
-        }
-
-        private static Type ResolveDeclaredType(Type type, string[] segments, int index)
-        {
-            while (type != null && segments != null && index < segments.Length)
-            {
-                string segment = segments[index];
-                if (segment == "Array")
-                {
-                    if (segments.Length <= index + 1)
-                    {
-                        break;
-                    }
-
-                    string next = segments[index + 1];
-                    if (!next.StartsWith("data[", StringComparison.Ordinal))
-                    {
-                        break;
-                    }
-
-                    if (type.IsArray)
-                    {
-                        type = type.GetElementType();
-                        index += 2;
-                        continue;
-                    }
-
-                    if (type.IsGenericType)
-                    {
-                        Type[] arguments = type.GetGenericArguments();
-                        if (arguments.Length == 1)
-                        {
-                            type = arguments[0];
-                            index += 2;
-                            continue;
-                        }
-                    }
-
-                    break;
-                }
-
-                FieldInfo field = type.GetField(
-                    segment,
-                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-                );
-                if (field != null)
-                {
-                    type = field.FieldType;
-                    index += 1;
-                    continue;
-                }
-
-                PropertyInfo propertyInfo = type.GetProperty(
-                    segment,
-                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-                );
-                if (propertyInfo != null)
-                {
-                    type = propertyInfo.PropertyType;
-                    index += 1;
-                    continue;
-                }
-
-                break;
-            }
-
-            return type;
-        }
-
-        private static bool TypeMatchesGenericDefinition(Type candidate, Type openGeneric)
-        {
-            Type current = candidate;
-            string openGenericName = openGeneric.Name;
-            int tickIndex = openGenericName.IndexOf('`');
-            if (0 <= tickIndex)
-            {
-                openGenericName = openGenericName.Substring(0, tickIndex);
-            }
-
-            while (current != null)
-            {
-                if (current.IsGenericType && current.GetGenericTypeDefinition() == openGeneric)
-                {
-                    return true;
-                }
-
-                string currentName = current.FullName ?? current.Name;
-                if (
-                    !string.IsNullOrEmpty(currentName)
-                    && 0 <= currentName.IndexOf(openGenericName, StringComparison.Ordinal)
-                    && typeof(ISerializableSetInspector).IsAssignableFrom(current)
-                )
-                {
-                    return true;
-                }
-
-                current = current.BaseType;
-            }
-
-            return false;
-        }
-
-        private static Type ResolveUnityPropertyType(SerializedProperty property)
-        {
-            string typeName = property?.type;
-            if (string.IsNullOrEmpty(typeName))
-            {
-                return null;
-            }
-
-            if (!PropertyTypeResolutionCache.TryGetValue(typeName, out Type cached))
-            {
-                cached = FindTypeByUnityName(typeName);
-                PropertyTypeResolutionCache[typeName] = cached;
-            }
-
-            return cached;
-        }
-
-        private static Type FindTypeByUnityName(string typeName)
-        {
-            foreach (Assembly assembly in ReflectionHelpers.GetAllLoadedAssemblies())
-            {
-                Type match = FindTypeByName(assembly, typeName);
-                if (match != null)
-                {
-                    return match;
-                }
-            }
-
-            return null;
-        }
-
-        private static Type FindTypeByName(Assembly assembly, string typeName)
-        {
-            if (string.IsNullOrEmpty(typeName))
-            {
-                return null;
-            }
-
-            string trimmedName = typeName.Replace("+", ".").Trim();
-            bool hasNamespace = typeName.Contains(".");
-
-            Type[] types = ReflectionHelpers.GetTypesFromAssembly(assembly) ?? Array.Empty<Type>();
-
-            foreach (Type candidate in types)
-            {
-                if (
-                    candidate != null
-                    && (
-                        string.Equals(candidate.Name, typeName, StringComparison.Ordinal)
-                        || string.Equals(candidate.FullName, typeName, StringComparison.Ordinal)
-                        || string.Equals(candidate.FullName, trimmedName, StringComparison.Ordinal)
-                        || (
-                            !hasNamespace
-                            && (
-                                candidate.FullName?.EndsWith(
-                                    "." + typeName,
-                                    StringComparison.Ordinal
-                                ) == true
-                                || candidate.FullName?.EndsWith(
-                                    "+" + typeName,
-                                    StringComparison.Ordinal
-                                ) == true
-                            )
-                        )
-                    )
-                )
-                {
-                    return candidate;
-                }
-            }
-
-            return null;
-        }
-
-        private static bool CanSortElements(SerializedProperty itemsProperty, bool allowSort)
-        {
-            if (!allowSort)
-            {
-                return false;
-            }
-
-            if (itemsProperty is not { isArray: true } || itemsProperty.arraySize <= 1)
-            {
-                return false;
-            }
-
-            return true;
-        }
-
-        private static bool NeedsSorting(SerializedProperty itemsProperty, bool allowSort)
-        {
-            if (!CanSortElements(itemsProperty, allowSort))
-            {
-                return false;
-            }
-
-            int count = itemsProperty.arraySize;
-            SetElementData previous = default;
-            bool hasPrevious = false;
-
-            for (int index = 0; index < count; index++)
-            {
-                SerializedProperty elementProperty = itemsProperty.GetArrayElementAtIndex(index);
-                SetElementData current = ReadElementData(elementProperty);
-
-                if (hasPrevious)
-                {
-                    int comparison = CompareComparableValues(
-                        previous.comparable,
-                        current.comparable
-                    );
-                    if (0 < comparison)
-                    {
-                        return true;
-                    }
-
-                    if (comparison == 0)
-                    {
-                        string previousFallback =
-                            previous.value != null ? previous.value.ToString() : string.Empty;
-                        string currentFallback =
-                            current.value != null ? current.value.ToString() : string.Empty;
-                        if (0 < string.CompareOrdinal(previousFallback, currentFallback))
-                        {
-                            return true;
-                        }
-                    }
-                }
-
-                previous = current;
-                hasPrevious = true;
-            }
-
-            return false;
-        }
-
-        internal bool TryAddNewElement(
-            ref SerializedProperty property,
-            string propertyPath,
-            ref SerializedProperty itemsProperty,
-            PaginationState pagination
-        )
-        {
-            if (
-                !TryGetSetInspector(property, propertyPath, out ISerializableSetInspector inspector)
-            )
-            {
-                return false;
-            }
-
-            Type elementType = inspector.ElementType;
-            if (elementType == null)
-            {
-                return false;
-            }
-
-            if (ElementTypeSupportsNull(elementType) && elementType != typeof(string))
-            {
-                if (
-                    AppendNullPlaceholderEntry(
-                        ref property,
-                        propertyPath,
-                        ref itemsProperty,
-                        pagination,
-                        inspector
-                    )
-                )
-                {
-                    return true;
-                }
-            }
-
-            Array snapshot = null;
-            bool hasSerializedArray = itemsProperty is { isArray: true };
-            int estimatedCount = hasSerializedArray ? Math.Max(0, itemsProperty.arraySize) : 0;
-            if (!hasSerializedArray)
-            {
-                snapshot = inspector.GetSerializedItemsSnapshot();
-                estimatedCount = snapshot?.Length ?? 0;
-            }
-
-            using PooledResource<List<object>> existingValuesLease = Buffers<object>.GetList(
-                Math.Max(estimatedCount, 4),
-                out List<object> existingValues
-            );
-
-            existingValues.Clear();
-            if (hasSerializedArray)
-            {
-                for (int index = 0; index < itemsProperty.arraySize; index++)
-                {
-                    SerializedProperty element = itemsProperty.GetArrayElementAtIndex(index);
-                    existingValues.Add(ReadElementData(element).value);
-                }
-            }
-            else if (snapshot is { Length: > 0 })
-            {
-                foreach (object value in snapshot)
-                {
-                    existingValues.Add(value);
-                }
-            }
-
-            SerializedObject serializedObject = property.serializedObject;
-            Object[] targets = serializedObject.targetObjects;
-
-            foreach (
-                object candidate in GenerateCandidateValues(elementType, inspector.UniqueCount)
-            )
-            {
-                if (inspector.ContainsElement(candidate))
-                {
-                    continue;
-                }
-
-                if (0 < targets.Length)
-                {
-                    Undo.RecordObjects(targets, "Add Set Entry");
-                }
-
-                if (!inspector.TryAddElement(candidate, out object normalizedValue))
-                {
-                    continue;
-                }
-
-                existingValues.Add(normalizedValue);
-
-                Array updated = Array.CreateInstance(elementType, existingValues.Count);
-                for (int index = 0; index < existingValues.Count; index++)
-                {
-                    object coerced = ConvertSnapshotValue(elementType, existingValues[index]);
-                    updated.SetValue(coerced, index);
-                }
-
-                inspector.SetSerializedItemsSnapshot(updated, preserveSerializedEntries: true);
-                inspector.SynchronizeSerializedState();
-                Undo.FlushUndoRecordObjects();
-
-                serializedObject.Update();
-                property = serializedObject.FindProperty(propertyPath);
-                itemsProperty = property?.FindPropertyRelative(
-                    SerializableHashSetSerializedPropertyNames.Items
-                );
-                int totalCount = itemsProperty is { isArray: true } ? itemsProperty.arraySize : 0;
-                EnsurePaginationBounds(pagination, totalCount);
-                EvaluateDuplicateState(property, itemsProperty, force: true);
-                EvaluateNullEntryState(property, itemsProperty);
-                SyncRuntimeSet(property);
-                if (0 < totalCount)
-                {
-                    pagination.selectedIndex = totalCount - 1;
-                }
-                MarkListCacheDirty(GetPropertyCacheKey(property));
-                return true;
-            }
-
-            if (ElementTypeSupportsNull(elementType))
-            {
-                if (
-                    AppendNullPlaceholderEntry(
-                        ref property,
-                        propertyPath,
-                        ref itemsProperty,
-                        pagination,
-                        inspector
-                    )
-                )
-                {
-                    return true;
-                }
-            }
-
-            Debug.LogWarning("Unable to generate a unique value for this set element type.");
-            return false;
         }
 
         private bool AppendNullPlaceholderEntry(
@@ -5271,27 +6389,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             return true;
         }
 
-        internal ListPageCache EnsurePageCache(
-            string cacheKey,
-            SerializedProperty itemsProperty,
-            PaginationState pagination
-        )
-        {
-            ListPageCache cache = GetOrCreatePageCache(cacheKey);
-            int itemCount = itemsProperty is { isArray: true } ? itemsProperty.arraySize : 0;
-            if (
-                cache.dirty
-                || cache.pageIndex != pagination.page
-                || cache.pageSize != pagination.pageSize
-                || cache.itemCount != itemCount
-            )
-            {
-                RefreshPageCache(cache, itemsProperty, pagination);
-            }
-
-            return cache;
-        }
-
         private ListPageCache GetOrCreatePageCache(string cacheKey)
         {
             if (_pageCaches.TryGetValue(cacheKey, out ListPageCache cache))
@@ -5302,46 +6399,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             cache = new ListPageCache();
             _pageCaches[cacheKey] = cache;
             return cache;
-        }
-
-        private static void RefreshPageCache(
-            ListPageCache cache,
-            SerializedProperty itemsProperty,
-            PaginationState pagination
-        )
-        {
-            cache.entries.Clear();
-
-            if (itemsProperty is not { isArray: true })
-            {
-                cache.itemCount = 0;
-                cache.pageIndex = pagination.page;
-                cache.pageSize = pagination.pageSize;
-                cache.dirty = false;
-                return;
-            }
-
-            cache.itemCount = itemsProperty.arraySize;
-            cache.pageIndex = pagination.page;
-            int effectivePageSize = Mathf.Clamp(pagination.pageSize, 1, MaxPageSize);
-            cache.pageSize = effectivePageSize;
-            pagination.pageSize = effectivePageSize;
-            cache.dirty = false;
-
-            if (cache.itemCount <= 0)
-            {
-                return;
-            }
-
-            int startIndex = pagination.page * effectivePageSize;
-            startIndex = Mathf.Clamp(startIndex, 0, cache.itemCount);
-            int endIndex = Mathf.Min(startIndex + effectivePageSize, cache.itemCount);
-
-            for (int i = startIndex; i < endIndex; i++)
-            {
-                PageEntry entry = new() { arrayIndex = i };
-                cache.entries.Add(entry);
-            }
         }
 
         private void MarkListCacheDirty(string cacheKey)
@@ -5356,145 +6413,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 cache.pageIndex = -1;
                 cache.pageSize = -1;
                 cache.itemCount = -1;
-            }
-        }
-
-        internal static void SyncRuntimeSet(SerializedProperty setProperty)
-        {
-            if (setProperty == null)
-            {
-                return;
-            }
-
-            SerializedObject sharedSerializedObject = setProperty.serializedObject;
-            Object[] targets = sharedSerializedObject.targetObjects;
-            string propertyPath = setProperty.propertyPath;
-
-            foreach (Object target in targets)
-            {
-                bool isScriptableSingletonTarget = IsScriptableSingletonType(target);
-                bool calledSave = false;
-
-                using SerializedObject targetSerializedObject = new(target);
-                targetSerializedObject.UpdateIfRequiredOrScript();
-                SerializedProperty targetSetProperty = targetSerializedObject.FindProperty(
-                    propertyPath
-                );
-                if (targetSetProperty == null)
-                {
-                    continue;
-                }
-
-                SerializedProperty targetItemsProperty = targetSetProperty.FindPropertyRelative(
-                    SerializableHashSetSerializedPropertyNames.Items
-                );
-
-                object setInstance = GetTargetObjectOfProperty(target, propertyPath);
-                bool isInspector = setInstance is ISerializableSetInspector;
-
-                if (setInstance is not ISerializableSetInspector inspector)
-                {
-                    PaletteSerializationDiagnostics.ReportSyncRuntimeSet(
-                        sharedSerializedObject,
-                        propertyPath,
-                        setInstance,
-                        isInspector,
-                        calledSave
-                    );
-                    continue;
-                }
-
-                // ScriptableSingleton managed fields may lag SerializedProperties; use current serialized data to rebuild runtime state.
-                Array snapshot = BuildSnapshotArray(targetItemsProperty, inspector.ElementType);
-                inspector.SetSerializedItemsSnapshot(snapshot, preserveSerializedEntries: true);
-
-                if (setInstance is ISerializableSetEditorSync editorSync)
-                {
-                    editorSync.EditorAfterDeserialize();
-                }
-
-                inspector.SynchronizeSerializedState();
-                EditorUtility.SetDirty(target);
-
-                if (isScriptableSingletonTarget)
-                {
-                    if (target is UnityHelpersSettings unitySettings)
-                    {
-                        unitySettings.SaveSettings();
-                    }
-                    else
-                    {
-                        SaveScriptableSingleton(target);
-                    }
-                    calledSave = true;
-                }
-
-                PaletteSerializationDiagnostics.ReportSyncRuntimeSet(
-                    sharedSerializedObject,
-                    propertyPath,
-                    setInstance,
-                    isInspector,
-                    calledSave
-                );
-            }
-
-            sharedSerializedObject.UpdateIfRequiredOrScript();
-        }
-
-        /// <summary>
-        /// Checks if the target is a ScriptableSingleton type.
-        /// ScriptableSingletons have issues with ApplyModifiedProperties not persisting changes.
-        /// </summary>
-        internal static bool IsScriptableSingletonType(Object target)
-        {
-            if (target == null)
-            {
-                return false;
-            }
-
-            Type scriptableSingletonGenericType = typeof(ScriptableSingleton<>);
-            Type type = target.GetType();
-            while (type != null)
-            {
-                if (
-                    type.IsGenericType
-                    && type.GetGenericTypeDefinition() == scriptableSingletonGenericType
-                )
-                {
-                    return true;
-                }
-                type = type.BaseType;
-            }
-            return false;
-        }
-
-        /// <summary>
-        /// Saves a ScriptableSingleton by calling its Save(true) method via reflection.
-        /// </summary>
-        internal static void SaveScriptableSingleton(Object target)
-        {
-            if (target == null)
-            {
-                return;
-            }
-
-            Type type = target.GetType();
-            MethodInfo saveMethod = null;
-            while (type != null && saveMethod == null)
-            {
-                saveMethod = type.GetMethod(
-                    "Save",
-                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                    null,
-                    new[] { typeof(bool) },
-                    null
-                );
-                type = type.BaseType;
-            }
-
-            if (saveMethod != null)
-            {
-                saveMethod.Invoke(target, new object[] { true });
             }
         }
 
@@ -5775,90 +6693,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
         }
 
-        private static bool SerializedPropertySupportsFoldout(SerializedProperty property)
-        {
-            return property != null && property.hasVisibleChildren;
-        }
-
-        private static bool ShouldUseElementFoldout(Type elementType, SerializedProperty property)
-        {
-            if (property == null)
-            {
-                return false;
-            }
-
-            // New elements can temporarily report no visible children; trust types known to support expansion.
-            bool typeSupports =
-                elementType == null
-                    ? property.hasVisibleChildren
-                    : TypeSupportsComplexEditing(elementType)
-                        && !typeof(Object).IsAssignableFrom(elementType);
-
-            return typeSupports || SerializedPropertySupportsFoldout(property);
-        }
-
-        private static bool DrawSetRowFoldoutValue(
-            Rect valueRect,
-            SerializedProperty valueProperty,
-            out float renderedHeight
-        )
-        {
-            if (valueProperty == null)
-            {
-                renderedHeight = EditorGUIUtility.singleLineHeight;
-                return false;
-            }
-
-            bool changed = false;
-            float headerHeight = EditorGUIUtility.singleLineHeight;
-            Rect headerRect = new(valueRect.x, valueRect.y, valueRect.width, headerHeight);
-
-            EditorGUI.BeginChangeCheck();
-            EditorGUI.PropertyField(
-                headerRect,
-                valueProperty,
-                GUIContent.none,
-                includeChildren: false
-            );
-            if (EditorGUI.EndChangeCheck())
-            {
-                changed = true;
-            }
-
-            float childY = headerRect.yMax + EditorGUIUtility.standardVerticalSpacing;
-            if (valueProperty.isExpanded && valueProperty.hasVisibleChildren)
-            {
-                SerializedProperty iterator = valueProperty.Copy();
-                SerializedProperty endProperty = iterator.GetEndProperty();
-                bool enterChildren = true;
-                int baseDepth = valueProperty.depth;
-                using IndentLevelScope indentScope = IndentLevelScope.Indent();
-
-                while (
-                    iterator.NextVisible(enterChildren)
-                    && !SerializedProperty.EqualContents(iterator, endProperty)
-                )
-                {
-                    enterChildren = false;
-                    if (iterator.depth <= baseDepth)
-                    {
-                        break;
-                    }
-
-                    float childHeight = EditorGUI.GetPropertyHeight(iterator, true);
-                    Rect childRect = new(valueRect.x, childY, valueRect.width, childHeight);
-                    EditorGUI.PropertyField(childRect, iterator, true);
-                    childY = childRect.yMax + EditorGUIUtility.standardVerticalSpacing;
-                }
-            }
-
-            renderedHeight = Mathf.Max(
-                headerHeight,
-                (childY - EditorGUIUtility.standardVerticalSpacing) - valueRect.y
-            );
-            return changed;
-        }
-
         private void HandleListReorder(
             string listKey,
             SerializedProperty property,
@@ -5927,53 +6761,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 SyncListSelectionWithPagination(existingList, pagination, refreshedCache);
             }
             GUI.changed = true;
-        }
-
-        private static void ApplySliceOrder(
-            SerializedProperty itemsProperty,
-            List<int> orderedIndices,
-            int pageStart
-        )
-        {
-            if (itemsProperty == null || orderedIndices == null)
-            {
-                return;
-            }
-
-            for (int i = 0; i < orderedIndices.Count; i++)
-            {
-                int desiredIndex = pageStart + i;
-                int currentIndex = orderedIndices[i];
-                if (currentIndex == desiredIndex)
-                {
-                    continue;
-                }
-
-                itemsProperty.MoveArrayElement(currentIndex, desiredIndex);
-
-                if (currentIndex < desiredIndex)
-                {
-                    for (int j = i + 1; j < orderedIndices.Count; j++)
-                    {
-                        if (currentIndex < orderedIndices[j] && orderedIndices[j] <= desiredIndex)
-                        {
-                            orderedIndices[j]--;
-                        }
-                    }
-                }
-                else
-                {
-                    for (int j = i + 1; j < orderedIndices.Count; j++)
-                    {
-                        if (desiredIndex <= orderedIndices[j] && orderedIndices[j] < currentIndex)
-                        {
-                            orderedIndices[j]++;
-                        }
-                    }
-                }
-
-                orderedIndices[i] = desiredIndex;
-            }
         }
 
         private bool TryClearSet(
@@ -6195,30 +6982,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             return true;
         }
 
-        internal void RemoveValueFromSet(
-            SerializedProperty property,
-            string propertyPath,
-            object value
-        )
-        {
-            if (
-                !TryGetSetInspector(property, propertyPath, out ISerializableSetInspector inspector)
-            )
-            {
-                return;
-            }
-
-            if (inspector.RemoveElement(value))
-            {
-                inspector.SynchronizeSerializedState();
-            }
-        }
-
-        private static object GetSetInstance(SerializedProperty property, string propertyPath)
-        {
-            return GetTargetObjectOfProperty(property.serializedObject.targetObject, propertyPath);
-        }
-
         private bool TryGetSetInspectorCached(
             SerializedProperty property,
             string propertyPath,
@@ -6257,768 +7020,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             object setInstance = GetSetInstance(property, propertyPath);
             inspector = setInstance as ISerializableSetInspector;
             return inspector != null;
-        }
-
-        private static IEnumerable<object> GenerateCandidateValues(
-            Type elementType,
-            int existingCount
-        )
-        {
-            if (elementType == typeof(string))
-            {
-                yield return string.Empty;
-                for (int i = 1; i < MaxAutoAddAttempts; i++)
-                {
-                    yield return $"New Entry {i}";
-                }
-                yield break;
-            }
-
-            if (IsSignedIntegral(elementType))
-            {
-                for (long i = 0; i < MaxAutoAddAttempts; i++)
-                {
-                    yield return Convert.ChangeType(i, elementType);
-                    if (0 < i)
-                    {
-                        yield return Convert.ChangeType(-i, elementType);
-                    }
-                }
-                yield break;
-            }
-
-            if (IsUnsignedIntegral(elementType))
-            {
-                for (long i = 0; i < MaxAutoAddAttempts; i++)
-                {
-                    yield return Convert.ChangeType(i, elementType);
-                }
-                yield break;
-            }
-
-            if (
-                elementType == typeof(float)
-                || elementType == typeof(double)
-                || elementType == typeof(decimal)
-            )
-            {
-                for (int i = 0; i < MaxAutoAddAttempts; i++)
-                {
-                    yield return Convert.ChangeType(i, elementType);
-                }
-                yield break;
-            }
-
-            if (elementType == typeof(bool))
-            {
-                yield return false;
-                yield return true;
-                yield break;
-            }
-
-            if (elementType == typeof(char))
-            {
-                for (int i = 0; i < MaxAutoAddAttempts; i++)
-                {
-                    yield return (char)('A' + (i % 26));
-                }
-                yield break;
-            }
-
-            if (elementType.IsEnum)
-            {
-                foreach (object value in Enum.GetValues(elementType))
-                {
-                    yield return value;
-                }
-                yield break;
-            }
-
-            if (elementType == typeof(Vector2))
-            {
-                for (int i = 0; i < MaxAutoAddAttempts; i++)
-                {
-                    yield return new Vector2(i + 1f, 0f);
-                }
-                yield break;
-            }
-
-            if (elementType == typeof(Vector3))
-            {
-                for (int i = 0; i < MaxAutoAddAttempts; i++)
-                {
-                    yield return new Vector3(i + 1f, 0f, 0f);
-                }
-                yield break;
-            }
-
-            if (elementType == typeof(Vector4))
-            {
-                for (int i = 0; i < MaxAutoAddAttempts; i++)
-                {
-                    yield return new Vector4(i + 1f, 0f, 0f, 0f);
-                }
-                yield break;
-            }
-
-            if (elementType == typeof(Vector2Int))
-            {
-                for (int i = 0; i < MaxAutoAddAttempts; i++)
-                {
-                    yield return new Vector2Int(i + 1, 0);
-                }
-                yield break;
-            }
-
-            if (elementType == typeof(Vector3Int))
-            {
-                for (int i = 0; i < MaxAutoAddAttempts; i++)
-                {
-                    yield return new Vector3Int(i + 1, 0, 0);
-                }
-                yield break;
-            }
-
-            if (elementType == typeof(Rect))
-            {
-                for (int i = 0; i < MaxAutoAddAttempts; i++)
-                {
-                    yield return new Rect(i + 1f, 0f, 1f, 1f);
-                }
-                yield break;
-            }
-
-            if (elementType == typeof(RectInt))
-            {
-                for (int i = 0; i < MaxAutoAddAttempts; i++)
-                {
-                    yield return new RectInt(i + 1, 0, 1, 1);
-                }
-                yield break;
-            }
-
-            if (elementType == typeof(Bounds))
-            {
-                for (int i = 0; i < MaxAutoAddAttempts; i++)
-                {
-                    Bounds bounds = new(new Vector3(i + 1f, 0f, 0f), Vector3.one);
-                    yield return bounds;
-                }
-                yield break;
-            }
-
-            if (elementType == typeof(BoundsInt))
-            {
-                for (int i = 0; i < MaxAutoAddAttempts; i++)
-                {
-                    BoundsInt bounds = new(new Vector3Int(i + 1, 0, 0), Vector3Int.one);
-                    yield return bounds;
-                }
-                yield break;
-            }
-
-            if (elementType == typeof(Color))
-            {
-                for (int i = 0; i < MaxAutoAddAttempts; i++)
-                {
-                    float hue =
-                        (existingCount + i) % MaxAutoAddAttempts / (float)MaxAutoAddAttempts;
-                    yield return Color.HSVToRGB(hue, 0.8f, 1f);
-                }
-                yield break;
-            }
-
-            if (elementType == typeof(Quaternion))
-            {
-                for (int i = 0; i < MaxAutoAddAttempts; i++)
-                {
-                    yield return Quaternion.Euler((existingCount + i) * 10f, 0f, 0f);
-                }
-                yield break;
-            }
-
-            if (elementType == typeof(Hash128))
-            {
-                for (uint i = 1; i <= MaxAutoAddAttempts; i++)
-                {
-                    yield return new Hash128(i, 0u, 0u, 0u);
-                }
-                yield break;
-            }
-
-            if (typeof(Object).IsAssignableFrom(elementType))
-            {
-                yield return null;
-                yield break;
-            }
-
-            if (
-                !elementType.IsAbstract
-                && TryGetParameterlessFactory(elementType, out Func<object> elementFactory)
-            )
-            {
-                for (int i = 0; i < MaxAutoAddAttempts; i++)
-                {
-                    yield return elementFactory();
-                }
-                yield break;
-            }
-
-            if (
-                elementType.IsValueType
-                && TryGetParameterlessFactory(elementType, out Func<object> valueFactory)
-            )
-            {
-                yield return valueFactory();
-            }
-            else
-            {
-                yield return null;
-            }
-        }
-
-        private static bool IsSignedIntegral(Type type)
-        {
-            return type == typeof(int)
-                || type == typeof(long)
-                || type == typeof(short)
-                || type == typeof(sbyte);
-        }
-
-        private static bool IsUnsignedIntegral(Type type)
-        {
-            return type == typeof(uint)
-                || type == typeof(ulong)
-                || type == typeof(ushort)
-                || type == typeof(byte);
-        }
-
-        private static object GetTargetObjectOfProperty(object target, string propertyPath)
-        {
-            if (target == null || string.IsNullOrEmpty(propertyPath))
-            {
-                return null;
-            }
-
-            object currentTarget = target;
-            string[] elements = propertyPath.Replace(".Array.data[", "[").Split('.');
-            foreach (string element in elements)
-            {
-                if (currentTarget == null)
-                {
-                    return null;
-                }
-
-                if (element.Contains("["))
-                {
-                    int leftBracket = element.IndexOf('[');
-                    string elementName = element.Substring(0, leftBracket);
-                    string indexPart = element
-                        .Substring(leftBracket)
-                        .Replace("[", string.Empty)
-                        .Replace("]", string.Empty);
-                    if (!int.TryParse(indexPart, out int index))
-                    {
-                        return null;
-                    }
-
-                    currentTarget = GetIndexedValue(currentTarget, elementName, index);
-                }
-                else
-                {
-                    currentTarget = GetMemberValue(currentTarget, element);
-                }
-            }
-
-            return currentTarget;
-        }
-
-        private static object GetMemberValue(object source, string name)
-        {
-            if (source == null)
-            {
-                return null;
-            }
-
-            Type type = source.GetType();
-
-            FieldInfo field = type.GetField(
-                name,
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-            );
-            if (field != null)
-            {
-                return field.GetValue(source);
-            }
-
-            PropertyInfo property = type.GetProperty(
-                name,
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-            );
-            return property?.GetValue(source);
-        }
-
-        private static object GetIndexedValue(object source, string name, int index)
-        {
-            object collection = GetMemberValue(source, name);
-            if (collection is not IEnumerable enumerable)
-            {
-                return null;
-            }
-
-            IEnumerator enumerator = enumerable.GetEnumerator();
-            try
-            {
-                for (int i = 0; i <= index; i++)
-                {
-                    if (!enumerator.MoveNext())
-                    {
-                        return null;
-                    }
-                }
-
-                return enumerator.Current;
-            }
-            finally
-            {
-                if (enumerator is IDisposable disposable)
-                {
-                    disposable.Dispose();
-                }
-            }
-        }
-
-        internal void SortElements(SerializedProperty property, SerializedProperty itemsProperty)
-        {
-            TrySortElements(ref property, property.propertyPath, itemsProperty);
-        }
-
-        private static int CompareComparableValues(object left, object right)
-        {
-            if (ReferenceEquals(left, right))
-            {
-                return 0;
-            }
-
-            if (left == null || left == NullComparable)
-            {
-                return right == null || right == NullComparable ? 0 : -1;
-            }
-
-            if (right == null || right == NullComparable)
-            {
-                return 1;
-            }
-
-            if (left is Object || right is Object)
-            {
-                Object leftObject = left as Object;
-                Object rightObject = right as Object;
-                return UnityObjectNameComparer<Object>.Instance.Compare(leftObject, rightObject);
-            }
-
-            if (left is IComparable comparable)
-            {
-                return comparable.CompareTo(right);
-            }
-
-            if (right is IComparable comparableRight)
-            {
-                return -comparableRight.CompareTo(left);
-            }
-
-            string leftString = left.ToString();
-            string rightString = right.ToString();
-            return string.CompareOrdinal(leftString, rightString);
-        }
-
-        private static SetElementData ReadElementData(SerializedProperty property)
-        {
-            SetElementData data = new()
-            {
-                propertyType = property.propertyType,
-                comparable = null,
-                value = null,
-            };
-
-            switch (property.propertyType)
-            {
-                case SerializedPropertyType.Integer:
-                case SerializedPropertyType.LayerMask:
-                case SerializedPropertyType.Enum:
-                case SerializedPropertyType.Character:
-                case SerializedPropertyType.ArraySize:
-                    long longValue = property.longValue;
-                    data.value = longValue;
-                    data.comparable = longValue;
-                    break;
-                case SerializedPropertyType.Boolean:
-                    bool boolValue = property.boolValue;
-                    data.value = boolValue;
-                    data.comparable = boolValue ? 1 : 0;
-                    break;
-                case SerializedPropertyType.Float:
-                    double doubleValue = property.doubleValue;
-                    data.value = doubleValue;
-                    data.comparable = doubleValue;
-                    break;
-                case SerializedPropertyType.String:
-                    string stringValue = property.stringValue ?? string.Empty;
-                    data.value = stringValue;
-                    data.comparable = stringValue;
-                    break;
-                case SerializedPropertyType.Color:
-                    Color colorValue = property.colorValue;
-                    data.value = colorValue;
-                    data.comparable = colorValue;
-                    break;
-                case SerializedPropertyType.Vector2:
-                    Vector2 vector2Value = property.vector2Value;
-                    data.value = vector2Value;
-                    data.comparable = vector2Value;
-                    break;
-                case SerializedPropertyType.Vector3:
-                    Vector3 vector3Value = property.vector3Value;
-                    data.value = vector3Value;
-                    data.comparable = vector3Value;
-                    break;
-                case SerializedPropertyType.Vector4:
-                    Vector4 vector4Value = property.vector4Value;
-                    data.value = vector4Value;
-                    data.comparable = vector4Value;
-                    break;
-                case SerializedPropertyType.Rect:
-                    Rect rectValue = property.rectValue;
-                    data.value = rectValue;
-                    data.comparable = rectValue;
-                    break;
-                case SerializedPropertyType.Bounds:
-                    Bounds boundsValue = property.boundsValue;
-                    data.value = boundsValue;
-                    data.comparable = boundsValue;
-                    break;
-                case SerializedPropertyType.Vector2Int:
-                    Vector2Int vector2IntValue = property.vector2IntValue;
-                    data.value = vector2IntValue;
-                    data.comparable = vector2IntValue;
-                    break;
-                case SerializedPropertyType.Vector3Int:
-                    Vector3Int vector3IntValue = property.vector3IntValue;
-                    data.value = vector3IntValue;
-                    data.comparable = vector3IntValue;
-                    break;
-                case SerializedPropertyType.RectInt:
-                    RectInt rectIntValue = property.rectIntValue;
-                    data.value = rectIntValue;
-                    data.comparable = rectIntValue;
-                    break;
-                case SerializedPropertyType.BoundsInt:
-                    BoundsInt boundsIntValue = property.boundsIntValue;
-                    data.value = boundsIntValue;
-                    data.comparable = boundsIntValue;
-                    break;
-                case SerializedPropertyType.Hash128:
-                    Hash128 hashValue = property.hash128Value;
-                    data.value = hashValue;
-                    data.comparable = hashValue;
-                    break;
-                case SerializedPropertyType.Quaternion:
-                    Quaternion quaternionValue = property.quaternionValue;
-                    data.value = quaternionValue;
-                    data.comparable = quaternionValue;
-                    break;
-                case SerializedPropertyType.ObjectReference:
-                    Object objectReferenceValue = property.objectReferenceValue;
-                    data.value = objectReferenceValue;
-                    data.comparable =
-                        objectReferenceValue != null ? objectReferenceValue : NullComparable;
-                    break;
-                case SerializedPropertyType.AnimationCurve:
-                    AnimationCurve curveValue = property.animationCurveValue;
-                    data.value = curveValue;
-                    data.comparable = curveValue?.length ?? 0;
-                    break;
-                case SerializedPropertyType.ManagedReference:
-                case SerializedPropertyType.Generic:
-#if UNITY_2022_1_OR_NEWER
-                    // Before Unity 2022.1, unavailable boxedValue requires degraded property-path identity.
-                    try
-                    {
-                        object boxed = property.boxedValue;
-                        data.value = boxed;
-                        data.comparable = boxed ?? NullComparable;
-                    }
-                    catch (Exception)
-                    {
-                        data.value = property.propertyPath;
-                        data.comparable = property.propertyPath;
-                    }
-#else
-                    data.value = property.propertyPath;
-                    data.comparable = property.propertyPath;
-#endif
-                    break;
-                default:
-                    data.value = property.propertyPath;
-                    data.comparable = property.propertyPath;
-                    break;
-            }
-
-            return data;
-        }
-
-        private static Array BuildSnapshotArray(SerializedProperty itemsProperty, Type elementType)
-        {
-            elementType ??= typeof(object);
-
-            if (itemsProperty == null || !itemsProperty.isArray)
-            {
-                return Array.CreateInstance(elementType, 0);
-            }
-
-            int count = itemsProperty.arraySize;
-            Array snapshot = Array.CreateInstance(elementType, count);
-
-            for (int index = 0; index < count; index++)
-            {
-                SerializedProperty element = itemsProperty.GetArrayElementAtIndex(index);
-                SetElementData elementData = ReadElementData(element);
-                object value = ConvertSnapshotValue(elementType, elementData.value);
-                // Unity 2021.3 cannot reconstruct complex boxed values; leave incompatible snapshot slots default instead of throwing.
-                if (value != null && !elementType.IsInstanceOfType(value))
-                {
-                    continue;
-                }
-                snapshot.SetValue(value, index);
-            }
-
-            return snapshot;
-        }
-
-        private static object ConvertSnapshotValue(Type elementType, object value)
-        {
-            if (value == null)
-            {
-                return null;
-            }
-
-            if (elementType == null)
-            {
-                return value;
-            }
-
-            Type nullableUnderlying = Nullable.GetUnderlyingType(elementType);
-            if (nullableUnderlying != null)
-            {
-                return ConvertSnapshotValue(nullableUnderlying, value);
-            }
-
-            if (elementType.IsInstanceOfType(value))
-            {
-                return value;
-            }
-
-            Type targetType = elementType;
-
-            try
-            {
-                if (targetType.IsEnum)
-                {
-                    if (value is string enumName)
-                    {
-                        return Enum.Parse(targetType, enumName, ignoreCase: true);
-                    }
-
-                    return Enum.ToObject(targetType, value);
-                }
-
-                if (value is IConvertible && typeof(IConvertible).IsAssignableFrom(targetType))
-                {
-                    return Convert.ChangeType(value, targetType, CultureInfo.InvariantCulture);
-                }
-            }
-            catch (Exception)
-            {
-                return value;
-            }
-
-            return value;
-        }
-
-        private static void WriteElementValue(SerializedProperty property, SetElementData data)
-        {
-            switch (data.propertyType)
-            {
-                case SerializedPropertyType.Integer:
-                case SerializedPropertyType.LayerMask:
-                case SerializedPropertyType.Enum:
-                case SerializedPropertyType.Character:
-                case SerializedPropertyType.ArraySize:
-                    property.longValue = Convert.ToInt64(data.value);
-                    break;
-                case SerializedPropertyType.Boolean:
-                    property.boolValue = Convert.ToBoolean(data.value);
-                    break;
-                case SerializedPropertyType.Float:
-                    property.doubleValue = Convert.ToDouble(data.value);
-                    break;
-                case SerializedPropertyType.String:
-                    property.stringValue = data.value as string ?? string.Empty;
-                    break;
-                case SerializedPropertyType.Color:
-                    property.colorValue = data.value is Color color ? color : Color.white;
-                    break;
-                case SerializedPropertyType.Vector2:
-                    property.vector2Value = data.value is Vector2 vector2 ? vector2 : Vector2.zero;
-                    break;
-                case SerializedPropertyType.Vector3:
-                    property.vector3Value = data.value is Vector3 vector3 ? vector3 : Vector3.zero;
-                    break;
-                case SerializedPropertyType.Vector4:
-                    property.vector4Value = data.value is Vector4 vector4 ? vector4 : Vector4.zero;
-                    break;
-                case SerializedPropertyType.Rect:
-                    property.rectValue = data.value is Rect rect ? rect : default;
-                    break;
-                case SerializedPropertyType.Bounds:
-                    property.boundsValue = data.value is Bounds bounds ? bounds : default;
-                    break;
-                case SerializedPropertyType.Vector2Int:
-                    property.vector2IntValue = data.value is Vector2Int vector2Int
-                        ? vector2Int
-                        : default;
-                    break;
-                case SerializedPropertyType.Vector3Int:
-                    property.vector3IntValue = data.value is Vector3Int vector3Int
-                        ? vector3Int
-                        : default;
-                    break;
-                case SerializedPropertyType.RectInt:
-                    property.rectIntValue = data.value is RectInt rectInt ? rectInt : default;
-                    break;
-                case SerializedPropertyType.BoundsInt:
-                    property.boundsIntValue = data.value is BoundsInt boundsInt
-                        ? boundsInt
-                        : default;
-                    break;
-                case SerializedPropertyType.Quaternion:
-                    property.quaternionValue = data.value is Quaternion quaternion
-                        ? quaternion
-                        : Quaternion.identity;
-                    break;
-                case SerializedPropertyType.Hash128:
-                    property.hash128Value = data.value is Hash128 hash ? hash : default;
-                    break;
-                case SerializedPropertyType.ObjectReference:
-                    property.objectReferenceValue = data.value as Object;
-                    break;
-                case SerializedPropertyType.AnimationCurve:
-                    property.animationCurveValue = data.value as AnimationCurve;
-                    break;
-                case SerializedPropertyType.ManagedReference:
-                case SerializedPropertyType.Generic:
-#if UNITY_2022_1_OR_NEWER
-                    // Before Unity 2022.1, unavailable boxedValue prevents writing generic managed values back.
-                    try
-                    {
-                        property.boxedValue = data.value;
-                    }
-                    catch (Exception) { }
-#endif
-                    break;
-            }
-        }
-
-        private static GUIContent GetFoldoutLabelContent(GUIContent label)
-        {
-            string text = label != null ? label.text : "Serialized HashSet";
-            string tooltip = label != null ? label.tooltip : null;
-            FoldoutLabelContent.text = text;
-            FoldoutLabelContent.tooltip = tooltip;
-            FoldoutLabelContent.image = label?.image;
-            return FoldoutLabelContent;
-        }
-
-        /// <summary>
-        /// Gets a cached pagination label in the format "Page X / Y".
-        /// Delegates to <see cref="EditorCacheHelper.GetPaginationLabel"/> for shared LRU caching.
-        /// </summary>
-        private static string GetPaginationLabel(int currentPage, int pageCount)
-        {
-            return EditorCacheHelper.GetPaginationLabel(currentPage, pageCount);
-        }
-
-        private static string GetRangeLabel(int start, int end, int total)
-        {
-            (int, int, int) key = (start, end, total);
-            if (RangeLabelCache.TryGetValue(key, out string cached))
-            {
-                return cached;
-            }
-
-            using PooledResource<StringBuilder> lease = Buffers.GetStringBuilder(
-                32,
-                out StringBuilder builder
-            );
-            builder.Clear();
-            builder.Append(start);
-            builder.Append('-');
-            builder.Append(end);
-            builder.Append(" of ");
-            builder.Append(total);
-            string result = builder.ToString();
-
-            if (RangeLabelCache.Count < 10000)
-            {
-                RangeLabelCache[key] = result;
-            }
-
-            return result;
-        }
-
-        internal bool InvokeTryClearSet(
-            ref SerializedProperty property,
-            string propertyPath,
-            ref SerializedProperty itemsProperty
-        )
-        {
-            return TryClearSet(ref property, propertyPath, ref itemsProperty);
-        }
-
-        internal void InvokeTryMoveSelectedEntry(
-            ref SerializedProperty property,
-            string propertyPath,
-            ref SerializedProperty itemsProperty,
-            PaginationState pagination,
-            int direction
-        )
-        {
-            TryMoveSelectedEntry(
-                ref property,
-                propertyPath,
-                ref itemsProperty,
-                pagination,
-                direction
-            );
-        }
-
-        internal void InvokeTryRemoveSelectedEntry(
-            ref SerializedProperty property,
-            string propertyPath,
-            ref SerializedProperty itemsProperty,
-            PaginationState pagination
-        )
-        {
-            TryRemoveSelectedEntry(ref property, propertyPath, ref itemsProperty, pagination);
-        }
-
-        internal bool InvokeTrySortElements(
-            ref SerializedProperty property,
-            string propertyPath,
-            SerializedProperty itemsProperty
-        )
-        {
-            return TrySortElements(ref property, propertyPath, itemsProperty);
         }
 
         /// <summary>
@@ -7139,6 +7140,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         internal sealed class DuplicateState
         {
+            public bool IsDirty => _lastArraySize < 0;
+
+            public bool IsAnimating => hasDuplicates && !_animationsCompleted;
+
             public bool hasDuplicates;
             public readonly HashSet<int> duplicateIndices = new();
             public string summary = string.Empty;
@@ -7151,10 +7156,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             private bool _lastHadDuplicates;
             private int _lastArraySize = -1;
             private bool _animationsCompleted;
-
-            public bool IsDirty => _lastArraySize < 0;
-
-            public bool IsAnimating => hasDuplicates && !_animationsCompleted;
 
             public void MarkDirty()
             {
@@ -7270,17 +7271,17 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private readonly struct RowFoldoutKey : IEquatable<RowFoldoutKey>
         {
+            public string CacheKey { get; }
+
+            public bool IsValid => !string.IsNullOrEmpty(CacheKey) && 0 <= Index;
+
+            private int Index { get; }
+
             public RowFoldoutKey(string cacheKey, int index)
             {
                 CacheKey = cacheKey;
                 Index = index;
             }
-
-            public string CacheKey { get; }
-
-            private int Index { get; }
-
-            public bool IsValid => !string.IsNullOrEmpty(CacheKey) && 0 <= Index;
 
             public bool Equals(RowFoldoutKey other)
             {
@@ -7357,6 +7358,12 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         {
             public static readonly PendingWrapperContext Empty = new(null, null, null);
 
+            public PendingValueWrapper Wrapper { get; }
+
+            public SerializedObject Serialized { get; }
+
+            public SerializedProperty Property { get; }
+
             public PendingWrapperContext(
                 PendingValueWrapper wrapper,
                 SerializedObject serialized,
@@ -7367,12 +7374,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 Serialized = serialized;
                 Property = property;
             }
-
-            public PendingValueWrapper Wrapper { get; }
-
-            public SerializedObject Serialized { get; }
-
-            public SerializedProperty Property { get; }
         }
     }
 

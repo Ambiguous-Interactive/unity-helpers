@@ -16,6 +16,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     [NUnit.Framework.Category("Integration")]
     public sealed class ProtoEqualsPerformanceTests
     {
+        private const int Iterations = 10_000;
+
         private static SmallMsg MakeSmall(int i) => new() { Id = i, Name = "Name_" + i };
 
         private static MediumMsg MakeMedium(int i, int len) =>
@@ -34,23 +36,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 Blob = MakeBytes(blobSize, seed: i),
                 Nested = MakeMedium(i, nestedLen),
             };
-
-        private const int Iterations = 10_000;
-
-        [Test, Timeout(0)]
-        public void CompareProtoEqualsSmallMediumLarge()
-        {
-            UnityEngine.Debug.Log(
-                "| Payload | Optimized ProtoEquals (ms) | Classic ProtoEquals (ms) | Speedup |"
-            );
-            UnityEngine.Debug.Log(
-                "| ------- | -------------------------:| ------------------------:| -------:|"
-            );
-
-            RunEqualsBenchmark("Small", () => MakeSmall(123));
-            RunEqualsBenchmark("Medium", () => MakeMedium(123, 16));
-            RunEqualsBenchmark("Large", () => MakeLarge(123, 8 * 1024, 64));
-        }
 
         private static void RunEqualsBenchmark<T>(string label, Func<T> factory)
         {
@@ -122,6 +107,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 b[i] = (byte)(x >> 24);
             }
             return b;
+        }
+
+        [Test, Timeout(0)]
+        public void CompareProtoEqualsSmallMediumLarge()
+        {
+            UnityEngine.Debug.Log(
+                "| Payload | Optimized ProtoEquals (ms) | Classic ProtoEquals (ms) | Speedup |"
+            );
+            UnityEngine.Debug.Log(
+                "| ------- | -------------------------:| ------------------------:| -------:|"
+            );
+
+            RunEqualsBenchmark("Small", () => MakeSmall(123));
+            RunEqualsBenchmark("Medium", () => MakeMedium(123, 16));
+            RunEqualsBenchmark("Large", () => MakeLarge(123, 8 * 1024, 64));
         }
 
         [ProtoContract]

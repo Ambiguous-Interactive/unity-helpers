@@ -194,6 +194,66 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
         }
 
+        private static bool Converts(INamedTypeSymbol converter, INamedTypeSymbol serialized)
+        {
+            if (converter == null || serialized == null)
+            {
+                return false;
+            }
+
+            for (
+                INamedTypeSymbol current = converter.BaseType;
+                current != null;
+                current = current.BaseType
+            )
+            {
+                if (
+                    current.Arity != 1
+                    || current.ConstructedFrom?.ToDisplayString() != ConverterBase + "<T>"
+                )
+                {
+                    continue;
+                }
+
+                if (SymbolEqualityComparer.Default.Equals(current.TypeArguments[0], serialized))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static IEnumerable<Pair> Pairs(IAssemblySymbol assembly)
+        {
+            foreach (AttributeData attribute in assembly.GetAttributes())
+            {
+                if (
+                    attribute.AttributeClass == null
+                    || attribute.AttributeClass.ToDisplayString() != ConverterAttribute
+                    || attribute.ConstructorArguments.Length < 2
+                )
+                {
+                    continue;
+                }
+
+                if (
+                    !(attribute.ConstructorArguments[0].Value is INamedTypeSymbol serialized)
+                    || !(attribute.ConstructorArguments[1].Value is INamedTypeSymbol converter)
+                )
+                {
+                    continue;
+                }
+
+                // Normalize unbound typeof arguments to definitions so they match source closures.
+                yield return new Pair(
+                    serialized.OriginalDefinition,
+                    converter.OriginalDefinition,
+                    attribute
+                );
+            }
+        }
+
         /// <summary>
         /// Returns one <c>(type, converter)</c> registration pair per closure this compilation
         /// writes.
@@ -272,68 +332,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return registrations;
         }
 
-        private static bool Converts(INamedTypeSymbol converter, INamedTypeSymbol serialized)
-        {
-            if (converter == null || serialized == null)
-            {
-                return false;
-            }
-
-            for (
-                INamedTypeSymbol current = converter.BaseType;
-                current != null;
-                current = current.BaseType
-            )
-            {
-                if (
-                    current.Arity != 1
-                    || current.ConstructedFrom?.ToDisplayString() != ConverterBase + "<T>"
-                )
-                {
-                    continue;
-                }
-
-                if (SymbolEqualityComparer.Default.Equals(current.TypeArguments[0], serialized))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static IEnumerable<Pair> Pairs(IAssemblySymbol assembly)
-        {
-            foreach (AttributeData attribute in assembly.GetAttributes())
-            {
-                if (
-                    attribute.AttributeClass == null
-                    || attribute.AttributeClass.ToDisplayString() != ConverterAttribute
-                    || attribute.ConstructorArguments.Length < 2
-                )
-                {
-                    continue;
-                }
-
-                if (
-                    !(attribute.ConstructorArguments[0].Value is INamedTypeSymbol serialized)
-                    || !(attribute.ConstructorArguments[1].Value is INamedTypeSymbol converter)
-                )
-                {
-                    continue;
-                }
-
-                // Normalize unbound typeof arguments to definitions so they match source closures.
-                yield return new Pair(
-                    serialized.OriginalDefinition,
-                    converter.OriginalDefinition,
-                    attribute
-                );
-            }
-        }
-
         private readonly struct Pair
         {
+            internal INamedTypeSymbol Serialized { get; }
+
+            internal INamedTypeSymbol Converter { get; }
+
+            internal AttributeData Attribute { get; }
+
             internal Pair(
                 INamedTypeSymbol serialized,
                 INamedTypeSymbol converter,
@@ -344,12 +350,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 Converter = converter;
                 Attribute = attribute;
             }
-
-            internal INamedTypeSymbol Serialized { get; }
-
-            internal INamedTypeSymbol Converter { get; }
-
-            internal AttributeData Attribute { get; }
         }
     }
 }

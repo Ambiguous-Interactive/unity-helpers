@@ -492,6 +492,108 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             };
         }
 
+        /// <summary>
+        /// Generates a complementary color by rotating the hue by 180 degrees in HSV space.
+        /// Handles grayscale colors specially and supports optional randomization.
+        /// </summary>
+        /// <param name="source">The source color to find the complement of.</param>
+        /// <param name="random">Optional random number generator for adding variance (default: null for no randomization).</param>
+        /// <param name="variance">
+        /// The amount of random variance to apply (default: 0 for none).
+        /// If non-zero, variance is applied as +/- range to each RGB component.
+        /// If zero with random provided, multiplies each component by random value.
+        /// </param>
+        /// <returns>The complementary color with the same alpha as the source.</returns>
+        /// <remarks>
+        /// Null Handling: random can be null (no randomization applied).
+        /// Thread Safety: Thread-safe if the provided IRandom is thread-safe.
+        /// Performance: O(1) - constant time color space conversion and arithmetic.
+        /// Allocations: No heap allocations.
+        /// Edge Cases: Grayscale colors (RGB values within 20/255 of each other) are converted to contrasting colors
+        /// rather than complementary - dark grays become cyan-ish, light grays become yellow.
+        /// </remarks>
+        public static Color GetComplement(
+            this in Color source,
+            IRandom random = null,
+            float variance = 0f
+        )
+        {
+            Color inputColor = source;
+            /*
+                If RGB values are close to each other by a diff less than 10%, then if RGB values are lighter side,
+                decrease the blue by 50% (eventually it will increase in conversion below), if RBB values are on the
+                darker side, decrease yellow by about 50% (it will increase in conversion)
+             */
+            float avgColorValue = (source.r + source.g + source.b) / 3;
+            float rDiff = Mathf.Abs(source.r - avgColorValue);
+            float gDiff = Mathf.Abs(source.g - avgColorValue);
+            float bDiff = Mathf.Abs(source.b - avgColorValue);
+            const float greyDelta = 20 / 255f;
+
+            if (rDiff < greyDelta && gDiff < greyDelta && bDiff < greyDelta)
+            {
+                if (avgColorValue < 123 / 255f)
+                {
+                    inputColor.b = 220 / 255f;
+                    inputColor.g = 230 / 255f;
+                    inputColor.r = 50 / 255f;
+                }
+                else
+                {
+                    inputColor.r = 255 / 255f;
+                    inputColor.g = 255 / 255f;
+                    inputColor.b = 50 / 255f;
+                }
+            }
+
+            if (random != null)
+            {
+                if (variance != 0)
+                {
+                    variance = Mathf.Abs(variance);
+
+                    float minR = Mathf.Clamp01(inputColor.r - variance);
+                    float maxR = Mathf.Clamp01(inputColor.r + variance);
+                    inputColor.r = random.NextFloat(minR, maxR);
+
+                    float minG = Mathf.Clamp01(inputColor.g - variance);
+                    float maxG = Mathf.Clamp01(inputColor.g + variance);
+                    inputColor.g = random.NextFloat(minG, maxG);
+
+                    float minB = Mathf.Clamp01(inputColor.b - variance);
+                    float maxB = Mathf.Clamp01(inputColor.b + variance);
+                    inputColor.b = random.NextFloat(minB, maxB);
+                }
+                else
+                {
+                    inputColor.r *= GetRandomScale(random, inputColor.r);
+                    inputColor.g *= GetRandomScale(random, inputColor.g);
+                    inputColor.b *= GetRandomScale(random, inputColor.b);
+                }
+            }
+
+            Color.RGBToHSV(inputColor, out float h, out float s, out float v);
+            h = h < 0.5f ? h + 0.5f : h - 0.5f;
+            Color result = Color.HSVToRGB(h, s, v);
+            return result;
+
+            static float GetRandomScale(IRandom rng, float component)
+            {
+                if (component <= 0f || float.IsNaN(component))
+                {
+                    return rng.NextFloat();
+                }
+
+                float maxScale = 1f / component;
+                if (maxScale <= 0f || float.IsInfinity(maxScale))
+                {
+                    return rng.NextFloat();
+                }
+
+                return rng.NextFloat(maxScale);
+            }
+        }
+
         private static Color AverageInLABSpace(IEnumerable<Color> pixels, float alphaCutoff)
         {
             double l = 0;
@@ -927,108 +1029,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 Mathf.Clamp01((float)b2),
                 1f
             );
-        }
-
-        /// <summary>
-        /// Generates a complementary color by rotating the hue by 180 degrees in HSV space.
-        /// Handles grayscale colors specially and supports optional randomization.
-        /// </summary>
-        /// <param name="source">The source color to find the complement of.</param>
-        /// <param name="random">Optional random number generator for adding variance (default: null for no randomization).</param>
-        /// <param name="variance">
-        /// The amount of random variance to apply (default: 0 for none).
-        /// If non-zero, variance is applied as +/- range to each RGB component.
-        /// If zero with random provided, multiplies each component by random value.
-        /// </param>
-        /// <returns>The complementary color with the same alpha as the source.</returns>
-        /// <remarks>
-        /// Null Handling: random can be null (no randomization applied).
-        /// Thread Safety: Thread-safe if the provided IRandom is thread-safe.
-        /// Performance: O(1) - constant time color space conversion and arithmetic.
-        /// Allocations: No heap allocations.
-        /// Edge Cases: Grayscale colors (RGB values within 20/255 of each other) are converted to contrasting colors
-        /// rather than complementary - dark grays become cyan-ish, light grays become yellow.
-        /// </remarks>
-        public static Color GetComplement(
-            this in Color source,
-            IRandom random = null,
-            float variance = 0f
-        )
-        {
-            Color inputColor = source;
-            /*
-                If RGB values are close to each other by a diff less than 10%, then if RGB values are lighter side,
-                decrease the blue by 50% (eventually it will increase in conversion below), if RBB values are on the
-                darker side, decrease yellow by about 50% (it will increase in conversion)
-             */
-            float avgColorValue = (source.r + source.g + source.b) / 3;
-            float rDiff = Mathf.Abs(source.r - avgColorValue);
-            float gDiff = Mathf.Abs(source.g - avgColorValue);
-            float bDiff = Mathf.Abs(source.b - avgColorValue);
-            const float greyDelta = 20 / 255f;
-
-            if (rDiff < greyDelta && gDiff < greyDelta && bDiff < greyDelta)
-            {
-                if (avgColorValue < 123 / 255f)
-                {
-                    inputColor.b = 220 / 255f;
-                    inputColor.g = 230 / 255f;
-                    inputColor.r = 50 / 255f;
-                }
-                else
-                {
-                    inputColor.r = 255 / 255f;
-                    inputColor.g = 255 / 255f;
-                    inputColor.b = 50 / 255f;
-                }
-            }
-
-            if (random != null)
-            {
-                if (variance != 0)
-                {
-                    variance = Mathf.Abs(variance);
-
-                    float minR = Mathf.Clamp01(inputColor.r - variance);
-                    float maxR = Mathf.Clamp01(inputColor.r + variance);
-                    inputColor.r = random.NextFloat(minR, maxR);
-
-                    float minG = Mathf.Clamp01(inputColor.g - variance);
-                    float maxG = Mathf.Clamp01(inputColor.g + variance);
-                    inputColor.g = random.NextFloat(minG, maxG);
-
-                    float minB = Mathf.Clamp01(inputColor.b - variance);
-                    float maxB = Mathf.Clamp01(inputColor.b + variance);
-                    inputColor.b = random.NextFloat(minB, maxB);
-                }
-                else
-                {
-                    inputColor.r *= GetRandomScale(random, inputColor.r);
-                    inputColor.g *= GetRandomScale(random, inputColor.g);
-                    inputColor.b *= GetRandomScale(random, inputColor.b);
-                }
-            }
-
-            Color.RGBToHSV(inputColor, out float h, out float s, out float v);
-            h = h < 0.5f ? h + 0.5f : h - 0.5f;
-            Color result = Color.HSVToRGB(h, s, v);
-            return result;
-
-            static float GetRandomScale(IRandom rng, float component)
-            {
-                if (component <= 0f || float.IsNaN(component))
-                {
-                    return rng.NextFloat();
-                }
-
-                float maxScale = 1f / component;
-                if (maxScale <= 0f || float.IsInfinity(maxScale))
-                {
-                    return rng.NextFloat();
-                }
-
-                return rng.NextFloat(maxScale);
-            }
         }
 
         private readonly struct LABColor

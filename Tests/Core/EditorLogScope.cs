@@ -22,17 +22,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             RegexOptions.Compiled | RegexOptions.CultureInvariant
         );
 
-        private readonly object _syncRoot = new();
-        private readonly List<LogRecord> _warnings = new();
-        private readonly List<LogRecord> _errors = new();
-
-        private bool _disposed;
-
-        public EditorLogScope()
-        {
-            Application.logMessageReceivedThreaded += HandleLogThreaded;
-        }
-
         /// <summary>
         /// All warning messages captured since the scope was created.
         /// </summary>
@@ -59,6 +48,45 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     return _errors.ToArray();
                 }
             }
+        }
+
+        private readonly object _syncRoot = new();
+        private readonly List<LogRecord> _warnings = new();
+        private readonly List<LogRecord> _errors = new();
+
+        private bool _disposed;
+
+        public EditorLogScope()
+        {
+            Application.logMessageReceivedThreaded += HandleLogThreaded;
+        }
+
+        private static string FormatFailure(
+            string header,
+            string patternDescription,
+            IReadOnlyList<LogRecord> matches
+        )
+        {
+            StringBuilder builder = new();
+            builder.Append("Expected no ");
+            builder.Append(header);
+            builder.Append(" '");
+            builder.Append(patternDescription);
+            builder.Append("', but found ");
+            builder.Append(matches.Count);
+            builder.AppendLine(":");
+            for (int i = 0; i < matches.Count; i++)
+            {
+                LogRecord match = matches[i];
+                builder.Append("  [");
+                builder.Append(i);
+                builder.Append("] ");
+                builder.Append(match.Type);
+                builder.Append(": ");
+                builder.AppendLine(match.Condition);
+            }
+
+            return builder.ToString();
         }
 
         /// <summary>
@@ -144,49 +172,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             }
         }
 
-        private static string FormatFailure(
-            string header,
-            string patternDescription,
-            IReadOnlyList<LogRecord> matches
-        )
-        {
-            StringBuilder builder = new();
-            builder.Append("Expected no ");
-            builder.Append(header);
-            builder.Append(" '");
-            builder.Append(patternDescription);
-            builder.Append("', but found ");
-            builder.Append(matches.Count);
-            builder.AppendLine(":");
-            for (int i = 0; i < matches.Count; i++)
-            {
-                LogRecord match = matches[i];
-                builder.Append("  [");
-                builder.Append(i);
-                builder.Append("] ");
-                builder.Append(match.Type);
-                builder.Append(": ");
-                builder.AppendLine(match.Condition);
-            }
-
-            return builder.ToString();
-        }
-
         /// <summary>
         /// Immutable snapshot of a captured log message.
         /// </summary>
         public readonly struct LogRecord
         {
+            public LogType Type { get; }
+            public string Condition { get; }
+            public string StackTrace { get; }
+
             public LogRecord(LogType type, string condition, string stackTrace)
             {
                 Type = type;
                 Condition = condition ?? string.Empty;
                 StackTrace = stackTrace ?? string.Empty;
             }
-
-            public LogType Type { get; }
-            public string Condition { get; }
-            public string StackTrace { get; }
         }
     }
 }

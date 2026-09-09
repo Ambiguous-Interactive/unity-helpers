@@ -120,12 +120,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             IComparable,
             IComparable<PcgRandom>
     {
-        // Setting the low bit normalizes the increment without changing an already-odd stream.
-        private static ulong NormalizeIncrement(ulong increment)
-        {
-            return increment | 1UL;
-        }
-
         public static PcgRandom Instance => ThreadLocalRandom<PcgRandom>.Instance;
 
         public override RandomState InternalState => BuildState(_state, _increment);
@@ -169,6 +163,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             _increment = NormalizeIncrement(NextUlong());
         }
 
+        // Setting the low bit normalizes the increment without changing an already-odd stream.
+        private static ulong NormalizeIncrement(ulong increment)
+        {
+            return increment | 1UL;
+        }
+
         public override uint NextUint()
         {
             unchecked
@@ -179,11 +179,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 int rot = (int)(oldState >> 59);
                 return (xorShifted >> rot) | (xorShifted << (-rot & 31));
             }
-        }
-
-        protected override void OnAfterDeserialization()
-        {
-            _increment = NormalizeIncrement(_increment);
         }
 
         public bool Equals(PcgRandom other)
@@ -263,6 +258,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         public override IRandom Copy()
         {
             return new PcgRandom(InternalState);
+        }
+
+        protected override void OnAfterDeserialization()
+        {
+            _increment = NormalizeIncrement(_increment);
         }
     }
 }

@@ -32,6 +32,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         private const int ScratchSize = 4096;
         private const int MaximumVarint32Bytes = 10;
 
+        private static WProtoReader PackedVarints(int[] values)
+        {
+            /*
+                Size scratch space for ten-byte negative int32 varints; a fixed buffer formerly failed at 1,000
+                elements.
+            */
+            byte[] scratch = new byte[(values.Length * MaximumVarint32Bytes) + 1];
+            WProtoWriter writer = new(scratch);
+            foreach (int value in values)
+            {
+                Assert.IsTrue(writer.TryWriteInt32(value));
+            }
+
+            return new WProtoReader(writer.Written);
+        }
+
         [TestCase(0)]
         [TestCase(1)]
         [TestCase(2)]
@@ -282,22 +298,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public void ReservingANullListIsIgnoredRatherThanThrowing()
         {
             Assert.DoesNotThrow(() => WProtoRepeated.Reserve((List<int>)null, 8));
-        }
-
-        private static WProtoReader PackedVarints(int[] values)
-        {
-            /*
-                Size scratch space for ten-byte negative int32 varints; a fixed buffer formerly failed at 1,000
-                elements.
-            */
-            byte[] scratch = new byte[(values.Length * MaximumVarint32Bytes) + 1];
-            WProtoWriter writer = new(scratch);
-            foreach (int value in values)
-            {
-                Assert.IsTrue(writer.TryWriteInt32(value));
-            }
-
-            return new WProtoReader(writer.Written);
         }
     }
 }

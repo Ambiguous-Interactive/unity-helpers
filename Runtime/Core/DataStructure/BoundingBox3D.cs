@@ -24,6 +24,34 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     {
         private const float MinimumExclusivePadding = 1e-6f;
 
+        public static BoundingBox3D Empty => default;
+
+        public static bool operator ==(BoundingBox3D left, BoundingBox3D right)
+        {
+            return left.Equals(right);
+        }
+
+        public static bool operator !=(BoundingBox3D left, BoundingBox3D right)
+        {
+            return !left.Equals(right);
+        }
+
+        /// <summary>Gets the midpoint without overflowing finite endpoint sums.</summary>
+        public Vector3 Center => SpatialQueryMath.Midpoint(min, max);
+
+        public Vector3 Size => max - min;
+
+        public float Volume
+        {
+            get
+            {
+                Vector3 size = Size;
+                return size.x * size.y * size.z;
+            }
+        }
+
+        public bool IsEmpty => max.x <= min.x || max.y <= min.y || max.z <= min.z;
+
         public readonly Vector3 min;
         public readonly Vector3 max;
 
@@ -49,24 +77,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 this.max = max;
             }
         }
-
-        /// <summary>Gets the midpoint without overflowing finite endpoint sums.</summary>
-        public Vector3 Center => SpatialQueryMath.Midpoint(min, max);
-
-        public Vector3 Size => max - min;
-
-        public float Volume
-        {
-            get
-            {
-                Vector3 size = Size;
-                return size.x * size.y * size.z;
-            }
-        }
-
-        public bool IsEmpty => max.x <= min.x || max.y <= min.y || max.z <= min.z;
-
-        public static BoundingBox3D Empty => default;
 
         public static BoundingBox3D FromCenterAndSize(Vector3 center, Vector3 size)
         {
@@ -100,6 +110,41 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         {
             Vector3 exclusiveMax = new(NextFloat(point.x), NextFloat(point.y), NextFloat(point.z));
             return new BoundingBox3D(point, exclusiveMax);
+        }
+
+        private static Vector3 EnsureExclusiveMax(Vector3 min, Vector3 max)
+        {
+            Vector3 exclusive = max;
+            if (exclusive.x <= min.x)
+            {
+                exclusive.x = NextFloat(min.x + MinimumExclusivePadding);
+            }
+            if (exclusive.y <= min.y)
+            {
+                exclusive.y = NextFloat(min.y + MinimumExclusivePadding);
+            }
+            if (exclusive.z <= min.z)
+            {
+                exclusive.z = NextFloat(min.z + MinimumExclusivePadding);
+            }
+            return exclusive;
+        }
+
+        private static float NextFloat(float value)
+        {
+            if (float.IsNaN(value) || float.IsInfinity(value))
+            {
+                return value;
+            }
+
+            if (value == 0f)
+            {
+                return float.Epsilon;
+            }
+
+            int bits = BitConverter.SingleToInt32Bits(value);
+            bits = 0f < value ? bits + 1 : bits - 1;
+            return BitConverter.Int32BitsToSingle(bits);
         }
 
         public BoundingBox3D ExpandToInclude(Vector3 point)
@@ -353,54 +398,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return Objects.HashCode(min, max);
         }
 
-        public static bool operator ==(BoundingBox3D left, BoundingBox3D right)
-        {
-            return left.Equals(right);
-        }
-
-        public static bool operator !=(BoundingBox3D left, BoundingBox3D right)
-        {
-            return !left.Equals(right);
-        }
-
         public override string ToString()
         {
             return $"BoundingBox3D(min: {min}, max: {max})";
-        }
-
-        private static Vector3 EnsureExclusiveMax(Vector3 min, Vector3 max)
-        {
-            Vector3 exclusive = max;
-            if (exclusive.x <= min.x)
-            {
-                exclusive.x = NextFloat(min.x + MinimumExclusivePadding);
-            }
-            if (exclusive.y <= min.y)
-            {
-                exclusive.y = NextFloat(min.y + MinimumExclusivePadding);
-            }
-            if (exclusive.z <= min.z)
-            {
-                exclusive.z = NextFloat(min.z + MinimumExclusivePadding);
-            }
-            return exclusive;
-        }
-
-        private static float NextFloat(float value)
-        {
-            if (float.IsNaN(value) || float.IsInfinity(value))
-            {
-                return value;
-            }
-
-            if (value == 0f)
-            {
-                return float.Epsilon;
-            }
-
-            int bits = BitConverter.SingleToInt32Bits(value);
-            bits = 0f < value ? bits + 1 : bits - 1;
-            return BitConverter.Int32BitsToSingle(bits);
         }
     }
 }

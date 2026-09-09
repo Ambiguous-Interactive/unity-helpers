@@ -5,6 +5,7 @@
 namespace WallstopStudios.UnityHelpers.Core.Extension
 {
     using System.Collections.Generic;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     public static partial class IListExtensions
     {
@@ -365,17 +366,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
             }
             return true;
-        }
-
-        private static int FloorLog2(int value)
-        {
-            int result = 0;
-            while (1 < value)
-            {
-                value >>= 1;
-                result++;
-            }
-            return result;
         }
     }
 }

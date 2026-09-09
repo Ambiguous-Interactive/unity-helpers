@@ -12,9 +12,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     /// </summary>
     internal static class TestMultiAttributeHandler
     {
-        private static readonly List<AssetInvocationRecord> Recorded = new();
-
         public static IReadOnlyList<AssetInvocationRecord> RecordedInvocations => Recorded;
+
+        private static readonly List<AssetInvocationRecord> Recorded = new();
 
         public static void Clear()
         {

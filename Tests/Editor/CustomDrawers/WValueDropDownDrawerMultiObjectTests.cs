@@ -23,6 +23,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
     [NUnit.Framework.Category("Integration")]
     public sealed class WValueDropDownDrawerMultiObjectTests : CommonTestBase
     {
+        private static void AssignAttribute(PropertyDrawer drawer, PropertyAttribute attribute)
+        {
+            PropertyDrawerTestHelper.AssignAttribute(drawer, attribute);
+        }
+
         [Test]
         public void MultiObjectSameValueDoesNotShowMixedIndicator()
         {
@@ -114,11 +119,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
 
             yield return null;
-        }
-
-        private static void AssignAttribute(PropertyDrawer drawer, PropertyAttribute attribute)
-        {
-            PropertyDrawerTestHelper.AssignAttribute(drawer, attribute);
         }
     }
 #endif

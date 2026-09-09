@@ -9,6 +9,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
     internal sealed class ValidationConfiguredRule : IValidationRule
     {
+        /// <inheritdoc />
+        public string RuleId => _rule.RuleId;
+
+        /// <inheritdoc />
+        public string DisplayName => _rule.DisplayName;
+
         private readonly IValidationRule _rule;
         private readonly ValidationSeverity? _severity;
 
@@ -17,12 +23,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             _rule = rule;
             _severity = severity;
         }
-
-        /// <inheritdoc />
-        public string RuleId => _rule.RuleId;
-
-        /// <inheritdoc />
-        public string DisplayName => _rule.DisplayName;
 
         /// <inheritdoc />
         public bool AppliesTo(in ValidationTarget target) => _rule.AppliesTo(in target);

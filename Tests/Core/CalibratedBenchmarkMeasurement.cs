@@ -134,55 +134,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
             EnvironmentMetadata = CaptureEnvironment();
         }
 
-        /// <summary>Writes raw evidence without reflection or runtime serializer generation.</summary>
-        public string ToJson()
-        {
-            using MemoryStream stream = new MemoryStream();
-            Utf8JsonWriter writer = new Utf8JsonWriter(stream);
-            try
-            {
-                writer.WriteStartObject();
-                WriteSamples(writer, nameof(ReferenceMilliseconds), ReferenceMilliseconds);
-                WriteSamples(writer, nameof(SubjectMilliseconds), SubjectMilliseconds);
-                WriteSamples(writer, nameof(PairedLogRatios), PairedLogRatios);
-                writer.WriteStartObject(nameof(Comparison));
-                WriteFinite(writer, nameof(Comparison.Ratio), Comparison.Ratio);
-                WriteFinite(writer, nameof(Comparison.ReferenceSpread), Comparison.ReferenceSpread);
-                WriteFinite(writer, nameof(Comparison.SubjectSpread), Comparison.SubjectSpread);
-                writer.WriteNumber(nameof(Comparison.Cycles), Comparison.Cycles);
-                writer.WriteEndObject();
-                WriteFinite(writer, nameof(RatioLower95), RatioLower95);
-                WriteFinite(writer, nameof(RatioUpper95), RatioUpper95);
-                WriteSummary(writer, nameof(ReferenceSummary), ReferenceSummary);
-                WriteSummary(writer, nameof(SubjectSummary), SubjectSummary);
-                writer.WriteNumber(nameof(Iterations), Iterations);
-                writer.WriteNumber(nameof(Seed), Seed);
-                WriteFinite(
-                    writer,
-                    nameof(ReferenceWarmupMilliseconds),
-                    ReferenceWarmupMilliseconds
-                );
-                WriteFinite(writer, nameof(SubjectWarmupMilliseconds), SubjectWarmupMilliseconds);
-                writer.WriteNumber(nameof(ReferenceWarmupExecutions), ReferenceWarmupExecutions);
-                writer.WriteNumber(nameof(SubjectWarmupExecutions), SubjectWarmupExecutions);
-                writer.WriteBoolean(nameof(HasSufficientTiming), HasSufficientTiming);
-                writer.WriteBoolean(nameof(HasTimingImprovement), HasTimingImprovement);
-                writer.WriteBoolean(nameof(HasTimingNonInferiority), HasTimingNonInferiority);
-                writer.WriteStartObject(nameof(EnvironmentMetadata));
-                foreach (KeyValuePair<string, string> entry in EnvironmentMetadata)
-                {
-                    writer.WriteString(entry.Key, entry.Value);
-                }
-                writer.WriteEndObject();
-                writer.WriteEndObject();
-            }
-            finally
-            {
-                writer.Dispose();
-            }
-            return Encoding.UTF8.GetString(stream.GetBuffer(), 0, (int)stream.Length);
-        }
-
         private static void WriteSamples(
             Utf8JsonWriter writer,
             string name,
@@ -293,6 +244,55 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                     ["codeSizeMetric"] = "unsupported: player build report required",
                 }
             );
+        }
+
+        /// <summary>Writes raw evidence without reflection or runtime serializer generation.</summary>
+        public string ToJson()
+        {
+            using MemoryStream stream = new MemoryStream();
+            Utf8JsonWriter writer = new Utf8JsonWriter(stream);
+            try
+            {
+                writer.WriteStartObject();
+                WriteSamples(writer, nameof(ReferenceMilliseconds), ReferenceMilliseconds);
+                WriteSamples(writer, nameof(SubjectMilliseconds), SubjectMilliseconds);
+                WriteSamples(writer, nameof(PairedLogRatios), PairedLogRatios);
+                writer.WriteStartObject(nameof(Comparison));
+                WriteFinite(writer, nameof(Comparison.Ratio), Comparison.Ratio);
+                WriteFinite(writer, nameof(Comparison.ReferenceSpread), Comparison.ReferenceSpread);
+                WriteFinite(writer, nameof(Comparison.SubjectSpread), Comparison.SubjectSpread);
+                writer.WriteNumber(nameof(Comparison.Cycles), Comparison.Cycles);
+                writer.WriteEndObject();
+                WriteFinite(writer, nameof(RatioLower95), RatioLower95);
+                WriteFinite(writer, nameof(RatioUpper95), RatioUpper95);
+                WriteSummary(writer, nameof(ReferenceSummary), ReferenceSummary);
+                WriteSummary(writer, nameof(SubjectSummary), SubjectSummary);
+                writer.WriteNumber(nameof(Iterations), Iterations);
+                writer.WriteNumber(nameof(Seed), Seed);
+                WriteFinite(
+                    writer,
+                    nameof(ReferenceWarmupMilliseconds),
+                    ReferenceWarmupMilliseconds
+                );
+                WriteFinite(writer, nameof(SubjectWarmupMilliseconds), SubjectWarmupMilliseconds);
+                writer.WriteNumber(nameof(ReferenceWarmupExecutions), ReferenceWarmupExecutions);
+                writer.WriteNumber(nameof(SubjectWarmupExecutions), SubjectWarmupExecutions);
+                writer.WriteBoolean(nameof(HasSufficientTiming), HasSufficientTiming);
+                writer.WriteBoolean(nameof(HasTimingImprovement), HasTimingImprovement);
+                writer.WriteBoolean(nameof(HasTimingNonInferiority), HasTimingNonInferiority);
+                writer.WriteStartObject(nameof(EnvironmentMetadata));
+                foreach (KeyValuePair<string, string> entry in EnvironmentMetadata)
+                {
+                    writer.WriteString(entry.Key, entry.Value);
+                }
+                writer.WriteEndObject();
+                writer.WriteEndObject();
+            }
+            finally
+            {
+                writer.Dispose();
+            }
+            return Encoding.UTF8.GetString(stream.GetBuffer(), 0, (int)stream.Length);
         }
 
         /// <summary>Distribution statistics for one arm, in milliseconds.</summary>

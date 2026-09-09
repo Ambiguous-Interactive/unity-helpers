@@ -40,14 +40,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
             ImmutableArray.Create(UnityHelpersDiagnostics.NestedCollectionIsNotSerialized);
 
-        /// <inheritdoc />
-        public override void Initialize(AnalysisContext context)
-        {
-            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
-            context.EnableConcurrentExecution();
-            context.RegisterSymbolAction(AnalyzeField, SymbolKind.Field);
-        }
-
         private static void AnalyzeField(SymbolAnalysisContext context)
         {
             IFieldSymbol field = (IFieldSymbol)context.Symbol;
@@ -333,6 +325,14 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 || ns.StartsWith("System.", System.StringComparison.Ordinal)
                 || ns == "Microsoft"
                 || ns.StartsWith("Microsoft.", System.StringComparison.Ordinal);
+        }
+
+        /// <inheritdoc />
+        public override void Initialize(AnalysisContext context)
+        {
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+            context.EnableConcurrentExecution();
+            context.RegisterSymbolAction(AnalyzeField, SymbolKind.Field);
         }
     }
 }

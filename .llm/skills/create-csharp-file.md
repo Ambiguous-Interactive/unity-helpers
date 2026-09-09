@@ -125,19 +125,43 @@ if (condition)
 - Organize code through class structure and file organization instead
 - See [no-regions](./no-regions.md) for alternatives
 
-### 5b. Nested Types Go LAST
+### 5b. Member Ordering (#672) and Nested Types Go LAST
 
-A nested `class`, `struct`, `enum`, `interface` or `record` belongs at the **end** of its
-containing type, or in its own file. Never between members.
+**One member ordering, enforced at 100%** by `npm run lint:nested-type-placement` (which also
+enforces the nested-type rule below). Every tier is ordered `public` → `protected` → `internal` →
+`private`, including `const`:
+
+1. `const`
+2. events
+3. delegates
+4. static properties
+5. static fields
+6. properties
+7. fields
+8. constructors
+9. static methods
+10. methods
+
+Two details are deliberate and recorded in the issue so nobody "fixes" them back: static
+properties come before static fields and properties before fields (the reverse of StyleCop's
+SA1201 default), and `const` takes the accessibility ordering too. Events and delegates — which
+the issue's list does not name — take one tier of their own immediately after `const`: declared
+surface reads like the consts it accompanies.
 
 ```csharp
 public sealed class Attribute
 {
-    public float CurrentValue => ...;
+    public const int MaxValue = 100;          // 1. const (public before private)
+    public event Action Changed;              // 2. events
+    public static float DefaultScale { get; set; }   // 4. static properties
+    internal static int Instances;            // 5. static fields
+    public float CurrentValue => ...;         // 6. properties
+    private readonly float _baseValue;        // 7. fields
+    public Attribute(float baseValue) { ... } // 8. constructors
+    public static Attribute Default() => ...; // 9. static methods
+    private RemainingActions ApplyModificationsInOrder(...) { ... }  // 10. methods
 
-    private RemainingActions ApplyModificationsInOrder(...) { ... }
-
-    // ✅ every member first, the nested type last
+    // nested type last (see below)
     private readonly struct RemainingActions
     {
         public readonly bool hasMultiplication;
@@ -145,12 +169,13 @@ public sealed class Attribute
 }
 ```
 
-A reader scrolling for a method should not have to step over a type declaration to find it, and a
+**Nested types go LAST** — after every member — or in their own file. Never between members. A
+reader scrolling for a method should not have to step over a type declaration to find it, and a
 nested type in the middle reads as the start of a new file's worth of content. Owner review, PR
-\#574. `npm run lint:nested-type-placement` enforces it; `--fix` moves what it can, and refuses a
-type whose move would take it across a `#if` boundary into a different build. The backlog it was
-written for -- 459 sites across 177 files -- is swept to zero
-([#575](https://github.com/Ambiguous-Interactive/unity-helpers/issues/575)).
+\#574. `--fix` moves what it can, and refuses a type whose move would take it across a `#if`
+boundary into a different build. The backlog it was written for -- 459 sites across 177 files --
+is swept to zero ([#575](https://github.com/Ambiguous-Interactive/unity-helpers/issues/575)); the
+member-ordering sweep that adopted the full rule across 2224 files is #672.
 
 ### 6. NEVER Use Nullable Reference Types
 

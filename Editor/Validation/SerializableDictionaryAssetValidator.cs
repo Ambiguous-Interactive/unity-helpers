@@ -194,37 +194,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             return inspected;
         }
 
-        private static void ReportNullValues(
-            string assetPath,
-            IReadOnlyList<string> lines,
-            AuthoredAssetEntry carrier,
-            List<SerializableDictionaryAssetFinding> findings
-        )
-        {
-            foreach (
-                AuthoredSequenceElement element in AuthoredAssetYaml.EnumerateSequenceElements(
-                    lines,
-                    carrier
-                )
-            )
-            {
-                if (!AuthoredAssetYaml.IsNullObjectReference(element.Value))
-                {
-                    continue;
-                }
-
-                findings.Add(
-                    new SerializableDictionaryAssetFinding(
-                        assetPath,
-                        element.LineNumber,
-                        SerializableDictionaryAssetProblem.NullValueBesideKey,
-                        "a real key is paired with a value naming no object, so TryGetValue returns "
-                            + "true with a null."
-                    )
-                );
-            }
-        }
-
         internal static bool TryFindSibling(
             IReadOnlyList<AuthoredAssetEntry> entries,
             int anchor,
@@ -305,6 +274,37 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
             count = found;
             return true;
+        }
+
+        private static void ReportNullValues(
+            string assetPath,
+            IReadOnlyList<string> lines,
+            AuthoredAssetEntry carrier,
+            List<SerializableDictionaryAssetFinding> findings
+        )
+        {
+            foreach (
+                AuthoredSequenceElement element in AuthoredAssetYaml.EnumerateSequenceElements(
+                    lines,
+                    carrier
+                )
+            )
+            {
+                if (!AuthoredAssetYaml.IsNullObjectReference(element.Value))
+                {
+                    continue;
+                }
+
+                findings.Add(
+                    new SerializableDictionaryAssetFinding(
+                        assetPath,
+                        element.LineNumber,
+                        SerializableDictionaryAssetProblem.NullValueBesideKey,
+                        "a real key is paired with a value naming no object, so TryGetValue returns "
+                            + "true with a null."
+                    )
+                );
+            }
         }
     }
 #endif

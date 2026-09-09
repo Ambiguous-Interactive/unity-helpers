@@ -37,10 +37,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     /// </summary>
     internal static class UnityMainThreadGuard
     {
-        private static int _mainThreadId;
-        private static SynchronizationContext _mainThreadContext;
-        private static int _initialized;
-
         internal static bool IsInitialized => _initialized == 1;
 
         internal static SynchronizationContext MainThreadContext => _mainThreadContext;
@@ -63,6 +59,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return currentId == _mainThreadId;
             }
         }
+
+        private static int _mainThreadId;
+        private static SynchronizationContext _mainThreadContext;
+        private static int _initialized;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void CaptureRuntimeThread()

@@ -30,6 +30,79 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [NUnit.Framework.Category("Serialization")]
     public sealed class WProtoNestedContractTests
     {
+        private static WProtoNestedRootContract Build(int value, int bulk)
+        {
+            byte[] payload = bulk == 0 ? null : new byte[bulk];
+            for (int index = 0; index < bulk; index++)
+            {
+                payload[index] = (byte)(index * 31);
+            }
+
+            return new WProtoNestedRootContract
+            {
+                Id = 1,
+                Trailer = 7,
+                Child = new WProtoNestedMidContract
+                {
+                    Id = 2,
+                    Child = new WProtoNestedLeafContract { Value = value, Bulk = payload },
+                },
+            };
+        }
+
+        private static WProtoNestedChainContract BuildChain(int links)
+        {
+            WProtoNestedChainContract head = null;
+            for (int link = 1; link <= links; link++)
+            {
+                head = new WProtoNestedChainContract { Id = link, Next = head };
+            }
+
+            return head;
+        }
+
+        private static string ToHex(ReadOnlySpan<byte> bytes)
+        {
+            StringBuilder builder = new(bytes.Length * 2);
+            for (int index = 0; index < bytes.Length; index++)
+            {
+                builder.Append(bytes[index].ToString("X2"));
+            }
+
+            return builder.ToString();
+        }
+
+        private static string Encode(WProtoNestedRootContract value)
+        {
+            IWProtoFormatter<WProtoNestedRootContract> formatter =
+                WProtoFormatterProvider.Get<WProtoNestedRootContract>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+            Assert.AreEqual(buffer.Length, writer.Position);
+
+            StringBuilder builder = new(writer.Position * 2);
+            foreach (byte current in writer.Written)
+            {
+                builder.Append(current.ToString("X2"));
+            }
+
+            return builder.ToString();
+        }
+
+        private static WProtoNestedRootContract RoundTrip(WProtoNestedRootContract value)
+        {
+            IWProtoFormatter<WProtoNestedRootContract> formatter =
+                WProtoFormatterProvider.Get<WProtoNestedRootContract>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+
+            WProtoReader reader = new(buffer);
+            Assert.IsTrue(formatter.TryRead(ref reader, out WProtoNestedRootContract restored));
+            return restored;
+        }
+
         [Test]
         public void ANestedGraphRoundTripsAtEveryLevel()
         {
@@ -226,79 +299,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
 
             Assert.IsFalse(formatter.Write(ref writer, graph));
             Assert.IsTrue(writer.Faulted);
-        }
-
-        private static WProtoNestedRootContract Build(int value, int bulk)
-        {
-            byte[] payload = bulk == 0 ? null : new byte[bulk];
-            for (int index = 0; index < bulk; index++)
-            {
-                payload[index] = (byte)(index * 31);
-            }
-
-            return new WProtoNestedRootContract
-            {
-                Id = 1,
-                Trailer = 7,
-                Child = new WProtoNestedMidContract
-                {
-                    Id = 2,
-                    Child = new WProtoNestedLeafContract { Value = value, Bulk = payload },
-                },
-            };
-        }
-
-        private static WProtoNestedChainContract BuildChain(int links)
-        {
-            WProtoNestedChainContract head = null;
-            for (int link = 1; link <= links; link++)
-            {
-                head = new WProtoNestedChainContract { Id = link, Next = head };
-            }
-
-            return head;
-        }
-
-        private static string ToHex(ReadOnlySpan<byte> bytes)
-        {
-            StringBuilder builder = new(bytes.Length * 2);
-            for (int index = 0; index < bytes.Length; index++)
-            {
-                builder.Append(bytes[index].ToString("X2"));
-            }
-
-            return builder.ToString();
-        }
-
-        private static string Encode(WProtoNestedRootContract value)
-        {
-            IWProtoFormatter<WProtoNestedRootContract> formatter =
-                WProtoFormatterProvider.Get<WProtoNestedRootContract>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-            Assert.AreEqual(buffer.Length, writer.Position);
-
-            StringBuilder builder = new(writer.Position * 2);
-            foreach (byte current in writer.Written)
-            {
-                builder.Append(current.ToString("X2"));
-            }
-
-            return builder.ToString();
-        }
-
-        private static WProtoNestedRootContract RoundTrip(WProtoNestedRootContract value)
-        {
-            IWProtoFormatter<WProtoNestedRootContract> formatter =
-                WProtoFormatterProvider.Get<WProtoNestedRootContract>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-
-            WProtoReader reader = new(buffer);
-            Assert.IsTrue(formatter.TryRead(ref reader, out WProtoNestedRootContract restored));
-            return restored;
         }
     }
 }

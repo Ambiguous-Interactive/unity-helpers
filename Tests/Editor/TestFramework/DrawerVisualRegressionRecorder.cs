@@ -18,26 +18,26 @@ namespace WallstopStudios.UnityHelpers.Tests.TestUtils
 
     internal readonly struct DrawerVisualSample
     {
+        public DrawerVisualRole Role { get; }
+
+        public int ArrayIndex { get; }
+
+        public Rect Rect { get; }
+
         public DrawerVisualSample(DrawerVisualRole role, int arrayIndex, Rect rect)
         {
             Role = role;
             ArrayIndex = arrayIndex;
             Rect = rect;
         }
-
-        public DrawerVisualRole Role { get; }
-
-        public int ArrayIndex { get; }
-
-        public Rect Rect { get; }
     }
 
     internal static class DrawerVisualRecorder
     {
+        internal static bool IsRecording => _isRecording;
+
         private static readonly List<DrawerVisualSample> Samples = new();
         private static bool _isRecording;
-
-        internal static bool IsRecording => _isRecording;
 
         internal static void BeginRecording()
         {

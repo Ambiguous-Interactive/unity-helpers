@@ -26,9 +26,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             @"
 namespace Upstream {
     [WProtoContract, ProtoBuf.ProtoContract, WProtoInclude(100, typeof(Melee)), ProtoBuf.ProtoInclude(100, typeof(Melee))]
-    public partial class Weapon {
+    public partial class Weapon {        public int Damage { get => damage; set => damage = value; }
+
         [WProtoMember(1), ProtoBuf.ProtoMember(1)] private int damage;
-        public int Damage { get => damage; set => damage = value; }
     }
     [WProtoContract, ProtoBuf.ProtoContract] public sealed partial class Melee : Weapon {
         [WProtoMember(1), ProtoBuf.ProtoMember(1)] public int Sharpness;
@@ -87,6 +87,48 @@ namespace Consumer {
     }
 }";
 
+        private static Compilation Generate(
+            string name,
+            string source,
+            out ImmutableArray<Diagnostic> diagnostics,
+            params MetadataReference[] additional
+        )
+        {
+            List<MetadataReference> references = new List<MetadataReference>();
+            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
+                {
+                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
+                }
+            }
+            references.AddRange(additional);
+            CSharpCompilation compilation = CSharpCompilation.Create(
+                name,
+                new[] { CSharpSyntaxTree.ParseText(Imports + source) },
+                references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+            );
+            CSharpGeneratorDriver
+                .Create(new WProtoGenerator())
+                .RunGeneratorsAndUpdateCompilation(
+                    compilation,
+                    out Compilation generated,
+                    out diagnostics
+                );
+            return generated;
+        }
+
+        private static byte[] Emit(Compilation compilation)
+        {
+            using (MemoryStream stream = new MemoryStream())
+            {
+                Microsoft.CodeAnalysis.Emit.EmitResult result = compilation.Emit(stream);
+                Assert.IsTrue(result.Success, string.Join("\n", result.Diagnostics));
+                return stream.ToArray();
+            }
+        }
+
         [Test]
         public void CompiledUpstreamMemberAndCollectionRoundTripConsumerSubtypeAgainstOracle()
         {
@@ -138,10 +180,10 @@ namespace Consumer {
             string upstreamSource =
                 @"
 namespace Upstream {
-    [WProtoContract, ProtoBuf.ProtoContract] public partial class Weapon {
-        [WProtoMember(1), ProtoBuf.ProtoMember(1)] private int damage;
+    [WProtoContract, ProtoBuf.ProtoContract] public partial class Weapon {        public int Damage { get => damage; set => damage = value; }
         [WProtoMember(2), ProtoBuf.ProtoMember(2)] public int Energy;
-        public int Damage { get => damage; set => damage = value; }
+
+        [WProtoMember(1), ProtoBuf.ProtoMember(1)] private int damage;
     }
     [WProtoContract, ProtoBuf.ProtoContract] public sealed partial class Inventory {
         [WProtoMember(1), ProtoBuf.ProtoMember(1)] public Weapon Selected = new Weapon { Damage = 17 };
@@ -541,48 +583,6 @@ namespace Consumer {
                 "secret",
                 diagnostics.Single(item => item.Id == "WPROTO040").GetMessage()
             );
-        }
-
-        private static Compilation Generate(
-            string name,
-            string source,
-            out ImmutableArray<Diagnostic> diagnostics,
-            params MetadataReference[] additional
-        )
-        {
-            List<MetadataReference> references = new List<MetadataReference>();
-            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
-                {
-                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
-                }
-            }
-            references.AddRange(additional);
-            CSharpCompilation compilation = CSharpCompilation.Create(
-                name,
-                new[] { CSharpSyntaxTree.ParseText(Imports + source) },
-                references,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-            );
-            CSharpGeneratorDriver
-                .Create(new WProtoGenerator())
-                .RunGeneratorsAndUpdateCompilation(
-                    compilation,
-                    out Compilation generated,
-                    out diagnostics
-                );
-            return generated;
-        }
-
-        private static byte[] Emit(Compilation compilation)
-        {
-            using (MemoryStream stream = new MemoryStream())
-            {
-                Microsoft.CodeAnalysis.Emit.EmitResult result = compilation.Emit(stream);
-                Assert.IsTrue(result.Success, string.Join("\n", result.Diagnostics));
-                return stream.ToArray();
-            }
         }
 
         private sealed class ConflictContract { }

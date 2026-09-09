@@ -246,33 +246,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         }
 
         /// <summary>
-        /// Whether a base already names this subtype in a <c>[WProtoInclude]</c>.
-        /// </summary>
-        /// <param name="baseType">The contract to read.</param>
-        /// <param name="subType">The subtype to look for.</param>
-        /// <returns><c>true</c> when the base carries the number itself.</returns>
-        /// <remarks>
-        /// An include's number lives on the base, not in the manifest, so inventorying such a pair
-        /// would mint a second number for one type.
-        /// </remarks>
-        private static bool DeclaresInclude(Type baseType, Type subType)
-        {
-            foreach (
-                WProtoIncludeAttribute include in baseType.GetCustomAttributes<WProtoIncludeAttribute>(
-                    false
-                )
-            )
-            {
-                if (include.KnownType == subType)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        /// <summary>
         /// Whether a type is serialized by WallstopProto: it says so, or it inherits it.
         /// </summary>
         /// <param name="type">The type to classify.</param>
@@ -348,6 +321,33 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                         .GetNestedType(WProtoGeneratedNames.Formatter, BindingFlags.Public)
                         ?.GetMethod(WProtoGeneratedNames.ReadWithSubtypes) != null
                 );
+        }
+
+        /// <summary>
+        /// Whether a base already names this subtype in a <c>[WProtoInclude]</c>.
+        /// </summary>
+        /// <param name="baseType">The contract to read.</param>
+        /// <param name="subType">The subtype to look for.</param>
+        /// <returns><c>true</c> when the base carries the number itself.</returns>
+        /// <remarks>
+        /// An include's number lives on the base, not in the manifest, so inventorying such a pair
+        /// would mint a second number for one type.
+        /// </remarks>
+        private static bool DeclaresInclude(Type baseType, Type subType)
+        {
+            foreach (
+                WProtoIncludeAttribute include in baseType.GetCustomAttributes<WProtoIncludeAttribute>(
+                    false
+                )
+            )
+            {
+                if (include.KnownType == subType)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static Dictionary<Assembly, Inventory> Collect(Report report)

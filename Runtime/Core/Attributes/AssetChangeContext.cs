@@ -11,6 +11,18 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     /// </summary>
     public sealed class AssetChangeContext
     {
+        public Type AssetType { get; }
+
+        public AssetChangeFlags Flags { get; }
+
+        public IReadOnlyList<string> CreatedAssetPaths { get; }
+
+        public IReadOnlyList<string> DeletedAssetPaths { get; }
+
+        public bool HasCreatedAssets => 0 < CreatedAssetPaths.Count;
+
+        public bool HasDeletedAssets => 0 < DeletedAssetPaths.Count;
+
         public AssetChangeContext(
             Type assetType,
             AssetChangeFlags flags,
@@ -23,17 +35,5 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             CreatedAssetPaths = createdAssetPaths ?? Array.Empty<string>();
             DeletedAssetPaths = deletedAssetPaths ?? Array.Empty<string>();
         }
-
-        public Type AssetType { get; }
-
-        public AssetChangeFlags Flags { get; }
-
-        public IReadOnlyList<string> CreatedAssetPaths { get; }
-
-        public IReadOnlyList<string> DeletedAssetPaths { get; }
-
-        public bool HasCreatedAssets => 0 < CreatedAssetPaths.Count;
-
-        public bool HasDeletedAssets => 0 < DeletedAssetPaths.Count;
     }
 }

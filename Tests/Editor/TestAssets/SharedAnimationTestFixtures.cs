@@ -30,16 +30,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
         private const int DefaultSpritePoolSize = 20;
         private const int SpriteTextureSize = 4;
 
-        private static readonly object Lock = new();
-        private static int _referenceCount;
-        private static bool _fixturesCreated;
-
-        private static Texture2D _sharedSpriteTexture;
-
-        private static readonly List<Sprite> CachedSprites = new(DefaultSpritePoolSize);
-
-        private static AnimationClip _sharedEmptyClip;
-
         /// <summary>
         /// Gets the shared texture used for creating sprites. Created on first access.
         /// </summary>
@@ -91,6 +81,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
                 }
             }
         }
+
+        private static readonly object Lock = new();
+        private static int _referenceCount;
+        private static bool _fixturesCreated;
+
+        private static Texture2D _sharedSpriteTexture;
+
+        private static readonly List<Sprite> CachedSprites = new(DefaultSpritePoolSize);
+
+        private static AnimationClip _sharedEmptyClip;
 
         /// <summary>
         /// Gets a cached sprite at the specified index. Creates sprites as needed.

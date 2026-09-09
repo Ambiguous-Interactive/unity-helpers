@@ -12,6 +12,10 @@ namespace WallstopStudios.UnityHelpers.Core.Math
     /// </summary>
     public static class PointPolygonCheck
     {
+        private const int MaxStackVertexCount = StackAllocation.MaxByteBudget / VertexByteCount;
+
+        private const int VertexByteCount = 8;
+
         /// <summary>
         /// Determines if a 2D point is inside a polygon using the ray-casting algorithm.
         /// </summary>
@@ -190,9 +194,5 @@ namespace WallstopStudios.UnityHelpers.Core.Math
                 );
             }
         }
-
-        private const int MaxStackVertexCount = StackAllocation.MaxByteBudget / VertexByteCount;
-
-        private const int VertexByteCount = 8;
     }
 }

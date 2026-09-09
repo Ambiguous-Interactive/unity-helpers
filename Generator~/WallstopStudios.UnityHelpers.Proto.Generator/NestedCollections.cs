@@ -68,13 +68,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     /// </summary>
     internal sealed class NestedCollection : IGeneratedMessage
     {
-        internal NestedCollection(string formatterName, string qualified, string display)
-        {
-            FormatterName = formatterName;
-            Qualified = qualified;
-            Display = display;
-        }
-
         /// <inheritdoc />
         public string FormatterName { get; }
 
@@ -92,6 +85,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         /// <inheritdoc />
         public string Instance => FormatterName + ".Instance";
+
+        internal NestedCollection(string formatterName, string qualified, string display)
+        {
+            FormatterName = formatterName;
+            Qualified = qualified;
+            Display = display;
+        }
 
         /// <summary>
         /// Emits the wrapper as a nested formatter inside the contract's own.
@@ -301,6 +301,20 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         internal const int MaxDepth = 64;
 
+        /// <summary>The wrappers this contract needs, in the order they were discovered.</summary>
+        internal IReadOnlyList<IGeneratedMessage> All => _ordered;
+
+        /// <summary>
+        /// How many times resolution has refused a type for being nested past
+        /// <see cref="MaxDepth"/>.
+        /// </summary>
+        /// <remarks>
+        /// A counter rather than a flag, so the caller can attribute a refusal to the member it was
+        /// resolving by comparing the value across one <see cref="Member.Create"/> call. A flag
+        /// would have to be cleared, and the clear is what a later edit forgets.
+        /// </remarks>
+        internal int DepthRefusals { get; private set; }
+
         private readonly Dictionary<string, IGeneratedMessage> _byType =
             new Dictionary<string, IGeneratedMessage>();
 
@@ -333,19 +347,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             _surrogates = surrogates;
         }
 
-        /// <summary>The wrappers this contract needs, in the order they were discovered.</summary>
-        internal IReadOnlyList<IGeneratedMessage> All => _ordered;
-
-        /// <summary>
-        /// How many times resolution has refused a type for being nested past
-        /// <see cref="MaxDepth"/>.
-        /// </summary>
-        /// <remarks>
-        /// A counter rather than a flag, so the caller can attribute a refusal to the member it was
-        /// resolving by comparing the value across one <see cref="Member.Create"/> call. A flag
-        /// would have to be cleared, and the clear is what a later edit forgets.
-        /// </remarks>
-        internal int DepthRefusals { get; private set; }
+        private static Shape ShapeFor(IGeneratedMessage wrapper, ITypeSymbol type)
+        {
+            return Shape.Message(wrapper.Instance, wrapper.Qualified, type.IsValueType);
+        }
 
         /// <summary>
         /// Builds the shape for a collection-typed element or map value, or returns <c>null</c> when
@@ -489,11 +494,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 writer.Blank();
                 wrapper.Emit(writer);
             }
-        }
-
-        private static Shape ShapeFor(IGeneratedMessage wrapper, ITypeSymbol type)
-        {
-            return Shape.Message(wrapper.Instance, wrapper.Qualified, type.IsValueType);
         }
     }
 }

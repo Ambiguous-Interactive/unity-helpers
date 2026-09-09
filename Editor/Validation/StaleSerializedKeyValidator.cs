@@ -167,61 +167,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             return causes;
         }
 
-        private static void Judge(
-            string assetPath,
-            AuthoredAssetDocument document,
-            Type owner,
-            HashSet<string> declared,
-            List<StaleSerializedKeyFinding> findings
-        )
-        {
-            IReadOnlyList<AuthoredAssetEntry> entries = document.Entries;
-            if (entries.Count <= 0)
-            {
-                return;
-            }
-
-            int fieldIndent = entries[0].Indent;
-            for (int index = 1; index < entries.Count; ++index)
-            {
-                if (entries[index].Indent < fieldIndent)
-                {
-                    fieldIndent = entries[index].Indent;
-                }
-            }
-
-            for (int index = 0; index < entries.Count; ++index)
-            {
-                AuthoredAssetEntry entry = entries[index];
-                if (entry.Indent != fieldIndent || declared.Contains(entry.Key))
-                {
-                    continue;
-                }
-
-                findings.Add(
-                    new StaleSerializedKeyFinding(assetPath, entry.LineNumber, owner, entry.Key)
-                );
-            }
-        }
-
-        private static bool TryGetDeclaredKeys(
-            Type owner,
-            Dictionary<Type, HashSet<string>> cache,
-            out HashSet<string> keys
-        )
-        {
-            if (cache.TryGetValue(owner, out HashSet<string> cached))
-            {
-                keys = cached;
-                return cached != null;
-            }
-
-            HashSet<string> built = BuildDeclaredKeys(owner);
-            cache[owner] = built;
-            keys = built;
-            return built != null;
-        }
-
         internal static HashSet<string> BuildDeclaredKeys(Type owner)
         {
             Object instance = null;
@@ -276,6 +221,61 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     Object.DestroyImmediate(instance);
                 }
             }
+        }
+
+        private static void Judge(
+            string assetPath,
+            AuthoredAssetDocument document,
+            Type owner,
+            HashSet<string> declared,
+            List<StaleSerializedKeyFinding> findings
+        )
+        {
+            IReadOnlyList<AuthoredAssetEntry> entries = document.Entries;
+            if (entries.Count <= 0)
+            {
+                return;
+            }
+
+            int fieldIndent = entries[0].Indent;
+            for (int index = 1; index < entries.Count; ++index)
+            {
+                if (entries[index].Indent < fieldIndent)
+                {
+                    fieldIndent = entries[index].Indent;
+                }
+            }
+
+            for (int index = 0; index < entries.Count; ++index)
+            {
+                AuthoredAssetEntry entry = entries[index];
+                if (entry.Indent != fieldIndent || declared.Contains(entry.Key))
+                {
+                    continue;
+                }
+
+                findings.Add(
+                    new StaleSerializedKeyFinding(assetPath, entry.LineNumber, owner, entry.Key)
+                );
+            }
+        }
+
+        private static bool TryGetDeclaredKeys(
+            Type owner,
+            Dictionary<Type, HashSet<string>> cache,
+            out HashSet<string> keys
+        )
+        {
+            if (cache.TryGetValue(owner, out HashSet<string> cached))
+            {
+                keys = cached;
+                return cached != null;
+            }
+
+            HashSet<string> built = BuildDeclaredKeys(owner);
+            cache[owner] = built;
+            keys = built;
+            return built != null;
         }
 
         private static void AddAliases(Type owner, HashSet<string> keys)

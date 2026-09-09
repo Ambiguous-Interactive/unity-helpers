@@ -20,6 +20,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     [NUnit.Framework.Category("Fast")]
     public sealed class UnityExtensionsComprehensiveTests : CommonTestBase
     {
+        private static readonly float[] LargeRotationAngles = { 5f, 18.75f, -37.5f };
+
         private static List<FastVector3Int> GenerateRandomPointsSquare(
             int count,
             int range,
@@ -168,12 +170,182 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             }
         }
 
-        private Grid CreateGrid(out GameObject owner)
+        private static List<Vector2> InvokeVectorJarvisFallback(
+            List<Vector2> points,
+            bool includeColinearPoints
+        )
         {
-            owner = Track(new GameObject("Grid", typeof(Grid)));
-            Grid grid = owner.GetComponent<Grid>();
-            grid.cellSize = new Vector3(1f, 1f, 1f);
-            return grid;
+            int count = points?.Count ?? 0;
+            List<Vector2> hullBuffer = new(count);
+            List<int> scratchIndices = new(count);
+            float[] scratchDistances = new float[Math.Max(1, count)];
+            bool[] membership = new bool[Math.Max(1, count)];
+
+            return UnityExtensions.BuildConvexHullJarvisFallback(
+                points,
+                hullBuffer,
+                includeColinearPoints,
+                scratchIndices,
+                scratchDistances,
+                membership
+            );
+        }
+
+        private static List<FastVector3Int> InvokeGridJarvisFallback(
+            List<FastVector3Int> points,
+            Grid grid,
+            bool includeColinearPoints
+        )
+        {
+            int count = points?.Count ?? 0;
+            List<FastVector3Int> hullBuffer = new(count);
+            List<int> scratchIndices = new(count);
+            float[] scratchDistances = new float[Math.Max(1, count)];
+            bool[] membership = new bool[Math.Max(1, count)];
+            Vector2[] worldPositions = new Vector2[count];
+            for (int i = 0; i < count; ++i)
+            {
+                worldPositions[i] = grid.CellToWorld(points![i]);
+            }
+
+            return UnityExtensions.BuildGridConvexHullJarvisFallback(
+                points,
+                worldPositions,
+                hullBuffer,
+                includeColinearPoints,
+                scratchIndices,
+                scratchDistances,
+                membership
+            );
+        }
+
+        private static Vector2 InverseRotate(Vector2 value, float cos, float sin)
+        {
+            float invX = value.x * cos + value.y * sin;
+            float invY = -value.x * sin + value.y * cos;
+            return new Vector2(invX, invY);
+        }
+
+        private static void AssertHullCollapsesToCornersAfterInverseRotation(
+            IEnumerable<Vector2> hull,
+            float cos,
+            float sin,
+            params Vector2Int[] expectedCorners
+        )
+        {
+            HashSet<Vector2Int> actualCorners = new();
+            IEnumerable<Vector2> candidates = hull as Vector2[] ?? hull.ToArray();
+            foreach (Vector2 candidate in candidates)
+            {
+                Vector2 unrotated = InverseRotate(candidate, cos, sin);
+                int xr = Mathf.RoundToInt(unrotated.x);
+                int yr = Mathf.RoundToInt(unrotated.y);
+                actualCorners.Add(new Vector2Int(xr, yr));
+            }
+
+            TestContext.WriteLine(
+                $"Rotated hull raw count={candidates.Count()} uniqueCorners={actualCorners.Count}: {string.Join(", ", actualCorners)}"
+            );
+            CollectionAssert.AreEquivalent(expectedCorners, actualCorners);
+        }
+
+        private static void AssertHullContainsEdgeSamplesAfterInverseRotation(
+            IEnumerable<Vector2> hull,
+            float cos,
+            float sin,
+            params Vector2Int[] requiredSamples
+        )
+        {
+            HashSet<Vector2Int> actual = new();
+            foreach (Vector2 candidate in hull)
+            {
+                Vector2 unrotated = InverseRotate(candidate, cos, sin);
+                int xr = Mathf.RoundToInt(unrotated.x);
+                int yr = Mathf.RoundToInt(unrotated.y);
+                actual.Add(new Vector2Int(xr, yr));
+            }
+
+            foreach (Vector2Int expected in requiredSamples)
+            {
+                Assert.IsTrue(
+                    actual.Contains(expected),
+                    $"Expected rotated hull to include {expected} after inverse rotation."
+                );
+            }
+        }
+
+        private static List<Vector2> CreateRotatedVectorPerimeter(
+            int minX,
+            int maxX,
+            int minY,
+            int maxY,
+            float angleDegrees
+        )
+        {
+            double angleRad = angleDegrees * Mathf.Deg2Rad;
+            double cos = Math.Cos(angleRad);
+            double sin = Math.Sin(angleRad);
+
+            Vector2 bottomLeft = RotateExact(minX, minY, cos, sin);
+            Vector2 bottomRight = RotateExact(maxX, minY, cos, sin);
+            Vector2 topRight = RotateExact(maxX, maxY, cos, sin);
+            Vector2 topLeft = RotateExact(minX, maxY, cos, sin);
+
+            List<Vector2> perimeter = new((maxX - minX + 1) * 2 + Math.Max(0, maxY - minY - 1) * 2);
+
+            for (int x = minX; x <= maxX; ++x)
+            {
+                float t = (x - minX) / (float)(maxX - minX);
+                perimeter.Add(Quantize(Vector2.Lerp(bottomLeft, bottomRight, t)));
+            }
+
+            for (int x = minX; x <= maxX; ++x)
+            {
+                float t = (x - minX) / (float)(maxX - minX);
+                perimeter.Add(Quantize(Vector2.Lerp(topLeft, topRight, t)));
+            }
+
+            for (int y = minY + 1; y < maxY; ++y)
+            {
+                float t = (y - minY) / (float)(maxY - minY);
+                perimeter.Add(Quantize(Vector2.Lerp(topLeft, bottomLeft, t)));
+                perimeter.Add(Quantize(Vector2.Lerp(topRight, bottomRight, t)));
+            }
+
+            return perimeter;
+        }
+
+        private static Vector2 RotateExact(int x, int y, double cos, double sin)
+        {
+            double fx = x;
+            double fy = y;
+            double rotatedX = fx * cos - fy * sin;
+            double rotatedY = fx * sin + fy * cos;
+            return new Vector2((float)rotatedX, (float)rotatedY);
+        }
+
+        private static Vector2 Quantize(Vector2 value)
+        {
+            float x = Mathf.Round(value.x * 1000f) * 0.001f;
+            float y = Mathf.Round(value.y * 1000f) * 0.001f;
+            return new Vector2(x, y);
+        }
+
+        private static void AssertNoDuplicates(params List<FastVector3Int>[] hulls)
+        {
+            foreach (List<FastVector3Int> hull in hulls)
+            {
+                if (hull == null)
+                {
+                    continue;
+                }
+
+                Assert.AreEqual(
+                    hull.Distinct().Count(),
+                    hull.Count,
+                    "Hull should not contain duplicates."
+                );
+            }
         }
 
         [Test]
@@ -1782,8 +1954,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             );
         }
 
-        private static readonly float[] LargeRotationAngles = { 5f, 18.75f, -37.5f };
-
         [TestCaseSource(nameof(LargeRotationAngles))]
         public void Vector2ConvexHullRotatedSamplesCollapseToCorners(float angleDegrees)
         {
@@ -2596,185 +2766,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             yield return null;
         }
 
-        private static List<Vector2> InvokeVectorJarvisFallback(
-            List<Vector2> points,
-            bool includeColinearPoints
-        )
+        private Grid CreateGrid(out GameObject owner)
         {
-            int count = points?.Count ?? 0;
-            List<Vector2> hullBuffer = new(count);
-            List<int> scratchIndices = new(count);
-            float[] scratchDistances = new float[Math.Max(1, count)];
-            bool[] membership = new bool[Math.Max(1, count)];
-
-            return UnityExtensions.BuildConvexHullJarvisFallback(
-                points,
-                hullBuffer,
-                includeColinearPoints,
-                scratchIndices,
-                scratchDistances,
-                membership
-            );
-        }
-
-        private static List<FastVector3Int> InvokeGridJarvisFallback(
-            List<FastVector3Int> points,
-            Grid grid,
-            bool includeColinearPoints
-        )
-        {
-            int count = points?.Count ?? 0;
-            List<FastVector3Int> hullBuffer = new(count);
-            List<int> scratchIndices = new(count);
-            float[] scratchDistances = new float[Math.Max(1, count)];
-            bool[] membership = new bool[Math.Max(1, count)];
-            Vector2[] worldPositions = new Vector2[count];
-            for (int i = 0; i < count; ++i)
-            {
-                worldPositions[i] = grid.CellToWorld(points![i]);
-            }
-
-            return UnityExtensions.BuildGridConvexHullJarvisFallback(
-                points,
-                worldPositions,
-                hullBuffer,
-                includeColinearPoints,
-                scratchIndices,
-                scratchDistances,
-                membership
-            );
-        }
-
-        private static Vector2 InverseRotate(Vector2 value, float cos, float sin)
-        {
-            float invX = value.x * cos + value.y * sin;
-            float invY = -value.x * sin + value.y * cos;
-            return new Vector2(invX, invY);
-        }
-
-        private static void AssertHullCollapsesToCornersAfterInverseRotation(
-            IEnumerable<Vector2> hull,
-            float cos,
-            float sin,
-            params Vector2Int[] expectedCorners
-        )
-        {
-            HashSet<Vector2Int> actualCorners = new();
-            IEnumerable<Vector2> candidates = hull as Vector2[] ?? hull.ToArray();
-            foreach (Vector2 candidate in candidates)
-            {
-                Vector2 unrotated = InverseRotate(candidate, cos, sin);
-                int xr = Mathf.RoundToInt(unrotated.x);
-                int yr = Mathf.RoundToInt(unrotated.y);
-                actualCorners.Add(new Vector2Int(xr, yr));
-            }
-
-            TestContext.WriteLine(
-                $"Rotated hull raw count={candidates.Count()} uniqueCorners={actualCorners.Count}: {string.Join(", ", actualCorners)}"
-            );
-            CollectionAssert.AreEquivalent(expectedCorners, actualCorners);
-        }
-
-        private static void AssertHullContainsEdgeSamplesAfterInverseRotation(
-            IEnumerable<Vector2> hull,
-            float cos,
-            float sin,
-            params Vector2Int[] requiredSamples
-        )
-        {
-            HashSet<Vector2Int> actual = new();
-            foreach (Vector2 candidate in hull)
-            {
-                Vector2 unrotated = InverseRotate(candidate, cos, sin);
-                int xr = Mathf.RoundToInt(unrotated.x);
-                int yr = Mathf.RoundToInt(unrotated.y);
-                actual.Add(new Vector2Int(xr, yr));
-            }
-
-            foreach (Vector2Int expected in requiredSamples)
-            {
-                Assert.IsTrue(
-                    actual.Contains(expected),
-                    $"Expected rotated hull to include {expected} after inverse rotation."
-                );
-            }
-        }
-
-        private static List<Vector2> CreateRotatedVectorPerimeter(
-            int minX,
-            int maxX,
-            int minY,
-            int maxY,
-            float angleDegrees
-        )
-        {
-            double angleRad = angleDegrees * Mathf.Deg2Rad;
-            double cos = Math.Cos(angleRad);
-            double sin = Math.Sin(angleRad);
-
-            Vector2 bottomLeft = RotateExact(minX, minY, cos, sin);
-            Vector2 bottomRight = RotateExact(maxX, minY, cos, sin);
-            Vector2 topRight = RotateExact(maxX, maxY, cos, sin);
-            Vector2 topLeft = RotateExact(minX, maxY, cos, sin);
-
-            List<Vector2> perimeter = new((maxX - minX + 1) * 2 + Math.Max(0, maxY - minY - 1) * 2);
-
-            for (int x = minX; x <= maxX; ++x)
-            {
-                float t = (x - minX) / (float)(maxX - minX);
-                perimeter.Add(Quantize(Vector2.Lerp(bottomLeft, bottomRight, t)));
-            }
-
-            for (int x = minX; x <= maxX; ++x)
-            {
-                float t = (x - minX) / (float)(maxX - minX);
-                perimeter.Add(Quantize(Vector2.Lerp(topLeft, topRight, t)));
-            }
-
-            for (int y = minY + 1; y < maxY; ++y)
-            {
-                float t = (y - minY) / (float)(maxY - minY);
-                perimeter.Add(Quantize(Vector2.Lerp(topLeft, bottomLeft, t)));
-                perimeter.Add(Quantize(Vector2.Lerp(topRight, bottomRight, t)));
-            }
-
-            return perimeter;
-        }
-
-        private static Vector2 RotateExact(int x, int y, double cos, double sin)
-        {
-            double fx = x;
-            double fy = y;
-            double rotatedX = fx * cos - fy * sin;
-            double rotatedY = fx * sin + fy * cos;
-            return new Vector2((float)rotatedX, (float)rotatedY);
-        }
-
-        private static Vector2 Quantize(Vector2 value)
-        {
-            float x = Mathf.Round(value.x * 1000f) * 0.001f;
-            float y = Mathf.Round(value.y * 1000f) * 0.001f;
-            return new Vector2(x, y);
-        }
-
-        private static void AssertNoDuplicates(params List<FastVector3Int>[] hulls)
-        {
-            foreach (List<FastVector3Int> hull in hulls)
-            {
-                if (hull == null)
-                {
-                    continue;
-                }
-
-                Assert.AreEqual(
-                    hull.Distinct().Count(),
-                    hull.Count,
-                    "Hull should not contain duplicates."
-                );
-            }
+            owner = Track(new GameObject("Grid", typeof(Grid)));
+            Grid grid = owner.GetComponent<Grid>();
+            grid.cellSize = new Vector3(1f, 1f, 1f);
+            return grid;
         }
 
 #if UNITY_EDITOR
+
+        private static string NamesOf(IEnumerable<Sprite> sprites)
+        {
+            List<string> names = sprites.Select(sprite => sprite.name).ToList();
+            names.Sort(StringComparer.Ordinal);
+            return string.Join(",", names);
+        }
+
         [UnityTest]
         public IEnumerator GetSpritesFromClipEnumeratesKeyframes()
         {
@@ -2809,64 +2817,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.Contains(spriteB, sprites);
 
             yield return null;
-        }
-
-        /// <summary>
-        /// Builds a clip whose four curves differ in exactly one binding field each, so a filter
-        /// that ignores one of the three is visible as a wrong answer rather than a missing one.
-        /// Every sprite is named for what selects it.
-        /// </summary>
-        private AnimationClip BuildBoundSpriteClip()
-        {
-            Texture2D texture = Track(new Texture2D(8, 8));
-            AnimationClip clip = Track(new AnimationClip());
-
-            void Bind(string path, Type type, string propertyName, params string[] spriteNames)
-            {
-                UnityEditor.ObjectReferenceKeyframe[] frames =
-                    new UnityEditor.ObjectReferenceKeyframe[spriteNames.Length];
-                for (int index = 0; index < spriteNames.Length; ++index)
-                {
-                    Sprite sprite = Track(
-                        Sprite.Create(texture, new Rect(0f, 0f, 4f, 4f), new Vector2(0.5f, 0.5f))
-                    );
-                    sprite.name = spriteNames[index];
-                    frames[index] = new UnityEditor.ObjectReferenceKeyframe
-                    {
-                        time = index,
-                        value = sprite,
-                    };
-                }
-
-                UnityEditor.AnimationUtility.SetObjectReferenceCurve(
-                    clip,
-                    UnityEditor.EditorCurveBinding.PPtrCurve(path, type, propertyName),
-                    frames
-                );
-            }
-
-            Bind(string.Empty, typeof(SpriteRenderer), "m_Sprite", "root0", "root1");
-            Bind("Child", typeof(SpriteRenderer), "m_Sprite", "child0");
-            Bind(string.Empty, typeof(Image), "m_Sprite", "image0");
-            Bind(string.Empty, typeof(SpriteRenderer), "m_Decoration", "deco0");
-
-            /*
-                Assert stored curves before querying so editor setup failures cannot masquerade as filtering
-                defects.
-            */
-            Assert.AreEqual(
-                4,
-                UnityEditor.AnimationUtility.GetObjectReferenceCurveBindings(clip).Length,
-                "the editor did not store every object-reference curve this fixture set"
-            );
-            return clip;
-        }
-
-        private static string NamesOf(IEnumerable<Sprite> sprites)
-        {
-            List<string> names = sprites.Select(sprite => sprite.name).ToList();
-            names.Sort(StringComparer.Ordinal);
-            return string.Join(",", names);
         }
 
         [Test]
@@ -2977,6 +2927,57 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.IsEmpty(clip.GetSpriteFramesFromClip().ToList());
             Assert.IsEmpty(clip.GetSpritesFromClip().ToList());
             Assert.IsEmpty(clip.GetSpritesFromClip(string.Empty).ToList());
+        }
+
+        /// <summary>
+        /// Builds a clip whose four curves differ in exactly one binding field each, so a filter
+        /// that ignores one of the three is visible as a wrong answer rather than a missing one.
+        /// Every sprite is named for what selects it.
+        /// </summary>
+        private AnimationClip BuildBoundSpriteClip()
+        {
+            Texture2D texture = Track(new Texture2D(8, 8));
+            AnimationClip clip = Track(new AnimationClip());
+
+            void Bind(string path, Type type, string propertyName, params string[] spriteNames)
+            {
+                UnityEditor.ObjectReferenceKeyframe[] frames =
+                    new UnityEditor.ObjectReferenceKeyframe[spriteNames.Length];
+                for (int index = 0; index < spriteNames.Length; ++index)
+                {
+                    Sprite sprite = Track(
+                        Sprite.Create(texture, new Rect(0f, 0f, 4f, 4f), new Vector2(0.5f, 0.5f))
+                    );
+                    sprite.name = spriteNames[index];
+                    frames[index] = new UnityEditor.ObjectReferenceKeyframe
+                    {
+                        time = index,
+                        value = sprite,
+                    };
+                }
+
+                UnityEditor.AnimationUtility.SetObjectReferenceCurve(
+                    clip,
+                    UnityEditor.EditorCurveBinding.PPtrCurve(path, type, propertyName),
+                    frames
+                );
+            }
+
+            Bind(string.Empty, typeof(SpriteRenderer), "m_Sprite", "root0", "root1");
+            Bind("Child", typeof(SpriteRenderer), "m_Sprite", "child0");
+            Bind(string.Empty, typeof(Image), "m_Sprite", "image0");
+            Bind(string.Empty, typeof(SpriteRenderer), "m_Decoration", "deco0");
+
+            /*
+                Assert stored curves before querying so editor setup failures cannot masquerade as filtering
+                defects.
+            */
+            Assert.AreEqual(
+                4,
+                UnityEditor.AnimationUtility.GetObjectReferenceCurveBindings(clip).Length,
+                "the editor did not store every object-reference curve this fixture set"
+            );
+            return clip;
         }
 #endif
     }

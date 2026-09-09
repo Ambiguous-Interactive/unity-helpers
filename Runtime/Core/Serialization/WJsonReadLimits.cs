@@ -22,6 +22,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
         internal static readonly WJsonReadLimits Default = new WJsonReadLimits();
 
+        /// <summary>Maximum elements in one array, or members in one object, counted per container.</summary>
+        public int MaximumElementCount { get; }
+
+        /// <summary>Maximum encoded UTF-8 bytes in one string value or one property name.</summary>
+        public int MaximumTextLength { get; }
+
+        /// <summary>Maximum combined array and object nesting depth, never above 64.</summary>
+        public int MaximumNestingDepth { get; }
+
         /// <summary>Creates default JSON limits with nesting bounded to 64.</summary>
         public WJsonReadLimits()
             : this(int.MaxValue, int.MaxValue, MaximumSupportedNestingDepth) { }
@@ -43,14 +52,5 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 : MaximumSupportedNestingDepth < maximumNestingDepth ? MaximumSupportedNestingDepth
                 : maximumNestingDepth;
         }
-
-        /// <summary>Maximum elements in one array, or members in one object, counted per container.</summary>
-        public int MaximumElementCount { get; }
-
-        /// <summary>Maximum encoded UTF-8 bytes in one string value or one property name.</summary>
-        public int MaximumTextLength { get; }
-
-        /// <summary>Maximum combined array and object nesting depth, never above 64.</summary>
-        public int MaximumNestingDepth { get; }
     }
 }

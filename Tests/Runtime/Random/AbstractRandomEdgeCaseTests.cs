@@ -18,6 +18,40 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             "F2E9A25A-9D23-4C9E-AD4F-5FF9C0E8ABCD"
         );
 
+        private static ulong MultiplyHigh(ulong x, ulong y)
+        {
+            unchecked
+            {
+                ulong x0 = (uint)x;
+                ulong x1 = x >> 32;
+                ulong y0 = (uint)y;
+                ulong y1 = y >> 32;
+
+                ulong p11 = x1 * y1;
+                ulong p01 = x0 * y1;
+                ulong p10 = x1 * y0;
+                ulong p00 = x0 * y0;
+
+                ulong middle = p10 + (p00 >> 32) + (uint)p01;
+                ulong hi = p11 + (middle >> 32) + (p01 >> 32);
+                return hi;
+            }
+        }
+
+        private static RandomState WithoutPayload(RandomState state)
+        {
+            return new RandomState(
+                state.State1,
+                state.State2,
+                gaussian: state.Gaussian,
+                payload: null,
+                bitBuffer: state.BitBuffer,
+                bitCount: state.BitCount,
+                byteBuffer: state.ByteBuffer,
+                byteCount: state.ByteCount
+            );
+        }
+
         [Test]
         public void FloatingRangesRejectNaNBeforeDrawing()
         {
@@ -346,40 +380,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             Assert.Catch<Exception>(() => new DotNetRandom(excessiveReplay));
         }
 
-        private static ulong MultiplyHigh(ulong x, ulong y)
-        {
-            unchecked
-            {
-                ulong x0 = (uint)x;
-                ulong x1 = x >> 32;
-                ulong y0 = (uint)y;
-                ulong y1 = y >> 32;
-
-                ulong p11 = x1 * y1;
-                ulong p01 = x0 * y1;
-                ulong p10 = x1 * y0;
-                ulong p00 = x0 * y0;
-
-                ulong middle = p10 + (p00 >> 32) + (uint)p01;
-                ulong hi = p11 + (middle >> 32) + (p01 >> 32);
-                return hi;
-            }
-        }
-
-        private static RandomState WithoutPayload(RandomState state)
-        {
-            return new RandomState(
-                state.State1,
-                state.State2,
-                gaussian: state.Gaussian,
-                payload: null,
-                bitBuffer: state.BitBuffer,
-                bitCount: state.BitCount,
-                byteBuffer: state.ByteBuffer,
-                byteCount: state.ByteCount
-            );
-        }
-
         /// <summary>
         /// A test double for <see cref="AbstractRandom"/>, and never serialized.
         /// </summary>
@@ -393,11 +393,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         [WProtoNotSerialized]
         private sealed class DeterministicRandom : AbstractRandom
         {
-            private readonly Queue<uint> _values = new();
-
             public int UintCalls { get; private set; }
 
             public override RandomState InternalState => new(0UL);
+
+            private readonly Queue<uint> _values = new();
 
             public void EnqueueUlong(ulong value)
             {

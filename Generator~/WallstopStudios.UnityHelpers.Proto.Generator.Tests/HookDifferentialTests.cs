@@ -33,6 +33,33 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     {
         private static readonly List<string> Trace = new List<string>();
 
+        internal static void Record(string entry)
+        {
+            Trace.Add(entry);
+        }
+
+        private static string Oracle<T>(T value)
+        {
+            Trace.Clear();
+            using MemoryStream stream = new MemoryStream();
+            Serializer.Serialize(stream, value);
+            stream.Position = 0;
+            Serializer.Deserialize<T>(stream);
+            return string.Join(",", Trace);
+        }
+
+        private static string Generated<T>(T value)
+        {
+            Trace.Clear();
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new WProtoWriter(buffer);
+            formatter.Write(ref writer, value);
+            WProtoReader reader = new WProtoReader(buffer);
+            Assert.IsTrue(formatter.TryRead(ref reader, out T _));
+            return string.Join(",", Trace);
+        }
+
         [Test]
         public void AHookOnTheRootRunsOnceUnderEveryReader()
         {
@@ -96,33 +123,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 "Skip.BeforeSer,Skip.AfterSer,Skip.BeforeDes,Skip.AfterDes",
                 Oracle(new SkippingHookContract { Value = 3 })
             );
-        }
-
-        private static string Oracle<T>(T value)
-        {
-            Trace.Clear();
-            using MemoryStream stream = new MemoryStream();
-            Serializer.Serialize(stream, value);
-            stream.Position = 0;
-            Serializer.Deserialize<T>(stream);
-            return string.Join(",", Trace);
-        }
-
-        private static string Generated<T>(T value)
-        {
-            Trace.Clear();
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new WProtoWriter(buffer);
-            formatter.Write(ref writer, value);
-            WProtoReader reader = new WProtoReader(buffer);
-            Assert.IsTrue(formatter.TryRead(ref reader, out T _));
-            return string.Join(",", Trace);
-        }
-
-        internal static void Record(string entry)
-        {
-            Trace.Add(entry);
         }
     }
 }

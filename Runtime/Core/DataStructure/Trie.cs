@@ -105,38 +105,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
         }
 
-        private void Insert(string word)
-        {
-            int node = 0;
-            foreach (char c in word)
-            {
-                int prev = Poison;
-                int child = _firstChild[node];
-                while (child != Poison && _chars[child] != c)
-                {
-                    prev = child;
-                    child = _nextSibling[child];
-                }
-                if (child == Poison)
-                {
-                    child = _nodeCount++;
-                    _chars[child] = c;
-                    _firstChild[child] = Poison;
-                    _nextSibling[child] = Poison;
-                    if (prev == Poison)
-                    {
-                        _firstChild[node] = child;
-                    }
-                    else
-                    {
-                        _nextSibling[prev] = child;
-                    }
-                }
-                node = child;
-            }
-            _isWord[node] = true;
-        }
-
         /// <summary>
         /// Determines whether the exact word exists in the Trie.
         /// </summary>
@@ -204,6 +172,46 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return results;
         }
 
+        /// <summary>
+        /// Returns a value-based enumerator for efficient iteration without heap allocations.
+        /// </summary>
+        public Enumerator GetEnumerator()
+        {
+            return new Enumerator(this);
+        }
+
+        private void Insert(string word)
+        {
+            int node = 0;
+            foreach (char c in word)
+            {
+                int prev = Poison;
+                int child = _firstChild[node];
+                while (child != Poison && _chars[child] != c)
+                {
+                    prev = child;
+                    child = _nextSibling[child];
+                }
+                if (child == Poison)
+                {
+                    child = _nodeCount++;
+                    _chars[child] = c;
+                    _firstChild[child] = Poison;
+                    _nextSibling[child] = Poison;
+                    if (prev == Poison)
+                    {
+                        _firstChild[node] = child;
+                    }
+                    else
+                    {
+                        _nextSibling[prev] = child;
+                    }
+                }
+                node = child;
+            }
+            _isWord[node] = true;
+        }
+
         private void Collect(int node, List<string> results, int maxResults, StringBuilder builder)
         {
             if (maxResults <= results.Count)
@@ -231,14 +239,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
         }
 
-        /// <summary>
-        /// Returns a value-based enumerator for efficient iteration without heap allocations.
-        /// </summary>
-        public Enumerator GetEnumerator()
-        {
-            return new Enumerator(this);
-        }
-
         IEnumerator<string> IEnumerable<string>.GetEnumerator()
         {
             return new EnumeratorObject(this);
@@ -255,6 +255,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </summary>
         public struct Enumerator : IDisposable
         {
+            public string Current => _current;
+
             private readonly Trie _trie;
             private readonly PooledResource<
                 Stack<(int node, PooledResource<StringBuilder> sbResource, int sbLength)>
@@ -285,8 +287,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 _stringBuilderResources.Add(sbResource);
                 _stack.Push((0, sbResource, 0));
             }
-
-            public string Current => _current;
 
             public bool MoveNext()
             {
@@ -327,6 +327,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return false;
             }
 
+            public void Dispose()
+            {
+                foreach (PooledResource<StringBuilder> resource in _stringBuilderResources)
+                {
+                    resource.Dispose();
+                }
+
+                _stackResource.Dispose();
+                _listResource.Dispose();
+            }
+
             private void PushChildrenAndContinue(
                 int node,
                 PooledResource<StringBuilder> sbResource,
@@ -350,17 +361,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     _stack.Push((child, childResource, childSb.Length));
                 }
             }
-
-            public void Dispose()
-            {
-                foreach (PooledResource<StringBuilder> resource in _stringBuilderResources)
-                {
-                    resource.Dispose();
-                }
-
-                _stackResource.Dispose();
-                _listResource.Dispose();
-            }
         }
 
         /// <summary>
@@ -368,16 +368,16 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </summary>
         private sealed class EnumeratorObject : IEnumerator<string>
         {
+            public string Current => _enumerator.Current;
+
+            object IEnumerator.Current => Current;
+
             private Enumerator _enumerator;
 
             internal EnumeratorObject(Trie trie)
             {
                 _enumerator = new Enumerator(trie);
             }
-
-            public string Current => _enumerator.Current;
-
-            object IEnumerator.Current => Current;
 
             public bool MoveNext()
             {
@@ -450,39 +450,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
         }
 
-        private void Insert(string key, T value)
-        {
-            int node = 0;
-            foreach (char c in key)
-            {
-                int prev = Poison;
-                int child = _firstChild[node];
-                while (child != Poison && _chars[child] != c)
-                {
-                    prev = child;
-                    child = _nextSibling[child];
-                }
-                if (child == Poison)
-                {
-                    child = _nodeCount++;
-                    _chars[child] = c;
-                    _firstChild[child] = Poison;
-                    _nextSibling[child] = Poison;
-                    if (prev == Poison)
-                    {
-                        _firstChild[node] = child;
-                    }
-                    else
-                    {
-                        _nextSibling[prev] = child;
-                    }
-                }
-                node = child;
-            }
-            _hasValue[node] = true;
-            _values[node] = value;
-        }
-
         /// <summary>
         /// Attempts to retrieve the value associated with the exact key.
         /// </summary>
@@ -550,6 +517,47 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return results;
         }
 
+        /// <summary>
+        /// Returns a value-based enumerator for efficient iteration without heap allocations.
+        /// </summary>
+        public Enumerator GetEnumerator()
+        {
+            return new Enumerator(this);
+        }
+
+        private void Insert(string key, T value)
+        {
+            int node = 0;
+            foreach (char c in key)
+            {
+                int prev = Poison;
+                int child = _firstChild[node];
+                while (child != Poison && _chars[child] != c)
+                {
+                    prev = child;
+                    child = _nextSibling[child];
+                }
+                if (child == Poison)
+                {
+                    child = _nodeCount++;
+                    _chars[child] = c;
+                    _firstChild[child] = Poison;
+                    _nextSibling[child] = Poison;
+                    if (prev == Poison)
+                    {
+                        _firstChild[node] = child;
+                    }
+                    else
+                    {
+                        _nextSibling[prev] = child;
+                    }
+                }
+                node = child;
+            }
+            _hasValue[node] = true;
+            _values[node] = value;
+        }
+
         private void Collect(int node, List<T> results, int maxResults)
         {
             if (maxResults <= results.Count)
@@ -575,14 +583,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
         }
 
-        /// <summary>
-        /// Returns a value-based enumerator for efficient iteration without heap allocations.
-        /// </summary>
-        public Enumerator GetEnumerator()
-        {
-            return new Enumerator(this);
-        }
-
         IEnumerator<T> IEnumerable<T>.GetEnumerator()
         {
             return new EnumeratorObject(this);
@@ -599,6 +599,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </summary>
         public struct Enumerator : IDisposable
         {
+            public T Current => _current;
+
             private readonly Trie<T> _trie;
             private readonly PooledResource<Stack<int>> _stackResource;
             private readonly Stack<int> _stack;
@@ -616,8 +618,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     _stack.Push(0);
                 }
             }
-
-            public T Current => _current;
 
             public bool MoveNext()
             {
@@ -644,6 +644,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return false;
             }
 
+            public void Dispose()
+            {
+                _stackResource.Dispose();
+            }
+
             private void PushChildren(int node)
             {
                 for (
@@ -655,11 +660,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                     _stack.Push(child);
                 }
             }
-
-            public void Dispose()
-            {
-                _stackResource.Dispose();
-            }
         }
 
         /// <summary>
@@ -667,16 +667,16 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </summary>
         private sealed class EnumeratorObject : IEnumerator<T>
         {
+            public T Current => _enumerator.Current;
+
+            object IEnumerator.Current => Current;
+
             private Enumerator _enumerator;
 
             internal EnumeratorObject(Trie<T> trie)
             {
                 _enumerator = new Enumerator(trie);
             }
-
-            public T Current => _enumerator.Current;
-
-            object IEnumerator.Current => Current;
 
             public bool MoveNext()
             {

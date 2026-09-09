@@ -48,171 +48,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             typeof(StartupContract<StartupProtobufDeserializeMarker09>),
         };
 
-        [Test, Timeout(0)]
-        public void CompareGeneratedRegistrationAndFirstApiUse()
-        {
-            Assert.AreEqual(28, StartupContractClosures.Length);
-            Assert.IsTrue(
-                global::WallstopStudios
-                    .UnityHelpers
-                    .Generated
-                    .WProtoGeneratedRegistrar
-                    .HasRecordedFirstRegistration
-            );
-            Assert.Greater(
-                global::WallstopStudios
-                    .UnityHelpers
-                    .Generated
-                    .WProtoGeneratedRegistrar
-                    .FirstRegistrationElapsedTimestampTicks,
-                0
-            );
-            PrimeSharedStartupPaths<StartupWarmupMarker>();
-
-            double[] wallstopProtoSerialize = new double[StartupRounds];
-            double[] protobufNetSerialize = new double[StartupRounds];
-            double[] wallstopProtoDeserialize = new double[StartupRounds];
-            double[] protobufNetDeserialize = new double[StartupRounds];
-
-            MeasureStartupRound<
-                StartupSerializeMarker01,
-                StartupWallstopDeserializeMarker01,
-                StartupProtobufDeserializeMarker01
-            >(
-                0,
-                wallstopProtoSerialize,
-                protobufNetSerialize,
-                wallstopProtoDeserialize,
-                protobufNetDeserialize
-            );
-            MeasureStartupRound<
-                StartupSerializeMarker02,
-                StartupWallstopDeserializeMarker02,
-                StartupProtobufDeserializeMarker02
-            >(
-                1,
-                wallstopProtoSerialize,
-                protobufNetSerialize,
-                wallstopProtoDeserialize,
-                protobufNetDeserialize
-            );
-            MeasureStartupRound<
-                StartupSerializeMarker03,
-                StartupWallstopDeserializeMarker03,
-                StartupProtobufDeserializeMarker03
-            >(
-                2,
-                wallstopProtoSerialize,
-                protobufNetSerialize,
-                wallstopProtoDeserialize,
-                protobufNetDeserialize
-            );
-            MeasureStartupRound<
-                StartupSerializeMarker04,
-                StartupWallstopDeserializeMarker04,
-                StartupProtobufDeserializeMarker04
-            >(
-                3,
-                wallstopProtoSerialize,
-                protobufNetSerialize,
-                wallstopProtoDeserialize,
-                protobufNetDeserialize
-            );
-            MeasureStartupRound<
-                StartupSerializeMarker05,
-                StartupWallstopDeserializeMarker05,
-                StartupProtobufDeserializeMarker05
-            >(
-                4,
-                wallstopProtoSerialize,
-                protobufNetSerialize,
-                wallstopProtoDeserialize,
-                protobufNetDeserialize
-            );
-            MeasureStartupRound<
-                StartupSerializeMarker06,
-                StartupWallstopDeserializeMarker06,
-                StartupProtobufDeserializeMarker06
-            >(
-                5,
-                wallstopProtoSerialize,
-                protobufNetSerialize,
-                wallstopProtoDeserialize,
-                protobufNetDeserialize
-            );
-            MeasureStartupRound<
-                StartupSerializeMarker07,
-                StartupWallstopDeserializeMarker07,
-                StartupProtobufDeserializeMarker07
-            >(
-                6,
-                wallstopProtoSerialize,
-                protobufNetSerialize,
-                wallstopProtoDeserialize,
-                protobufNetDeserialize
-            );
-            MeasureStartupRound<
-                StartupSerializeMarker08,
-                StartupWallstopDeserializeMarker08,
-                StartupProtobufDeserializeMarker08
-            >(
-                7,
-                wallstopProtoSerialize,
-                protobufNetSerialize,
-                wallstopProtoDeserialize,
-                protobufNetDeserialize
-            );
-            MeasureStartupRound<
-                StartupSerializeMarker09,
-                StartupWallstopDeserializeMarker09,
-                StartupProtobufDeserializeMarker09
-            >(
-                8,
-                wallstopProtoSerialize,
-                protobufNetSerialize,
-                wallstopProtoDeserialize,
-                protobufNetDeserialize
-            );
-
-            double registrationMicroseconds = TimestampTicksToMicroseconds(
-                global::WallstopStudios
-                    .UnityHelpers
-                    .Generated
-                    .WProtoGeneratedRegistrar
-                    .FirstRegistrationElapsedTimestampTicks
-            );
-            double wallstopProtoSerializeApiMedian = Median(wallstopProtoSerialize);
-            double protobufNetSerializeMedian = Median(protobufNetSerialize);
-            double wallstopProtoDeserializeApiMedian = Median(wallstopProtoDeserialize);
-            double protobufNetDeserializeMedian = Median(protobufNetDeserialize);
-            double registrationAndSerializeMedian =
-                registrationMicroseconds + wallstopProtoSerializeApiMedian;
-            double registrationAndDeserializeMedian =
-                registrationMicroseconds + wallstopProtoDeserializeApiMedian;
-
-            UnityEngine.Debug.Log(
-                $"One-time generated assembly registration: {registrationMicroseconds:0.00} us. "
-                    + $"API values are medians of {StartupRounds} fresh generic contract closures; "
-                    + "process startup and shared JIT warmup are excluded."
-            );
-            UnityEngine.Debug.Log(
-                $"WallstopProto median first API use: serialize {wallstopProtoSerializeApiMedian:0.00} us; "
-                    + $"deserialize {wallstopProtoDeserializeApiMedian:0.00} us."
-            );
-            UnityEngine.Debug.Log(
-                "| Operation | WallstopProto (us) | protobuf-net (us) | Speedup |"
-            );
-            UnityEngine.Debug.Log(
-                "| --------- | ------------------:| ----------------:| -------:|"
-            );
-            UnityEngine.Debug.Log(
-                $"| One-time assembly registration + median first serialize | {registrationAndSerializeMedian, 18:0.00} | {protobufNetSerializeMedian, 16:0.00} | {protobufNetSerializeMedian / registrationAndSerializeMedian, 7:0.00}x |"
-            );
-            UnityEngine.Debug.Log(
-                $"| One-time assembly registration + median first deserialize | {registrationAndDeserializeMedian, 18:0.00} | {protobufNetDeserializeMedian, 16:0.00} | {protobufNetDeserializeMedian / registrationAndDeserializeMedian, 7:0.00}x |"
-            );
-        }
-
         private static void PrimeSharedStartupPaths<TMarker>()
         {
             MeasureStartupSerializePair<TMarker>(true, out _, out _);
@@ -387,6 +222,171 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 },
                 Child = new StartupChild { Sequence = 987_654_321L, Name = "nested" },
             };
+
+        [Test, Timeout(0)]
+        public void CompareGeneratedRegistrationAndFirstApiUse()
+        {
+            Assert.AreEqual(28, StartupContractClosures.Length);
+            Assert.IsTrue(
+                global::WallstopStudios
+                    .UnityHelpers
+                    .Generated
+                    .WProtoGeneratedRegistrar
+                    .HasRecordedFirstRegistration
+            );
+            Assert.Greater(
+                global::WallstopStudios
+                    .UnityHelpers
+                    .Generated
+                    .WProtoGeneratedRegistrar
+                    .FirstRegistrationElapsedTimestampTicks,
+                0
+            );
+            PrimeSharedStartupPaths<StartupWarmupMarker>();
+
+            double[] wallstopProtoSerialize = new double[StartupRounds];
+            double[] protobufNetSerialize = new double[StartupRounds];
+            double[] wallstopProtoDeserialize = new double[StartupRounds];
+            double[] protobufNetDeserialize = new double[StartupRounds];
+
+            MeasureStartupRound<
+                StartupSerializeMarker01,
+                StartupWallstopDeserializeMarker01,
+                StartupProtobufDeserializeMarker01
+            >(
+                0,
+                wallstopProtoSerialize,
+                protobufNetSerialize,
+                wallstopProtoDeserialize,
+                protobufNetDeserialize
+            );
+            MeasureStartupRound<
+                StartupSerializeMarker02,
+                StartupWallstopDeserializeMarker02,
+                StartupProtobufDeserializeMarker02
+            >(
+                1,
+                wallstopProtoSerialize,
+                protobufNetSerialize,
+                wallstopProtoDeserialize,
+                protobufNetDeserialize
+            );
+            MeasureStartupRound<
+                StartupSerializeMarker03,
+                StartupWallstopDeserializeMarker03,
+                StartupProtobufDeserializeMarker03
+            >(
+                2,
+                wallstopProtoSerialize,
+                protobufNetSerialize,
+                wallstopProtoDeserialize,
+                protobufNetDeserialize
+            );
+            MeasureStartupRound<
+                StartupSerializeMarker04,
+                StartupWallstopDeserializeMarker04,
+                StartupProtobufDeserializeMarker04
+            >(
+                3,
+                wallstopProtoSerialize,
+                protobufNetSerialize,
+                wallstopProtoDeserialize,
+                protobufNetDeserialize
+            );
+            MeasureStartupRound<
+                StartupSerializeMarker05,
+                StartupWallstopDeserializeMarker05,
+                StartupProtobufDeserializeMarker05
+            >(
+                4,
+                wallstopProtoSerialize,
+                protobufNetSerialize,
+                wallstopProtoDeserialize,
+                protobufNetDeserialize
+            );
+            MeasureStartupRound<
+                StartupSerializeMarker06,
+                StartupWallstopDeserializeMarker06,
+                StartupProtobufDeserializeMarker06
+            >(
+                5,
+                wallstopProtoSerialize,
+                protobufNetSerialize,
+                wallstopProtoDeserialize,
+                protobufNetDeserialize
+            );
+            MeasureStartupRound<
+                StartupSerializeMarker07,
+                StartupWallstopDeserializeMarker07,
+                StartupProtobufDeserializeMarker07
+            >(
+                6,
+                wallstopProtoSerialize,
+                protobufNetSerialize,
+                wallstopProtoDeserialize,
+                protobufNetDeserialize
+            );
+            MeasureStartupRound<
+                StartupSerializeMarker08,
+                StartupWallstopDeserializeMarker08,
+                StartupProtobufDeserializeMarker08
+            >(
+                7,
+                wallstopProtoSerialize,
+                protobufNetSerialize,
+                wallstopProtoDeserialize,
+                protobufNetDeserialize
+            );
+            MeasureStartupRound<
+                StartupSerializeMarker09,
+                StartupWallstopDeserializeMarker09,
+                StartupProtobufDeserializeMarker09
+            >(
+                8,
+                wallstopProtoSerialize,
+                protobufNetSerialize,
+                wallstopProtoDeserialize,
+                protobufNetDeserialize
+            );
+
+            double registrationMicroseconds = TimestampTicksToMicroseconds(
+                global::WallstopStudios
+                    .UnityHelpers
+                    .Generated
+                    .WProtoGeneratedRegistrar
+                    .FirstRegistrationElapsedTimestampTicks
+            );
+            double wallstopProtoSerializeApiMedian = Median(wallstopProtoSerialize);
+            double protobufNetSerializeMedian = Median(protobufNetSerialize);
+            double wallstopProtoDeserializeApiMedian = Median(wallstopProtoDeserialize);
+            double protobufNetDeserializeMedian = Median(protobufNetDeserialize);
+            double registrationAndSerializeMedian =
+                registrationMicroseconds + wallstopProtoSerializeApiMedian;
+            double registrationAndDeserializeMedian =
+                registrationMicroseconds + wallstopProtoDeserializeApiMedian;
+
+            UnityEngine.Debug.Log(
+                $"One-time generated assembly registration: {registrationMicroseconds:0.00} us. "
+                    + $"API values are medians of {StartupRounds} fresh generic contract closures; "
+                    + "process startup and shared JIT warmup are excluded."
+            );
+            UnityEngine.Debug.Log(
+                $"WallstopProto median first API use: serialize {wallstopProtoSerializeApiMedian:0.00} us; "
+                    + $"deserialize {wallstopProtoDeserializeApiMedian:0.00} us."
+            );
+            UnityEngine.Debug.Log(
+                "| Operation | WallstopProto (us) | protobuf-net (us) | Speedup |"
+            );
+            UnityEngine.Debug.Log(
+                "| --------- | ------------------:| ----------------:| -------:|"
+            );
+            UnityEngine.Debug.Log(
+                $"| One-time assembly registration + median first serialize | {registrationAndSerializeMedian, 18:0.00} | {protobufNetSerializeMedian, 16:0.00} | {protobufNetSerializeMedian / registrationAndSerializeMedian, 7:0.00}x |"
+            );
+            UnityEngine.Debug.Log(
+                $"| One-time assembly registration + median first deserialize | {registrationAndDeserializeMedian, 18:0.00} | {protobufNetDeserializeMedian, 16:0.00} | {protobufNetDeserializeMedian / registrationAndDeserializeMedian, 7:0.00}x |"
+            );
+        }
 
         [ProtoContract]
         [WProtoContract]

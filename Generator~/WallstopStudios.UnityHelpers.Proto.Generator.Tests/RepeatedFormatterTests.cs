@@ -122,6 +122,104 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             },
         };
 
+        private static void AssertRefusesNullElement(RepeatedContract value, string member)
+        {
+            IWProtoFormatter<RepeatedContract> formatter =
+                WProtoFormatterProvider.Get<RepeatedContract>();
+
+            InvalidOperationException measured = Assert.Throws<InvalidOperationException>(() =>
+                formatter.Measure(value)
+            );
+            StringAssert.Contains("RepeatedContract." + member, measured.Message);
+
+            // Write needs an independent public guard; ref locals cannot be captured by Assert.Throws.
+            bool wroteWithoutRefusing = false;
+            try
+            {
+                WProtoWriter writer = new WProtoWriter(new byte[64]);
+                formatter.Write(ref writer, value);
+                wroteWithoutRefusing = true;
+            }
+            catch (InvalidOperationException) { }
+
+            Assert.IsFalse(
+                wroteWithoutRefusing,
+                "Write must refuse a null element on its own, not only through Measure"
+            );
+        }
+
+        private static void AssertPackedLimit<T>(string hex, int required)
+        {
+            byte[] payload = Parse(hex);
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            WProtoReader refused = new WProtoReader(
+                payload,
+                new WProtoReadLimits(maximumPackedElementCount: required - 1)
+            );
+            Assert.IsFalse(formatter.TryRead(ref refused, out _), typeof(T).Name);
+            WProtoReader accepted = new WProtoReader(
+                payload,
+                new WProtoReadLimits(maximumPackedElementCount: required)
+            );
+            Assert.IsTrue(formatter.TryRead(ref accepted, out _), typeof(T).Name);
+            Assert.IsTrue(accepted.End);
+            Assert.IsFalse(accepted.Malformed);
+            WProtoReadLimits limits = new WProtoReadLimits(maximumPackedElementCount: required - 1);
+            Assert.Throws<InvalidOperationException>(() =>
+                WProtoFacade.TryDeserialize(payload, limits, out T _)
+            );
+            Assert.Throws<InvalidOperationException>(() =>
+                WProtoFacade.TryDeserializeAs(payload, typeof(T), limits, out T _)
+            );
+        }
+
+        private static byte[] Parse(string hex)
+        {
+            byte[] bytes = new byte[hex.Length / 2];
+            for (int index = 0; index < bytes.Length; index++)
+            {
+                bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
+            }
+
+            return bytes;
+        }
+
+        private static T Decode<T>(string hex)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            WProtoReader reader = new WProtoReader(Parse(hex));
+            Assert.IsTrue(formatter.TryRead(ref reader, out T value), hex);
+            return value;
+        }
+
+        private static string Encode<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new WProtoWriter(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+
+            StringBuilder builder = new StringBuilder(writer.Position * 2);
+            foreach (byte current in writer.Written)
+            {
+                builder.Append(current.ToString("X2"));
+            }
+
+            return builder.ToString();
+        }
+
+        private static T RoundTrip<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new WProtoWriter(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+
+            WProtoReader reader = new WProtoReader(buffer);
+            Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
+            return restored;
+        }
+
         /// <summary>
         /// Pins the exact bytes each element shape produces, and that protobuf-net reads them.
         /// </summary>
@@ -418,32 +516,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.IsFalse(formatter.Write(ref writer, value));
         }
 
-        private static void AssertRefusesNullElement(RepeatedContract value, string member)
-        {
-            IWProtoFormatter<RepeatedContract> formatter =
-                WProtoFormatterProvider.Get<RepeatedContract>();
-
-            InvalidOperationException measured = Assert.Throws<InvalidOperationException>(() =>
-                formatter.Measure(value)
-            );
-            StringAssert.Contains("RepeatedContract." + member, measured.Message);
-
-            // Write needs an independent public guard; ref locals cannot be captured by Assert.Throws.
-            bool wroteWithoutRefusing = false;
-            try
-            {
-                WProtoWriter writer = new WProtoWriter(new byte[64]);
-                formatter.Write(ref writer, value);
-                wroteWithoutRefusing = true;
-            }
-            catch (InvalidOperationException) { }
-
-            Assert.IsFalse(
-                wroteWithoutRefusing,
-                "Write must refuse a null element on its own, not only through Measure"
-            );
-        }
-
         [Test]
         public void GeneratedPackedReadersShareTheBudgetBeforeReservingCollections()
         {
@@ -478,78 +550,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 elementCount,
                 "The refused packed run reserved its collection before checking the limit."
             );
-        }
-
-        private static void AssertPackedLimit<T>(string hex, int required)
-        {
-            byte[] payload = Parse(hex);
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            WProtoReader refused = new WProtoReader(
-                payload,
-                new WProtoReadLimits(maximumPackedElementCount: required - 1)
-            );
-            Assert.IsFalse(formatter.TryRead(ref refused, out _), typeof(T).Name);
-            WProtoReader accepted = new WProtoReader(
-                payload,
-                new WProtoReadLimits(maximumPackedElementCount: required)
-            );
-            Assert.IsTrue(formatter.TryRead(ref accepted, out _), typeof(T).Name);
-            Assert.IsTrue(accepted.End);
-            Assert.IsFalse(accepted.Malformed);
-            WProtoReadLimits limits = new WProtoReadLimits(maximumPackedElementCount: required - 1);
-            Assert.Throws<InvalidOperationException>(() =>
-                WProtoFacade.TryDeserialize(payload, limits, out T _)
-            );
-            Assert.Throws<InvalidOperationException>(() =>
-                WProtoFacade.TryDeserializeAs(payload, typeof(T), limits, out T _)
-            );
-        }
-
-        private static byte[] Parse(string hex)
-        {
-            byte[] bytes = new byte[hex.Length / 2];
-            for (int index = 0; index < bytes.Length; index++)
-            {
-                bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
-            }
-
-            return bytes;
-        }
-
-        private static T Decode<T>(string hex)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            WProtoReader reader = new WProtoReader(Parse(hex));
-            Assert.IsTrue(formatter.TryRead(ref reader, out T value), hex);
-            return value;
-        }
-
-        private static string Encode<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new WProtoWriter(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-
-            StringBuilder builder = new StringBuilder(writer.Position * 2);
-            foreach (byte current in writer.Written)
-            {
-                builder.Append(current.ToString("X2"));
-            }
-
-            return builder.ToString();
-        }
-
-        private static T RoundTrip<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new WProtoWriter(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-
-            WProtoReader reader = new WProtoReader(buffer);
-            Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
-            return restored;
         }
 
         [Test]

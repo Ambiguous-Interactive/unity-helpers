@@ -19,6 +19,236 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
     [NUnit.Framework.Category("Fast")]
     public sealed class EditorCacheHelperBoundedCacheTests
     {
+        private static IEnumerable<TestCaseData> NormalAddEntryCases()
+        {
+            yield return new TestCaseData(0, "newKey", 42, 10, 1).SetName(
+                "Normal.AddEntryToEmptyCache.Succeeds"
+            );
+
+            yield return new TestCaseData(3, "newKey", 99, 10, 4).SetName(
+                "Normal.AddEntryToPartialCache.CountIncreases"
+            );
+
+            yield return new TestCaseData(5, "newKey", 100, 10, 6).SetName(
+                "Normal.AddMultipleEntries.AllPresent"
+            );
+
+            yield return new TestCaseData(1, "secondKey", 200, 100, 2).SetName(
+                "Normal.LargeMaxSize.AcceptsEntries"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> EdgeCaseCases()
+        {
+            yield return new TestCaseData(0, 1, false, 1).SetName(
+                "Edge.EmptyCache.SingleEntryCapacity"
+            );
+
+            yield return new TestCaseData(1, 1, true, 1).SetName(
+                "Edge.SingleEntryCapacity.EvictsOnSecondAdd"
+            );
+
+            yield return new TestCaseData(4, 5, false, 5).SetName(
+                "Edge.ExactlyUnderCapacity.NoEviction"
+            );
+
+            yield return new TestCaseData(5, 5, true, 5).SetName(
+                "Edge.ExactlyAtCapacity.EvictsOldest"
+            );
+
+            yield return new TestCaseData(6, 5, true, 5).SetName("Edge.OverCapacity.EvictsOldest");
+
+            yield return new TestCaseData(10, 10, true, 10).SetName(
+                "Edge.AtCapacityBoundary.EvictsOldest"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> NegativeCases()
+        {
+            yield return new TestCaseData(null, "key", 1, 10, 0, false).SetName(
+                "Negative.NullCache.DoesNotThrow"
+            );
+
+            yield return new TestCaseData(
+                new Dictionary<string, int>(),
+                "key",
+                1,
+                0,
+                0,
+                false
+            ).SetName("Negative.ZeroMaxSize.RejectsEntry");
+
+            yield return new TestCaseData(
+                new Dictionary<string, int>(),
+                "key",
+                1,
+                -1,
+                0,
+                false
+            ).SetName("Negative.NegativeMaxSize.RejectsEntry");
+
+            yield return new TestCaseData(
+                new Dictionary<string, int> { { "existing", 1 } },
+                "key",
+                2,
+                -5,
+                1,
+                false
+            ).SetName("Negative.NegativeMaxSizeWithExisting.PreservesExisting");
+        }
+
+        private static IEnumerable<TestCaseData> ExtremeCases()
+        {
+            yield return new TestCaseData(100, 200).SetName("Extreme.MediumMaxSizeDoubleEntries");
+
+            yield return new TestCaseData(1000, 2000).SetName("Extreme.LargeMaxSizeDoubleEntries");
+
+            yield return new TestCaseData(10000, 10500).SetName(
+                "Extreme.VeryLargeMaxSizeSlightlyOver"
+            );
+
+            yield return new TestCaseData(1, 1000).SetName("Extreme.SingleCapacityManyEvictions");
+
+            yield return new TestCaseData(5, 10000).SetName(
+                "Extreme.SmallCapacityMassiveEvictions"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> ValueTypeCases()
+        {
+            yield return new TestCaseData(1, 2, 2).SetName("ValueType.Int.UpdatesCorrectly");
+
+            yield return new TestCaseData("first", "second", "second").SetName(
+                "ValueType.String.UpdatesCorrectly"
+            );
+
+            yield return new TestCaseData(1.5f, 2.5f, 2.5f).SetName(
+                "ValueType.Float.UpdatesCorrectly"
+            );
+
+            yield return new TestCaseData(true, false, false).SetName(
+                "ValueType.Bool.UpdatesCorrectly"
+            );
+
+            yield return new TestCaseData(
+                new UnityEngine.Vector2(1, 2),
+                new UnityEngine.Vector2(3, 4),
+                new UnityEngine.Vector2(3, 4)
+            ).SetName("ValueType.Vector2.UpdatesCorrectly");
+        }
+
+        private static IEnumerable<TestCaseData> MaxSizeOneCases()
+        {
+            yield return new TestCaseData(1, "key0", 0).SetName(
+                "MaxSizeOne.SingleOperation.HasLastEntry"
+            );
+
+            yield return new TestCaseData(10, "key9", 9).SetName(
+                "MaxSizeOne.TenOperations.HasLastEntry"
+            );
+
+            yield return new TestCaseData(100, "key99", 99).SetName(
+                "MaxSizeOne.HundredOperations.HasLastEntry"
+            );
+
+            yield return new TestCaseData(1000, "key999", 999).SetName(
+                "MaxSizeOne.ThousandOperations.HasLastEntry"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> TryGetNullCases()
+        {
+            yield return new TestCaseData(null, "key", false).SetName(
+                "TryGet.NullCache.ReturnsFalse"
+            );
+
+            yield return new TestCaseData(new Dictionary<string, int>(), null, false).SetName(
+                "TryGet.NullKey.ReturnsFalse"
+            );
+
+            yield return new TestCaseData(null, null, false).SetName(
+                "TryGet.BothNull.ReturnsFalse"
+            );
+
+            yield return new TestCaseData(
+                new Dictionary<string, int> { { "existing", 42 } },
+                "missing",
+                false
+            ).SetName("TryGet.MissingKey.ReturnsFalse");
+
+            yield return new TestCaseData(
+                new Dictionary<string, int> { { "existing", 42 } },
+                "existing",
+                true
+            ).SetName("TryGet.ExistingKey.ReturnsTrue");
+        }
+
+        private static IEnumerable<TestCaseData> DefaultValueTypeKeyCases()
+        {
+            yield return new TestCaseData(0, "zero", "int").SetName(
+                "DefaultValueType.IntZero.IsValidKey"
+            );
+
+            yield return new TestCaseData(0L, "longZero", "long").SetName(
+                "DefaultValueType.LongZero.IsValidKey"
+            );
+
+            yield return new TestCaseData(0f, "floatZero", "float").SetName(
+                "DefaultValueType.FloatZero.IsValidKey"
+            );
+
+            yield return new TestCaseData(0.0, "doubleZero", "double").SetName(
+                "DefaultValueType.DoubleZero.IsValidKey"
+            );
+
+            yield return new TestCaseData(false, "boolFalse", "bool").SetName(
+                "DefaultValueType.BoolFalse.IsValidKey"
+            );
+
+            yield return new TestCaseData('\0', "nullChar", "char").SetName(
+                "DefaultValueType.CharNull.IsValidKey"
+            );
+
+            yield return new TestCaseData((byte)0, "byteZero", "byte").SetName(
+                "DefaultValueType.ByteZero.IsValidKey"
+            );
+
+            yield return new TestCaseData((short)0, "shortZero", "short").SetName(
+                "DefaultValueType.ShortZero.IsValidKey"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> ValueTypeKeyEdgeCases()
+        {
+            yield return new TestCaseData(int.MinValue, "int.MinValue").SetName(
+                "ValueTypeEdge.IntMinValue.IsValidKey"
+            );
+
+            yield return new TestCaseData(int.MaxValue, "int.MaxValue").SetName(
+                "ValueTypeEdge.IntMaxValue.IsValidKey"
+            );
+
+            yield return new TestCaseData(-1, "negative one").SetName(
+                "ValueTypeEdge.NegativeOne.IsValidKey"
+            );
+
+            yield return new TestCaseData(float.NaN, "NaN").SetName(
+                "ValueTypeEdge.FloatNaN.IsValidKey"
+            );
+
+            yield return new TestCaseData(float.PositiveInfinity, "positive infinity").SetName(
+                "ValueTypeEdge.FloatPosInf.IsValidKey"
+            );
+
+            yield return new TestCaseData(float.NegativeInfinity, "negative infinity").SetName(
+                "ValueTypeEdge.FloatNegInf.IsValidKey"
+            );
+
+            yield return new TestCaseData(double.Epsilon, "double epsilon").SetName(
+                "ValueTypeEdge.DoubleEpsilon.IsValidKey"
+            );
+        }
+
         [Test]
         [TestCaseSource(nameof(NormalAddEntryCases))]
         public void AddToBoundedCacheHandlesNormalCases(
@@ -51,25 +281,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
                 cache[keyToAdd],
                 Is.EqualTo(valueToAdd),
                 $"Value for key '{keyToAdd}' should be {valueToAdd}"
-            );
-        }
-
-        private static IEnumerable<TestCaseData> NormalAddEntryCases()
-        {
-            yield return new TestCaseData(0, "newKey", 42, 10, 1).SetName(
-                "Normal.AddEntryToEmptyCache.Succeeds"
-            );
-
-            yield return new TestCaseData(3, "newKey", 99, 10, 4).SetName(
-                "Normal.AddEntryToPartialCache.CountIncreases"
-            );
-
-            yield return new TestCaseData(5, "newKey", 100, 10, 6).SetName(
-                "Normal.AddMultipleEntries.AllPresent"
-            );
-
-            yield return new TestCaseData(1, "secondKey", 200, 100, 2).SetName(
-                "Normal.LargeMaxSize.AcceptsEntries"
             );
         }
 
@@ -150,31 +361,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
             }
         }
 
-        private static IEnumerable<TestCaseData> EdgeCaseCases()
-        {
-            yield return new TestCaseData(0, 1, false, 1).SetName(
-                "Edge.EmptyCache.SingleEntryCapacity"
-            );
-
-            yield return new TestCaseData(1, 1, true, 1).SetName(
-                "Edge.SingleEntryCapacity.EvictsOnSecondAdd"
-            );
-
-            yield return new TestCaseData(4, 5, false, 5).SetName(
-                "Edge.ExactlyUnderCapacity.NoEviction"
-            );
-
-            yield return new TestCaseData(5, 5, true, 5).SetName(
-                "Edge.ExactlyAtCapacity.EvictsOldest"
-            );
-
-            yield return new TestCaseData(6, 5, true, 5).SetName("Edge.OverCapacity.EvictsOldest");
-
-            yield return new TestCaseData(10, 10, true, 10).SetName(
-                "Edge.AtCapacityBoundary.EvictsOldest"
-            );
-        }
-
         [Test]
         [TestCaseSource(nameof(NegativeCases))]
         public void AddToBoundedCacheHandlesNegativeCases(
@@ -213,40 +399,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
                     );
                 }
             }
-        }
-
-        private static IEnumerable<TestCaseData> NegativeCases()
-        {
-            yield return new TestCaseData(null, "key", 1, 10, 0, false).SetName(
-                "Negative.NullCache.DoesNotThrow"
-            );
-
-            yield return new TestCaseData(
-                new Dictionary<string, int>(),
-                "key",
-                1,
-                0,
-                0,
-                false
-            ).SetName("Negative.ZeroMaxSize.RejectsEntry");
-
-            yield return new TestCaseData(
-                new Dictionary<string, int>(),
-                "key",
-                1,
-                -1,
-                0,
-                false
-            ).SetName("Negative.NegativeMaxSize.RejectsEntry");
-
-            yield return new TestCaseData(
-                new Dictionary<string, int> { { "existing", 1 } },
-                "key",
-                2,
-                -5,
-                1,
-                false
-            ).SetName("Negative.NegativeMaxSizeWithExisting.PreservesExisting");
         }
 
         [Test]
@@ -312,23 +464,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
                     Assert.That(cache.ContainsKey(i), Is.False, $"Expected key {i} to be evicted");
                 }
             }
-        }
-
-        private static IEnumerable<TestCaseData> ExtremeCases()
-        {
-            yield return new TestCaseData(100, 200).SetName("Extreme.MediumMaxSizeDoubleEntries");
-
-            yield return new TestCaseData(1000, 2000).SetName("Extreme.LargeMaxSizeDoubleEntries");
-
-            yield return new TestCaseData(10000, 10500).SetName(
-                "Extreme.VeryLargeMaxSizeSlightlyOver"
-            );
-
-            yield return new TestCaseData(1, 1000).SetName("Extreme.SingleCapacityManyEvictions");
-
-            yield return new TestCaseData(5, 10000).SetName(
-                "Extreme.SmallCapacityMassiveEvictions"
-            );
         }
 
         [Test]
@@ -543,29 +678,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
                 Is.EqualTo(expectedValue),
                 $"Value should be updated to {expectedValue}"
             );
-        }
-
-        private static IEnumerable<TestCaseData> ValueTypeCases()
-        {
-            yield return new TestCaseData(1, 2, 2).SetName("ValueType.Int.UpdatesCorrectly");
-
-            yield return new TestCaseData("first", "second", "second").SetName(
-                "ValueType.String.UpdatesCorrectly"
-            );
-
-            yield return new TestCaseData(1.5f, 2.5f, 2.5f).SetName(
-                "ValueType.Float.UpdatesCorrectly"
-            );
-
-            yield return new TestCaseData(true, false, false).SetName(
-                "ValueType.Bool.UpdatesCorrectly"
-            );
-
-            yield return new TestCaseData(
-                new UnityEngine.Vector2(1, 2),
-                new UnityEngine.Vector2(3, 4),
-                new UnityEngine.Vector2(3, 4)
-            ).SetName("ValueType.Vector2.UpdatesCorrectly");
         }
 
         [Test]
@@ -876,25 +988,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
             );
         }
 
-        private static IEnumerable<TestCaseData> MaxSizeOneCases()
-        {
-            yield return new TestCaseData(1, "key0", 0).SetName(
-                "MaxSizeOne.SingleOperation.HasLastEntry"
-            );
-
-            yield return new TestCaseData(10, "key9", 9).SetName(
-                "MaxSizeOne.TenOperations.HasLastEntry"
-            );
-
-            yield return new TestCaseData(100, "key99", 99).SetName(
-                "MaxSizeOne.HundredOperations.HasLastEntry"
-            );
-
-            yield return new TestCaseData(1000, "key999", 999).SetName(
-                "MaxSizeOne.ThousandOperations.HasLastEntry"
-            );
-        }
-
         [Test]
         public void CacheBehaviorCorrectAfterClearingAndReusing()
         {
@@ -1133,33 +1226,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
                     "Value should be default when not found"
                 );
             }
-        }
-
-        private static IEnumerable<TestCaseData> TryGetNullCases()
-        {
-            yield return new TestCaseData(null, "key", false).SetName(
-                "TryGet.NullCache.ReturnsFalse"
-            );
-
-            yield return new TestCaseData(new Dictionary<string, int>(), null, false).SetName(
-                "TryGet.NullKey.ReturnsFalse"
-            );
-
-            yield return new TestCaseData(null, null, false).SetName(
-                "TryGet.BothNull.ReturnsFalse"
-            );
-
-            yield return new TestCaseData(
-                new Dictionary<string, int> { { "existing", 42 } },
-                "missing",
-                false
-            ).SetName("TryGet.MissingKey.ReturnsFalse");
-
-            yield return new TestCaseData(
-                new Dictionary<string, int> { { "existing", 42 } },
-                "existing",
-                true
-            ).SetName("TryGet.ExistingKey.ReturnsTrue");
         }
 
         [Test]
@@ -1453,41 +1519,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
             );
         }
 
-        private static IEnumerable<TestCaseData> DefaultValueTypeKeyCases()
-        {
-            yield return new TestCaseData(0, "zero", "int").SetName(
-                "DefaultValueType.IntZero.IsValidKey"
-            );
-
-            yield return new TestCaseData(0L, "longZero", "long").SetName(
-                "DefaultValueType.LongZero.IsValidKey"
-            );
-
-            yield return new TestCaseData(0f, "floatZero", "float").SetName(
-                "DefaultValueType.FloatZero.IsValidKey"
-            );
-
-            yield return new TestCaseData(0.0, "doubleZero", "double").SetName(
-                "DefaultValueType.DoubleZero.IsValidKey"
-            );
-
-            yield return new TestCaseData(false, "boolFalse", "bool").SetName(
-                "DefaultValueType.BoolFalse.IsValidKey"
-            );
-
-            yield return new TestCaseData('\0', "nullChar", "char").SetName(
-                "DefaultValueType.CharNull.IsValidKey"
-            );
-
-            yield return new TestCaseData((byte)0, "byteZero", "byte").SetName(
-                "DefaultValueType.ByteZero.IsValidKey"
-            );
-
-            yield return new TestCaseData((short)0, "shortZero", "short").SetName(
-                "DefaultValueType.ShortZero.IsValidKey"
-            );
-        }
-
         [Test]
         public void TryGetFromBoundedLRUCacheWorksWithOrphanDictionaryEntries()
         {
@@ -1623,37 +1654,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Core.Helper
                 cache[key],
                 Is.EqualTo(expectedDescription),
                 $"Value for {expectedDescription} key should match"
-            );
-        }
-
-        private static IEnumerable<TestCaseData> ValueTypeKeyEdgeCases()
-        {
-            yield return new TestCaseData(int.MinValue, "int.MinValue").SetName(
-                "ValueTypeEdge.IntMinValue.IsValidKey"
-            );
-
-            yield return new TestCaseData(int.MaxValue, "int.MaxValue").SetName(
-                "ValueTypeEdge.IntMaxValue.IsValidKey"
-            );
-
-            yield return new TestCaseData(-1, "negative one").SetName(
-                "ValueTypeEdge.NegativeOne.IsValidKey"
-            );
-
-            yield return new TestCaseData(float.NaN, "NaN").SetName(
-                "ValueTypeEdge.FloatNaN.IsValidKey"
-            );
-
-            yield return new TestCaseData(float.PositiveInfinity, "positive infinity").SetName(
-                "ValueTypeEdge.FloatPosInf.IsValidKey"
-            );
-
-            yield return new TestCaseData(float.NegativeInfinity, "negative infinity").SetName(
-                "ValueTypeEdge.FloatNegInf.IsValidKey"
-            );
-
-            yield return new TestCaseData(double.Epsilon, "double epsilon").SetName(
-                "ValueTypeEdge.DoubleEpsilon.IsValidKey"
             );
         }
 

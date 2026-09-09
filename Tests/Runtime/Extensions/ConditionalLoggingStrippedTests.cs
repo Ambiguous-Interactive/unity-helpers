@@ -29,6 +29,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     {
         private bool _previousGlobalLogging;
 
+        private static void AssertCallSiteRemoved()
+        {
+            Assert.That(
+                LoggingCallSiteProbe.ReceiverEvaluations,
+                Is.Zero,
+                "A [Conditional] logging call must not evaluate its receiver -- a receiver such as "
+                    + "Singleton.Instance creates the singleton purely to call a stripped method."
+            );
+            Assert.That(
+                LoggingCallSiteProbe.ArgumentEvaluations,
+                Is.Zero,
+                "A [Conditional] logging call must not build its FormattableString arguments."
+            );
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -98,21 +113,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 LoggingCallSiteProbe.ReceiverEvaluations,
                 Is.Zero,
                 "ValidateAssignments must not evaluate its receiver when logging is compiled out."
-            );
-        }
-
-        private static void AssertCallSiteRemoved()
-        {
-            Assert.That(
-                LoggingCallSiteProbe.ReceiverEvaluations,
-                Is.Zero,
-                "A [Conditional] logging call must not evaluate its receiver -- a receiver such as "
-                    + "Singleton.Instance creates the singleton purely to call a stripped method."
-            );
-            Assert.That(
-                LoggingCallSiteProbe.ArgumentEvaluations,
-                Is.Zero,
-                "A [Conditional] logging call must not build its FormattableString arguments."
             );
         }
     }

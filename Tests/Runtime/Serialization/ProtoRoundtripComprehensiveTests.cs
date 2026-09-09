@@ -26,6 +26,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             return Serializer.ProtoDeserialize<T>(bytes);
         }
 
+        private static void AssertAllDefaultRoundTrips<T>(T value)
+        {
+            byte[] bytes = Serializer.ProtoSerialize(value);
+
+            Assert.AreEqual(
+                0,
+                bytes.Length,
+                $"{typeof(T).Name} at its defaults should encode to zero bytes"
+            );
+            Assert.AreEqual(
+                value,
+                Serializer.ProtoDeserialize<T>(bytes),
+                $"{typeof(T).Name} should read back what it wrote"
+            );
+        }
+
         [Test]
         public void WGuidRoundTrips()
         {
@@ -273,22 +289,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             AssertAllDefaultRoundTrips(new Bounds(Vector3.zero, Vector3.zero));
             AssertAllDefaultRoundTrips(new Rect(0f, 0f, 0f, 0f));
             AssertAllDefaultRoundTrips(new BoundsInt(Vector3Int.zero, Vector3Int.zero));
-        }
-
-        private static void AssertAllDefaultRoundTrips<T>(T value)
-        {
-            byte[] bytes = Serializer.ProtoSerialize(value);
-
-            Assert.AreEqual(
-                0,
-                bytes.Length,
-                $"{typeof(T).Name} at its defaults should encode to zero bytes"
-            );
-            Assert.AreEqual(
-                value,
-                Serializer.ProtoDeserialize<T>(bytes),
-                $"{typeof(T).Name} should read back what it wrote"
-            );
         }
 
         [ProtoContract]

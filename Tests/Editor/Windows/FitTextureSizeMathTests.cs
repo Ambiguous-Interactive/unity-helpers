@@ -22,30 +22,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
     [TestFixture]
     public sealed class FitTextureSizeMathTests
     {
-        [Test]
-        [TestCaseSource(nameof(GrowAndShrinkModeTestCases))]
-        public void GrowAndShrinkModeCalculatesCorrectSize(
-            int width,
-            int height,
-            int currentMaxSize,
-            int expectedSize
-        )
-        {
-            FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
-                width,
-                height,
-                currentMaxSize,
-                FitMode.GrowAndShrink,
-                1,
-                8192
-            );
-            Assert.That(
-                fit.TargetSize,
-                Is.EqualTo(expectedSize),
-                $"Size {width}x{height} should compute to {expectedSize}"
-            );
-        }
-
         private static IEnumerable<TestCaseData> GrowAndShrinkModeTestCases()
         {
             yield return new TestCaseData(400, 240, 256, 512).SetName(
@@ -104,30 +80,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             );
             yield return new TestCaseData(1, 512, 64, 512).SetName(
                 "GrowAndShrink.1x512.TallStrip.Grows512"
-            );
-        }
-
-        [Test]
-        [TestCaseSource(nameof(GrowOnlyModeTestCases))]
-        public void GrowOnlyModeCalculatesCorrectSize(
-            int width,
-            int height,
-            int currentMaxSize,
-            int expectedSize
-        )
-        {
-            FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
-                width,
-                height,
-                currentMaxSize,
-                FitMode.GrowOnly,
-                1,
-                8192
-            );
-            Assert.That(
-                fit.TargetSize,
-                Is.EqualTo(expectedSize),
-                $"GrowOnly with current={currentMaxSize} and size {width}x{height} should be {expectedSize}"
             );
         }
 
@@ -192,30 +144,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             );
         }
 
-        [Test]
-        [TestCaseSource(nameof(ShrinkOnlyModeTestCases))]
-        public void ShrinkOnlyModeCalculatesCorrectSize(
-            int width,
-            int height,
-            int currentMaxSize,
-            int expectedSize
-        )
-        {
-            FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
-                width,
-                height,
-                currentMaxSize,
-                FitMode.ShrinkOnly,
-                1,
-                8192
-            );
-            Assert.That(
-                fit.TargetSize,
-                Is.EqualTo(expectedSize),
-                $"ShrinkOnly with current={currentMaxSize} and size {width}x{height} should be {expectedSize}"
-            );
-        }
-
         private static IEnumerable<TestCaseData> ShrinkOnlyModeTestCases()
         {
             yield return new TestCaseData(400, 240, 512, 512).SetName(
@@ -269,30 +197,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             );
             yield return new TestCaseData(255, 255, 512, 256).SetName(
                 "ShrinkOnly.255x255.Current512.JustUnderPOTShrinks256"
-            );
-        }
-
-        [Test]
-        [TestCaseSource(nameof(RoundToNearestModeTestCases))]
-        public void RoundToNearestModeCalculatesCorrectSize(
-            int width,
-            int height,
-            int currentMaxSize,
-            int expectedSize
-        )
-        {
-            FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
-                width,
-                height,
-                currentMaxSize,
-                FitMode.RoundToNearest,
-                1,
-                8192
-            );
-            Assert.That(
-                fit.TargetSize,
-                Is.EqualTo(expectedSize),
-                $"RoundToNearest for size {width}x{height} should be {expectedSize}"
             );
         }
 
@@ -360,31 +264,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             );
             yield return new TestCaseData(129, 50, 64, 128).SetName(
                 "RoundToNearest.129x50.JustOver128.CloserTo128"
-            );
-        }
-
-        [Test]
-        [TestCaseSource(nameof(EdgeCaseTestCases))]
-        public void EdgeCasesAreHandledCorrectly(
-            int width,
-            int height,
-            FitMode mode,
-            int currentMaxSize,
-            int expectedSize
-        )
-        {
-            FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
-                width,
-                height,
-                currentMaxSize,
-                mode,
-                1,
-                16384
-            );
-            Assert.That(
-                fit.TargetSize,
-                Is.EqualTo(expectedSize),
-                $"Edge case {mode} for {width}x{height} should be {expectedSize}"
             );
         }
 
@@ -470,30 +349,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             );
         }
 
-        [Test]
-        [TestCaseSource(nameof(MinClampingTestCases))]
-        public void MinClampingAppliesCorrectly(
-            int width,
-            int height,
-            int minAllowedSize,
-            int expectedSize
-        )
-        {
-            FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
-                width,
-                height,
-                8192,
-                FitMode.GrowAndShrink,
-                minAllowedSize,
-                8192
-            );
-            Assert.That(
-                fit.TargetSize,
-                Is.EqualTo(expectedSize),
-                $"With _minAllowedTextureSize={minAllowedSize}, {width}x{height} should result in {expectedSize}"
-            );
-        }
-
         private static IEnumerable<TestCaseData> MinClampingTestCases()
         {
             yield return new TestCaseData(1, 1, 1, 1).SetName("MinClamp.1x1.MinAllowed1.Returns1");
@@ -533,31 +388,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             );
             yield return new TestCaseData(1, 1, 100, 100).SetName(
                 "MinClamp.1x1.MinAllowed100.Returns100"
-            );
-        }
-
-        [Test]
-        [TestCaseSource(nameof(MaxClampingTestCases))]
-        public void MaxClampingAppliesCorrectly(
-            int width,
-            int height,
-            int maxAllowedSize,
-            int expectedSize,
-            string description
-        )
-        {
-            FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
-                width,
-                height,
-                32,
-                FitMode.GrowAndShrink,
-                1,
-                maxAllowedSize
-            );
-            Assert.That(
-                fit.TargetSize,
-                Is.EqualTo(expectedSize),
-                $"With _maxAllowedTextureSize={maxAllowedSize}, {width}x{height} should result in {expectedSize}: {description}"
             );
         }
 
@@ -627,32 +457,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
                 1500,
                 "Non-POT max clamps large texture"
             ).SetName("MaxClamp.2000x2000.MaxAllowed1500.ClampedTo1500");
-        }
-
-        [Test]
-        [TestCaseSource(nameof(MinMaxInteractionTestCases))]
-        public void MinMaxClampingInteractionWorksCorrectly(
-            int width,
-            int height,
-            int minAllowedSize,
-            int maxAllowedSize,
-            int expectedSize,
-            string description
-        )
-        {
-            FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
-                width,
-                height,
-                2048,
-                FitMode.GrowAndShrink,
-                minAllowedSize,
-                maxAllowedSize
-            );
-            Assert.That(
-                fit.TargetSize,
-                Is.EqualTo(expectedSize),
-                $"With min={minAllowedSize}, max={maxAllowedSize}, {width}x{height} should result in {expectedSize}: {description}"
-            );
         }
 
         private static IEnumerable<TestCaseData> MinMaxInteractionTestCases()
@@ -741,32 +545,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             );
         }
 
-        [Test]
-        [TestCaseSource(nameof(MaxClampingWithFitModeTestCases))]
-        public void MaxClampingWorksWithAllFitModes(
-            int width,
-            int height,
-            FitMode mode,
-            int currentMaxSize,
-            int maxAllowedSize,
-            int expectedSize
-        )
-        {
-            FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
-                width,
-                height,
-                currentMaxSize,
-                mode,
-                1,
-                maxAllowedSize
-            );
-            Assert.That(
-                fit.TargetSize,
-                Is.EqualTo(expectedSize),
-                $"{mode} with max={maxAllowedSize} for {width}x{height} should result in {expectedSize}"
-            );
-        }
-
         private static IEnumerable<TestCaseData> MaxClampingWithFitModeTestCases()
         {
             yield return new TestCaseData(
@@ -808,32 +586,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             );
         }
 
-        [Test]
-        [TestCaseSource(nameof(MinClampingWithFitModeTestCases))]
-        public void MinClampingWorksWithAllFitModes(
-            int width,
-            int height,
-            FitMode mode,
-            int currentMaxSize,
-            int minAllowedSize,
-            int expectedSize
-        )
-        {
-            FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
-                width,
-                height,
-                currentMaxSize,
-                mode,
-                minAllowedSize,
-                16384
-            );
-            Assert.That(
-                fit.TargetSize,
-                Is.EqualTo(expectedSize),
-                $"{mode} with min={minAllowedSize} for {width}x{height} should result in {expectedSize}"
-            );
-        }
-
         private static IEnumerable<TestCaseData> MinClampingWithFitModeTestCases()
         {
             yield return new TestCaseData(10, 10, FitMode.GrowAndShrink, 1024, 256, 256).SetName(
@@ -862,30 +614,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             );
             yield return new TestCaseData(30, 30, FitMode.RoundToNearest, 128, 64, 64).SetName(
                 "MinMode.RoundToNearest.30x30.ClampedTo64"
-            );
-        }
-
-        [Test]
-        [TestCaseSource(nameof(AspectRatioTestCases))]
-        public void AspectRatiosAreHandledCorrectly(
-            int width,
-            int height,
-            FitMode mode,
-            int expectedSize
-        )
-        {
-            FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
-                width,
-                height,
-                128,
-                mode,
-                32,
-                8192
-            );
-            Assert.That(
-                fit.TargetSize,
-                Is.EqualTo(expectedSize),
-                $"Aspect ratio test {mode} for {width}x{height} should be {expectedSize}"
             );
         }
 
@@ -947,6 +675,278 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             );
             yield return new TestCaseData(3440, 1440, FitMode.GrowAndShrink, 4096).SetName(
                 "Aspect.3440x1440.GrowAndShrink.UltraWide34"
+            );
+        }
+
+        [Test]
+        [TestCaseSource(nameof(GrowAndShrinkModeTestCases))]
+        public void GrowAndShrinkModeCalculatesCorrectSize(
+            int width,
+            int height,
+            int currentMaxSize,
+            int expectedSize
+        )
+        {
+            FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
+                width,
+                height,
+                currentMaxSize,
+                FitMode.GrowAndShrink,
+                1,
+                8192
+            );
+            Assert.That(
+                fit.TargetSize,
+                Is.EqualTo(expectedSize),
+                $"Size {width}x{height} should compute to {expectedSize}"
+            );
+        }
+
+        [Test]
+        [TestCaseSource(nameof(GrowOnlyModeTestCases))]
+        public void GrowOnlyModeCalculatesCorrectSize(
+            int width,
+            int height,
+            int currentMaxSize,
+            int expectedSize
+        )
+        {
+            FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
+                width,
+                height,
+                currentMaxSize,
+                FitMode.GrowOnly,
+                1,
+                8192
+            );
+            Assert.That(
+                fit.TargetSize,
+                Is.EqualTo(expectedSize),
+                $"GrowOnly with current={currentMaxSize} and size {width}x{height} should be {expectedSize}"
+            );
+        }
+
+        [Test]
+        [TestCaseSource(nameof(ShrinkOnlyModeTestCases))]
+        public void ShrinkOnlyModeCalculatesCorrectSize(
+            int width,
+            int height,
+            int currentMaxSize,
+            int expectedSize
+        )
+        {
+            FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
+                width,
+                height,
+                currentMaxSize,
+                FitMode.ShrinkOnly,
+                1,
+                8192
+            );
+            Assert.That(
+                fit.TargetSize,
+                Is.EqualTo(expectedSize),
+                $"ShrinkOnly with current={currentMaxSize} and size {width}x{height} should be {expectedSize}"
+            );
+        }
+
+        [Test]
+        [TestCaseSource(nameof(RoundToNearestModeTestCases))]
+        public void RoundToNearestModeCalculatesCorrectSize(
+            int width,
+            int height,
+            int currentMaxSize,
+            int expectedSize
+        )
+        {
+            FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
+                width,
+                height,
+                currentMaxSize,
+                FitMode.RoundToNearest,
+                1,
+                8192
+            );
+            Assert.That(
+                fit.TargetSize,
+                Is.EqualTo(expectedSize),
+                $"RoundToNearest for size {width}x{height} should be {expectedSize}"
+            );
+        }
+
+        [Test]
+        [TestCaseSource(nameof(EdgeCaseTestCases))]
+        public void EdgeCasesAreHandledCorrectly(
+            int width,
+            int height,
+            FitMode mode,
+            int currentMaxSize,
+            int expectedSize
+        )
+        {
+            FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
+                width,
+                height,
+                currentMaxSize,
+                mode,
+                1,
+                16384
+            );
+            Assert.That(
+                fit.TargetSize,
+                Is.EqualTo(expectedSize),
+                $"Edge case {mode} for {width}x{height} should be {expectedSize}"
+            );
+        }
+
+        [Test]
+        [TestCaseSource(nameof(MinClampingTestCases))]
+        public void MinClampingAppliesCorrectly(
+            int width,
+            int height,
+            int minAllowedSize,
+            int expectedSize
+        )
+        {
+            FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
+                width,
+                height,
+                8192,
+                FitMode.GrowAndShrink,
+                minAllowedSize,
+                8192
+            );
+            Assert.That(
+                fit.TargetSize,
+                Is.EqualTo(expectedSize),
+                $"With _minAllowedTextureSize={minAllowedSize}, {width}x{height} should result in {expectedSize}"
+            );
+        }
+
+        [Test]
+        [TestCaseSource(nameof(MaxClampingTestCases))]
+        public void MaxClampingAppliesCorrectly(
+            int width,
+            int height,
+            int maxAllowedSize,
+            int expectedSize,
+            string description
+        )
+        {
+            FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
+                width,
+                height,
+                32,
+                FitMode.GrowAndShrink,
+                1,
+                maxAllowedSize
+            );
+            Assert.That(
+                fit.TargetSize,
+                Is.EqualTo(expectedSize),
+                $"With _maxAllowedTextureSize={maxAllowedSize}, {width}x{height} should result in {expectedSize}: {description}"
+            );
+        }
+
+        [Test]
+        [TestCaseSource(nameof(MinMaxInteractionTestCases))]
+        public void MinMaxClampingInteractionWorksCorrectly(
+            int width,
+            int height,
+            int minAllowedSize,
+            int maxAllowedSize,
+            int expectedSize,
+            string description
+        )
+        {
+            FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
+                width,
+                height,
+                2048,
+                FitMode.GrowAndShrink,
+                minAllowedSize,
+                maxAllowedSize
+            );
+            Assert.That(
+                fit.TargetSize,
+                Is.EqualTo(expectedSize),
+                $"With min={minAllowedSize}, max={maxAllowedSize}, {width}x{height} should result in {expectedSize}: {description}"
+            );
+        }
+
+        [Test]
+        [TestCaseSource(nameof(MaxClampingWithFitModeTestCases))]
+        public void MaxClampingWorksWithAllFitModes(
+            int width,
+            int height,
+            FitMode mode,
+            int currentMaxSize,
+            int maxAllowedSize,
+            int expectedSize
+        )
+        {
+            FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
+                width,
+                height,
+                currentMaxSize,
+                mode,
+                1,
+                maxAllowedSize
+            );
+            Assert.That(
+                fit.TargetSize,
+                Is.EqualTo(expectedSize),
+                $"{mode} with max={maxAllowedSize} for {width}x{height} should result in {expectedSize}"
+            );
+        }
+
+        [Test]
+        [TestCaseSource(nameof(MinClampingWithFitModeTestCases))]
+        public void MinClampingWorksWithAllFitModes(
+            int width,
+            int height,
+            FitMode mode,
+            int currentMaxSize,
+            int minAllowedSize,
+            int expectedSize
+        )
+        {
+            FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
+                width,
+                height,
+                currentMaxSize,
+                mode,
+                minAllowedSize,
+                16384
+            );
+            Assert.That(
+                fit.TargetSize,
+                Is.EqualTo(expectedSize),
+                $"{mode} with min={minAllowedSize} for {width}x{height} should result in {expectedSize}"
+            );
+        }
+
+        [Test]
+        [TestCaseSource(nameof(AspectRatioTestCases))]
+        public void AspectRatiosAreHandledCorrectly(
+            int width,
+            int height,
+            FitMode mode,
+            int expectedSize
+        )
+        {
+            FitTextureSizeWindow.FitComputation fit = FitTextureSizeWindow.ComputeFit(
+                width,
+                height,
+                128,
+                mode,
+                32,
+                8192
+            );
+            Assert.That(
+                fit.TargetSize,
+                Is.EqualTo(expectedSize),
+                $"Aspect ratio test {mode} for {width}x{height} should be {expectedSize}"
             );
         }
     }

@@ -158,6 +158,102 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                   }
               }";
 
+        private static string[] Messages(ImmutableArray<Diagnostic> reported)
+        {
+            return reported.Select(diagnostic => diagnostic.ToString()).ToArray();
+        }
+
+        private static Diagnostic Single(string body)
+        {
+            ImmutableArray<Diagnostic> reported = Analyze(body);
+            Assert.AreEqual(1, reported.Length, "Expected exactly one diagnostic");
+            return reported[0];
+        }
+
+        private static ImmutableArray<Diagnostic> Analyze(string body)
+        {
+            return Analyze(body, UnityStubs, ReportDiagnostic.Default);
+        }
+
+        /// <summary>
+        /// Compiles <paramref name="body"/> against <paramref name="stubs"/> and runs the analyzer
+        /// over it.
+        /// </summary>
+        /// <param name="body">Members of a static class in namespace <c>Consumer</c>.</param>
+        /// <param name="stubs">The world the fixture is compiled against.</param>
+        /// <param name="reportedAs">
+        /// What the compilation says about the diagnostic -- <see cref="ReportDiagnostic.Default"/>
+        /// for a consumer who configures nothing, or anything else for the ruleset /
+        /// <c>.editorconfig</c> entry they would write.
+        /// </param>
+        /// <param name="withUnityUsing">
+        /// Whether the fixture opens <c>UnityEngine</c>, which the lookalike world does not have.
+        /// </param>
+        /// <returns>Everything the analyzer reported.</returns>
+        private static ImmutableArray<Diagnostic> Analyze(
+            string body,
+            string stubs,
+            ReportDiagnostic reportedAs,
+            bool withUnityUsing = true
+        )
+        {
+            string source =
+                "namespace Consumer { "
+                + (withUnityUsing ? "using UnityEngine; " : string.Empty)
+                + "public static class Subject { "
+                + body
+                + " } }\n"
+                + stubs;
+
+            List<MetadataReference> references = new List<MetadataReference>();
+            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
+                {
+                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
+                }
+            }
+
+            CSharpCompilation compilation = CSharpCompilation.Create(
+                "ConsumerAssembly",
+                new[]
+                {
+                    CSharpSyntaxTree.ParseText(
+                        source,
+                        new CSharpParseOptions(LanguageVersion.CSharp9)
+                    ),
+                },
+                references,
+                new CSharpCompilationOptions(
+                    OutputKind.DynamicallyLinkedLibrary
+                ).WithSpecificDiagnosticOptions(
+                    ImmutableDictionary<string, ReportDiagnostic>.Empty.Add(
+                        GetComponentNullComparisonId,
+                        reportedAs
+                    )
+                )
+            );
+
+            ImmutableArray<Diagnostic> compileErrors = compilation
+                .GetDiagnostics()
+                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+                .ToImmutableArray();
+            Assert.IsEmpty(
+                compileErrors.Select(diagnostic => diagnostic.ToString()).ToArray(),
+                "The fixture must compile"
+            );
+
+            return compilation
+                .WithAnalyzers(
+                    ImmutableArray.Create<DiagnosticAnalyzer>(
+                        new GetComponentNullComparisonAnalyzer()
+                    )
+                )
+                .GetAnalyzerDiagnosticsAsync()
+                .GetAwaiter()
+                .GetResult();
+        }
+
         [TestCase(
             "a generic search off a GameObject",
             @"public static bool Has(GameObject subject) =>
@@ -496,102 +592,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                 Messages(Analyze(offending, UnityStubs, ReportDiagnostic.Suppress)),
                 "and one who does not want it must be able to turn it off"
             );
-        }
-
-        private static string[] Messages(ImmutableArray<Diagnostic> reported)
-        {
-            return reported.Select(diagnostic => diagnostic.ToString()).ToArray();
-        }
-
-        private static Diagnostic Single(string body)
-        {
-            ImmutableArray<Diagnostic> reported = Analyze(body);
-            Assert.AreEqual(1, reported.Length, "Expected exactly one diagnostic");
-            return reported[0];
-        }
-
-        private static ImmutableArray<Diagnostic> Analyze(string body)
-        {
-            return Analyze(body, UnityStubs, ReportDiagnostic.Default);
-        }
-
-        /// <summary>
-        /// Compiles <paramref name="body"/> against <paramref name="stubs"/> and runs the analyzer
-        /// over it.
-        /// </summary>
-        /// <param name="body">Members of a static class in namespace <c>Consumer</c>.</param>
-        /// <param name="stubs">The world the fixture is compiled against.</param>
-        /// <param name="reportedAs">
-        /// What the compilation says about the diagnostic -- <see cref="ReportDiagnostic.Default"/>
-        /// for a consumer who configures nothing, or anything else for the ruleset /
-        /// <c>.editorconfig</c> entry they would write.
-        /// </param>
-        /// <param name="withUnityUsing">
-        /// Whether the fixture opens <c>UnityEngine</c>, which the lookalike world does not have.
-        /// </param>
-        /// <returns>Everything the analyzer reported.</returns>
-        private static ImmutableArray<Diagnostic> Analyze(
-            string body,
-            string stubs,
-            ReportDiagnostic reportedAs,
-            bool withUnityUsing = true
-        )
-        {
-            string source =
-                "namespace Consumer { "
-                + (withUnityUsing ? "using UnityEngine; " : string.Empty)
-                + "public static class Subject { "
-                + body
-                + " } }\n"
-                + stubs;
-
-            List<MetadataReference> references = new List<MetadataReference>();
-            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
-                {
-                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
-                }
-            }
-
-            CSharpCompilation compilation = CSharpCompilation.Create(
-                "ConsumerAssembly",
-                new[]
-                {
-                    CSharpSyntaxTree.ParseText(
-                        source,
-                        new CSharpParseOptions(LanguageVersion.CSharp9)
-                    ),
-                },
-                references,
-                new CSharpCompilationOptions(
-                    OutputKind.DynamicallyLinkedLibrary
-                ).WithSpecificDiagnosticOptions(
-                    ImmutableDictionary<string, ReportDiagnostic>.Empty.Add(
-                        GetComponentNullComparisonId,
-                        reportedAs
-                    )
-                )
-            );
-
-            ImmutableArray<Diagnostic> compileErrors = compilation
-                .GetDiagnostics()
-                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-                .ToImmutableArray();
-            Assert.IsEmpty(
-                compileErrors.Select(diagnostic => diagnostic.ToString()).ToArray(),
-                "The fixture must compile"
-            );
-
-            return compilation
-                .WithAnalyzers(
-                    ImmutableArray.Create<DiagnosticAnalyzer>(
-                        new GetComponentNullComparisonAnalyzer()
-                    )
-                )
-                .GetAnalyzerDiagnosticsAsync()
-                .GetAwaiter()
-                .GetResult();
         }
     }
 }

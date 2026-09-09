@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 {
     using System.Collections.Generic;
     using Utils;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     public static partial class IListExtensions
     {
@@ -44,7 +45,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         private static void IpnSortCore<T, TComparer>(T[] array, int count, TComparer comparer)
             where TComparer : IComparer<T>
         {
-            IpnSortRange(array, 0, count - 1, comparer, 2 * FloorLog2(count));
+            IpnSortRange(array, 0, count - 1, comparer, 2 * BitOps.Log2(count));
         }
 
         private static void IpnSortRange<T, TComparer>(

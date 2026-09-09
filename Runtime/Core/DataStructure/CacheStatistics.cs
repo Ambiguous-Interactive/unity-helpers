@@ -17,6 +17,24 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     public readonly struct CacheStatistics : IEquatable<CacheStatistics>
     {
         /// <summary>
+        /// Equality operator.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool operator ==(CacheStatistics left, CacheStatistics right)
+        {
+            return left.Equals(right);
+        }
+
+        /// <summary>
+        /// Inequality operator.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool operator !=(CacheStatistics left, CacheStatistics right)
+        {
+            return !left.Equals(right);
+        }
+
+        /// <summary>
         /// The number of times a requested key was found in the cache.
         /// </summary>
         public long HitCount { get; }
@@ -138,24 +156,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 PeakSize,
                 GrowthEvents
             );
-        }
-
-        /// <summary>
-        /// Equality operator.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool operator ==(CacheStatistics left, CacheStatistics right)
-        {
-            return left.Equals(right);
-        }
-
-        /// <summary>
-        /// Inequality operator.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool operator !=(CacheStatistics left, CacheStatistics right)
-        {
-            return !left.Equals(right);
         }
 
         /// <inheritdoc />

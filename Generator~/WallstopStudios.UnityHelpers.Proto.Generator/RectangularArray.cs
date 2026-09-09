@@ -35,17 +35,35 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     /// </remarks>
     internal sealed class RectangularArray : IGeneratedMessage
     {
-        /// <summary>The field number carrying the dimension header.</summary>
-        private const int DimensionsTag = 1;
-
         /// <summary>The field number carrying the flat element run.</summary>
         internal const int ValuesTag = 2;
+
+        /// <summary>The field number carrying the dimension header.</summary>
+        private const int DimensionsTag = 1;
 
         /// <summary>The local holding how many dimensions the payload stated.</summary>
         private const string DimensionCount = "dimensionCount";
 
         /// <summary>The local holding one decoded dimension before it is filed.</summary>
         private const string DecodedDimension = "dimension";
+
+        /// <inheritdoc />
+        public string FormatterName { get; }
+
+        /// <inheritdoc />
+        public string Qualified { get; }
+
+        /// <inheritdoc />
+        public string Display { get; }
+
+        /// <inheritdoc />
+        public int Depth { get; set; }
+
+        /// <inheritdoc />
+        public Member Inner { get; set; }
+
+        /// <inheritdoc />
+        public string Instance => FormatterName + ".Instance";
 
         private readonly int _rank;
         private readonly string _elementQualified;
@@ -86,23 +104,23 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             _creationSuffix = suffix.ToString();
         }
 
-        /// <inheritdoc />
-        public string FormatterName { get; }
+        private static string Dimension(int axis)
+        {
+            return "dimension" + axis;
+        }
 
-        /// <inheritdoc />
-        public string Qualified { get; }
-
-        /// <inheritdoc />
-        public string Display { get; }
-
-        /// <inheritdoc />
-        public int Depth { get; set; }
-
-        /// <inheritdoc />
-        public Member Inner { get; set; }
-
-        /// <inheritdoc />
-        public string Instance => FormatterName + ".Instance";
+        /// <summary>
+        /// The fill loop's index for one axis.
+        /// </summary>
+        /// <remarks>
+        /// Named for the axis rather than <c>index</c>, because the element run's own emitter names
+        /// its locals <c>index{tag}</c> -- and the run's tag is 2, so a rank-three array would
+        /// otherwise be one emitter change away from declaring <c>index2</c> twice in one method.
+        /// </remarks>
+        private static string Axis(int axis)
+        {
+            return "axis" + axis;
+        }
 
         /// <inheritdoc />
         public void Emit(Writer writer)
@@ -140,24 +158,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             writer.Outdent();
             writer.Line("}");
-        }
-
-        private static string Dimension(int axis)
-        {
-            return "dimension" + axis;
-        }
-
-        /// <summary>
-        /// The fill loop's index for one axis.
-        /// </summary>
-        /// <remarks>
-        /// Named for the axis rather than <c>index</c>, because the element run's own emitter names
-        /// its locals <c>index{tag}</c> -- and the run's tag is 2, so a rank-three array would
-        /// otherwise be one emitter change away from declaring <c>index2</c> twice in one method.
-        /// </remarks>
-        private static string Axis(int axis)
-        {
-            return "axis" + axis;
         }
 
         /// <summary>

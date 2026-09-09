@@ -10,14 +10,21 @@ namespace WallstopStudios.UnityHelpers.Core.OneOf
 
     public readonly struct FastOneOf<T0, T1, T2> : IEquatable<FastOneOf<T0, T1, T2>>
     {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool operator ==(FastOneOf<T0, T1, T2> left, FastOneOf<T0, T1, T2> right)
+        {
+            return left.Equals(right);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool operator !=(FastOneOf<T0, T1, T2> left, FastOneOf<T0, T1, T2> right)
+        {
+            return !left.Equals(right);
+        }
+
         private static readonly EqualityComparer<T0> T0Comparer = EqualityComparer<T0>.Default;
         private static readonly EqualityComparer<T1> T1Comparer = EqualityComparer<T1>.Default;
         private static readonly EqualityComparer<T2> T2Comparer = EqualityComparer<T2>.Default;
-
-        private readonly T0 _value0;
-        private readonly T1 _value1;
-        private readonly T2 _value2;
-        private readonly int _index;
 
         public int Index => _index;
 
@@ -87,6 +94,25 @@ namespace WallstopStudios.UnityHelpers.Core.OneOf
             }
         }
 
+        private readonly T0 _value0;
+        private readonly T1 _value1;
+        private readonly T2 _value2;
+        private readonly int _index;
+
+        private FastOneOf(int index, T0 value0 = default, T1 value1 = default, T2 value2 = default)
+        {
+            _index = index;
+            _value0 = value0;
+            _value1 = value1;
+            _value2 = value2;
+        }
+
+        public static implicit operator FastOneOf<T0, T1, T2>(T0 value) => new(0, value0: value);
+
+        public static implicit operator FastOneOf<T0, T1, T2>(T1 value) => new(1, value1: value);
+
+        public static implicit operator FastOneOf<T0, T1, T2>(T2 value) => new(2, value2: value);
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryGetT0(out T0 value)
         {
@@ -125,20 +151,6 @@ namespace WallstopStudios.UnityHelpers.Core.OneOf
             value = default;
             return false;
         }
-
-        private FastOneOf(int index, T0 value0 = default, T1 value1 = default, T2 value2 = default)
-        {
-            _index = index;
-            _value0 = value0;
-            _value1 = value1;
-            _value2 = value2;
-        }
-
-        public static implicit operator FastOneOf<T0, T1, T2>(T0 value) => new(0, value0: value);
-
-        public static implicit operator FastOneOf<T0, T1, T2>(T1 value) => new(1, value1: value);
-
-        public static implicit operator FastOneOf<T0, T1, T2>(T2 value) => new(2, value2: value);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Equals(FastOneOf<T0, T1, T2> other)
@@ -237,18 +249,6 @@ namespace WallstopStudios.UnityHelpers.Core.OneOf
                 2 => $"T2({_value2})",
                 _ => $"Invalid({_index})",
             };
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool operator ==(FastOneOf<T0, T1, T2> left, FastOneOf<T0, T1, T2> right)
-        {
-            return left.Equals(right);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool operator !=(FastOneOf<T0, T1, T2> left, FastOneOf<T0, T1, T2> right)
-        {
-            return !left.Equals(right);
         }
     }
 }

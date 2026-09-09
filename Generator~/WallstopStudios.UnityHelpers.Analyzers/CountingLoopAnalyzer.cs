@@ -37,14 +37,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
             ImmutableArray.Create(UnityHelpersDiagnostics.CountingLoopOverAllocationFreeSequence);
 
-        /// <inheritdoc />
-        public override void Initialize(AnalysisContext context)
-        {
-            context.EnableConcurrentExecution();
-            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
-            context.RegisterCompilationStartAction(OnCompilationStart);
-        }
-
         private static void OnCompilationStart(CompilationStartAnalysisContext context)
         {
             INamedTypeSymbol list = context.Compilation.GetTypeByMetadataName(ListMetadataName);
@@ -554,6 +546,14 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                     }
                 }
             }
+        }
+
+        /// <inheritdoc />
+        public override void Initialize(AnalysisContext context)
+        {
+            context.EnableConcurrentExecution();
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+            context.RegisterCompilationStartAction(OnCompilationStart);
         }
     }
 }

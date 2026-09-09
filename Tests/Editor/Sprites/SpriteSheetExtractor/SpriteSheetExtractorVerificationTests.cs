@@ -41,6 +41,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             "Packages/com.wallstop-studios.unity-helpers/Tests/Editor/TestAssets/Sprites";
 
         /// <summary>
+        /// Threshold for using compact array format vs multiline format in golden JSON files.
+        /// Arrays with this many elements or fewer use compact format.
+        /// </summary>
+        private const int CompactArrayThreshold = 4;
+
+        /// <summary>
         /// Converts a Unity relative path to an absolute file system path.
         /// </summary>
         private static string RelToFull(string relativePath)
@@ -185,6 +191,97 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             return File.Exists(fullPath);
         }
 
+        /// <summary>
+        /// Test case source for golden file verification tests.
+        /// </summary>
+        private static IEnumerable<TestCaseData> GoldenFileCases()
+        {
+            yield return new TestCaseData("golden_2x2_grid.json").SetName("GoldenVerify.2x2Grid");
+            yield return new TestCaseData("golden_4x4_grid.json").SetName("GoldenVerify.4x4Grid");
+            yield return new TestCaseData("golden_8x8_grid.json").SetName("GoldenVerify.8x8Grid");
+            yield return new TestCaseData("golden_single.json").SetName("GoldenVerify.Single");
+            yield return new TestCaseData("golden_wide.json").SetName("GoldenVerify.Wide");
+            yield return new TestCaseData("golden_tall.json").SetName("GoldenVerify.Tall");
+            yield return new TestCaseData("golden_odd.json").SetName("GoldenVerify.OddDimensions");
+        }
+
+        /// <summary>
+        /// Test case source for static asset verification.
+        /// </summary>
+        private static IEnumerable<TestCaseData> StaticAssetCases()
+        {
+            yield return new TestCaseData("test_2x2_grid.png", 64, 64, true).SetName(
+                "StaticAsset.2x2Grid"
+            );
+            yield return new TestCaseData("test_4x4_grid.png", 128, 128, true).SetName(
+                "StaticAsset.4x4Grid"
+            );
+            yield return new TestCaseData("test_8x8_grid.png", 256, 256, true).SetName(
+                "StaticAsset.8x8Grid"
+            );
+            yield return new TestCaseData("test_single.png", 32, 32, true).SetName(
+                "StaticAsset.Single"
+            );
+            yield return new TestCaseData("test_wide.png", 128, 64, true).SetName(
+                "StaticAsset.Wide"
+            );
+            yield return new TestCaseData("test_tall.png", 64, 128, true).SetName(
+                "StaticAsset.Tall"
+            );
+            yield return new TestCaseData("test_odd.png", 63, 63, true).SetName(
+                "StaticAsset.OddDimensions"
+            );
+        }
+
+        /// <summary>
+        /// Builds a JSON string for a golden metadata file.
+        /// </summary>
+        private static string BuildGoldenJson(
+            string sourceFile,
+            int spriteCount,
+            List<string> expectedNames,
+            int spriteWidth,
+            int spriteHeight,
+            int columns,
+            int rows
+        )
+        {
+            string namesJson;
+            if (expectedNames.Count <= CompactArrayThreshold)
+            {
+                namesJson =
+                    "[" + string.Join(", ", expectedNames.ConvertAll(n => $"\"{n}\"")) + "]";
+            }
+            else
+            {
+                System.Text.StringBuilder sb = new System.Text.StringBuilder();
+                sb.AppendLine("[");
+                for (int i = 0; i < expectedNames.Count; i++)
+                {
+                    sb.Append($"    \"{expectedNames[i]}\"");
+                    if (i < expectedNames.Count - 1)
+                    {
+                        sb.AppendLine(",");
+                    }
+                    else
+                    {
+                        sb.AppendLine();
+                    }
+                }
+                sb.Append("  ]");
+                namesJson = sb.ToString();
+            }
+
+            return $@"{{
+  ""sourceFile"": ""{sourceFile}"",
+  ""spriteCount"": {spriteCount},
+  ""expectedNames"": {namesJson},
+  ""spriteDimensions"": [{spriteWidth}, {spriteHeight}],
+  ""gridSize"": [{columns}, {rows}]
+}}
+";
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -199,20 +296,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         public override void TearDown()
         {
             base.TearDown();
-        }
-
-        /// <summary>
-        /// Test case source for golden file verification tests.
-        /// </summary>
-        private static IEnumerable<TestCaseData> GoldenFileCases()
-        {
-            yield return new TestCaseData("golden_2x2_grid.json").SetName("GoldenVerify.2x2Grid");
-            yield return new TestCaseData("golden_4x4_grid.json").SetName("GoldenVerify.4x4Grid");
-            yield return new TestCaseData("golden_8x8_grid.json").SetName("GoldenVerify.8x8Grid");
-            yield return new TestCaseData("golden_single.json").SetName("GoldenVerify.Single");
-            yield return new TestCaseData("golden_wide.json").SetName("GoldenVerify.Wide");
-            yield return new TestCaseData("golden_tall.json").SetName("GoldenVerify.Tall");
-            yield return new TestCaseData("golden_odd.json").SetName("GoldenVerify.OddDimensions");
         }
 
         [Test]
@@ -583,34 +666,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             );
         }
 
-        /// <summary>
-        /// Test case source for static asset verification.
-        /// </summary>
-        private static IEnumerable<TestCaseData> StaticAssetCases()
-        {
-            yield return new TestCaseData("test_2x2_grid.png", 64, 64, true).SetName(
-                "StaticAsset.2x2Grid"
-            );
-            yield return new TestCaseData("test_4x4_grid.png", 128, 128, true).SetName(
-                "StaticAsset.4x4Grid"
-            );
-            yield return new TestCaseData("test_8x8_grid.png", 256, 256, true).SetName(
-                "StaticAsset.8x8Grid"
-            );
-            yield return new TestCaseData("test_single.png", 32, 32, true).SetName(
-                "StaticAsset.Single"
-            );
-            yield return new TestCaseData("test_wide.png", 128, 64, true).SetName(
-                "StaticAsset.Wide"
-            );
-            yield return new TestCaseData("test_tall.png", 64, 128, true).SetName(
-                "StaticAsset.Tall"
-            );
-            yield return new TestCaseData("test_odd.png", 63, 63, true).SetName(
-                "StaticAsset.OddDimensions"
-            );
-        }
-
         [Test]
         [TestCaseSource(nameof(StaticAssetCases))]
         public void StaticAssetHasExpectedDimensions(
@@ -843,61 +898,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             {
                 SharedSpriteTestFixtures.ReleaseFixtures();
             }
-        }
-
-        /// <summary>
-        /// Threshold for using compact array format vs multiline format in golden JSON files.
-        /// Arrays with this many elements or fewer use compact format.
-        /// </summary>
-        private const int CompactArrayThreshold = 4;
-
-        /// <summary>
-        /// Builds a JSON string for a golden metadata file.
-        /// </summary>
-        private static string BuildGoldenJson(
-            string sourceFile,
-            int spriteCount,
-            List<string> expectedNames,
-            int spriteWidth,
-            int spriteHeight,
-            int columns,
-            int rows
-        )
-        {
-            string namesJson;
-            if (expectedNames.Count <= CompactArrayThreshold)
-            {
-                namesJson =
-                    "[" + string.Join(", ", expectedNames.ConvertAll(n => $"\"{n}\"")) + "]";
-            }
-            else
-            {
-                System.Text.StringBuilder sb = new System.Text.StringBuilder();
-                sb.AppendLine("[");
-                for (int i = 0; i < expectedNames.Count; i++)
-                {
-                    sb.Append($"    \"{expectedNames[i]}\"");
-                    if (i < expectedNames.Count - 1)
-                    {
-                        sb.AppendLine(",");
-                    }
-                    else
-                    {
-                        sb.AppendLine();
-                    }
-                }
-                sb.Append("  ]");
-                namesJson = sb.ToString();
-            }
-
-            return $@"{{
-  ""sourceFile"": ""{sourceFile}"",
-  ""spriteCount"": {spriteCount},
-  ""expectedNames"": {namesJson},
-  ""spriteDimensions"": [{spriteWidth}, {spriteHeight}],
-  ""gridSize"": [{columns}, {rows}]
-}}
-";
         }
 
         /// <summary>

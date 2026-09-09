@@ -25,15 +25,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     public sealed class EditorMarkerTarget
     {
         [EditorMarker]
+        public int MarkedProperty { get; set; }
+
+        [EditorMarker]
         public int markedField;
 
         public EditorMarkerTarget(int markedField)
         {
             this.markedField = markedField;
         }
-
-        [EditorMarker]
-        public int MarkedProperty { get; set; }
 
         [EditorMarker]
         public void MarkedMethod() { }

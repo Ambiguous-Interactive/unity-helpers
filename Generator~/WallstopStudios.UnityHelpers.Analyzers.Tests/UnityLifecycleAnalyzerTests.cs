@@ -47,6 +47,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     public sealed class SuppressAnalyzerAttribute : System.Attribute { }
 }";
 
+        private static Diagnostic[] Analyze(string source)
+        {
+            List<MetadataReference> references = new List<MetadataReference>();
+            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
+                {
+                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
+                }
+            }
+
+            CSharpCompilation compilation = CSharpCompilation.Create(
+                "LifecycleFixture",
+                new[]
+                {
+                    CSharpSyntaxTree.ParseText(UnityTypes),
+                    CSharpSyntaxTree.ParseText(source),
+                },
+                references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+            );
+            Assert.That(
+                compilation
+                    .GetDiagnostics()
+                    .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error),
+                Is.Empty
+            );
+            return compilation
+                .WithAnalyzers(
+                    ImmutableArray.Create<DiagnosticAnalyzer>(new UnityLifecycleAnalyzer())
+                )
+                .GetAnalyzerDiagnosticsAsync()
+                .GetAwaiter()
+                .GetResult()
+                .ToArray();
+        }
+
         [TestCase("static void Awake() {}")]
         [TestCase("int Awake() => 1;")]
         [TestCase("void Update(int count) {}")]
@@ -416,43 +453,6 @@ class Subject : Base<int> { int Awake() => 1; }"
                 Analyze("class Subject : UnityEditor.Editor { int OnSceneGUI() => 1; }"),
                 Has.Length.EqualTo(1)
             );
-        }
-
-        private static Diagnostic[] Analyze(string source)
-        {
-            List<MetadataReference> references = new List<MetadataReference>();
-            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
-                {
-                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
-                }
-            }
-
-            CSharpCompilation compilation = CSharpCompilation.Create(
-                "LifecycleFixture",
-                new[]
-                {
-                    CSharpSyntaxTree.ParseText(UnityTypes),
-                    CSharpSyntaxTree.ParseText(source),
-                },
-                references,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-            );
-            Assert.That(
-                compilation
-                    .GetDiagnostics()
-                    .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error),
-                Is.Empty
-            );
-            return compilation
-                .WithAnalyzers(
-                    ImmutableArray.Create<DiagnosticAnalyzer>(new UnityLifecycleAnalyzer())
-                )
-                .GetAnalyzerDiagnosticsAsync()
-                .GetAwaiter()
-                .GetResult()
-                .ToArray();
         }
     }
 }

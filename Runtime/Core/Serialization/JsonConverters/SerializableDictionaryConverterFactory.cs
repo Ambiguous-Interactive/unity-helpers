@@ -69,6 +69,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             private const string ValuesPropertyName =
                 SerializableDictionarySerializedPropertyNames.Values;
 
+            private static void SetSerializedArrays(
+                SerializableDictionary<TKey, TValue> dict,
+                TKey[] keys,
+                TValue[] values
+            )
+            {
+                dict._keys = keys;
+                dict._values = values;
+            }
+
             public override SerializableDictionary<TKey, TValue> Read(
                 ref Utf8JsonReader reader,
                 Type typeToConvert,
@@ -157,16 +167,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                 WJsonArray.Write(writer, value.SerializedValues, options);
                 writer.WriteEndObject();
             }
-
-            private static void SetSerializedArrays(
-                SerializableDictionary<TKey, TValue> dict,
-                TKey[] keys,
-                TValue[] values
-            )
-            {
-                dict._keys = keys;
-                dict._values = values;
-            }
         }
 
         public sealed class SerializableDictionaryWithCacheConverter<TKey, TValue, TValueCache>
@@ -177,6 +177,16 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                 SerializableDictionarySerializedPropertyNames.Keys;
             private const string ValuesPropertyName =
                 SerializableDictionarySerializedPropertyNames.Values;
+
+            private static void SetSerializedArrays(
+                SerializableDictionary<TKey, TValue, TValueCache> dict,
+                TKey[] keys,
+                TValueCache[] values
+            )
+            {
+                dict._keys = keys;
+                dict._values = values;
+            }
 
             public override SerializableDictionary<TKey, TValue, TValueCache> Read(
                 ref Utf8JsonReader reader,
@@ -265,16 +275,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
                 writer.WritePropertyName(ValuesPropertyName);
                 WJsonArray.Write(writer, value.SerializedValues, options);
                 writer.WriteEndObject();
-            }
-
-            private static void SetSerializedArrays(
-                SerializableDictionary<TKey, TValue, TValueCache> dict,
-                TKey[] keys,
-                TValueCache[] values
-            )
-            {
-                dict._keys = keys;
-                dict._values = values;
             }
         }
     }

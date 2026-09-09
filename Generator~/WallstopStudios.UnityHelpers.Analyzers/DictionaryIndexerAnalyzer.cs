@@ -59,14 +59,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
             ImmutableArray.Create(UnityHelpersDiagnostics.DictionaryIndexerReadThrowsOnMiss);
 
-        /// <inheritdoc />
-        public override void Initialize(AnalysisContext context)
-        {
-            context.EnableConcurrentExecution();
-            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
-            context.RegisterCompilationStartAction(OnCompilationStart);
-        }
-
         private static void OnCompilationStart(CompilationStartAnalysisContext context)
         {
             INamedTypeSymbol dictionary = context.Compilation.GetTypeByMetadataName(
@@ -90,6 +82,14 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             );
         }
 
+        /// <inheritdoc />
+        public override void Initialize(AnalysisContext context)
+        {
+            context.EnableConcurrentExecution();
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+            context.RegisterCompilationStartAction(OnCompilationStart);
+        }
+
         /// <summary>
         /// The two dictionary interfaces, resolved once per compilation.
         /// </summary>
@@ -105,26 +105,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             {
                 _dictionary = dictionary;
                 _readOnlyDictionary = readOnlyDictionary;
-            }
-
-            internal void OnPropertyReference(OperationAnalysisContext context)
-            {
-                IPropertyReferenceOperation reference = (IPropertyReferenceOperation)
-                    context.Operation;
-                if (!IsDictionaryKeyIndexer(reference) || IsWriteOnly(reference))
-                {
-                    return;
-                }
-
-                context.ReportDiagnostic(
-                    Diagnostic.Create(
-                        UnityHelpersDiagnostics.DictionaryIndexerReadThrowsOnMiss,
-                        reference.Syntax.GetLocation(),
-                        reference.Property.ContainingType.ToDisplayString(
-                            SymbolDisplayFormat.MinimallyQualifiedFormat
-                        )
-                    )
-                );
             }
 
             /// <summary>
@@ -154,6 +134,49 @@ namespace WallstopStudios.UnityHelpers.Analyzers
 
                 return parent is IDeconstructionAssignmentOperation deconstruction
                     && ReferenceEquals(deconstruction.Target, assigned);
+            }
+
+            /// <summary>
+            /// <c>match.Groups["name"]</c>, which the interface test does not reach on the
+            /// framework Unity compiles against.
+            /// </summary>
+            /// <remarks>
+            /// <c>GroupCollection</c> gained <c>IReadOnlyDictionary&lt;string, Group&gt;</c> in
+            /// .NET Core 3.0 and does not carry it on netstandard2.1. Its string indexer is the
+            /// keyed one either way, and it is the worst member of the class: a group name the
+            /// pattern never declared comes back as an unsuccessful <c>Group</c> rather than as any
+            /// kind of error.
+            /// </remarks>
+            private static bool IsGroupCollectionNameIndexer(
+                INamedTypeSymbol containing,
+                ITypeSymbol key
+            )
+            {
+                return key.SpecialType == SpecialType.System_String
+                    && containing.MetadataName == "GroupCollection"
+                    && containing.ContainingNamespace != null
+                    && containing.ContainingNamespace.ToDisplayString()
+                        == "System.Text.RegularExpressions";
+            }
+
+            internal void OnPropertyReference(OperationAnalysisContext context)
+            {
+                IPropertyReferenceOperation reference = (IPropertyReferenceOperation)
+                    context.Operation;
+                if (!IsDictionaryKeyIndexer(reference) || IsWriteOnly(reference))
+                {
+                    return;
+                }
+
+                context.ReportDiagnostic(
+                    Diagnostic.Create(
+                        UnityHelpersDiagnostics.DictionaryIndexerReadThrowsOnMiss,
+                        reference.Syntax.GetLocation(),
+                        reference.Property.ContainingType.ToDisplayString(
+                            SymbolDisplayFormat.MinimallyQualifiedFormat
+                        )
+                    )
+                );
             }
 
             private bool IsDictionaryKeyIndexer(IPropertyReferenceOperation reference)
@@ -190,29 +213,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 }
 
                 return false;
-            }
-
-            /// <summary>
-            /// <c>match.Groups["name"]</c>, which the interface test does not reach on the
-            /// framework Unity compiles against.
-            /// </summary>
-            /// <remarks>
-            /// <c>GroupCollection</c> gained <c>IReadOnlyDictionary&lt;string, Group&gt;</c> in
-            /// .NET Core 3.0 and does not carry it on netstandard2.1. Its string indexer is the
-            /// keyed one either way, and it is the worst member of the class: a group name the
-            /// pattern never declared comes back as an unsuccessful <c>Group</c> rather than as any
-            /// kind of error.
-            /// </remarks>
-            private static bool IsGroupCollectionNameIndexer(
-                INamedTypeSymbol containing,
-                ITypeSymbol key
-            )
-            {
-                return key.SpecialType == SpecialType.System_String
-                    && containing.MetadataName == "GroupCollection"
-                    && containing.ContainingNamespace != null
-                    && containing.ContainingNamespace.ToDisplayString()
-                        == "System.Text.RegularExpressions";
             }
 
             private bool IsKeyedBy(INamedTypeSymbol candidate, ITypeSymbol key)

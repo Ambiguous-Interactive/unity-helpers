@@ -11,22 +11,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
     [CustomEditor(typeof(AttributeMetadataCache))]
     public sealed class AttributeMetadataCacheEditor : Editor
     {
-        public override void OnInspectorGUI()
-        {
-            DrawDefaultInspector();
-
-            EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Cache Utilities", EditorStyles.boldLabel);
-
-            using (new EditorGUI.DisabledScope(EditorApplication.isPlaying))
-            {
-                if (GUILayout.Button("Purge & Refresh Cache"))
-                {
-                    PurgeAndRefreshCache();
-                }
-            }
-        }
-
         private static void PurgeAndRefreshCache()
         {
             AttributeMetadataCache cache = AttributeMetadataCache.Instance;
@@ -47,6 +31,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
 
             AttributeMetadataCacheGenerator.GenerateCache();
             Debug.Log("Attribute Metadata Cache refreshed.");
+        }
+
+        public override void OnInspectorGUI()
+        {
+            DrawDefaultInspector();
+
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Cache Utilities", EditorStyles.boldLabel);
+
+            using (new EditorGUI.DisabledScope(EditorApplication.isPlaying))
+            {
+                if (GUILayout.Button("Purge & Refresh Cache"))
+                {
+                    PurgeAndRefreshCache();
+                }
+            }
         }
     }
 }

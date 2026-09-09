@@ -51,6 +51,79 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         /// </remarks>
         private const int MaxMemoizedPropertyEntries = 4096;
 
+        /// <remarks>
+        /// The key is built from a target instance id and a property path, so every inspected
+        /// object a session touches adds an entry that nothing removes.
+        /// Each value holds a <see cref="RequestRepaint"/> listener the clear paths deliberately
+        /// unsubscribe, so eviction has to do the same -- a dropped animation that kept its
+        /// listener would repaint every view for the life of the editor. A re-created animation
+        /// starts at its target rather than resuming, so an eviction mid-tween SNAPS the foldout
+        /// -- which needs the bound's worth of distinct keys touched inside one tween to reach,
+        /// because the least recently used entry is by definition not the foldout being drawn.
+        /// </remarks>
+        private const int MaxFoldoutAnimations = 256;
+
+        /// <summary>
+        /// Test hook to get detailed height calculation info for diagnostics.
+        /// </summary>
+        internal static (
+            float baseHeight,
+            float inlineHeight,
+            bool showHeader,
+            bool showBody,
+            float displayHeight
+        ) GetHeightCalculationDetailsForTesting(
+            SerializedProperty property,
+            WInLineEditorAttribute inlineAttribute,
+            Object value,
+            float availableWidth
+        )
+        {
+            if (value == null || property == null)
+            {
+                return (0f, 0f, false, false, 0f);
+            }
+
+            float baseHeight = inlineAttribute.DrawObjectField
+                ? EditorGUI.GetPropertyHeight(property, GUIContent.none, false)
+                : EditorGUIUtility.singleLineHeight;
+
+            WInLineEditorMode mode = InLineEditorShared.ResolveMode(inlineAttribute);
+            bool useStandaloneHeader = InLineEditorShared.ShouldDrawStandaloneHeader(
+                inlineAttribute
+            );
+            bool showHeader =
+                useStandaloneHeader
+                && (inlineAttribute.DrawHeader || mode != WInLineEditorMode.AlwaysExpanded);
+            bool foldoutState = GetFoldoutState(property, inlineAttribute, mode);
+            bool showBody = mode == WInLineEditorMode.AlwaysExpanded || foldoutState;
+
+            float inlineHeight = 0f;
+            float displayHeight = 0f;
+            if (showHeader)
+            {
+                inlineHeight += InLineEditorShared.HeaderHeight + InLineEditorShared.Spacing;
+            }
+
+            if (showBody)
+            {
+                InspectorHeightInfo inspectorHeightInfo = ResolveInspectorHeightInfo(
+                    value,
+                    inlineAttribute,
+                    availableWidth
+                );
+                displayHeight = inspectorHeightInfo.DisplayHeight;
+                inlineHeight += displayHeight;
+            }
+
+            return (baseHeight, inlineHeight, showHeader, showBody, displayHeight);
+        }
+
+        /// <summary>
+        /// Test hook to check if the force serialized inspector flag is enabled.
+        /// </summary>
+        internal static bool ForceSerializedInspectorForTesting => _forceSerializedInspector;
+
         private static readonly Cache<string, float> PropertyWidths = CacheBuilder<string, float>
             .NewBuilder()
             .MaximumSize(MaxMemoizedPropertyEntries)
@@ -81,18 +154,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         > InspectorHeightCache = new Dictionary<(long, float), InspectorHeightInfoCacheEntry>();
         private static int _lastInspectorHeightCacheFrame = -1;
 
-        /// <remarks>
-        /// The key is built from a target instance id and a property path, so every inspected
-        /// object a session touches adds an entry that nothing removes.
-        /// Each value holds a <see cref="RequestRepaint"/> listener the clear paths deliberately
-        /// unsubscribe, so eviction has to do the same -- a dropped animation that kept its
-        /// listener would repaint every view for the life of the editor. A re-created animation
-        /// starts at its target rather than resuming, so an eviction mid-tween SNAPS the foldout
-        /// -- which needs the bound's worth of distinct keys touched inside one tween to reach,
-        /// because the least recently used entry is by definition not the foldout being drawn.
-        /// </remarks>
-        private const int MaxFoldoutAnimations = 256;
-
         private static readonly Cache<string, AnimBool> FoldoutAnimations = CacheBuilder<
             string,
             AnimBool
@@ -111,6 +172,285 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         // Use serialized layout because reflected width overrides differ across Unity versions.
         private static bool _forceSerializedInspector = true;
+
+        internal static Rect GetInlineContentRectForTesting(Rect backgroundRect)
+        {
+            return GetInlineContentRect(backgroundRect);
+        }
+
+        /// <summary>
+        /// Test hook to get extensive diagnostic info for debugging height calculation issues.
+        /// </summary>
+        internal static string GetExtensiveDiagnosticsForTesting(
+            SerializedProperty property,
+            WInLineEditorAttribute inlineAttribute,
+            Object value,
+            float availableWidth
+        )
+        {
+            if (value == null || property == null)
+            {
+                return "null property or value";
+            }
+
+            System.Text.StringBuilder sb = new();
+            sb.AppendLine($"=== Extensive Diagnostics ===");
+            sb.AppendLine($"Property path: {property.propertyPath}");
+            sb.AppendLine($"Value type: {value.GetType().Name}");
+            sb.AppendLine($"Available width: {availableWidth}");
+
+            sb.AppendLine($"--- Attribute ---");
+            sb.AppendLine($"  Mode: {inlineAttribute.Mode}");
+            sb.AppendLine($"  DrawObjectField: {inlineAttribute.DrawObjectField}");
+            sb.AppendLine($"  DrawHeader: {inlineAttribute.DrawHeader}");
+            sb.AppendLine($"  EnableScrolling: {inlineAttribute.EnableScrolling}");
+            sb.AppendLine($"  InspectorHeight: {inlineAttribute.InspectorHeight}");
+            sb.AppendLine($"  MinInspectorWidth: {inlineAttribute.MinInspectorWidth}");
+            sb.AppendLine(
+                $"  HasExplicitMinInspectorWidth: {inlineAttribute.HasExplicitMinInspectorWidth}"
+            );
+
+            WInLineEditorMode resolvedMode = InLineEditorShared.ResolveMode(inlineAttribute);
+            sb.AppendLine($"--- Mode Resolution ---");
+            sb.AppendLine($"  Resolved mode: {resolvedMode}");
+            if (inlineAttribute.Mode == WInLineEditorMode.UseSettings)
+            {
+                UnityHelpersSettings.InlineEditorFoldoutBehavior behavior =
+                    UnityHelpersSettings.GetInlineEditorFoldoutBehavior();
+                sb.AppendLine($"  Settings behavior: {behavior}");
+            }
+
+            string foldoutKey = BuildFoldoutKey(property);
+            bool foldoutInCache = InLineEditorShared.GetFoldoutStateForTesting(foldoutKey);
+            bool foldoutState = GetFoldoutState(property, inlineAttribute, resolvedMode);
+            sb.AppendLine($"--- Foldout State ---");
+            sb.AppendLine($"  Foldout key: {foldoutKey}");
+            sb.AppendLine($"  In cache before GetFoldoutState: {foldoutInCache}");
+            sb.AppendLine($"  GetFoldoutState result: {foldoutState}");
+
+            bool useStandaloneHeader = InLineEditorShared.ShouldDrawStandaloneHeader(
+                inlineAttribute
+            );
+            bool showHeader =
+                useStandaloneHeader
+                && (inlineAttribute.DrawHeader || resolvedMode != WInLineEditorMode.AlwaysExpanded);
+            bool showBody = resolvedMode == WInLineEditorMode.AlwaysExpanded || foldoutState;
+            sb.AppendLine($"--- Visibility ---");
+            sb.AppendLine($"  useStandaloneHeader: {useStandaloneHeader}");
+            sb.AppendLine($"  showHeader: {showHeader}");
+            sb.AppendLine($"  showBody: {showBody}");
+
+            sb.AppendLine($"--- Inspector Height ---");
+            Editor editor = InLineEditorShared.GetOrCreateEditor(value);
+            SerializedObject analysisObject = GetSerializedObjectForAnalysis(editor, value);
+            using SerializedObject ownedAnalysisObject = editor == null ? analysisObject : null;
+            bool hasSerializedData = analysisObject != null;
+            bool hasSimpleLayout =
+                hasSerializedData && SerializedObjectHasOnlySimpleProperties(analysisObject);
+            bool canUseSerializedInspector =
+                hasSerializedData && ShouldUseSerializedInspector(editor);
+            sb.AppendLine(
+                $"  Editor type: {(editor != null ? editor.GetType().FullName : "null")}"
+            );
+            sb.AppendLine($"  hasSerializedData: {hasSerializedData}");
+            sb.AppendLine($"  hasSimpleLayout: {hasSimpleLayout}");
+            sb.AppendLine($"  canUseSerializedInspector: {canUseSerializedInspector}");
+
+            if (hasSerializedData)
+            {
+                float serializedHeight = CalculateSerializedInspectorHeight(analysisObject);
+                sb.AppendLine($"  Serialized inspector height: {serializedHeight}");
+
+                sb.AppendLine($"  --- Properties ---");
+                analysisObject.UpdateIfRequiredOrScript();
+                SerializedProperty iterator = analysisObject.GetIterator();
+                bool enterChildren = true;
+                while (iterator.NextVisible(enterChildren))
+                {
+                    float propHeight = EditorGUI.GetPropertyHeight(iterator, true);
+                    bool isScript = string.Equals(
+                        iterator.propertyPath,
+                        InLineEditorShared.ScriptPropertyPath,
+                        System.StringComparison.Ordinal
+                    );
+                    sb.AppendLine(
+                        $"    {iterator.propertyPath}: {propHeight}px (type: {iterator.propertyType}){(isScript ? " [SCRIPT - skipped]" : "")}"
+                    );
+                    enterChildren = false;
+                }
+            }
+
+            InspectorHeightInfo heightInfo = ResolveInspectorHeightInfo(
+                value,
+                inlineAttribute,
+                availableWidth
+            );
+            sb.AppendLine($"--- Height Info Result ---");
+            sb.AppendLine($"  ContentHeight: {heightInfo.ContentHeight}");
+            sb.AppendLine($"  DisplayHeight: {heightInfo.DisplayHeight}");
+            sb.AppendLine($"  UsesSerializedInspector: {heightInfo.UsesSerializedInspector}");
+            sb.AppendLine($"  HorizontalScrollbarHeight: {heightInfo.HorizontalScrollbarHeight}");
+            sb.AppendLine(
+                $"  RequiresHorizontalScrollbar: {heightInfo.RequiresHorizontalScrollbar}"
+            );
+            sb.AppendLine($"  PaddingHeight: {heightInfo.PaddingHeight}");
+
+            float inlineHeight = 0f;
+            if (showHeader)
+            {
+                inlineHeight += InLineEditorShared.HeaderHeight + InLineEditorShared.Spacing;
+            }
+            if (showBody)
+            {
+                inlineHeight += heightInfo.DisplayHeight;
+            }
+            sb.AppendLine($"--- Final Inline Height ---");
+            sb.AppendLine(
+                $"  Header contribution: {(showHeader ? InLineEditorShared.HeaderHeight + InLineEditorShared.Spacing : 0f)}"
+            );
+            sb.AppendLine($"  Body contribution: {(showBody ? heightInfo.DisplayHeight : 0f)}");
+            sb.AppendLine($"  Total inline height: {inlineHeight}");
+
+            return sb.ToString();
+        }
+
+        internal static bool ShouldShowPingButton(Object value)
+        {
+            return InLineEditorShared.ShouldShowPingButton(value);
+        }
+
+        internal static void ClearAnimationCacheForTesting()
+        {
+            FoldoutAnimations.Clear();
+        }
+
+        /// <summary>
+        /// Test hook to get the number of cached animation entries.
+        /// </summary>
+        internal static int GetAnimationCacheCountForTesting()
+        {
+            return FoldoutAnimations.Count;
+        }
+
+        /// <summary>
+        /// Test hook to check if an animation entry exists for a specific key.
+        /// </summary>
+        internal static bool HasAnimationCacheEntryForTesting(string foldoutKey)
+        {
+            return FoldoutAnimations.ContainsKey(foldoutKey);
+        }
+
+        /// <summary>
+        /// Test hook to get or create a foldout animation for testing purposes.
+        /// </summary>
+        internal static AnimBool GetOrCreateFoldoutAnimForTesting(string foldoutKey, bool expanded)
+        {
+            return GetOrCreateFoldoutAnim(foldoutKey, expanded);
+        }
+
+        /// <summary>
+        /// Test hook to get the fade progress for a foldout.
+        /// </summary>
+        internal static float GetFadeProgressForTesting(string foldoutKey, bool expanded)
+        {
+            return GetFadeProgress(foldoutKey, expanded);
+        }
+
+        /// <summary>
+        /// Test hook to build a foldout key from a serialized property.
+        /// </summary>
+        internal static string BuildFoldoutKeyForTesting(SerializedProperty property)
+        {
+            return BuildFoldoutKey(property);
+        }
+
+        internal static void ClearCachedStateForTesting()
+        {
+            InLineEditorShared.ClearCachedStateForTesting();
+            PropertyWidths.Clear();
+            FoldoutKeyCache.Clear();
+            ScrollKeyCache.Clear();
+            InspectorHeightCache.Clear();
+            _lastInspectorHeightCacheFrame = -1;
+            ClearAnimationCacheForTesting();
+        }
+
+        internal static void SetInlineFoldoutStateForTesting(
+            SerializedProperty property,
+            bool expanded
+        )
+        {
+            if (property == null)
+            {
+                return;
+            }
+
+            string key = BuildFoldoutKey(property);
+            InLineEditorShared.SetFoldoutState(key, expanded);
+        }
+
+        internal static bool UsesHorizontalScrollbarForTesting(
+            Object value,
+            WInLineEditorAttribute inlineAttribute,
+            float availableWidth
+        )
+        {
+            if (value == null || inlineAttribute == null)
+            {
+                return false;
+            }
+
+            InspectorHeightInfo inspectorHeightInfo = ResolveInspectorHeightInfo(
+                value,
+                inlineAttribute,
+                availableWidth
+            );
+            return inspectorHeightInfo.RequiresHorizontalScrollbar;
+        }
+
+        /// <summary>
+        /// Test hook to directly check if a SerializedObject has only simple properties.
+        /// This allows unit testing the simple layout detection without full editor integration.
+        /// </summary>
+        internal static bool HasOnlySimplePropertiesForTesting(SerializedObject serializedObject)
+        {
+            return SerializedObjectHasOnlySimpleProperties(serializedObject);
+        }
+
+        /// <summary>
+        /// Test hook to directly check horizontal scrollbar requirement with explicit parameters.
+        /// This bypasses editor creation and allows testing the decision logic directly.
+        /// </summary>
+        internal static bool RequiresHorizontalScrollbarForTesting(
+            bool enableScrolling,
+            float minInspectorWidth,
+            bool hasExplicitMinInspectorWidth,
+            bool hasSimpleLayout,
+            float availableWidth
+        )
+        {
+            float effectiveWidth = Mathf.Max(
+                0f,
+                availableWidth - (InLineEditorShared.ContentPadding * 2f)
+            );
+
+            const float MinimumUsableWidth = 200f;
+            bool widthIsTooNarrow = effectiveWidth < MinimumUsableWidth;
+            bool shouldRespectMinWidth =
+                hasExplicitMinInspectorWidth || !hasSimpleLayout || widthIsTooNarrow;
+            return enableScrolling
+                && 0f < minInspectorWidth
+                && shouldRespectMinWidth
+                && 0.5f < minInspectorWidth - effectiveWidth;
+        }
+
+        /// <summary>
+        /// Test hook to calculate label width for a given available width.
+        /// </summary>
+        internal static float CalculateLabelWidthForTesting(float availableWidth)
+        {
+            return availableWidth * InLineEditorShared.DefaultLabelWidthRatio;
+        }
 
         private static float GetHorizontalScrollbarHeight()
         {
@@ -164,157 +504,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 // Fallback for calls outside OnGUI - use a reasonable default
                 return 300f;
             }
-        }
-
-        public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
-        {
-            if (_isCalculatingHeight)
-            {
-                return EditorGUIUtility.singleLineHeight;
-            }
-
-            WInLineEditorAttribute inlineAttribute = (WInLineEditorAttribute)attribute;
-
-            float height;
-            try
-            {
-                _isCalculatingHeight = true;
-                height = inlineAttribute.DrawObjectField
-                    ? EditorGUI.GetPropertyHeight(property, label, false)
-                    : EditorGUIUtility.singleLineHeight;
-            }
-            finally
-            {
-                _isCalculatingHeight = false;
-            }
-
-            Object value = property.hasMultipleDifferentValues
-                ? null
-                : property.objectReferenceValue;
-            if (value == null || property.propertyType != SerializedPropertyType.ObjectReference)
-            {
-                return height;
-            }
-
-            float availableWidth = GetEstimatedPropertyWidth(property);
-            float inlineHeight = CalculateInlineHeight(
-                property,
-                inlineAttribute,
-                value,
-                availableWidth
-            );
-            return height
-                + (
-                    inlineHeight <= 0f
-                        ? 0f
-                        : EditorGUIUtility.standardVerticalSpacing + inlineHeight
-                );
-        }
-
-        public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
-        {
-            WInLineEditorAttribute inlineAttribute = (WInLineEditorAttribute)attribute;
-            EditorGUI.BeginProperty(position, label, property);
-
-            if (property.propertyType != SerializedPropertyType.ObjectReference)
-            {
-                EditorGUI.HelpBox(
-                    position,
-                    "WInLineEditor only supports object references.",
-                    MessageType.Warning
-                );
-                EditorGUI.EndProperty();
-                return;
-            }
-
-            if (property.hasMultipleDifferentValues)
-            {
-                if (inlineAttribute.DrawObjectField)
-                {
-                    EditorGUI.PropertyField(position, property, label, false);
-                }
-                else
-                {
-                    EditorGUI.LabelField(position, label);
-                }
-
-                EditorGUI.EndProperty();
-                return;
-            }
-
-            SetPropertyWidth(property, position.width);
-
-            float fieldHeight = inlineAttribute.DrawObjectField
-                ? EditorGUI.GetPropertyHeight(property, label, false)
-                : EditorGUIUtility.singleLineHeight;
-            Rect currentRect = new Rect(position.x, position.y, position.width, fieldHeight);
-
-            WInLineEditorMode mode = InLineEditorShared.ResolveMode(inlineAttribute);
-            string foldoutKey = BuildFoldoutKey(property);
-            bool foldoutState = GetFoldoutState(property, inlineAttribute, mode);
-
-            if (inlineAttribute.DrawObjectField)
-            {
-                foldoutState = DrawInlineObjectReferenceField(
-                    currentRect,
-                    property,
-                    label,
-                    foldoutState,
-                    foldoutKey,
-                    mode
-                );
-            }
-            else
-            {
-                foldoutState = DrawCompactObjectReferenceField(
-                    currentRect,
-                    property,
-                    label,
-                    foldoutState,
-                    foldoutKey,
-                    mode
-                );
-            }
-
-            currentRect.y += currentRect.height + EditorGUIUtility.standardVerticalSpacing;
-
-            Object value = property.objectReferenceValue;
-            if (value != null)
-            {
-                float inlineHeight = CalculateInlineHeight(
-                    property,
-                    inlineAttribute,
-                    value,
-                    currentRect.width
-                );
-                if (0f < inlineHeight)
-                {
-                    InspectorHeightInfo inspectorHeightInfo = ResolveInspectorHeightInfo(
-                        value,
-                        inlineAttribute,
-                        currentRect.width
-                    );
-                    Rect inlineRect = new Rect(
-                        currentRect.x,
-                        currentRect.y,
-                        currentRect.width,
-                        inlineHeight
-                    );
-                    DrawInlineInspector(
-                        inlineRect,
-                        property,
-                        inlineAttribute,
-                        label,
-                        value,
-                        foldoutState,
-                        foldoutKey,
-                        mode,
-                        inspectorHeightInfo
-                    );
-                }
-            }
-
-            EditorGUI.EndProperty();
         }
 
         private static float CalculateInlineHeight(
@@ -1047,203 +1236,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             );
         }
 
-        internal static Rect GetInlineContentRectForTesting(Rect backgroundRect)
-        {
-            return GetInlineContentRect(backgroundRect);
-        }
-
-        /// <summary>
-        /// Test hook to get detailed height calculation info for diagnostics.
-        /// </summary>
-        internal static (
-            float baseHeight,
-            float inlineHeight,
-            bool showHeader,
-            bool showBody,
-            float displayHeight
-        ) GetHeightCalculationDetailsForTesting(
-            SerializedProperty property,
-            WInLineEditorAttribute inlineAttribute,
-            Object value,
-            float availableWidth
-        )
-        {
-            if (value == null || property == null)
-            {
-                return (0f, 0f, false, false, 0f);
-            }
-
-            float baseHeight = inlineAttribute.DrawObjectField
-                ? EditorGUI.GetPropertyHeight(property, GUIContent.none, false)
-                : EditorGUIUtility.singleLineHeight;
-
-            WInLineEditorMode mode = InLineEditorShared.ResolveMode(inlineAttribute);
-            bool useStandaloneHeader = InLineEditorShared.ShouldDrawStandaloneHeader(
-                inlineAttribute
-            );
-            bool showHeader =
-                useStandaloneHeader
-                && (inlineAttribute.DrawHeader || mode != WInLineEditorMode.AlwaysExpanded);
-            bool foldoutState = GetFoldoutState(property, inlineAttribute, mode);
-            bool showBody = mode == WInLineEditorMode.AlwaysExpanded || foldoutState;
-
-            float inlineHeight = 0f;
-            float displayHeight = 0f;
-            if (showHeader)
-            {
-                inlineHeight += InLineEditorShared.HeaderHeight + InLineEditorShared.Spacing;
-            }
-
-            if (showBody)
-            {
-                InspectorHeightInfo inspectorHeightInfo = ResolveInspectorHeightInfo(
-                    value,
-                    inlineAttribute,
-                    availableWidth
-                );
-                displayHeight = inspectorHeightInfo.DisplayHeight;
-                inlineHeight += displayHeight;
-            }
-
-            return (baseHeight, inlineHeight, showHeader, showBody, displayHeight);
-        }
-
-        /// <summary>
-        /// Test hook to get extensive diagnostic info for debugging height calculation issues.
-        /// </summary>
-        internal static string GetExtensiveDiagnosticsForTesting(
-            SerializedProperty property,
-            WInLineEditorAttribute inlineAttribute,
-            Object value,
-            float availableWidth
-        )
-        {
-            if (value == null || property == null)
-            {
-                return "null property or value";
-            }
-
-            System.Text.StringBuilder sb = new();
-            sb.AppendLine($"=== Extensive Diagnostics ===");
-            sb.AppendLine($"Property path: {property.propertyPath}");
-            sb.AppendLine($"Value type: {value.GetType().Name}");
-            sb.AppendLine($"Available width: {availableWidth}");
-
-            sb.AppendLine($"--- Attribute ---");
-            sb.AppendLine($"  Mode: {inlineAttribute.Mode}");
-            sb.AppendLine($"  DrawObjectField: {inlineAttribute.DrawObjectField}");
-            sb.AppendLine($"  DrawHeader: {inlineAttribute.DrawHeader}");
-            sb.AppendLine($"  EnableScrolling: {inlineAttribute.EnableScrolling}");
-            sb.AppendLine($"  InspectorHeight: {inlineAttribute.InspectorHeight}");
-            sb.AppendLine($"  MinInspectorWidth: {inlineAttribute.MinInspectorWidth}");
-            sb.AppendLine(
-                $"  HasExplicitMinInspectorWidth: {inlineAttribute.HasExplicitMinInspectorWidth}"
-            );
-
-            WInLineEditorMode resolvedMode = InLineEditorShared.ResolveMode(inlineAttribute);
-            sb.AppendLine($"--- Mode Resolution ---");
-            sb.AppendLine($"  Resolved mode: {resolvedMode}");
-            if (inlineAttribute.Mode == WInLineEditorMode.UseSettings)
-            {
-                UnityHelpersSettings.InlineEditorFoldoutBehavior behavior =
-                    UnityHelpersSettings.GetInlineEditorFoldoutBehavior();
-                sb.AppendLine($"  Settings behavior: {behavior}");
-            }
-
-            string foldoutKey = BuildFoldoutKey(property);
-            bool foldoutInCache = InLineEditorShared.GetFoldoutStateForTesting(foldoutKey);
-            bool foldoutState = GetFoldoutState(property, inlineAttribute, resolvedMode);
-            sb.AppendLine($"--- Foldout State ---");
-            sb.AppendLine($"  Foldout key: {foldoutKey}");
-            sb.AppendLine($"  In cache before GetFoldoutState: {foldoutInCache}");
-            sb.AppendLine($"  GetFoldoutState result: {foldoutState}");
-
-            bool useStandaloneHeader = InLineEditorShared.ShouldDrawStandaloneHeader(
-                inlineAttribute
-            );
-            bool showHeader =
-                useStandaloneHeader
-                && (inlineAttribute.DrawHeader || resolvedMode != WInLineEditorMode.AlwaysExpanded);
-            bool showBody = resolvedMode == WInLineEditorMode.AlwaysExpanded || foldoutState;
-            sb.AppendLine($"--- Visibility ---");
-            sb.AppendLine($"  useStandaloneHeader: {useStandaloneHeader}");
-            sb.AppendLine($"  showHeader: {showHeader}");
-            sb.AppendLine($"  showBody: {showBody}");
-
-            sb.AppendLine($"--- Inspector Height ---");
-            Editor editor = InLineEditorShared.GetOrCreateEditor(value);
-            SerializedObject analysisObject = GetSerializedObjectForAnalysis(editor, value);
-            using SerializedObject ownedAnalysisObject = editor == null ? analysisObject : null;
-            bool hasSerializedData = analysisObject != null;
-            bool hasSimpleLayout =
-                hasSerializedData && SerializedObjectHasOnlySimpleProperties(analysisObject);
-            bool canUseSerializedInspector =
-                hasSerializedData && ShouldUseSerializedInspector(editor);
-            sb.AppendLine(
-                $"  Editor type: {(editor != null ? editor.GetType().FullName : "null")}"
-            );
-            sb.AppendLine($"  hasSerializedData: {hasSerializedData}");
-            sb.AppendLine($"  hasSimpleLayout: {hasSimpleLayout}");
-            sb.AppendLine($"  canUseSerializedInspector: {canUseSerializedInspector}");
-
-            if (hasSerializedData)
-            {
-                float serializedHeight = CalculateSerializedInspectorHeight(analysisObject);
-                sb.AppendLine($"  Serialized inspector height: {serializedHeight}");
-
-                sb.AppendLine($"  --- Properties ---");
-                analysisObject.UpdateIfRequiredOrScript();
-                SerializedProperty iterator = analysisObject.GetIterator();
-                bool enterChildren = true;
-                while (iterator.NextVisible(enterChildren))
-                {
-                    float propHeight = EditorGUI.GetPropertyHeight(iterator, true);
-                    bool isScript = string.Equals(
-                        iterator.propertyPath,
-                        InLineEditorShared.ScriptPropertyPath,
-                        System.StringComparison.Ordinal
-                    );
-                    sb.AppendLine(
-                        $"    {iterator.propertyPath}: {propHeight}px (type: {iterator.propertyType}){(isScript ? " [SCRIPT - skipped]" : "")}"
-                    );
-                    enterChildren = false;
-                }
-            }
-
-            InspectorHeightInfo heightInfo = ResolveInspectorHeightInfo(
-                value,
-                inlineAttribute,
-                availableWidth
-            );
-            sb.AppendLine($"--- Height Info Result ---");
-            sb.AppendLine($"  ContentHeight: {heightInfo.ContentHeight}");
-            sb.AppendLine($"  DisplayHeight: {heightInfo.DisplayHeight}");
-            sb.AppendLine($"  UsesSerializedInspector: {heightInfo.UsesSerializedInspector}");
-            sb.AppendLine($"  HorizontalScrollbarHeight: {heightInfo.HorizontalScrollbarHeight}");
-            sb.AppendLine(
-                $"  RequiresHorizontalScrollbar: {heightInfo.RequiresHorizontalScrollbar}"
-            );
-            sb.AppendLine($"  PaddingHeight: {heightInfo.PaddingHeight}");
-
-            float inlineHeight = 0f;
-            if (showHeader)
-            {
-                inlineHeight += InLineEditorShared.HeaderHeight + InLineEditorShared.Spacing;
-            }
-            if (showBody)
-            {
-                inlineHeight += heightInfo.DisplayHeight;
-            }
-            sb.AppendLine($"--- Final Inline Height ---");
-            sb.AppendLine(
-                $"  Header contribution: {(showHeader ? InLineEditorShared.HeaderHeight + InLineEditorShared.Spacing : 0f)}"
-            );
-            sb.AppendLine($"  Body contribution: {(showBody ? heightInfo.DisplayHeight : 0f)}");
-            sb.AppendLine($"  Total inline height: {inlineHeight}");
-
-            return sb.ToString();
-        }
-
         private static bool DrawHeader(
             Rect rect,
             SerializedProperty property,
@@ -1347,11 +1339,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             return key;
         }
 
-        internal static bool ShouldShowPingButton(Object value)
-        {
-            return InLineEditorShared.ShouldShowPingButton(value);
-        }
-
         private static bool GetFoldoutState(
             SerializedProperty property,
             WInLineEditorAttribute inlineAttribute,
@@ -1407,142 +1394,155 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
         }
 
-        internal static void ClearAnimationCacheForTesting()
+        public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
-            FoldoutAnimations.Clear();
-        }
-
-        /// <summary>
-        /// Test hook to get the number of cached animation entries.
-        /// </summary>
-        internal static int GetAnimationCacheCountForTesting()
-        {
-            return FoldoutAnimations.Count;
-        }
-
-        /// <summary>
-        /// Test hook to check if an animation entry exists for a specific key.
-        /// </summary>
-        internal static bool HasAnimationCacheEntryForTesting(string foldoutKey)
-        {
-            return FoldoutAnimations.ContainsKey(foldoutKey);
-        }
-
-        /// <summary>
-        /// Test hook to get or create a foldout animation for testing purposes.
-        /// </summary>
-        internal static AnimBool GetOrCreateFoldoutAnimForTesting(string foldoutKey, bool expanded)
-        {
-            return GetOrCreateFoldoutAnim(foldoutKey, expanded);
-        }
-
-        /// <summary>
-        /// Test hook to get the fade progress for a foldout.
-        /// </summary>
-        internal static float GetFadeProgressForTesting(string foldoutKey, bool expanded)
-        {
-            return GetFadeProgress(foldoutKey, expanded);
-        }
-
-        /// <summary>
-        /// Test hook to build a foldout key from a serialized property.
-        /// </summary>
-        internal static string BuildFoldoutKeyForTesting(SerializedProperty property)
-        {
-            return BuildFoldoutKey(property);
-        }
-
-        internal static void ClearCachedStateForTesting()
-        {
-            InLineEditorShared.ClearCachedStateForTesting();
-            PropertyWidths.Clear();
-            FoldoutKeyCache.Clear();
-            ScrollKeyCache.Clear();
-            InspectorHeightCache.Clear();
-            _lastInspectorHeightCacheFrame = -1;
-            ClearAnimationCacheForTesting();
-        }
-
-        internal static void SetInlineFoldoutStateForTesting(
-            SerializedProperty property,
-            bool expanded
-        )
-        {
-            if (property == null)
+            if (_isCalculatingHeight)
             {
+                return EditorGUIUtility.singleLineHeight;
+            }
+
+            WInLineEditorAttribute inlineAttribute = (WInLineEditorAttribute)attribute;
+
+            float height;
+            try
+            {
+                _isCalculatingHeight = true;
+                height = inlineAttribute.DrawObjectField
+                    ? EditorGUI.GetPropertyHeight(property, label, false)
+                    : EditorGUIUtility.singleLineHeight;
+            }
+            finally
+            {
+                _isCalculatingHeight = false;
+            }
+
+            Object value = property.hasMultipleDifferentValues
+                ? null
+                : property.objectReferenceValue;
+            if (value == null || property.propertyType != SerializedPropertyType.ObjectReference)
+            {
+                return height;
+            }
+
+            float availableWidth = GetEstimatedPropertyWidth(property);
+            float inlineHeight = CalculateInlineHeight(
+                property,
+                inlineAttribute,
+                value,
+                availableWidth
+            );
+            return height
+                + (
+                    inlineHeight <= 0f
+                        ? 0f
+                        : EditorGUIUtility.standardVerticalSpacing + inlineHeight
+                );
+        }
+
+        public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+        {
+            WInLineEditorAttribute inlineAttribute = (WInLineEditorAttribute)attribute;
+            EditorGUI.BeginProperty(position, label, property);
+
+            if (property.propertyType != SerializedPropertyType.ObjectReference)
+            {
+                EditorGUI.HelpBox(
+                    position,
+                    "WInLineEditor only supports object references.",
+                    MessageType.Warning
+                );
+                EditorGUI.EndProperty();
                 return;
             }
 
-            string key = BuildFoldoutKey(property);
-            InLineEditorShared.SetFoldoutState(key, expanded);
-        }
-
-        internal static bool UsesHorizontalScrollbarForTesting(
-            Object value,
-            WInLineEditorAttribute inlineAttribute,
-            float availableWidth
-        )
-        {
-            if (value == null || inlineAttribute == null)
+            if (property.hasMultipleDifferentValues)
             {
-                return false;
+                if (inlineAttribute.DrawObjectField)
+                {
+                    EditorGUI.PropertyField(position, property, label, false);
+                }
+                else
+                {
+                    EditorGUI.LabelField(position, label);
+                }
+
+                EditorGUI.EndProperty();
+                return;
             }
 
-            InspectorHeightInfo inspectorHeightInfo = ResolveInspectorHeightInfo(
-                value,
-                inlineAttribute,
-                availableWidth
-            );
-            return inspectorHeightInfo.RequiresHorizontalScrollbar;
-        }
+            SetPropertyWidth(property, position.width);
 
-        /// <summary>
-        /// Test hook to directly check if a SerializedObject has only simple properties.
-        /// This allows unit testing the simple layout detection without full editor integration.
-        /// </summary>
-        internal static bool HasOnlySimplePropertiesForTesting(SerializedObject serializedObject)
-        {
-            return SerializedObjectHasOnlySimpleProperties(serializedObject);
-        }
+            float fieldHeight = inlineAttribute.DrawObjectField
+                ? EditorGUI.GetPropertyHeight(property, label, false)
+                : EditorGUIUtility.singleLineHeight;
+            Rect currentRect = new Rect(position.x, position.y, position.width, fieldHeight);
 
-        /// <summary>
-        /// Test hook to directly check horizontal scrollbar requirement with explicit parameters.
-        /// This bypasses editor creation and allows testing the decision logic directly.
-        /// </summary>
-        internal static bool RequiresHorizontalScrollbarForTesting(
-            bool enableScrolling,
-            float minInspectorWidth,
-            bool hasExplicitMinInspectorWidth,
-            bool hasSimpleLayout,
-            float availableWidth
-        )
-        {
-            float effectiveWidth = Mathf.Max(
-                0f,
-                availableWidth - (InLineEditorShared.ContentPadding * 2f)
-            );
+            WInLineEditorMode mode = InLineEditorShared.ResolveMode(inlineAttribute);
+            string foldoutKey = BuildFoldoutKey(property);
+            bool foldoutState = GetFoldoutState(property, inlineAttribute, mode);
 
-            const float MinimumUsableWidth = 200f;
-            bool widthIsTooNarrow = effectiveWidth < MinimumUsableWidth;
-            bool shouldRespectMinWidth =
-                hasExplicitMinInspectorWidth || !hasSimpleLayout || widthIsTooNarrow;
-            return enableScrolling
-                && 0f < minInspectorWidth
-                && shouldRespectMinWidth
-                && 0.5f < minInspectorWidth - effectiveWidth;
-        }
+            if (inlineAttribute.DrawObjectField)
+            {
+                foldoutState = DrawInlineObjectReferenceField(
+                    currentRect,
+                    property,
+                    label,
+                    foldoutState,
+                    foldoutKey,
+                    mode
+                );
+            }
+            else
+            {
+                foldoutState = DrawCompactObjectReferenceField(
+                    currentRect,
+                    property,
+                    label,
+                    foldoutState,
+                    foldoutKey,
+                    mode
+                );
+            }
 
-        /// <summary>
-        /// Test hook to check if the force serialized inspector flag is enabled.
-        /// </summary>
-        internal static bool ForceSerializedInspectorForTesting => _forceSerializedInspector;
+            currentRect.y += currentRect.height + EditorGUIUtility.standardVerticalSpacing;
 
-        /// <summary>
-        /// Test hook to calculate label width for a given available width.
-        /// </summary>
-        internal static float CalculateLabelWidthForTesting(float availableWidth)
-        {
-            return availableWidth * InLineEditorShared.DefaultLabelWidthRatio;
+            Object value = property.objectReferenceValue;
+            if (value != null)
+            {
+                float inlineHeight = CalculateInlineHeight(
+                    property,
+                    inlineAttribute,
+                    value,
+                    currentRect.width
+                );
+                if (0f < inlineHeight)
+                {
+                    InspectorHeightInfo inspectorHeightInfo = ResolveInspectorHeightInfo(
+                        value,
+                        inlineAttribute,
+                        currentRect.width
+                    );
+                    Rect inlineRect = new Rect(
+                        currentRect.x,
+                        currentRect.y,
+                        currentRect.width,
+                        inlineHeight
+                    );
+                    DrawInlineInspector(
+                        inlineRect,
+                        property,
+                        inlineAttribute,
+                        label,
+                        value,
+                        foldoutState,
+                        foldoutKey,
+                        mode,
+                        inspectorHeightInfo
+                    );
+                }
+            }
+
+            EditorGUI.EndProperty();
         }
 
         private sealed class InspectorHeightInfoCacheEntry
@@ -1552,6 +1552,16 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
 
         private readonly struct InspectorHeightInfo
         {
+            public static InspectorHeightInfo Empty =>
+                new InspectorHeightInfo(0f, 0f, false, 0f, false, 0f);
+
+            public float ContentHeight { get; }
+            public float DisplayHeight { get; }
+            public bool UsesSerializedInspector { get; }
+            public float HorizontalScrollbarHeight { get; }
+            public bool RequiresHorizontalScrollbar { get; }
+            public float PaddingHeight { get; }
+
             public InspectorHeightInfo(
                 float contentHeight,
                 float displayHeight,
@@ -1568,16 +1578,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 RequiresHorizontalScrollbar = requiresHorizontalScrollbar;
                 PaddingHeight = Mathf.Max(0f, paddingHeight);
             }
-
-            public float ContentHeight { get; }
-            public float DisplayHeight { get; }
-            public bool UsesSerializedInspector { get; }
-            public float HorizontalScrollbarHeight { get; }
-            public bool RequiresHorizontalScrollbar { get; }
-            public float PaddingHeight { get; }
-
-            public static InspectorHeightInfo Empty =>
-                new InspectorHeightInfo(0f, 0f, false, 0f, false, 0f);
         }
     }
 }

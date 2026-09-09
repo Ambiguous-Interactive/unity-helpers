@@ -19,98 +19,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
             ImmutableArray.Create(UnityHelpersDiagnostics.InvalidUnityLifecycleSignature);
 
-        /// <summary>
-        /// Registers lifecycle callback analysis.
-        /// </summary>
-        public override void Initialize(AnalysisContext context)
-        {
-            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
-            context.EnableConcurrentExecution();
-            context.RegisterCompilationStartAction(startContext =>
-            {
-                INamedTypeSymbol monoBehaviour = startContext.Compilation.GetTypeByMetadataName(
-                    "UnityEngine.MonoBehaviour"
-                );
-                INamedTypeSymbol scriptableObject = startContext.Compilation.GetTypeByMetadataName(
-                    "UnityEngine.ScriptableObject"
-                );
-                INamedTypeSymbol enumerator = startContext.Compilation.GetTypeByMetadataName(
-                    "System.Collections.IEnumerator"
-                );
-                INamedTypeSymbol suppressionAttribute =
-                    startContext.Compilation.GetTypeByMetadataName(
-                        "WallstopStudios.UnityHelpers.Tests.Core.SuppressAnalyzerAttribute"
-                    );
-                if (monoBehaviour == null && scriptableObject == null)
-                {
-                    return;
-                }
-
-                startContext.RegisterSymbolAction(
-                    symbolContext =>
-                    {
-                        IMethodSymbol method = (IMethodSymbol)symbolContext.Symbol;
-                        if (
-                            method.MethodKind != MethodKind.Ordinary
-                            || method.IsImplicitlyDeclared
-                            || method.IsOverride
-                            || IsSuppressed(method, suppressionAttribute)
-                            || IsSuppressed(method.ContainingType, suppressionAttribute)
-                        )
-                        {
-                            return;
-                        }
-
-                        bool isMonoBehaviour = DerivesFrom(method.ContainingType, monoBehaviour);
-                        if (
-                            !isMonoBehaviour
-                            && !DerivesFrom(method.ContainingType, scriptableObject)
-                        )
-                        {
-                            return;
-                        }
-
-                        bool isEditorWindow = DerivesFrom(
-                            method.ContainingType,
-                            startContext.Compilation.GetTypeByMetadataName(
-                                "UnityEditor.EditorWindow"
-                            )
-                        );
-                        bool isEditor = DerivesFrom(
-                            method.ContainingType,
-                            startContext.Compilation.GetTypeByMetadataName("UnityEditor.Editor")
-                        );
-                        if (!IsCallback(method.Name, isMonoBehaviour, isEditorWindow, isEditor))
-                        {
-                            return;
-                        }
-
-                        CallbackSignature signature = GetSignature(method.Name);
-                        if (!isMonoBehaviour)
-                        {
-                            signature = new CallbackSignature(false, false, signature.Parameters);
-                        }
-                        if (IsValid(method, signature, startContext.Compilation, enumerator))
-                        {
-                            return;
-                        }
-
-                        symbolContext.ReportDiagnostic(
-                            Diagnostic.Create(
-                                UnityHelpersDiagnostics.InvalidUnityLifecycleSignature,
-                                method.Locations[0],
-                                method.ToDisplayString(
-                                    SymbolDisplayFormat.CSharpErrorMessageFormat
-                                ),
-                                signature.Description
-                            )
-                        );
-                    },
-                    SymbolKind.Method
-                );
-            });
-        }
-
         internal static bool DerivesFrom(INamedTypeSymbol candidate, INamedTypeSymbol expected)
         {
             if (expected == null)
@@ -388,8 +296,107 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             }
         }
 
+        /// <summary>
+        /// Registers lifecycle callback analysis.
+        /// </summary>
+        public override void Initialize(AnalysisContext context)
+        {
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+            context.EnableConcurrentExecution();
+            context.RegisterCompilationStartAction(startContext =>
+            {
+                INamedTypeSymbol monoBehaviour = startContext.Compilation.GetTypeByMetadataName(
+                    "UnityEngine.MonoBehaviour"
+                );
+                INamedTypeSymbol scriptableObject = startContext.Compilation.GetTypeByMetadataName(
+                    "UnityEngine.ScriptableObject"
+                );
+                INamedTypeSymbol enumerator = startContext.Compilation.GetTypeByMetadataName(
+                    "System.Collections.IEnumerator"
+                );
+                INamedTypeSymbol suppressionAttribute =
+                    startContext.Compilation.GetTypeByMetadataName(
+                        "WallstopStudios.UnityHelpers.Tests.Core.SuppressAnalyzerAttribute"
+                    );
+                if (monoBehaviour == null && scriptableObject == null)
+                {
+                    return;
+                }
+
+                startContext.RegisterSymbolAction(
+                    symbolContext =>
+                    {
+                        IMethodSymbol method = (IMethodSymbol)symbolContext.Symbol;
+                        if (
+                            method.MethodKind != MethodKind.Ordinary
+                            || method.IsImplicitlyDeclared
+                            || method.IsOverride
+                            || IsSuppressed(method, suppressionAttribute)
+                            || IsSuppressed(method.ContainingType, suppressionAttribute)
+                        )
+                        {
+                            return;
+                        }
+
+                        bool isMonoBehaviour = DerivesFrom(method.ContainingType, monoBehaviour);
+                        if (
+                            !isMonoBehaviour
+                            && !DerivesFrom(method.ContainingType, scriptableObject)
+                        )
+                        {
+                            return;
+                        }
+
+                        bool isEditorWindow = DerivesFrom(
+                            method.ContainingType,
+                            startContext.Compilation.GetTypeByMetadataName(
+                                "UnityEditor.EditorWindow"
+                            )
+                        );
+                        bool isEditor = DerivesFrom(
+                            method.ContainingType,
+                            startContext.Compilation.GetTypeByMetadataName("UnityEditor.Editor")
+                        );
+                        if (!IsCallback(method.Name, isMonoBehaviour, isEditorWindow, isEditor))
+                        {
+                            return;
+                        }
+
+                        CallbackSignature signature = GetSignature(method.Name);
+                        if (!isMonoBehaviour)
+                        {
+                            signature = new CallbackSignature(false, false, signature.Parameters);
+                        }
+                        if (IsValid(method, signature, startContext.Compilation, enumerator))
+                        {
+                            return;
+                        }
+
+                        symbolContext.ReportDiagnostic(
+                            Diagnostic.Create(
+                                UnityHelpersDiagnostics.InvalidUnityLifecycleSignature,
+                                method.Locations[0],
+                                method.ToDisplayString(
+                                    SymbolDisplayFormat.CSharpErrorMessageFormat
+                                ),
+                                signature.Description
+                            )
+                        );
+                    },
+                    SymbolKind.Method
+                );
+            });
+        }
+
         private readonly struct CallbackSignature
         {
+            internal string Description =>
+                (Coroutine ? "void or System.Collections.IEnumerator" : "void")
+                + " ("
+                + string.Join(", ", Parameters)
+                + ")"
+                + (OptionalParameter ? "; the event argument may also be omitted" : string.Empty);
+
             internal readonly bool Coroutine;
             internal readonly bool OptionalParameter;
             internal readonly string[] Parameters;
@@ -404,13 +411,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 OptionalParameter = optionalParameter;
                 Parameters = parameters;
             }
-
-            internal string Description =>
-                (Coroutine ? "void or System.Collections.IEnumerator" : "void")
-                + " ("
-                + string.Join(", ", Parameters)
-                + ")"
-                + (OptionalParameter ? "; the event argument may also be omitted" : string.Empty);
         }
     }
 }

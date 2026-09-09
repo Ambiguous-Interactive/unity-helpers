@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     using System;
     using System.Collections.Generic;
     using Utils;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     public static partial class IListExtensions
     {
@@ -73,7 +74,13 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             if (length <= Ips4oFallbackThreshold)
             {
-                PatternDefeatingQuickSortRange(array, left, right, comparer, 2 * FloorLog2(length));
+                PatternDefeatingQuickSortRange(
+                    array,
+                    left,
+                    right,
+                    comparer,
+                    2 * BitOps.Log2(length)
+                );
                 return;
             }
 
@@ -147,7 +154,13 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             if (degeneratePartition)
             {
-                PatternDefeatingQuickSortRange(array, left, right, comparer, 2 * FloorLog2(length));
+                PatternDefeatingQuickSortRange(
+                    array,
+                    left,
+                    right,
+                    comparer,
+                    2 * BitOps.Log2(length)
+                );
                 return;
             }
 

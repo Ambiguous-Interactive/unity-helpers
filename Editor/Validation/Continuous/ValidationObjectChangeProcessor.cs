@@ -23,6 +23,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             UpdateSubscriptions();
         }
 
+        internal static Object Load(ValidationTarget target)
+        {
+            if (LivePrefabRoots.TryGetValue(target.AssetGuid, out GameObject root))
+            {
+                if (root != null)
+                    return root;
+                LivePrefabRoots.Remove(target.AssetGuid);
+            }
+            return AssetDatabase.LoadMainAssetAtPath(target.AssetPath);
+        }
+
         private static void UpdateSubscriptions()
         {
             Undo.postprocessModifications -= Modified;
@@ -91,17 +102,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             PrefabStage stage = PrefabStageUtility.GetCurrentPrefabStage();
             if (stage != null && stage.scene.isDirty)
                 QueueObject(stage.prefabContentsRoot);
-        }
-
-        internal static Object Load(ValidationTarget target)
-        {
-            if (LivePrefabRoots.TryGetValue(target.AssetGuid, out GameObject root))
-            {
-                if (root != null)
-                    return root;
-                LivePrefabRoots.Remove(target.AssetGuid);
-            }
-            return AssetDatabase.LoadMainAssetAtPath(target.AssetPath);
         }
     }
 #endif

@@ -58,6 +58,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         [JsonInclude]
         public int ByteCount => _byteCount;
 
+        [ProtoMember(5)]
+        [JsonIgnore]
+        internal readonly byte[] _payload;
+
         [ProtoMember(1)]
         [JsonIgnore]
         private readonly ulong _state1;
@@ -73,10 +77,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         [ProtoMember(4)]
         [JsonIgnore]
         private readonly double _gaussian;
-
-        [ProtoMember(5)]
-        [JsonIgnore]
-        internal readonly byte[] _payload;
 
         [ProtoMember(6)]
         [JsonIgnore]
@@ -172,6 +172,53 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             );
         }
 
+        internal static int ComputeHashCode(
+            ulong state1,
+            ulong state2,
+            bool hasGaussian,
+            double gaussian,
+            byte[] payload,
+            uint bitBuffer,
+            int bitCount,
+            uint byteBuffer,
+            int byteCount
+        )
+        {
+            return Objects.HashCode(
+                state1,
+                state2,
+                hasGaussian,
+                GaussianHashContribution(hasGaussian, gaussian),
+                payload?.Length,
+                bitBuffer,
+                bitCount,
+                byteBuffer,
+                byteCount
+            );
+        }
+
+        private static double GaussianHashContribution(bool hasGaussian, double gaussian)
+        {
+            if (!hasGaussian)
+            {
+                return 0d;
+            }
+
+            if (double.IsNaN(gaussian))
+            {
+                return double.NaN;
+            }
+
+            /* Canonicalize signed zero to match TotalEquals. */
+            // ReSharper disable once CompareOfFloatsByEqualityOperator
+            if (gaussian == 0d)
+            {
+                return 0d;
+            }
+
+            return gaussian;
+        }
+
         public override bool Equals(object other)
         {
             return other is RandomState randomState && Equals(randomState);
@@ -241,53 +288,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
                 _byteBuffer,
                 _byteCount
             );
-        }
-
-        internal static int ComputeHashCode(
-            ulong state1,
-            ulong state2,
-            bool hasGaussian,
-            double gaussian,
-            byte[] payload,
-            uint bitBuffer,
-            int bitCount,
-            uint byteBuffer,
-            int byteCount
-        )
-        {
-            return Objects.HashCode(
-                state1,
-                state2,
-                hasGaussian,
-                GaussianHashContribution(hasGaussian, gaussian),
-                payload?.Length,
-                bitBuffer,
-                bitCount,
-                byteBuffer,
-                byteCount
-            );
-        }
-
-        private static double GaussianHashContribution(bool hasGaussian, double gaussian)
-        {
-            if (!hasGaussian)
-            {
-                return 0d;
-            }
-
-            if (double.IsNaN(gaussian))
-            {
-                return double.NaN;
-            }
-
-            /* Canonicalize signed zero to match TotalEquals. */
-            // ReSharper disable once CompareOfFloatsByEqualityOperator
-            if (gaussian == 0d)
-            {
-                return 0d;
-            }
-
-            return gaussian;
         }
 
         public override string ToString()

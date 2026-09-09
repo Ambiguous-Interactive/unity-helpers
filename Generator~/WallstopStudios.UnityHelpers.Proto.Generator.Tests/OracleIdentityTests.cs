@@ -15,6 +15,21 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [TestFixture]
     public sealed class OracleIdentityTests
     {
+        private static string Sha256(string path)
+        {
+            using (FileStream stream = File.OpenRead(path))
+            using (SHA256 sha256 = SHA256.Create())
+            {
+                byte[] hash = sha256.ComputeHash(stream);
+                StringBuilder value = new StringBuilder(hash.Length * 2);
+                foreach (byte current in hash)
+                {
+                    value.Append(current.ToString("x2"));
+                }
+                return value.ToString();
+            }
+        }
+
         [Test]
         public void LoadedOracleHasTheExpectedPhysicalIdentity()
         {
@@ -59,21 +74,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.AreEqual(expectedInformationalVersion, coreInformation.InformationalVersion);
             Assert.AreEqual(expectedCoreSha256, Sha256(core.Location));
 #endif
-        }
-
-        private static string Sha256(string path)
-        {
-            using (FileStream stream = File.OpenRead(path))
-            using (SHA256 sha256 = SHA256.Create())
-            {
-                byte[] hash = sha256.ComputeHash(stream);
-                StringBuilder value = new StringBuilder(hash.Length * 2);
-                foreach (byte current in hash)
-                {
-                    value.Append(current.ToString("x2"));
-                }
-                return value.ToString();
-            }
         }
     }
 }

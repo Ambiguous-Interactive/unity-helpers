@@ -26,6 +26,612 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [TestFixture]
     public sealed class DiagnosticTests
     {
+        /// <summary>
+        /// protobuf-net's contract vocabulary under a namespace of the consumer's own, which is what
+        /// a project does when it has to vendor the library to avoid an assembly conflict.
+        /// </summary>
+        private const string VendoredProtobufNet =
+            @"namespace Vendored
+              {
+                  public sealed class ProtoContractAttribute : global::System.Attribute { }
+                  public sealed class ProtoMemberAttribute : global::System.Attribute { public ProtoMemberAttribute(int tag) { } }
+              }";
+
+        /// <summary>
+        /// The assembly declaring <c>[DataContract]</c>, referenced explicitly so a fixture using it
+        /// does not depend on whether some earlier test happened to load it.
+        /// </summary>
+        private static readonly MetadataReference DataContractReference =
+            MetadataReference.CreateFromFile(
+                typeof(System.Runtime.Serialization.DataContractAttribute).Assembly.Location
+            );
+
+        private static IEnumerable<TestCaseData> WithholdingShapes()
+        {
+            /*
+             * The positive emission control distinguishes refusal from a harness that never generates
+             * formatters.
+             */
+            yield return Withholding(
+                "nothing refused, so everything publishes",
+                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)] public partial class GoodOne : Base { [WProtoMember(1)] public int B; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 6)] public partial class GoodTwo : Base { [WProtoMember(1)] public int C; }",
+                "Base",
+                "GoodOne",
+                "GoodTwo"
+            );
+            yield return Withholding(
+                "one undeclared sibling withholds only itself",
+                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)] public partial class GoodOne : Base { [WProtoMember(1)] public int B; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 6)] public partial class GoodTwo : Base { [WProtoMember(1)] public int C; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 7)] public partial class GoodThree : Base { [WProtoMember(1)] public int D; }
+                  [WProtoContract] public partial class Undeclared : Base { [WProtoMember(1)] public int E; }",
+                "Base",
+                "GoodOne",
+                "GoodThree",
+                "GoodTwo"
+            );
+            yield return Withholding(
+                "a refused subtype leaves its base published",
+                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] public partial class Unrelated { [WProtoMember(1)] public int U; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)] [WProtoSubtype(typeof(Unrelated), 6)]
+                  public partial class Sub : Base { [WProtoMember(1)] public int B; }",
+                "Base",
+                "Unrelated"
+            );
+            yield return Withholding(
+                "a refused BASE withholds its whole subtree, and only that",
+                @"[WProtoContract] public partial class Base { [WProtoMember(0)] public int A; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)] public partial class GoodOne : Base { [WProtoMember(1)] public int B; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 6)] public partial class GoodTwo : Base { [WProtoMember(1)] public int C; }
+                  [WProtoContract] public partial class Elsewhere { [WProtoMember(1)] public int Z; }",
+                "Elsewhere"
+            );
+            yield return Withholding(
+                "an abstract base with nothing left to dispatch to is withheld",
+                @"[WProtoContract] public abstract partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)] public partial class Sub : Base { [WProtoMember(0)] public int B; }
+                  [WProtoContract] public partial class Elsewhere { [WProtoMember(1)] public int Z; }",
+                "Elsewhere"
+            );
+            yield return Withholding(
+                "a refused leaf leaves both levels above it published",
+                @"[WProtoContract] public partial class Root { [WProtoMember(1)] public int A; }
+                  [WProtoContract] [WProtoSubtype(typeof(Root), 5)] public partial class Middle : Root { [WProtoMember(1)] public int B; }
+                  [WProtoContract] [WProtoSubtype(typeof(Middle), 6)] public partial class Leaf : Middle { [WProtoMember(0)] public int C; }",
+                "Middle",
+                "Root"
+            );
+
+            /*
+             * An inherited nested formatter can hide a refused middle contract without a compiler error;
+             * inspect the published set.
+             */
+            yield return Withholding(
+                "a refused middle withholds the leaf under it, not just the root's subtree",
+                @"[WProtoContract] public partial class Root { [WProtoMember(1)] public int A; }
+                  [WProtoContract] [WProtoSubtype(typeof(Root), 5)] public partial class Middle : Root { [WProtoMember(0)] public int B; }
+                  [WProtoContract] [WProtoSubtype(typeof(Middle), 6)] public partial class Leaf : Middle { [WProtoMember(1)] public int C; }",
+                "Root"
+            );
+        }
+
+        private static TestCaseData Withholding(
+            string label,
+            string source,
+            params string[] expected
+        )
+        {
+            return new TestCaseData(label, source, expected).SetName("{m} - " + label);
+        }
+
+        private static IEnumerable<TestCaseData> RefusedContractShapes()
+        {
+            yield return Refusal(
+                "an unusable [WProtoSubtype] beside a usable one",
+                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] public partial class Unrelated { [WProtoMember(1)] public int U; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)] [WProtoSubtype(typeof(Unrelated), 6)]
+                  public partial class Sub : Base { [WProtoMember(1)] public int B; }"
+            );
+            yield return Refusal(
+                "a self-declared subtype with an unsupported member",
+                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)]
+                  public partial class Sub : Base { [WProtoMember(1)] public System.DateTimeOffset Bad; }"
+            );
+            yield return Refusal(
+                "a base-declared subtype with an unsupported member",
+                @"[WProtoContract] [WProtoInclude(5, typeof(Sub))] public partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] public partial class Sub : Base { [WProtoMember(1)] public System.DateTimeOffset Bad; }"
+            );
+            yield return Refusal(
+                "a subtype whose field number is out of range",
+                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)]
+                  public partial class Sub : Base { [WProtoMember(0)] public int B; }"
+            );
+            yield return Refusal(
+                "a subtype that is not partial",
+                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)]
+                  public class Sub : Base { [WProtoMember(1)] public int B; }"
+            );
+            yield return Refusal(
+                "a three-level chain whose leaf is refused",
+                @"[WProtoContract] public partial class Root { [WProtoMember(1)] public int A; }
+                  [WProtoContract] [WProtoSubtype(typeof(Root), 5)] public partial class Middle : Root { [WProtoMember(1)] public int B; }
+                  [WProtoContract] [WProtoSubtype(typeof(Middle), 6)] public partial class Leaf : Middle { [WProtoMember(0)] public int C; }"
+            );
+            yield return Refusal(
+                "an abstract base whose only subtype is refused",
+                @"[WProtoContract] public abstract partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)]
+                  public partial class Sub : Base { [WProtoMember(0)] public int B; }"
+            );
+            yield return Refusal(
+                "a refused subtype with a surviving sibling, which must not name the base either",
+                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)] public partial class Good : Base { [WProtoMember(1)] public int B; }
+                  [WProtoContract] [WProtoSubtype(typeof(Base), 6)] public partial class Bad : Base { [WProtoMember(0)] public int C; }"
+            );
+            yield return Refusal(
+                "a contract held as a member, which is the shape that already degraded gracefully",
+                @"[WProtoContract] public partial class Bad { [WProtoMember(0)] public int B; }
+                  [WProtoContract] public partial class Holder { [WProtoMember(1)] public Bad Value; }"
+            );
+        }
+
+        private static TestCaseData Refusal(string label, string source)
+        {
+            return new TestCaseData(label, source).SetName("{m} - " + label);
+        }
+
+        /// <summary>
+        /// Every shape WPROTO030 does and does not recognize, and the discriminator it names.
+        /// </summary>
+        /// <returns>One case per row of the detection matrix.</returns>
+        /// <remarks>
+        /// The last four rows are the ones a public survey of four Unity codebases found: 80 of 485
+        /// protobuf-net contracts (16.5%) were invisible to an exact match on
+        /// <c>ProtoBuf.ProtoContractAttribute</c>. The negative rows matter at least as much --
+        /// a WPROTO030 on a WCF <c>[DataContract]</c> would break the family's promise that the code
+        /// names a serialization contract that cannot be honoured.
+        /// </remarks>
+        private static IEnumerable<TestCaseData> MigrationSignalCases()
+        {
+            yield return new TestCaseData(
+                @"[global::ProtoBuf.ProtoContract] public partial class Legacy { [global::ProtoBuf.ProtoMember(1)] public int Value; }",
+                true,
+                "protobuf-net's own contract attribute"
+            ).SetName("ProtoBuf.ProtoContract is announced");
+
+            yield return new TestCaseData(
+                VendoredProtobufNet
+                    + @" [global::Consumer.Vendored.ProtoContract] public partial class Renamed { [global::Consumer.Vendored.ProtoMember(1)] public int Value; }",
+                true,
+                "vendored under a renamed namespace"
+            ).SetName("A renamed-namespace ProtoContract is announced");
+
+            yield return new TestCaseData(
+                VendoredProtobufNet
+                    + @" [global::Consumer.Vendored.ProtoContract] public partial class Renamed { [global::Consumer.Vendored.ProtoMember(1)] public int Value; }",
+                false,
+                "vendored under a renamed namespace"
+            ).SetName("A vendored ProtoContract needs no separate protobuf-net reference");
+
+            yield return new TestCaseData(
+                @"namespace Lonely { public sealed class ProtoContractAttribute : global::System.Attribute { } }
+                  [global::Consumer.Lonely.ProtoContract] public partial class Coincidence { public int Value; }",
+                true,
+                null
+            ).SetName("An unrelated type merely named ProtoContractAttribute is not announced");
+
+            yield return new TestCaseData(
+                @"[global::System.Runtime.Serialization.DataContract] public partial class Ordered { [global::System.Runtime.Serialization.DataMember(Order = 1)] public int Value; }",
+                true,
+                "Order"
+            ).SetName("A [DataContract] with ordered members is announced");
+
+            yield return new TestCaseData(
+                @"[global::System.Runtime.Serialization.DataContract] public partial class Ordered { [global::System.Runtime.Serialization.DataMember(Order = 1)] public int Value; }",
+                false,
+                null
+            ).SetName("A [DataContract] is silent without a protobuf-net reference");
+
+            yield return new TestCaseData(
+                @"[global::System.Runtime.Serialization.DataContract] public partial class Wcf { [global::System.Runtime.Serialization.DataMember] public int Value; }",
+                true,
+                null
+            ).SetName("A [DataContract] is silent without an explicit member Order");
+
+            yield return new TestCaseData(
+                @"[global::System.Runtime.Serialization.DataContract] [WProtoContract] public sealed partial class Ported { [global::System.Runtime.Serialization.DataMember(Order = 1)] [WProtoMember(1)] public int Value; }",
+                true,
+                null
+            ).SetName("A ported [DataContract] is silent");
+        }
+
+        /// <summary>
+        /// Builds a contract whose members are <c>List</c> chains of the given depths.
+        /// </summary>
+        /// <param name="members">Each member's name and how many <c>List</c> levels it has.</param>
+        /// <returns>The contract source.</returns>
+        private static string Chain(params (string Name, int Levels)[] members)
+        {
+            StringBuilder source = new StringBuilder(
+                "[WProtoContract] public sealed partial class Ordered\n{\n"
+            );
+
+            int tag = 0;
+            foreach ((string name, int levels) in members)
+            {
+                tag++;
+                source.Append("    [WProtoMember(").Append(tag).Append(")] public ");
+                source.Append(
+                    string.Concat(Enumerable.Repeat("System.Collections.Generic.List<", levels))
+                );
+                source.Append("int").Append(new string('>', levels));
+                source.Append(' ').Append(name).Append(";\n");
+            }
+
+            return source.Append('}').ToString();
+        }
+
+        private static void AssertNoDiagnostics(string source)
+        {
+            ImmutableArray<Diagnostic> diagnostics = Run(source);
+            Assert.IsEmpty(
+                diagnostics.Where(d => d.Id.StartsWith("WPROTO", StringComparison.Ordinal)),
+                string.Join("; ", diagnostics.Select(d => d.ToString()))
+            );
+        }
+
+        private static IEnumerable<TestCaseData> BadDeclaredRoots()
+        {
+            yield return new TestCaseData(
+                "WPROTO023",
+                "Consumer.Stray",
+                @"[assembly: WProtoDeclaredRoot(typeof(Consumer.IThing), typeof(Consumer.Stray))]
+                  public interface IThing { }
+                  [WProtoContract] public partial class Stray { [WProtoMember(1)] public int A; }"
+            ).SetName("ARootThatIsNotAssignableToItsDeclaredTypeIsAnError");
+
+            yield return new TestCaseData(
+                "WPROTO029",
+                "int",
+                @"[assembly: WProtoDeclaredRoot(typeof(int), typeof(Consumer.Thing))]
+                  [WProtoContract] public partial class Thing { [WProtoMember(1)] public int A; }"
+            ).SetName("AValueTypeAsTheDeclaredTypeIsAnError");
+
+            yield return new TestCaseData(
+                "WPROTO024",
+                "Consumer.Thing",
+                @"[assembly: WProtoDeclaredRoot(typeof(Consumer.Thing), typeof(Consumer.Thing))]
+                  [WProtoContract] public partial class Thing { [WProtoMember(1)] public int A; }"
+            ).SetName("ARootThatIsItsOwnDeclaredTypeIsAnError");
+
+            yield return new TestCaseData(
+                "WPROTO025",
+                "Consumer.Base",
+                @"[assembly: WProtoDeclaredRoot(typeof(Consumer.Base), typeof(Consumer.Sub))]
+                  [WProtoContract] [WProtoInclude(100, typeof(Consumer.Sub))] public partial class Base { [WProtoMember(1)] public int A; }
+                  [WProtoContract] public partial class Sub : Base { [WProtoMember(1)] public int B; }"
+            ).SetName("ADeclaredTypeThatIsItselfAContractIsAnError");
+
+            yield return new TestCaseData(
+                "WPROTO026",
+                "Consumer.IThing",
+                @"[assembly: WProtoDeclaredRoot(typeof(Consumer.IThing<>), typeof(Consumer.Thing<>))]
+                  public interface IThing<T> { }
+                  [WProtoContract] public partial class Thing<T> : IThing<T> { [WProtoMember(1)] public int A; }"
+            ).SetName("AGenericDeclaredRootIsAnError");
+
+            yield return new TestCaseData(
+                "WPROTO029",
+                "Consumer.Plain",
+                @"[assembly: WProtoDeclaredRoot(typeof(Consumer.Plain), typeof(Consumer.Sub))]
+                  public class Plain { }
+                  [WProtoContract] public partial class Sub : Plain { [WProtoMember(1)] public int A; }"
+            ).SetName("ADeclaredTypeAValueCanBeIsAnError");
+
+            yield return new TestCaseData(
+                "WPROTO029",
+                "Consumer.IThing[]",
+                @"[assembly: WProtoDeclaredRoot(typeof(Consumer.IThing[]), typeof(Consumer.Thing[]))]
+                  public interface IThing { }
+                  [WProtoContract] public partial class Thing : IThing { [WProtoMember(1)] public int A; }"
+            ).SetName("AnArrayAsTheDeclaredTypeIsAnError");
+
+            yield return new TestCaseData(
+                "WPROTO027",
+                "Consumer.IThing",
+                @"[assembly: WProtoDeclaredRoot(typeof(Consumer.IThing), typeof(Consumer.First))]
+                  [assembly: WProtoDeclaredRoot(typeof(Consumer.IThing), typeof(Consumer.Second))]
+                  public interface IThing { }
+                  [WProtoContract] public partial class First : IThing { [WProtoMember(1)] public int A; }
+                  [WProtoContract] public partial class Second : IThing { [WProtoMember(1)] public int B; }"
+            ).SetName("TwoRootsForOneDeclaredTypeIsAnError");
+        }
+
+        private static void AssertDiagnostic(string id, string mustName, string source)
+        {
+            ImmutableArray<Diagnostic> diagnostics = Run(source);
+            Diagnostic match = diagnostics.FirstOrDefault(d => d.Id == id);
+
+            Assert.IsTrue(
+                match != null,
+                "expected "
+                    + id
+                    + ", saw: "
+                    + string.Join("; ", diagnostics.Select(d => d.Id + " " + d.GetMessage()))
+            );
+            Assert.AreEqual(DiagnosticSeverity.Error, match.Severity);
+            Assert.IsTrue(
+                match.GetMessage().Contains(mustName),
+                "the message must name '" + mustName + "': " + match.GetMessage()
+            );
+        }
+
+        /// <summary>
+        /// The formatter source the generator emits for one contract of a fixture.
+        /// </summary>
+        /// <param name="qualified">The contract's fully qualified name.</param>
+        /// <param name="body">The fixture to compile.</param>
+        /// <returns>The generated file's text.</returns>
+        private static string GeneratedFormatterFor(string qualified, string body)
+        {
+            Assert.IsEmpty(Run(body, out Compilation _));
+            return PublishedFormatterFor(qualified, body);
+        }
+
+        /// <summary>
+        /// The generated formatter source for one contract, whether or not the fixture was refused.
+        /// </summary>
+        /// <param name="qualified">The contract's fully qualified name.</param>
+        /// <param name="body">The fixture to compile.</param>
+        /// <returns>The generated file's text.</returns>
+        private static string PublishedFormatterFor(string qualified, string body)
+        {
+            Run(body, out Compilation generated);
+
+            SyntaxTree emitted = generated
+                .SyntaxTrees.Where(tree =>
+                    tree.FilePath.EndsWith(
+                        qualified.Replace('.', '_') + ".WProtoFormatter.g.cs",
+                        StringComparison.Ordinal
+                    )
+                )
+                .Single();
+
+            return emitted.GetText().ToString();
+        }
+
+        /// <summary>
+        /// The contracts a fixture actually published a formatter for, ordinal by name.
+        /// </summary>
+        /// <param name="body">The fixture to compile.</param>
+        /// <returns>Each published contract's simple name.</returns>
+        private static string[] PublishedFormatters(string body)
+        {
+            Run(body, out Compilation generated);
+
+            return generated
+                .SyntaxTrees.Where(tree =>
+                    tree.FilePath.EndsWith(".WProtoFormatter.g.cs", StringComparison.Ordinal)
+                )
+                .Select(tree =>
+                    Path.GetFileName(tree.FilePath)
+                        .Replace("global__Consumer_", string.Empty)
+                        .Replace(".WProtoFormatter.g.cs", string.Empty)
+                )
+                .OrderBy(name => name, StringComparer.Ordinal)
+                .ToArray();
+        }
+
+        /// <summary>
+        /// Whether an assembly is one of the protobuf-net oracles, so a fixture can be compiled
+        /// against a compilation that has never heard of protobuf-net.
+        /// </summary>
+        /// <param name="assembly">The candidate assembly.</param>
+        /// <returns><c>true</c> when it declares or forwards protobuf-net's attributes.</returns>
+        private static bool DeclaresProtobufNet(System.Reflection.Assembly assembly)
+        {
+            return assembly.GetType(typeof(ProtoBuf.ProtoContractAttribute).FullName, false) != null
+                || assembly.GetType(typeof(ProtoBuf.ProtoMemberAttribute).FullName, false) != null;
+        }
+
+        private static ImmutableArray<Diagnostic> Run(string body)
+        {
+            return Run(body, Array.Empty<MetadataReference>(), out Compilation _);
+        }
+
+        private static ImmutableArray<Diagnostic> Run(
+            string body,
+            params MetadataReference[] additionalReferences
+        )
+        {
+            return Run(body, additionalReferences, out Compilation _);
+        }
+
+        private static ImmutableArray<Diagnostic> Run(string body, out Compilation generated)
+        {
+            return Run(body, Array.Empty<MetadataReference>(), out generated);
+        }
+
+        private static ImmutableArray<Diagnostic> Run(
+            string body,
+            IReadOnlyCollection<MetadataReference> additionalReferences,
+            out Compilation generated
+        )
+        {
+            return Run(body, additionalReferences, true, out generated);
+        }
+
+        private static ImmutableArray<Diagnostic> Run(
+            string body,
+            IReadOnlyCollection<MetadataReference> additionalReferences,
+            bool includeProtobufNet,
+            out Compilation generated
+        )
+        {
+            // Assembly attributes must be hoisted before the synthetic consumer namespace.
+            List<string> assemblyAttributes = new List<string>();
+            List<string> rest = new List<string>();
+            foreach (string line in body.Split('\n'))
+            {
+                (
+                    line.TrimStart().StartsWith("[assembly:", StringComparison.Ordinal)
+                        ? assemblyAttributes
+                        : rest
+                ).Add(line);
+            }
+
+            string source =
+                "using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;\n"
+                + string.Join("\n", assemblyAttributes)
+                + "\nnamespace Consumer { using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto; "
+                + string.Join("\n", rest)
+                + " }";
+
+            List<MetadataReference> references = new List<MetadataReference>();
+            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (assembly.IsDynamic || string.IsNullOrEmpty(assembly.Location))
+                {
+                    continue;
+                }
+
+                if (!includeProtobufNet && DeclaresProtobufNet(assembly))
+                {
+                    continue;
+                }
+
+                references.Add(MetadataReference.CreateFromFile(assembly.Location));
+            }
+            references.AddRange(additionalReferences);
+
+            CSharpCompilation compilation = CSharpCompilation.Create(
+                "ConsumerAssembly",
+                new[] { CSharpSyntaxTree.ParseText(source) },
+                references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+            );
+
+            CSharpGeneratorDriver
+                .Create(new WProtoGenerator())
+                .RunGeneratorsAndUpdateCompilation(
+                    compilation,
+                    out Compilation updated,
+                    out ImmutableArray<Diagnostic> diagnostics
+                );
+
+            generated = updated;
+            return diagnostics;
+        }
+
+        private static MetadataReference CompileReference(
+            string assemblyName,
+            string body,
+            params MetadataReference[] additionalReferences
+        )
+        {
+            List<MetadataReference> references = new List<MetadataReference>();
+            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
+                {
+                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
+                }
+            }
+            references.AddRange(additionalReferences);
+
+            CSharpCompilation compilation = CSharpCompilation.Create(
+                assemblyName,
+                new[]
+                {
+                    CSharpSyntaxTree.ParseText(
+                        "using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;\n"
+                            + body
+                    ),
+                },
+                references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+            );
+            using (MemoryStream stream = new MemoryStream())
+            {
+                Microsoft.CodeAnalysis.Emit.EmitResult result = compilation.Emit(stream);
+                Assert.IsTrue(
+                    result.Success,
+                    string.Join("; ", result.Diagnostics.Select(d => d.Id + " " + d.GetMessage()))
+                );
+                return MetadataReference.CreateFromImage(stream.ToArray());
+            }
+        }
+
+        private static MetadataReference CompileGeneratedReference(string assemblyName, string body)
+        {
+            List<MetadataReference> references = new List<MetadataReference>();
+            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
+                {
+                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
+                }
+            }
+
+            CSharpCompilation compilation = CSharpCompilation.Create(
+                assemblyName,
+                new[]
+                {
+                    CSharpSyntaxTree.ParseText(
+                        "using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;\n"
+                            + body
+                    ),
+                },
+                references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+            );
+            CSharpGeneratorDriver
+                .Create(new WProtoGenerator())
+                .RunGeneratorsAndUpdateCompilation(
+                    compilation,
+                    out Compilation generated,
+                    out ImmutableArray<Diagnostic> diagnostics
+                );
+            Assert.IsEmpty(diagnostics.Select(d => d.Id + " " + d.GetMessage()));
+
+            using (MemoryStream stream = new MemoryStream())
+            {
+                Microsoft.CodeAnalysis.Emit.EmitResult result = generated.Emit(stream);
+                Assert.IsTrue(
+                    result.Success,
+                    string.Join("; ", result.Diagnostics.Select(d => d.Id + " " + d.GetMessage()))
+                );
+                return MetadataReference.CreateFromImage(stream.ToArray());
+            }
+        }
+
+        /// <summary>
+        /// Compiles the generator's own output and returns its errors.
+        /// </summary>
+        /// <remarks>
+        /// The generator reporting no diagnostic is not the same as the consumer's build succeeding.
+        /// Emitted code that does not compile is the failure a developer actually hits, and it is
+        /// invisible to a suite that only inspects what the generator chose to report.
+        /// </remarks>
+        private static ImmutableArray<Diagnostic> CompileGenerated(string body)
+        {
+            Run(body, out Compilation generated);
+            return generated
+                .GetDiagnostics()
+                .Where(d => d.Severity == DiagnosticSeverity.Error)
+                .ToImmutableArray();
+        }
+
         [Test]
         public void ANonPartialContractIsAnError()
         {
@@ -803,88 +1409,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             CollectionAssert.AreEqual(expected, PublishedFormatters(source), label);
         }
 
-        private static IEnumerable<TestCaseData> WithholdingShapes()
-        {
-            /*
-             * The positive emission control distinguishes refusal from a harness that never generates
-             * formatters.
-             */
-            yield return Withholding(
-                "nothing refused, so everything publishes",
-                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
-                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)] public partial class GoodOne : Base { [WProtoMember(1)] public int B; }
-                  [WProtoContract] [WProtoSubtype(typeof(Base), 6)] public partial class GoodTwo : Base { [WProtoMember(1)] public int C; }",
-                "Base",
-                "GoodOne",
-                "GoodTwo"
-            );
-            yield return Withholding(
-                "one undeclared sibling withholds only itself",
-                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
-                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)] public partial class GoodOne : Base { [WProtoMember(1)] public int B; }
-                  [WProtoContract] [WProtoSubtype(typeof(Base), 6)] public partial class GoodTwo : Base { [WProtoMember(1)] public int C; }
-                  [WProtoContract] [WProtoSubtype(typeof(Base), 7)] public partial class GoodThree : Base { [WProtoMember(1)] public int D; }
-                  [WProtoContract] public partial class Undeclared : Base { [WProtoMember(1)] public int E; }",
-                "Base",
-                "GoodOne",
-                "GoodThree",
-                "GoodTwo"
-            );
-            yield return Withholding(
-                "a refused subtype leaves its base published",
-                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
-                  [WProtoContract] public partial class Unrelated { [WProtoMember(1)] public int U; }
-                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)] [WProtoSubtype(typeof(Unrelated), 6)]
-                  public partial class Sub : Base { [WProtoMember(1)] public int B; }",
-                "Base",
-                "Unrelated"
-            );
-            yield return Withholding(
-                "a refused BASE withholds its whole subtree, and only that",
-                @"[WProtoContract] public partial class Base { [WProtoMember(0)] public int A; }
-                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)] public partial class GoodOne : Base { [WProtoMember(1)] public int B; }
-                  [WProtoContract] [WProtoSubtype(typeof(Base), 6)] public partial class GoodTwo : Base { [WProtoMember(1)] public int C; }
-                  [WProtoContract] public partial class Elsewhere { [WProtoMember(1)] public int Z; }",
-                "Elsewhere"
-            );
-            yield return Withholding(
-                "an abstract base with nothing left to dispatch to is withheld",
-                @"[WProtoContract] public abstract partial class Base { [WProtoMember(1)] public int A; }
-                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)] public partial class Sub : Base { [WProtoMember(0)] public int B; }
-                  [WProtoContract] public partial class Elsewhere { [WProtoMember(1)] public int Z; }",
-                "Elsewhere"
-            );
-            yield return Withholding(
-                "a refused leaf leaves both levels above it published",
-                @"[WProtoContract] public partial class Root { [WProtoMember(1)] public int A; }
-                  [WProtoContract] [WProtoSubtype(typeof(Root), 5)] public partial class Middle : Root { [WProtoMember(1)] public int B; }
-                  [WProtoContract] [WProtoSubtype(typeof(Middle), 6)] public partial class Leaf : Middle { [WProtoMember(0)] public int C; }",
-                "Middle",
-                "Root"
-            );
-
-            /*
-             * An inherited nested formatter can hide a refused middle contract without a compiler error;
-             * inspect the published set.
-             */
-            yield return Withholding(
-                "a refused middle withholds the leaf under it, not just the root's subtree",
-                @"[WProtoContract] public partial class Root { [WProtoMember(1)] public int A; }
-                  [WProtoContract] [WProtoSubtype(typeof(Root), 5)] public partial class Middle : Root { [WProtoMember(0)] public int B; }
-                  [WProtoContract] [WProtoSubtype(typeof(Middle), 6)] public partial class Leaf : Middle { [WProtoMember(1)] public int C; }",
-                "Root"
-            );
-        }
-
-        private static TestCaseData Withholding(
-            string label,
-            string source,
-            params string[] expected
-        )
-        {
-            return new TestCaseData(label, source, expected).SetName("{m} - " + label);
-        }
-
         /// <summary>
         /// A published base keeps every surviving branch and loses only the withheld one.
         /// </summary>
@@ -953,68 +1477,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     .Select(diagnostic => diagnostic.Id + " " + diagnostic.GetMessage()),
                 label
             );
-        }
-
-        private static IEnumerable<TestCaseData> RefusedContractShapes()
-        {
-            yield return Refusal(
-                "an unusable [WProtoSubtype] beside a usable one",
-                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
-                  [WProtoContract] public partial class Unrelated { [WProtoMember(1)] public int U; }
-                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)] [WProtoSubtype(typeof(Unrelated), 6)]
-                  public partial class Sub : Base { [WProtoMember(1)] public int B; }"
-            );
-            yield return Refusal(
-                "a self-declared subtype with an unsupported member",
-                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
-                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)]
-                  public partial class Sub : Base { [WProtoMember(1)] public System.DateTimeOffset Bad; }"
-            );
-            yield return Refusal(
-                "a base-declared subtype with an unsupported member",
-                @"[WProtoContract] [WProtoInclude(5, typeof(Sub))] public partial class Base { [WProtoMember(1)] public int A; }
-                  [WProtoContract] public partial class Sub : Base { [WProtoMember(1)] public System.DateTimeOffset Bad; }"
-            );
-            yield return Refusal(
-                "a subtype whose field number is out of range",
-                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
-                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)]
-                  public partial class Sub : Base { [WProtoMember(0)] public int B; }"
-            );
-            yield return Refusal(
-                "a subtype that is not partial",
-                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
-                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)]
-                  public class Sub : Base { [WProtoMember(1)] public int B; }"
-            );
-            yield return Refusal(
-                "a three-level chain whose leaf is refused",
-                @"[WProtoContract] public partial class Root { [WProtoMember(1)] public int A; }
-                  [WProtoContract] [WProtoSubtype(typeof(Root), 5)] public partial class Middle : Root { [WProtoMember(1)] public int B; }
-                  [WProtoContract] [WProtoSubtype(typeof(Middle), 6)] public partial class Leaf : Middle { [WProtoMember(0)] public int C; }"
-            );
-            yield return Refusal(
-                "an abstract base whose only subtype is refused",
-                @"[WProtoContract] public abstract partial class Base { [WProtoMember(1)] public int A; }
-                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)]
-                  public partial class Sub : Base { [WProtoMember(0)] public int B; }"
-            );
-            yield return Refusal(
-                "a refused subtype with a surviving sibling, which must not name the base either",
-                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }
-                  [WProtoContract] [WProtoSubtype(typeof(Base), 5)] public partial class Good : Base { [WProtoMember(1)] public int B; }
-                  [WProtoContract] [WProtoSubtype(typeof(Base), 6)] public partial class Bad : Base { [WProtoMember(0)] public int C; }"
-            );
-            yield return Refusal(
-                "a contract held as a member, which is the shape that already degraded gracefully",
-                @"[WProtoContract] public partial class Bad { [WProtoMember(0)] public int B; }
-                  [WProtoContract] public partial class Holder { [WProtoMember(1)] public Bad Value; }"
-            );
-        }
-
-        private static TestCaseData Refusal(string label, string source)
-        {
-            return new TestCaseData(label, source).SetName("{m} - " + label);
         }
 
         /// <summary>
@@ -1506,71 +1968,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.AreEqual(1, diagnostics.Count(diagnostic => diagnostic.Id == "WPROTO030"));
         }
 
-        /// <summary>
-        /// Every shape WPROTO030 does and does not recognize, and the discriminator it names.
-        /// </summary>
-        /// <returns>One case per row of the detection matrix.</returns>
-        /// <remarks>
-        /// The last four rows are the ones a public survey of four Unity codebases found: 80 of 485
-        /// protobuf-net contracts (16.5%) were invisible to an exact match on
-        /// <c>ProtoBuf.ProtoContractAttribute</c>. The negative rows matter at least as much --
-        /// a WPROTO030 on a WCF <c>[DataContract]</c> would break the family's promise that the code
-        /// names a serialization contract that cannot be honoured.
-        /// </remarks>
-        private static IEnumerable<TestCaseData> MigrationSignalCases()
-        {
-            yield return new TestCaseData(
-                @"[global::ProtoBuf.ProtoContract] public partial class Legacy { [global::ProtoBuf.ProtoMember(1)] public int Value; }",
-                true,
-                "protobuf-net's own contract attribute"
-            ).SetName("ProtoBuf.ProtoContract is announced");
-
-            yield return new TestCaseData(
-                VendoredProtobufNet
-                    + @" [global::Consumer.Vendored.ProtoContract] public partial class Renamed { [global::Consumer.Vendored.ProtoMember(1)] public int Value; }",
-                true,
-                "vendored under a renamed namespace"
-            ).SetName("A renamed-namespace ProtoContract is announced");
-
-            yield return new TestCaseData(
-                VendoredProtobufNet
-                    + @" [global::Consumer.Vendored.ProtoContract] public partial class Renamed { [global::Consumer.Vendored.ProtoMember(1)] public int Value; }",
-                false,
-                "vendored under a renamed namespace"
-            ).SetName("A vendored ProtoContract needs no separate protobuf-net reference");
-
-            yield return new TestCaseData(
-                @"namespace Lonely { public sealed class ProtoContractAttribute : global::System.Attribute { } }
-                  [global::Consumer.Lonely.ProtoContract] public partial class Coincidence { public int Value; }",
-                true,
-                null
-            ).SetName("An unrelated type merely named ProtoContractAttribute is not announced");
-
-            yield return new TestCaseData(
-                @"[global::System.Runtime.Serialization.DataContract] public partial class Ordered { [global::System.Runtime.Serialization.DataMember(Order = 1)] public int Value; }",
-                true,
-                "Order"
-            ).SetName("A [DataContract] with ordered members is announced");
-
-            yield return new TestCaseData(
-                @"[global::System.Runtime.Serialization.DataContract] public partial class Ordered { [global::System.Runtime.Serialization.DataMember(Order = 1)] public int Value; }",
-                false,
-                null
-            ).SetName("A [DataContract] is silent without a protobuf-net reference");
-
-            yield return new TestCaseData(
-                @"[global::System.Runtime.Serialization.DataContract] public partial class Wcf { [global::System.Runtime.Serialization.DataMember] public int Value; }",
-                true,
-                null
-            ).SetName("A [DataContract] is silent without an explicit member Order");
-
-            yield return new TestCaseData(
-                @"[global::System.Runtime.Serialization.DataContract] [WProtoContract] public sealed partial class Ported { [global::System.Runtime.Serialization.DataMember(Order = 1)] [WProtoMember(1)] public int Value; }",
-                true,
-                null
-            ).SetName("A ported [DataContract] is silent");
-        }
-
         [TestCaseSource(nameof(MigrationSignalCases))]
         public void MigrationSignalMatchesOnlyProtobufNetContracts(
             string body,
@@ -2025,32 +2422,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 diagnostics.Where(d => d.Id == "WPROTO003"),
                 string.Join("; ", diagnostics.Select(d => d.Id + " " + d.GetMessage()))
             );
-        }
-
-        /// <summary>
-        /// Builds a contract whose members are <c>List</c> chains of the given depths.
-        /// </summary>
-        /// <param name="members">Each member's name and how many <c>List</c> levels it has.</param>
-        /// <returns>The contract source.</returns>
-        private static string Chain(params (string Name, int Levels)[] members)
-        {
-            StringBuilder source = new StringBuilder(
-                "[WProtoContract] public sealed partial class Ordered\n{\n"
-            );
-
-            int tag = 0;
-            foreach ((string name, int levels) in members)
-            {
-                tag++;
-                source.Append("    [WProtoMember(").Append(tag).Append(")] public ");
-                source.Append(
-                    string.Concat(Enumerable.Repeat("System.Collections.Generic.List<", levels))
-                );
-                source.Append("int").Append(new string('>', levels));
-                source.Append(' ').Append(name).Append(";\n");
-            }
-
-            return source.Append('}').ToString();
         }
 
         [Test]
@@ -2522,15 +2893,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
-        private static void AssertNoDiagnostics(string source)
-        {
-            ImmutableArray<Diagnostic> diagnostics = Run(source);
-            Assert.IsEmpty(
-                diagnostics.Where(d => d.Id.StartsWith("WPROTO", StringComparison.Ordinal)),
-                string.Join("; ", diagnostics.Select(d => d.ToString()))
-            );
-        }
-
         [Test]
         public void ASurrogateThatIsNotAContractIsAnError()
         {
@@ -2692,9 +3054,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             ImmutableArray<Diagnostic> errors = CompileGenerated(
                 @"[WProtoContract] public sealed partial class Fine { [WProtoMember(1)] public int Value; }
                   public sealed class Unrelated
-                  {
+                  {                      private System.Collections.Generic.List<Hidden> Values;
+
                       private enum Hidden { None }
-                      private System.Collections.Generic.List<Hidden> Values;
                   }"
             );
 
@@ -2967,9 +3329,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             const string source =
                 @"[WProtoContract] public partial class Box<T> { [WProtoMember(1)] public T Value; }
                   public sealed class Holder
-                  {
+                  {                      private Box<Hidden> _box = new Box<Hidden>();
+
                       private sealed class Hidden { }
-                      private Box<Hidden> _box = new Box<Hidden>();
                   }";
 
             ImmutableArray<Diagnostic> diagnostics = Run(source);
@@ -3034,9 +3396,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                       public bool TryRead(ref WProtoReader reader, out Consumer.Ring<T> value) { value = null; return true; }
                   }
                   public sealed class Holder
-                  {
+                  {                      private Ring<Hidden> _ring = new Ring<Hidden>();
+
                       private sealed class Hidden { }
-                      private Ring<Hidden> _ring = new Ring<Hidden>();
                   }"
             );
 
@@ -3119,73 +3481,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
-        private static IEnumerable<TestCaseData> BadDeclaredRoots()
-        {
-            yield return new TestCaseData(
-                "WPROTO023",
-                "Consumer.Stray",
-                @"[assembly: WProtoDeclaredRoot(typeof(Consumer.IThing), typeof(Consumer.Stray))]
-                  public interface IThing { }
-                  [WProtoContract] public partial class Stray { [WProtoMember(1)] public int A; }"
-            ).SetName("ARootThatIsNotAssignableToItsDeclaredTypeIsAnError");
-
-            yield return new TestCaseData(
-                "WPROTO029",
-                "int",
-                @"[assembly: WProtoDeclaredRoot(typeof(int), typeof(Consumer.Thing))]
-                  [WProtoContract] public partial class Thing { [WProtoMember(1)] public int A; }"
-            ).SetName("AValueTypeAsTheDeclaredTypeIsAnError");
-
-            yield return new TestCaseData(
-                "WPROTO024",
-                "Consumer.Thing",
-                @"[assembly: WProtoDeclaredRoot(typeof(Consumer.Thing), typeof(Consumer.Thing))]
-                  [WProtoContract] public partial class Thing { [WProtoMember(1)] public int A; }"
-            ).SetName("ARootThatIsItsOwnDeclaredTypeIsAnError");
-
-            yield return new TestCaseData(
-                "WPROTO025",
-                "Consumer.Base",
-                @"[assembly: WProtoDeclaredRoot(typeof(Consumer.Base), typeof(Consumer.Sub))]
-                  [WProtoContract] [WProtoInclude(100, typeof(Consumer.Sub))] public partial class Base { [WProtoMember(1)] public int A; }
-                  [WProtoContract] public partial class Sub : Base { [WProtoMember(1)] public int B; }"
-            ).SetName("ADeclaredTypeThatIsItselfAContractIsAnError");
-
-            yield return new TestCaseData(
-                "WPROTO026",
-                "Consumer.IThing",
-                @"[assembly: WProtoDeclaredRoot(typeof(Consumer.IThing<>), typeof(Consumer.Thing<>))]
-                  public interface IThing<T> { }
-                  [WProtoContract] public partial class Thing<T> : IThing<T> { [WProtoMember(1)] public int A; }"
-            ).SetName("AGenericDeclaredRootIsAnError");
-
-            yield return new TestCaseData(
-                "WPROTO029",
-                "Consumer.Plain",
-                @"[assembly: WProtoDeclaredRoot(typeof(Consumer.Plain), typeof(Consumer.Sub))]
-                  public class Plain { }
-                  [WProtoContract] public partial class Sub : Plain { [WProtoMember(1)] public int A; }"
-            ).SetName("ADeclaredTypeAValueCanBeIsAnError");
-
-            yield return new TestCaseData(
-                "WPROTO029",
-                "Consumer.IThing[]",
-                @"[assembly: WProtoDeclaredRoot(typeof(Consumer.IThing[]), typeof(Consumer.Thing[]))]
-                  public interface IThing { }
-                  [WProtoContract] public partial class Thing : IThing { [WProtoMember(1)] public int A; }"
-            ).SetName("AnArrayAsTheDeclaredTypeIsAnError");
-
-            yield return new TestCaseData(
-                "WPROTO027",
-                "Consumer.IThing",
-                @"[assembly: WProtoDeclaredRoot(typeof(Consumer.IThing), typeof(Consumer.First))]
-                  [assembly: WProtoDeclaredRoot(typeof(Consumer.IThing), typeof(Consumer.Second))]
-                  public interface IThing { }
-                  [WProtoContract] public partial class First : IThing { [WProtoMember(1)] public int A; }
-                  [WProtoContract] public partial class Second : IThing { [WProtoMember(1)] public int B; }"
-            ).SetName("TwoRootsForOneDeclaredTypeIsAnError");
-        }
-
         /// <summary>
         /// Every type protobuf has no <c>sint</c> form for is refused rather than quietly widened.
         /// </summary>
@@ -3227,301 +3522,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         + "; }"
                 )
             );
-        }
-
-        private static void AssertDiagnostic(string id, string mustName, string source)
-        {
-            ImmutableArray<Diagnostic> diagnostics = Run(source);
-            Diagnostic match = diagnostics.FirstOrDefault(d => d.Id == id);
-
-            Assert.IsTrue(
-                match != null,
-                "expected "
-                    + id
-                    + ", saw: "
-                    + string.Join("; ", diagnostics.Select(d => d.Id + " " + d.GetMessage()))
-            );
-            Assert.AreEqual(DiagnosticSeverity.Error, match.Severity);
-            Assert.IsTrue(
-                match.GetMessage().Contains(mustName),
-                "the message must name '" + mustName + "': " + match.GetMessage()
-            );
-        }
-
-        /// <summary>
-        /// The formatter source the generator emits for one contract of a fixture.
-        /// </summary>
-        /// <param name="qualified">The contract's fully qualified name.</param>
-        /// <param name="body">The fixture to compile.</param>
-        /// <returns>The generated file's text.</returns>
-        private static string GeneratedFormatterFor(string qualified, string body)
-        {
-            Assert.IsEmpty(Run(body, out Compilation _));
-            return PublishedFormatterFor(qualified, body);
-        }
-
-        /// <summary>
-        /// The generated formatter source for one contract, whether or not the fixture was refused.
-        /// </summary>
-        /// <param name="qualified">The contract's fully qualified name.</param>
-        /// <param name="body">The fixture to compile.</param>
-        /// <returns>The generated file's text.</returns>
-        private static string PublishedFormatterFor(string qualified, string body)
-        {
-            Run(body, out Compilation generated);
-
-            SyntaxTree emitted = generated
-                .SyntaxTrees.Where(tree =>
-                    tree.FilePath.EndsWith(
-                        qualified.Replace('.', '_') + ".WProtoFormatter.g.cs",
-                        StringComparison.Ordinal
-                    )
-                )
-                .Single();
-
-            return emitted.GetText().ToString();
-        }
-
-        /// <summary>
-        /// The contracts a fixture actually published a formatter for, ordinal by name.
-        /// </summary>
-        /// <param name="body">The fixture to compile.</param>
-        /// <returns>Each published contract's simple name.</returns>
-        private static string[] PublishedFormatters(string body)
-        {
-            Run(body, out Compilation generated);
-
-            return generated
-                .SyntaxTrees.Where(tree =>
-                    tree.FilePath.EndsWith(".WProtoFormatter.g.cs", StringComparison.Ordinal)
-                )
-                .Select(tree =>
-                    Path.GetFileName(tree.FilePath)
-                        .Replace("global__Consumer_", string.Empty)
-                        .Replace(".WProtoFormatter.g.cs", string.Empty)
-                )
-                .OrderBy(name => name, StringComparer.Ordinal)
-                .ToArray();
-        }
-
-        /// <summary>
-        /// protobuf-net's contract vocabulary under a namespace of the consumer's own, which is what
-        /// a project does when it has to vendor the library to avoid an assembly conflict.
-        /// </summary>
-        private const string VendoredProtobufNet =
-            @"namespace Vendored
-              {
-                  public sealed class ProtoContractAttribute : global::System.Attribute { }
-                  public sealed class ProtoMemberAttribute : global::System.Attribute { public ProtoMemberAttribute(int tag) { } }
-              }";
-
-        /// <summary>
-        /// The assembly declaring <c>[DataContract]</c>, referenced explicitly so a fixture using it
-        /// does not depend on whether some earlier test happened to load it.
-        /// </summary>
-        private static readonly MetadataReference DataContractReference =
-            MetadataReference.CreateFromFile(
-                typeof(System.Runtime.Serialization.DataContractAttribute).Assembly.Location
-            );
-
-        /// <summary>
-        /// Whether an assembly is one of the protobuf-net oracles, so a fixture can be compiled
-        /// against a compilation that has never heard of protobuf-net.
-        /// </summary>
-        /// <param name="assembly">The candidate assembly.</param>
-        /// <returns><c>true</c> when it declares or forwards protobuf-net's attributes.</returns>
-        private static bool DeclaresProtobufNet(System.Reflection.Assembly assembly)
-        {
-            return assembly.GetType(typeof(ProtoBuf.ProtoContractAttribute).FullName, false) != null
-                || assembly.GetType(typeof(ProtoBuf.ProtoMemberAttribute).FullName, false) != null;
-        }
-
-        private static ImmutableArray<Diagnostic> Run(string body)
-        {
-            return Run(body, Array.Empty<MetadataReference>(), out Compilation _);
-        }
-
-        private static ImmutableArray<Diagnostic> Run(
-            string body,
-            params MetadataReference[] additionalReferences
-        )
-        {
-            return Run(body, additionalReferences, out Compilation _);
-        }
-
-        private static ImmutableArray<Diagnostic> Run(string body, out Compilation generated)
-        {
-            return Run(body, Array.Empty<MetadataReference>(), out generated);
-        }
-
-        private static ImmutableArray<Diagnostic> Run(
-            string body,
-            IReadOnlyCollection<MetadataReference> additionalReferences,
-            out Compilation generated
-        )
-        {
-            return Run(body, additionalReferences, true, out generated);
-        }
-
-        private static ImmutableArray<Diagnostic> Run(
-            string body,
-            IReadOnlyCollection<MetadataReference> additionalReferences,
-            bool includeProtobufNet,
-            out Compilation generated
-        )
-        {
-            // Assembly attributes must be hoisted before the synthetic consumer namespace.
-            List<string> assemblyAttributes = new List<string>();
-            List<string> rest = new List<string>();
-            foreach (string line in body.Split('\n'))
-            {
-                (
-                    line.TrimStart().StartsWith("[assembly:", StringComparison.Ordinal)
-                        ? assemblyAttributes
-                        : rest
-                ).Add(line);
-            }
-
-            string source =
-                "using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;\n"
-                + string.Join("\n", assemblyAttributes)
-                + "\nnamespace Consumer { using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto; "
-                + string.Join("\n", rest)
-                + " }";
-
-            List<MetadataReference> references = new List<MetadataReference>();
-            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                if (assembly.IsDynamic || string.IsNullOrEmpty(assembly.Location))
-                {
-                    continue;
-                }
-
-                if (!includeProtobufNet && DeclaresProtobufNet(assembly))
-                {
-                    continue;
-                }
-
-                references.Add(MetadataReference.CreateFromFile(assembly.Location));
-            }
-            references.AddRange(additionalReferences);
-
-            CSharpCompilation compilation = CSharpCompilation.Create(
-                "ConsumerAssembly",
-                new[] { CSharpSyntaxTree.ParseText(source) },
-                references,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-            );
-
-            CSharpGeneratorDriver
-                .Create(new WProtoGenerator())
-                .RunGeneratorsAndUpdateCompilation(
-                    compilation,
-                    out Compilation updated,
-                    out ImmutableArray<Diagnostic> diagnostics
-                );
-
-            generated = updated;
-            return diagnostics;
-        }
-
-        private static MetadataReference CompileReference(
-            string assemblyName,
-            string body,
-            params MetadataReference[] additionalReferences
-        )
-        {
-            List<MetadataReference> references = new List<MetadataReference>();
-            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
-                {
-                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
-                }
-            }
-            references.AddRange(additionalReferences);
-
-            CSharpCompilation compilation = CSharpCompilation.Create(
-                assemblyName,
-                new[]
-                {
-                    CSharpSyntaxTree.ParseText(
-                        "using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;\n"
-                            + body
-                    ),
-                },
-                references,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-            );
-            using (MemoryStream stream = new MemoryStream())
-            {
-                Microsoft.CodeAnalysis.Emit.EmitResult result = compilation.Emit(stream);
-                Assert.IsTrue(
-                    result.Success,
-                    string.Join("; ", result.Diagnostics.Select(d => d.Id + " " + d.GetMessage()))
-                );
-                return MetadataReference.CreateFromImage(stream.ToArray());
-            }
-        }
-
-        private static MetadataReference CompileGeneratedReference(string assemblyName, string body)
-        {
-            List<MetadataReference> references = new List<MetadataReference>();
-            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
-                {
-                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
-                }
-            }
-
-            CSharpCompilation compilation = CSharpCompilation.Create(
-                assemblyName,
-                new[]
-                {
-                    CSharpSyntaxTree.ParseText(
-                        "using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;\n"
-                            + body
-                    ),
-                },
-                references,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-            );
-            CSharpGeneratorDriver
-                .Create(new WProtoGenerator())
-                .RunGeneratorsAndUpdateCompilation(
-                    compilation,
-                    out Compilation generated,
-                    out ImmutableArray<Diagnostic> diagnostics
-                );
-            Assert.IsEmpty(diagnostics.Select(d => d.Id + " " + d.GetMessage()));
-
-            using (MemoryStream stream = new MemoryStream())
-            {
-                Microsoft.CodeAnalysis.Emit.EmitResult result = generated.Emit(stream);
-                Assert.IsTrue(
-                    result.Success,
-                    string.Join("; ", result.Diagnostics.Select(d => d.Id + " " + d.GetMessage()))
-                );
-                return MetadataReference.CreateFromImage(stream.ToArray());
-            }
-        }
-
-        /// <summary>
-        /// Compiles the generator's own output and returns its errors.
-        /// </summary>
-        /// <remarks>
-        /// The generator reporting no diagnostic is not the same as the consumer's build succeeding.
-        /// Emitted code that does not compile is the failure a developer actually hits, and it is
-        /// invisible to a suite that only inspects what the generator chose to report.
-        /// </remarks>
-        private static ImmutableArray<Diagnostic> CompileGenerated(string body)
-        {
-            Run(body, out Compilation generated);
-            return generated
-                .GetDiagnostics()
-                .Where(d => d.Severity == DiagnosticSeverity.Error)
-                .ToImmutableArray();
         }
     }
 }

@@ -127,6 +127,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     /// </example>
     public sealed class AnimationCreatorWindow : EditorWindow
     {
+        private const int AnimationDataPageSize = 20;
+
         private static readonly char[] WhiteSpaceSplitters = { ' ', '\t', '\n', '\r' };
 
         private static readonly GUIContent AnimationNameContent = new("Animation Name");
@@ -166,23 +168,115 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             "Show live animation preview"
         );
 
-        private SerializedObject _serializedObject;
-        private SerializedProperty _animationDataProp;
-        private SerializedProperty _animationSourcesProp;
-        private SerializedProperty _spriteNameRegexProp;
-        private SerializedProperty _textProp;
-        private SerializedProperty _autoRefreshProp;
-        private SerializedProperty _groupingCaseInsensitiveProp;
-        private SerializedProperty _includeFolderNameProp;
-        private SerializedProperty _includeFullFolderPathProp;
-        private SerializedProperty _autoParseNamePrefixProp;
-        private SerializedProperty _autoParseNameSuffixProp;
-        private SerializedProperty _useCustomGroupRegexProp;
-        private SerializedProperty _customGroupRegexProp;
-        private SerializedProperty _customGroupRegexIgnoreCaseProp;
-        private SerializedProperty _resolveDuplicateNamesProp;
-        private SerializedProperty _regexTestInputProp;
-        private SerializedProperty _strictNumericOrderingProp;
+        private static readonly Regex s_ParenIndexRegex = new(
+            @"^(?<base>.*?)[\s]*\(\s*(?<index>\d+)\s*\)\s*$",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant
+        );
+        private static readonly Regex s_SeparatorIndexRegex = new(
+            @"^(?<base>.*?)[_\-\.\s]+(?<index>\d+)$",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant
+        );
+        private static readonly Regex s_TrailingIndexRegex = new(
+            @"^(?<base>.*?)(?<index>\d+)$",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant
+        );
+
+        internal SerializedObject SerializedStateForTesting => _serializedObject;
+
+        private Dictionary<
+            string,
+            Dictionary<string, List<(int index, Sprite sprite)>>
+        > GroupFilteredSprites(bool withProgress)
+        {
+            Dictionary<
+                string,
+                Dictionary<string, List<(int index, Sprite sprite)>>
+            > spritesByBaseAndAssetPath = new(StringComparer.Ordinal);
+
+            int total = _filteredSprites.Count;
+            int processed = 0;
+
+            foreach (Sprite sprite in _filteredSprites)
+            {
+                processed++;
+                if (sprite == null)
+                {
+                    // Serialized preview rows can survive reimports that destroy their sprite slices; reject dead entries.
+                    continue;
+                }
+
+                if (withProgress && (processed % 10 == 0 || processed == total))
+                {
+                    Utils.EditorUi.ShowProgress(
+                        "Auto-Parsing Sprites",
+                        $"Processing: {sprite.name} ({processed}/{total})",
+                        (float)processed / total
+                    );
+                }
+
+                string assetPath = AssetDatabase.GetAssetPath(sprite);
+                string directoryPath =
+                    Path.GetDirectoryName(assetPath).SanitizePath() ?? string.Empty;
+                string frameName = StripDensitySuffix(sprite.name);
+
+                string baseName;
+                int frameIndex;
+
+                if (useCustomGroupRegex && _compiledGroupRegex != null)
+                {
+                    Match m = _compiledGroupRegex.Match(frameName);
+                    if (m.Success)
+                    {
+                        baseName = _compiledGroupRegex.TryGetGroup(m, "base", out Group baseGroup)
+                            ? baseGroup.Value
+                            : frameName;
+                        frameIndex =
+                            _compiledGroupRegex.TryGetGroup(m, "index", out Group indexGroup)
+                            && int.TryParse(indexGroup.Value, out int idx)
+                                ? idx
+                                : -1;
+                    }
+                    else if (!TryExtractBaseAndIndex(frameName, out baseName, out frameIndex))
+                    {
+                        baseName = frameName;
+                        frameIndex = -1;
+                    }
+                }
+                else if (!TryExtractBaseAndIndex(frameName, out baseName, out frameIndex))
+                {
+                    baseName = frameName;
+                    frameIndex = -1;
+                }
+
+                if (string.IsNullOrWhiteSpace(baseName))
+                {
+                    this.LogWarn(
+                        $"Could not extract valid base name for '{frameName}' at '{assetPath}'. Skipping."
+                    );
+                    continue;
+                }
+
+                if (
+                    !spritesByBaseAndAssetPath.TryGetValue(
+                        directoryPath,
+                        out Dictionary<string, List<(int index, Sprite sprite)>> byBase
+                    )
+                )
+                {
+                    byBase = new Dictionary<string, List<(int index, Sprite sprite)>>(
+                        groupingCaseInsensitive
+                            ? StringComparer.OrdinalIgnoreCase
+                            : StringComparer.Ordinal
+                    );
+                    spritesByBaseAndAssetPath.Add(directoryPath, byBase);
+                }
+
+                List<(int index, Sprite sprite)> list = byBase.GetOrAdd(baseName);
+                list.Add((frameIndex, sprite));
+            }
+
+            return spritesByBaseAndAssetPath;
+        }
 
         public List<AnimationData> animationData = new();
         public List<Object> animationSources = new();
@@ -200,6 +294,25 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         public bool resolveDuplicateAnimationNames = true;
         public string regexTestInput = string.Empty;
         public bool strictNumericOrdering = false;
+        internal readonly SpritePreviewCache _previewTextureCache = new();
+
+        private SerializedObject _serializedObject;
+        private SerializedProperty _animationDataProp;
+        private SerializedProperty _animationSourcesProp;
+        private SerializedProperty _spriteNameRegexProp;
+        private SerializedProperty _textProp;
+        private SerializedProperty _autoRefreshProp;
+        private SerializedProperty _groupingCaseInsensitiveProp;
+        private SerializedProperty _includeFolderNameProp;
+        private SerializedProperty _includeFullFolderPathProp;
+        private SerializedProperty _autoParseNamePrefixProp;
+        private SerializedProperty _autoParseNameSuffixProp;
+        private SerializedProperty _useCustomGroupRegexProp;
+        private SerializedProperty _customGroupRegexProp;
+        private SerializedProperty _customGroupRegexIgnoreCaseProp;
+        private SerializedProperty _resolveDuplicateNamesProp;
+        private SerializedProperty _regexTestInputProp;
+        private SerializedProperty _strictNumericOrderingProp;
 
         [HideInInspector]
         [SerializeField]
@@ -224,7 +337,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private int _previewFrameIndex;
         private TimeSpan _lastPreviewTick;
         private bool _isPreviewPlaying;
-        internal readonly SpritePreviewCache _previewTextureCache = new();
 
         private readonly Dictionary<string, AnimationCreatorConfig> _loadedConfigs = new();
         private bool _configSectionExpanded = true;
@@ -236,24 +348,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private readonly Dictionary<int, CachedElementProperties> _cachedElementProperties = new();
         private int _lastCacheFrame = -1;
         private int _animationDataPageIndex;
-        private const int AnimationDataPageSize = 20;
 
         private readonly List<AutoParsePreviewRecord> _autoParsePreview = new();
 
         private readonly List<AutoParseDryRunRecord> _autoParseDryRun = new();
-
-        private static readonly Regex s_ParenIndexRegex = new(
-            @"^(?<base>.*?)[\s]*\(\s*(?<index>\d+)\s*\)\s*$",
-            RegexOptions.Compiled | RegexOptions.CultureInvariant
-        );
-        private static readonly Regex s_SeparatorIndexRegex = new(
-            @"^(?<base>.*?)[_\-\.\s]+(?<index>\d+)$",
-            RegexOptions.Compiled | RegexOptions.CultureInvariant
-        );
-        private static readonly Regex s_TrailingIndexRegex = new(
-            @"^(?<base>.*?)(?<index>\d+)$",
-            RegexOptions.Compiled | RegexOptions.CultureInvariant
-        );
 
         [MenuItem("Tools/Wallstop Studios/Unity Helpers/Animation Creator", priority = -3)]
         public static void ShowWindow()
@@ -261,7 +359,593 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             GetWindow<AnimationCreatorWindow>("Animation Creator");
         }
 
-        internal SerializedObject SerializedStateForTesting => _serializedObject;
+        internal static float GetCurrentFpsForTests(AnimationData data, int frameIndex)
+        {
+            if (data.framerateMode == FramerateMode.Constant)
+            {
+                return 0 < data.framesPerSecond
+                    ? data.framesPerSecond
+                    : AnimationData.DefaultFramesPerSecond;
+            }
+
+            float normalizedPosition =
+                1 < data.frames.Count ? (float)frameIndex / (data.frames.Count - 1) : 0f;
+
+            float fps = data.framesPerSecondCurve.Evaluate(normalizedPosition);
+            return 0 < fps ? fps : AnimationData.DefaultFramesPerSecond;
+        }
+
+        internal static AnimationClip CreateAnimationClipForTests(
+            AnimationData data,
+            List<Sprite> validFrames
+        )
+        {
+            float baseFrameRate =
+                0 < data.framesPerSecond
+                    ? data.framesPerSecond
+                    : AnimationData.DefaultFramesPerSecond;
+
+            AnimationClip clip = new() { frameRate = baseFrameRate };
+
+            ObjectReferenceKeyframe[] keyframes = new ObjectReferenceKeyframe[validFrames.Count];
+
+            float currentTime = 0f;
+
+            for (int i = 0; i < validFrames.Count; i++)
+            {
+                keyframes[i].time = currentTime;
+                keyframes[i].value = validFrames[i];
+
+                if (i < validFrames.Count - 1)
+                {
+                    float fps;
+                    if (data.framerateMode == FramerateMode.Curve)
+                    {
+                        float normalizedPosition =
+                            1 < validFrames.Count ? (float)i / (validFrames.Count - 1) : 0f;
+
+                        fps = data.framesPerSecondCurve.Evaluate(normalizedPosition);
+                        if (fps <= 0)
+                        {
+                            fps = baseFrameRate;
+                        }
+                    }
+                    else
+                    {
+                        fps = baseFrameRate;
+                    }
+
+                    currentTime += 1f / fps;
+                }
+            }
+
+            AnimationUtility.SetObjectReferenceCurve(
+                clip,
+                EditorCurveBinding.PPtrCurve(
+                    "",
+                    typeof(SpriteRenderer),
+                    UnityExtensions.SpriteBindingProperty
+                ),
+                keyframes
+            );
+
+            AnimationClipSettings settings = AnimationUtility.GetAnimationClipSettings(clip);
+            settings.loopTime = data.loop;
+            settings.cycleOffset = Mathf.Clamp01(data.cycleOffset);
+            AnimationUtility.SetAnimationClipSettings(clip, settings);
+
+            return clip;
+        }
+
+        internal static int CalculateScrubberFrame(float scrubberValue, int frameCount)
+        {
+            if (frameCount <= 0)
+            {
+                return 0;
+            }
+            float clampedValue = Mathf.Clamp01(scrubberValue);
+            // UI scrubbers use round-half-up rather than Mathf.RoundToInt's ties-to-even behavior.
+            int frame = Mathf.FloorToInt(clampedValue * (frameCount - 1) + 0.5f);
+            return Mathf.Clamp(frame, 0, frameCount - 1);
+        }
+
+        internal static float CalculateCycleOffsetClamped(float inputOffset)
+        {
+            return Mathf.Clamp01(inputOffset);
+        }
+
+        private static string SanitizeName(string inputName)
+        {
+            inputName = inputName.Replace(" ", "_");
+            inputName = Regex.Replace(inputName, @"[^a-zA-Z0-9_]", "");
+
+            if (string.IsNullOrWhiteSpace(inputName))
+            {
+                return "Default_Animation";
+            }
+
+            return inputName.Trim('_');
+        }
+
+        private static string StripDensitySuffix(string name)
+        {
+            return Regex.Replace(name, @"@\d+(?:\.\d+)?x$", string.Empty);
+        }
+
+        private static bool TryExtractBaseAndIndex(string name, out string baseName, out int index)
+        {
+            Match m = s_ParenIndexRegex.Match(name);
+            if (
+                m.Success
+                && int.TryParse(s_ParenIndexRegex.GroupValueOrEmpty(m, "index"), out int parenIndex)
+            )
+            {
+                baseName = s_ParenIndexRegex
+                    .GroupValueOrEmpty(m, "base")
+                    .TrimEnd('_', '-', '.', ' ');
+                index = parenIndex;
+                return true;
+            }
+
+            m = s_SeparatorIndexRegex.Match(name);
+            if (
+                m.Success
+                && int.TryParse(
+                    s_SeparatorIndexRegex.GroupValueOrEmpty(m, "index"),
+                    out int separatorIndex
+                )
+            )
+            {
+                baseName = s_SeparatorIndexRegex
+                    .GroupValueOrEmpty(m, "base")
+                    .TrimEnd('_', '-', '.', ' ');
+                index = separatorIndex;
+                return true;
+            }
+
+            m = s_TrailingIndexRegex.Match(name);
+            if (
+                m.Success
+                && s_TrailingIndexRegex.TryGetGroup(m, "base", out Group trailingBaseGroup)
+                && 0 < trailingBaseGroup.Length
+                && int.TryParse(
+                    s_TrailingIndexRegex.GroupValueOrEmpty(m, "index"),
+                    out int trailingIndex
+                )
+            )
+            {
+                baseName = trailingBaseGroup.Value.TrimEnd('_', '-', '.', ' ');
+                index = trailingIndex;
+                return true;
+            }
+
+            baseName = null;
+            index = -1;
+            return false;
+        }
+
+        private static string EnsureUniqueName(string baseName, ISet<string> used)
+        {
+            if (!used.Contains(baseName))
+            {
+                return baseName;
+            }
+            int counter = 2;
+            string candidate;
+            do
+            {
+                candidate = $"{baseName}_{counter}";
+                counter++;
+            } while (used.Contains(candidate));
+            return candidate;
+        }
+
+        /// <summary>
+        /// Creates an AnimationCreatorConfig from the current window state.
+        /// </summary>
+        /// <returns>A config object representing the current settings.</returns>
+        internal AnimationCreatorConfig CreateConfigFromCurrentState()
+        {
+            AnimationCreatorConfig config = new()
+            {
+                version = AnimationCreatorConfig.CurrentVersion,
+                spriteNameRegex = spriteNameRegex,
+                autoRefresh = autoRefresh,
+                groupingCaseInsensitive = groupingCaseInsensitive,
+                includeFolderNameInAnimName = includeFolderNameInAnimName,
+                includeFullFolderPathInAnimName = includeFullFolderPathInAnimName,
+                autoParseNamePrefix = autoParseNamePrefix,
+                autoParseNameSuffix = autoParseNameSuffix,
+                useCustomGroupRegex = useCustomGroupRegex,
+                customGroupRegex = customGroupRegex,
+                customGroupRegexIgnoreCase = customGroupRegexIgnoreCase,
+                resolveDuplicateAnimationNames = resolveDuplicateAnimationNames,
+                strictNumericOrdering = strictNumericOrdering,
+                animationEntries = new List<AnimationCreatorConfig.AnimationDataEntry>(),
+            };
+
+            foreach (AnimationData data in animationData)
+            {
+                AnimationCreatorConfig.AnimationDataEntry entry = new()
+                {
+                    animationName = data.animationName,
+                    framesPerSecond = data.framesPerSecond,
+                    isCreatedFromAutoParse = data.isCreatedFromAutoParse,
+                    loop = data.loop,
+                    framerateMode = data.framerateMode,
+                    cycleOffset = data.cycleOffset,
+                    framePaths = new List<string>(),
+                    curveKeyframes = AnimationCreatorConfig.SerializeCurve(
+                        data.framesPerSecondCurve
+                    ),
+                    curvePreWrapMode = data.framesPerSecondCurve?.preWrapMode ?? WrapMode.Clamp,
+                    curvePostWrapMode = data.framesPerSecondCurve?.postWrapMode ?? WrapMode.Clamp,
+                };
+
+                foreach (Sprite sprite in data.frames)
+                {
+                    if (sprite != null)
+                    {
+                        string path = AssetDatabase.GetAssetPath(sprite);
+                        if (!string.IsNullOrEmpty(path))
+                        {
+                            entry.framePaths.Add(path);
+                        }
+                    }
+                }
+
+                config.animationEntries.Add(entry);
+            }
+
+            return config;
+        }
+
+        /// <summary>
+        /// Applies an AnimationCreatorConfig to the current window state.
+        /// </summary>
+        /// <param name="config">The config to apply.</param>
+        internal void ApplyConfigToCurrentState(AnimationCreatorConfig config)
+        {
+            if (config == null)
+            {
+                return;
+            }
+
+            AnimationCreatorConfig.MigrateConfig(config);
+
+            spriteNameRegex = config.spriteNameRegex;
+            autoRefresh = config.autoRefresh;
+            groupingCaseInsensitive = config.groupingCaseInsensitive;
+            includeFolderNameInAnimName = config.includeFolderNameInAnimName;
+            includeFullFolderPathInAnimName = config.includeFullFolderPathInAnimName;
+            autoParseNamePrefix = config.autoParseNamePrefix;
+            autoParseNameSuffix = config.autoParseNameSuffix;
+            useCustomGroupRegex = config.useCustomGroupRegex;
+            customGroupRegex = config.customGroupRegex;
+            customGroupRegexIgnoreCase = config.customGroupRegexIgnoreCase;
+            resolveDuplicateAnimationNames = config.resolveDuplicateAnimationNames;
+            strictNumericOrdering = config.strictNumericOrdering;
+
+            animationData.Clear();
+            foreach (AnimationCreatorConfig.AnimationDataEntry entry in config.animationEntries)
+            {
+                AnimationData data = new()
+                {
+                    animationName = entry.animationName,
+                    framesPerSecond = entry.framesPerSecond,
+                    isCreatedFromAutoParse = entry.isCreatedFromAutoParse,
+                    loop = entry.loop,
+                    framerateMode = entry.framerateMode,
+                    cycleOffset = entry.cycleOffset,
+                    framesPerSecondCurve = AnimationCreatorConfig.DeserializeCurve(
+                        entry.curveKeyframes,
+                        entry.curvePreWrapMode,
+                        entry.curvePostWrapMode
+                    ),
+                    frames = new List<Sprite>(),
+                };
+
+                foreach (string path in entry.framePaths)
+                {
+                    if (string.IsNullOrEmpty(path))
+                    {
+                        continue;
+                    }
+
+                    Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+                    if (sprite != null)
+                    {
+                        data.frames.Add(sprite);
+                    }
+                    else
+                    {
+                        this.LogWarn(
+                            $"Could not load sprite at path '{path}' for animation '{entry.animationName}'."
+                        );
+                    }
+                }
+
+                animationData.Add(data);
+            }
+
+            UpdateRegex();
+            UpdateGroupRegex();
+            FindAndFilterSprites();
+            _serializedObject.Update();
+            Repaint();
+        }
+
+        /// <summary>
+        /// Saves the current configuration to a JSON file in the specified folder.
+        /// </summary>
+        /// <param name="folderPath">The folder path to save the config to.</param>
+        /// <returns>True if the config was saved successfully, false otherwise.</returns>
+        internal bool SaveConfig(string folderPath)
+        {
+            if (string.IsNullOrEmpty(folderPath))
+            {
+                return false;
+            }
+
+            try
+            {
+                string configPath = AnimationCreatorConfig.GetConfigPath(folderPath);
+                string fullConfigPath = Path.GetFullPath(configPath);
+
+                AnimationCreatorConfig config = CreateConfigFromCurrentState();
+                string json = Serializer.JsonStringify(config, pretty: true);
+                File.WriteAllText(fullConfigPath, json, Encoding.UTF8);
+
+                _loadedConfigs[folderPath] = config;
+                this.Log($"Saved animation creator config to '{configPath}'.");
+
+                AssetDatabase.Refresh();
+                return true;
+            }
+            catch (Exception e)
+            {
+                this.LogError($"Failed to save config to '{folderPath}'", e);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Saves configs to all animation source folders.
+        /// </summary>
+        /// <returns>The number of configs successfully saved.</returns>
+        internal int SaveAllConfigs()
+        {
+            int savedCount = 0;
+            foreach (Object source in animationSources)
+            {
+                if (source == null)
+                {
+                    continue;
+                }
+
+                string path = AssetDatabase.GetAssetPath(source);
+                if (!string.IsNullOrWhiteSpace(path) && AssetDatabase.IsValidFolder(path))
+                {
+                    if (SaveConfig(path))
+                    {
+                        savedCount++;
+                    }
+                }
+            }
+
+            this.Log($"Saved {savedCount} animation creator configs.");
+            return savedCount;
+        }
+
+        /// <summary>
+        /// Loads the configuration from a JSON file in the specified folder.
+        /// </summary>
+        /// <param name="folderPath">The folder path to load the config from.</param>
+        /// <returns>True if the config was loaded successfully, false otherwise.</returns>
+        internal bool LoadConfig(string folderPath)
+        {
+            if (string.IsNullOrEmpty(folderPath))
+            {
+                return false;
+            }
+
+            try
+            {
+                string configPath = AnimationCreatorConfig.GetConfigPath(folderPath);
+                string fullConfigPath = Path.GetFullPath(configPath);
+
+                if (!File.Exists(fullConfigPath))
+                {
+                    return false;
+                }
+
+                string json = File.ReadAllText(fullConfigPath, Encoding.UTF8);
+                AnimationCreatorConfig config = Serializer.JsonDeserialize<AnimationCreatorConfig>(
+                    json
+                );
+
+                if (config == null)
+                {
+                    return false;
+                }
+
+                _loadedConfigs[folderPath] = config;
+                ApplyConfigToCurrentState(config);
+                this.Log($"Loaded animation creator config from '{configPath}'.");
+                return true;
+            }
+            catch (Exception e)
+            {
+                this.LogError($"Failed to load config from '{folderPath}'", e);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Attempts to auto-load configs from all animation source folders.
+        /// Loads the first found config.
+        /// </summary>
+        /// <returns>True if any config was loaded, false otherwise.</returns>
+        internal bool TryAutoLoadConfigs()
+        {
+            foreach (Object source in animationSources)
+            {
+                if (source == null)
+                {
+                    continue;
+                }
+
+                string path = AssetDatabase.GetAssetPath(source);
+                if (!string.IsNullOrWhiteSpace(path) && AssetDatabase.IsValidFolder(path))
+                {
+                    string configPath = AnimationCreatorConfig.GetConfigPath(path);
+                    string fullConfigPath = Path.GetFullPath(configPath);
+
+                    if (File.Exists(fullConfigPath))
+                    {
+                        if (LoadConfig(path))
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Checks if any animation source folder has a saved config.
+        /// </summary>
+        /// <returns>True if any config file exists, false otherwise.</returns>
+        internal bool HasAnyConfig()
+        {
+            foreach (Object source in animationSources)
+            {
+                if (source == null)
+                {
+                    continue;
+                }
+
+                string path = AssetDatabase.GetAssetPath(source);
+                if (!string.IsNullOrWhiteSpace(path) && AssetDatabase.IsValidFolder(path))
+                {
+                    string configPath = AnimationCreatorConfig.GetConfigPath(path);
+                    string fullConfigPath = Path.GetFullPath(configPath);
+
+                    if (File.Exists(fullConfigPath))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Gets all folder paths that have saved configs.
+        /// </summary>
+        /// <returns>List of folder paths with configs.</returns>
+        internal List<string> GetFoldersWithConfigs()
+        {
+            List<string> folders = new();
+            foreach (Object source in animationSources)
+            {
+                if (source == null)
+                {
+                    continue;
+                }
+
+                string path = AssetDatabase.GetAssetPath(source);
+                if (!string.IsNullOrWhiteSpace(path) && AssetDatabase.IsValidFolder(path))
+                {
+                    string configPath = AnimationCreatorConfig.GetConfigPath(path);
+                    string fullConfigPath = Path.GetFullPath(configPath);
+
+                    if (File.Exists(fullConfigPath))
+                    {
+                        folders.Add(path);
+                    }
+                }
+            }
+
+            return folders;
+        }
+
+        /// <summary>
+        /// Resets the window to default settings, discarding loaded config.
+        /// </summary>
+        /// <param name="folderPath">Optional folder path whose config to delete.</param>
+        internal void ResetToDefault(string folderPath = null)
+        {
+            spriteNameRegex = ".*";
+            autoRefresh = true;
+            groupingCaseInsensitive = true;
+            includeFolderNameInAnimName = false;
+            includeFullFolderPathInAnimName = false;
+            autoParseNamePrefix = string.Empty;
+            autoParseNameSuffix = string.Empty;
+            useCustomGroupRegex = false;
+            customGroupRegex = string.Empty;
+            customGroupRegexIgnoreCase = true;
+            resolveDuplicateAnimationNames = true;
+            strictNumericOrdering = false;
+            animationData.Clear();
+
+            if (!string.IsNullOrEmpty(folderPath))
+            {
+                _loadedConfigs.Remove(folderPath);
+            }
+            else
+            {
+                _loadedConfigs.Clear();
+            }
+
+            UpdateRegex();
+            UpdateGroupRegex();
+            FindAndFilterSprites();
+            _serializedObject.Update();
+            Repaint();
+
+            this.Log($"Reset animation creator settings to defaults.");
+        }
+
+        /// <summary>
+        /// Deletes a saved config file.
+        /// </summary>
+        /// <param name="folderPath">The folder path whose config to delete.</param>
+        /// <returns>True if the config was deleted, false otherwise.</returns>
+        internal bool DeleteConfig(string folderPath)
+        {
+            if (string.IsNullOrEmpty(folderPath))
+            {
+                return false;
+            }
+
+            try
+            {
+                string configPath = AnimationCreatorConfig.GetConfigPath(folderPath);
+                string fullConfigPath = Path.GetFullPath(configPath);
+
+                if (!File.Exists(fullConfigPath))
+                {
+                    return false;
+                }
+
+                File.Delete(fullConfigPath);
+                _loadedConfigs.Remove(folderPath);
+                this.Log($"Deleted animation creator config at '{configPath}'.");
+
+                AssetDatabase.Refresh();
+                return true;
+            }
+            catch (Exception e)
+            {
+                this.LogError($"Failed to delete config at '{folderPath}'", e);
+                return false;
+            }
+        }
 
         private void BindSerializedState()
         {
@@ -2013,76 +2697,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
         }
 
-        private static string SanitizeName(string inputName)
-        {
-            inputName = inputName.Replace(" ", "_");
-            inputName = Regex.Replace(inputName, @"[^a-zA-Z0-9_]", "");
-
-            if (string.IsNullOrWhiteSpace(inputName))
-            {
-                return "Default_Animation";
-            }
-
-            return inputName.Trim('_');
-        }
-
-        private static string StripDensitySuffix(string name)
-        {
-            return Regex.Replace(name, @"@\d+(?:\.\d+)?x$", string.Empty);
-        }
-
-        private static bool TryExtractBaseAndIndex(string name, out string baseName, out int index)
-        {
-            Match m = s_ParenIndexRegex.Match(name);
-            if (
-                m.Success
-                && int.TryParse(s_ParenIndexRegex.GroupValueOrEmpty(m, "index"), out int parenIndex)
-            )
-            {
-                baseName = s_ParenIndexRegex
-                    .GroupValueOrEmpty(m, "base")
-                    .TrimEnd('_', '-', '.', ' ');
-                index = parenIndex;
-                return true;
-            }
-
-            m = s_SeparatorIndexRegex.Match(name);
-            if (
-                m.Success
-                && int.TryParse(
-                    s_SeparatorIndexRegex.GroupValueOrEmpty(m, "index"),
-                    out int separatorIndex
-                )
-            )
-            {
-                baseName = s_SeparatorIndexRegex
-                    .GroupValueOrEmpty(m, "base")
-                    .TrimEnd('_', '-', '.', ' ');
-                index = separatorIndex;
-                return true;
-            }
-
-            m = s_TrailingIndexRegex.Match(name);
-            if (
-                m.Success
-                && s_TrailingIndexRegex.TryGetGroup(m, "base", out Group trailingBaseGroup)
-                && 0 < trailingBaseGroup.Length
-                && int.TryParse(
-                    s_TrailingIndexRegex.GroupValueOrEmpty(m, "index"),
-                    out int trailingIndex
-                )
-            )
-            {
-                baseName = trailingBaseGroup.Value.TrimEnd('_', '-', '.', ' ');
-                index = trailingIndex;
-                return true;
-            }
-
-            baseName = null;
-            index = -1;
-            return false;
-        }
-
         private int ComputeSourcesHash()
         {
             if (animationSources == null || animationSources.Count == 0)
@@ -2101,101 +2715,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     yield return (id, path);
                 }
             }
-        }
-
-        private Dictionary<
-            string,
-            Dictionary<string, List<(int index, Sprite sprite)>>
-        > GroupFilteredSprites(bool withProgress)
-        {
-            Dictionary<
-                string,
-                Dictionary<string, List<(int index, Sprite sprite)>>
-            > spritesByBaseAndAssetPath = new(StringComparer.Ordinal);
-
-            int total = _filteredSprites.Count;
-            int processed = 0;
-
-            foreach (Sprite sprite in _filteredSprites)
-            {
-                processed++;
-                if (sprite == null)
-                {
-                    // Serialized preview rows can survive reimports that destroy their sprite slices; reject dead entries.
-                    continue;
-                }
-
-                if (withProgress && (processed % 10 == 0 || processed == total))
-                {
-                    Utils.EditorUi.ShowProgress(
-                        "Auto-Parsing Sprites",
-                        $"Processing: {sprite.name} ({processed}/{total})",
-                        (float)processed / total
-                    );
-                }
-
-                string assetPath = AssetDatabase.GetAssetPath(sprite);
-                string directoryPath =
-                    Path.GetDirectoryName(assetPath).SanitizePath() ?? string.Empty;
-                string frameName = StripDensitySuffix(sprite.name);
-
-                string baseName;
-                int frameIndex;
-
-                if (useCustomGroupRegex && _compiledGroupRegex != null)
-                {
-                    Match m = _compiledGroupRegex.Match(frameName);
-                    if (m.Success)
-                    {
-                        baseName = _compiledGroupRegex.TryGetGroup(m, "base", out Group baseGroup)
-                            ? baseGroup.Value
-                            : frameName;
-                        frameIndex =
-                            _compiledGroupRegex.TryGetGroup(m, "index", out Group indexGroup)
-                            && int.TryParse(indexGroup.Value, out int idx)
-                                ? idx
-                                : -1;
-                    }
-                    else if (!TryExtractBaseAndIndex(frameName, out baseName, out frameIndex))
-                    {
-                        baseName = frameName;
-                        frameIndex = -1;
-                    }
-                }
-                else if (!TryExtractBaseAndIndex(frameName, out baseName, out frameIndex))
-                {
-                    baseName = frameName;
-                    frameIndex = -1;
-                }
-
-                if (string.IsNullOrWhiteSpace(baseName))
-                {
-                    this.LogWarn(
-                        $"Could not extract valid base name for '{frameName}' at '{assetPath}'. Skipping."
-                    );
-                    continue;
-                }
-
-                if (
-                    !spritesByBaseAndAssetPath.TryGetValue(
-                        directoryPath,
-                        out Dictionary<string, List<(int index, Sprite sprite)>> byBase
-                    )
-                )
-                {
-                    byBase = new Dictionary<string, List<(int index, Sprite sprite)>>(
-                        groupingCaseInsensitive
-                            ? StringComparer.OrdinalIgnoreCase
-                            : StringComparer.Ordinal
-                    );
-                    spritesByBaseAndAssetPath.Add(directoryPath, byBase);
-                }
-
-                List<(int index, Sprite sprite)> list = byBase.GetOrAdd(baseName);
-                list.Add((frameIndex, sprite));
-            }
-
-            return spritesByBaseAndAssetPath;
         }
 
         private int ApplyAutoParseGroups(
@@ -2290,22 +2809,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             return addedCount;
-        }
-
-        private static string EnsureUniqueName(string baseName, ISet<string> used)
-        {
-            if (!used.Contains(baseName))
-            {
-                return baseName;
-            }
-            int counter = 2;
-            string candidate;
-            do
-            {
-                candidate = $"{baseName}_{counter}";
-                counter++;
-            } while (used.Contains(candidate));
-            return candidate;
         }
 
         private string ComposeFinalName(
@@ -2476,508 +2979,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             _autoParsePreview.Sort(
                 (a, b) => string.Compare(a.folder, b.folder, StringComparison.Ordinal)
             );
-        }
-
-        internal static float GetCurrentFpsForTests(AnimationData data, int frameIndex)
-        {
-            if (data.framerateMode == FramerateMode.Constant)
-            {
-                return 0 < data.framesPerSecond
-                    ? data.framesPerSecond
-                    : AnimationData.DefaultFramesPerSecond;
-            }
-
-            float normalizedPosition =
-                1 < data.frames.Count ? (float)frameIndex / (data.frames.Count - 1) : 0f;
-
-            float fps = data.framesPerSecondCurve.Evaluate(normalizedPosition);
-            return 0 < fps ? fps : AnimationData.DefaultFramesPerSecond;
-        }
-
-        internal static AnimationClip CreateAnimationClipForTests(
-            AnimationData data,
-            List<Sprite> validFrames
-        )
-        {
-            float baseFrameRate =
-                0 < data.framesPerSecond
-                    ? data.framesPerSecond
-                    : AnimationData.DefaultFramesPerSecond;
-
-            AnimationClip clip = new() { frameRate = baseFrameRate };
-
-            ObjectReferenceKeyframe[] keyframes = new ObjectReferenceKeyframe[validFrames.Count];
-
-            float currentTime = 0f;
-
-            for (int i = 0; i < validFrames.Count; i++)
-            {
-                keyframes[i].time = currentTime;
-                keyframes[i].value = validFrames[i];
-
-                if (i < validFrames.Count - 1)
-                {
-                    float fps;
-                    if (data.framerateMode == FramerateMode.Curve)
-                    {
-                        float normalizedPosition =
-                            1 < validFrames.Count ? (float)i / (validFrames.Count - 1) : 0f;
-
-                        fps = data.framesPerSecondCurve.Evaluate(normalizedPosition);
-                        if (fps <= 0)
-                        {
-                            fps = baseFrameRate;
-                        }
-                    }
-                    else
-                    {
-                        fps = baseFrameRate;
-                    }
-
-                    currentTime += 1f / fps;
-                }
-            }
-
-            AnimationUtility.SetObjectReferenceCurve(
-                clip,
-                EditorCurveBinding.PPtrCurve(
-                    "",
-                    typeof(SpriteRenderer),
-                    UnityExtensions.SpriteBindingProperty
-                ),
-                keyframes
-            );
-
-            AnimationClipSettings settings = AnimationUtility.GetAnimationClipSettings(clip);
-            settings.loopTime = data.loop;
-            settings.cycleOffset = Mathf.Clamp01(data.cycleOffset);
-            AnimationUtility.SetAnimationClipSettings(clip, settings);
-
-            return clip;
-        }
-
-        internal static int CalculateScrubberFrame(float scrubberValue, int frameCount)
-        {
-            if (frameCount <= 0)
-            {
-                return 0;
-            }
-            float clampedValue = Mathf.Clamp01(scrubberValue);
-            // UI scrubbers use round-half-up rather than Mathf.RoundToInt's ties-to-even behavior.
-            int frame = Mathf.FloorToInt(clampedValue * (frameCount - 1) + 0.5f);
-            return Mathf.Clamp(frame, 0, frameCount - 1);
-        }
-
-        internal static float CalculateCycleOffsetClamped(float inputOffset)
-        {
-            return Mathf.Clamp01(inputOffset);
-        }
-
-        /// <summary>
-        /// Creates an AnimationCreatorConfig from the current window state.
-        /// </summary>
-        /// <returns>A config object representing the current settings.</returns>
-        internal AnimationCreatorConfig CreateConfigFromCurrentState()
-        {
-            AnimationCreatorConfig config = new()
-            {
-                version = AnimationCreatorConfig.CurrentVersion,
-                spriteNameRegex = spriteNameRegex,
-                autoRefresh = autoRefresh,
-                groupingCaseInsensitive = groupingCaseInsensitive,
-                includeFolderNameInAnimName = includeFolderNameInAnimName,
-                includeFullFolderPathInAnimName = includeFullFolderPathInAnimName,
-                autoParseNamePrefix = autoParseNamePrefix,
-                autoParseNameSuffix = autoParseNameSuffix,
-                useCustomGroupRegex = useCustomGroupRegex,
-                customGroupRegex = customGroupRegex,
-                customGroupRegexIgnoreCase = customGroupRegexIgnoreCase,
-                resolveDuplicateAnimationNames = resolveDuplicateAnimationNames,
-                strictNumericOrdering = strictNumericOrdering,
-                animationEntries = new List<AnimationCreatorConfig.AnimationDataEntry>(),
-            };
-
-            foreach (AnimationData data in animationData)
-            {
-                AnimationCreatorConfig.AnimationDataEntry entry = new()
-                {
-                    animationName = data.animationName,
-                    framesPerSecond = data.framesPerSecond,
-                    isCreatedFromAutoParse = data.isCreatedFromAutoParse,
-                    loop = data.loop,
-                    framerateMode = data.framerateMode,
-                    cycleOffset = data.cycleOffset,
-                    framePaths = new List<string>(),
-                    curveKeyframes = AnimationCreatorConfig.SerializeCurve(
-                        data.framesPerSecondCurve
-                    ),
-                    curvePreWrapMode = data.framesPerSecondCurve?.preWrapMode ?? WrapMode.Clamp,
-                    curvePostWrapMode = data.framesPerSecondCurve?.postWrapMode ?? WrapMode.Clamp,
-                };
-
-                foreach (Sprite sprite in data.frames)
-                {
-                    if (sprite != null)
-                    {
-                        string path = AssetDatabase.GetAssetPath(sprite);
-                        if (!string.IsNullOrEmpty(path))
-                        {
-                            entry.framePaths.Add(path);
-                        }
-                    }
-                }
-
-                config.animationEntries.Add(entry);
-            }
-
-            return config;
-        }
-
-        /// <summary>
-        /// Applies an AnimationCreatorConfig to the current window state.
-        /// </summary>
-        /// <param name="config">The config to apply.</param>
-        internal void ApplyConfigToCurrentState(AnimationCreatorConfig config)
-        {
-            if (config == null)
-            {
-                return;
-            }
-
-            AnimationCreatorConfig.MigrateConfig(config);
-
-            spriteNameRegex = config.spriteNameRegex;
-            autoRefresh = config.autoRefresh;
-            groupingCaseInsensitive = config.groupingCaseInsensitive;
-            includeFolderNameInAnimName = config.includeFolderNameInAnimName;
-            includeFullFolderPathInAnimName = config.includeFullFolderPathInAnimName;
-            autoParseNamePrefix = config.autoParseNamePrefix;
-            autoParseNameSuffix = config.autoParseNameSuffix;
-            useCustomGroupRegex = config.useCustomGroupRegex;
-            customGroupRegex = config.customGroupRegex;
-            customGroupRegexIgnoreCase = config.customGroupRegexIgnoreCase;
-            resolveDuplicateAnimationNames = config.resolveDuplicateAnimationNames;
-            strictNumericOrdering = config.strictNumericOrdering;
-
-            animationData.Clear();
-            foreach (AnimationCreatorConfig.AnimationDataEntry entry in config.animationEntries)
-            {
-                AnimationData data = new()
-                {
-                    animationName = entry.animationName,
-                    framesPerSecond = entry.framesPerSecond,
-                    isCreatedFromAutoParse = entry.isCreatedFromAutoParse,
-                    loop = entry.loop,
-                    framerateMode = entry.framerateMode,
-                    cycleOffset = entry.cycleOffset,
-                    framesPerSecondCurve = AnimationCreatorConfig.DeserializeCurve(
-                        entry.curveKeyframes,
-                        entry.curvePreWrapMode,
-                        entry.curvePostWrapMode
-                    ),
-                    frames = new List<Sprite>(),
-                };
-
-                foreach (string path in entry.framePaths)
-                {
-                    if (string.IsNullOrEmpty(path))
-                    {
-                        continue;
-                    }
-
-                    Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
-                    if (sprite != null)
-                    {
-                        data.frames.Add(sprite);
-                    }
-                    else
-                    {
-                        this.LogWarn(
-                            $"Could not load sprite at path '{path}' for animation '{entry.animationName}'."
-                        );
-                    }
-                }
-
-                animationData.Add(data);
-            }
-
-            UpdateRegex();
-            UpdateGroupRegex();
-            FindAndFilterSprites();
-            _serializedObject.Update();
-            Repaint();
-        }
-
-        /// <summary>
-        /// Saves the current configuration to a JSON file in the specified folder.
-        /// </summary>
-        /// <param name="folderPath">The folder path to save the config to.</param>
-        /// <returns>True if the config was saved successfully, false otherwise.</returns>
-        internal bool SaveConfig(string folderPath)
-        {
-            if (string.IsNullOrEmpty(folderPath))
-            {
-                return false;
-            }
-
-            try
-            {
-                string configPath = AnimationCreatorConfig.GetConfigPath(folderPath);
-                string fullConfigPath = Path.GetFullPath(configPath);
-
-                AnimationCreatorConfig config = CreateConfigFromCurrentState();
-                string json = Serializer.JsonStringify(config, pretty: true);
-                File.WriteAllText(fullConfigPath, json, Encoding.UTF8);
-
-                _loadedConfigs[folderPath] = config;
-                this.Log($"Saved animation creator config to '{configPath}'.");
-
-                AssetDatabase.Refresh();
-                return true;
-            }
-            catch (Exception e)
-            {
-                this.LogError($"Failed to save config to '{folderPath}'", e);
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Saves configs to all animation source folders.
-        /// </summary>
-        /// <returns>The number of configs successfully saved.</returns>
-        internal int SaveAllConfigs()
-        {
-            int savedCount = 0;
-            foreach (Object source in animationSources)
-            {
-                if (source == null)
-                {
-                    continue;
-                }
-
-                string path = AssetDatabase.GetAssetPath(source);
-                if (!string.IsNullOrWhiteSpace(path) && AssetDatabase.IsValidFolder(path))
-                {
-                    if (SaveConfig(path))
-                    {
-                        savedCount++;
-                    }
-                }
-            }
-
-            this.Log($"Saved {savedCount} animation creator configs.");
-            return savedCount;
-        }
-
-        /// <summary>
-        /// Loads the configuration from a JSON file in the specified folder.
-        /// </summary>
-        /// <param name="folderPath">The folder path to load the config from.</param>
-        /// <returns>True if the config was loaded successfully, false otherwise.</returns>
-        internal bool LoadConfig(string folderPath)
-        {
-            if (string.IsNullOrEmpty(folderPath))
-            {
-                return false;
-            }
-
-            try
-            {
-                string configPath = AnimationCreatorConfig.GetConfigPath(folderPath);
-                string fullConfigPath = Path.GetFullPath(configPath);
-
-                if (!File.Exists(fullConfigPath))
-                {
-                    return false;
-                }
-
-                string json = File.ReadAllText(fullConfigPath, Encoding.UTF8);
-                AnimationCreatorConfig config = Serializer.JsonDeserialize<AnimationCreatorConfig>(
-                    json
-                );
-
-                if (config == null)
-                {
-                    return false;
-                }
-
-                _loadedConfigs[folderPath] = config;
-                ApplyConfigToCurrentState(config);
-                this.Log($"Loaded animation creator config from '{configPath}'.");
-                return true;
-            }
-            catch (Exception e)
-            {
-                this.LogError($"Failed to load config from '{folderPath}'", e);
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Attempts to auto-load configs from all animation source folders.
-        /// Loads the first found config.
-        /// </summary>
-        /// <returns>True if any config was loaded, false otherwise.</returns>
-        internal bool TryAutoLoadConfigs()
-        {
-            foreach (Object source in animationSources)
-            {
-                if (source == null)
-                {
-                    continue;
-                }
-
-                string path = AssetDatabase.GetAssetPath(source);
-                if (!string.IsNullOrWhiteSpace(path) && AssetDatabase.IsValidFolder(path))
-                {
-                    string configPath = AnimationCreatorConfig.GetConfigPath(path);
-                    string fullConfigPath = Path.GetFullPath(configPath);
-
-                    if (File.Exists(fullConfigPath))
-                    {
-                        if (LoadConfig(path))
-                        {
-                            return true;
-                        }
-                    }
-                }
-            }
-
-            return false;
-        }
-
-        /// <summary>
-        /// Checks if any animation source folder has a saved config.
-        /// </summary>
-        /// <returns>True if any config file exists, false otherwise.</returns>
-        internal bool HasAnyConfig()
-        {
-            foreach (Object source in animationSources)
-            {
-                if (source == null)
-                {
-                    continue;
-                }
-
-                string path = AssetDatabase.GetAssetPath(source);
-                if (!string.IsNullOrWhiteSpace(path) && AssetDatabase.IsValidFolder(path))
-                {
-                    string configPath = AnimationCreatorConfig.GetConfigPath(path);
-                    string fullConfigPath = Path.GetFullPath(configPath);
-
-                    if (File.Exists(fullConfigPath))
-                    {
-                        return true;
-                    }
-                }
-            }
-
-            return false;
-        }
-
-        /// <summary>
-        /// Gets all folder paths that have saved configs.
-        /// </summary>
-        /// <returns>List of folder paths with configs.</returns>
-        internal List<string> GetFoldersWithConfigs()
-        {
-            List<string> folders = new();
-            foreach (Object source in animationSources)
-            {
-                if (source == null)
-                {
-                    continue;
-                }
-
-                string path = AssetDatabase.GetAssetPath(source);
-                if (!string.IsNullOrWhiteSpace(path) && AssetDatabase.IsValidFolder(path))
-                {
-                    string configPath = AnimationCreatorConfig.GetConfigPath(path);
-                    string fullConfigPath = Path.GetFullPath(configPath);
-
-                    if (File.Exists(fullConfigPath))
-                    {
-                        folders.Add(path);
-                    }
-                }
-            }
-
-            return folders;
-        }
-
-        /// <summary>
-        /// Resets the window to default settings, discarding loaded config.
-        /// </summary>
-        /// <param name="folderPath">Optional folder path whose config to delete.</param>
-        internal void ResetToDefault(string folderPath = null)
-        {
-            spriteNameRegex = ".*";
-            autoRefresh = true;
-            groupingCaseInsensitive = true;
-            includeFolderNameInAnimName = false;
-            includeFullFolderPathInAnimName = false;
-            autoParseNamePrefix = string.Empty;
-            autoParseNameSuffix = string.Empty;
-            useCustomGroupRegex = false;
-            customGroupRegex = string.Empty;
-            customGroupRegexIgnoreCase = true;
-            resolveDuplicateAnimationNames = true;
-            strictNumericOrdering = false;
-            animationData.Clear();
-
-            if (!string.IsNullOrEmpty(folderPath))
-            {
-                _loadedConfigs.Remove(folderPath);
-            }
-            else
-            {
-                _loadedConfigs.Clear();
-            }
-
-            UpdateRegex();
-            UpdateGroupRegex();
-            FindAndFilterSprites();
-            _serializedObject.Update();
-            Repaint();
-
-            this.Log($"Reset animation creator settings to defaults.");
-        }
-
-        /// <summary>
-        /// Deletes a saved config file.
-        /// </summary>
-        /// <param name="folderPath">The folder path whose config to delete.</param>
-        /// <returns>True if the config was deleted, false otherwise.</returns>
-        internal bool DeleteConfig(string folderPath)
-        {
-            if (string.IsNullOrEmpty(folderPath))
-            {
-                return false;
-            }
-
-            try
-            {
-                string configPath = AnimationCreatorConfig.GetConfigPath(folderPath);
-                string fullConfigPath = Path.GetFullPath(configPath);
-
-                if (!File.Exists(fullConfigPath))
-                {
-                    return false;
-                }
-
-                File.Delete(fullConfigPath);
-                _loadedConfigs.Remove(folderPath);
-                this.Log($"Deleted animation creator config at '{configPath}'.");
-
-                AssetDatabase.Refresh();
-                return true;
-            }
-            catch (Exception e)
-            {
-                this.LogError($"Failed to delete config at '{folderPath}'", e);
-                return false;
-            }
         }
 
         private readonly struct CachedElementProperties

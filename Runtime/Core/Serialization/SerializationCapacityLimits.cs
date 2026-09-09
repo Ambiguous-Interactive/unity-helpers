@@ -43,8 +43,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// </remarks>
         public const int DefaultMaximumRestoredCapacity = 1 << 20;
 
-        private static int _maximumRestoredCapacity = DefaultMaximumRestoredCapacity;
-
         /// <summary>
         /// The largest capacity a payload may ask for beyond the elements it carries.
         /// </summary>
@@ -57,6 +55,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             get => _maximumRestoredCapacity;
             set => _maximumRestoredCapacity = value < 1 ? 1 : value;
         }
+
+        private static int _maximumRestoredCapacity = DefaultMaximumRestoredCapacity;
 
         /// <summary>
         /// Restores <see cref="MaximumRestoredCapacity"/> to its default.

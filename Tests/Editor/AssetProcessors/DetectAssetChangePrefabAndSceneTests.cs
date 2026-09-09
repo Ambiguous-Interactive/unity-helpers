@@ -26,10 +26,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     [NUnit.Framework.Category("Integration")]
     public sealed class DetectAssetChangePrefabAndSceneTests : DetectAssetChangeTestBase
     {
-        protected override string DefaultPayloadAssetPath => TestRoot + "/Payload.asset";
         private const string TestScenePath = TestRoot + "/TestScene.unity";
-
-        private readonly List<GameObject> _instantiatedSceneObjects = new();
 
         /// <summary>
         /// Folder prefixes this fixture is allowed to drive the processor through.
@@ -44,6 +41,102 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             "Packages/com.wallstop-studios.unity-helpers/Tests/Editor/TestAssets/Prefabs/",
             "Assets/Temp/DynamicPrefabFixtures/",
         };
+
+        private static readonly (Type HandlerType, string HumanName)[] HandlerTypesUnderTest =
+        {
+            (typeof(TestPrefabAssetChangeHandler), "TestPrefabAssetChangeHandler"),
+            (typeof(TestSceneAssetChangeHandler), "TestSceneAssetChangeHandler"),
+            (typeof(TestCombinedSearchHandler), "TestCombinedSearchHandler"),
+            (typeof(TestNestedPrefabHandler), "TestNestedPrefabHandler"),
+        };
+
+        protected override string DefaultPayloadAssetPath => TestRoot + "/Payload.asset";
+
+        private readonly List<GameObject> _instantiatedSceneObjects = new();
+
+        /// <summary>
+        /// Resets the processor to a clean state while preserving this fixture's
+        /// <see cref="PrefabSceneFixtureAllowlist"/>. Every in-test call site that resets the
+        /// processor MUST go through this helper — calling
+        /// <see cref="DetectAssetChangeProcessor.ResetForTesting()"/> directly drops
+        /// the allowlist, which silently opens the structural defense against
+        /// cross-fixture pollution for the remainder of that test.
+        /// </summary>
+        private static void ResetProcessorWithPrefabSceneFixtureAllowlist()
+        {
+            DetectAssetChangeProcessor.ResetForTesting();
+            /*
+                Reset clears the enablement override; force it back on because CI runs these watcher tests in
+                batch mode.
+            */
+            DetectAssetChangeProcessor.EnabledOverride = true;
+            DetectAssetChangeProcessor.IncludeTestAssets = true;
+            DetectAssetChangeProcessor.TestAssetFolderAllowlist = PrefabSceneFixtureAllowlist;
+        }
+
+        /// <summary>
+        /// Counts how many times the specified handler instances were invoked.
+        /// This filters the global RecordedInstances to only count invocations for
+        /// the specific instances passed in, providing test isolation.
+        /// </summary>
+        private static int CountInvocationsForInstances<T>(
+            IReadOnlyList<T> recordedInstances,
+            params T[] expectedInstances
+        )
+            where T : Component
+        {
+            HashSet<long> expectedIds = new();
+            foreach (T instance in expectedInstances)
+            {
+                if (instance != null)
+                {
+                    expectedIds.Add(instance.GetUnityObjectId());
+                }
+            }
+
+            int count = 0;
+            foreach (T recorded in recordedInstances)
+            {
+                if (recorded != null && expectedIds.Contains(recorded.GetUnityObjectId()))
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        /// <summary>
+        /// Gets the contexts recorded for specific handler instances.
+        /// This filters the global RecordedContexts to only return entries for
+        /// the specific instances passed in, providing test isolation.
+        /// </summary>
+        private static List<AssetChangeContext> GetContextsForInstances<T>(
+            IReadOnlyList<AssetChangeContext> recordedContexts,
+            IReadOnlyList<T> recordedInstances,
+            params T[] expectedInstances
+        )
+            where T : Component
+        {
+            HashSet<long> expectedIds = new();
+            foreach (T instance in expectedInstances)
+            {
+                if (instance != null)
+                {
+                    expectedIds.Add(instance.GetUnityObjectId());
+                }
+            }
+
+            List<AssetChangeContext> result = new();
+            for (int i = 0; i < recordedInstances.Count && i < recordedContexts.Count; i++)
+            {
+                T recorded = recordedInstances[i];
+                if (recorded != null && expectedIds.Contains(recorded.GetUnityObjectId()))
+                {
+                    result.Add(recordedContexts[i]);
+                }
+            }
+            return result;
+        }
 
         [OneTimeSetUp]
         public override void CommonOneTimeSetUp()
@@ -67,28 +160,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             AssetPostprocessorDeferral.FlushForTesting();
         }
 
-        private GameObject InstantiateInScene(GameObject prefab)
-        {
-            GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
-            return TrackSceneObject(instance);
-        }
-
-        private GameObject TrackSceneObject(GameObject go)
-        {
-            if (go != null)
-            {
-                _instantiatedSceneObjects.Add(go);
-            }
-            return Track(go);
-        }
-
-        private GameObject CreateTrackedSceneObject(string name)
-        {
-            GameObject go = Track(new GameObject(name));
-            _instantiatedSceneObjects.Add(go);
-            return go;
-        }
-
         [SetUp]
         public override void BaseSetUp()
         {
@@ -110,26 +181,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
             // Configure the allowlist last so setup drains run while the processor is still unconfigured.
             ResetProcessorWithPrefabSceneFixtureAllowlist();
-        }
-
-        /// <summary>
-        /// Resets the processor to a clean state while preserving this fixture's
-        /// <see cref="PrefabSceneFixtureAllowlist"/>. Every in-test call site that resets the
-        /// processor MUST go through this helper — calling
-        /// <see cref="DetectAssetChangeProcessor.ResetForTesting()"/> directly drops
-        /// the allowlist, which silently opens the structural defense against
-        /// cross-fixture pollution for the remainder of that test.
-        /// </summary>
-        private static void ResetProcessorWithPrefabSceneFixtureAllowlist()
-        {
-            DetectAssetChangeProcessor.ResetForTesting();
-            /*
-                Reset clears the enablement override; force it back on because CI runs these watcher tests in
-                batch mode.
-            */
-            DetectAssetChangeProcessor.EnabledOverride = true;
-            DetectAssetChangeProcessor.IncludeTestAssets = true;
-            DetectAssetChangeProcessor.TestAssetFolderAllowlist = PrefabSceneFixtureAllowlist;
         }
 
         [TearDown]
@@ -886,14 +937,6 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             );
         }
 
-        private static readonly (Type HandlerType, string HumanName)[] HandlerTypesUnderTest =
-        {
-            (typeof(TestPrefabAssetChangeHandler), "TestPrefabAssetChangeHandler"),
-            (typeof(TestSceneAssetChangeHandler), "TestSceneAssetChangeHandler"),
-            (typeof(TestCombinedSearchHandler), "TestCombinedSearchHandler"),
-            (typeof(TestNestedPrefabHandler), "TestNestedPrefabHandler"),
-        };
-
         /// <summary>
         /// Verifies that each MonoBehaviour handler test double lives in a non-Editor
         /// folder so Unity permits attaching it to GameObjects.
@@ -956,68 +999,26 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             );
         }
 
-        /// <summary>
-        /// Counts how many times the specified handler instances were invoked.
-        /// This filters the global RecordedInstances to only count invocations for
-        /// the specific instances passed in, providing test isolation.
-        /// </summary>
-        private static int CountInvocationsForInstances<T>(
-            IReadOnlyList<T> recordedInstances,
-            params T[] expectedInstances
-        )
-            where T : Component
+        private GameObject InstantiateInScene(GameObject prefab)
         {
-            HashSet<long> expectedIds = new();
-            foreach (T instance in expectedInstances)
-            {
-                if (instance != null)
-                {
-                    expectedIds.Add(instance.GetUnityObjectId());
-                }
-            }
-
-            int count = 0;
-            foreach (T recorded in recordedInstances)
-            {
-                if (recorded != null && expectedIds.Contains(recorded.GetUnityObjectId()))
-                {
-                    count++;
-                }
-            }
-            return count;
+            GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+            return TrackSceneObject(instance);
         }
 
-        /// <summary>
-        /// Gets the contexts recorded for specific handler instances.
-        /// This filters the global RecordedContexts to only return entries for
-        /// the specific instances passed in, providing test isolation.
-        /// </summary>
-        private static List<AssetChangeContext> GetContextsForInstances<T>(
-            IReadOnlyList<AssetChangeContext> recordedContexts,
-            IReadOnlyList<T> recordedInstances,
-            params T[] expectedInstances
-        )
-            where T : Component
+        private GameObject TrackSceneObject(GameObject go)
         {
-            HashSet<long> expectedIds = new();
-            foreach (T instance in expectedInstances)
+            if (go != null)
             {
-                if (instance != null)
-                {
-                    expectedIds.Add(instance.GetUnityObjectId());
-                }
+                _instantiatedSceneObjects.Add(go);
             }
+            return Track(go);
+        }
 
-            List<AssetChangeContext> result = new();
-            for (int i = 0; i < recordedInstances.Count && i < recordedContexts.Count; i++)
-            {
-                T recorded = recordedInstances[i];
-                if (recorded != null && expectedIds.Contains(recorded.GetUnityObjectId()))
-                {
-                    result.Add(recordedContexts[i]);
-                }
-            }
-            return result;
+        private GameObject CreateTrackedSceneObject(string name)
+        {
+            GameObject go = Track(new GameObject(name));
+            _instantiatedSceneObjects.Add(go);
+            return go;
         }
     }
 }

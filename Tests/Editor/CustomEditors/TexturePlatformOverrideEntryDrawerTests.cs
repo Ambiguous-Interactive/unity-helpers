@@ -26,6 +26,51 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
         private SerializedObject _serializedObject;
         private TexturePlatformOverrideEntryDrawer _drawer;
 
+        private static IEnumerable<TestCaseData> KnownPlatformRenderSafetyTestData()
+        {
+            yield return new TestCaseData("Standalone")
+                .Returns(null)
+                .SetName("RenderPhaseSafety.KnownPlatformStandalone");
+            yield return new TestCaseData("Android")
+                .Returns(null)
+                .SetName("RenderPhaseSafety.KnownPlatformAndroid");
+            yield return new TestCaseData("iPhone")
+                .Returns(null)
+                .SetName("RenderPhaseSafety.KnownPlatformiPhone");
+            yield return new TestCaseData("WebGL")
+                .Returns(null)
+                .SetName("RenderPhaseSafety.KnownPlatformWebGL");
+        }
+
+        private static IEnumerable<TestCaseData> PlatformNameHeightModeTestData()
+        {
+            yield return new TestCaseData("Standalone", false).SetName(
+                "HeightMode.KnownPlatform.Standalone"
+            );
+            yield return new TestCaseData("iPhone", false).SetName(
+                "HeightMode.KnownPlatform.iPhone"
+            );
+            yield return new TestCaseData("Android", false).SetName(
+                "HeightMode.KnownPlatform.Android"
+            );
+            yield return new TestCaseData("WebGL", false).SetName("HeightMode.KnownPlatform.WebGL");
+
+            yield return new TestCaseData(string.Empty, true).SetName(
+                "HeightMode.EmptyString.TriggersCustomMode"
+            );
+
+            yield return new TestCaseData(null, true).SetName(
+                "HeightMode.Null.TriggersCustomModeDueToSerialization"
+            );
+
+            yield return new TestCaseData("MyCustomPlatform", true).SetName(
+                "HeightMode.UnknownPlatform.TriggersCustomMode"
+            );
+            yield return new TestCaseData("FuturePlatform2099", true).SetName(
+                "HeightMode.UnknownPlatform.FuturePlatformTriggersCustomMode"
+            );
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -451,22 +496,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
             Assert.IsTrue(testCompleted, "Test should complete successfully");
         }
 
-        private static IEnumerable<TestCaseData> KnownPlatformRenderSafetyTestData()
-        {
-            yield return new TestCaseData("Standalone")
-                .Returns(null)
-                .SetName("RenderPhaseSafety.KnownPlatformStandalone");
-            yield return new TestCaseData("Android")
-                .Returns(null)
-                .SetName("RenderPhaseSafety.KnownPlatformAndroid");
-            yield return new TestCaseData("iPhone")
-                .Returns(null)
-                .SetName("RenderPhaseSafety.KnownPlatformiPhone");
-            yield return new TestCaseData("WebGL")
-                .Returns(null)
-                .SetName("RenderPhaseSafety.KnownPlatformWebGL");
-        }
-
         [UnityTest]
         [TestCaseSource(nameof(KnownPlatformRenderSafetyTestData))]
         public IEnumerator OnGUIDoesNotModifyKnownPlatformName(string platformName)
@@ -629,35 +658,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
                 Is.EqualTo(emptyStringHeight).Within(0.001f),
                 "Null platform name should be treated as empty string by Unity serialization, "
                     + "triggering custom mode (same as explicit empty string)"
-            );
-        }
-
-        private static IEnumerable<TestCaseData> PlatformNameHeightModeTestData()
-        {
-            yield return new TestCaseData("Standalone", false).SetName(
-                "HeightMode.KnownPlatform.Standalone"
-            );
-            yield return new TestCaseData("iPhone", false).SetName(
-                "HeightMode.KnownPlatform.iPhone"
-            );
-            yield return new TestCaseData("Android", false).SetName(
-                "HeightMode.KnownPlatform.Android"
-            );
-            yield return new TestCaseData("WebGL", false).SetName("HeightMode.KnownPlatform.WebGL");
-
-            yield return new TestCaseData(string.Empty, true).SetName(
-                "HeightMode.EmptyString.TriggersCustomMode"
-            );
-
-            yield return new TestCaseData(null, true).SetName(
-                "HeightMode.Null.TriggersCustomModeDueToSerialization"
-            );
-
-            yield return new TestCaseData("MyCustomPlatform", true).SetName(
-                "HeightMode.UnknownPlatform.TriggersCustomMode"
-            );
-            yield return new TestCaseData("FuturePlatform2099", true).SetName(
-                "HeightMode.UnknownPlatform.FuturePlatformTriggersCustomMode"
             );
         }
 

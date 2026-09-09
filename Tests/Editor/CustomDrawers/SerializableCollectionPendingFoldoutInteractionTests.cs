@@ -41,6 +41,102 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
         }
 
+        private static Event CreateMouseDown(Vector2 mousePosition)
+        {
+            return new Event
+            {
+                type = EventType.MouseDown,
+                mousePosition = mousePosition,
+                button = 0,
+            };
+        }
+
+        private static Rect BuildLabelRect(Rect headerRect, Rect toggleRect)
+        {
+            float labelWidth = Mathf.Max(0f, headerRect.xMax - toggleRect.xMax);
+            return new Rect(toggleRect.xMax, headerRect.y, labelWidth, headerRect.height);
+        }
+
+        private static void AssertDictionaryPendingState(
+            SerializableDictionaryPropertyDrawer drawer,
+            SerializedProperty property,
+            bool expectedExpanded,
+            string phase
+        )
+        {
+            Assert.IsTrue(
+                drawer.TryGetPendingAnimationStateForTests(
+                    property,
+                    out bool isExpanded,
+                    out float animProgress,
+                    out bool hasAnimBool
+                ),
+                $"Expected dictionary pending state to exist {phase}."
+            );
+            Assert.AreEqual(
+                expectedExpanded,
+                isExpanded,
+                $"Unexpected dictionary pending foldout state {phase}. "
+                    + BuildDictionaryLayoutDiagnostics()
+            );
+            Assert.IsTrue(hasAnimBool, $"Expected dictionary pending AnimBool {phase}.");
+            Assert.GreaterOrEqual(
+                animProgress,
+                0f,
+                $"Expected non-negative dictionary animation progress {phase}."
+            );
+        }
+
+        private static void AssertSetPendingState(
+            SerializableSetPropertyDrawer drawer,
+            SerializedProperty property,
+            bool expectedExpanded,
+            string phase
+        )
+        {
+            Assert.IsTrue(
+                drawer.TryGetPendingAnimationStateForTests(
+                    property,
+                    out bool isExpanded,
+                    out float animProgress,
+                    out bool hasAnimBool
+                ),
+                $"Expected set pending state to exist {phase}."
+            );
+            Assert.AreEqual(
+                expectedExpanded,
+                isExpanded,
+                $"Unexpected set pending foldout state {phase}."
+            );
+            Assert.IsTrue(hasAnimBool, $"Expected set pending AnimBool {phase}.");
+            Assert.GreaterOrEqual(
+                animProgress,
+                0f,
+                $"Expected non-negative set animation progress {phase}."
+            );
+        }
+
+        private static string BuildToggleFailureMessage(Vector2 mousePosition)
+        {
+            return $"Expected label click to toggle at mouse={mousePosition}. "
+                + $"local={LocalLabelRect}, absolute={AbsoluteLabelRect}.";
+        }
+
+        private static string BuildExpandedFailureMessage(Vector2 mousePosition)
+        {
+            return $"Expected pending foldout to expand at mouse={mousePosition}. "
+                + $"local={LocalLabelRect}, absolute={AbsoluteLabelRect}.";
+        }
+
+        private static string BuildDictionaryLayoutDiagnostics()
+        {
+            return "Recorded dictionary rects: "
+                + $"header={SerializableDictionaryPropertyDrawer.LastPendingHeaderRect}, "
+                + $"toggle={SerializableDictionaryPropertyDrawer.LastPendingFoldoutToggleRect}, "
+                + $"localLabel={SerializableDictionaryPropertyDrawer.LastPendingLabelHitRect}, "
+                + $"absoluteLabel={SerializableDictionaryPropertyDrawer.LastPendingAbsoluteLabelHitRect}.";
+        }
+
         [TestCaseSource(nameof(DictionaryPendingFoldoutClickCases))]
         public void DictionaryPendingFoldoutLabelClickToggles(Vector2 mousePosition)
         {
@@ -278,102 +374,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             yield return TestIMGUIExecutor.RunMouseDown(draw, labelRect.center);
 
             AssertSetPendingState(drawer, property, expectedExpanded: true, "after label click");
-        }
-
-        private static Event CreateMouseDown(Vector2 mousePosition)
-        {
-            return new Event
-            {
-                type = EventType.MouseDown,
-                mousePosition = mousePosition,
-                button = 0,
-            };
-        }
-
-        private static Rect BuildLabelRect(Rect headerRect, Rect toggleRect)
-        {
-            float labelWidth = Mathf.Max(0f, headerRect.xMax - toggleRect.xMax);
-            return new Rect(toggleRect.xMax, headerRect.y, labelWidth, headerRect.height);
-        }
-
-        private static void AssertDictionaryPendingState(
-            SerializableDictionaryPropertyDrawer drawer,
-            SerializedProperty property,
-            bool expectedExpanded,
-            string phase
-        )
-        {
-            Assert.IsTrue(
-                drawer.TryGetPendingAnimationStateForTests(
-                    property,
-                    out bool isExpanded,
-                    out float animProgress,
-                    out bool hasAnimBool
-                ),
-                $"Expected dictionary pending state to exist {phase}."
-            );
-            Assert.AreEqual(
-                expectedExpanded,
-                isExpanded,
-                $"Unexpected dictionary pending foldout state {phase}. "
-                    + BuildDictionaryLayoutDiagnostics()
-            );
-            Assert.IsTrue(hasAnimBool, $"Expected dictionary pending AnimBool {phase}.");
-            Assert.GreaterOrEqual(
-                animProgress,
-                0f,
-                $"Expected non-negative dictionary animation progress {phase}."
-            );
-        }
-
-        private static void AssertSetPendingState(
-            SerializableSetPropertyDrawer drawer,
-            SerializedProperty property,
-            bool expectedExpanded,
-            string phase
-        )
-        {
-            Assert.IsTrue(
-                drawer.TryGetPendingAnimationStateForTests(
-                    property,
-                    out bool isExpanded,
-                    out float animProgress,
-                    out bool hasAnimBool
-                ),
-                $"Expected set pending state to exist {phase}."
-            );
-            Assert.AreEqual(
-                expectedExpanded,
-                isExpanded,
-                $"Unexpected set pending foldout state {phase}."
-            );
-            Assert.IsTrue(hasAnimBool, $"Expected set pending AnimBool {phase}.");
-            Assert.GreaterOrEqual(
-                animProgress,
-                0f,
-                $"Expected non-negative set animation progress {phase}."
-            );
-        }
-
-        private static string BuildToggleFailureMessage(Vector2 mousePosition)
-        {
-            return $"Expected label click to toggle at mouse={mousePosition}. "
-                + $"local={LocalLabelRect}, absolute={AbsoluteLabelRect}.";
-        }
-
-        private static string BuildExpandedFailureMessage(Vector2 mousePosition)
-        {
-            return $"Expected pending foldout to expand at mouse={mousePosition}. "
-                + $"local={LocalLabelRect}, absolute={AbsoluteLabelRect}.";
-        }
-
-        private static string BuildDictionaryLayoutDiagnostics()
-        {
-            return "Recorded dictionary rects: "
-                + $"header={SerializableDictionaryPropertyDrawer.LastPendingHeaderRect}, "
-                + $"toggle={SerializableDictionaryPropertyDrawer.LastPendingFoldoutToggleRect}, "
-                + $"localLabel={SerializableDictionaryPropertyDrawer.LastPendingLabelHitRect}, "
-                + $"absoluteLabel={SerializableDictionaryPropertyDrawer.LastPendingAbsoluteLabelHitRect}.";
         }
     }
 }

@@ -23,6 +23,26 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
     internal sealed class WButtonParameterMetadata
     {
+        internal ParameterInfo ParameterInfo { get; }
+
+        internal Type ParameterType { get; }
+
+        internal string Name { get; }
+
+        internal bool IsOptional { get; }
+
+        internal bool IsParamsArray { get; }
+
+        internal bool IsCancellationToken { get; }
+
+        internal bool IsUnityObject { get; }
+
+        internal bool IsValueType { get; }
+
+        internal bool HasDefaultValue { get; }
+
+        internal object DefaultValue { get; }
+
         internal WButtonParameterMetadata(ParameterInfo parameter, int index)
         {
             ParameterInfo = parameter ?? throw new ArgumentNullException(nameof(parameter));
@@ -46,26 +66,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
             IsUnityObject = typeof(UnityEngine.Object).IsAssignableFrom(ParameterType);
             IsValueType = ParameterType.IsValueType && !ParameterType.IsEnum;
         }
-
-        internal ParameterInfo ParameterInfo { get; }
-
-        internal Type ParameterType { get; }
-
-        internal string Name { get; }
-
-        internal bool IsOptional { get; }
-
-        internal bool IsParamsArray { get; }
-
-        internal bool IsCancellationToken { get; }
-
-        internal bool IsUnityObject { get; }
-
-        internal bool IsValueType { get; }
-
-        internal bool HasDefaultValue { get; }
-
-        internal object DefaultValue { get; }
 
         private static bool TryGetDefaultValue(ParameterInfo parameter, out object value)
         {
@@ -114,41 +114,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
 
     internal sealed class WButtonMethodMetadata
     {
-        internal WButtonMethodMetadata(
-            Type declaringType,
-            MethodInfo method,
-            WButtonAttribute attribute,
-            WButtonParameterMetadata[] parameters,
-            WButtonExecutionKind executionKind,
-            Type returnType,
-            Type asyncResultType,
-            bool returnsVoid,
-            int cancellationTokenIndex,
-            string colorKey,
-            int declarationOrder
-        )
-        {
-            DeclaringType = declaringType;
-            Method = method;
-            Attribute = attribute;
-            Parameters = parameters ?? Array.Empty<WButtonParameterMetadata>();
-            ExecutionKind = executionKind;
-            ReturnType = returnType ?? typeof(void);
-            AsyncResultType = asyncResultType;
-            ReturnsVoid = returnsVoid;
-            CancellationTokenParameterIndex = cancellationTokenIndex;
-            DisplayName = string.IsNullOrEmpty(attribute.DisplayName)
-                ? method.Name
-                : attribute.DisplayName;
-            DrawOrder = attribute.DrawOrder;
-            HistoryCapacity = attribute.HistoryCapacity;
-            ColorKey = string.IsNullOrEmpty(colorKey) ? null : colorKey;
-            GroupName = string.IsNullOrWhiteSpace(attribute.GroupName) ? null : attribute.GroupName;
-            GroupPriority = attribute.GroupPriority;
-            GroupPlacement = attribute.GroupPlacement;
-            DeclarationOrder = declarationOrder;
-        }
-
         internal Type DeclaringType { get; }
 
         internal MethodInfo Method { get; }
@@ -198,6 +163,41 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
         internal bool ReturnsVoid { get; }
 
         internal int CancellationTokenParameterIndex { get; }
+
+        internal WButtonMethodMetadata(
+            Type declaringType,
+            MethodInfo method,
+            WButtonAttribute attribute,
+            WButtonParameterMetadata[] parameters,
+            WButtonExecutionKind executionKind,
+            Type returnType,
+            Type asyncResultType,
+            bool returnsVoid,
+            int cancellationTokenIndex,
+            string colorKey,
+            int declarationOrder
+        )
+        {
+            DeclaringType = declaringType;
+            Method = method;
+            Attribute = attribute;
+            Parameters = parameters ?? Array.Empty<WButtonParameterMetadata>();
+            ExecutionKind = executionKind;
+            ReturnType = returnType ?? typeof(void);
+            AsyncResultType = asyncResultType;
+            ReturnsVoid = returnsVoid;
+            CancellationTokenParameterIndex = cancellationTokenIndex;
+            DisplayName = string.IsNullOrEmpty(attribute.DisplayName)
+                ? method.Name
+                : attribute.DisplayName;
+            DrawOrder = attribute.DrawOrder;
+            HistoryCapacity = attribute.HistoryCapacity;
+            ColorKey = string.IsNullOrEmpty(colorKey) ? null : colorKey;
+            GroupName = string.IsNullOrWhiteSpace(attribute.GroupName) ? null : attribute.GroupName;
+            GroupPriority = attribute.GroupPriority;
+            GroupPlacement = attribute.GroupPlacement;
+            DeclarationOrder = declarationOrder;
+        }
     }
 
     internal static class WButtonMetadataCache

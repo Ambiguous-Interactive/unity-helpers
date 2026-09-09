@@ -46,6 +46,99 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             ISerializationCallbackReceiver,
             ISerializable
     {
+        /// <summary>
+        /// Equality comparison between two <see cref="SerializableType"/> instances.
+        /// </summary>
+        public static bool operator ==(SerializableType left, SerializableType right)
+        {
+            return left.Equals(right);
+        }
+
+        /// <summary>
+        /// Inequality comparison between two <see cref="SerializableType"/> instances.
+        /// </summary>
+        public static bool operator !=(SerializableType left, SerializableType right)
+        {
+            return !left.Equals(right);
+        }
+
+        /// <summary>
+        /// Equality comparison between a <see cref="SerializableType"/> and a nullable wrapper.
+        /// </summary>
+        public static bool operator ==(SerializableType left, SerializableType? right)
+        {
+            if (!right.HasValue)
+            {
+                return left.IsEmpty;
+            }
+
+            return left.Equals(right.Value);
+        }
+
+        /// <summary>
+        /// Inequality comparison between a <see cref="SerializableType"/> and a nullable wrapper.
+        /// </summary>
+        public static bool operator !=(SerializableType left, SerializableType? right)
+        {
+            return !(left == right);
+        }
+
+        /// <summary>
+        /// Equality comparison between a nullable wrapper and a <see cref="SerializableType"/>.
+        /// </summary>
+        public static bool operator ==(SerializableType? left, SerializableType right)
+        {
+            if (!left.HasValue)
+            {
+                return right.IsEmpty;
+            }
+
+            return left.Value.Equals(right);
+        }
+
+        /// <summary>
+        /// Inequality comparison between a nullable wrapper and a <see cref="SerializableType"/>.
+        /// </summary>
+        public static bool operator !=(SerializableType? left, SerializableType right)
+        {
+            return !(left == right);
+        }
+
+        /// <summary>
+        /// Gets a value indicating whether this instance does not reference a type.
+        /// </summary>
+        public bool IsEmpty => string.IsNullOrEmpty(_assemblyQualifiedName);
+
+        /// <summary>
+        /// Gets the stored assembly qualified type name.
+        /// </summary>
+        public string AssemblyQualifiedName =>
+            string.IsNullOrEmpty(_assemblyQualifiedName) ? string.Empty : _assemblyQualifiedName;
+
+        /// <summary>
+        /// Gets a user-friendly display name for the wrapped type.
+        /// </summary>
+        public string DisplayName
+        {
+            get
+            {
+                Type resolved = GetResolvedType();
+                if (resolved == null)
+                {
+                    return string.IsNullOrEmpty(_assemblyQualifiedName)
+                        ? SerializableTypeCatalog.NoneDisplayName
+                        : $"{SerializableTypeCatalog.NoneDisplayName}: {_assemblyQualifiedName}";
+                }
+
+                return SerializableTypeCatalog.GetDisplayName(resolved);
+            }
+        }
+
+        /// <summary>
+        /// Gets the resolved <see cref="Type"/> instance, or <c>null</c> when unresolved.
+        /// </summary>
+        public Type Value => GetResolvedType();
+
         [SerializeField]
         [ProtoMember(1)]
         [WProtoMember(1)]
@@ -86,39 +179,75 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         }
 
         /// <summary>
-        /// Gets a value indicating whether this instance does not reference a type.
+        /// Implicitly converts the wrapper to a <see cref="Type"/>.
         /// </summary>
-        public bool IsEmpty => string.IsNullOrEmpty(_assemblyQualifiedName);
-
-        /// <summary>
-        /// Gets the stored assembly qualified type name.
-        /// </summary>
-        public string AssemblyQualifiedName =>
-            string.IsNullOrEmpty(_assemblyQualifiedName) ? string.Empty : _assemblyQualifiedName;
-
-        /// <summary>
-        /// Gets a user-friendly display name for the wrapped type.
-        /// </summary>
-        public string DisplayName
+        public static implicit operator Type(SerializableType value)
         {
-            get
-            {
-                Type resolved = GetResolvedType();
-                if (resolved == null)
-                {
-                    return string.IsNullOrEmpty(_assemblyQualifiedName)
-                        ? SerializableTypeCatalog.NoneDisplayName
-                        : $"{SerializableTypeCatalog.NoneDisplayName}: {_assemblyQualifiedName}";
-                }
-
-                return SerializableTypeCatalog.GetDisplayName(resolved);
-            }
+            return value.Value;
         }
 
         /// <summary>
-        /// Gets the resolved <see cref="Type"/> instance, or <c>null</c> when unresolved.
+        /// Creates a wrapper from the provided <see cref="Type"/>.
         /// </summary>
-        public Type Value => GetResolvedType();
+        /// <param name="type">Type to wrap.</param>
+        /// <returns>The constructed <see cref="SerializableType"/>.</returns>
+        public static SerializableType FromType(Type type)
+        {
+            return new SerializableType(type);
+        }
+
+        internal static SerializableType FromSerializedName(string serialized)
+        {
+            SerializableType value = default;
+            value._assemblyQualifiedName = string.IsNullOrEmpty(serialized)
+                ? string.Empty
+                : serialized;
+            value._cachedType = SerializableTypeCatalog.Resolve(value._assemblyQualifiedName);
+            value._resolutionAttempted = true;
+            return value;
+        }
+
+        internal static string NormalizeTypeName(Type type)
+        {
+            if (type == null)
+            {
+                return string.Empty;
+            }
+
+            string assemblyQualifiedName = type.AssemblyQualifiedName;
+            if (!string.IsNullOrEmpty(assemblyQualifiedName))
+            {
+                return assemblyQualifiedName;
+            }
+
+            string fullName = type.FullName;
+            if (!string.IsNullOrEmpty(fullName))
+            {
+                Assembly assembly = type.Assembly;
+                string assemblyName = assembly.GetName().Name;
+                if (!string.IsNullOrEmpty(assemblyName))
+                {
+                    return $"{fullName}, {assemblyName}";
+                }
+
+                return fullName;
+            }
+
+            string name = type.Name;
+            if (!string.IsNullOrEmpty(name))
+            {
+                Assembly assembly = type.Assembly;
+                string assemblyName = assembly.GetName().Name;
+                if (!string.IsNullOrEmpty(assemblyName))
+                {
+                    return $"{name}, {assemblyName}";
+                }
+
+                return name;
+            }
+
+            return string.Empty;
+        }
 
         /// <summary>
         /// Assigns the wrapper to the provided <see cref="Type"/>.
@@ -202,104 +331,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             return StringComparer.Ordinal.GetHashCode(_assemblyQualifiedName);
         }
 
-        /// <summary>
-        /// Equality comparison between two <see cref="SerializableType"/> instances.
-        /// </summary>
-        public static bool operator ==(SerializableType left, SerializableType right)
-        {
-            return left.Equals(right);
-        }
-
-        /// <summary>
-        /// Inequality comparison between two <see cref="SerializableType"/> instances.
-        /// </summary>
-        public static bool operator !=(SerializableType left, SerializableType right)
-        {
-            return !left.Equals(right);
-        }
-
-        /// <summary>
-        /// Equality comparison between a <see cref="SerializableType"/> and a nullable wrapper.
-        /// </summary>
-        public static bool operator ==(SerializableType left, SerializableType? right)
-        {
-            if (!right.HasValue)
-            {
-                return left.IsEmpty;
-            }
-
-            return left.Equals(right.Value);
-        }
-
-        /// <summary>
-        /// Inequality comparison between a <see cref="SerializableType"/> and a nullable wrapper.
-        /// </summary>
-        public static bool operator !=(SerializableType left, SerializableType? right)
-        {
-            return !(left == right);
-        }
-
-        /// <summary>
-        /// Equality comparison between a nullable wrapper and a <see cref="SerializableType"/>.
-        /// </summary>
-        public static bool operator ==(SerializableType? left, SerializableType right)
-        {
-            if (!left.HasValue)
-            {
-                return right.IsEmpty;
-            }
-
-            return left.Value.Equals(right);
-        }
-
-        /// <summary>
-        /// Inequality comparison between a nullable wrapper and a <see cref="SerializableType"/>.
-        /// </summary>
-        public static bool operator !=(SerializableType? left, SerializableType right)
-        {
-            return !(left == right);
-        }
-
-        /// <summary>
-        /// Implicitly converts the wrapper to a <see cref="Type"/>.
-        /// </summary>
-        public static implicit operator Type(SerializableType value)
-        {
-            return value.Value;
-        }
-
-        /// <summary>
-        /// Creates a wrapper from the provided <see cref="Type"/>.
-        /// </summary>
-        /// <param name="type">Type to wrap.</param>
-        /// <returns>The constructed <see cref="SerializableType"/>.</returns>
-        public static SerializableType FromType(Type type)
-        {
-            return new SerializableType(type);
-        }
-
-        /// <inheritdoc/>
-        void ISerializationCallbackReceiver.OnBeforeSerialize()
-        {
-            if (_cachedType != null)
-            {
-                _assemblyQualifiedName = NormalizeTypeName(_cachedType);
-            }
-        }
-
-        /// <inheritdoc/>
-        void ISerializationCallbackReceiver.OnAfterDeserialize()
-        {
-            _cachedType = SerializableTypeCatalog.Resolve(_assemblyQualifiedName);
-            _resolutionAttempted = true;
-        }
-
-        /// <inheritdoc/>
-        void ISerializable.GetObjectData(SerializationInfo info, StreamingContext context)
-        {
-            info.AddValue(nameof(_assemblyQualifiedName), _assemblyQualifiedName);
-        }
-
         private Type GetResolvedType()
         {
             if (_cachedType != null)
@@ -326,57 +357,26 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             return _cachedType;
         }
 
-        internal static SerializableType FromSerializedName(string serialized)
+        /// <inheritdoc/>
+        void ISerializationCallbackReceiver.OnBeforeSerialize()
         {
-            SerializableType value = default;
-            value._assemblyQualifiedName = string.IsNullOrEmpty(serialized)
-                ? string.Empty
-                : serialized;
-            value._cachedType = SerializableTypeCatalog.Resolve(value._assemblyQualifiedName);
-            value._resolutionAttempted = true;
-            return value;
+            if (_cachedType != null)
+            {
+                _assemblyQualifiedName = NormalizeTypeName(_cachedType);
+            }
         }
 
-        internal static string NormalizeTypeName(Type type)
+        /// <inheritdoc/>
+        void ISerializationCallbackReceiver.OnAfterDeserialize()
         {
-            if (type == null)
-            {
-                return string.Empty;
-            }
+            _cachedType = SerializableTypeCatalog.Resolve(_assemblyQualifiedName);
+            _resolutionAttempted = true;
+        }
 
-            string assemblyQualifiedName = type.AssemblyQualifiedName;
-            if (!string.IsNullOrEmpty(assemblyQualifiedName))
-            {
-                return assemblyQualifiedName;
-            }
-
-            string fullName = type.FullName;
-            if (!string.IsNullOrEmpty(fullName))
-            {
-                Assembly assembly = type.Assembly;
-                string assemblyName = assembly.GetName().Name;
-                if (!string.IsNullOrEmpty(assemblyName))
-                {
-                    return $"{fullName}, {assemblyName}";
-                }
-
-                return fullName;
-            }
-
-            string name = type.Name;
-            if (!string.IsNullOrEmpty(name))
-            {
-                Assembly assembly = type.Assembly;
-                string assemblyName = assembly.GetName().Name;
-                if (!string.IsNullOrEmpty(assemblyName))
-                {
-                    return $"{name}, {assemblyName}";
-                }
-
-                return name;
-            }
-
-            return string.Empty;
+        /// <inheritdoc/>
+        void ISerializable.GetObjectData(SerializationInfo info, StreamingContext context)
+        {
+            info.AddValue(nameof(_assemblyQualifiedName), _assemblyQualifiedName);
         }
 
         internal static class SerializedPropertyNames
@@ -390,15 +390,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     /// </summary>
     public static class SerializableTypeCatalog
     {
-        internal const string NoneDisplayName = "<None>";
-
-        private static readonly object SyncRoot = new();
-        private static SerializableTypeDescriptor[] _descriptors;
-        private static Dictionary<string, SerializableTypeDescriptor> _descriptorByName;
-        private static string[] _assemblyQualifiedNames;
-        private static string[] _displayNames;
-        private static string[] _tooltips;
-
         /// <summary>
         /// The default bound on distinct search terms <see cref="GetFilteredDescriptors"/> retains.
         /// </summary>
@@ -410,16 +401,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// </remarks>
         public const int DefaultMaxCachedFilterResults = 64;
 
-        private static readonly Cache<string, SerializableTypeDescriptor[]> FilterCache =
-            CacheBuilder<string, SerializableTypeDescriptor[]>
-                .NewBuilder()
-                .MaximumSize(DefaultMaxCachedFilterResults)
-                .InitialCapacity(16)
-                .KeyComparer(StringComparer.OrdinalIgnoreCase)
-                .Build();
-
-        private static int _maxCachedFilterResults = DefaultMaxCachedFilterResults;
-        private static readonly object FilterCacheResizeLock = new();
+        internal const string NoneDisplayName = "<None>";
 
         /// <summary>
         /// Gets or sets how many distinct search terms <see cref="GetFilteredDescriptors"/> retains.
@@ -440,6 +422,24 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
         internal static int CachedFilterResultCountForTesting => FilterCache.Count;
 
+        private static readonly object SyncRoot = new();
+        private static SerializableTypeDescriptor[] _descriptors;
+        private static Dictionary<string, SerializableTypeDescriptor> _descriptorByName;
+        private static string[] _assemblyQualifiedNames;
+        private static string[] _displayNames;
+        private static string[] _tooltips;
+
+        private static readonly Cache<string, SerializableTypeDescriptor[]> FilterCache =
+            CacheBuilder<string, SerializableTypeDescriptor[]>
+                .NewBuilder()
+                .MaximumSize(DefaultMaxCachedFilterResults)
+                .InitialCapacity(16)
+                .KeyComparer(StringComparer.OrdinalIgnoreCase)
+                .Build();
+
+        private static int _maxCachedFilterResults = DefaultMaxCachedFilterResults;
+        private static readonly object FilterCacheResizeLock = new();
+
         private static readonly string[] DefaultIgnorePatternStrings =
         {
             @"^\$",
@@ -457,313 +457,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             StringComparer.Ordinal
         );
         private static TypeSignature[] _typeSignatures;
-
-        /// <summary>
-        /// Exposes the default ignore patterns used when no explicit configuration is provided.
-        /// </summary>
-        internal static IReadOnlyList<string> GetDefaultIgnorePatterns()
-        {
-            return DefaultIgnorePatternStrings;
-        }
-
-        /// <summary>
-        /// Retrieves the currently active ignore pattern strings. Falls back to defaults when no overrides exist.
-        /// </summary>
-        internal static IReadOnlyList<string> GetActiveIgnorePatterns()
-        {
-            return _configuredIgnorePatterns ?? DefaultIgnorePatternStrings;
-        }
-
-        /// <summary>
-        /// Replaces the ignore pattern set used to filter candidate SerializableTypes. A <c>null</c> input reverts to defaults.
-        /// </summary>
-        /// <param name="patterns">Patterns to apply. Empty strings are discarded.</param>
-        internal static void ConfigureTypeNameIgnorePatterns(IEnumerable<string> patterns)
-        {
-            string[] sanitized = SanitizePatternInput(patterns);
-
-            lock (SyncRoot)
-            {
-                if (PatternsEqual(_configuredIgnorePatterns, sanitized))
-                {
-                    return;
-                }
-
-                _configuredIgnorePatterns = sanitized;
-                _configuredIgnoreRegexes = sanitized == null ? null : CompilePatterns(sanitized);
-
-                PatternStatsCache.Clear();
-                _descriptors = null;
-                _descriptorByName = null;
-                _assemblyQualifiedNames = null;
-                _displayNames = null;
-                _tooltips = null;
-                FilterCache.Clear();
-            }
-        }
-
-        /// <summary>
-        /// Provides statistics for the supplied pattern, including validity and match counts.
-        /// </summary>
-        internal static PatternStats GetPatternStats(string pattern)
-        {
-            if (string.IsNullOrWhiteSpace(pattern))
-            {
-                return new PatternStats(string.Empty, true, 0, null);
-            }
-
-            string trimmed = pattern.Trim();
-            lock (SyncRoot)
-            {
-                if (PatternStatsCache.TryGetValue(trimmed, out PatternStats cached))
-                {
-                    return cached;
-                }
-            }
-
-            PatternStats stats;
-            try
-            {
-                Regex regex = new(trimmed, RegexOptions.Compiled | RegexOptions.CultureInvariant);
-                int count = CountTypesMatchingRegex(regex);
-                stats = new PatternStats(trimmed, true, count, null);
-            }
-            catch (ArgumentException e)
-            {
-                stats = new PatternStats(trimmed, false, 0, e.Message);
-            }
-
-            lock (SyncRoot)
-            {
-                PatternStatsCache[trimmed] = stats;
-            }
-
-            return stats;
-        }
-
-        private static Regex[] GetActiveIgnoreRegexes()
-        {
-            Regex[] configured = _configuredIgnoreRegexes;
-            if (configured != null)
-            {
-                return configured;
-            }
-
-            return _defaultIgnoreRegexes ??= CompilePatterns(DefaultIgnorePatternStrings);
-        }
-
-        internal static void WarmPatternStats(IEnumerable<string> patterns)
-        {
-            if (patterns == null)
-            {
-                return;
-            }
-
-            using (
-                PooledResource<HashSet<string>> uniqueLease = SetBuffers<string>
-                    .GetHashSetPool(StringComparer.Ordinal)
-                    .Get(out HashSet<string> unique)
-            )
-            {
-                foreach (string pattern in patterns)
-                {
-                    if (string.IsNullOrWhiteSpace(pattern))
-                    {
-                        continue;
-                    }
-
-                    unique.Add(pattern.Trim());
-                }
-
-                if (unique.Count == 0)
-                {
-                    return;
-                }
-
-                foreach (string pattern in unique)
-                {
-                    GetPatternStats(pattern);
-                }
-            }
-        }
-
-        private static Regex[] CompilePatterns(IEnumerable<string> patterns)
-        {
-            if (patterns == null)
-            {
-                return null;
-            }
-
-            using (
-                PooledResource<List<Regex>> listLease = Buffers<Regex>.List.Get(
-                    out List<Regex> compiled
-                )
-            )
-            {
-                foreach (string pattern in patterns)
-                {
-                    if (string.IsNullOrWhiteSpace(pattern))
-                    {
-                        continue;
-                    }
-
-                    string trimmed = pattern.Trim();
-                    try
-                    {
-                        compiled.Add(
-                            new Regex(
-                                trimmed,
-                                RegexOptions.Compiled | RegexOptions.CultureInvariant
-                            )
-                        );
-                    }
-                    catch (ArgumentException e)
-                    {
-                        Debug.LogWarning(
-                            $"SerializableTypeCatalog ignore pattern '{trimmed}' is invalid: {e.Message}"
-                        );
-                    }
-                }
-
-                return compiled.Count == 0 ? Array.Empty<Regex>() : compiled.ToArray();
-            }
-        }
-
-        private static string[] SanitizePatternInput(IEnumerable<string> patterns)
-        {
-            if (patterns == null)
-            {
-                return null;
-            }
-
-            using (
-                PooledResource<List<string>> sanitizedLease = Buffers<string>.List.Get(
-                    out List<string> sanitized
-                )
-            )
-            {
-                foreach (string pattern in patterns)
-                {
-                    if (string.IsNullOrWhiteSpace(pattern))
-                    {
-                        continue;
-                    }
-
-                    sanitized.Add(pattern.Trim());
-                }
-
-                return sanitized.Count == 0 ? Array.Empty<string>() : sanitized.ToArray();
-            }
-        }
-
-        private static bool PatternsEqual(string[] left, string[] right)
-        {
-            if (ReferenceEquals(left, right))
-            {
-                return true;
-            }
-
-            if (left == null || right == null)
-            {
-                return false;
-            }
-
-            if (left.Length != right.Length)
-            {
-                return false;
-            }
-
-            for (int index = 0; index < left.Length; index++)
-            {
-                if (!string.Equals(left[index], right[index], StringComparison.Ordinal))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        private static bool MatchesConfiguredIgnorePattern(Type type)
-        {
-            Regex[] patterns = GetActiveIgnoreRegexes();
-            if (patterns == null || patterns.Length == 0)
-            {
-                return false;
-            }
-
-            foreach (Regex regex in patterns)
-            {
-                if (regex == null)
-                {
-                    continue;
-                }
-
-                if (RegexMatchesType(type, regex))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool RegexMatchesType(Type type, Regex regex)
-        {
-            if (type == null || regex == null)
-            {
-                return false;
-            }
-
-            string fullName = type.FullName;
-            if (!string.IsNullOrEmpty(fullName) && regex.IsMatch(fullName))
-            {
-                return true;
-            }
-
-            string name = type.Name;
-            if (!string.IsNullOrEmpty(name) && regex.IsMatch(name))
-            {
-                return true;
-            }
-
-            string assemblyQualifiedName = type.AssemblyQualifiedName;
-            if (
-                !string.IsNullOrEmpty(assemblyQualifiedName) && regex.IsMatch(assemblyQualifiedName)
-            )
-            {
-                return true;
-            }
-
-            return false;
-        }
-
-        private static int CountTypesMatchingRegex(Regex regex)
-        {
-            if (regex == null)
-            {
-                return 0;
-            }
-
-            EnsureTypeSignatures();
-
-            TypeSignature[] signatures = _typeSignatures;
-            if (signatures == null || signatures.Length == 0)
-            {
-                return 0;
-            }
-
-            int matches = 0;
-            foreach (TypeSignature signature in signatures)
-            {
-                if (RegexMatchesSignature(signature, regex))
-                {
-                    matches++;
-                }
-            }
-
-            return matches;
-        }
 
         /// <summary>
         /// Resolves a type from an assembly qualified name.
@@ -968,6 +661,330 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 FilterCache.Set(key, result);
                 return result;
             }
+        }
+
+        /// <summary>
+        /// Exposes the default ignore patterns used when no explicit configuration is provided.
+        /// </summary>
+        internal static IReadOnlyList<string> GetDefaultIgnorePatterns()
+        {
+            return DefaultIgnorePatternStrings;
+        }
+
+        /// <summary>
+        /// Retrieves the currently active ignore pattern strings. Falls back to defaults when no overrides exist.
+        /// </summary>
+        internal static IReadOnlyList<string> GetActiveIgnorePatterns()
+        {
+            return _configuredIgnorePatterns ?? DefaultIgnorePatternStrings;
+        }
+
+        /// <summary>
+        /// Replaces the ignore pattern set used to filter candidate SerializableTypes. A <c>null</c> input reverts to defaults.
+        /// </summary>
+        /// <param name="patterns">Patterns to apply. Empty strings are discarded.</param>
+        internal static void ConfigureTypeNameIgnorePatterns(IEnumerable<string> patterns)
+        {
+            string[] sanitized = SanitizePatternInput(patterns);
+
+            lock (SyncRoot)
+            {
+                if (PatternsEqual(_configuredIgnorePatterns, sanitized))
+                {
+                    return;
+                }
+
+                _configuredIgnorePatterns = sanitized;
+                _configuredIgnoreRegexes = sanitized == null ? null : CompilePatterns(sanitized);
+
+                PatternStatsCache.Clear();
+                _descriptors = null;
+                _descriptorByName = null;
+                _assemblyQualifiedNames = null;
+                _displayNames = null;
+                _tooltips = null;
+                FilterCache.Clear();
+            }
+        }
+
+        /// <summary>
+        /// Provides statistics for the supplied pattern, including validity and match counts.
+        /// </summary>
+        internal static PatternStats GetPatternStats(string pattern)
+        {
+            if (string.IsNullOrWhiteSpace(pattern))
+            {
+                return new PatternStats(string.Empty, true, 0, null);
+            }
+
+            string trimmed = pattern.Trim();
+            lock (SyncRoot)
+            {
+                if (PatternStatsCache.TryGetValue(trimmed, out PatternStats cached))
+                {
+                    return cached;
+                }
+            }
+
+            PatternStats stats;
+            try
+            {
+                Regex regex = new(trimmed, RegexOptions.Compiled | RegexOptions.CultureInvariant);
+                int count = CountTypesMatchingRegex(regex);
+                stats = new PatternStats(trimmed, true, count, null);
+            }
+            catch (ArgumentException e)
+            {
+                stats = new PatternStats(trimmed, false, 0, e.Message);
+            }
+
+            lock (SyncRoot)
+            {
+                PatternStatsCache[trimmed] = stats;
+            }
+
+            return stats;
+        }
+
+        internal static void WarmPatternStats(IEnumerable<string> patterns)
+        {
+            if (patterns == null)
+            {
+                return;
+            }
+
+            using (
+                PooledResource<HashSet<string>> uniqueLease = SetBuffers<string>
+                    .GetHashSetPool(StringComparer.Ordinal)
+                    .Get(out HashSet<string> unique)
+            )
+            {
+                foreach (string pattern in patterns)
+                {
+                    if (string.IsNullOrWhiteSpace(pattern))
+                    {
+                        continue;
+                    }
+
+                    unique.Add(pattern.Trim());
+                }
+
+                if (unique.Count == 0)
+                {
+                    return;
+                }
+
+                foreach (string pattern in unique)
+                {
+                    GetPatternStats(pattern);
+                }
+            }
+        }
+
+        internal static bool ShouldSkipType(Type type)
+        {
+            if (type == null)
+            {
+                return true;
+            }
+
+            if (
+                ReflectionHelpers.HasAttributeSafe<CompilerGeneratedAttribute>(type, inherit: false)
+            )
+            {
+                return true;
+            }
+
+            return MatchesConfiguredIgnorePattern(type);
+        }
+
+        private static Regex[] GetActiveIgnoreRegexes()
+        {
+            Regex[] configured = _configuredIgnoreRegexes;
+            if (configured != null)
+            {
+                return configured;
+            }
+
+            return _defaultIgnoreRegexes ??= CompilePatterns(DefaultIgnorePatternStrings);
+        }
+
+        private static Regex[] CompilePatterns(IEnumerable<string> patterns)
+        {
+            if (patterns == null)
+            {
+                return null;
+            }
+
+            using (
+                PooledResource<List<Regex>> listLease = Buffers<Regex>.List.Get(
+                    out List<Regex> compiled
+                )
+            )
+            {
+                foreach (string pattern in patterns)
+                {
+                    if (string.IsNullOrWhiteSpace(pattern))
+                    {
+                        continue;
+                    }
+
+                    string trimmed = pattern.Trim();
+                    try
+                    {
+                        compiled.Add(
+                            new Regex(
+                                trimmed,
+                                RegexOptions.Compiled | RegexOptions.CultureInvariant
+                            )
+                        );
+                    }
+                    catch (ArgumentException e)
+                    {
+                        Debug.LogWarning(
+                            $"SerializableTypeCatalog ignore pattern '{trimmed}' is invalid: {e.Message}"
+                        );
+                    }
+                }
+
+                return compiled.Count == 0 ? Array.Empty<Regex>() : compiled.ToArray();
+            }
+        }
+
+        private static string[] SanitizePatternInput(IEnumerable<string> patterns)
+        {
+            if (patterns == null)
+            {
+                return null;
+            }
+
+            using (
+                PooledResource<List<string>> sanitizedLease = Buffers<string>.List.Get(
+                    out List<string> sanitized
+                )
+            )
+            {
+                foreach (string pattern in patterns)
+                {
+                    if (string.IsNullOrWhiteSpace(pattern))
+                    {
+                        continue;
+                    }
+
+                    sanitized.Add(pattern.Trim());
+                }
+
+                return sanitized.Count == 0 ? Array.Empty<string>() : sanitized.ToArray();
+            }
+        }
+
+        private static bool PatternsEqual(string[] left, string[] right)
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return true;
+            }
+
+            if (left == null || right == null)
+            {
+                return false;
+            }
+
+            if (left.Length != right.Length)
+            {
+                return false;
+            }
+
+            for (int index = 0; index < left.Length; index++)
+            {
+                if (!string.Equals(left[index], right[index], StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool MatchesConfiguredIgnorePattern(Type type)
+        {
+            Regex[] patterns = GetActiveIgnoreRegexes();
+            if (patterns == null || patterns.Length == 0)
+            {
+                return false;
+            }
+
+            foreach (Regex regex in patterns)
+            {
+                if (regex == null)
+                {
+                    continue;
+                }
+
+                if (RegexMatchesType(type, regex))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool RegexMatchesType(Type type, Regex regex)
+        {
+            if (type == null || regex == null)
+            {
+                return false;
+            }
+
+            string fullName = type.FullName;
+            if (!string.IsNullOrEmpty(fullName) && regex.IsMatch(fullName))
+            {
+                return true;
+            }
+
+            string name = type.Name;
+            if (!string.IsNullOrEmpty(name) && regex.IsMatch(name))
+            {
+                return true;
+            }
+
+            string assemblyQualifiedName = type.AssemblyQualifiedName;
+            if (
+                !string.IsNullOrEmpty(assemblyQualifiedName) && regex.IsMatch(assemblyQualifiedName)
+            )
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private static int CountTypesMatchingRegex(Regex regex)
+        {
+            if (regex == null)
+            {
+                return 0;
+            }
+
+            EnsureTypeSignatures();
+
+            TypeSignature[] signatures = _typeSignatures;
+            if (signatures == null || signatures.Length == 0)
+            {
+                return 0;
+            }
+
+            int matches = 0;
+            foreach (TypeSignature signature in signatures)
+            {
+                if (RegexMatchesSignature(signature, regex))
+                {
+                    matches++;
+                }
+            }
+
+            return matches;
         }
 
         private static string FormatDisplayName(Type type)
@@ -1366,25 +1383,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             }
         }
 
-        internal static bool ShouldSkipType(Type type)
-        {
-            if (type == null)
-            {
-                return true;
-            }
-
-            if (
-                ReflectionHelpers.HasAttributeSafe<CompilerGeneratedAttribute>(type, inherit: false)
-            )
-            {
-                return true;
-            }
-
-            return MatchesConfiguredIgnorePattern(type);
-        }
-
         private readonly struct TypeSignature
         {
+            public string Name { get; }
+
+            public string FullName { get; }
+
+            public string AssemblyQualifiedName { get; }
+
             /// <summary>
             /// Snapshot of type metadata used for filtering results.
             /// </summary>
@@ -1397,12 +1403,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 FullName = fullName ?? string.Empty;
                 AssemblyQualifiedName = assemblyQualifiedName ?? string.Empty;
             }
-
-            public string Name { get; }
-
-            public string FullName { get; }
-
-            public string AssemblyQualifiedName { get; }
         }
 
         /// <summary>
@@ -1410,6 +1410,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// </summary>
         internal readonly struct PatternStats
         {
+            public string Pattern { get; }
+
+            public bool IsValid { get; }
+
+            public int MatchCount { get; }
+
+            public string ErrorMessage { get; }
+
             /// <summary>
             /// Captures the validation results for a regex ignore pattern.
             /// </summary>
@@ -1430,14 +1438,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 MatchCount = matchCount;
                 ErrorMessage = errorMessage;
             }
-
-            public string Pattern { get; }
-
-            public bool IsValid { get; }
-
-            public int MatchCount { get; }
-
-            public string ErrorMessage { get; }
         }
 
         /// <summary>
@@ -1445,6 +1445,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// </summary>
         public readonly struct SerializableTypeDescriptor
         {
+            public Type Type { get; }
+
+            public string AssemblyQualifiedName { get; }
+
+            public string DisplayName { get; }
+
+            public string Tooltip { get; }
+
             /// <summary>
             /// Initializes a descriptor that feeds the inspector with display and lookup data.
             /// </summary>
@@ -1473,14 +1481,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 DisplayName = displayName ?? string.Empty;
                 Tooltip = tooltip ?? string.Empty;
             }
-
-            public Type Type { get; }
-
-            public string AssemblyQualifiedName { get; }
-
-            public string DisplayName { get; }
-
-            public string Tooltip { get; }
 
             internal bool Matches(string search)
             {

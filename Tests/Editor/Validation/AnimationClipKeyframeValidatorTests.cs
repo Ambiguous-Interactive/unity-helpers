@@ -24,6 +24,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     [TestFixture]
     public sealed class AnimationClipKeyframeValidatorTests
     {
+        private string _folder;
+        private string _clipPath;
+
         [OneTimeSetUp]
         public void CreateFixtureClip()
         {
@@ -240,8 +243,5 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 )
             );
         }
-
-        private string _folder;
-        private string _clipPath;
     }
 }

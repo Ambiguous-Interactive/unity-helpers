@@ -114,10 +114,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     {
         private const string PlaceholderReason = "operation failed";
 
-        // Recompose the nonserialized message after restore; concurrent duplicate computation is harmless.
-        [NonSerialized]
-        private string _composedMessage;
-
         /// <summary>The wire format involved in the failure.</summary>
         public SerializationFormat Format { get; }
 
@@ -151,6 +147,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
         /// <summary>A short, human-readable reason supplied by the throw site.</summary>
         public string Reason { get; }
+
+        /// <inheritdoc />
+        public override string Message => _composedMessage ??= ComposeMessage();
+
+        // Recompose the nonserialized message after restore; concurrent duplicate computation is harmless.
+        [NonSerialized]
+        private string _composedMessage;
 
         /// <summary>
         /// Constructs a new instance. Prefer the static <c>Throw*</c> helpers on this type so that
@@ -191,57 +194,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             InputDescriptor = info.GetString(nameof(InputDescriptor)) ?? "<unknown>";
             Stage = (SerializationStage)info.GetInt32(nameof(Stage));
             Reason = info.GetString(nameof(Reason)) ?? PlaceholderReason;
-        }
-
-        private static Type ResolveTypeOrNull(string assemblyQualifiedName)
-        {
-            if (string.IsNullOrEmpty(assemblyQualifiedName))
-            {
-                return null;
-            }
-
-            return Type.GetType(assemblyQualifiedName, throwOnError: false);
-        }
-
-        /// <inheritdoc />
-        public override void GetObjectData(SerializationInfo info, StreamingContext context)
-        {
-            base.GetObjectData(info, context);
-            // info is non-null per the BinaryFormatter contract; base.GetObjectData validates it.
-            info.AddValue(nameof(Format), (int)Format);
-            info.AddValue(nameof(Operation), (int)Operation);
-            // Persist assembly-qualified type names because raw Type serialization is unavailable on AOT.
-            info.AddValue(nameof(DeclaredType), DeclaredType?.AssemblyQualifiedName);
-            info.AddValue(nameof(ResolvedType), ResolvedType?.AssemblyQualifiedName);
-            info.AddValue(nameof(InputDescriptor), InputDescriptor);
-            info.AddValue(nameof(Stage), (int)Stage);
-            info.AddValue(nameof(Reason), Reason);
-        }
-
-        /// <inheritdoc />
-        public override string Message => _composedMessage ??= ComposeMessage();
-
-        private string ComposeMessage()
-        {
-            // Avoid DefaultInterpolatedStringHandler, which older supported Unity profiles do not provide.
-            string declaredName = DeclaredType?.FullName ?? "<unknown>";
-            string resolvedSuffix =
-                ResolvedType == null || ResolvedType == DeclaredType
-                    ? string.Empty
-                    : " (resolved as " + ResolvedType.FullName + ")";
-            return "["
-                + Format
-                + "."
-                + Operation
-                + "] "
-                + Stage
-                + " failed for "
-                + declaredName
-                + resolvedSuffix
-                + " (input: "
-                + InputDescriptor
-                + "): "
-                + Reason;
         }
 
         /// <summary>
@@ -379,6 +331,54 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             parameterName == "data" || string.IsNullOrEmpty(parameterName)
                 ? "empty"
                 : "empty " + parameterName;
+
+        private static Type ResolveTypeOrNull(string assemblyQualifiedName)
+        {
+            if (string.IsNullOrEmpty(assemblyQualifiedName))
+            {
+                return null;
+            }
+
+            return Type.GetType(assemblyQualifiedName, throwOnError: false);
+        }
+
+        /// <inheritdoc />
+        public override void GetObjectData(SerializationInfo info, StreamingContext context)
+        {
+            base.GetObjectData(info, context);
+            // info is non-null per the BinaryFormatter contract; base.GetObjectData validates it.
+            info.AddValue(nameof(Format), (int)Format);
+            info.AddValue(nameof(Operation), (int)Operation);
+            // Persist assembly-qualified type names because raw Type serialization is unavailable on AOT.
+            info.AddValue(nameof(DeclaredType), DeclaredType?.AssemblyQualifiedName);
+            info.AddValue(nameof(ResolvedType), ResolvedType?.AssemblyQualifiedName);
+            info.AddValue(nameof(InputDescriptor), InputDescriptor);
+            info.AddValue(nameof(Stage), (int)Stage);
+            info.AddValue(nameof(Reason), Reason);
+        }
+
+        private string ComposeMessage()
+        {
+            // Avoid DefaultInterpolatedStringHandler, which older supported Unity profiles do not provide.
+            string declaredName = DeclaredType?.FullName ?? "<unknown>";
+            string resolvedSuffix =
+                ResolvedType == null || ResolvedType == DeclaredType
+                    ? string.Empty
+                    : " (resolved as " + ResolvedType.FullName + ")";
+            return "["
+                + Format
+                + "."
+                + Operation
+                + "] "
+                + Stage
+                + " failed for "
+                + declaredName
+                + resolvedSuffix
+                + " (input: "
+                + InputDescriptor
+                + "): "
+                + Reason;
+        }
     }
 
     /// <summary>

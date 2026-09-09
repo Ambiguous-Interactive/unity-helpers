@@ -28,6 +28,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
     [NUnit.Framework.Category("Integration")]
     public sealed class OdinWButtonInspectorTests : BatchedEditorTestBase
     {
+        private static IEnumerator WaitUntil(Func<bool> condition, float timeoutSeconds)
+        {
+            float endTime = Time.realtimeSinceStartup + timeoutSeconds;
+            while (!condition())
+            {
+                if (endTime < Time.realtimeSinceStartup)
+                {
+                    Assert.Fail("Timed out while waiting for condition.");
+                }
+                yield return null;
+            }
+        }
+
         [Test]
         public void WButtonOdinMonoBehaviourInspectorCanBeInstantiated()
         {
@@ -705,19 +718,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
                 $"OnInspectorGUI should not throw. Exception: {caughtException}"
             );
             Assert.That(testCompleted, Is.True);
-        }
-
-        private static IEnumerator WaitUntil(Func<bool> condition, float timeoutSeconds)
-        {
-            float endTime = Time.realtimeSinceStartup + timeoutSeconds;
-            while (!condition())
-            {
-                if (endTime < Time.realtimeSinceStartup)
-                {
-                    Assert.Fail("Timed out while waiting for condition.");
-                }
-                yield return null;
-            }
         }
     }
 #endif

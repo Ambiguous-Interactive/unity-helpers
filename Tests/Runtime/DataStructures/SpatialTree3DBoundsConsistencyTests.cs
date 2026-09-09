@@ -69,6 +69,82 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
         }
 
+        private static Bounds BuildAxisAlignedBounds(Bounds source, Quaternion rotation)
+        {
+            Vector3 extents = source.extents;
+            Vector3 min = new(
+                float.PositiveInfinity,
+                float.PositiveInfinity,
+                float.PositiveInfinity
+            );
+            Vector3 max = new(
+                float.NegativeInfinity,
+                float.NegativeInfinity,
+                float.NegativeInfinity
+            );
+
+            for (int sx = -1; sx <= 1; sx += 2)
+            {
+                for (int sy = -1; sy <= 1; sy += 2)
+                {
+                    for (int sz = -1; sz <= 1; sz += 2)
+                    {
+                        Vector3 offset = new(extents.x * sx, extents.y * sy, extents.z * sz);
+                        Vector3 rotated = rotation * offset;
+                        Vector3 point = source.center + rotated;
+                        if (point.x < min.x)
+                        {
+                            min.x = point.x;
+                        }
+                        if (point.y < min.y)
+                        {
+                            min.y = point.y;
+                        }
+                        if (point.z < min.z)
+                        {
+                            min.z = point.z;
+                        }
+                        if (max.x < point.x)
+                        {
+                            max.x = point.x;
+                        }
+                        if (max.y < point.y)
+                        {
+                            max.y = point.y;
+                        }
+                        if (max.z < point.z)
+                        {
+                            max.z = point.z;
+                        }
+                    }
+                }
+            }
+
+            Vector3 size = max - min;
+            Vector3 center = (min + max) * 0.5f;
+            return new Bounds(center, size);
+        }
+
+        private static Bounds CreateRandomBounds(IRandom random, Vector3Int gridSize)
+        {
+            Vector3 center = new(
+                RandomRange(random, -2f, gridSize.x + 2f),
+                RandomRange(random, -2f, gridSize.y + 2f),
+                RandomRange(random, -2f, gridSize.z + 2f)
+            );
+            Vector3 size = new(
+                Mathf.Max(1f, RandomRange(random, 1f, gridSize.x)),
+                Mathf.Max(1f, RandomRange(random, 1f, gridSize.y)),
+                Mathf.Max(1f, RandomRange(random, 1f, gridSize.z))
+            );
+            return new Bounds(center, size);
+        }
+
+        private static float RandomRange(IRandom random, float min, float max)
+        {
+            return (float)(min + random.NextDouble() * (max - min));
+        }
+
         [Test]
         public void BoundsDefinitionsOnTenAndTwentyGridsMatchAcrossTrees()
         {
@@ -398,82 +474,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     maxItems: 128
                 );
             }
-        }
-
-        private static Bounds BuildAxisAlignedBounds(Bounds source, Quaternion rotation)
-        {
-            Vector3 extents = source.extents;
-            Vector3 min = new(
-                float.PositiveInfinity,
-                float.PositiveInfinity,
-                float.PositiveInfinity
-            );
-            Vector3 max = new(
-                float.NegativeInfinity,
-                float.NegativeInfinity,
-                float.NegativeInfinity
-            );
-
-            for (int sx = -1; sx <= 1; sx += 2)
-            {
-                for (int sy = -1; sy <= 1; sy += 2)
-                {
-                    for (int sz = -1; sz <= 1; sz += 2)
-                    {
-                        Vector3 offset = new(extents.x * sx, extents.y * sy, extents.z * sz);
-                        Vector3 rotated = rotation * offset;
-                        Vector3 point = source.center + rotated;
-                        if (point.x < min.x)
-                        {
-                            min.x = point.x;
-                        }
-                        if (point.y < min.y)
-                        {
-                            min.y = point.y;
-                        }
-                        if (point.z < min.z)
-                        {
-                            min.z = point.z;
-                        }
-                        if (max.x < point.x)
-                        {
-                            max.x = point.x;
-                        }
-                        if (max.y < point.y)
-                        {
-                            max.y = point.y;
-                        }
-                        if (max.z < point.z)
-                        {
-                            max.z = point.z;
-                        }
-                    }
-                }
-            }
-
-            Vector3 size = max - min;
-            Vector3 center = (min + max) * 0.5f;
-            return new Bounds(center, size);
-        }
-
-        private static Bounds CreateRandomBounds(IRandom random, Vector3Int gridSize)
-        {
-            Vector3 center = new(
-                RandomRange(random, -2f, gridSize.x + 2f),
-                RandomRange(random, -2f, gridSize.y + 2f),
-                RandomRange(random, -2f, gridSize.z + 2f)
-            );
-            Vector3 size = new(
-                Mathf.Max(1f, RandomRange(random, 1f, gridSize.x)),
-                Mathf.Max(1f, RandomRange(random, 1f, gridSize.y)),
-                Mathf.Max(1f, RandomRange(random, 1f, gridSize.z))
-            );
-            return new Bounds(center, size);
-        }
-
-        private static float RandomRange(IRandom random, float min, float max)
-        {
-            return (float)(min + random.NextDouble() * (max - min));
         }
     }
 }

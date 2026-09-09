@@ -31,10 +31,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         private const int DefaultCapacity = 16;
         private const int MinimumGrowth = 4;
 
-        private T[] _items;
-        private int _count;
-        private readonly IComparer<T> _comparer;
-
         /// <summary>
         /// Gets the number of elements in the heap.
         /// </summary>
@@ -67,22 +63,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
         }
 
-        /// <summary>
-        /// Attempts to get the element at the specified index in heap order (not sorted order).
-        /// </summary>
-        /// <param name="index">The index to access.</param>
-        /// <param name="result">The element at the index if valid.</param>
-        /// <returns>True if the index is valid, false otherwise.</returns>
-        public bool TryGet(int index, out T result)
-        {
-            if (index < 0 || _count <= index)
-            {
-                result = default;
-                return false;
-            }
-            result = _items[index];
-            return true;
-        }
+        private T[] _items;
+        private int _count;
+        private readonly IComparer<T> _comparer;
 
         public Heap()
             : this(Comparer<T>.Default) { }
@@ -223,6 +206,38 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return comparer == null
                 ? new Heap<T>(items, ReverseComparer<T>.Instance)
                 : new Heap<T>(items, new ReverseComparer<T>(comparer));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int ComputeGrowth(int currentCapacity)
+        {
+            // Grow by 1.5x to limit retained capacity while preserving amortized insertion cost.
+            int growth = currentCapacity + (currentCapacity >> 1);
+            int newCapacity = currentCapacity + Math.Max(growth - currentCapacity, MinimumGrowth);
+
+            if (0X7FFFFFC7 < (uint)newCapacity)
+            {
+                newCapacity = 0X7FFFFFC7;
+            }
+
+            return newCapacity;
+        }
+
+        /// <summary>
+        /// Attempts to get the element at the specified index in heap order (not sorted order).
+        /// </summary>
+        /// <param name="index">The index to access.</param>
+        /// <param name="result">The element at the index if valid.</param>
+        /// <returns>True if the index is valid, false otherwise.</returns>
+        public bool TryGet(int index, out T result)
+        {
+            if (index < 0 || _count <= index)
+            {
+                result = default;
+                return false;
+            }
+            result = _items[index];
+            return true;
         }
 
         /// <summary>
@@ -389,6 +404,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return true;
         }
 
+        public HeapEnumerator GetEnumerator()
+        {
+            return new HeapEnumerator(_items, _count);
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void HeapifyUp(int index)
         {
@@ -440,21 +460,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             _items[index] = item;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static int ComputeGrowth(int currentCapacity)
-        {
-            // Grow by 1.5x to limit retained capacity while preserving amortized insertion cost.
-            int growth = currentCapacity + (currentCapacity >> 1);
-            int newCapacity = currentCapacity + Math.Max(growth - currentCapacity, MinimumGrowth);
-
-            if (0X7FFFFFC7 < (uint)newCapacity)
-            {
-                newCapacity = 0X7FFFFFC7;
-            }
-
-            return newCapacity;
-        }
-
         private void Resize(int newCapacity)
         {
             if (newCapacity <= _count)
@@ -463,11 +468,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             }
 
             Array.Resize(ref _items, newCapacity);
-        }
-
-        public HeapEnumerator GetEnumerator()
-        {
-            return new HeapEnumerator(_items, _count);
         }
 
         IEnumerator<T> IEnumerable<T>.GetEnumerator()
@@ -482,6 +482,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
         public struct HeapEnumerator : IEnumerator<T>
         {
+            public T Current => _current;
+
+            object IEnumerator.Current => Current;
+
             private readonly T[] _items;
             private readonly int _count;
             private int _index;
@@ -506,10 +510,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 _current = default;
                 return false;
             }
-
-            public T Current => _current;
-
-            object IEnumerator.Current => Current;
 
             public void Reset()
             {

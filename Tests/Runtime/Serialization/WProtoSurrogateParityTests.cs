@@ -81,20 +81,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         /// </remarks>
         private static readonly HashSet<Type> WritesAPackedRun = new() { typeof(ImmutableBitSet) };
 
-        [Test]
-        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
-        public void EverySurrogatedTypeMatchesProtobufNetByteForByte()
-        {
-            /*
-                The protobuf-net oracle cannot run under IL2CPP; initialize surrogate registration before using
-                it elsewhere.
-            */
-            ProtobufUnityModel.EnsureInitialized();
-            List<string> mismatches = new();
-            RunEveryCase(mismatches, Mode.Bytes);
-            Assert.IsEmpty(mismatches, string.Join(Environment.NewLine, mismatches));
-        }
-
         private static void RunEveryCase(List<string> mismatches, Mode mode)
         {
             AssertParity(
@@ -229,19 +215,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
         }
 
-        [Test]
-        public void ParabolaSurrogatePreservesLegacyUnderflowedCoefficients()
-        {
-            Parabola restored = LegacyUnderflowedParabola();
-            Assert.AreEqual(float.MaxValue, restored.Length);
-            Assert.AreEqual(0.001f, restored.MaxHeight);
-            Assert.AreEqual(int.MinValue, BitConverter.SingleToInt32Bits(restored.A));
-            Assert.AreEqual(0, BitConverter.SingleToInt32Bits(restored.B));
-            ParabolaSurrogate roundTripped = restored;
-            Assert.AreEqual(int.MinValue, BitConverter.SingleToInt32Bits(roundTripped.a));
-            Assert.AreEqual(0, BitConverter.SingleToInt32Bits(roundTripped.b));
-        }
-
         private static Parabola LegacyUnderflowedParabola()
         {
             // The former float-only constructor produced signed zero coefficients at these dimensions.
@@ -252,124 +225,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 a = BitConverter.Int32BitsToSingle(int.MinValue),
                 b = 0f,
             };
-        }
-
-        [Test]
-        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
-        public void EachEncoderReadsWhatTheOtherWrote()
-        {
-            // Re-encode to compare exact bits because NaN cannot prove equality by value.
-            ProtobufUnityModel.EnsureInitialized();
-            List<string> mismatches = new();
-            RunEveryCase(mismatches, Mode.CrossRead);
-            Assert.IsEmpty(mismatches, string.Join(Environment.NewLine, mismatches));
-        }
-
-        /// <summary>
-        /// Every surrogate this package declares actually reached protobuf-net's model.
-        /// </summary>
-        /// <remarks>
-        /// <para>
-        /// <c>RuntimeTypeModel.Default</c> is process-global and freezes a type the first time it
-        /// serializes one, so a registration can be refused rather than applied -- and a refused
-        /// surrogate is silent: the type keeps serializing, with different bytes. The registrations
-        /// used to share one <c>try</c>, which made a single refusal skip every one after it.
-        /// </para>
-        /// <para>
-        /// Skipped under IL2CPP because there a refusal is expected rather than a defect, and this
-        /// assertion cannot tell the two apart. protobuf-net builds its serializers by reflection
-        /// and the AOT compiler cannot emit them, so a standalone player refuses <c>Vector2</c>,
-        /// <c>Vector3</c>, <c>Rect</c>, <c>RectInt</c>, <c>Bounds</c>, <c>BoundsInt</c>,
-        /// <c>Vector2Int</c> and <c>Vector3Int</c> outright -- measured on the standalone legs,
-        /// which refuse exactly those eight. Those types are served by WallstopProto there, so
-        /// nothing encodes wrongly; the property this test is about only means something on the
-        /// backend where protobuf-net can run at all.
-        /// </para>
-        /// </remarks>
-        [Test]
-        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
-        public void EverySurrogateThisPackageDeclaresWasActuallyRegistered()
-        {
-            ProtobufUnityModel.EnsureInitialized();
-            Assert.IsEmpty(
-                ProtobufUnityModel.RegistrationFailures,
-                "protobuf-net had already bound these types, so they now encode with bytes this "
-                    + "package does not document: "
-                    + string.Join(", ", ProtobufUnityModel.RegistrationFailures)
-            );
-        }
-
-        /// <summary>
-        /// The public accessor must answer the same question the internal list does, and must wake
-        /// the static constructor itself.
-        /// </summary>
-        /// <remarks>
-        /// The accessor exists so a game can refuse to write a save it will not read back. Its whole
-        /// hazard is the ordering trap that caused the defect it reports on: the failures are
-        /// recorded by a static constructor, so an accessor that does not trigger it reports "ready"
-        /// purely because nothing has run yet.
-        /// </remarks>
-        [Test]
-        public void ProtobufSurrogatesReadyAgreesWithTheRecordedFailures()
-        {
-            bool ready = Serializer.ProtobufSurrogatesReady(out IReadOnlyList<string> refusedTypes);
-
-            Assert.IsTrue(refusedTypes != null, "The refused list must never be null.");
-#if ENABLE_IL2CPP
-            Assert.IsTrue(
-                ready,
-                "Under IL2CPP these types are encoded by WallstopProto, so a refused protobuf-net "
-                    + "registration changes nothing a consumer can observe."
-            );
-            Assert.IsEmpty(refusedTypes);
-#else
-            Assert.AreEqual(
-                ProtobufUnityModel.RegistrationFailures.Count == 0,
-                ready,
-                "The public answer disagreed with the recorded failures."
-            );
-            CollectionAssert.AreEqual(ProtobufUnityModel.RegistrationFailures, refusedTypes);
-#endif
-        }
-
-        /// <summary>
-        /// Reading the report must not let a caller edit it.
-        /// </summary>
-        [Test]
-        public void ProtobufSurrogatesReadyHandsOutAReadOnlyList()
-        {
-            Serializer.ProtobufSurrogatesReady(out IReadOnlyList<string> refusedTypes);
-
-            Assert.IsFalse(
-                refusedTypes is List<string>,
-                "The accessor handed out the mutable backing list, so a caller could rewrite the "
-                    + "package's own record of what failed."
-            );
-        }
-
-        [Test]
-        public void EveryRegisteredSurrogateIsGated()
-        {
-            // Discover registration attributes so new surrogates automatically enter the parity corpus.
-            HashSet<Type> registered = new();
-            foreach (
-                Attribute declared in Attribute.GetCustomAttributes(
-                    typeof(WProtoFacade).Assembly,
-                    typeof(WProtoSurrogateAttribute)
-                )
-            )
-            {
-                registered.Add(((WProtoSurrogateAttribute)declared).RealType);
-            }
-
-            Assert.IsNotEmpty(registered, "No surrogate registrations found at all.");
-            CollectionAssert.AreEquivalent(
-                registered,
-                Gated,
-                "The gated list and the shipped registrations disagree. Add the missing type to "
-                    + nameof(EverySurrogatedTypeMatchesProtobufNetByteForByte)
-                    + " so a new surrogate is covered the day it is registered."
-            );
         }
 
         private static ImmutableBitSet BitSet(params int[] setBits)
@@ -514,6 +369,151 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             }
 
             return builder.ToString();
+        }
+
+        [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
+        public void EverySurrogatedTypeMatchesProtobufNetByteForByte()
+        {
+            /*
+                The protobuf-net oracle cannot run under IL2CPP; initialize surrogate registration before using
+                it elsewhere.
+            */
+            ProtobufUnityModel.EnsureInitialized();
+            List<string> mismatches = new();
+            RunEveryCase(mismatches, Mode.Bytes);
+            Assert.IsEmpty(mismatches, string.Join(Environment.NewLine, mismatches));
+        }
+
+        [Test]
+        public void ParabolaSurrogatePreservesLegacyUnderflowedCoefficients()
+        {
+            Parabola restored = LegacyUnderflowedParabola();
+            Assert.AreEqual(float.MaxValue, restored.Length);
+            Assert.AreEqual(0.001f, restored.MaxHeight);
+            Assert.AreEqual(int.MinValue, BitConverter.SingleToInt32Bits(restored.A));
+            Assert.AreEqual(0, BitConverter.SingleToInt32Bits(restored.B));
+            ParabolaSurrogate roundTripped = restored;
+            Assert.AreEqual(int.MinValue, BitConverter.SingleToInt32Bits(roundTripped.a));
+            Assert.AreEqual(0, BitConverter.SingleToInt32Bits(roundTripped.b));
+        }
+
+        [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
+        public void EachEncoderReadsWhatTheOtherWrote()
+        {
+            // Re-encode to compare exact bits because NaN cannot prove equality by value.
+            ProtobufUnityModel.EnsureInitialized();
+            List<string> mismatches = new();
+            RunEveryCase(mismatches, Mode.CrossRead);
+            Assert.IsEmpty(mismatches, string.Join(Environment.NewLine, mismatches));
+        }
+
+        /// <summary>
+        /// Every surrogate this package declares actually reached protobuf-net's model.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <c>RuntimeTypeModel.Default</c> is process-global and freezes a type the first time it
+        /// serializes one, so a registration can be refused rather than applied -- and a refused
+        /// surrogate is silent: the type keeps serializing, with different bytes. The registrations
+        /// used to share one <c>try</c>, which made a single refusal skip every one after it.
+        /// </para>
+        /// <para>
+        /// Skipped under IL2CPP because there a refusal is expected rather than a defect, and this
+        /// assertion cannot tell the two apart. protobuf-net builds its serializers by reflection
+        /// and the AOT compiler cannot emit them, so a standalone player refuses <c>Vector2</c>,
+        /// <c>Vector3</c>, <c>Rect</c>, <c>RectInt</c>, <c>Bounds</c>, <c>BoundsInt</c>,
+        /// <c>Vector2Int</c> and <c>Vector3Int</c> outright -- measured on the standalone legs,
+        /// which refuse exactly those eight. Those types are served by WallstopProto there, so
+        /// nothing encodes wrongly; the property this test is about only means something on the
+        /// backend where protobuf-net can run at all.
+        /// </para>
+        /// </remarks>
+        [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
+        public void EverySurrogateThisPackageDeclaresWasActuallyRegistered()
+        {
+            ProtobufUnityModel.EnsureInitialized();
+            Assert.IsEmpty(
+                ProtobufUnityModel.RegistrationFailures,
+                "protobuf-net had already bound these types, so they now encode with bytes this "
+                    + "package does not document: "
+                    + string.Join(", ", ProtobufUnityModel.RegistrationFailures)
+            );
+        }
+
+        /// <summary>
+        /// The public accessor must answer the same question the internal list does, and must wake
+        /// the static constructor itself.
+        /// </summary>
+        /// <remarks>
+        /// The accessor exists so a game can refuse to write a save it will not read back. Its whole
+        /// hazard is the ordering trap that caused the defect it reports on: the failures are
+        /// recorded by a static constructor, so an accessor that does not trigger it reports "ready"
+        /// purely because nothing has run yet.
+        /// </remarks>
+        [Test]
+        public void ProtobufSurrogatesReadyAgreesWithTheRecordedFailures()
+        {
+            bool ready = Serializer.ProtobufSurrogatesReady(out IReadOnlyList<string> refusedTypes);
+
+            Assert.IsTrue(refusedTypes != null, "The refused list must never be null.");
+#if ENABLE_IL2CPP
+            Assert.IsTrue(
+                ready,
+                "Under IL2CPP these types are encoded by WallstopProto, so a refused protobuf-net "
+                    + "registration changes nothing a consumer can observe."
+            );
+            Assert.IsEmpty(refusedTypes);
+#else
+            Assert.AreEqual(
+                ProtobufUnityModel.RegistrationFailures.Count == 0,
+                ready,
+                "The public answer disagreed with the recorded failures."
+            );
+            CollectionAssert.AreEqual(ProtobufUnityModel.RegistrationFailures, refusedTypes);
+#endif
+        }
+
+        /// <summary>
+        /// Reading the report must not let a caller edit it.
+        /// </summary>
+        [Test]
+        public void ProtobufSurrogatesReadyHandsOutAReadOnlyList()
+        {
+            Serializer.ProtobufSurrogatesReady(out IReadOnlyList<string> refusedTypes);
+
+            Assert.IsFalse(
+                refusedTypes is List<string>,
+                "The accessor handed out the mutable backing list, so a caller could rewrite the "
+                    + "package's own record of what failed."
+            );
+        }
+
+        [Test]
+        public void EveryRegisteredSurrogateIsGated()
+        {
+            // Discover registration attributes so new surrogates automatically enter the parity corpus.
+            HashSet<Type> registered = new();
+            foreach (
+                Attribute declared in Attribute.GetCustomAttributes(
+                    typeof(WProtoFacade).Assembly,
+                    typeof(WProtoSurrogateAttribute)
+                )
+            )
+            {
+                registered.Add(((WProtoSurrogateAttribute)declared).RealType);
+            }
+
+            Assert.IsNotEmpty(registered, "No surrogate registrations found at all.");
+            CollectionAssert.AreEquivalent(
+                registered,
+                Gated,
+                "The gated list and the shipped registrations disagree. Add the missing type to "
+                    + nameof(EverySurrogatedTypeMatchesProtobufNetByteForByte)
+                    + " so a new surrogate is covered the day it is registered."
+            );
         }
 
         private enum Mode

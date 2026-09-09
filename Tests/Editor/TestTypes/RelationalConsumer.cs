@@ -8,11 +8,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
 
     public sealed class RelationalConsumer : MonoBehaviour
     {
+        public SpriteRenderer SR => _spriteRenderer;
+
         [SiblingComponent]
 #pragma warning disable CS0649 // Field is never assigned to, and will always have its default value
         private SpriteRenderer _spriteRenderer;
 #pragma warning restore CS0649 // Field is never assigned to, and will always have its default value
-
-        public SpriteRenderer SR => _spriteRenderer;
     }
 }

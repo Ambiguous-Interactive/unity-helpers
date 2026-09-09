@@ -23,6 +23,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
     /// </remarks>
     internal static class WGroupIndentDiagnostics
     {
+        private const string LogPrefix = "[WGroupIndent] ";
+
         /// <summary>
         /// When true, enables diagnostic logging for WGroup padding operations.
         /// </summary>
@@ -38,34 +40,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
         /// Leave null to log all groups.
         /// </summary>
         internal static string GroupNameFilter { get; set; }
-
-        private const string LogPrefix = "[WGroupIndent] ";
-
-        private static bool MatchesGroupNameFilter(string groupName)
-        {
-            if (!string.IsNullOrEmpty(GroupNameFilter))
-            {
-                if (string.IsNullOrEmpty(groupName))
-                {
-                    return false;
-                }
-
-                if (
-                    groupName.IndexOf(GroupNameFilter, System.StringComparison.OrdinalIgnoreCase)
-                    < 0
-                )
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        private static bool ShouldLog(string groupName)
-        {
-            return Enabled && MatchesGroupNameFilter(groupName);
-        }
 
         internal static void ResetCounters()
         {
@@ -139,6 +113,32 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
                     + $"totalLeft={GroupGUIWidthUtility.CurrentLeftPadding:F2}, "
                     + $"totalRight={GroupGUIWidthUtility.CurrentRightPadding:F2}"
             );
+        }
+
+        private static bool MatchesGroupNameFilter(string groupName)
+        {
+            if (!string.IsNullOrEmpty(GroupNameFilter))
+            {
+                if (string.IsNullOrEmpty(groupName))
+                {
+                    return false;
+                }
+
+                if (
+                    groupName.IndexOf(GroupNameFilter, System.StringComparison.OrdinalIgnoreCase)
+                    < 0
+                )
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool ShouldLog(string groupName)
+        {
+            return Enabled && MatchesGroupNameFilter(groupName);
         }
     }
 
@@ -619,8 +619,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
         /// </remarks>
         private const float FoldoutContentOffsetSettings = 0f;
 
-        private static bool _isSettingsContext;
-
         /// <summary>
         /// Gets or sets whether WGroup headers are being drawn in a SettingsProvider context.
         /// </summary>
@@ -637,6 +635,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WGroup
 
         private static float CurrentFoldoutContentOffset =>
             _isSettingsContext ? FoldoutContentOffsetSettings : FoldoutContentOffsetInspector;
+
+        private static bool _isSettingsContext;
 
         internal static Rect GetContentRect(
             Rect rect,

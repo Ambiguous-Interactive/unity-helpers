@@ -22,83 +22,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [TestFixture]
     public sealed class ImmutableDifferentialTests
     {
-        [Test]
-        public void AnImmutableStructRoundTripsThroughItsGeneratedConstructor()
-        {
-            ImmutablePoint original = Build(1, -2, "a", new[] { 3, 4 });
-            ImmutablePoint restored = RoundTrip(original);
-
-            Assert.AreEqual(1, restored.X);
-            Assert.AreEqual(-2, restored.Y);
-            Assert.AreEqual("a", restored.Label);
-            CollectionAssert.AreEqual(new[] { 3, 4 }, restored.Marks);
-        }
-
-        [Test]
-        public void AnImmutableClassRoundTripsToo()
-        {
-            ImmutableRecord restored = RoundTrip(BuildRecord(7, "n", new[] { 1, 2 }));
-
-            Assert.AreEqual(7, restored.Id);
-            Assert.AreEqual("n", restored.Name);
-            CollectionAssert.AreEqual(new[] { 1, 2 }, restored.Tags);
-        }
-
-        [Test]
-        public void EveryImmutableShapeRoundTripsThroughProtobufNet()
-        {
-            ImmutablePoint[] values =
-            {
-                default,
-                Build(1, 0, null, null),
-                Build(0, -1, string.Empty, Array.Empty<int>()),
-                Build(int.MinValue, int.MaxValue, "é中", new[] { 0, -1 }),
-            };
-
-            foreach (ImmutablePoint value in values)
-            {
-                AssertProtobufNetReadsMine(value, Describe(value));
-            }
-
-            ImmutableRecord[] records =
-            {
-                BuildRecord(0, null, null),
-                BuildRecord(7, "n", null),
-                BuildRecord(0, string.Empty, Array.Empty<int>()),
-                BuildRecord(-1, "x", new[] { 1, 0, -1 }),
-            };
-
-            foreach (ImmutableRecord record in records)
-            {
-                AssertProtobufNetReadsMine(record, record.Id.ToString());
-            }
-        }
-
-        [Test]
-        public void TheGeneratedConstructorDoesNotCollideWithTheAuthorsOwn()
-        {
-            ImmutablePoint theirs = new ImmutablePoint(5, 6);
-
-            Assert.AreEqual(5, theirs.X);
-            Assert.AreEqual(6, theirs.Y);
-            Assert.IsNull(theirs.Label);
-            Assert.IsNull(theirs.Marks);
-        }
-
-        [Test]
-        public void MeasurePredictsWriteExactlyForAnImmutableContract()
-        {
-            ImmutablePoint value = Build(int.MinValue, 1, new string('x', 200), new[] { 1, 2, 3 });
-            IWProtoFormatter<ImmutablePoint> formatter =
-                WProtoFormatterProvider.Get<ImmutablePoint>();
-
-            int predicted = formatter.Measure(value);
-            byte[] buffer = new byte[predicted];
-            WProtoWriter writer = new WProtoWriter(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-            Assert.AreEqual(predicted, writer.Position);
-        }
-
         /*
          * Oracle reflection populates readonly fields without adding a constructor that could mask generated
          * construction.
@@ -225,6 +148,83 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             WProtoReader reader = new(buffer);
             Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
             return restored;
+        }
+
+        [Test]
+        public void AnImmutableStructRoundTripsThroughItsGeneratedConstructor()
+        {
+            ImmutablePoint original = Build(1, -2, "a", new[] { 3, 4 });
+            ImmutablePoint restored = RoundTrip(original);
+
+            Assert.AreEqual(1, restored.X);
+            Assert.AreEqual(-2, restored.Y);
+            Assert.AreEqual("a", restored.Label);
+            CollectionAssert.AreEqual(new[] { 3, 4 }, restored.Marks);
+        }
+
+        [Test]
+        public void AnImmutableClassRoundTripsToo()
+        {
+            ImmutableRecord restored = RoundTrip(BuildRecord(7, "n", new[] { 1, 2 }));
+
+            Assert.AreEqual(7, restored.Id);
+            Assert.AreEqual("n", restored.Name);
+            CollectionAssert.AreEqual(new[] { 1, 2 }, restored.Tags);
+        }
+
+        [Test]
+        public void EveryImmutableShapeRoundTripsThroughProtobufNet()
+        {
+            ImmutablePoint[] values =
+            {
+                default,
+                Build(1, 0, null, null),
+                Build(0, -1, string.Empty, Array.Empty<int>()),
+                Build(int.MinValue, int.MaxValue, "é中", new[] { 0, -1 }),
+            };
+
+            foreach (ImmutablePoint value in values)
+            {
+                AssertProtobufNetReadsMine(value, Describe(value));
+            }
+
+            ImmutableRecord[] records =
+            {
+                BuildRecord(0, null, null),
+                BuildRecord(7, "n", null),
+                BuildRecord(0, string.Empty, Array.Empty<int>()),
+                BuildRecord(-1, "x", new[] { 1, 0, -1 }),
+            };
+
+            foreach (ImmutableRecord record in records)
+            {
+                AssertProtobufNetReadsMine(record, record.Id.ToString());
+            }
+        }
+
+        [Test]
+        public void TheGeneratedConstructorDoesNotCollideWithTheAuthorsOwn()
+        {
+            ImmutablePoint theirs = new ImmutablePoint(5, 6);
+
+            Assert.AreEqual(5, theirs.X);
+            Assert.AreEqual(6, theirs.Y);
+            Assert.IsNull(theirs.Label);
+            Assert.IsNull(theirs.Marks);
+        }
+
+        [Test]
+        public void MeasurePredictsWriteExactlyForAnImmutableContract()
+        {
+            ImmutablePoint value = Build(int.MinValue, 1, new string('x', 200), new[] { 1, 2, 3 });
+            IWProtoFormatter<ImmutablePoint> formatter =
+                WProtoFormatterProvider.Get<ImmutablePoint>();
+
+            int predicted = formatter.Measure(value);
+            byte[] buffer = new byte[predicted];
+            WProtoWriter writer = new WProtoWriter(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+            Assert.AreEqual(predicted, writer.Position);
         }
 
         [ProtoBuf.ProtoContract]

@@ -37,6 +37,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     {
         private const int MinimumGrowth = 4;
 
+        /// <summary>How many elements have been collected.</summary>
+        public int Count => _count;
+
         private T[] _items;
         private int _count;
         private bool _reserved;
@@ -63,9 +66,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             Array.Copy(seed, _items, seed.Length);
             _count = seed.Length;
         }
-
-        /// <summary>How many elements have been collected.</summary>
-        public int Count => _count;
 
         /// <summary>
         /// Makes room for <paramref name="additional"/> more elements in one allocation.

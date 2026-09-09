@@ -33,6 +33,275 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         private TestDictionaryHost _sharedHost;
         private SerializedObject _sharedSerializedObject;
 
+        internal static void AssignDictionaryFieldInfo(
+            SerializableDictionaryPropertyDrawer drawer,
+            Type hostType,
+            string fieldName
+        )
+        {
+            PropertyDrawerTestHelper.AssignFieldInfo(drawer, hostType, fieldName);
+        }
+
+        private static string BuildDictionaryDrawerDiagnostics(
+            SerializedProperty dictionaryProperty,
+            SerializableDictionaryPropertyDrawer drawer
+        )
+        {
+            if (dictionaryProperty == null)
+            {
+                return "[DictionaryProperty=null]";
+            }
+
+            SerializedProperty keysProperty = dictionaryProperty.FindPropertyRelative(
+                SerializableDictionarySerializedPropertyNames.Keys
+            );
+            SerializedProperty valuesProperty = dictionaryProperty.FindPropertyRelative(
+                SerializableDictionarySerializedPropertyNames.Values
+            );
+
+            string keysSummary =
+                keysProperty == null
+                    ? "keys:null"
+                    : $"keys:array={keysProperty.isArray},size={keysProperty.arraySize}";
+            string valuesSummary =
+                valuesProperty == null
+                    ? "values:null"
+                    : $"values:array={valuesProperty.isArray},size={valuesProperty.arraySize}";
+            Rect lastRect = drawer.HasLastListRect ? drawer.LastListRect : Rect.zero;
+            return $"[expanded={dictionaryProperty.isExpanded},propertyPath={dictionaryProperty.propertyPath},{keysSummary},{valuesSummary},hasLastRect={drawer.HasLastListRect},lastRect={lastRect}]";
+        }
+
+        private static void AssertColorsApproximately(
+            Color expected,
+            Color actual,
+            float tolerance = 0.001f
+        )
+        {
+            Assert.That(Mathf.Abs(expected.r - actual.r), Is.LessThanOrEqualTo(tolerance));
+            Assert.That(Mathf.Abs(expected.g - actual.g), Is.LessThanOrEqualTo(tolerance));
+            Assert.That(Mathf.Abs(expected.b - actual.b), Is.LessThanOrEqualTo(tolerance));
+            Assert.That(Mathf.Abs(expected.a - actual.a), Is.LessThanOrEqualTo(tolerance));
+        }
+
+        private static void ForcePopulateTestDictionarySerializedData(
+            TestDictionaryHost host,
+            SerializedProperty dictionaryProperty
+        )
+        {
+            if (host == null || dictionaryProperty == null)
+            {
+                return;
+            }
+
+            SerializedProperty keysProperty = dictionaryProperty.FindPropertyRelative(
+                SerializableDictionarySerializedPropertyNames.Keys
+            );
+            SerializedProperty valuesProperty = dictionaryProperty.FindPropertyRelative(
+                SerializableDictionarySerializedPropertyNames.Values
+            );
+            if (keysProperty == null || valuesProperty == null)
+            {
+                return;
+            }
+
+            List<KeyValuePair<int, string>> entries = host.dictionary.ToList();
+            keysProperty.arraySize = entries.Count;
+            valuesProperty.arraySize = entries.Count;
+
+            for (int i = 0; i < entries.Count; i++)
+            {
+                AssignKey(keysProperty.GetArrayElementAtIndex(i), entries[i].Key);
+                AssignValue(valuesProperty.GetArrayElementAtIndex(i), entries[i].Value);
+            }
+
+            dictionaryProperty.serializedObject.ApplyModifiedPropertiesWithoutUndo();
+            dictionaryProperty.serializedObject.UpdateIfRequiredOrScript();
+
+            static void AssignKey(SerializedProperty property, int value)
+            {
+                if (property != null)
+                {
+                    property.intValue = value;
+                }
+            }
+
+            static void AssignValue(SerializedProperty property, string value)
+            {
+                if (property != null)
+                {
+                    property.stringValue = value ?? string.Empty;
+                }
+            }
+        }
+
+        private static void ForcePopulateComplexDictionarySerializedData(
+            ComplexValueDictionaryHost host,
+            SerializedProperty dictionaryProperty
+        )
+        {
+            if (host == null || dictionaryProperty == null)
+            {
+                return;
+            }
+
+            SerializedProperty keysProperty = dictionaryProperty.FindPropertyRelative(
+                SerializableDictionarySerializedPropertyNames.Keys
+            );
+            SerializedProperty valuesProperty = dictionaryProperty.FindPropertyRelative(
+                SerializableDictionarySerializedPropertyNames.Values
+            );
+            if (keysProperty == null || valuesProperty == null)
+            {
+                return;
+            }
+
+            List<KeyValuePair<string, ComplexValue>> entries = host.dictionary.ToList();
+            keysProperty.arraySize = entries.Count;
+            valuesProperty.arraySize = entries.Count;
+
+            for (int i = 0; i < entries.Count; i++)
+            {
+                SerializedProperty keyProperty = keysProperty.GetArrayElementAtIndex(i);
+                SerializedProperty valueProperty = valuesProperty.GetArrayElementAtIndex(i);
+                SerializableDictionaryPropertyDrawer.SetPropertyValue(
+                    keyProperty,
+                    entries[i].Key,
+                    typeof(string)
+                );
+                SerializableDictionaryPropertyDrawer.SetPropertyValue(
+                    valueProperty,
+                    entries[i].Value,
+                    typeof(ComplexValue)
+                );
+            }
+
+            dictionaryProperty.serializedObject.ApplyModifiedPropertiesWithoutUndo();
+            dictionaryProperty.serializedObject.UpdateIfRequiredOrScript();
+        }
+
+        private static string DumpIntArray(SerializedProperty property)
+        {
+            if (property == null || !property.isArray)
+            {
+                return "<null>";
+            }
+
+            List<int> values = new(property.arraySize);
+            for (int i = 0; i < property.arraySize; i++)
+            {
+                SerializedProperty element = property.GetArrayElementAtIndex(i);
+                values.Add(element?.intValue ?? 0);
+            }
+
+            return string.Join(", ", values);
+        }
+
+        private static string DumpPageEntries(
+            SerializableDictionaryPropertyDrawer.ListPageCache cache
+        )
+        {
+            if (cache?.entries == null || cache.entries.Count == 0)
+            {
+                return "[]";
+            }
+
+            List<int> indices = new(cache.entries.Count);
+            foreach (SerializableDictionaryPropertyDrawer.PageEntry cacheEntry in cache.entries)
+            {
+                indices.Add(cacheEntry?.arrayIndex ?? -1);
+            }
+
+            return $"[{string.Join(", ", indices)}]";
+        }
+
+        private static void RemoveStringDictionaryEntry(
+            SerializedProperty keysProperty,
+            SerializedProperty valuesProperty,
+            string key
+        )
+        {
+            if (
+                keysProperty == null
+                || valuesProperty == null
+                || string.IsNullOrEmpty(key)
+                || !keysProperty.isArray
+                || !valuesProperty.isArray
+            )
+            {
+                return;
+            }
+
+            for (int i = 0; i < keysProperty.arraySize; i++)
+            {
+                SerializedProperty keyProperty = keysProperty.GetArrayElementAtIndex(i);
+                if (!string.Equals(keyProperty.stringValue, key, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                keysProperty.DeleteArrayElementAtIndex(i);
+                if (i < valuesProperty.arraySize)
+                {
+                    valuesProperty.DeleteArrayElementAtIndex(i);
+                }
+
+                break;
+            }
+        }
+
+        private static SerializableDictionaryPropertyDrawer.PendingEntry GetPendingEntry(
+            SerializableDictionaryPropertyDrawer drawer,
+            SerializedProperty dictionaryProperty,
+            Type keyType,
+            Type valueType,
+            bool isSortedDictionary
+        )
+        {
+            SerializableDictionaryPropertyDrawer.PendingEntry pending =
+                drawer.GetOrCreatePendingEntry(
+                    dictionaryProperty,
+                    keyType,
+                    valueType,
+                    isSortedDictionary
+                );
+            Assert.IsTrue(pending != null, "Pending entry instance should not be null.");
+            return pending;
+        }
+
+        private static bool InvokeValuesEqual(object left, object right)
+        {
+            return SerializableDictionaryPropertyDrawer.ValuesEqual(left, right);
+        }
+
+        private static ColorData ReadColorData(SerializedProperty property)
+        {
+            if (property == null)
+            {
+                return default;
+            }
+
+            object value = SerializableDictionaryPropertyDrawer.GetPropertyValue(
+                property,
+                typeof(ColorData)
+            );
+            return value is ColorData data ? data : default;
+        }
+
+        private static string DescribeColorData(ColorData data)
+        {
+            string formattedColor1 = FormatColor(data.color1);
+            string otherSummary =
+                data.otherColors == null
+                    ? "null"
+                    : data.otherColors.Length.ToString(CultureInfo.InvariantCulture);
+            return $"color1={formattedColor1}, otherColors={otherSummary}";
+        }
+
+        private static string FormatColor(Color color)
+        {
+            return $"({color.r:0.00},{color.g:0.00},{color.b:0.00},{color.a:0.00})";
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -56,32 +325,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             }
 
             _sharedHost.Destroy();
-        }
-
-        /// <summary>
-        /// Resets the shared host state between tests to ensure test isolation.
-        /// </summary>
-        private void ResetHostState()
-        {
-            Assert.IsTrue(
-                _sharedSerializedObject != null,
-                "SerializedObject was disposed or null - check OneTimeTearDown ordering"
-            );
-            Assert.IsTrue(
-                _sharedSerializedObject.targetObject != null,
-                "SerializedObject's target was destroyed - check disposal order"
-            );
-
-            _sharedHost.dictionary.Clear();
-            _sharedSerializedObject.Update();
-            SerializedProperty dictionaryProperty = _sharedSerializedObject.FindProperty(
-                nameof(TestDictionaryHost.dictionary)
-            );
-            if (dictionaryProperty != null)
-            {
-                dictionaryProperty.isExpanded = false;
-                _sharedSerializedObject.ApplyModifiedPropertiesWithoutUndo();
-            }
         }
 
         [TestCase(false)]
@@ -3524,85 +3767,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             yield return VerifyPendingEntryAlignmentAtIndentLevel(5);
         }
 
-        private IEnumerator VerifyPendingEntryAlignmentAtIndentLevel(int indentLevel)
-        {
-            using (new DictionaryTweenDisabledScope())
-            {
-                _sharedSerializedObject.Update();
-                SerializedProperty dictionaryProperty = _sharedSerializedObject.FindProperty(
-                    nameof(TestDictionaryHost.dictionary)
-                );
-                dictionaryProperty.isExpanded = true;
-                _sharedSerializedObject.ApplyModifiedPropertiesWithoutUndo();
-
-                SerializableDictionaryPropertyDrawer drawer = new();
-                AssignDictionaryFieldInfo(
-                    drawer,
-                    typeof(TestDictionaryHost),
-                    nameof(TestDictionaryHost.dictionary)
-                );
-
-                Rect controlRect = new(0f, 0f, 360f, 420f);
-                GUIContent label = new("Dictionary");
-
-                SerializableDictionaryPropertyDrawer.PendingEntry pending =
-                    drawer.GetOrCreatePendingEntry(
-                        dictionaryProperty,
-                        typeof(int),
-                        typeof(string),
-                        isSortedDictionary: false
-                    );
-                pending.isExpanded = true;
-
-                SerializableDictionaryPropertyDrawer.ResetLayoutTrackingForTests();
-
-                yield return TestIMGUIExecutor.Run(() =>
-                {
-                    int previousIndent = EditorGUI.indentLevel;
-                    try
-                    {
-                        EditorGUI.indentLevel = indentLevel;
-                        dictionaryProperty.serializedObject.UpdateIfRequiredOrScript();
-                        pending.isExpanded = true;
-                        drawer.OnGUI(controlRect, dictionaryProperty, label);
-                    }
-                    finally
-                    {
-                        EditorGUI.indentLevel = previousIndent;
-                    }
-                });
-
-                Assert.IsTrue(
-                    SerializableDictionaryPropertyDrawer.HasLastPendingFieldRects,
-                    $"Draw at indent level {indentLevel} should capture pending key/value rects."
-                );
-
-                Rect keyRect = SerializableDictionaryPropertyDrawer.LastPendingKeyFieldRect;
-                Rect valueRect = SerializableDictionaryPropertyDrawer.LastPendingValueFieldRect;
-
-                float actualShift = keyRect.xMin - valueRect.xMin;
-
-                TestContext.WriteLine(
-                    $"[PendingEntryKeyAndValueAlignedAtIndentLevel{indentLevel}] "
-                        + $"keyRect.xMin={keyRect.xMin:F3}, valueRect.xMin={valueRect.xMin:F3}, "
-                        + $"keyRect.width={keyRect.width:F3}, valueRect.width={valueRect.width:F3}, "
-                        + $"actualShift={actualShift:F3}"
-                );
-
-                Assert.That(
-                    actualShift,
-                    Is.EqualTo(0f).Within(0.01f),
-                    $"Key and Value are one column stacked twice, so they must share an origin at indent level {indentLevel} (#284)."
-                );
-
-                Assert.That(
-                    valueRect.width - keyRect.width,
-                    Is.EqualTo(0f).Within(0.01f),
-                    $"Key and Value must share a width at indent level {indentLevel} (#284)."
-                );
-            }
-        }
-
         [UnityTest]
         public IEnumerator PendingEntryAlignmentDiagnostics(
             [Values(0, 1, 2, 3, 5, 10)] int indentLevel
@@ -3713,88 +3877,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         public IEnumerator PendingEntryKeyAndValueAlignedWithComplexFoldoutValueAtIndentLevel3()
         {
             yield return VerifyPendingEntryAlignmentWithComplexValueAtIndentLevel(3);
-        }
-
-        private IEnumerator VerifyPendingEntryAlignmentWithComplexValueAtIndentLevel(
-            int indentLevel
-        )
-        {
-            ColorDataDictionaryHost host = CreateScriptableObject<ColorDataDictionaryHost>();
-            SerializedObject serializedObject = TrackDisposable(new SerializedObject(host));
-            serializedObject.Update();
-            SerializedProperty dictionaryProperty = serializedObject.FindProperty(
-                nameof(ColorDataDictionaryHost.dictionary)
-            );
-            dictionaryProperty.isExpanded = true;
-            serializedObject.ApplyModifiedPropertiesWithoutUndo();
-
-            SerializableDictionaryPropertyDrawer drawer = new();
-            AssignDictionaryFieldInfo(
-                drawer,
-                typeof(ColorDataDictionaryHost),
-                nameof(ColorDataDictionaryHost.dictionary)
-            );
-
-            Rect controlRect = new(0f, 0f, 420f, 480f);
-            GUIContent label = new("Dictionary");
-
-            SerializableDictionaryPropertyDrawer.PendingEntry pending =
-                drawer.GetOrCreatePendingEntry(
-                    dictionaryProperty,
-                    typeof(string),
-                    typeof(ColorData),
-                    isSortedDictionary: false
-                );
-            pending.isExpanded = true;
-
-            SerializableDictionaryPropertyDrawer.ResetLayoutTrackingForTests();
-
-            yield return TestIMGUIExecutor.Run(() =>
-            {
-                int previousIndent = EditorGUI.indentLevel;
-                try
-                {
-                    EditorGUI.indentLevel = indentLevel;
-                    dictionaryProperty.serializedObject.UpdateIfRequiredOrScript();
-                    pending.isExpanded = true;
-                    drawer.OnGUI(controlRect, dictionaryProperty, label);
-                }
-                finally
-                {
-                    EditorGUI.indentLevel = previousIndent;
-                }
-            });
-
-            Assert.IsTrue(
-                SerializableDictionaryPropertyDrawer.HasLastPendingFieldRects,
-                $"Draw with complex value at indent level {indentLevel} should capture pending key/value rects."
-            );
-            Assert.IsTrue(
-                SerializableDictionaryPropertyDrawer.LastPendingValueUsedFoldoutLabel,
-                $"Complex value should use foldout label at indent level {indentLevel}."
-            );
-
-            Rect keyRect = SerializableDictionaryPropertyDrawer.LastPendingKeyFieldRect;
-            Rect valueRect = SerializableDictionaryPropertyDrawer.LastPendingValueFieldRect;
-
-            TestContext.WriteLine(
-                $"[PendingEntryKeyAndValueAlignedWithComplexFoldoutValue@Indent{indentLevel}] "
-                    + $"keyRect.xMin={keyRect.xMin:F3}, valueRect.xMin={valueRect.xMin:F3}, "
-                    + $"keyRect.width={keyRect.width:F3}, valueRect.width={valueRect.width:F3}, "
-                    + $"foldoutOffset={SerializableDictionaryPropertyDrawer.LastPendingValueFoldoutOffset:F3}"
-            );
-
-            Assert.That(
-                keyRect.xMin,
-                Is.EqualTo(valueRect.xMin).Within(1f),
-                $"Pending key and value field left edges should be aligned with complex foldout value at indent level {indentLevel}."
-            );
-
-            Assert.That(
-                keyRect.width,
-                Is.EqualTo(valueRect.width).Within(1f),
-                $"Pending key and value field widths should match with complex foldout value at indent level {indentLevel}."
-            );
         }
 
         [UnityTest]
@@ -4493,156 +4575,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         {
             // Large enough that the grouped width clamps to minContentWidth.
             yield return DictionaryRowLayoutConsistencyWithVariousPaddingsInternal(150f, 150f);
-        }
-
-        private IEnumerator DictionaryRowLayoutConsistencyWithVariousPaddingsInternal(
-            float leftPadding,
-            float rightPadding
-        )
-        {
-            _sharedHost.dictionary.Add(1, "One");
-            _sharedSerializedObject.Update();
-            SerializedProperty dictionaryProperty = _sharedSerializedObject.FindProperty(
-                nameof(TestDictionaryHost.dictionary)
-            );
-            ForcePopulateTestDictionarySerializedData(_sharedHost, dictionaryProperty);
-            dictionaryProperty.isExpanded = true;
-            _sharedSerializedObject.ApplyModifiedPropertiesWithoutUndo();
-
-            SerializableDictionaryPropertyDrawer drawer = new();
-            AssignDictionaryFieldInfo(
-                drawer,
-                typeof(TestDictionaryHost),
-                nameof(TestDictionaryHost.dictionary)
-            );
-
-            Rect controlRect = new(0f, 0f, 400f, 520f);
-            GUIContent label = new("Dictionary");
-
-            GroupGUIWidthUtility.ResetForTests();
-            SerializableDictionaryPropertyDrawer.ResetLayoutTrackingForTests();
-
-            yield return TestIMGUIExecutor.Run(() =>
-            {
-                dictionaryProperty.serializedObject.UpdateIfRequiredOrScript();
-                drawer.OnGUI(controlRect, dictionaryProperty, label);
-            });
-
-            Assert.IsTrue(
-                SerializableDictionaryPropertyDrawer.HasLastRowRects,
-                "Baseline draw should capture dictionary row layout."
-            );
-
-            Rect baselineRowRect = SerializableDictionaryPropertyDrawer.LastRowOriginalRect;
-            Rect baselineKeyRect = SerializableDictionaryPropertyDrawer.LastRowKeyRect;
-            Rect baselineValueRect = SerializableDictionaryPropertyDrawer.LastRowValueRect;
-
-            float horizontalPadding = leftPadding + rightPadding;
-
-            GroupGUIWidthUtility.ResetForTests();
-
-            yield return TestIMGUIExecutor.Run(() =>
-            {
-                dictionaryProperty.serializedObject.UpdateIfRequiredOrScript();
-                using (
-                    GroupGUIWidthUtility.PushContentPadding(
-                        horizontalPadding,
-                        leftPadding,
-                        rightPadding
-                    )
-                )
-                {
-                    SerializableDictionaryPropertyDrawer.ResetLayoutTrackingForTests();
-                    drawer.OnGUI(controlRect, dictionaryProperty, label);
-                }
-            });
-
-            Assert.IsTrue(
-                SerializableDictionaryPropertyDrawer.HasLastRowRects,
-                "Grouped draw should capture dictionary row layout."
-            );
-
-            Rect groupedRowRect = SerializableDictionaryPropertyDrawer.LastRowOriginalRect;
-            Rect groupedKeyRect = SerializableDictionaryPropertyDrawer.LastRowKeyRect;
-            Rect groupedValueRect = SerializableDictionaryPropertyDrawer.LastRowValueRect;
-
-            /*
-                ReorderableList row rects do not expose WGroup padding or virtual width, so assert the resulting
-                field geometry instead.
-            */
-
-            bool zeroPadding = horizontalPadding <= 0f;
-            int scopeDepthAfterGrouped = GroupGUIWidthUtility.CurrentScopeDepth;
-
-            TestContext.WriteLine(
-                $"[DictionaryRowLayoutConsistencyWithVariousPaddings(left={leftPadding}, right={rightPadding})] "
-                    + $"baselineRow={{xMin={baselineRowRect.xMin:F3}, width={baselineRowRect.width:F3}}}, "
-                    + $"groupedRow={{xMin={groupedRowRect.xMin:F3}, width={groupedRowRect.width:F3}}}, "
-                    + $"zeroPadding={zeroPadding}, scopeDepthAfterGrouped={scopeDepthAfterGrouped}"
-            );
-
-            Assert.Greater(
-                baselineKeyRect.width,
-                0f,
-                "Baseline key rect should have positive width."
-            );
-            Assert.Greater(
-                groupedKeyRect.width,
-                0f,
-                "Grouped key rect should have positive width."
-            );
-
-            Assert.Greater(
-                baselineValueRect.width,
-                0f,
-                "Baseline value rect should have positive width."
-            );
-            Assert.Greater(
-                groupedValueRect.width,
-                0f,
-                "Grouped value rect should have positive width."
-            );
-
-            float baselineValueOffset = baselineValueRect.xMin - baselineRowRect.xMin;
-            float groupedValueOffset = groupedValueRect.xMin - groupedRowRect.xMin;
-            float offsetDelta = Mathf.Abs(groupedValueOffset - baselineValueOffset);
-
-            TestContext.WriteLine(
-                $"[DictionaryRowLayoutConsistencyWithVariousPaddings] "
-                    + $"baselineValueOffset={baselineValueOffset:F3}, groupedValueOffset={groupedValueOffset:F3}, "
-                    + $"offsetDelta={offsetDelta:F3}"
-            );
-
-            // Unity’s varying ReorderableList rects require tolerance when comparing proportional column offsets.
-            float scaleFactor = 100f < horizontalPadding ? 0.5f : 0.3f;
-            float scaledTolerance = 15.0f + (horizontalPadding * scaleFactor);
-            Assert.LessOrEqual(
-                offsetDelta,
-                scaledTolerance,
-                $"Value field offset delta ({offsetDelta:F3}) should be within scaled tolerance ({scaledTolerance:F3}) for padding {horizontalPadding:F0}."
-            );
-
-            float minKeyWidth = SerializableDictionaryPropertyDrawer.DictionaryRowKeyColumnMinWidth;
-            float minValueWidth =
-                SerializableDictionaryPropertyDrawer.DictionaryRowValueColumnMinWidth;
-
-            float keyWidthWithPadding =
-                baselineKeyRect.width
-                + SerializableDictionaryPropertyDrawer.DictionaryRowFieldPadding;
-            Assert.GreaterOrEqual(
-                keyWidthWithPadding,
-                minKeyWidth * 0.5f,
-                $"Baseline key column should respect minimum width constraint (~{minKeyWidth:F0}px)."
-            );
-
-            float valueWidthWithPadding =
-                baselineValueRect.width
-                + SerializableDictionaryPropertyDrawer.DictionaryRowFieldPadding;
-            Assert.GreaterOrEqual(
-                valueWidthWithPadding,
-                minValueWidth * 0.5f,
-                $"Baseline value column should respect minimum width constraint (~{minValueWidth:F0}px)."
-            );
         }
 
         [UnityTest]
@@ -5426,275 +5358,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 Is.EqualTo(paddedRect.xMin).Within(0.0001f),
                 $"List rect should align with the padded content area. {BuildDictionaryDrawerDiagnostics(dictionaryProperty, drawer)}"
             );
-        }
-
-        private static string BuildDictionaryDrawerDiagnostics(
-            SerializedProperty dictionaryProperty,
-            SerializableDictionaryPropertyDrawer drawer
-        )
-        {
-            if (dictionaryProperty == null)
-            {
-                return "[DictionaryProperty=null]";
-            }
-
-            SerializedProperty keysProperty = dictionaryProperty.FindPropertyRelative(
-                SerializableDictionarySerializedPropertyNames.Keys
-            );
-            SerializedProperty valuesProperty = dictionaryProperty.FindPropertyRelative(
-                SerializableDictionarySerializedPropertyNames.Values
-            );
-
-            string keysSummary =
-                keysProperty == null
-                    ? "keys:null"
-                    : $"keys:array={keysProperty.isArray},size={keysProperty.arraySize}";
-            string valuesSummary =
-                valuesProperty == null
-                    ? "values:null"
-                    : $"values:array={valuesProperty.isArray},size={valuesProperty.arraySize}";
-            Rect lastRect = drawer.HasLastListRect ? drawer.LastListRect : Rect.zero;
-            return $"[expanded={dictionaryProperty.isExpanded},propertyPath={dictionaryProperty.propertyPath},{keysSummary},{valuesSummary},hasLastRect={drawer.HasLastListRect},lastRect={lastRect}]";
-        }
-
-        private static void AssertColorsApproximately(
-            Color expected,
-            Color actual,
-            float tolerance = 0.001f
-        )
-        {
-            Assert.That(Mathf.Abs(expected.r - actual.r), Is.LessThanOrEqualTo(tolerance));
-            Assert.That(Mathf.Abs(expected.g - actual.g), Is.LessThanOrEqualTo(tolerance));
-            Assert.That(Mathf.Abs(expected.b - actual.b), Is.LessThanOrEqualTo(tolerance));
-            Assert.That(Mathf.Abs(expected.a - actual.a), Is.LessThanOrEqualTo(tolerance));
-        }
-
-        internal static void AssignDictionaryFieldInfo(
-            SerializableDictionaryPropertyDrawer drawer,
-            Type hostType,
-            string fieldName
-        )
-        {
-            PropertyDrawerTestHelper.AssignFieldInfo(drawer, hostType, fieldName);
-        }
-
-        private static void ForcePopulateTestDictionarySerializedData(
-            TestDictionaryHost host,
-            SerializedProperty dictionaryProperty
-        )
-        {
-            if (host == null || dictionaryProperty == null)
-            {
-                return;
-            }
-
-            SerializedProperty keysProperty = dictionaryProperty.FindPropertyRelative(
-                SerializableDictionarySerializedPropertyNames.Keys
-            );
-            SerializedProperty valuesProperty = dictionaryProperty.FindPropertyRelative(
-                SerializableDictionarySerializedPropertyNames.Values
-            );
-            if (keysProperty == null || valuesProperty == null)
-            {
-                return;
-            }
-
-            List<KeyValuePair<int, string>> entries = host.dictionary.ToList();
-            keysProperty.arraySize = entries.Count;
-            valuesProperty.arraySize = entries.Count;
-
-            for (int i = 0; i < entries.Count; i++)
-            {
-                AssignKey(keysProperty.GetArrayElementAtIndex(i), entries[i].Key);
-                AssignValue(valuesProperty.GetArrayElementAtIndex(i), entries[i].Value);
-            }
-
-            dictionaryProperty.serializedObject.ApplyModifiedPropertiesWithoutUndo();
-            dictionaryProperty.serializedObject.UpdateIfRequiredOrScript();
-
-            static void AssignKey(SerializedProperty property, int value)
-            {
-                if (property != null)
-                {
-                    property.intValue = value;
-                }
-            }
-
-            static void AssignValue(SerializedProperty property, string value)
-            {
-                if (property != null)
-                {
-                    property.stringValue = value ?? string.Empty;
-                }
-            }
-        }
-
-        private static void ForcePopulateComplexDictionarySerializedData(
-            ComplexValueDictionaryHost host,
-            SerializedProperty dictionaryProperty
-        )
-        {
-            if (host == null || dictionaryProperty == null)
-            {
-                return;
-            }
-
-            SerializedProperty keysProperty = dictionaryProperty.FindPropertyRelative(
-                SerializableDictionarySerializedPropertyNames.Keys
-            );
-            SerializedProperty valuesProperty = dictionaryProperty.FindPropertyRelative(
-                SerializableDictionarySerializedPropertyNames.Values
-            );
-            if (keysProperty == null || valuesProperty == null)
-            {
-                return;
-            }
-
-            List<KeyValuePair<string, ComplexValue>> entries = host.dictionary.ToList();
-            keysProperty.arraySize = entries.Count;
-            valuesProperty.arraySize = entries.Count;
-
-            for (int i = 0; i < entries.Count; i++)
-            {
-                SerializedProperty keyProperty = keysProperty.GetArrayElementAtIndex(i);
-                SerializedProperty valueProperty = valuesProperty.GetArrayElementAtIndex(i);
-                SerializableDictionaryPropertyDrawer.SetPropertyValue(
-                    keyProperty,
-                    entries[i].Key,
-                    typeof(string)
-                );
-                SerializableDictionaryPropertyDrawer.SetPropertyValue(
-                    valueProperty,
-                    entries[i].Value,
-                    typeof(ComplexValue)
-                );
-            }
-
-            dictionaryProperty.serializedObject.ApplyModifiedPropertiesWithoutUndo();
-            dictionaryProperty.serializedObject.UpdateIfRequiredOrScript();
-        }
-
-        private static string DumpIntArray(SerializedProperty property)
-        {
-            if (property == null || !property.isArray)
-            {
-                return "<null>";
-            }
-
-            List<int> values = new(property.arraySize);
-            for (int i = 0; i < property.arraySize; i++)
-            {
-                SerializedProperty element = property.GetArrayElementAtIndex(i);
-                values.Add(element?.intValue ?? 0);
-            }
-
-            return string.Join(", ", values);
-        }
-
-        private static string DumpPageEntries(
-            SerializableDictionaryPropertyDrawer.ListPageCache cache
-        )
-        {
-            if (cache?.entries == null || cache.entries.Count == 0)
-            {
-                return "[]";
-            }
-
-            List<int> indices = new(cache.entries.Count);
-            foreach (SerializableDictionaryPropertyDrawer.PageEntry cacheEntry in cache.entries)
-            {
-                indices.Add(cacheEntry?.arrayIndex ?? -1);
-            }
-
-            return $"[{string.Join(", ", indices)}]";
-        }
-
-        private static void RemoveStringDictionaryEntry(
-            SerializedProperty keysProperty,
-            SerializedProperty valuesProperty,
-            string key
-        )
-        {
-            if (
-                keysProperty == null
-                || valuesProperty == null
-                || string.IsNullOrEmpty(key)
-                || !keysProperty.isArray
-                || !valuesProperty.isArray
-            )
-            {
-                return;
-            }
-
-            for (int i = 0; i < keysProperty.arraySize; i++)
-            {
-                SerializedProperty keyProperty = keysProperty.GetArrayElementAtIndex(i);
-                if (!string.Equals(keyProperty.stringValue, key, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                keysProperty.DeleteArrayElementAtIndex(i);
-                if (i < valuesProperty.arraySize)
-                {
-                    valuesProperty.DeleteArrayElementAtIndex(i);
-                }
-
-                break;
-            }
-        }
-
-        private static SerializableDictionaryPropertyDrawer.PendingEntry GetPendingEntry(
-            SerializableDictionaryPropertyDrawer drawer,
-            SerializedProperty dictionaryProperty,
-            Type keyType,
-            Type valueType,
-            bool isSortedDictionary
-        )
-        {
-            SerializableDictionaryPropertyDrawer.PendingEntry pending =
-                drawer.GetOrCreatePendingEntry(
-                    dictionaryProperty,
-                    keyType,
-                    valueType,
-                    isSortedDictionary
-                );
-            Assert.IsTrue(pending != null, "Pending entry instance should not be null.");
-            return pending;
-        }
-
-        private static bool InvokeValuesEqual(object left, object right)
-        {
-            return SerializableDictionaryPropertyDrawer.ValuesEqual(left, right);
-        }
-
-        private static ColorData ReadColorData(SerializedProperty property)
-        {
-            if (property == null)
-            {
-                return default;
-            }
-
-            object value = SerializableDictionaryPropertyDrawer.GetPropertyValue(
-                property,
-                typeof(ColorData)
-            );
-            return value is ColorData data ? data : default;
-        }
-
-        private static string DescribeColorData(ColorData data)
-        {
-            string formattedColor1 = FormatColor(data.color1);
-            string otherSummary =
-                data.otherColors == null
-                    ? "null"
-                    : data.otherColors.Length.ToString(CultureInfo.InvariantCulture);
-            return $"color1={formattedColor1}, otherColors={otherSummary}";
-        }
-
-        private static string FormatColor(Color color)
-        {
-            return $"({color.r:0.00},{color.g:0.00},{color.b:0.00},{color.a:0.00})";
         }
 
         [Test]
@@ -8265,6 +7928,343 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.IsFalse(
                 info2.isPrimary,
                 "Third occurrence (index 2) should NOT be marked as primary."
+            );
+        }
+
+        /// <summary>
+        /// Resets the shared host state between tests to ensure test isolation.
+        /// </summary>
+        private void ResetHostState()
+        {
+            Assert.IsTrue(
+                _sharedSerializedObject != null,
+                "SerializedObject was disposed or null - check OneTimeTearDown ordering"
+            );
+            Assert.IsTrue(
+                _sharedSerializedObject.targetObject != null,
+                "SerializedObject's target was destroyed - check disposal order"
+            );
+
+            _sharedHost.dictionary.Clear();
+            _sharedSerializedObject.Update();
+            SerializedProperty dictionaryProperty = _sharedSerializedObject.FindProperty(
+                nameof(TestDictionaryHost.dictionary)
+            );
+            if (dictionaryProperty != null)
+            {
+                dictionaryProperty.isExpanded = false;
+                _sharedSerializedObject.ApplyModifiedPropertiesWithoutUndo();
+            }
+        }
+
+        private IEnumerator VerifyPendingEntryAlignmentAtIndentLevel(int indentLevel)
+        {
+            using (new DictionaryTweenDisabledScope())
+            {
+                _sharedSerializedObject.Update();
+                SerializedProperty dictionaryProperty = _sharedSerializedObject.FindProperty(
+                    nameof(TestDictionaryHost.dictionary)
+                );
+                dictionaryProperty.isExpanded = true;
+                _sharedSerializedObject.ApplyModifiedPropertiesWithoutUndo();
+
+                SerializableDictionaryPropertyDrawer drawer = new();
+                AssignDictionaryFieldInfo(
+                    drawer,
+                    typeof(TestDictionaryHost),
+                    nameof(TestDictionaryHost.dictionary)
+                );
+
+                Rect controlRect = new(0f, 0f, 360f, 420f);
+                GUIContent label = new("Dictionary");
+
+                SerializableDictionaryPropertyDrawer.PendingEntry pending =
+                    drawer.GetOrCreatePendingEntry(
+                        dictionaryProperty,
+                        typeof(int),
+                        typeof(string),
+                        isSortedDictionary: false
+                    );
+                pending.isExpanded = true;
+
+                SerializableDictionaryPropertyDrawer.ResetLayoutTrackingForTests();
+
+                yield return TestIMGUIExecutor.Run(() =>
+                {
+                    int previousIndent = EditorGUI.indentLevel;
+                    try
+                    {
+                        EditorGUI.indentLevel = indentLevel;
+                        dictionaryProperty.serializedObject.UpdateIfRequiredOrScript();
+                        pending.isExpanded = true;
+                        drawer.OnGUI(controlRect, dictionaryProperty, label);
+                    }
+                    finally
+                    {
+                        EditorGUI.indentLevel = previousIndent;
+                    }
+                });
+
+                Assert.IsTrue(
+                    SerializableDictionaryPropertyDrawer.HasLastPendingFieldRects,
+                    $"Draw at indent level {indentLevel} should capture pending key/value rects."
+                );
+
+                Rect keyRect = SerializableDictionaryPropertyDrawer.LastPendingKeyFieldRect;
+                Rect valueRect = SerializableDictionaryPropertyDrawer.LastPendingValueFieldRect;
+
+                float actualShift = keyRect.xMin - valueRect.xMin;
+
+                TestContext.WriteLine(
+                    $"[PendingEntryKeyAndValueAlignedAtIndentLevel{indentLevel}] "
+                        + $"keyRect.xMin={keyRect.xMin:F3}, valueRect.xMin={valueRect.xMin:F3}, "
+                        + $"keyRect.width={keyRect.width:F3}, valueRect.width={valueRect.width:F3}, "
+                        + $"actualShift={actualShift:F3}"
+                );
+
+                Assert.That(
+                    actualShift,
+                    Is.EqualTo(0f).Within(0.01f),
+                    $"Key and Value are one column stacked twice, so they must share an origin at indent level {indentLevel} (#284)."
+                );
+
+                Assert.That(
+                    valueRect.width - keyRect.width,
+                    Is.EqualTo(0f).Within(0.01f),
+                    $"Key and Value must share a width at indent level {indentLevel} (#284)."
+                );
+            }
+        }
+
+        private IEnumerator VerifyPendingEntryAlignmentWithComplexValueAtIndentLevel(
+            int indentLevel
+        )
+        {
+            ColorDataDictionaryHost host = CreateScriptableObject<ColorDataDictionaryHost>();
+            SerializedObject serializedObject = TrackDisposable(new SerializedObject(host));
+            serializedObject.Update();
+            SerializedProperty dictionaryProperty = serializedObject.FindProperty(
+                nameof(ColorDataDictionaryHost.dictionary)
+            );
+            dictionaryProperty.isExpanded = true;
+            serializedObject.ApplyModifiedPropertiesWithoutUndo();
+
+            SerializableDictionaryPropertyDrawer drawer = new();
+            AssignDictionaryFieldInfo(
+                drawer,
+                typeof(ColorDataDictionaryHost),
+                nameof(ColorDataDictionaryHost.dictionary)
+            );
+
+            Rect controlRect = new(0f, 0f, 420f, 480f);
+            GUIContent label = new("Dictionary");
+
+            SerializableDictionaryPropertyDrawer.PendingEntry pending =
+                drawer.GetOrCreatePendingEntry(
+                    dictionaryProperty,
+                    typeof(string),
+                    typeof(ColorData),
+                    isSortedDictionary: false
+                );
+            pending.isExpanded = true;
+
+            SerializableDictionaryPropertyDrawer.ResetLayoutTrackingForTests();
+
+            yield return TestIMGUIExecutor.Run(() =>
+            {
+                int previousIndent = EditorGUI.indentLevel;
+                try
+                {
+                    EditorGUI.indentLevel = indentLevel;
+                    dictionaryProperty.serializedObject.UpdateIfRequiredOrScript();
+                    pending.isExpanded = true;
+                    drawer.OnGUI(controlRect, dictionaryProperty, label);
+                }
+                finally
+                {
+                    EditorGUI.indentLevel = previousIndent;
+                }
+            });
+
+            Assert.IsTrue(
+                SerializableDictionaryPropertyDrawer.HasLastPendingFieldRects,
+                $"Draw with complex value at indent level {indentLevel} should capture pending key/value rects."
+            );
+            Assert.IsTrue(
+                SerializableDictionaryPropertyDrawer.LastPendingValueUsedFoldoutLabel,
+                $"Complex value should use foldout label at indent level {indentLevel}."
+            );
+
+            Rect keyRect = SerializableDictionaryPropertyDrawer.LastPendingKeyFieldRect;
+            Rect valueRect = SerializableDictionaryPropertyDrawer.LastPendingValueFieldRect;
+
+            TestContext.WriteLine(
+                $"[PendingEntryKeyAndValueAlignedWithComplexFoldoutValue@Indent{indentLevel}] "
+                    + $"keyRect.xMin={keyRect.xMin:F3}, valueRect.xMin={valueRect.xMin:F3}, "
+                    + $"keyRect.width={keyRect.width:F3}, valueRect.width={valueRect.width:F3}, "
+                    + $"foldoutOffset={SerializableDictionaryPropertyDrawer.LastPendingValueFoldoutOffset:F3}"
+            );
+
+            Assert.That(
+                keyRect.xMin,
+                Is.EqualTo(valueRect.xMin).Within(1f),
+                $"Pending key and value field left edges should be aligned with complex foldout value at indent level {indentLevel}."
+            );
+
+            Assert.That(
+                keyRect.width,
+                Is.EqualTo(valueRect.width).Within(1f),
+                $"Pending key and value field widths should match with complex foldout value at indent level {indentLevel}."
+            );
+        }
+
+        private IEnumerator DictionaryRowLayoutConsistencyWithVariousPaddingsInternal(
+            float leftPadding,
+            float rightPadding
+        )
+        {
+            _sharedHost.dictionary.Add(1, "One");
+            _sharedSerializedObject.Update();
+            SerializedProperty dictionaryProperty = _sharedSerializedObject.FindProperty(
+                nameof(TestDictionaryHost.dictionary)
+            );
+            ForcePopulateTestDictionarySerializedData(_sharedHost, dictionaryProperty);
+            dictionaryProperty.isExpanded = true;
+            _sharedSerializedObject.ApplyModifiedPropertiesWithoutUndo();
+
+            SerializableDictionaryPropertyDrawer drawer = new();
+            AssignDictionaryFieldInfo(
+                drawer,
+                typeof(TestDictionaryHost),
+                nameof(TestDictionaryHost.dictionary)
+            );
+
+            Rect controlRect = new(0f, 0f, 400f, 520f);
+            GUIContent label = new("Dictionary");
+
+            GroupGUIWidthUtility.ResetForTests();
+            SerializableDictionaryPropertyDrawer.ResetLayoutTrackingForTests();
+
+            yield return TestIMGUIExecutor.Run(() =>
+            {
+                dictionaryProperty.serializedObject.UpdateIfRequiredOrScript();
+                drawer.OnGUI(controlRect, dictionaryProperty, label);
+            });
+
+            Assert.IsTrue(
+                SerializableDictionaryPropertyDrawer.HasLastRowRects,
+                "Baseline draw should capture dictionary row layout."
+            );
+
+            Rect baselineRowRect = SerializableDictionaryPropertyDrawer.LastRowOriginalRect;
+            Rect baselineKeyRect = SerializableDictionaryPropertyDrawer.LastRowKeyRect;
+            Rect baselineValueRect = SerializableDictionaryPropertyDrawer.LastRowValueRect;
+
+            float horizontalPadding = leftPadding + rightPadding;
+
+            GroupGUIWidthUtility.ResetForTests();
+
+            yield return TestIMGUIExecutor.Run(() =>
+            {
+                dictionaryProperty.serializedObject.UpdateIfRequiredOrScript();
+                using (
+                    GroupGUIWidthUtility.PushContentPadding(
+                        horizontalPadding,
+                        leftPadding,
+                        rightPadding
+                    )
+                )
+                {
+                    SerializableDictionaryPropertyDrawer.ResetLayoutTrackingForTests();
+                    drawer.OnGUI(controlRect, dictionaryProperty, label);
+                }
+            });
+
+            Assert.IsTrue(
+                SerializableDictionaryPropertyDrawer.HasLastRowRects,
+                "Grouped draw should capture dictionary row layout."
+            );
+
+            Rect groupedRowRect = SerializableDictionaryPropertyDrawer.LastRowOriginalRect;
+            Rect groupedKeyRect = SerializableDictionaryPropertyDrawer.LastRowKeyRect;
+            Rect groupedValueRect = SerializableDictionaryPropertyDrawer.LastRowValueRect;
+
+            /*
+                ReorderableList row rects do not expose WGroup padding or virtual width, so assert the resulting
+                field geometry instead.
+            */
+
+            bool zeroPadding = horizontalPadding <= 0f;
+            int scopeDepthAfterGrouped = GroupGUIWidthUtility.CurrentScopeDepth;
+
+            TestContext.WriteLine(
+                $"[DictionaryRowLayoutConsistencyWithVariousPaddings(left={leftPadding}, right={rightPadding})] "
+                    + $"baselineRow={{xMin={baselineRowRect.xMin:F3}, width={baselineRowRect.width:F3}}}, "
+                    + $"groupedRow={{xMin={groupedRowRect.xMin:F3}, width={groupedRowRect.width:F3}}}, "
+                    + $"zeroPadding={zeroPadding}, scopeDepthAfterGrouped={scopeDepthAfterGrouped}"
+            );
+
+            Assert.Greater(
+                baselineKeyRect.width,
+                0f,
+                "Baseline key rect should have positive width."
+            );
+            Assert.Greater(
+                groupedKeyRect.width,
+                0f,
+                "Grouped key rect should have positive width."
+            );
+
+            Assert.Greater(
+                baselineValueRect.width,
+                0f,
+                "Baseline value rect should have positive width."
+            );
+            Assert.Greater(
+                groupedValueRect.width,
+                0f,
+                "Grouped value rect should have positive width."
+            );
+
+            float baselineValueOffset = baselineValueRect.xMin - baselineRowRect.xMin;
+            float groupedValueOffset = groupedValueRect.xMin - groupedRowRect.xMin;
+            float offsetDelta = Mathf.Abs(groupedValueOffset - baselineValueOffset);
+
+            TestContext.WriteLine(
+                $"[DictionaryRowLayoutConsistencyWithVariousPaddings] "
+                    + $"baselineValueOffset={baselineValueOffset:F3}, groupedValueOffset={groupedValueOffset:F3}, "
+                    + $"offsetDelta={offsetDelta:F3}"
+            );
+
+            // Unity’s varying ReorderableList rects require tolerance when comparing proportional column offsets.
+            float scaleFactor = 100f < horizontalPadding ? 0.5f : 0.3f;
+            float scaledTolerance = 15.0f + (horizontalPadding * scaleFactor);
+            Assert.LessOrEqual(
+                offsetDelta,
+                scaledTolerance,
+                $"Value field offset delta ({offsetDelta:F3}) should be within scaled tolerance ({scaledTolerance:F3}) for padding {horizontalPadding:F0}."
+            );
+
+            float minKeyWidth = SerializableDictionaryPropertyDrawer.DictionaryRowKeyColumnMinWidth;
+            float minValueWidth =
+                SerializableDictionaryPropertyDrawer.DictionaryRowValueColumnMinWidth;
+
+            float keyWidthWithPadding =
+                baselineKeyRect.width
+                + SerializableDictionaryPropertyDrawer.DictionaryRowFieldPadding;
+            Assert.GreaterOrEqual(
+                keyWidthWithPadding,
+                minKeyWidth * 0.5f,
+                $"Baseline key column should respect minimum width constraint (~{minKeyWidth:F0}px)."
+            );
+
+            float valueWidthWithPadding =
+                baselineValueRect.width
+                + SerializableDictionaryPropertyDrawer.DictionaryRowFieldPadding;
+            Assert.GreaterOrEqual(
+                valueWidthWithPadding,
+                minValueWidth * 0.5f,
+                $"Baseline value column should respect minimum width constraint (~{minValueWidth:F0}px)."
             );
         }
 

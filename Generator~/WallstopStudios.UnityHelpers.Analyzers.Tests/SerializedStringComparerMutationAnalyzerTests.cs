@@ -31,6 +31,111 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                   }
               }";
 
+        private static Diagnostic Single(string body, bool membersAreComplete = false)
+        {
+            ImmutableArray<Diagnostic> reported = Analyze(
+                body,
+                ReportDiagnostic.Default,
+                membersAreComplete
+            );
+            Assert.AreEqual(1, reported.Length, "Expected exactly one diagnostic");
+            return reported[0];
+        }
+
+        private static ImmutableArray<Diagnostic> Analyze(string body)
+        {
+            return Analyze(body, ReportDiagnostic.Default);
+        }
+
+        private static ImmutableArray<Diagnostic> Analyze(
+            string body,
+            ReportDiagnostic reportedAs,
+            bool membersAreComplete = false,
+            string additionalType = ""
+        )
+        {
+            string members = membersAreComplete
+                ? body
+                : "public static void Run() { " + body + " }";
+            string source =
+                "using System.Collections.Generic;\n"
+                + "using WallstopStudios.UnityHelpers.Utils;\n"
+                + "namespace Consumer { public static class Subject { "
+                + members
+                + " } "
+                + additionalType
+                + " }\n"
+                + ComparerStub;
+
+            HashSet<string> locations = new HashSet<string>(StringComparer.Ordinal);
+            List<MetadataReference> references = new List<MetadataReference>();
+            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (
+                    !assembly.IsDynamic
+                    && !string.IsNullOrEmpty(assembly.Location)
+                    && locations.Add(assembly.Location)
+                )
+                {
+                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
+                }
+            }
+
+            foreach (
+                Type anchor in new[]
+                {
+                    typeof(object),
+                    typeof(Dictionary<string, int>),
+                    typeof(HashSet<string>),
+                }
+            )
+            {
+                if (locations.Add(anchor.Assembly.Location))
+                {
+                    references.Add(MetadataReference.CreateFromFile(anchor.Assembly.Location));
+                }
+            }
+
+            CSharpCompilation compilation = CSharpCompilation.Create(
+                "ConsumerAssembly",
+                new[]
+                {
+                    CSharpSyntaxTree.ParseText(
+                        source,
+                        new CSharpParseOptions(LanguageVersion.CSharp9)
+                    ),
+                },
+                references,
+                new CSharpCompilationOptions(
+                    OutputKind.DynamicallyLinkedLibrary
+                ).WithSpecificDiagnosticOptions(
+                    ImmutableDictionary<string, ReportDiagnostic>.Empty.Add(
+                        DiagnosticId,
+                        reportedAs
+                    )
+                )
+            );
+
+            ImmutableArray<Diagnostic> compileErrors = compilation
+                .GetDiagnostics()
+                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+                .ToImmutableArray();
+            Assert.IsEmpty(
+                compileErrors.Select(diagnostic => diagnostic.ToString()).ToArray(),
+                "The fixture must compile"
+            );
+
+            return compilation
+                .WithAnalyzers(
+                    ImmutableArray.Create<DiagnosticAnalyzer>(
+                        new SerializedStringComparerMutationAnalyzer()
+                    )
+                )
+                .GetAnalyzerDiagnosticsAsync()
+                .GetAwaiter()
+                .GetResult();
+        }
+
         [TestCase(
             "a dictionary",
             @"SerializedStringComparer comparer = new SerializedStringComparer();
@@ -635,111 +740,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
 
             Assert.IsNotEmpty(Analyze(offending, ReportDiagnostic.Default));
             Assert.IsEmpty(Analyze(offending, ReportDiagnostic.Suppress));
-        }
-
-        private static Diagnostic Single(string body, bool membersAreComplete = false)
-        {
-            ImmutableArray<Diagnostic> reported = Analyze(
-                body,
-                ReportDiagnostic.Default,
-                membersAreComplete
-            );
-            Assert.AreEqual(1, reported.Length, "Expected exactly one diagnostic");
-            return reported[0];
-        }
-
-        private static ImmutableArray<Diagnostic> Analyze(string body)
-        {
-            return Analyze(body, ReportDiagnostic.Default);
-        }
-
-        private static ImmutableArray<Diagnostic> Analyze(
-            string body,
-            ReportDiagnostic reportedAs,
-            bool membersAreComplete = false,
-            string additionalType = ""
-        )
-        {
-            string members = membersAreComplete
-                ? body
-                : "public static void Run() { " + body + " }";
-            string source =
-                "using System.Collections.Generic;\n"
-                + "using WallstopStudios.UnityHelpers.Utils;\n"
-                + "namespace Consumer { public static class Subject { "
-                + members
-                + " } "
-                + additionalType
-                + " }\n"
-                + ComparerStub;
-
-            HashSet<string> locations = new HashSet<string>(StringComparer.Ordinal);
-            List<MetadataReference> references = new List<MetadataReference>();
-            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                if (
-                    !assembly.IsDynamic
-                    && !string.IsNullOrEmpty(assembly.Location)
-                    && locations.Add(assembly.Location)
-                )
-                {
-                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
-                }
-            }
-
-            foreach (
-                Type anchor in new[]
-                {
-                    typeof(object),
-                    typeof(Dictionary<string, int>),
-                    typeof(HashSet<string>),
-                }
-            )
-            {
-                if (locations.Add(anchor.Assembly.Location))
-                {
-                    references.Add(MetadataReference.CreateFromFile(anchor.Assembly.Location));
-                }
-            }
-
-            CSharpCompilation compilation = CSharpCompilation.Create(
-                "ConsumerAssembly",
-                new[]
-                {
-                    CSharpSyntaxTree.ParseText(
-                        source,
-                        new CSharpParseOptions(LanguageVersion.CSharp9)
-                    ),
-                },
-                references,
-                new CSharpCompilationOptions(
-                    OutputKind.DynamicallyLinkedLibrary
-                ).WithSpecificDiagnosticOptions(
-                    ImmutableDictionary<string, ReportDiagnostic>.Empty.Add(
-                        DiagnosticId,
-                        reportedAs
-                    )
-                )
-            );
-
-            ImmutableArray<Diagnostic> compileErrors = compilation
-                .GetDiagnostics()
-                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-                .ToImmutableArray();
-            Assert.IsEmpty(
-                compileErrors.Select(diagnostic => diagnostic.ToString()).ToArray(),
-                "The fixture must compile"
-            );
-
-            return compilation
-                .WithAnalyzers(
-                    ImmutableArray.Create<DiagnosticAnalyzer>(
-                        new SerializedStringComparerMutationAnalyzer()
-                    )
-                )
-                .GetAnalyzerDiagnosticsAsync()
-                .GetAwaiter()
-                .GetResult();
         }
     }
 }

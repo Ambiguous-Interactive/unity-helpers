@@ -57,54 +57,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return new SurrogateMap(pairs, compilation);
         }
 
-        private static void Collect(
-            IAssemblySymbol assembly,
-            Dictionary<INamedTypeSymbol, INamedTypeSymbol> pairs
-        )
-        {
-            foreach (AttributeData attribute in assembly.GetAttributes())
-            {
-                if (
-                    attribute.AttributeClass == null
-                    || attribute.AttributeClass.ToDisplayString() != SurrogateAttribute
-                    || attribute.ConstructorArguments.Length < 2
-                )
-                {
-                    continue;
-                }
-
-                if (
-                    !(attribute.ConstructorArguments[0].Value is INamedTypeSymbol real)
-                    || !(attribute.ConstructorArguments[1].Value is INamedTypeSymbol surrogate)
-                )
-                {
-                    continue;
-                }
-
-                bool openPair = real.IsUnboundGenericType && surrogate.IsUnboundGenericType;
-                if (
-                    real.IsUnboundGenericType != surrogate.IsUnboundGenericType
-                    || (openPair && real.Arity != surrogate.Arity)
-                )
-                {
-                    continue;
-                }
-
-                /*
-                 * Reading the compilation's own assembly first lets consumer surrogate declarations override
-                 * referenced ones.
-                 */
-                INamedTypeSymbol realKey = openPair ? real.OriginalDefinition : real;
-                INamedTypeSymbol surrogateValue = openPair
-                    ? surrogate.OriginalDefinition
-                    : surrogate;
-                if (!pairs.ContainsKey(realKey))
-                {
-                    pairs[realKey] = surrogateValue;
-                }
-            }
-        }
-
         /// <summary>
         /// Reports every pair declared by this compilation that cannot work, before anything is
         /// emitted against it.
@@ -220,11 +172,105 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
         }
 
+        /// <summary>
+        /// Reports whether the two types convert to each other in both directions.
+        /// </summary>
+        /// <remarks>
+        /// A surrogate that cannot be converted back is worse than an unsupported type: it produces
+        /// bytes that look right and a value that never returns, so the conversion is checked at
+        /// generate time rather than discovered as a compile error inside emitted code.
+        /// </remarks>
+        internal static bool ConvertsBothWays(INamedTypeSymbol real, INamedTypeSymbol surrogate)
+        {
+            return HasConversion(surrogate, real, surrogate)
+                    && HasConversion(surrogate, surrogate, real)
+                || (HasConversion(real, real, surrogate) && HasConversion(real, surrogate, real))
+                || (
+                    HasConversion(surrogate, real, surrogate)
+                    && HasConversion(real, surrogate, real)
+                )
+                || (
+                    HasConversion(real, real, surrogate)
+                    && HasConversion(surrogate, surrogate, real)
+                );
+        }
+
+        private static void Collect(
+            IAssemblySymbol assembly,
+            Dictionary<INamedTypeSymbol, INamedTypeSymbol> pairs
+        )
+        {
+            foreach (AttributeData attribute in assembly.GetAttributes())
+            {
+                if (
+                    attribute.AttributeClass == null
+                    || attribute.AttributeClass.ToDisplayString() != SurrogateAttribute
+                    || attribute.ConstructorArguments.Length < 2
+                )
+                {
+                    continue;
+                }
+
+                if (
+                    !(attribute.ConstructorArguments[0].Value is INamedTypeSymbol real)
+                    || !(attribute.ConstructorArguments[1].Value is INamedTypeSymbol surrogate)
+                )
+                {
+                    continue;
+                }
+
+                bool openPair = real.IsUnboundGenericType && surrogate.IsUnboundGenericType;
+                if (
+                    real.IsUnboundGenericType != surrogate.IsUnboundGenericType
+                    || (openPair && real.Arity != surrogate.Arity)
+                )
+                {
+                    continue;
+                }
+
+                /*
+                 * Reading the compilation's own assembly first lets consumer surrogate declarations override
+                 * referenced ones.
+                 */
+                INamedTypeSymbol realKey = openPair ? real.OriginalDefinition : real;
+                INamedTypeSymbol surrogateValue = openPair
+                    ? surrogate.OriginalDefinition
+                    : surrogate;
+                if (!pairs.ContainsKey(realKey))
+                {
+                    pairs[realKey] = surrogateValue;
+                }
+            }
+        }
+
         private static bool IsContract(INamedTypeSymbol type)
         {
             foreach (AttributeData attribute in type.GetAttributes())
             {
                 if (attribute.AttributeClass?.ToDisplayString() == ContractAttribute)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasConversion(
+            INamedTypeSymbol declaringType,
+            ITypeSymbol from,
+            ITypeSymbol to
+        )
+        {
+            foreach (ISymbol member in declaringType.GetMembers())
+            {
+                if (
+                    member is IMethodSymbol method
+                    && method.MethodKind == MethodKind.Conversion
+                    && method.Parameters.Length == 1
+                    && SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, from)
+                    && SymbolEqualityComparer.Default.Equals(method.ReturnType, to)
+                )
                 {
                     return true;
                 }
@@ -256,52 +302,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             }
 
             return ClosureScan.Close(definition, named.TypeArguments);
-        }
-
-        /// <summary>
-        /// Reports whether the two types convert to each other in both directions.
-        /// </summary>
-        /// <remarks>
-        /// A surrogate that cannot be converted back is worse than an unsupported type: it produces
-        /// bytes that look right and a value that never returns, so the conversion is checked at
-        /// generate time rather than discovered as a compile error inside emitted code.
-        /// </remarks>
-        internal static bool ConvertsBothWays(INamedTypeSymbol real, INamedTypeSymbol surrogate)
-        {
-            return HasConversion(surrogate, real, surrogate)
-                    && HasConversion(surrogate, surrogate, real)
-                || (HasConversion(real, real, surrogate) && HasConversion(real, surrogate, real))
-                || (
-                    HasConversion(surrogate, real, surrogate)
-                    && HasConversion(real, surrogate, real)
-                )
-                || (
-                    HasConversion(real, real, surrogate)
-                    && HasConversion(surrogate, surrogate, real)
-                );
-        }
-
-        private static bool HasConversion(
-            INamedTypeSymbol declaringType,
-            ITypeSymbol from,
-            ITypeSymbol to
-        )
-        {
-            foreach (ISymbol member in declaringType.GetMembers())
-            {
-                if (
-                    member is IMethodSymbol method
-                    && method.MethodKind == MethodKind.Conversion
-                    && method.Parameters.Length == 1
-                    && SymbolEqualityComparer.Default.Equals(method.Parameters[0].Type, from)
-                    && SymbolEqualityComparer.Default.Equals(method.ReturnType, to)
-                )
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
     }
 }

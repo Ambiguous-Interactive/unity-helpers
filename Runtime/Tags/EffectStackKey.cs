@@ -24,6 +24,28 @@ namespace WallstopStudios.UnityHelpers.Tags
     /// </remarks>
     internal readonly struct EffectStackKey : IEquatable<EffectStackKey>
     {
+        /// <summary>
+        /// Determines whether two keys are equal.
+        /// </summary>
+        /// <param name="left">First key to compare.</param>
+        /// <param name="right">Second key to compare.</param>
+        /// <returns><c>true</c> if both keys represent the same stack group; otherwise, <c>false</c>.</returns>
+        public static bool operator ==(EffectStackKey left, EffectStackKey right)
+        {
+            return left.Equals(right);
+        }
+
+        /// <summary>
+        /// Determines whether two keys are not equal.
+        /// </summary>
+        /// <param name="left">First key to compare.</param>
+        /// <param name="right">Second key to compare.</param>
+        /// <returns><c>true</c> if the keys differ; otherwise, <c>false</c>.</returns>
+        public static bool operator !=(EffectStackKey left, EffectStackKey right)
+        {
+            return !(left == right);
+        }
+
         private readonly EffectStackGroup _group;
         private readonly AttributeEffect _effect;
         private readonly string _customKey;
@@ -132,28 +154,6 @@ namespace WallstopStudios.UnityHelpers.Tags
                 ),
                 _ => Objects.HashCode(_group),
             };
-        }
-
-        /// <summary>
-        /// Determines whether two keys are equal.
-        /// </summary>
-        /// <param name="left">First key to compare.</param>
-        /// <param name="right">Second key to compare.</param>
-        /// <returns><c>true</c> if both keys represent the same stack group; otherwise, <c>false</c>.</returns>
-        public static bool operator ==(EffectStackKey left, EffectStackKey right)
-        {
-            return left.Equals(right);
-        }
-
-        /// <summary>
-        /// Determines whether two keys are not equal.
-        /// </summary>
-        /// <param name="left">First key to compare.</param>
-        /// <param name="right">Second key to compare.</param>
-        /// <returns><c>true</c> if the keys differ; otherwise, <c>false</c>.</returns>
-        public static bool operator !=(EffectStackKey left, EffectStackKey right)
-        {
-            return !(left == right);
         }
     }
 }

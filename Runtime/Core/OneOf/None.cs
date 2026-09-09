@@ -13,6 +13,12 @@ namespace WallstopStudios.UnityHelpers.Core.OneOf
     [WProtoContract]
     public readonly partial struct None : IEquatable<None>
     {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool operator ==(None left, None right) => true;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool operator !=(None left, None right) => false;
+
         public static readonly None Default = default;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -25,11 +31,5 @@ namespace WallstopStudios.UnityHelpers.Core.OneOf
         public override int GetHashCode() => 0;
 
         public override string ToString() => "None";
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool operator ==(None left, None right) => true;
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool operator !=(None left, None right) => false;
     }
 }

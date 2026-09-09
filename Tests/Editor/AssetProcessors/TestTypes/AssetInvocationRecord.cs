@@ -12,15 +12,15 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     /// </summary>
     internal readonly struct AssetInvocationRecord
     {
+        public Type AssetType { get; }
+
+        public AssetChangeFlags Flags { get; }
+
         public AssetInvocationRecord(Type assetType, AssetChangeFlags flags)
         {
             AssetType = assetType;
             Flags = flags;
         }
-
-        public Type AssetType { get; }
-
-        public AssetChangeFlags Flags { get; }
     }
 }
 #endif

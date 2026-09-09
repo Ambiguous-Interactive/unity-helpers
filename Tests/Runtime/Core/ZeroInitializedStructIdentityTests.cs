@@ -32,6 +32,102 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     [NUnit.Framework.Category("Fast")]
     public sealed class ZeroInitializedStructIdentityTests
     {
+        private static IEnumerable<Type> CandidateStructs()
+        {
+            foreach (Type type in RuntimeTypes())
+            {
+                if (
+                    !type.IsValueType
+                    || type.IsEnum
+                    || type.IsPrimitive
+                    || type.IsGenericTypeDefinition
+                    || type.ContainsGenericParameters
+                )
+                {
+                    continue;
+                }
+
+                // ValueType equality is structural; only a handwritten hash can disagree for these default values.
+                if (
+                    type.GetMethod(
+                        nameof(GetHashCode),
+                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                        binder: null,
+                        Type.EmptyTypes,
+                        modifiers: null
+                    )?.DeclaringType != type
+                )
+                {
+                    continue;
+                }
+
+                yield return type;
+            }
+        }
+
+        private static IEnumerable<Type> RuntimeTypes()
+        {
+            Assembly runtime = typeof(IRandom).Assembly;
+            try
+            {
+                return runtime.GetTypes();
+            }
+            catch (ReflectionTypeLoadException partial)
+            {
+                return partial.Types.Where(type => type != null);
+            }
+        }
+
+        /// <summary>
+        /// The widest constructor whose every parameter has a meaningful zero, so that passing zero
+        /// for all of them describes exactly the value <c>default(T)</c> already holds.
+        /// </summary>
+        private static ConstructorInfo ZeroableConstructor(Type type)
+        {
+            ConstructorInfo widest = null;
+            foreach (
+                ConstructorInfo candidate in type.GetConstructors(
+                    BindingFlags.Instance | BindingFlags.Public
+                )
+            )
+            {
+                ParameterInfo[] parameters = candidate.GetParameters();
+                if (parameters.Length == 0 || !parameters.All(p => IsZeroable(p.ParameterType)))
+                {
+                    continue;
+                }
+
+                if (widest == null || widest.GetParameters().Length < parameters.Length)
+                {
+                    widest = candidate;
+                }
+            }
+
+            return widest;
+        }
+
+        private static bool IsZeroable(Type type)
+        {
+            return type.IsEnum
+                || (type.IsPrimitive && type != typeof(IntPtr) && type != typeof(UIntPtr))
+                || type == typeof(decimal);
+        }
+
+        private static object[] ZeroArguments(ConstructorInfo constructor)
+        {
+            ParameterInfo[] parameters = constructor.GetParameters();
+            object[] arguments = new object[parameters.Length];
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                Type parameterType = parameters[i].ParameterType;
+                arguments[i] = parameterType.IsEnum
+                    ? Enum.ToObject(parameterType, 0)
+                    : Convert.ChangeType(0, parameterType);
+            }
+
+            return arguments;
+        }
+
         [Test]
         public void EveryStructAgreesWithItsOwnZeroConstruction()
         {
@@ -198,102 +294,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 default(FastVector3Int),
                 Serializer.ProtoDeserialize<FastVector3Int>(encodedVoxel)
             );
-        }
-
-        private static IEnumerable<Type> CandidateStructs()
-        {
-            foreach (Type type in RuntimeTypes())
-            {
-                if (
-                    !type.IsValueType
-                    || type.IsEnum
-                    || type.IsPrimitive
-                    || type.IsGenericTypeDefinition
-                    || type.ContainsGenericParameters
-                )
-                {
-                    continue;
-                }
-
-                // ValueType equality is structural; only a handwritten hash can disagree for these default values.
-                if (
-                    type.GetMethod(
-                        nameof(GetHashCode),
-                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                        binder: null,
-                        Type.EmptyTypes,
-                        modifiers: null
-                    )?.DeclaringType != type
-                )
-                {
-                    continue;
-                }
-
-                yield return type;
-            }
-        }
-
-        private static IEnumerable<Type> RuntimeTypes()
-        {
-            Assembly runtime = typeof(IRandom).Assembly;
-            try
-            {
-                return runtime.GetTypes();
-            }
-            catch (ReflectionTypeLoadException partial)
-            {
-                return partial.Types.Where(type => type != null);
-            }
-        }
-
-        /// <summary>
-        /// The widest constructor whose every parameter has a meaningful zero, so that passing zero
-        /// for all of them describes exactly the value <c>default(T)</c> already holds.
-        /// </summary>
-        private static ConstructorInfo ZeroableConstructor(Type type)
-        {
-            ConstructorInfo widest = null;
-            foreach (
-                ConstructorInfo candidate in type.GetConstructors(
-                    BindingFlags.Instance | BindingFlags.Public
-                )
-            )
-            {
-                ParameterInfo[] parameters = candidate.GetParameters();
-                if (parameters.Length == 0 || !parameters.All(p => IsZeroable(p.ParameterType)))
-                {
-                    continue;
-                }
-
-                if (widest == null || widest.GetParameters().Length < parameters.Length)
-                {
-                    widest = candidate;
-                }
-            }
-
-            return widest;
-        }
-
-        private static bool IsZeroable(Type type)
-        {
-            return type.IsEnum
-                || (type.IsPrimitive && type != typeof(IntPtr) && type != typeof(UIntPtr))
-                || type == typeof(decimal);
-        }
-
-        private static object[] ZeroArguments(ConstructorInfo constructor)
-        {
-            ParameterInfo[] parameters = constructor.GetParameters();
-            object[] arguments = new object[parameters.Length];
-            for (int i = 0; i < parameters.Length; i++)
-            {
-                Type parameterType = parameters[i].ParameterType;
-                arguments[i] = parameterType.IsEnum
-                    ? Enum.ToObject(parameterType, 0)
-                    : Convert.ChangeType(0, parameterType);
-            }
-
-            return arguments;
         }
     }
 }

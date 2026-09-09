@@ -53,6 +53,297 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             PaginationStates.Clear();
         }
 
+        internal static ulong CalculateAllFlagsMask(EnumShared.ToggleOption[] options)
+        {
+            ulong mask = 0UL;
+            for (int index = 0; index < options.Length; index += 1)
+            {
+                EnumShared.ToggleOption option = options[index];
+                if (option.FlagValue != 0UL)
+                {
+                    mask |= option.FlagValue;
+                }
+            }
+            return mask;
+        }
+
+        internal static EnumShared.ToggleOption[] GetCachedEnumOptions(Type enumType)
+        {
+            if (enumType == null || !enumType.IsEnum)
+            {
+                return null;
+            }
+
+            if (EnumOptionsCache.TryGetValue(enumType, out EnumShared.ToggleOption[] cached))
+            {
+                return cached;
+            }
+
+            bool isFlags = ReflectionHelpers.HasAttributeSafe<FlagsAttribute>(
+                enumType,
+                inherit: true
+            );
+            EnumShared.ToggleOption[] options = BuildEnumOptions(enumType, isFlags);
+            EnumOptionsCache[enumType] = options;
+            return options;
+        }
+
+        internal static EnumShared.ToggleOption[] BuildEnumOptions(Type enumType, bool isFlags)
+        {
+            Array values = Enum.GetValues(enumType);
+            ulong underlyingMask = EnumShared.GetUnderlyingTypeMask(enumType);
+            using PooledResource<List<EnumShared.ToggleOption>> optionsLease =
+                Buffers<EnumShared.ToggleOption>.GetList(
+                    values.Length,
+                    out List<EnumShared.ToggleOption> options
+                );
+
+            for (int index = 0; index < values.Length; index += 1)
+            {
+                object value = values.GetValue(index);
+                if (value == null)
+                {
+                    continue;
+                }
+
+                string name = Enum.GetName(enumType, value);
+                if (string.IsNullOrEmpty(name))
+                {
+                    continue;
+                }
+
+                ulong numericValue = EnumShared.ConvertToUInt64(value);
+                // Mask sign extension before deciding whether a signed top-bit flag is composite.
+                if (
+                    isFlags
+                    && numericValue != 0UL
+                    && !EnumShared.IsPowerOfTwo(numericValue & underlyingMask)
+                )
+                {
+                    Debug.LogWarning(
+                        $"[{nameof(WEnumToggleButtonsOdinDrawer)}] Skipping composite flag value {name} "
+                            + $"in {enumType.Name} (value: {numericValue})"
+                    );
+                    continue;
+                }
+
+                string label = ObjectNames.NicifyVariableName(name);
+                EnumShared.ToggleOption option = new(
+                    label,
+                    value,
+                    numericValue,
+                    numericValue == 0UL
+                );
+                options.Add(option);
+            }
+
+            if (options.Count == 0)
+            {
+                return Array.Empty<EnumShared.ToggleOption>();
+            }
+
+            return options.ToArray();
+        }
+
+        internal static bool ShouldPaginate(
+            WEnumToggleButtonsAttribute attribute,
+            int optionCount,
+            out int pageSize
+        )
+        {
+            int resolved = ResolvePageSize(attribute);
+            if (attribute is { EnablePagination: false })
+            {
+                pageSize = resolved;
+                return false;
+            }
+
+            pageSize = resolved;
+            return resolved < optionCount;
+        }
+
+        internal static int ResolvePageSize(WEnumToggleButtonsAttribute attribute)
+        {
+            int overrideSize = attribute?.PageSize ?? 0;
+            if (0 < overrideSize)
+            {
+                return Mathf.Clamp(
+                    overrideSize,
+                    UnityHelpersSettings.MinPageSize,
+                    UnityHelpersSettings.MaxPageSize
+                );
+            }
+
+            return Mathf.Clamp(
+                UnityHelpersSettings.GetEnumToggleButtonsPageSize(),
+                UnityHelpersSettings.MinPageSize,
+                UnityHelpersSettings.MaxPageSize
+            );
+        }
+
+        private static void DrawPagination(Rect rect, EnumShared.PaginationState state)
+        {
+            if (state.TotalPages <= 1)
+            {
+                return;
+            }
+
+            float spacing = EnumShared.ToolbarSpacing;
+            float buttonWidth = Mathf.Min(
+                EnumShared.PaginationButtonWidth,
+                rect.width * EnumShared.MaxPaginationButtonWidthRatio
+            );
+            float labelWidth = Mathf.Max(
+                EnumShared.PaginationLabelMinWidth,
+                rect.width - (buttonWidth * 4f) - spacing * 4f
+            );
+
+            Rect firstRect = new(rect.x, rect.y, buttonWidth, rect.height);
+            Rect prevRect = new(firstRect.xMax + spacing, rect.y, buttonWidth, rect.height);
+            Rect labelRect = new(prevRect.xMax + spacing, rect.y, labelWidth, rect.height);
+            Rect nextRect = new(labelRect.xMax + spacing, rect.y, buttonWidth, rect.height);
+            Rect lastRect = new(nextRect.xMax + spacing, rect.y, buttonWidth, rect.height);
+
+            if (rect.xMax < lastRect.xMax)
+            {
+                float overflow = lastRect.xMax - rect.xMax;
+                firstRect.x -= overflow * EnumShared.OverflowCenteringRatio;
+                prevRect.x -= overflow * EnumShared.OverflowCenteringRatio;
+                labelRect.x -= overflow * EnumShared.OverflowCenteringRatio;
+                nextRect.x -= overflow * EnumShared.OverflowCenteringRatio;
+                lastRect.x -= overflow * EnumShared.OverflowCenteringRatio;
+            }
+
+            bool originalEnabled = GUI.enabled;
+            bool canNavigateBackward = 0 < state.PageIndex;
+            bool canNavigateForward = state.PageIndex < state.TotalPages - 1;
+
+            GUI.enabled = originalEnabled && canNavigateBackward;
+            if (GUI.Button(firstRect, EnumShared.FirstPageContent, EditorStyles.miniButtonLeft))
+            {
+                state.PageIndex = 0;
+            }
+
+            if (GUI.Button(prevRect, EnumShared.PrevPageContent, EditorStyles.miniButtonMid))
+            {
+                state.PageIndex = Mathf.Max(0, state.PageIndex - 1);
+            }
+            GUI.enabled = originalEnabled;
+
+            GUI.Label(
+                labelRect,
+                CacheHelper.GetPaginationLabel(state.PageIndex + 1, state.TotalPages),
+                EditorStyles.miniLabel
+            );
+
+            GUI.enabled = originalEnabled && canNavigateForward;
+            if (GUI.Button(nextRect, EnumShared.NextPageContent, EditorStyles.miniButtonMid))
+            {
+                state.PageIndex = Mathf.Min(state.TotalPages - 1, state.PageIndex + 1);
+            }
+
+            if (GUI.Button(lastRect, EnumShared.LastPageContent, EditorStyles.miniButtonRight))
+            {
+                state.PageIndex = state.TotalPages - 1;
+            }
+
+            GUI.enabled = originalEnabled;
+        }
+
+        private static bool IsOptionActive(
+            EnumShared.ToggleOption option,
+            ulong currentMask,
+            bool isFlags
+        )
+        {
+            if (isFlags)
+            {
+                if (option.IsZeroFlag)
+                {
+                    return currentMask == 0UL;
+                }
+                return (currentMask & option.FlagValue) == option.FlagValue;
+            }
+
+            return currentMask == option.FlagValue;
+        }
+
+        private static EnumShared.PaginationState GetOrCreatePaginationState(
+            string key,
+            int totalItems,
+            int pageSize
+        )
+        {
+            if (!PaginationStates.TryGetValue(key, out EnumShared.PaginationState state))
+            {
+                state = new EnumShared.PaginationState();
+                PaginationStates[key] = state;
+            }
+
+            state.PageSize = Mathf.Max(1, pageSize);
+            state.TotalItems = Mathf.Max(0, totalItems);
+
+            int totalPages = state.TotalPages;
+            if (totalPages <= state.PageIndex)
+            {
+                state.PageIndex = totalPages - 1;
+            }
+
+            if (state.PageIndex < 0)
+            {
+                state.PageIndex = 0;
+            }
+
+            return state;
+        }
+
+        private static EnumShared.SelectionSummary BuildSelectionSummary(
+            EnumShared.ToggleOption[] options,
+            ulong currentMask,
+            bool isFlags,
+            int startIndex,
+            int visibleCount,
+            bool usePagination
+        )
+        {
+            if (!usePagination || options == null || options.Length == 0)
+            {
+                return EnumShared.SelectionSummary.None;
+            }
+
+            int endIndex = startIndex + visibleCount;
+            using PooledResource<List<string>> lease = Buffers<string>.GetList(
+                4,
+                out List<string> outOfView
+            );
+
+            for (int index = 0; index < options.Length; index += 1)
+            {
+                EnumShared.ToggleOption option = options[index];
+                if (!IsOptionActive(option, currentMask, isFlags))
+                {
+                    continue;
+                }
+
+                if (startIndex <= index && index < endIndex)
+                {
+                    continue;
+                }
+
+                outOfView.Add(option.Label);
+            }
+
+            if (outOfView.Count == 0)
+            {
+                return EnumShared.SelectionSummary.None;
+            }
+
+            string joined = string.Join(", ", outOfView);
+            string text = "Current (out of view): " + joined;
+            OutOfViewContent.text = text;
+            return new EnumShared.SelectionSummary(true, OutOfViewContent);
+        }
+
         protected override void DrawPropertyLayout(GUIContent label)
         {
             WEnumToggleButtonsAttribute toggleAttribute = Attribute;
@@ -368,75 +659,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
         }
 
-        private static void DrawPagination(Rect rect, EnumShared.PaginationState state)
-        {
-            if (state.TotalPages <= 1)
-            {
-                return;
-            }
-
-            float spacing = EnumShared.ToolbarSpacing;
-            float buttonWidth = Mathf.Min(
-                EnumShared.PaginationButtonWidth,
-                rect.width * EnumShared.MaxPaginationButtonWidthRatio
-            );
-            float labelWidth = Mathf.Max(
-                EnumShared.PaginationLabelMinWidth,
-                rect.width - (buttonWidth * 4f) - spacing * 4f
-            );
-
-            Rect firstRect = new(rect.x, rect.y, buttonWidth, rect.height);
-            Rect prevRect = new(firstRect.xMax + spacing, rect.y, buttonWidth, rect.height);
-            Rect labelRect = new(prevRect.xMax + spacing, rect.y, labelWidth, rect.height);
-            Rect nextRect = new(labelRect.xMax + spacing, rect.y, buttonWidth, rect.height);
-            Rect lastRect = new(nextRect.xMax + spacing, rect.y, buttonWidth, rect.height);
-
-            if (rect.xMax < lastRect.xMax)
-            {
-                float overflow = lastRect.xMax - rect.xMax;
-                firstRect.x -= overflow * EnumShared.OverflowCenteringRatio;
-                prevRect.x -= overflow * EnumShared.OverflowCenteringRatio;
-                labelRect.x -= overflow * EnumShared.OverflowCenteringRatio;
-                nextRect.x -= overflow * EnumShared.OverflowCenteringRatio;
-                lastRect.x -= overflow * EnumShared.OverflowCenteringRatio;
-            }
-
-            bool originalEnabled = GUI.enabled;
-            bool canNavigateBackward = 0 < state.PageIndex;
-            bool canNavigateForward = state.PageIndex < state.TotalPages - 1;
-
-            GUI.enabled = originalEnabled && canNavigateBackward;
-            if (GUI.Button(firstRect, EnumShared.FirstPageContent, EditorStyles.miniButtonLeft))
-            {
-                state.PageIndex = 0;
-            }
-
-            if (GUI.Button(prevRect, EnumShared.PrevPageContent, EditorStyles.miniButtonMid))
-            {
-                state.PageIndex = Mathf.Max(0, state.PageIndex - 1);
-            }
-            GUI.enabled = originalEnabled;
-
-            GUI.Label(
-                labelRect,
-                CacheHelper.GetPaginationLabel(state.PageIndex + 1, state.TotalPages),
-                EditorStyles.miniLabel
-            );
-
-            GUI.enabled = originalEnabled && canNavigateForward;
-            if (GUI.Button(nextRect, EnumShared.NextPageContent, EditorStyles.miniButtonMid))
-            {
-                state.PageIndex = Mathf.Min(state.TotalPages - 1, state.PageIndex + 1);
-            }
-
-            if (GUI.Button(lastRect, EnumShared.LastPageContent, EditorStyles.miniButtonRight))
-            {
-                state.PageIndex = state.TotalPages - 1;
-            }
-
-            GUI.enabled = originalEnabled;
-        }
-
         private void DrawToggle(
             Rect rect,
             EnumShared.ToggleOption option,
@@ -463,24 +685,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             ApplyToggleChange(option, currentMask, isFlags, newState);
-        }
-
-        private static bool IsOptionActive(
-            EnumShared.ToggleOption option,
-            ulong currentMask,
-            bool isFlags
-        )
-        {
-            if (isFlags)
-            {
-                if (option.IsZeroFlag)
-                {
-                    return currentMask == 0UL;
-                }
-                return (currentMask & option.FlagValue) == option.FlagValue;
-            }
-
-            return currentMask == option.FlagValue;
         }
 
         private void ApplyToggleChange(
@@ -548,210 +752,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             string instancePart = instanceId.ToString("X8", CultureInfo.InvariantCulture);
             string pathPart = Property.Path ?? string.Empty;
             return instancePart + ":" + pathPart;
-        }
-
-        private static EnumShared.PaginationState GetOrCreatePaginationState(
-            string key,
-            int totalItems,
-            int pageSize
-        )
-        {
-            if (!PaginationStates.TryGetValue(key, out EnumShared.PaginationState state))
-            {
-                state = new EnumShared.PaginationState();
-                PaginationStates[key] = state;
-            }
-
-            state.PageSize = Mathf.Max(1, pageSize);
-            state.TotalItems = Mathf.Max(0, totalItems);
-
-            int totalPages = state.TotalPages;
-            if (totalPages <= state.PageIndex)
-            {
-                state.PageIndex = totalPages - 1;
-            }
-
-            if (state.PageIndex < 0)
-            {
-                state.PageIndex = 0;
-            }
-
-            return state;
-        }
-
-        private static EnumShared.SelectionSummary BuildSelectionSummary(
-            EnumShared.ToggleOption[] options,
-            ulong currentMask,
-            bool isFlags,
-            int startIndex,
-            int visibleCount,
-            bool usePagination
-        )
-        {
-            if (!usePagination || options == null || options.Length == 0)
-            {
-                return EnumShared.SelectionSummary.None;
-            }
-
-            int endIndex = startIndex + visibleCount;
-            using PooledResource<List<string>> lease = Buffers<string>.GetList(
-                4,
-                out List<string> outOfView
-            );
-
-            for (int index = 0; index < options.Length; index += 1)
-            {
-                EnumShared.ToggleOption option = options[index];
-                if (!IsOptionActive(option, currentMask, isFlags))
-                {
-                    continue;
-                }
-
-                if (startIndex <= index && index < endIndex)
-                {
-                    continue;
-                }
-
-                outOfView.Add(option.Label);
-            }
-
-            if (outOfView.Count == 0)
-            {
-                return EnumShared.SelectionSummary.None;
-            }
-
-            string joined = string.Join(", ", outOfView);
-            string text = "Current (out of view): " + joined;
-            OutOfViewContent.text = text;
-            return new EnumShared.SelectionSummary(true, OutOfViewContent);
-        }
-
-        internal static ulong CalculateAllFlagsMask(EnumShared.ToggleOption[] options)
-        {
-            ulong mask = 0UL;
-            for (int index = 0; index < options.Length; index += 1)
-            {
-                EnumShared.ToggleOption option = options[index];
-                if (option.FlagValue != 0UL)
-                {
-                    mask |= option.FlagValue;
-                }
-            }
-            return mask;
-        }
-
-        internal static EnumShared.ToggleOption[] GetCachedEnumOptions(Type enumType)
-        {
-            if (enumType == null || !enumType.IsEnum)
-            {
-                return null;
-            }
-
-            if (EnumOptionsCache.TryGetValue(enumType, out EnumShared.ToggleOption[] cached))
-            {
-                return cached;
-            }
-
-            bool isFlags = ReflectionHelpers.HasAttributeSafe<FlagsAttribute>(
-                enumType,
-                inherit: true
-            );
-            EnumShared.ToggleOption[] options = BuildEnumOptions(enumType, isFlags);
-            EnumOptionsCache[enumType] = options;
-            return options;
-        }
-
-        internal static EnumShared.ToggleOption[] BuildEnumOptions(Type enumType, bool isFlags)
-        {
-            Array values = Enum.GetValues(enumType);
-            ulong underlyingMask = EnumShared.GetUnderlyingTypeMask(enumType);
-            using PooledResource<List<EnumShared.ToggleOption>> optionsLease =
-                Buffers<EnumShared.ToggleOption>.GetList(
-                    values.Length,
-                    out List<EnumShared.ToggleOption> options
-                );
-
-            for (int index = 0; index < values.Length; index += 1)
-            {
-                object value = values.GetValue(index);
-                if (value == null)
-                {
-                    continue;
-                }
-
-                string name = Enum.GetName(enumType, value);
-                if (string.IsNullOrEmpty(name))
-                {
-                    continue;
-                }
-
-                ulong numericValue = EnumShared.ConvertToUInt64(value);
-                // Mask sign extension before deciding whether a signed top-bit flag is composite.
-                if (
-                    isFlags
-                    && numericValue != 0UL
-                    && !EnumShared.IsPowerOfTwo(numericValue & underlyingMask)
-                )
-                {
-                    Debug.LogWarning(
-                        $"[{nameof(WEnumToggleButtonsOdinDrawer)}] Skipping composite flag value {name} "
-                            + $"in {enumType.Name} (value: {numericValue})"
-                    );
-                    continue;
-                }
-
-                string label = ObjectNames.NicifyVariableName(name);
-                EnumShared.ToggleOption option = new(
-                    label,
-                    value,
-                    numericValue,
-                    numericValue == 0UL
-                );
-                options.Add(option);
-            }
-
-            if (options.Count == 0)
-            {
-                return Array.Empty<EnumShared.ToggleOption>();
-            }
-
-            return options.ToArray();
-        }
-
-        internal static bool ShouldPaginate(
-            WEnumToggleButtonsAttribute attribute,
-            int optionCount,
-            out int pageSize
-        )
-        {
-            int resolved = ResolvePageSize(attribute);
-            if (attribute is { EnablePagination: false })
-            {
-                pageSize = resolved;
-                return false;
-            }
-
-            pageSize = resolved;
-            return resolved < optionCount;
-        }
-
-        internal static int ResolvePageSize(WEnumToggleButtonsAttribute attribute)
-        {
-            int overrideSize = attribute?.PageSize ?? 0;
-            if (0 < overrideSize)
-            {
-                return Mathf.Clamp(
-                    overrideSize,
-                    UnityHelpersSettings.MinPageSize,
-                    UnityHelpersSettings.MaxPageSize
-                );
-            }
-
-            return Mathf.Clamp(
-                UnityHelpersSettings.GetEnumToggleButtonsPageSize(),
-                UnityHelpersSettings.MinPageSize,
-                UnityHelpersSettings.MaxPageSize
-            );
         }
     }
 #endif

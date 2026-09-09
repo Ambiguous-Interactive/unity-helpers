@@ -32,6 +32,39 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             onRelease: list => list.Clear()
         );
 
+        private static IEnumerable<TestCaseData> SteadyStateArrayPoolCases()
+        {
+            yield return new TestCaseData(
+                (Action)(
+                    () =>
+                    {
+                        using PooledArray<int> lease = WallstopArrayPool<int>.Get(
+                            16,
+                            out int[] buffer
+                        );
+                        buffer[0] = 1;
+                    }
+                )
+            ).SetName(
+                $"{nameof(ArrayPoolSteadyStateRentAndReturnDoesNotAllocate)}({nameof(WallstopArrayPool<int>)})"
+            );
+
+            yield return new TestCaseData(
+                (Action)(
+                    () =>
+                    {
+                        using PooledArray<int> lease = WallstopFastArrayPool<int>.Get(
+                            16,
+                            out int[] buffer
+                        );
+                        buffer[0] = 1;
+                    }
+                )
+            ).SetName(
+                $"{nameof(ArrayPoolSteadyStateRentAndReturnDoesNotAllocate)}({nameof(WallstopFastArrayPool<int>)})"
+            );
+        }
+
         [SetUp]
         public void SetUp()
         {
@@ -200,39 +233,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                     Assert.AreEqual(0, buffer[j]);
                 }
             }
-        }
-
-        private static IEnumerable<TestCaseData> SteadyStateArrayPoolCases()
-        {
-            yield return new TestCaseData(
-                (Action)(
-                    () =>
-                    {
-                        using PooledArray<int> lease = WallstopArrayPool<int>.Get(
-                            16,
-                            out int[] buffer
-                        );
-                        buffer[0] = 1;
-                    }
-                )
-            ).SetName(
-                $"{nameof(ArrayPoolSteadyStateRentAndReturnDoesNotAllocate)}({nameof(WallstopArrayPool<int>)})"
-            );
-
-            yield return new TestCaseData(
-                (Action)(
-                    () =>
-                    {
-                        using PooledArray<int> lease = WallstopFastArrayPool<int>.Get(
-                            16,
-                            out int[] buffer
-                        );
-                        buffer[0] = 1;
-                    }
-                )
-            ).SetName(
-                $"{nameof(ArrayPoolSteadyStateRentAndReturnDoesNotAllocate)}({nameof(WallstopFastArrayPool<int>)})"
-            );
         }
 
         /*
@@ -856,18 +856,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
 #if !SINGLE_THREADED
 
-        [TestCaseSource(nameof(WallstopFastArrayPoolConcurrentScenarioCases))]
-        public void WallstopFastArrayPoolConcurrentAccessScenarios(ConcurrentScenario scenario)
-        {
-            RunConcurrentScenario(scenario);
-        }
-
-        [TestCaseSource(nameof(WallstopArrayPoolConcurrentScenarioCases))]
-        public void WallstopArrayPoolConcurrentAccessScenarios(ConcurrentScenario scenario)
-        {
-            RunConcurrentScenario(scenario);
-        }
-
         private static IEnumerable<TestCaseData> WallstopFastArrayPoolConcurrentScenarioCases()
         {
             yield return CreateDifferentSizesScenario();
@@ -1284,6 +1272,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             );
 
             return new TestCaseData(scenario).SetName(scenario.Name);
+        }
+
+        [TestCaseSource(nameof(WallstopFastArrayPoolConcurrentScenarioCases))]
+        public void WallstopFastArrayPoolConcurrentAccessScenarios(ConcurrentScenario scenario)
+        {
+            RunConcurrentScenario(scenario);
+        }
+
+        [TestCaseSource(nameof(WallstopArrayPoolConcurrentScenarioCases))]
+        public void WallstopArrayPoolConcurrentAccessScenarios(ConcurrentScenario scenario)
+        {
+            RunConcurrentScenario(scenario);
         }
 
         [Test]
@@ -2570,16 +2570,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
         public sealed class ConcurrentScenario
         {
+            public string Name { get; }
+            public int ThreadCount { get; }
+            public Func<int, Task> Work { get; }
+
             public ConcurrentScenario(string name, int threadCount, Func<int, Task> work)
             {
                 Name = name;
                 ThreadCount = threadCount;
                 Work = work;
             }
-
-            public string Name { get; }
-            public int ThreadCount { get; }
-            public Func<int, Task> Work { get; }
 
             public override string ToString()
             {
@@ -2589,14 +2589,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
 
         private sealed class ScenarioException
         {
+            public int ThreadId { get; }
+            public Exception Exception { get; }
+
             public ScenarioException(int threadId, Exception exception)
             {
                 ThreadId = threadId;
                 Exception = exception;
             }
-
-            public int ThreadId { get; }
-            public Exception Exception { get; }
         }
 #endif
     }

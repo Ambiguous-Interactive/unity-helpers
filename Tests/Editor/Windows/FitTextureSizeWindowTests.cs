@@ -34,6 +34,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
         // Shared window instance - reused across tests to reduce CreateInstance overhead
         private static FitTextureSizeWindow _sharedWindow;
 
+        private static string RelToFull(string rel)
+        {
+            return Path.Combine(
+                    Application.dataPath.Substring(
+                        0,
+                        Application.dataPath.Length - "Assets".Length
+                    ),
+                    rel
+                )
+                .SanitizePath();
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -95,65 +107,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             SharedTextureTestFixtures.ReleaseFixtures();
 
             base.OneTimeTearDown();
-        }
-
-        /// <summary>
-        /// Clones a shared texture to a per-test path for tests that need to modify importer settings.
-        /// Wraps copy and import in ExecuteWithImmediateImport to ensure asset is fully imported when batching.
-        /// </summary>
-        private string CloneSharedTexture(string sharedPath, string testName)
-        {
-            string fileName = Path.GetFileNameWithoutExtension(sharedPath);
-            string destPath = Path.Combine(Root, testName + "_" + fileName + ".png").SanitizePath();
-
-            bool success = false;
-            ExecuteWithImmediateImport(() =>
-            {
-                if (TryCopyAssetSilent(sharedPath, destPath))
-                {
-                    TrackAssetPath(destPath);
-                    success = true;
-                    return;
-                }
-
-                Texture2D source = AssetDatabase.LoadAssetAtPath<Texture2D>(sharedPath);
-                if (source != null)
-                {
-                    CreatePng(destPath, source.width, source.height, Color.white);
-                    AssetDatabase.ImportAsset(destPath, ImportAssetOptions.ForceSynchronousImport);
-                    success = true;
-                }
-            });
-
-            return success ? destPath : null;
-        }
-
-        /// <summary>
-        /// Resets the shared window to a clean state between tests.
-        /// </summary>
-        private FitTextureSizeWindow GetResetWindow()
-        {
-            if (_sharedWindow == null)
-            {
-                _sharedWindow = ScriptableObject.CreateInstance<FitTextureSizeWindow>();
-                Track(_sharedWindow);
-                _trackedObjects.Remove(_sharedWindow); // Managed manually in one-time teardown
-            }
-            _sharedWindow._fitMode = FitMode.GrowAndShrink;
-            _sharedWindow._textureSourcePaths = new List<Object>();
-            _sharedWindow._onlySprites = false;
-            _sharedWindow._nameFilter = string.Empty;
-            _sharedWindow._useRegexForName = false;
-            _sharedWindow._labelFilterCsv = string.Empty;
-            _sharedWindow._caseSensitiveNameFilter = false;
-            _sharedWindow._useSelectionOnly = false;
-            _sharedWindow._applyToAndroid = false;
-            _sharedWindow._applyToiOS = false;
-            _sharedWindow._applyToStandalone = false;
-            _sharedWindow._minAllowedTextureSize = 32;
-            _sharedWindow._maxAllowedTextureSize = 8192;
-            _sharedWindow._hasLastRunSummary = false;
-            return _sharedWindow;
         }
 
         [Test]
@@ -926,6 +879,65 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             );
         }
 
+        /// <summary>
+        /// Clones a shared texture to a per-test path for tests that need to modify importer settings.
+        /// Wraps copy and import in ExecuteWithImmediateImport to ensure asset is fully imported when batching.
+        /// </summary>
+        private string CloneSharedTexture(string sharedPath, string testName)
+        {
+            string fileName = Path.GetFileNameWithoutExtension(sharedPath);
+            string destPath = Path.Combine(Root, testName + "_" + fileName + ".png").SanitizePath();
+
+            bool success = false;
+            ExecuteWithImmediateImport(() =>
+            {
+                if (TryCopyAssetSilent(sharedPath, destPath))
+                {
+                    TrackAssetPath(destPath);
+                    success = true;
+                    return;
+                }
+
+                Texture2D source = AssetDatabase.LoadAssetAtPath<Texture2D>(sharedPath);
+                if (source != null)
+                {
+                    CreatePng(destPath, source.width, source.height, Color.white);
+                    AssetDatabase.ImportAsset(destPath, ImportAssetOptions.ForceSynchronousImport);
+                    success = true;
+                }
+            });
+
+            return success ? destPath : null;
+        }
+
+        /// <summary>
+        /// Resets the shared window to a clean state between tests.
+        /// </summary>
+        private FitTextureSizeWindow GetResetWindow()
+        {
+            if (_sharedWindow == null)
+            {
+                _sharedWindow = ScriptableObject.CreateInstance<FitTextureSizeWindow>();
+                Track(_sharedWindow);
+                _trackedObjects.Remove(_sharedWindow); // Managed manually in one-time teardown
+            }
+            _sharedWindow._fitMode = FitMode.GrowAndShrink;
+            _sharedWindow._textureSourcePaths = new List<Object>();
+            _sharedWindow._onlySprites = false;
+            _sharedWindow._nameFilter = string.Empty;
+            _sharedWindow._useRegexForName = false;
+            _sharedWindow._labelFilterCsv = string.Empty;
+            _sharedWindow._caseSensitiveNameFilter = false;
+            _sharedWindow._useSelectionOnly = false;
+            _sharedWindow._applyToAndroid = false;
+            _sharedWindow._applyToiOS = false;
+            _sharedWindow._applyToStandalone = false;
+            _sharedWindow._minAllowedTextureSize = 32;
+            _sharedWindow._maxAllowedTextureSize = 8192;
+            _sharedWindow._hasLastRunSummary = false;
+            return _sharedWindow;
+        }
+
         private void CreatePng(string relPath, int w, int h, Color c)
         {
             string dir = Path.GetDirectoryName(relPath).SanitizePath();
@@ -962,18 +974,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
                 CreatePng(relPath, w, h, c);
                 AssetDatabase.ImportAsset(relPath, ImportAssetOptions.ForceSynchronousImport);
             });
-        }
-
-        private static string RelToFull(string rel)
-        {
-            return Path.Combine(
-                    Application.dataPath.Substring(
-                        0,
-                        Application.dataPath.Length - "Assets".Length
-                    ),
-                    rel
-                )
-                .SanitizePath();
         }
     }
 #endif

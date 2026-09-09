@@ -30,6 +30,35 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [TestFixture]
     public sealed class NestedCollectionTests
     {
+        private static NestedCollectionContract Bare(Action<NestedCollectionContract> set)
+        {
+            NestedCollectionContract value = new NestedCollectionContract();
+            set(value);
+            return value;
+        }
+
+        private static string Encode<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new WProtoWriter(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+            Assert.AreEqual(buffer.Length, writer.Position, "Measure disagreed with Write");
+            return BitConverter.ToString(buffer).Replace("-", string.Empty);
+        }
+
+        private static T RoundTrip<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new WProtoWriter(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+
+            WProtoReader reader = new WProtoReader(buffer);
+            Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
+            return restored;
+        }
+
         [Test]
         public void TheOracleRefusesEveryNestedShape()
         {
@@ -409,35 +438,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.IsTrue(restored.Rows == null);
             Assert.IsTrue(restored.Grid == null);
             Assert.IsTrue(restored.Lookup == null);
-        }
-
-        private static NestedCollectionContract Bare(Action<NestedCollectionContract> set)
-        {
-            NestedCollectionContract value = new NestedCollectionContract();
-            set(value);
-            return value;
-        }
-
-        private static string Encode<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new WProtoWriter(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-            Assert.AreEqual(buffer.Length, writer.Position, "Measure disagreed with Write");
-            return BitConverter.ToString(buffer).Replace("-", string.Empty);
-        }
-
-        private static T RoundTrip<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new WProtoWriter(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-
-            WProtoReader reader = new WProtoReader(buffer);
-            Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
-            return restored;
         }
     }
 }

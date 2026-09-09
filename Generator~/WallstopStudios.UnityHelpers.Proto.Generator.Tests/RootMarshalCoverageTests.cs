@@ -44,54 +44,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             "IsSpecialCollectionType",
         };
 
-        [Test]
-        public void EveryInterceptedCollectionHasARootMarshal()
-        {
-            IReadOnlyCollection<string> intercepted = InterceptedTypes();
-            IReadOnlyCollection<string> marshalled = MarshalledTypes();
-
-            List<string> missing = intercepted
-                .Where(name => !marshalled.Contains(name))
-                .OrderBy(name => name, StringComparer.Ordinal)
-                .ToList();
-
-            Assert.That(
-                missing,
-                Is.Empty,
-                "Serializer marshals these through a wrapper and nothing registers a WallstopProto "
-                    + "root marshal for them, so they fall back to protobuf-net -- which does not run "
-                    + "under IL2CPP: "
-                    + string.Join(", ", missing)
-            );
-        }
-
-        /// <summary>
-        /// A marshal for a type nothing intercepts is a wire shape with no counterpart.
-        /// </summary>
-        /// <remarks>
-        /// The reverse direction matters as much: a marshal whose interception was deleted would
-        /// keep writing the wrapper under <c>WALLSTOP_PROTO</c> while the shipped path had moved on
-        /// to writing the type itself, and only one of the two would be in any given save file.
-        /// </remarks>
-        [Test]
-        public void EveryRootMarshalHasAnInterception()
-        {
-            IReadOnlyCollection<string> intercepted = InterceptedTypes();
-
-            List<string> extra = MarshalledTypes()
-                .Where(name => !intercepted.Contains(name))
-                .OrderBy(name => name, StringComparer.Ordinal)
-                .ToList();
-
-            Assert.That(
-                extra,
-                Is.Empty,
-                "These types have a WallstopProto root marshal but Serializer no longer marshals "
-                    + "them through a wrapper: "
-                    + string.Join(", ", extra)
-            );
-        }
-
         private static IReadOnlyCollection<string> InterceptedTypes()
         {
             SyntaxNode root = Parse(SerializerFile);
@@ -202,6 +154,54 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             string path = Path.Combine(ContractMirrorTests.RepositoryRoot(), relative);
             Assert.IsTrue(File.Exists(path), path + " is missing.");
             return CSharpSyntaxTree.ParseText(File.ReadAllText(path, Encoding.UTF8)).GetRoot();
+        }
+
+        [Test]
+        public void EveryInterceptedCollectionHasARootMarshal()
+        {
+            IReadOnlyCollection<string> intercepted = InterceptedTypes();
+            IReadOnlyCollection<string> marshalled = MarshalledTypes();
+
+            List<string> missing = intercepted
+                .Where(name => !marshalled.Contains(name))
+                .OrderBy(name => name, StringComparer.Ordinal)
+                .ToList();
+
+            Assert.That(
+                missing,
+                Is.Empty,
+                "Serializer marshals these through a wrapper and nothing registers a WallstopProto "
+                    + "root marshal for them, so they fall back to protobuf-net -- which does not run "
+                    + "under IL2CPP: "
+                    + string.Join(", ", missing)
+            );
+        }
+
+        /// <summary>
+        /// A marshal for a type nothing intercepts is a wire shape with no counterpart.
+        /// </summary>
+        /// <remarks>
+        /// The reverse direction matters as much: a marshal whose interception was deleted would
+        /// keep writing the wrapper under <c>WALLSTOP_PROTO</c> while the shipped path had moved on
+        /// to writing the type itself, and only one of the two would be in any given save file.
+        /// </remarks>
+        [Test]
+        public void EveryRootMarshalHasAnInterception()
+        {
+            IReadOnlyCollection<string> intercepted = InterceptedTypes();
+
+            List<string> extra = MarshalledTypes()
+                .Where(name => !intercepted.Contains(name))
+                .OrderBy(name => name, StringComparer.Ordinal)
+                .ToList();
+
+            Assert.That(
+                extra,
+                Is.Empty,
+                "These types have a WallstopProto root marshal but Serializer no longer marshals "
+                    + "them through a wrapper: "
+                    + string.Join(", ", extra)
+            );
         }
     }
 }

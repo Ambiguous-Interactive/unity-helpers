@@ -9,13 +9,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true)]
     public sealed class WProtoReplacementAttribute : Attribute
     {
+        /// <summary>The contract whose complete subtype chain this assembly supplies.</summary>
+        public Type Contract { get; }
+
         /// <summary>Records the contract this assembly replaces.</summary>
         public WProtoReplacementAttribute(Type contract)
         {
             Contract = contract;
         }
-
-        /// <summary>The contract whose complete subtype chain this assembly supplies.</summary>
-        public Type Contract { get; }
     }
 }

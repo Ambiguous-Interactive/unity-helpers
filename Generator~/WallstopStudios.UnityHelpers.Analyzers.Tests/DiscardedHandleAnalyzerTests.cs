@@ -112,6 +112,111 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
               private IEnumerator Body() { yield break; }
               private void Consume(Coroutine handle) { }";
 
+        private static string ReadShipped(string repoRoot, params string[] segments)
+        {
+            string[] parts = new string[segments.Length + 1];
+            parts[0] = repoRoot;
+            Array.Copy(segments, 0, parts, 1, segments.Length);
+            string path = Path.Combine(parts);
+            Assert.IsTrue(File.Exists(path), $"expected shipped source at {path}");
+            return File.ReadAllText(path);
+        }
+
+        private static string FindRepositoryRoot()
+        {
+            DirectoryInfo directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
+            while (directory != null)
+            {
+                if (Directory.Exists(Path.Combine(directory.FullName, "Runtime")))
+                {
+                    return directory.FullName;
+                }
+
+                directory = directory.Parent;
+            }
+
+            throw new DirectoryNotFoundException(
+                "Could not find the repository root above the test directory"
+            );
+        }
+
+        private static Diagnostic Single(string body)
+        {
+            ImmutableArray<Diagnostic> reported = Analyze(body);
+            Assert.AreEqual(1, reported.Length, "Expected exactly one diagnostic");
+            return reported[0];
+        }
+
+        /// <summary>
+        /// Compiles <paramref name="body"/> as members of a <c>MonoBehaviour</c> and runs the
+        /// analyzer over it.
+        /// </summary>
+        /// <param name="body">Members of a class deriving from <c>UnityEngine.MonoBehaviour</c>.</param>
+        /// <returns>Everything the analyzer reported.</returns>
+        private static ImmutableArray<Diagnostic> Analyze(string body)
+        {
+            return AnalyzeSource(
+                "using System;\n"
+                    + "using System.Collections;\n"
+                    + "using System.Collections.Generic;\n"
+                    + "using UnityEngine;\n"
+                    + "using WallstopStudios.UnityHelpers.Core.Helper;\n"
+                    + "using WallstopStudios.UnityHelpers.Tags;\n"
+                    + "namespace Consumer { public class Subject : MonoBehaviour { "
+                    + body
+                    + "\n"
+                    + SharedFixtureMembers
+                    + " } }\n"
+                    + UnityEngineStub
+                    + "\n"
+                    + PackageHelpers
+                    + "\n"
+                    + PackageTags
+            );
+        }
+
+        private static ImmutableArray<Diagnostic> AnalyzeSource(string source)
+        {
+            List<MetadataReference> references = new List<MetadataReference>();
+            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
+                {
+                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
+                }
+            }
+
+            CSharpCompilation compilation = CSharpCompilation.Create(
+                "ConsumerAssembly",
+                new[]
+                {
+                    CSharpSyntaxTree.ParseText(
+                        source,
+                        new CSharpParseOptions(LanguageVersion.CSharp9)
+                    ),
+                },
+                references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+            );
+
+            ImmutableArray<Diagnostic> compileErrors = compilation
+                .GetDiagnostics()
+                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+                .ToImmutableArray();
+            Assert.IsEmpty(
+                compileErrors.Select(diagnostic => diagnostic.ToString()).ToArray(),
+                "The fixture must compile"
+            );
+
+            return compilation
+                .WithAnalyzers(
+                    ImmutableArray.Create<DiagnosticAnalyzer>(new DiscardedHandleAnalyzer())
+                )
+                .GetAnalyzerDiagnosticsAsync()
+                .GetAwaiter()
+                .GetResult();
+        }
+
         [TestCase(
             "StartCoroutine as a whole statement",
             "StartCoroutine",
@@ -363,111 +468,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
                     helper + " is covered by its return type, so that return type has to stay"
                 );
             }
-        }
-
-        private static string ReadShipped(string repoRoot, params string[] segments)
-        {
-            string[] parts = new string[segments.Length + 1];
-            parts[0] = repoRoot;
-            Array.Copy(segments, 0, parts, 1, segments.Length);
-            string path = Path.Combine(parts);
-            Assert.IsTrue(File.Exists(path), $"expected shipped source at {path}");
-            return File.ReadAllText(path);
-        }
-
-        private static string FindRepositoryRoot()
-        {
-            DirectoryInfo directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-            while (directory != null)
-            {
-                if (Directory.Exists(Path.Combine(directory.FullName, "Runtime")))
-                {
-                    return directory.FullName;
-                }
-
-                directory = directory.Parent;
-            }
-
-            throw new DirectoryNotFoundException(
-                "Could not find the repository root above the test directory"
-            );
-        }
-
-        private static Diagnostic Single(string body)
-        {
-            ImmutableArray<Diagnostic> reported = Analyze(body);
-            Assert.AreEqual(1, reported.Length, "Expected exactly one diagnostic");
-            return reported[0];
-        }
-
-        /// <summary>
-        /// Compiles <paramref name="body"/> as members of a <c>MonoBehaviour</c> and runs the
-        /// analyzer over it.
-        /// </summary>
-        /// <param name="body">Members of a class deriving from <c>UnityEngine.MonoBehaviour</c>.</param>
-        /// <returns>Everything the analyzer reported.</returns>
-        private static ImmutableArray<Diagnostic> Analyze(string body)
-        {
-            return AnalyzeSource(
-                "using System;\n"
-                    + "using System.Collections;\n"
-                    + "using System.Collections.Generic;\n"
-                    + "using UnityEngine;\n"
-                    + "using WallstopStudios.UnityHelpers.Core.Helper;\n"
-                    + "using WallstopStudios.UnityHelpers.Tags;\n"
-                    + "namespace Consumer { public class Subject : MonoBehaviour { "
-                    + body
-                    + "\n"
-                    + SharedFixtureMembers
-                    + " } }\n"
-                    + UnityEngineStub
-                    + "\n"
-                    + PackageHelpers
-                    + "\n"
-                    + PackageTags
-            );
-        }
-
-        private static ImmutableArray<Diagnostic> AnalyzeSource(string source)
-        {
-            List<MetadataReference> references = new List<MetadataReference>();
-            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
-                {
-                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
-                }
-            }
-
-            CSharpCompilation compilation = CSharpCompilation.Create(
-                "ConsumerAssembly",
-                new[]
-                {
-                    CSharpSyntaxTree.ParseText(
-                        source,
-                        new CSharpParseOptions(LanguageVersion.CSharp9)
-                    ),
-                },
-                references,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-            );
-
-            ImmutableArray<Diagnostic> compileErrors = compilation
-                .GetDiagnostics()
-                .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-                .ToImmutableArray();
-            Assert.IsEmpty(
-                compileErrors.Select(diagnostic => diagnostic.ToString()).ToArray(),
-                "The fixture must compile"
-            );
-
-            return compilation
-                .WithAnalyzers(
-                    ImmutableArray.Create<DiagnosticAnalyzer>(new DiscardedHandleAnalyzer())
-                )
-                .GetAnalyzerDiagnosticsAsync()
-                .GetAwaiter()
-                .GetResult();
         }
     }
 }

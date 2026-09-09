@@ -165,14 +165,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             return conflicts;
         }
 
-        private static int CompareByAssemblyName(
-            KeyValuePair<string, List<string>> left,
-            KeyValuePair<string, List<string>> right
-        )
-        {
-            return string.CompareOrdinal(left.Key, right.Key);
-        }
-
         /// <summary>
         /// The shallowest directory whose <c>.asmdef</c> could take
         /// <paramref name="assemblyName"/>'s manifest directory away from it.
@@ -571,6 +563,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 Entries(rendered),
                 StringComparison.Ordinal
             );
+        }
+
+        private static int CompareByAssemblyName(
+            KeyValuePair<string, List<string>> left,
+            KeyValuePair<string, List<string>> right
+        )
+        {
+            return string.CompareOrdinal(left.Key, right.Key);
         }
 
         /// <summary>

@@ -19,19 +19,28 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         // Reseed each test so a failing tree can be reproduced alone or within the fixture.
         private const uint RandomSeed = 0x5EED0302;
 
+        private IRandom Random => _random;
+
         private IRandom _random = new PcgRandom(RandomSeed);
 
-        private IRandom Random => _random;
+        private static Bounds CreatePointBounds(Vector3 point)
+        {
+            const float pointBoundsSize = 0.001f;
+            return new Bounds(
+                point,
+                new Vector3(pointBoundsSize, pointBoundsSize, pointBoundsSize)
+            );
+        }
+
+        private static Bounds ZeroSizeBounds(Vector3 point)
+        {
+            return new Bounds(point, Vector3.zero);
+        }
 
         [SetUp]
         public void SeedRTree3DRandom()
         {
             _random = new PcgRandom(RandomSeed);
-        }
-
-        protected override RTree3D<Vector3> CreateTree(IEnumerable<Vector3> points)
-        {
-            return new RTree3D<Vector3>(points, CreatePointBounds);
         }
 
         [Test]
@@ -359,18 +368,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
         }
 
-        private static Bounds CreatePointBounds(Vector3 point)
+        protected override RTree3D<Vector3> CreateTree(IEnumerable<Vector3> points)
         {
-            const float pointBoundsSize = 0.001f;
-            return new Bounds(
-                point,
-                new Vector3(pointBoundsSize, pointBoundsSize, pointBoundsSize)
-            );
-        }
-
-        private static Bounds ZeroSizeBounds(Vector3 point)
-        {
-            return new Bounds(point, Vector3.zero);
+            return new RTree3D<Vector3>(points, CreatePointBounds);
         }
     }
 }

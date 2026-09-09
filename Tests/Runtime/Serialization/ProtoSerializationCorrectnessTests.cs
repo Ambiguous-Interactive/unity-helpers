@@ -16,6 +16,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
     public sealed class ProtoSerializationCorrectnessTests
     {
+        private static byte[] MakeBytes(int len)
+        {
+            byte[] b = new byte[len];
+            for (int i = 0; i < b.Length; ++i)
+            {
+                b[i] = (byte)(i * 31);
+            }
+
+            return b;
+        }
+
         [Test]
         public void RoundTripEmptyAndDefaults()
         {
@@ -377,17 +388,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             CollectionAssert.AreEqual(msg.Values, clone.Values);
             Assert.AreEqual(1024 * 1024, clone.Data.Length);
             CollectionAssert.AreEqual(msg.Data, clone.Data);
-        }
-
-        private static byte[] MakeBytes(int len)
-        {
-            byte[] b = new byte[len];
-            for (int i = 0; i < b.Length; ++i)
-            {
-                b[i] = (byte)(i * 31);
-            }
-
-            return b;
         }
 
         [ProtoContract]

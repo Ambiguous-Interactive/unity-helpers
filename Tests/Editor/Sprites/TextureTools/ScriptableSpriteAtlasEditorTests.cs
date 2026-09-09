@@ -21,6 +21,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
     {
         private const string Root = "Assets/Temp/ScriptableSpriteAtlasEditorTests";
 
+        private static string RelToFull(string rel)
+        {
+            return Path.Combine(
+                    Application.dataPath.Substring(
+                        0,
+                        Application.dataPath.Length - "Assets".Length
+                    ),
+                    rel
+                )
+                .SanitizePath();
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -103,18 +115,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             {
                 Object.DestroyImmediate(t); // UNH-SUPPRESS: Cleanup temporary texture in finally block
             }
-        }
-
-        private static string RelToFull(string rel)
-        {
-            return Path.Combine(
-                    Application.dataPath.Substring(
-                        0,
-                        Application.dataPath.Length - "Assets".Length
-                    ),
-                    rel
-                )
-                .SanitizePath();
         }
     }
 #endif

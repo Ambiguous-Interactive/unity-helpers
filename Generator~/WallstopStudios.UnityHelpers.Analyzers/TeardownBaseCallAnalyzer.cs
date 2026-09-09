@@ -65,18 +65,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
             ImmutableArray.Create(UnityHelpersDiagnostics.TeardownBaseCallIsNotLast);
 
-        /// <inheritdoc />
-        public override void Initialize(AnalysisContext context)
-        {
-            context.EnableConcurrentExecution();
-            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
-            /*
-             * Syntax actions still locate trailing statements when missing Unity references prevent operation
-             * binding.
-             */
-            context.RegisterSyntaxNodeAction(AnalyzeMethod, SyntaxKind.MethodDeclaration);
-        }
-
         private static void AnalyzeMethod(SyntaxNodeAnalysisContext context)
         {
             MethodDeclarationSyntax method = (MethodDeclarationSyntax)context.Node;
@@ -201,6 +189,18 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         {
             return statement is ReturnStatementSyntax returnStatement
                 && returnStatement.Expression == null;
+        }
+
+        /// <inheritdoc />
+        public override void Initialize(AnalysisContext context)
+        {
+            context.EnableConcurrentExecution();
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+            /*
+             * Syntax actions still locate trailing statements when missing Unity references prevent operation
+             * binding.
+             */
+            context.RegisterSyntaxNodeAction(AnalyzeMethod, SyntaxKind.MethodDeclaration);
         }
     }
 }

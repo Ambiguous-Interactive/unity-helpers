@@ -26,6 +26,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
         int SerializedCount { get; }
 
+        bool SupportsSorting { get; }
+
         bool TryAddElement(object value, out object normalizedValue);
 
         bool ContainsElement(object value);
@@ -39,8 +41,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         void SetSerializedItemsSnapshot(Array values, bool preserveSerializedEntries);
 
         void SynchronizeSerializedState();
-
-        bool SupportsSorting { get; }
     }
 
     internal interface ISerializableSetEditorSync
@@ -94,17 +94,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             ISerializableSetEditorSync
         where TSet : ISet<T>, new()
     {
-        static SerializableSetBase()
-        {
-            ProtobufUnityModel.EnsureInitialized();
-        }
-
-        protected internal bool HasDuplicatesOrNulls => _hasDuplicatesOrNulls;
-
-        internal bool PreserveSerializedEntries => _preserveSerializedEntries;
         public int Count => _set.Count;
 
-        bool ICollection<T>.IsReadOnly => _set.IsReadOnly;
+        protected internal bool HasDuplicatesOrNulls => _hasDuplicatesOrNulls;
 
         /// <summary>
         /// The backing set, for read access from a derived type.
@@ -125,6 +117,10 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         protected internal T[] SerializedItems => _items;
 
         protected virtual bool SupportsSorting => false;
+
+        internal bool PreserveSerializedEntries => _preserveSerializedEntries;
+
+        bool ICollection<T>.IsReadOnly => _set.IsReadOnly;
 
         [SerializeField]
         [ProtoMember(1, OverwriteList = true)]
@@ -188,6 +184,30 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             _set = factory(serializationInfo, streamingContext);
         }
 
+        static SerializableSetBase()
+        {
+            ProtobufUnityModel.EnsureInitialized();
+        }
+
+        private static bool TypeSupportsNullReferences(Type type)
+        {
+            return type != null
+                && (!type.IsValueType || typeof(UnityEngine.Object).IsAssignableFrom(type));
+        }
+
+        private static void LogNullEntrySkip(int index)
+        {
+#if UNITY_EDITOR
+            if (!EditorShouldLog())
+            {
+                return;
+            }
+#endif
+            Debug.LogWarning(
+                $"SerializableSet<{typeof(T).FullName}> skipped serialized entry at index {index} because the value reference was null."
+            );
+        }
+
         /// <summary>
         /// Adds an element to the set and updates the serialized cache when the value was not already present.
         /// </summary>
@@ -209,20 +229,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             }
 
             return added;
-        }
-
-        /// <summary>
-        /// Tracks a newly added item for order preservation during serialization.
-        /// </summary>
-        private void TrackNewItem(T item)
-        {
-            _newItemsOrder ??= new List<T>();
-            _newItemsOrder.Add(item);
-        }
-
-        void ICollection<T>.Add(T item)
-        {
-            Add(item);
         }
 
         /// <summary>
@@ -495,35 +501,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         }
 
         /// <summary>
-        /// Allows derived types to substitute custom lookup behavior (for example, when values are wrapped).
-        /// </summary>
-        /// <param name="equalValue">The candidate value.</param>
-        /// <param name="actualValue">Receives the resolved value.</param>
-        /// <returns><c>true</c> when the derived type resolved a match.</returns>
-        /// <example>
-        /// <code><![CDATA[
-        /// protected override bool TryGetValueCore(string equalValue, out string actualValue)
-        /// {
-        ///     foreach (string stored in SerializedItems)
-        ///     {
-        ///         if (string.Equals(stored, equalValue, StringComparison.OrdinalIgnoreCase))
-        ///         {
-        ///             actualValue = stored;
-        ///             return true;
-        ///         }
-        ///     }
-        ///     actualValue = null;
-        ///     return false;
-        /// }
-        /// ]]></code>
-        /// </example>
-        protected virtual bool TryGetValueCore(T equalValue, out T actualValue)
-        {
-            actualValue = default;
-            return false;
-        }
-
-        /// <summary>
         /// Creates a new array containing all elements in the set's natural iteration order.
         /// </summary>
         /// <remarks>
@@ -690,42 +667,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         }
 
         /// <summary>
-        /// Allows derived types to customize how batch removals are handled.
-        /// </summary>
-        /// <param name="match">The predicate describing which elements to remove.</param>
-        /// <returns>The number of removed elements.</returns>
-        protected virtual int RemoveWhereInternal(Predicate<T> match)
-        {
-            using PooledResource<List<T>> bufferResource = Buffers<T>.List.Get(out List<T> buffer);
-            foreach (T value in _set)
-            {
-                if (match(value))
-                {
-                    buffer.Add(value);
-                }
-            }
-
-            foreach (T value in buffer)
-            {
-                _set.Remove(value);
-            }
-
-            return buffer.Count;
-        }
-
-        /// <inheritdoc />
-        IEnumerator<T> IEnumerable<T>.GetEnumerator()
-        {
-            return _set.GetEnumerator();
-        }
-
-        /// <inheritdoc />
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return ((IEnumerable)_set).GetEnumerator();
-        }
-
-        /// <summary>
         /// Copies the live set contents into the serialized backing array before Unity or ProtoBuf serialization.
         /// </summary>
         /// <remarks>
@@ -781,6 +722,89 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             _set.CopyTo(_items, 0);
             _preserveSerializedEntries = true;
             _itemsDirty = false;
+        }
+
+        /// <summary>
+        /// Reconstructs the live set from the serialized array after Unity or ProtoBuf deserialization.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The serialized array represents the user-defined order of elements as they appear in the Unity inspector.
+        /// This order is preserved across domain reloads and serialization cycles. The internal set maintains its
+        /// natural ordering for efficient operations, but the serialized array always reflects the user's intended order.
+        /// </para>
+        /// </remarks>
+        /// <example>
+        /// <code>
+        /// hashSet.OnAfterDeserialize();
+        /// bool contains = hashSet.Contains(item);
+        /// </code>
+        /// </example>
+        public void OnAfterDeserialize()
+        {
+            OnAfterDeserializeInternal(suppressWarnings: false);
+        }
+
+        /// <summary>
+        /// Allows derived types to substitute custom lookup behavior (for example, when values are wrapped).
+        /// </summary>
+        /// <param name="equalValue">The candidate value.</param>
+        /// <param name="actualValue">Receives the resolved value.</param>
+        /// <returns><c>true</c> when the derived type resolved a match.</returns>
+        /// <example>
+        /// <code><![CDATA[
+        /// protected override bool TryGetValueCore(string equalValue, out string actualValue)
+        /// {
+        ///     foreach (string stored in SerializedItems)
+        ///     {
+        ///         if (string.Equals(stored, equalValue, StringComparison.OrdinalIgnoreCase))
+        ///         {
+        ///             actualValue = stored;
+        ///             return true;
+        ///         }
+        ///     }
+        ///     actualValue = null;
+        ///     return false;
+        /// }
+        /// ]]></code>
+        /// </example>
+        protected virtual bool TryGetValueCore(T equalValue, out T actualValue)
+        {
+            actualValue = default;
+            return false;
+        }
+
+        /// <summary>
+        /// Allows derived types to customize how batch removals are handled.
+        /// </summary>
+        /// <param name="match">The predicate describing which elements to remove.</param>
+        /// <returns>The number of removed elements.</returns>
+        protected virtual int RemoveWhereInternal(Predicate<T> match)
+        {
+            using PooledResource<List<T>> bufferResource = Buffers<T>.List.Get(out List<T> buffer);
+            foreach (T value in _set)
+            {
+                if (match(value))
+                {
+                    buffer.Add(value);
+                }
+            }
+
+            foreach (T value in buffer)
+            {
+                _set.Remove(value);
+            }
+
+            return buffer.Count;
+        }
+
+        /// <summary>
+        /// Tracks a newly added item for order preservation during serialization.
+        /// </summary>
+        private void TrackNewItem(T item)
+        {
+            _newItemsOrder ??= new List<T>();
+            _newItemsOrder.Add(item);
         }
 
         /// <summary>
@@ -859,32 +883,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             _newItemsOrder?.Clear();
         }
 
-        /// <summary>
-        /// Reconstructs the live set from the serialized array after Unity or ProtoBuf deserialization.
-        /// </summary>
-        /// <remarks>
-        /// <para>
-        /// The serialized array represents the user-defined order of elements as they appear in the Unity inspector.
-        /// This order is preserved across domain reloads and serialization cycles. The internal set maintains its
-        /// natural ordering for efficient operations, but the serialized array always reflects the user's intended order.
-        /// </para>
-        /// </remarks>
-        /// <example>
-        /// <code>
-        /// hashSet.OnAfterDeserialize();
-        /// bool contains = hashSet.Contains(item);
-        /// </code>
-        /// </example>
-        public void OnAfterDeserialize()
-        {
-            OnAfterDeserializeInternal(suppressWarnings: false);
-        }
-
-        void ISerializableSetEditorSync.EditorAfterDeserialize()
-        {
-            OnAfterDeserializeInternal(suppressWarnings: true);
-        }
-
         private void OnAfterDeserializeInternal(bool suppressWarnings)
         {
             if (_items == null)
@@ -927,23 +925,26 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             _hasDuplicatesOrNulls = hasDuplicates || encounteredNullReference;
         }
 
-        private static bool TypeSupportsNullReferences(Type type)
+        void ICollection<T>.Add(T item)
         {
-            return type != null
-                && (!type.IsValueType || typeof(UnityEngine.Object).IsAssignableFrom(type));
+            Add(item);
         }
 
-        private static void LogNullEntrySkip(int index)
+        /// <inheritdoc />
+        IEnumerator<T> IEnumerable<T>.GetEnumerator()
         {
-#if UNITY_EDITOR
-            if (!EditorShouldLog())
-            {
-                return;
-            }
-#endif
-            Debug.LogWarning(
-                $"SerializableSet<{typeof(T).FullName}> skipped serialized entry at index {index} because the value reference was null."
-            );
+            return _set.GetEnumerator();
+        }
+
+        /// <inheritdoc />
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return ((IEnumerable)_set).GetEnumerator();
+        }
+
+        void ISerializableSetEditorSync.EditorAfterDeserialize()
+        {
+            OnAfterDeserializeInternal(suppressWarnings: true);
         }
 
 #if UNITY_EDITOR
@@ -959,6 +960,54 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             }
         }
 #endif
+
+        Type ISerializableSetInspector.ElementType => typeof(T);
+
+        int ISerializableSetInspector.UniqueCount => _set.Count;
+
+        int ISerializableSetInspector.SerializedCount => _items?.Length ?? _set.Count;
+
+        bool ISerializableSetInspector.SupportsSorting => SupportsSorting;
+
+        /// <summary>
+        /// Completes deserialization after <see cref="SerializationInfo"/> data has been applied.
+        /// </summary>
+        /// <param name="sender">Reserved for future use.</param>
+        public void OnDeserialization(object sender)
+        {
+            if (_set is IDeserializationCallback callback)
+            {
+                callback.OnDeserialization(sender);
+            }
+        }
+
+        /// <summary>
+        /// Writes the serialized representation of the set into a <see cref="SerializationInfo"/> instance.
+        /// </summary>
+        /// <param name="info">The serialization store to populate.</param>
+        /// <param name="context">Context for the serialization process.</param>
+        public void GetObjectData(SerializationInfo info, StreamingContext context)
+        {
+            if (_set is ISerializable serializable)
+            {
+                serializable.GetObjectData(info, context);
+            }
+        }
+
+        /// <summary>
+        /// Returns a JSON string describing the serialized items for quick debugging.
+        /// </summary>
+        /// <returns>A JSON representation of the set.</returns>
+        /// <example>
+        /// <code><![CDATA[
+        /// SerializableHashSet<string> storyUnlocks = new SerializableHashSet<string>();
+        /// string snapshot = storyUnlocks.ToString();
+        /// ]]></code>
+        /// </example>
+        public override string ToString()
+        {
+            return this.ToJson();
+        }
 
         [ProtoBeforeSerialization]
         protected internal void OnProtoBeforeSerialization()
@@ -998,31 +1047,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             OnAfterDeserialize();
         }
 
-        /// <summary>
-        /// Completes deserialization after <see cref="SerializationInfo"/> data has been applied.
-        /// </summary>
-        /// <param name="sender">Reserved for future use.</param>
-        public void OnDeserialization(object sender)
-        {
-            if (_set is IDeserializationCallback callback)
-            {
-                callback.OnDeserialization(sender);
-            }
-        }
-
-        /// <summary>
-        /// Writes the serialized representation of the set into a <see cref="SerializationInfo"/> instance.
-        /// </summary>
-        /// <param name="info">The serialization store to populate.</param>
-        /// <param name="context">Context for the serialization process.</param>
-        public void GetObjectData(SerializationInfo info, StreamingContext context)
-        {
-            if (_set is ISerializable serializable)
-            {
-                serializable.GetObjectData(info, context);
-            }
-        }
-
         protected void MarkSerializationCacheDirty()
         {
             _preserveSerializedEntries = false;
@@ -1032,28 +1056,65 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             // Retain serialized items as the ordering source for the next sync.
         }
 
-        /// <summary>
-        /// Returns a JSON string describing the serialized items for quick debugging.
-        /// </summary>
-        /// <returns>A JSON representation of the set.</returns>
-        /// <example>
-        /// <code><![CDATA[
-        /// SerializableHashSet<string> storyUnlocks = new SerializableHashSet<string>();
-        /// string snapshot = storyUnlocks.ToString();
-        /// ]]></code>
-        /// </example>
-        public override string ToString()
+        private bool TryConvertToElement(object value, out T result)
         {
-            return this.ToJson();
+            if (value is T typedValue)
+            {
+                result = typedValue;
+                return true;
+            }
+
+            if (value == null)
+            {
+                if (default(T) == null)
+                {
+                    result = default;
+                    return true;
+                }
+
+                result = default;
+                return false;
+            }
+
+            Type elementType = typeof(T);
+
+            if (elementType.IsInstanceOfType(value))
+            {
+                result = (T)value;
+                return true;
+            }
+
+            try
+            {
+                if (elementType.IsEnum)
+                {
+                    if (value is string enumName)
+                    {
+                        result = (T)Enum.Parse(elementType, enumName);
+                        return true;
+                    }
+
+                    object enumValue = Enum.ToObject(elementType, value);
+                    result = (T)enumValue;
+                    return true;
+                }
+
+                if (value is IConvertible)
+                {
+                    object converted = Convert.ChangeType(
+                        value,
+                        elementType,
+                        CultureInfo.InvariantCulture
+                    );
+                    result = (T)converted;
+                    return true;
+                }
+            }
+            catch { }
+
+            result = default;
+            return false;
         }
-
-        Type ISerializableSetInspector.ElementType => typeof(T);
-
-        int ISerializableSetInspector.UniqueCount => _set.Count;
-
-        int ISerializableSetInspector.SerializedCount => _items?.Length ?? _set.Count;
-
-        bool ISerializableSetInspector.SupportsSorting => SupportsSorting;
 
         bool ISerializableSetInspector.TryAddElement(object value, out object normalizedValue)
         {
@@ -1184,66 +1245,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             OnBeforeSerialize();
         }
 
-        private bool TryConvertToElement(object value, out T result)
-        {
-            if (value is T typedValue)
-            {
-                result = typedValue;
-                return true;
-            }
-
-            if (value == null)
-            {
-                if (default(T) == null)
-                {
-                    result = default;
-                    return true;
-                }
-
-                result = default;
-                return false;
-            }
-
-            Type elementType = typeof(T);
-
-            if (elementType.IsInstanceOfType(value))
-            {
-                result = (T)value;
-                return true;
-            }
-
-            try
-            {
-                if (elementType.IsEnum)
-                {
-                    if (value is string enumName)
-                    {
-                        result = (T)Enum.Parse(elementType, enumName);
-                        return true;
-                    }
-
-                    object enumValue = Enum.ToObject(elementType, value);
-                    result = (T)enumValue;
-                    return true;
-                }
-
-                if (value is IConvertible)
-                {
-                    object converted = Convert.ChangeType(
-                        value,
-                        elementType,
-                        CultureInfo.InvariantCulture
-                    );
-                    result = (T)converted;
-                    return true;
-                }
-            }
-            catch { }
-
-            result = default;
-            return false;
-        }
-
         /// <summary>
         /// Unity inspector helper for identifying serialized array property names.
         /// </summary>
@@ -1280,6 +1281,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     [Serializable]
     public class SerializableHashSet<T> : SerializableSetBase<T, HashSet<T>>
     {
+        /// <summary>
+        /// Gets the equality comparer used by the underlying hash set.
+        /// </summary>
+        public IEqualityComparer<T> Comparer => Set.Comparer;
+
+        /// <inheritdoc />
+        protected override IEqualityComparer<T> SetComparer => Set.Comparer;
+
         /// <summary>
         /// Initializes an empty hash set compatible with Unity and ProtoBuf serialization.
         /// </summary>
@@ -1320,14 +1329,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 (serializationInfo, streamingContext) =>
                     new StorageSet(serializationInfo, streamingContext)
             ) { }
-
-        /// <summary>
-        /// Gets the equality comparer used by the underlying hash set.
-        /// </summary>
-        public IEqualityComparer<T> Comparer => Set.Comparer;
-
-        /// <inheritdoc />
-        protected override IEqualityComparer<T> SetComparer => Set.Comparer;
 
         /// <summary>
         /// Creates a new <see cref="global::System.Collections.Generic.HashSet{T}"/> populated with this set's contents.

@@ -93,15 +93,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         [WProtoMember(7)]
         internal ulong _s1;
 
-        private void EnsureNonZeroState()
-        {
-            if ((_s0 | _s1) == 0)
-            {
-                _s0 = 0x9E3779B97F4A7C15UL;
-                _s1 = 0xD1B54A32D192ED03UL;
-            }
-        }
-
         public XoroShiroRandom()
             : this(Guid.NewGuid()) { }
 
@@ -129,9 +120,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             EnsureNonZeroState();
         }
 
-        protected override void OnAfterDeserialization()
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static ulong Rotl(ulong x, int k)
         {
-            EnsureNonZeroState();
+            return (x << k) | (x >> (64 - k));
         }
 
         public override uint NextUint()
@@ -154,12 +146,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         public override IRandom Copy()
         {
             return new XoroShiroRandom(InternalState);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong Rotl(ulong x, int k)
-        {
-            return (x << k) | (x >> (64 - k));
         }
 
         public override bool Equals(object obj)
@@ -206,6 +192,20 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
 
             return _s1.CompareTo(other._s1);
+        }
+
+        protected override void OnAfterDeserialization()
+        {
+            EnsureNonZeroState();
+        }
+
+        private void EnsureNonZeroState()
+        {
+            if ((_s0 | _s1) == 0)
+            {
+                _s0 = 0x9E3779B97F4A7C15UL;
+                _s1 = 0xD1B54A32D192ED03UL;
+            }
         }
     }
 }

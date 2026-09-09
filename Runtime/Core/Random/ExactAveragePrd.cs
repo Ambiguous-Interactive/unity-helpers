@@ -17,10 +17,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// </remarks>
     public sealed class ExactAveragePrd
     {
-        private const int SolverIterations = 48;
-        private const double SurvivalEpsilon = 1e-14d;
-        private const int ExpectedAttemptSafetyLimit = 10_000_000;
-
         /// <summary>
         /// The smallest non-zero target chance supported by the bounded coefficient solver.
         /// </summary>
@@ -29,6 +25,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// <see cref="WeightedShuffleBag{T}"/> so construction remains predictable in gameplay code.
         /// </remarks>
         public const float MinimumPositiveTargetChance = 0.0001f;
+
+        private const int SolverIterations = 48;
+        private const double SurvivalEpsilon = 1e-14d;
+        private const int ExpectedAttemptSafetyLimit = 10_000_000;
 
         /// <summary>
         /// Gets the configured long-run success chance.
@@ -128,6 +128,78 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             return true;
         }
 
+        private static float SolveCoefficient(float targetChance)
+        {
+            double low = 0d;
+            double high = targetChance;
+            double targetExpectedAttempts = 1d / targetChance;
+
+            for (int i = 0; i < SolverIterations; ++i)
+            {
+                double candidate = (low + high) * 0.5d;
+                double expectedAttempts = EstimateExpectedAttempts(candidate);
+                if (targetExpectedAttempts < expectedAttempts)
+                {
+                    low = candidate;
+                }
+                else
+                {
+                    high = candidate;
+                }
+            }
+
+            return (float)((low + high) * 0.5d);
+        }
+
+        private static double EstimateExpectedAttempts(double coefficient)
+        {
+            if (coefficient <= 0d)
+            {
+                return double.PositiveInfinity;
+            }
+
+            double expectedAttempts = 0d;
+            double survival = 1d;
+            for (int attempt = 1; attempt <= ExpectedAttemptSafetyLimit; ++attempt)
+            {
+                expectedAttempts += survival;
+                double chance = coefficient * attempt;
+                if (1d <= chance)
+                {
+                    return expectedAttempts;
+                }
+
+                survival *= 1d - chance;
+                if (survival <= SurvivalEpsilon)
+                {
+                    return expectedAttempts;
+                }
+            }
+
+            return expectedAttempts;
+        }
+
+        private static int ResolveGuaranteedAttempt(float coefficient)
+        {
+            if (coefficient <= 0f)
+            {
+                return int.MaxValue;
+            }
+
+            double attempt = Math.Ceiling(1d / coefficient);
+            if (int.MaxValue <= attempt)
+            {
+                return int.MaxValue;
+            }
+
+            return Math.Max(1, (int)attempt);
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
+        }
+
         /// <summary>
         /// Gets the success chance for a one-based attempt number.
         /// </summary>
@@ -199,78 +271,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
             FailuresSinceSuccess = failuresSinceSuccess;
             return true;
-        }
-
-        private static float SolveCoefficient(float targetChance)
-        {
-            double low = 0d;
-            double high = targetChance;
-            double targetExpectedAttempts = 1d / targetChance;
-
-            for (int i = 0; i < SolverIterations; ++i)
-            {
-                double candidate = (low + high) * 0.5d;
-                double expectedAttempts = EstimateExpectedAttempts(candidate);
-                if (targetExpectedAttempts < expectedAttempts)
-                {
-                    low = candidate;
-                }
-                else
-                {
-                    high = candidate;
-                }
-            }
-
-            return (float)((low + high) * 0.5d);
-        }
-
-        private static double EstimateExpectedAttempts(double coefficient)
-        {
-            if (coefficient <= 0d)
-            {
-                return double.PositiveInfinity;
-            }
-
-            double expectedAttempts = 0d;
-            double survival = 1d;
-            for (int attempt = 1; attempt <= ExpectedAttemptSafetyLimit; ++attempt)
-            {
-                expectedAttempts += survival;
-                double chance = coefficient * attempt;
-                if (1d <= chance)
-                {
-                    return expectedAttempts;
-                }
-
-                survival *= 1d - chance;
-                if (survival <= SurvivalEpsilon)
-                {
-                    return expectedAttempts;
-                }
-            }
-
-            return expectedAttempts;
-        }
-
-        private static int ResolveGuaranteedAttempt(float coefficient)
-        {
-            if (coefficient <= 0f)
-            {
-                return int.MaxValue;
-            }
-
-            double attempt = Math.Ceiling(1d / coefficient);
-            if (int.MaxValue <= attempt)
-            {
-                return int.MaxValue;
-            }
-
-            return Math.Max(1, (int)attempt);
-        }
-
-        private static bool IsFinite(float value)
-        {
-            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
 
         private void IncrementFailures()

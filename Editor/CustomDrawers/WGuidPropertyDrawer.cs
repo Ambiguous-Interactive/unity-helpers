@@ -47,6 +47,101 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             .Build();
         private static readonly GUIContent GenerateContent = CreateGenerateContent();
 
+        internal static void HandleTextChange(
+            SerializedProperty property,
+            SerializedProperty lowProperty,
+            SerializedProperty highProperty,
+            DrawerState state,
+            string incoming
+        )
+        {
+            string normalizedInput = incoming ?? string.Empty;
+            string trimmed = normalizedInput.Trim();
+            state.displayText = normalizedInput;
+
+            if (string.IsNullOrEmpty(trimmed))
+            {
+                WGuid empty = WGuid.EmptyGuid;
+                UpdateGuidValue(property, lowProperty, highProperty, empty, ClearUndoLabel);
+                string serializedText = ConvertToString(
+                    lowProperty.longValue,
+                    highProperty.longValue
+                );
+                state.displayText = serializedText;
+                state.serializedText = serializedText;
+                state.hasPendingInvalid = false;
+                state.warningMessage = string.Empty;
+                return;
+            }
+
+            if (!Guid.TryParse(trimmed, out _))
+            {
+                state.hasPendingInvalid = true;
+                state.warningMessage = InvalidGuidWarning;
+                return;
+            }
+
+            try
+            {
+                if (!WGuid.TryParse(trimmed, out WGuid parsed))
+                {
+                    state.hasPendingInvalid = true;
+                    state.warningMessage = VersionFourWarning;
+                    return;
+                }
+
+                UpdateGuidValue(property, lowProperty, highProperty, parsed, SetUndoLabel);
+                string normalized = parsed.ToString();
+                state.displayText = normalized;
+                state.serializedText = normalized;
+                state.hasPendingInvalid = false;
+                state.warningMessage = string.Empty;
+            }
+            catch (FormatException e)
+            {
+                state.hasPendingInvalid = true;
+                state.warningMessage = e.Message;
+            }
+        }
+
+        internal static void GenerateNewGuid(
+            SerializedProperty property,
+            SerializedProperty lowProperty,
+            SerializedProperty highProperty,
+            DrawerState state
+        )
+        {
+            WGuid generated = WGuid.NewGuid();
+            UpdateGuidValue(property, lowProperty, highProperty, generated, GenerateUndoLabel);
+            string normalized = generated.ToString();
+            state.displayText = normalized;
+            state.serializedText = normalized;
+            state.hasPendingInvalid = false;
+            state.warningMessage = string.Empty;
+        }
+
+        internal static string ConvertToString(long low, long high)
+        {
+            Span<byte> buffer = stackalloc byte[16];
+            ulong lowUnsigned = unchecked((ulong)low);
+            ulong highUnsigned = unchecked((ulong)high);
+            BinaryPrimitives.WriteUInt64LittleEndian(buffer.Slice(0, 8), lowUnsigned);
+            BinaryPrimitives.WriteUInt64LittleEndian(buffer.Slice(8, 8), highUnsigned);
+            Guid guid = new(buffer);
+            return guid.ToString();
+        }
+
+        internal static DrawerState GetState(SerializedProperty property)
+        {
+            string key = property.propertyPath;
+            return States.GetOrAdd(key, static _ => new DrawerState());
+        }
+
+        internal static void ClearCachedStates()
+        {
+            States.Clear();
+        }
+
         private static void GetCachedProperties(
             SerializedProperty property,
             DrawerState state,
@@ -102,6 +197,71 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             catch (Exception)
             {
                 return false;
+            }
+        }
+
+        private static void UpdateGuidValue(
+            SerializedProperty property,
+            SerializedProperty lowProperty,
+            SerializedProperty highProperty,
+            WGuid value,
+            string undoLabel
+        )
+        {
+            SerializedObject serializedObject = property.serializedObject;
+            UnityEngine.Object[] targets = serializedObject.targetObjects;
+            if (targets is { Length: > 0 })
+            {
+                Undo.RecordObjects(targets, undoLabel);
+            }
+
+            Span<byte> buffer = stackalloc byte[16];
+            bool success = value.TryWriteBytes(buffer);
+            if (!success)
+            {
+                throw new InvalidOperationException($"Failed to write {nameof(WGuid)} bytes.");
+            }
+
+            ulong low = BinaryPrimitives.ReadUInt64LittleEndian(buffer.Slice(0, 8));
+            ulong high = BinaryPrimitives.ReadUInt64LittleEndian(buffer.Slice(8, 8));
+            lowProperty.longValue = unchecked((long)low);
+            highProperty.longValue = unchecked((long)high);
+
+            serializedObject.ApplyModifiedProperties();
+            serializedObject.UpdateIfRequiredOrScript();
+        }
+
+        private static GUIContent CreateGenerateContent()
+        {
+            string tooltip = $"Generate a new {nameof(WGuid)} (v4).";
+            GUIContent content = EditorGUIUtility.IconContent("Refresh", tooltip);
+            if (content == null)
+            {
+                return new GUIContent("New", tooltip);
+            }
+
+            if (content.image == null && string.IsNullOrEmpty(content.text))
+            {
+                content.text = "New";
+            }
+
+            if (string.IsNullOrEmpty(content.tooltip))
+            {
+                content.tooltip = tooltip;
+            }
+
+            return content;
+        }
+
+        private static float GetWarningWidth()
+        {
+            try
+            {
+                return EditorGUIUtility.currentViewWidth;
+            }
+            catch (ArgumentException)
+            {
+                return 400f;
             }
         }
 
@@ -232,166 +392,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             EditorGUI.EndProperty();
-        }
-
-        internal static void HandleTextChange(
-            SerializedProperty property,
-            SerializedProperty lowProperty,
-            SerializedProperty highProperty,
-            DrawerState state,
-            string incoming
-        )
-        {
-            string normalizedInput = incoming ?? string.Empty;
-            string trimmed = normalizedInput.Trim();
-            state.displayText = normalizedInput;
-
-            if (string.IsNullOrEmpty(trimmed))
-            {
-                WGuid empty = WGuid.EmptyGuid;
-                UpdateGuidValue(property, lowProperty, highProperty, empty, ClearUndoLabel);
-                string serializedText = ConvertToString(
-                    lowProperty.longValue,
-                    highProperty.longValue
-                );
-                state.displayText = serializedText;
-                state.serializedText = serializedText;
-                state.hasPendingInvalid = false;
-                state.warningMessage = string.Empty;
-                return;
-            }
-
-            if (!Guid.TryParse(trimmed, out _))
-            {
-                state.hasPendingInvalid = true;
-                state.warningMessage = InvalidGuidWarning;
-                return;
-            }
-
-            try
-            {
-                if (!WGuid.TryParse(trimmed, out WGuid parsed))
-                {
-                    state.hasPendingInvalid = true;
-                    state.warningMessage = VersionFourWarning;
-                    return;
-                }
-
-                UpdateGuidValue(property, lowProperty, highProperty, parsed, SetUndoLabel);
-                string normalized = parsed.ToString();
-                state.displayText = normalized;
-                state.serializedText = normalized;
-                state.hasPendingInvalid = false;
-                state.warningMessage = string.Empty;
-            }
-            catch (FormatException e)
-            {
-                state.hasPendingInvalid = true;
-                state.warningMessage = e.Message;
-            }
-        }
-
-        internal static void GenerateNewGuid(
-            SerializedProperty property,
-            SerializedProperty lowProperty,
-            SerializedProperty highProperty,
-            DrawerState state
-        )
-        {
-            WGuid generated = WGuid.NewGuid();
-            UpdateGuidValue(property, lowProperty, highProperty, generated, GenerateUndoLabel);
-            string normalized = generated.ToString();
-            state.displayText = normalized;
-            state.serializedText = normalized;
-            state.hasPendingInvalid = false;
-            state.warningMessage = string.Empty;
-        }
-
-        private static void UpdateGuidValue(
-            SerializedProperty property,
-            SerializedProperty lowProperty,
-            SerializedProperty highProperty,
-            WGuid value,
-            string undoLabel
-        )
-        {
-            SerializedObject serializedObject = property.serializedObject;
-            UnityEngine.Object[] targets = serializedObject.targetObjects;
-            if (targets is { Length: > 0 })
-            {
-                Undo.RecordObjects(targets, undoLabel);
-            }
-
-            Span<byte> buffer = stackalloc byte[16];
-            bool success = value.TryWriteBytes(buffer);
-            if (!success)
-            {
-                throw new InvalidOperationException($"Failed to write {nameof(WGuid)} bytes.");
-            }
-
-            ulong low = BinaryPrimitives.ReadUInt64LittleEndian(buffer.Slice(0, 8));
-            ulong high = BinaryPrimitives.ReadUInt64LittleEndian(buffer.Slice(8, 8));
-            lowProperty.longValue = unchecked((long)low);
-            highProperty.longValue = unchecked((long)high);
-
-            serializedObject.ApplyModifiedProperties();
-            serializedObject.UpdateIfRequiredOrScript();
-        }
-
-        internal static string ConvertToString(long low, long high)
-        {
-            Span<byte> buffer = stackalloc byte[16];
-            ulong lowUnsigned = unchecked((ulong)low);
-            ulong highUnsigned = unchecked((ulong)high);
-            BinaryPrimitives.WriteUInt64LittleEndian(buffer.Slice(0, 8), lowUnsigned);
-            BinaryPrimitives.WriteUInt64LittleEndian(buffer.Slice(8, 8), highUnsigned);
-            Guid guid = new(buffer);
-            return guid.ToString();
-        }
-
-        internal static DrawerState GetState(SerializedProperty property)
-        {
-            string key = property.propertyPath;
-            return States.GetOrAdd(key, static _ => new DrawerState());
-        }
-
-        internal static void ClearCachedStates()
-        {
-            States.Clear();
-        }
-
-        private static GUIContent CreateGenerateContent()
-        {
-            string tooltip = $"Generate a new {nameof(WGuid)} (v4).";
-            GUIContent content = EditorGUIUtility.IconContent("Refresh", tooltip);
-            if (content == null)
-            {
-                return new GUIContent("New", tooltip);
-            }
-
-            if (content.image == null && string.IsNullOrEmpty(content.text))
-            {
-                content.text = "New";
-            }
-
-            if (string.IsNullOrEmpty(content.tooltip))
-            {
-                content.tooltip = tooltip;
-            }
-
-            return content;
-        }
-
-        private static float GetWarningWidth()
-        {
-            try
-            {
-                return EditorGUIUtility.currentViewWidth;
-            }
-            catch (ArgumentException)
-            {
-                return 400f;
-            }
         }
 
         internal sealed class DrawerState

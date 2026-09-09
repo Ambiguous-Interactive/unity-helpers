@@ -12,10 +12,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
     /// </summary>
     public sealed class RelationalPrivateNameDerived : RelationalPrivateNameBase
     {
-        [SiblingComponent]
-        private BoxCollider _collider;
-
         /// <summary>The field this subclass declared.</summary>
         public BoxCollider DerivedCollider => _collider;
+
+        [SiblingComponent]
+        private BoxCollider _collider;
     }
 }

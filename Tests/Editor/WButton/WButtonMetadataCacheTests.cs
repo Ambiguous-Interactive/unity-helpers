@@ -21,6 +21,20 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
     [NUnit.Framework.Category("Integration")]
     public sealed class WButtonMetadataCacheTests : CommonTestBase
     {
+        private static int FindDictionaryKeyIndex(SerializedProperty keysProperty, string key)
+        {
+            for (int index = 0; index < keysProperty.arraySize; index++)
+            {
+                SerializedProperty keyProperty = keysProperty.GetArrayElementAtIndex(index);
+                if (string.Equals(keyProperty.stringValue, key, StringComparison.OrdinalIgnoreCase))
+                {
+                    return index;
+                }
+            }
+
+            return -1;
+        }
+
         [Test]
         public void MetadataSortedByDrawOrder()
         {
@@ -228,20 +242,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 serialized.ApplyModifiedPropertiesWithoutUndo();
                 settings.SaveSettings();
             }
-        }
-
-        private static int FindDictionaryKeyIndex(SerializedProperty keysProperty, string key)
-        {
-            for (int index = 0; index < keysProperty.arraySize; index++)
-            {
-                SerializedProperty keyProperty = keysProperty.GetArrayElementAtIndex(index);
-                if (string.Equals(keyProperty.stringValue, key, StringComparison.OrdinalIgnoreCase))
-                {
-                    return index;
-                }
-            }
-
-            return -1;
         }
     }
 }

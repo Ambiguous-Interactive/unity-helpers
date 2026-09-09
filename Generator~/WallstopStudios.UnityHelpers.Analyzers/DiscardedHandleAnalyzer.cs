@@ -46,14 +46,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 UnityHelpersDiagnostics.DiscardedCoroutineHandle
             );
 
-        /// <inheritdoc />
-        public override void Initialize(AnalysisContext context)
-        {
-            context.EnableConcurrentExecution();
-            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
-            context.RegisterCompilationStartAction(OnCompilationStart);
-        }
-
         private static void OnCompilationStart(CompilationStartAnalysisContext context)
         {
             INamedTypeSymbol coroutine = context.Compilation.GetTypeByMetadataName(
@@ -169,6 +161,14 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             }
 
             return type;
+        }
+
+        /// <inheritdoc />
+        public override void Initialize(AnalysisContext context)
+        {
+            context.EnableConcurrentExecution();
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+            context.RegisterCompilationStartAction(OnCompilationStart);
         }
     }
 }

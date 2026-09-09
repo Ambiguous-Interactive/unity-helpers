@@ -24,17 +24,15 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         // Reseed each test so a failing tree can be reproduced alone or within the fixture.
         private const uint RandomSeed = 0x5EED0201;
 
-        private IRandom _random = new PcgRandom(RandomSeed);
-
         private IRandom Random => _random;
+
+        private IRandom _random = new PcgRandom(RandomSeed);
 
         [SetUp]
         public void SeedSpatialTree2DRandom()
         {
             _random = new PcgRandom(RandomSeed);
         }
-
-        protected abstract TTree CreateTree(IEnumerable<Vector2> points);
 
         [Test]
         public void WarmRangeQueriesDoNotAllocate()
@@ -591,5 +589,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             );
             Assert.IsEmpty(results);
         }
+
+        protected abstract TTree CreateTree(IEnumerable<Vector2> points);
     }
 }

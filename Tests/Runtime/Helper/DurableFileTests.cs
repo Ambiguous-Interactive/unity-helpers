@@ -24,6 +24,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
         private string _testDirectory;
 
+        // A directory at the staging path forces the interrupted-write branch without killing the process.
+        private static void BlockStaging(string path)
+        {
+            Directory.CreateDirectory(path + DurableFile.TemporarySuffix);
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -531,12 +537,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             string path = Path.Combine(_testDirectory, fileName);
             File.WriteAllText(path, contents);
             return path;
-        }
-
-        // A directory at the staging path forces the interrupted-write branch without killing the process.
-        private static void BlockStaging(string path)
-        {
-            Directory.CreateDirectory(path + DurableFile.TemporarySuffix);
         }
     }
 }

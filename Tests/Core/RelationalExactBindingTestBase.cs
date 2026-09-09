@@ -16,69 +16,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
     /// </summary>
     public abstract class RelationalExactBindingTestBase : CommonTestBase
     {
-        protected void VerifyExactTypeAssignment(int depth, bool inactive, int capability)
-        {
-            using IDisposable scope = ReflectionHelpers.OverrideReflectionCapabilities(
-                capability == 0,
-                capability == 1
-            );
-            SiblingComponentExtensions.ClearCachedFieldMetadata();
-            ParentComponentExtensions.ClearCachedFieldMetadata();
-            ChildComponentExtensions.ClearCachedFieldMetadata();
-            ReflectionHelpers.ClearFieldSetterCache();
-            GameObject root = CreateExactTypeCandidates("ExactRoot");
-            GameObject ancestor = root;
-            for (int level = 1; level < depth; level++)
-            {
-                GameObject next = CreateExactTypeCandidates("ExactAncestor");
-                next.transform.SetParent(ancestor.transform);
-                ancestor = next;
-            }
-            GameObject owner = CreateExactTypeCandidates("ExactOwner");
-            owner.transform.SetParent(ancestor.transform);
-            RelationalExactTypeTester tester = owner.AddComponent<RelationalExactTypeTester>();
-            GameObject first = CreateExactTypeCandidates("ExactFirstChild");
-            first.transform.SetParent(owner.transform);
-            GameObject grandchild = CreateExactTypeCandidates("ExactGrandchild");
-            grandchild.transform.SetParent(first.transform);
-            GameObject second = CreateExactTypeCandidates("ExactSecondChild");
-            second.transform.SetParent(owner.transform);
-            root.SetActive(!inactive);
-            AssertExactTypeAssignmentMatchesDirectQueries(tester);
-            AssertExactTypeAssignmentMatchesDirectQueries(tester);
-            CreateExactTypeCandidates("ExactUnrelated");
-            AssertExactTypeAssignmentMatchesDirectQueries(tester);
-            second.transform.SetAsFirstSibling();
-            AssertExactTypeAssignmentMatchesDirectQueries(tester);
-            foreach (RelationalExactComponent candidate in ExactComponentsOn(first.transform))
-            {
-                UnityEngine.Object.DestroyImmediate(candidate); // UNH-SUPPRESS: Rebinding must discard destroyed candidates before teardown.
-            }
-            foreach (RelationalExactComponent candidate in ExactComponentsOn(second.transform))
-            {
-                UnityEngine.Object.DestroyImmediate(candidate); // UNH-SUPPRESS: Rebinding must discard destroyed candidates before teardown.
-            }
-            AssertExactTypeAssignmentMatchesDirectQueries(tester);
-            foreach (
-                RelationalExactComponent candidate in root.GetComponentsInChildren<RelationalExactComponent>(
-                    true
-                )
-            )
-            {
-                UnityEngine.Object.DestroyImmediate(candidate); // UNH-SUPPRESS: Rebinding must discard destroyed candidates before teardown.
-            }
-            AssertExactTypeAssignmentMatchesDirectQueries(tester);
-        }
-
-        private GameObject CreateExactTypeCandidates(string name)
-        {
-            GameObject candidate = Track(new GameObject(name));
-            candidate.AddComponent<RelationalExactDerivedComponent>();
-            candidate.AddComponent<RelationalExactComponent>();
-            candidate.AddComponent<RelationalExactComponent>();
-            return candidate;
-        }
-
         private static void AssertExactTypeAssignmentMatchesDirectQueries(
             RelationalExactTypeTester tester
         )
@@ -168,6 +105,69 @@ namespace WallstopStudios.UnityHelpers.Tests.Core
                 }
             }
             return expected;
+        }
+
+        protected void VerifyExactTypeAssignment(int depth, bool inactive, int capability)
+        {
+            using IDisposable scope = ReflectionHelpers.OverrideReflectionCapabilities(
+                capability == 0,
+                capability == 1
+            );
+            SiblingComponentExtensions.ClearCachedFieldMetadata();
+            ParentComponentExtensions.ClearCachedFieldMetadata();
+            ChildComponentExtensions.ClearCachedFieldMetadata();
+            ReflectionHelpers.ClearFieldSetterCache();
+            GameObject root = CreateExactTypeCandidates("ExactRoot");
+            GameObject ancestor = root;
+            for (int level = 1; level < depth; level++)
+            {
+                GameObject next = CreateExactTypeCandidates("ExactAncestor");
+                next.transform.SetParent(ancestor.transform);
+                ancestor = next;
+            }
+            GameObject owner = CreateExactTypeCandidates("ExactOwner");
+            owner.transform.SetParent(ancestor.transform);
+            RelationalExactTypeTester tester = owner.AddComponent<RelationalExactTypeTester>();
+            GameObject first = CreateExactTypeCandidates("ExactFirstChild");
+            first.transform.SetParent(owner.transform);
+            GameObject grandchild = CreateExactTypeCandidates("ExactGrandchild");
+            grandchild.transform.SetParent(first.transform);
+            GameObject second = CreateExactTypeCandidates("ExactSecondChild");
+            second.transform.SetParent(owner.transform);
+            root.SetActive(!inactive);
+            AssertExactTypeAssignmentMatchesDirectQueries(tester);
+            AssertExactTypeAssignmentMatchesDirectQueries(tester);
+            CreateExactTypeCandidates("ExactUnrelated");
+            AssertExactTypeAssignmentMatchesDirectQueries(tester);
+            second.transform.SetAsFirstSibling();
+            AssertExactTypeAssignmentMatchesDirectQueries(tester);
+            foreach (RelationalExactComponent candidate in ExactComponentsOn(first.transform))
+            {
+                UnityEngine.Object.DestroyImmediate(candidate); // UNH-SUPPRESS: Rebinding must discard destroyed candidates before teardown.
+            }
+            foreach (RelationalExactComponent candidate in ExactComponentsOn(second.transform))
+            {
+                UnityEngine.Object.DestroyImmediate(candidate); // UNH-SUPPRESS: Rebinding must discard destroyed candidates before teardown.
+            }
+            AssertExactTypeAssignmentMatchesDirectQueries(tester);
+            foreach (
+                RelationalExactComponent candidate in root.GetComponentsInChildren<RelationalExactComponent>(
+                    true
+                )
+            )
+            {
+                UnityEngine.Object.DestroyImmediate(candidate); // UNH-SUPPRESS: Rebinding must discard destroyed candidates before teardown.
+            }
+            AssertExactTypeAssignmentMatchesDirectQueries(tester);
+        }
+
+        private GameObject CreateExactTypeCandidates(string name)
+        {
+            GameObject candidate = Track(new GameObject(name));
+            candidate.AddComponent<RelationalExactDerivedComponent>();
+            candidate.AddComponent<RelationalExactComponent>();
+            candidate.AddComponent<RelationalExactComponent>();
+            return candidate;
         }
     }
 }

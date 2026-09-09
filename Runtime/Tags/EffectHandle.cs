@@ -65,6 +65,12 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// </summary>
         public readonly long id;
 
+        private EffectHandle(long id, AttributeEffect effect)
+        {
+            this.id = id;
+            this.effect = effect;
+        }
+
         /// <summary>
         /// Creates a new EffectHandle instance with a unique ID for the specified effect.
         /// </summary>
@@ -78,12 +84,6 @@ namespace WallstopStudios.UnityHelpers.Tags
         internal static EffectHandle CreateInstanceInternal()
         {
             return new EffectHandle(Interlocked.Increment(ref Id), null);
-        }
-
-        private EffectHandle(long id, AttributeEffect effect)
-        {
-            this.id = id;
-            this.effect = effect;
         }
 
         /// <summary>

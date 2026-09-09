@@ -260,15 +260,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
     /// </summary>
     public static class AssetDatabaseBatchHelper
     {
-        private static readonly object Lock = new();
-        private static int _batchDepth;
-
-        /// <summary>
-        ///     Tracks the number of actual Unity AssetDatabase API calls we've made.
-        ///     This can differ from _batchDepth if code manually calls IncrementBatchDepth.
-        /// </summary>
-        private static int _actualUnityBatchDepth;
-
         /// <summary>
         ///     Gets a value indicating whether AssetDatabase operations are currently being batched.
         /// </summary>
@@ -311,6 +302,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 }
             }
         }
+
+        private static readonly object Lock = new();
+        private static int _batchDepth;
+
+        /// <summary>
+        ///     Tracks the number of actual Unity AssetDatabase API calls we've made.
+        ///     This can differ from _batchDepth if code manually calls IncrementBatchDepth.
+        /// </summary>
+        private static int _actualUnityBatchDepth;
 
         /// <summary>
         ///     Begins a new AssetDatabase batch scope. All asset operations within the scope
@@ -423,85 +423,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
                 return AssetDatabase.IsValidFolder(normalized);
             }
-        }
-
-        /// <summary>
-        ///     Ensures a single child folder segment exists in the AssetDatabase, robust to the
-        ///     common desync where the folder already exists on disk but has not yet been imported.
-        ///     Calling <see cref="AssetDatabase.CreateFolder(string, string)"/> blindly in that
-        ///     state either fails (empty GUID) or fabricates a numbered duplicate ("Name 1") that
-        ///     leaves the intended path invalid — the root cause of the "Failed to ensure folder"
-        ///     errors and the leftover "Name 1" duplicate folders. Must be called inside
-        ///     <see cref="PauseBatch"/> so the operations apply synchronously.
-        /// </summary>
-        /// <param name="parentFolder">The (already-valid) parent folder, e.g. <c>Assets/Resources</c>.</param>
-        /// <param name="childName">The single child segment to create, e.g. <c>Wallstop Studios</c>.</param>
-        /// <param name="childFolder">The full intended child path (<paramref name="parentFolder"/>/<paramref name="childName"/>).</param>
-        /// <returns><see langword="true"/> if <paramref name="childFolder"/> is a valid AssetDatabase folder afterwards.</returns>
-        private static bool EnsureSingleFolderSegment(
-            string parentFolder,
-            string childName,
-            string childFolder
-        )
-        {
-            // Import existing filesystem folders instead of creating numbered duplicates.
-            if (DirectoryExistsOnDisk(childFolder))
-            {
-                AssetDatabase.ImportAsset(childFolder, ImportAssetOptions.ForceSynchronousImport);
-                if (AssetDatabase.IsValidFolder(childFolder))
-                {
-                    return true;
-                }
-            }
-
-            string createdGuid = AssetDatabase.CreateFolder(parentFolder, childName);
-
-            // A creation race can produce a numbered duplicate; remove it if empty and adopt the intended folder.
-            if (!string.IsNullOrEmpty(createdGuid))
-            {
-                string createdPath = AssetDatabase.GUIDToAssetPath(createdGuid)?.SanitizePath();
-                if (
-                    !string.IsNullOrEmpty(createdPath)
-                    && !string.Equals(createdPath, childFolder, StringComparison.OrdinalIgnoreCase)
-                )
-                {
-                    AssetDatabase.DeleteAsset(createdPath);
-                    if (DirectoryExistsOnDisk(childFolder))
-                    {
-                        AssetDatabase.ImportAsset(
-                            childFolder,
-                            ImportAssetOptions.ForceSynchronousImport
-                        );
-                    }
-                }
-            }
-
-            return AssetDatabase.IsValidFolder(childFolder);
-        }
-
-        /// <summary>
-        ///     Returns <see langword="true"/> if the given Unity-relative asset folder path
-        ///     (rooted at <c>Assets</c>) exists as a directory on the project's filesystem,
-        ///     regardless of whether the AssetDatabase has imported it.
-        /// </summary>
-        private static bool DirectoryExistsOnDisk(string assetFolderPath)
-        {
-            if (string.IsNullOrEmpty(assetFolderPath))
-            {
-                return false;
-            }
-
-            string projectRoot = Path.GetDirectoryName(Application.dataPath);
-            if (string.IsNullOrEmpty(projectRoot))
-            {
-                return false;
-            }
-
-            string absolute = Path.Combine(
-                projectRoot,
-                assetFolderPath.Replace('/', Path.DirectorySeparatorChar)
-            );
-            return Directory.Exists(absolute);
         }
 
         /// <summary>
@@ -627,6 +548,85 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh(options);
             }
+        }
+
+        /// <summary>
+        ///     Temporarily pauses the current batch scope to allow asset operations that require
+        ///     immediate processing (like <see cref="AssetImporter.SaveAndReimport"/> or <see cref="AssetDatabase.ImportAsset(string)"/>).
+        /// </summary>
+        /// <returns>
+        ///     A disposable scope that resumes batch mode when disposed.
+        ///     If no batch was active, the returned scope does nothing on disposal.
+        /// </returns>
+        /// <remarks>
+        ///     <para>
+        ///     Use this method when you need to perform asset operations that require immediate processing
+        ///     while inside a batch scope. The typical pattern is:
+        ///     </para>
+        ///     <code>
+        ///     using (AssetDatabaseBatchHelper.BeginBatch())
+        ///     {
+        ///         // ... batch operations ...
+        ///         using (AssetDatabaseBatchHelper.PauseBatch())
+        ///         {
+        ///             // Operations here run outside of batch mode
+        ///             importer.SaveAndReimport();
+        ///         }
+        ///         // ... more batch operations (batch mode resumed) ...
+        ///     }
+        ///     </code>
+        ///     <para>
+        ///     This method properly tracks the pause state so the counters remain in sync with Unity's state.
+        ///     </para>
+        /// </remarks>
+        public static AssetDatabasePauseScope PauseBatch()
+        {
+            bool wasBatching;
+            lock (Lock)
+            {
+                wasBatching = 0 < _batchDepth && 0 < _actualUnityBatchDepth;
+                if (wasBatching)
+                {
+                    _actualUnityBatchDepth--;
+                }
+            }
+
+            if (wasBatching)
+            {
+                bool allowAutoRefreshFailed = false;
+
+                try
+                {
+                    AssetDatabase.AllowAutoRefresh();
+                }
+                catch (Exception allowAutoRefreshException)
+                {
+                    allowAutoRefreshFailed = true;
+                    Debug.LogError(
+                        $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.AllowAutoRefresh)} threw during {nameof(PauseBatch)}: {allowAutoRefreshException.Message}"
+                    );
+                }
+
+                try
+                {
+                    AssetDatabase.StopAssetEditing();
+                }
+                catch (Exception stopAssetEditingException)
+                {
+                    Debug.LogError(
+                        $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.StopAssetEditing)} threw during {nameof(PauseBatch)}: {stopAssetEditingException.Message}"
+                    );
+
+                    if (allowAutoRefreshFailed)
+                    {
+                        Debug.LogWarning(
+                            $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(PauseBatch)} completed with multiple errors. Unity AssetDatabase state may be inconsistent."
+                        );
+                    }
+                }
+            }
+
+            return new AssetDatabasePauseScope(wasBatching);
         }
 
         /// <summary>
@@ -877,85 +877,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         }
 
         /// <summary>
-        ///     Temporarily pauses the current batch scope to allow asset operations that require
-        ///     immediate processing (like <see cref="AssetImporter.SaveAndReimport"/> or <see cref="AssetDatabase.ImportAsset(string)"/>).
-        /// </summary>
-        /// <returns>
-        ///     A disposable scope that resumes batch mode when disposed.
-        ///     If no batch was active, the returned scope does nothing on disposal.
-        /// </returns>
-        /// <remarks>
-        ///     <para>
-        ///     Use this method when you need to perform asset operations that require immediate processing
-        ///     while inside a batch scope. The typical pattern is:
-        ///     </para>
-        ///     <code>
-        ///     using (AssetDatabaseBatchHelper.BeginBatch())
-        ///     {
-        ///         // ... batch operations ...
-        ///         using (AssetDatabaseBatchHelper.PauseBatch())
-        ///         {
-        ///             // Operations here run outside of batch mode
-        ///             importer.SaveAndReimport();
-        ///         }
-        ///         // ... more batch operations (batch mode resumed) ...
-        ///     }
-        ///     </code>
-        ///     <para>
-        ///     This method properly tracks the pause state so the counters remain in sync with Unity's state.
-        ///     </para>
-        /// </remarks>
-        public static AssetDatabasePauseScope PauseBatch()
-        {
-            bool wasBatching;
-            lock (Lock)
-            {
-                wasBatching = 0 < _batchDepth && 0 < _actualUnityBatchDepth;
-                if (wasBatching)
-                {
-                    _actualUnityBatchDepth--;
-                }
-            }
-
-            if (wasBatching)
-            {
-                bool allowAutoRefreshFailed = false;
-
-                try
-                {
-                    AssetDatabase.AllowAutoRefresh();
-                }
-                catch (Exception allowAutoRefreshException)
-                {
-                    allowAutoRefreshFailed = true;
-                    Debug.LogError(
-                        $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.AllowAutoRefresh)} threw during {nameof(PauseBatch)}: {allowAutoRefreshException.Message}"
-                    );
-                }
-
-                try
-                {
-                    AssetDatabase.StopAssetEditing();
-                }
-                catch (Exception stopAssetEditingException)
-                {
-                    Debug.LogError(
-                        $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.StopAssetEditing)} threw during {nameof(PauseBatch)}: {stopAssetEditingException.Message}"
-                    );
-
-                    if (allowAutoRefreshFailed)
-                    {
-                        Debug.LogWarning(
-                            $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(PauseBatch)} completed with multiple errors. Unity AssetDatabase state may be inconsistent."
-                        );
-                    }
-                }
-            }
-
-            return new AssetDatabasePauseScope(wasBatching);
-        }
-
-        /// <summary>
         ///     Resumes a previously paused batch scope.
         ///     This is called automatically by <see cref="AssetDatabasePauseScope.Dispose"/>.
         /// </summary>
@@ -1022,6 +943,85 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(ResumeBatch)} completed with partial success. StartAssetEditing: {startAssetEditingSucceeded}, DisallowAutoRefresh: {disallowAutoRefreshSucceeded}"
                 );
             }
+        }
+
+        /// <summary>
+        ///     Ensures a single child folder segment exists in the AssetDatabase, robust to the
+        ///     common desync where the folder already exists on disk but has not yet been imported.
+        ///     Calling <see cref="AssetDatabase.CreateFolder(string, string)"/> blindly in that
+        ///     state either fails (empty GUID) or fabricates a numbered duplicate ("Name 1") that
+        ///     leaves the intended path invalid — the root cause of the "Failed to ensure folder"
+        ///     errors and the leftover "Name 1" duplicate folders. Must be called inside
+        ///     <see cref="PauseBatch"/> so the operations apply synchronously.
+        /// </summary>
+        /// <param name="parentFolder">The (already-valid) parent folder, e.g. <c>Assets/Resources</c>.</param>
+        /// <param name="childName">The single child segment to create, e.g. <c>Wallstop Studios</c>.</param>
+        /// <param name="childFolder">The full intended child path (<paramref name="parentFolder"/>/<paramref name="childName"/>).</param>
+        /// <returns><see langword="true"/> if <paramref name="childFolder"/> is a valid AssetDatabase folder afterwards.</returns>
+        private static bool EnsureSingleFolderSegment(
+            string parentFolder,
+            string childName,
+            string childFolder
+        )
+        {
+            // Import existing filesystem folders instead of creating numbered duplicates.
+            if (DirectoryExistsOnDisk(childFolder))
+            {
+                AssetDatabase.ImportAsset(childFolder, ImportAssetOptions.ForceSynchronousImport);
+                if (AssetDatabase.IsValidFolder(childFolder))
+                {
+                    return true;
+                }
+            }
+
+            string createdGuid = AssetDatabase.CreateFolder(parentFolder, childName);
+
+            // A creation race can produce a numbered duplicate; remove it if empty and adopt the intended folder.
+            if (!string.IsNullOrEmpty(createdGuid))
+            {
+                string createdPath = AssetDatabase.GUIDToAssetPath(createdGuid)?.SanitizePath();
+                if (
+                    !string.IsNullOrEmpty(createdPath)
+                    && !string.Equals(createdPath, childFolder, StringComparison.OrdinalIgnoreCase)
+                )
+                {
+                    AssetDatabase.DeleteAsset(createdPath);
+                    if (DirectoryExistsOnDisk(childFolder))
+                    {
+                        AssetDatabase.ImportAsset(
+                            childFolder,
+                            ImportAssetOptions.ForceSynchronousImport
+                        );
+                    }
+                }
+            }
+
+            return AssetDatabase.IsValidFolder(childFolder);
+        }
+
+        /// <summary>
+        ///     Returns <see langword="true"/> if the given Unity-relative asset folder path
+        ///     (rooted at <c>Assets</c>) exists as a directory on the project's filesystem,
+        ///     regardless of whether the AssetDatabase has imported it.
+        /// </summary>
+        private static bool DirectoryExistsOnDisk(string assetFolderPath)
+        {
+            if (string.IsNullOrEmpty(assetFolderPath))
+            {
+                return false;
+            }
+
+            string projectRoot = Path.GetDirectoryName(Application.dataPath);
+            if (string.IsNullOrEmpty(projectRoot))
+            {
+                return false;
+            }
+
+            string absolute = Path.Combine(
+                projectRoot,
+                assetFolderPath.Replace('/', Path.DirectorySeparatorChar)
+            );
+            return Directory.Exists(absolute);
         }
     }
 #endif

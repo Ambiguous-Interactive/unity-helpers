@@ -38,6 +38,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// </summary>
         private const string DefaultSuppressionsPath = "ValidationSuppressions.txt";
 
+        internal string StatusForTesting => _status;
+
         private readonly List<ValidationFinding> _visible = new List<ValidationFinding>();
 
         // Reuse the snapshot buffer across search, filter, and result updates.
@@ -78,6 +80,45 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             window.titleContent = new GUIContent(WindowTitle);
             window.minSize = new Vector2(760f, 420f);
             window.Show();
+        }
+
+        private static void Reveal(ValidationFinding finding)
+        {
+            // Reimport can leave a managed reference to a destroyed native object.
+            if (finding.TryGetTarget(out Object target))
+            {
+                Selection.activeObject = target;
+                EditorGUIUtility.PingObject(target);
+                return;
+            }
+
+            Object reloaded = AssetDatabase.LoadMainAssetAtPath(finding.AssetPath);
+            if (reloaded != null)
+            {
+                Selection.activeObject = reloaded;
+                EditorGUIUtility.PingObject(reloaded);
+            }
+        }
+
+        private static string ReadOrEmpty(string path)
+        {
+            try
+            {
+                return File.Exists(path) ? File.ReadAllText(path) : string.Empty;
+            }
+            catch (IOException)
+            {
+                return string.Empty;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return string.Empty;
+            }
+        }
+
+        internal void CompleteForTesting(ValidationRun run)
+        {
+            Complete(run);
         }
 
         private void OnEnable()
@@ -142,24 +183,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
             _selected = index.Value;
             RefreshDetails();
-        }
-
-        private static void Reveal(ValidationFinding finding)
-        {
-            // Reimport can leave a managed reference to a destroyed native object.
-            if (finding.TryGetTarget(out Object target))
-            {
-                Selection.activeObject = target;
-                EditorGUIUtility.PingObject(target);
-                return;
-            }
-
-            Object reloaded = AssetDatabase.LoadMainAssetAtPath(finding.AssetPath);
-            if (reloaded != null)
-            {
-                Selection.activeObject = reloaded;
-                EditorGUIUtility.PingObject(reloaded);
-            }
         }
 
         /// <summary>
@@ -292,13 +315,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             Refresh();
         }
 
-        internal void CompleteForTesting(ValidationRun run)
-        {
-            Complete(run);
-        }
-
-        internal string StatusForTesting => _status;
-
         /// <summary>
         /// Shows the active run's progress, and the last status once nothing is running.
         /// </summary>
@@ -349,22 +365,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             _suppressions = ValidationSuppressions.Parse(ReadOrEmpty(DefaultSuppressionsPath));
             ValidationStatusSurfaces.SuppressionsChanged(_suppressions);
             Refresh();
-        }
-
-        private static string ReadOrEmpty(string path)
-        {
-            try
-            {
-                return File.Exists(path) ? File.ReadAllText(path) : string.Empty;
-            }
-            catch (IOException)
-            {
-                return string.Empty;
-            }
-            catch (UnauthorizedAccessException)
-            {
-                return string.Empty;
-            }
         }
 
         /// <summary>

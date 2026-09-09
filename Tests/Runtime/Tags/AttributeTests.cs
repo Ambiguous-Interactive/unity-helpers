@@ -13,6 +13,52 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
     [NUnit.Framework.Category("Fast")]
     public sealed class AttributeTests : AttributeTagsTestBase
     {
+        private static ModificationAction ActionFor(char action)
+        {
+            switch (action)
+            {
+                case 'A':
+                {
+                    return ModificationAction.Addition;
+                }
+                case 'M':
+                {
+                    return ModificationAction.Multiplication;
+                }
+                case 'O':
+                {
+                    return ModificationAction.Override;
+                }
+                default:
+                {
+                    throw new ArgumentOutOfRangeException(nameof(action), action, null);
+                }
+            }
+        }
+
+        private static float ValueFor(char action)
+        {
+            switch (action)
+            {
+                case 'A':
+                {
+                    return 5f;
+                }
+                case 'M':
+                {
+                    return 2f;
+                }
+                case 'O':
+                {
+                    return 42f;
+                }
+                default:
+                {
+                    throw new ArgumentOutOfRangeException(nameof(action), action, null);
+                }
+            }
+        }
+
         [SetUp]
         public void SetUp()
         {
@@ -271,52 +317,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                     attribute.CurrentValue,
                     $"actions={actions} splitAcrossHandles={splitAcrossHandles}"
                 );
-            }
-        }
-
-        private static ModificationAction ActionFor(char action)
-        {
-            switch (action)
-            {
-                case 'A':
-                {
-                    return ModificationAction.Addition;
-                }
-                case 'M':
-                {
-                    return ModificationAction.Multiplication;
-                }
-                case 'O':
-                {
-                    return ModificationAction.Override;
-                }
-                default:
-                {
-                    throw new ArgumentOutOfRangeException(nameof(action), action, null);
-                }
-            }
-        }
-
-        private static float ValueFor(char action)
-        {
-            switch (action)
-            {
-                case 'A':
-                {
-                    return 5f;
-                }
-                case 'M':
-                {
-                    return 2f;
-                }
-                case 'O':
-                {
-                    return 42f;
-                }
-                default:
-                {
-                    throw new ArgumentOutOfRangeException(nameof(action), action, null);
-                }
             }
         }
 

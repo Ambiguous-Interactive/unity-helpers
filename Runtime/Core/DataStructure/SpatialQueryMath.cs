@@ -12,6 +12,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
     /// </summary>
     internal static class SpatialQueryMath
     {
+        /// <summary>
+        /// The widest cell radius a query can need. The whole signed-int cell grid is this many
+        /// cells across, so clamping here can never exclude an occupied cell.
+        /// </summary>
+        internal const long MaximumCellRadius = uint.MaxValue;
+
         internal static Bounds CreateConservativeBounds(
             Vector3 minimum,
             Vector3 maximum,
@@ -61,53 +67,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 Midpoint(minimum.z, maximum.z)
             );
         }
-
-        private static float Midpoint(float minimum, float maximum)
-        {
-            return (float)(((double)minimum + maximum) * 0.5d);
-        }
-
-        private static void GetConservativeAxis(
-            float minimum,
-            float maximum,
-            float minimumSize,
-            out float center,
-            out float extent
-        )
-        {
-            if (float.IsInfinity(minimum) || float.IsInfinity(maximum))
-            {
-                center = 0f;
-                extent = float.PositiveInfinity;
-                return;
-            }
-
-            float midpoint = Midpoint(minimum, maximum);
-            double requiredExtent = Math.Max(
-                Math.Max((double)midpoint - minimum, (double)maximum - midpoint),
-                (double)minimumSize * 0.5d
-            );
-            float conservativeExtent = (float)requiredExtent;
-            if (
-                conservativeExtent < requiredExtent
-                || minimum < midpoint - conservativeExtent
-                || midpoint + conservativeExtent < maximum
-            )
-            {
-                conservativeExtent = BitConverter.Int32BitsToSingle(
-                    BitConverter.SingleToInt32Bits(conservativeExtent) + 1
-                );
-            }
-            center = midpoint;
-            extent = conservativeExtent;
-            return;
-        }
-
-        /// <summary>
-        /// The widest cell radius a query can need. The whole signed-int cell grid is this many
-        /// cells across, so clamping here can never exclude an occupied cell.
-        /// </summary>
-        internal const long MaximumCellRadius = uint.MaxValue;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static bool IsFinite(Vector2 value)
@@ -223,22 +182,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             return (deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static double AxisDistance(float minimum, float maximum, float coordinate)
-        {
-            if (coordinate < minimum)
-            {
-                return (double)minimum - coordinate;
-            }
-
-            if (maximum < coordinate)
-            {
-                return (double)coordinate - maximum;
-            }
-
-            return 0d;
-        }
-
         /// <summary>
         /// Maps a world coordinate onto its cell index, saturating at the ends of the int range.
         /// </summary>
@@ -325,6 +268,63 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         )
         {
             return MultiplySaturating(MultiplySaturating(spanX, spanY), spanZ) <= occupiedCells;
+        }
+
+        private static float Midpoint(float minimum, float maximum)
+        {
+            return (float)(((double)minimum + maximum) * 0.5d);
+        }
+
+        private static void GetConservativeAxis(
+            float minimum,
+            float maximum,
+            float minimumSize,
+            out float center,
+            out float extent
+        )
+        {
+            if (float.IsInfinity(minimum) || float.IsInfinity(maximum))
+            {
+                center = 0f;
+                extent = float.PositiveInfinity;
+                return;
+            }
+
+            float midpoint = Midpoint(minimum, maximum);
+            double requiredExtent = Math.Max(
+                Math.Max((double)midpoint - minimum, (double)maximum - midpoint),
+                (double)minimumSize * 0.5d
+            );
+            float conservativeExtent = (float)requiredExtent;
+            if (
+                conservativeExtent < requiredExtent
+                || minimum < midpoint - conservativeExtent
+                || midpoint + conservativeExtent < maximum
+            )
+            {
+                conservativeExtent = BitConverter.Int32BitsToSingle(
+                    BitConverter.SingleToInt32Bits(conservativeExtent) + 1
+                );
+            }
+            center = midpoint;
+            extent = conservativeExtent;
+            return;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static double AxisDistance(float minimum, float maximum, float coordinate)
+        {
+            if (coordinate < minimum)
+            {
+                return (double)minimum - coordinate;
+            }
+
+            if (maximum < coordinate)
+            {
+                return (double)coordinate - maximum;
+            }
+
+            return 0d;
         }
 
         private static long MultiplySaturating(long left, long right)

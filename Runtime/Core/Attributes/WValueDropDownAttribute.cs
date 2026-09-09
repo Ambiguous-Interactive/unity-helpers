@@ -67,15 +67,33 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         private static readonly object[] Empty = Array.Empty<object>();
         private static readonly Func<object, object[]> EmptyFactory = _ => Empty;
 
+        /// <summary>
+        /// Gets the effective type for the dropdown values.
+        /// When constructors infer provider output, this is the element type returned by the provider.
+        /// </summary>
+        public Type ValueType { get; }
+
+        /// <summary>
+        /// Retrieves the dropdown entries as boxed objects without any context.
+        /// Note: when the attribute targets an instance method, this returns an empty array.
+        /// The returned array should be treated as read-only.
+        /// </summary>
+        public object[] Options => _getOptions?.Invoke(null) ?? Empty;
+
+        internal Type ProviderType { get; }
+
+        internal string ProviderMethodName { get; }
+
+        /// <summary>
+        /// Indicates whether this attribute uses an instance method provider.
+        /// </summary>
+        internal bool RequiresInstanceContext => _requiresInstanceContext;
+
         private readonly Func<object, object[]> _getOptions;
         private readonly bool _requiresInstanceContext;
         private readonly string _instanceMethodName;
         private readonly Dictionary<Type, InstanceProviderEntry> _instanceMethodCache;
         private readonly Type _explicitProviderType;
-
-        internal Type ProviderType { get; }
-
-        internal string ProviderMethodName { get; }
 
         /// <inheritdoc cref="WValueDropDownAttribute(Type, object[])" />
         public WValueDropDownAttribute(params bool[] options)
@@ -320,170 +338,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             _getOptions = optionFactory ?? EmptyFactory;
         }
 
-        /// <summary>
-        /// Gets the effective type for the dropdown values.
-        /// When constructors infer provider output, this is the element type returned by the provider.
-        /// </summary>
-        public Type ValueType { get; }
-
-        /// <summary>
-        /// Retrieves the dropdown entries as boxed objects without any context.
-        /// Note: when the attribute targets an instance method, this returns an empty array.
-        /// The returned array should be treated as read-only.
-        /// </summary>
-        public object[] Options => _getOptions?.Invoke(null) ?? Empty;
-
-        /// <summary>
-        /// Retrieves the dropdown entries for the supplied context object.
-        /// </summary>
-        /// <param name="context">The object declaring the field/property. Required for instance providers.</param>
-        /// <returns>Resolved option list (never null).</returns>
-        public object[] GetOptions(object context)
-        {
-            if (_requiresInstanceContext && context == null)
-            {
-                return Empty;
-            }
-
-            return _getOptions?.Invoke(context) ?? Empty;
-        }
-
-        /// <summary>
-        /// Indicates whether this attribute uses an instance method provider.
-        /// </summary>
-        internal bool RequiresInstanceContext => _requiresInstanceContext;
-
-        private object[] ResolveInstanceMethodValues(object context)
-        {
-            if (context == null)
-            {
-                return Empty;
-            }
-
-            Type contextType = context.GetType();
-
-            Type lookupType = _explicitProviderType ?? contextType;
-
-            if (
-                _explicitProviderType != null
-                && !_explicitProviderType.IsAssignableFrom(contextType)
-            )
-            {
-                Debug.LogWarning(
-                    $"{AttributeName}: Context object of type '{contextType.FullName}' is not assignable to explicit provider type '{_explicitProviderType.FullName}'."
-                );
-                return Empty;
-            }
-
-            InstanceProviderEntry provider = GetOrResolveInstanceProvider(lookupType);
-            if (provider == null)
-            {
-                return Empty;
-            }
-
-            object result;
-            try
-            {
-                result = provider.Invoke(context);
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning(
-                    $"{AttributeName}: Invocation of '{lookupType.FullName}.{provider.Method.Name}' threw {e.GetType().Name}."
-                );
-                return Empty;
-            }
-
-            return ConvertResult(
-                result,
-                provider.Method.DeclaringType ?? lookupType,
-                provider.Method.Name
-            );
-        }
-
-        private InstanceProviderEntry GetOrResolveInstanceProvider(Type providerType)
-        {
-            if (
-                _instanceMethodCache != null
-                && _instanceMethodCache.TryGetValue(providerType, out InstanceProviderEntry cached)
-            )
-            {
-                return cached;
-            }
-
-            BindingFlags flags =
-                BindingFlags.Instance
-                | BindingFlags.Static
-                | BindingFlags.Public
-                | BindingFlags.NonPublic;
-            MethodInfo method = providerType.GetMethod(
-                _instanceMethodName,
-                flags,
-                null,
-                Type.EmptyTypes,
-                null
-            );
-
-            if (method == null)
-            {
-                Debug.LogWarning(
-                    $"{AttributeName}: Could not locate '{_instanceMethodName}' on {providerType.FullName}."
-                );
-                CacheProvider(providerType, null);
-                return null;
-            }
-
-            Type returnType = method.ReturnType;
-            if (returnType == typeof(void))
-            {
-                Debug.LogWarning(
-                    $"{AttributeName}: Method '{providerType.FullName}.{method.Name}' must return an array or IEnumerable."
-                );
-                CacheProvider(providerType, null);
-                return null;
-            }
-
-            bool isEnumerable =
-                returnType.IsArray
-                || (
-                    returnType != typeof(string) && typeof(IEnumerable).IsAssignableFrom(returnType)
-                );
-
-            if (!isEnumerable)
-            {
-                Debug.LogWarning(
-                    $"{AttributeName}: Method '{providerType.FullName}.{method.Name}' must return an array or IEnumerable."
-                );
-                CacheProvider(providerType, null);
-                return null;
-            }
-
-            InstanceProviderEntry entry = method.IsStatic
-                ? new InstanceProviderEntry(
-                    method,
-                    instanceInvoker: null,
-                    staticInvoker: ReflectionHelpers.GetStaticMethodInvoker(method)
-                )
-                : new InstanceProviderEntry(
-                    method,
-                    ReflectionHelpers.GetMethodInvoker(method),
-                    staticInvoker: null
-                );
-
-            CacheProvider(providerType, entry);
-            return entry;
-        }
-
-        private void CacheProvider(Type providerType, InstanceProviderEntry entry)
-        {
-            if (_instanceMethodCache == null)
-            {
-                return;
-            }
-
-            _instanceMethodCache[providerType] = entry;
-        }
-
         private static Type InferInstanceMethodValueType(Type providerType, string methodName)
         {
             if (providerType == null || string.IsNullOrEmpty(methodName))
@@ -625,50 +479,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             return new MethodValidationResult(true, true, elementType ?? typeof(object));
         }
 
-        private object[] ConvertResult(object result, Type providerType, string methodName)
-        {
-            if (result == null)
-            {
-                return Empty;
-            }
-
-            if (result is object[] objectArray)
-            {
-                return objectArray;
-            }
-
-            if (result is Array array)
-            {
-                object[] boxed = new object[array.Length];
-                for (int i = 0; i < array.Length; i++)
-                {
-                    boxed[i] = array.GetValue(i);
-                }
-                return boxed;
-            }
-
-            if (result is IEnumerable enumerable)
-            {
-                List<object> values = new();
-                foreach (object entry in enumerable)
-                {
-                    values.Add(entry);
-                }
-
-                if (values.Count == 0)
-                {
-                    return Empty;
-                }
-
-                return values.ToArray();
-            }
-
-            Debug.LogWarning(
-                $"{AttributeName}: Method '{providerType.FullName}.{methodName}' returned incompatible type '{result.GetType().FullName}'. Expected an array or IEnumerable."
-            );
-            return Empty;
-        }
-
         private static Func<object, object[]> WrapStatic<T>(Func<T[]> provider)
         {
             if (provider == null)
@@ -713,6 +523,196 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             }
 
             return _ => provider();
+        }
+
+        /// <summary>
+        /// Retrieves the dropdown entries for the supplied context object.
+        /// </summary>
+        /// <param name="context">The object declaring the field/property. Required for instance providers.</param>
+        /// <returns>Resolved option list (never null).</returns>
+        public object[] GetOptions(object context)
+        {
+            if (_requiresInstanceContext && context == null)
+            {
+                return Empty;
+            }
+
+            return _getOptions?.Invoke(context) ?? Empty;
+        }
+
+        private object[] ResolveInstanceMethodValues(object context)
+        {
+            if (context == null)
+            {
+                return Empty;
+            }
+
+            Type contextType = context.GetType();
+
+            Type lookupType = _explicitProviderType ?? contextType;
+
+            if (
+                _explicitProviderType != null
+                && !_explicitProviderType.IsAssignableFrom(contextType)
+            )
+            {
+                Debug.LogWarning(
+                    $"{AttributeName}: Context object of type '{contextType.FullName}' is not assignable to explicit provider type '{_explicitProviderType.FullName}'."
+                );
+                return Empty;
+            }
+
+            InstanceProviderEntry provider = GetOrResolveInstanceProvider(lookupType);
+            if (provider == null)
+            {
+                return Empty;
+            }
+
+            object result;
+            try
+            {
+                result = provider.Invoke(context);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning(
+                    $"{AttributeName}: Invocation of '{lookupType.FullName}.{provider.Method.Name}' threw {e.GetType().Name}."
+                );
+                return Empty;
+            }
+
+            return ConvertResult(
+                result,
+                provider.Method.DeclaringType ?? lookupType,
+                provider.Method.Name
+            );
+        }
+
+        private InstanceProviderEntry GetOrResolveInstanceProvider(Type providerType)
+        {
+            if (
+                _instanceMethodCache != null
+                && _instanceMethodCache.TryGetValue(providerType, out InstanceProviderEntry cached)
+            )
+            {
+                return cached;
+            }
+
+            BindingFlags flags =
+                BindingFlags.Instance
+                | BindingFlags.Static
+                | BindingFlags.Public
+                | BindingFlags.NonPublic;
+            MethodInfo method = providerType.GetMethod(
+                _instanceMethodName,
+                flags,
+                null,
+                Type.EmptyTypes,
+                null
+            );
+
+            if (method == null)
+            {
+                Debug.LogWarning(
+                    $"{AttributeName}: Could not locate '{_instanceMethodName}' on {providerType.FullName}."
+                );
+                CacheProvider(providerType, null);
+                return null;
+            }
+
+            Type returnType = method.ReturnType;
+            if (returnType == typeof(void))
+            {
+                Debug.LogWarning(
+                    $"{AttributeName}: Method '{providerType.FullName}.{method.Name}' must return an array or IEnumerable."
+                );
+                CacheProvider(providerType, null);
+                return null;
+            }
+
+            bool isEnumerable =
+                returnType.IsArray
+                || (
+                    returnType != typeof(string) && typeof(IEnumerable).IsAssignableFrom(returnType)
+                );
+
+            if (!isEnumerable)
+            {
+                Debug.LogWarning(
+                    $"{AttributeName}: Method '{providerType.FullName}.{method.Name}' must return an array or IEnumerable."
+                );
+                CacheProvider(providerType, null);
+                return null;
+            }
+
+            InstanceProviderEntry entry = method.IsStatic
+                ? new InstanceProviderEntry(
+                    method,
+                    instanceInvoker: null,
+                    staticInvoker: ReflectionHelpers.GetStaticMethodInvoker(method)
+                )
+                : new InstanceProviderEntry(
+                    method,
+                    ReflectionHelpers.GetMethodInvoker(method),
+                    staticInvoker: null
+                );
+
+            CacheProvider(providerType, entry);
+            return entry;
+        }
+
+        private void CacheProvider(Type providerType, InstanceProviderEntry entry)
+        {
+            if (_instanceMethodCache == null)
+            {
+                return;
+            }
+
+            _instanceMethodCache[providerType] = entry;
+        }
+
+        private object[] ConvertResult(object result, Type providerType, string methodName)
+        {
+            if (result == null)
+            {
+                return Empty;
+            }
+
+            if (result is object[] objectArray)
+            {
+                return objectArray;
+            }
+
+            if (result is Array array)
+            {
+                object[] boxed = new object[array.Length];
+                for (int i = 0; i < array.Length; i++)
+                {
+                    boxed[i] = array.GetValue(i);
+                }
+                return boxed;
+            }
+
+            if (result is IEnumerable enumerable)
+            {
+                List<object> values = new();
+                foreach (object entry in enumerable)
+                {
+                    values.Add(entry);
+                }
+
+                if (values.Count == 0)
+                {
+                    return Empty;
+                }
+
+                return values.ToArray();
+            }
+
+            Debug.LogWarning(
+                $"{AttributeName}: Method '{providerType.FullName}.{methodName}' returned incompatible type '{result.GetType().FullName}'. Expected an array or IEnumerable."
+            );
+            return Empty;
         }
 
         private sealed class InstanceProviderEntry

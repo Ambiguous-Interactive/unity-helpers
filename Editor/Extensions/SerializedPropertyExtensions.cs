@@ -22,50 +22,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Extensions
         );
         private static readonly char[] PathSeparator = { '.' };
 
-        internal static void ClearCache()
-        {
-            PathSplitCache.Clear();
-            TrimmedPathSplitCache.Clear();
-        }
-
-        private static string[] GetCachedPathParts(string propertyPath)
-        {
-            if (PathSplitCache.TryGetValue(propertyPath, out string[] cached))
-            {
-                return cached;
-            }
-
-            string[] parts = propertyPath.Split(PathSeparator);
-            PathSplitCache[propertyPath] = parts;
-            return parts;
-        }
-
-        private static string[] GetTrimmedPathParts(string propertyPath, string propertyName)
-        {
-            if (TrimmedPathSplitCache.TryGetValue(propertyPath, out string[] cached))
-            {
-                return cached;
-            }
-
-            string[] pathParts = GetCachedPathParts(propertyPath);
-
-            if (
-                string.Equals(propertyName, "data", StringComparison.Ordinal)
-                && 1 < pathParts.Length
-                && pathParts[^1].Contains('[')
-                && pathParts[^1].Contains(']')
-                && string.Equals(pathParts[^2], "Array", StringComparison.Ordinal)
-            )
-            {
-                string[] trimmed = new string[pathParts.Length - 2];
-                Array.Copy(pathParts, trimmed, trimmed.Length);
-                TrimmedPathSplitCache[propertyPath] = trimmed;
-                return trimmed;
-            }
-
-            TrimmedPathSplitCache[propertyPath] = pathParts;
-            return pathParts;
-        }
+        private static readonly Dictionary<string, int> ArrayIndexCache = new(
+            StringComparer.Ordinal
+        );
 
         /// <summary>
         /// Appends a new default element to the end of an array/list property and returns it.
@@ -261,9 +220,50 @@ namespace WallstopStudios.UnityHelpers.Editor.Extensions
             return obj;
         }
 
-        private static readonly Dictionary<string, int> ArrayIndexCache = new(
-            StringComparer.Ordinal
-        );
+        internal static void ClearCache()
+        {
+            PathSplitCache.Clear();
+            TrimmedPathSplitCache.Clear();
+        }
+
+        private static string[] GetCachedPathParts(string propertyPath)
+        {
+            if (PathSplitCache.TryGetValue(propertyPath, out string[] cached))
+            {
+                return cached;
+            }
+
+            string[] parts = propertyPath.Split(PathSeparator);
+            PathSplitCache[propertyPath] = parts;
+            return parts;
+        }
+
+        private static string[] GetTrimmedPathParts(string propertyPath, string propertyName)
+        {
+            if (TrimmedPathSplitCache.TryGetValue(propertyPath, out string[] cached))
+            {
+                return cached;
+            }
+
+            string[] pathParts = GetCachedPathParts(propertyPath);
+
+            if (
+                string.Equals(propertyName, "data", StringComparison.Ordinal)
+                && 1 < pathParts.Length
+                && pathParts[^1].Contains('[')
+                && pathParts[^1].Contains(']')
+                && string.Equals(pathParts[^2], "Array", StringComparison.Ordinal)
+            )
+            {
+                string[] trimmed = new string[pathParts.Length - 2];
+                Array.Copy(pathParts, trimmed, trimmed.Length);
+                TrimmedPathSplitCache[propertyPath] = trimmed;
+                return trimmed;
+            }
+
+            TrimmedPathSplitCache[propertyPath] = pathParts;
+            return pathParts;
+        }
 
         private static bool TryParseArrayIndex(string dataField, out int index)
         {

@@ -23,6 +23,11 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
     [NUnit.Framework.Category("Integration")]
     public sealed class IntDropDownDrawerTests : CommonTestBase
     {
+        private static void AssignAttribute(PropertyDrawer drawer, PropertyAttribute attribute)
+        {
+            PropertyDrawerTestHelper.AssignAttribute(drawer, attribute);
+        }
+
         [Test]
         public void CreatePropertyGUIWithoutOptionsReturnsHelpBox()
         {
@@ -534,11 +539,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.IsInstanceOf<BaseField<int>>(element);
             BaseField<int> selector = (BaseField<int>)element;
             Assert.That(selector.value, Is.EqualTo(expectedValue));
-        }
-
-        private static void AssignAttribute(PropertyDrawer drawer, PropertyAttribute attribute)
-        {
-            PropertyDrawerTestHelper.AssignAttribute(drawer, attribute);
         }
     }
 #endif

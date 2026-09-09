@@ -28,6 +28,57 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
             StringComparer.Ordinal
         );
 
+        internal static string GetRegexFoldoutKey(SerializedProperty property)
+        {
+            return (
+                    property.serializedObject.targetObject != null
+                        ? property.serializedObject.targetObject.name
+                        : "NULL"
+                )
+                + property.propertyPath
+                + ".regexesList";
+        }
+
+        internal static string GetExcludeRegexFoldoutKey(SerializedProperty property)
+        {
+            return (
+                    property.serializedObject.targetObject != null
+                        ? property.serializedObject.targetObject.name
+                        : "NULL"
+                )
+                + property.propertyPath
+                + ".excludeRegexesList";
+        }
+
+        internal static string GetExcludePathFoldoutKey(SerializedProperty property)
+        {
+            return (
+                    property.serializedObject.targetObject != null
+                        ? property.serializedObject.targetObject.name
+                        : "NULL"
+                )
+                + property.propertyPath
+                + ".excludePathPrefixesList";
+        }
+
+        private static string GetHistoryContextKey(SerializedProperty property)
+        {
+            return (
+                    property.serializedObject.targetObject != null
+                        ? property.serializedObject.targetObject.name
+                        : "NULL"
+                ) + ".DefaultHistoryContext";
+        }
+
+        private static string GetFolderPathFoldoutKey(SerializedProperty property)
+        {
+            return (
+                    property.serializedObject.targetObject != null
+                        ? property.serializedObject.targetObject.name
+                        : "NULL"
+                ) + ".folderList";
+        }
+
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
             if (property == null)
@@ -673,57 +724,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
 
             height += EditorGUIUtility.standardVerticalSpacing;
             return height;
-        }
-
-        private static string GetHistoryContextKey(SerializedProperty property)
-        {
-            return (
-                    property.serializedObject.targetObject != null
-                        ? property.serializedObject.targetObject.name
-                        : "NULL"
-                ) + ".DefaultHistoryContext";
-        }
-
-        private static string GetFolderPathFoldoutKey(SerializedProperty property)
-        {
-            return (
-                    property.serializedObject.targetObject != null
-                        ? property.serializedObject.targetObject.name
-                        : "NULL"
-                ) + ".folderList";
-        }
-
-        internal static string GetRegexFoldoutKey(SerializedProperty property)
-        {
-            return (
-                    property.serializedObject.targetObject != null
-                        ? property.serializedObject.targetObject.name
-                        : "NULL"
-                )
-                + property.propertyPath
-                + ".regexesList";
-        }
-
-        internal static string GetExcludeRegexFoldoutKey(SerializedProperty property)
-        {
-            return (
-                    property.serializedObject.targetObject != null
-                        ? property.serializedObject.targetObject.name
-                        : "NULL"
-                )
-                + property.propertyPath
-                + ".excludeRegexesList";
-        }
-
-        internal static string GetExcludePathFoldoutKey(SerializedProperty property)
-        {
-            return (
-                    property.serializedObject.targetObject != null
-                        ? property.serializedObject.targetObject.name
-                        : "NULL"
-                )
-                + property.propertyPath
-                + ".excludePathPrefixesList";
         }
     }
 #endif

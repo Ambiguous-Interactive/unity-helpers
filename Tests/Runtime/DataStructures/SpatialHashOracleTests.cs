@@ -26,7 +26,170 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     [NUnit.Framework.Category("Fast")]
     public sealed class SpatialHashOracleTests
     {
+        private static Sample Sentinel => new(new Vector3(987f, 654f, 321f), -99, -1);
+
+        private static Vector3 StackedPoint => new(1f, 0f, 0f);
+
         private readonly List<IDisposable> _trackedResources = new();
+
+        private static void AssertMultisetSubset(List<Sample> subset, List<Sample> superset)
+        {
+            Dictionary<Sample, int> available = new();
+            foreach (Sample sample in superset)
+            {
+                if (!available.TryGetValue(sample, out int existing))
+                {
+                    existing = 0;
+                }
+
+                available[sample] = existing + 1;
+            }
+
+            foreach (Sample sample in subset)
+            {
+                if (!available.TryGetValue(sample, out int remaining))
+                {
+                    remaining = 0;
+                }
+
+                Assert.Less(
+                    0,
+                    remaining,
+                    "{0} appears more often in the exact answer than in the coarse one",
+                    sample
+                );
+                available[sample] = remaining - 1;
+            }
+        }
+
+        private static IEnumerable<float> CellSizes()
+        {
+            yield return 0.5f;
+            yield return 1f;
+            yield return 2.5f;
+        }
+
+        private static IEnumerable<RangeQuery> RangeQueries()
+        {
+            yield return new RangeQuery(Vector2.zero, 0f);
+            yield return new RangeQuery(new Vector2(2f, 2f), 0f);
+            yield return new RangeQuery(Vector2.zero, 1f);
+            yield return new RangeQuery(Vector2.zero, 2f);
+            yield return new RangeQuery(new Vector2(-3f, -3f), 4f);
+            yield return new RangeQuery(new Vector2(0.5f, 0.5f), 1.5f);
+            yield return new RangeQuery(Vector2.zero, 1000f);
+            /*
+                This radius overflows when squared; comparing saturated squared distances would incorrectly
+                admit farther points.
+            */
+            yield return new RangeQuery(Vector2.zero, 1e20f);
+            yield return new RangeQuery(Vector2.zero, float.NaN);
+            yield return new RangeQuery(Vector2.zero, -1f);
+            yield return new RangeQuery(Vector2.zero, float.NegativeInfinity);
+            yield return new RangeQuery(new Vector2(float.NaN, 0f), 2f);
+            yield return new RangeQuery(new Vector2(0f, float.PositiveInfinity), 2f);
+        }
+
+        private static IEnumerable<BoxQuery> BoxQueries()
+        {
+            yield return new BoxQuery(new Vector2(-2f, -2f), new Vector2(2f, 2f));
+            yield return new BoxQuery(Vector2.zero, Vector2.zero);
+            yield return new BoxQuery(new Vector2(2f, 2f), new Vector2(2f, 2f));
+            yield return new BoxQuery(new Vector2(-8f, -8f), new Vector2(-4f, -4f));
+            yield return new BoxQuery(new Vector2(-1024f, -1024f), new Vector2(1024f, 1024f));
+            yield return new BoxQuery(new Vector2(float.NaN, -2f), new Vector2(2f, 2f));
+            yield return new BoxQuery(new Vector2(-2f, -2f), new Vector2(2f, float.NaN));
+            yield return new BoxQuery(new Vector2(2f, 2f), new Vector2(-2f, -2f));
+        }
+
+        private static IEnumerable<Corpus> Corpora()
+        {
+            yield return new Corpus("empty", Array.Empty<Sample>());
+            yield return new Corpus(
+                "singleton",
+                new[] { new Sample(new Vector3(3f, -7f, 0f), 5, 0) }
+            );
+            yield return new Corpus("duplicates", DuplicateCorpus());
+            yield return new Corpus("grid", GridCorpus());
+            yield return new Corpus("negative", NegativeCorpus());
+            yield return new Corpus("saturating", SaturatingCorpus());
+        }
+
+        private static Sample[] DuplicateCorpus()
+        {
+            return new[]
+            {
+                new Sample(new Vector3(2f, 2f, 0f), 1, 0),
+                new Sample(new Vector3(2f, 2f, 0f), 1, 1),
+                new Sample(new Vector3(2f, 2f, 0f), 1, 2),
+                new Sample(new Vector3(-5f, 4f, 0f), 2, 3),
+                new Sample(new Vector3(-5f, 4f, 0f), 2, 4),
+                new Sample(Vector3.zero, 3, 5),
+            };
+        }
+
+        private static Sample[] GridCorpus()
+        {
+            List<Sample> samples = new();
+            int insertionIndex = 0;
+            for (int x = -2; x <= 2; ++x)
+            {
+                for (int y = -2; y <= 2; ++y)
+                {
+                    samples.Add(new Sample(new Vector3(x, y, 0f), x + y, insertionIndex));
+                    ++insertionIndex;
+                }
+            }
+
+            return samples.ToArray();
+        }
+
+        private static Sample[] NegativeCorpus()
+        {
+            return new[]
+            {
+                new Sample(new Vector3(-1f, -1f, 0f), 7, 0),
+                new Sample(new Vector3(-4f, -4f, 0f), 7, 1),
+                new Sample(new Vector3(-6f, -6f, 0f), 8, 2),
+                new Sample(new Vector3(-0.5f, -0.5f, 0f), 9, 3),
+            };
+        }
+
+        /// <summary>
+        /// Coordinates that saturate onto the ends of the signed-int cell grid. Every one of the
+        /// radius and box queries then has to answer over a grid whose occupied cells are
+        /// <c>int.MinValue</c>, <c>0</c> and <c>int.MaxValue</c>, which is where the cell walk used
+        /// to either wrap its counter or ask for more probes than a run could finish. The corner
+        /// sample is 1.27e20 from the origin, far enough that its squared distance saturates float
+        /// too, so the 1e20 radius separates an exact filter from one comparing two infinities.
+        /// </summary>
+        private static Sample[] SaturatingCorpus()
+        {
+            return new[]
+            {
+                new Sample(Vector3.zero, 0, 0),
+                new Sample(new Vector3(1e18f, 0f, 0f), 1, 1),
+                new Sample(new Vector3(-1e18f, 0f, 0f), 2, 2),
+                new Sample(new Vector3(3e18f, 0f, 0f), 3, 3),
+                new Sample(new Vector3(9e19f, 9e19f, 0f), 4, 4),
+            };
+        }
+
+        /// <summary>
+        /// Three samples on one point plus two neighbors, so a coarse walk has something extra to
+        /// return and a set comparison would hide the collapse of the stack.
+        /// </summary>
+        private static Sample[] StackedCorpus()
+        {
+            return new[]
+            {
+                new Sample(StackedPoint, 1, 0),
+                new Sample(StackedPoint, 1, 1),
+                new Sample(StackedPoint, 1, 2),
+                new Sample(new Vector3(1.9f, 1.9f, 0f), 2, 3),
+                new Sample(new Vector3(-1.9f, -1.9f, 0f), 3, 4),
+            };
+        }
 
         [TearDown]
         public void TearDown()
@@ -492,40 +655,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             CollectionAssert.AreEquivalent(new[] { 1, 2, 3 }, results);
         }
 
-        private static Sample Sentinel => new(new Vector3(987f, 654f, 321f), -99, -1);
-
-        private static Vector3 StackedPoint => new(1f, 0f, 0f);
-
-        private static void AssertMultisetSubset(List<Sample> subset, List<Sample> superset)
-        {
-            Dictionary<Sample, int> available = new();
-            foreach (Sample sample in superset)
-            {
-                if (!available.TryGetValue(sample, out int existing))
-                {
-                    existing = 0;
-                }
-
-                available[sample] = existing + 1;
-            }
-
-            foreach (Sample sample in subset)
-            {
-                if (!available.TryGetValue(sample, out int remaining))
-                {
-                    remaining = 0;
-                }
-
-                Assert.Less(
-                    0,
-                    remaining,
-                    "{0} appears more often in the exact answer than in the coarse one",
-                    sample
-                );
-                available[sample] = remaining - 1;
-            }
-        }
-
         private T Track<T>(T disposable)
             where T : IDisposable
         {
@@ -553,135 +682,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             }
 
             return hash;
-        }
-
-        private static IEnumerable<float> CellSizes()
-        {
-            yield return 0.5f;
-            yield return 1f;
-            yield return 2.5f;
-        }
-
-        private static IEnumerable<RangeQuery> RangeQueries()
-        {
-            yield return new RangeQuery(Vector2.zero, 0f);
-            yield return new RangeQuery(new Vector2(2f, 2f), 0f);
-            yield return new RangeQuery(Vector2.zero, 1f);
-            yield return new RangeQuery(Vector2.zero, 2f);
-            yield return new RangeQuery(new Vector2(-3f, -3f), 4f);
-            yield return new RangeQuery(new Vector2(0.5f, 0.5f), 1.5f);
-            yield return new RangeQuery(Vector2.zero, 1000f);
-            /*
-                This radius overflows when squared; comparing saturated squared distances would incorrectly
-                admit farther points.
-            */
-            yield return new RangeQuery(Vector2.zero, 1e20f);
-            yield return new RangeQuery(Vector2.zero, float.NaN);
-            yield return new RangeQuery(Vector2.zero, -1f);
-            yield return new RangeQuery(Vector2.zero, float.NegativeInfinity);
-            yield return new RangeQuery(new Vector2(float.NaN, 0f), 2f);
-            yield return new RangeQuery(new Vector2(0f, float.PositiveInfinity), 2f);
-        }
-
-        private static IEnumerable<BoxQuery> BoxQueries()
-        {
-            yield return new BoxQuery(new Vector2(-2f, -2f), new Vector2(2f, 2f));
-            yield return new BoxQuery(Vector2.zero, Vector2.zero);
-            yield return new BoxQuery(new Vector2(2f, 2f), new Vector2(2f, 2f));
-            yield return new BoxQuery(new Vector2(-8f, -8f), new Vector2(-4f, -4f));
-            yield return new BoxQuery(new Vector2(-1024f, -1024f), new Vector2(1024f, 1024f));
-            yield return new BoxQuery(new Vector2(float.NaN, -2f), new Vector2(2f, 2f));
-            yield return new BoxQuery(new Vector2(-2f, -2f), new Vector2(2f, float.NaN));
-            yield return new BoxQuery(new Vector2(2f, 2f), new Vector2(-2f, -2f));
-        }
-
-        private static IEnumerable<Corpus> Corpora()
-        {
-            yield return new Corpus("empty", Array.Empty<Sample>());
-            yield return new Corpus(
-                "singleton",
-                new[] { new Sample(new Vector3(3f, -7f, 0f), 5, 0) }
-            );
-            yield return new Corpus("duplicates", DuplicateCorpus());
-            yield return new Corpus("grid", GridCorpus());
-            yield return new Corpus("negative", NegativeCorpus());
-            yield return new Corpus("saturating", SaturatingCorpus());
-        }
-
-        private static Sample[] DuplicateCorpus()
-        {
-            return new[]
-            {
-                new Sample(new Vector3(2f, 2f, 0f), 1, 0),
-                new Sample(new Vector3(2f, 2f, 0f), 1, 1),
-                new Sample(new Vector3(2f, 2f, 0f), 1, 2),
-                new Sample(new Vector3(-5f, 4f, 0f), 2, 3),
-                new Sample(new Vector3(-5f, 4f, 0f), 2, 4),
-                new Sample(Vector3.zero, 3, 5),
-            };
-        }
-
-        private static Sample[] GridCorpus()
-        {
-            List<Sample> samples = new();
-            int insertionIndex = 0;
-            for (int x = -2; x <= 2; ++x)
-            {
-                for (int y = -2; y <= 2; ++y)
-                {
-                    samples.Add(new Sample(new Vector3(x, y, 0f), x + y, insertionIndex));
-                    ++insertionIndex;
-                }
-            }
-
-            return samples.ToArray();
-        }
-
-        private static Sample[] NegativeCorpus()
-        {
-            return new[]
-            {
-                new Sample(new Vector3(-1f, -1f, 0f), 7, 0),
-                new Sample(new Vector3(-4f, -4f, 0f), 7, 1),
-                new Sample(new Vector3(-6f, -6f, 0f), 8, 2),
-                new Sample(new Vector3(-0.5f, -0.5f, 0f), 9, 3),
-            };
-        }
-
-        /// <summary>
-        /// Coordinates that saturate onto the ends of the signed-int cell grid. Every one of the
-        /// radius and box queries then has to answer over a grid whose occupied cells are
-        /// <c>int.MinValue</c>, <c>0</c> and <c>int.MaxValue</c>, which is where the cell walk used
-        /// to either wrap its counter or ask for more probes than a run could finish. The corner
-        /// sample is 1.27e20 from the origin, far enough that its squared distance saturates float
-        /// too, so the 1e20 radius separates an exact filter from one comparing two infinities.
-        /// </summary>
-        private static Sample[] SaturatingCorpus()
-        {
-            return new[]
-            {
-                new Sample(Vector3.zero, 0, 0),
-                new Sample(new Vector3(1e18f, 0f, 0f), 1, 1),
-                new Sample(new Vector3(-1e18f, 0f, 0f), 2, 2),
-                new Sample(new Vector3(3e18f, 0f, 0f), 3, 3),
-                new Sample(new Vector3(9e19f, 9e19f, 0f), 4, 4),
-            };
-        }
-
-        /// <summary>
-        /// Three samples on one point plus two neighbors, so a coarse walk has something extra to
-        /// return and a set comparison would hide the collapse of the stack.
-        /// </summary>
-        private static Sample[] StackedCorpus()
-        {
-            return new[]
-            {
-                new Sample(StackedPoint, 1, 0),
-                new Sample(StackedPoint, 1, 1),
-                new Sample(StackedPoint, 1, 2),
-                new Sample(new Vector3(1.9f, 1.9f, 0f), 2, 3),
-                new Sample(new Vector3(-1.9f, -1.9f, 0f), 3, 4),
-            };
         }
 
         private readonly struct Corpus

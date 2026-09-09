@@ -64,6 +64,39 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestUtils
         /// </summary>
         protected string GoldenFileDirectory => GoldenOutputRootDir + "/" + GoldenFileSubdirectory;
 
+        private static string GetAbsolutePath(string unityPath)
+        {
+            string projectRoot = Application.dataPath.Substring(
+                0,
+                Application.dataPath.Length - "Assets".Length
+            );
+            return Path.Combine(projectRoot, unityPath).SanitizePath();
+        }
+
+        /// <summary>
+        /// Generates golden files for this test class. Override this method to create
+        /// the expected outputs for your tests.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This method is marked with <c>[Test]</c> and <c>[Explicit]</c>, meaning it
+        /// will only run when explicitly selected in the test runner.
+        /// </para>
+        /// <para>
+        /// <strong>Important:</strong> Only run this when you intentionally want to update
+        /// the expected outputs. Review the generated files carefully before committing.
+        /// </para>
+        /// </remarks>
+        [Test]
+        [Explicit("Run manually to regenerate golden files")]
+        public virtual void GenerateGoldenFiles()
+        {
+            Assert.Inconclusive(
+                $"No golden file generation implemented for {GetType().Name}. "
+                    + "Override GenerateGoldenFiles() to generate expected outputs."
+            );
+        }
+
         /// <summary>
         /// Loads golden metadata from a JSON file in the golden files directory.
         /// </summary>
@@ -210,30 +243,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestUtils
             Assert.AreEqual(expected, actualContent, message ?? $"Content mismatch for {fileName}");
         }
 
-        /// <summary>
-        /// Generates golden files for this test class. Override this method to create
-        /// the expected outputs for your tests.
-        /// </summary>
-        /// <remarks>
-        /// <para>
-        /// This method is marked with <c>[Test]</c> and <c>[Explicit]</c>, meaning it
-        /// will only run when explicitly selected in the test runner.
-        /// </para>
-        /// <para>
-        /// <strong>Important:</strong> Only run this when you intentionally want to update
-        /// the expected outputs. Review the generated files carefully before committing.
-        /// </para>
-        /// </remarks>
-        [Test]
-        [Explicit("Run manually to regenerate golden files")]
-        public virtual void GenerateGoldenFiles()
-        {
-            Assert.Inconclusive(
-                $"No golden file generation implemented for {GetType().Name}. "
-                    + "Override GenerateGoldenFiles() to generate expected outputs."
-            );
-        }
-
         private void EnsureGoldenDirectory()
         {
             if (AssetDatabase.IsValidFolder(GoldenFileDirectory))
@@ -253,15 +262,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestUtils
                 }
                 currentPath = nextPath;
             }
-        }
-
-        private static string GetAbsolutePath(string unityPath)
-        {
-            string projectRoot = Application.dataPath.Substring(
-                0,
-                Application.dataPath.Length - "Assets".Length
-            );
-            return Path.Combine(projectRoot, unityPath).SanitizePath();
         }
     }
 #endif

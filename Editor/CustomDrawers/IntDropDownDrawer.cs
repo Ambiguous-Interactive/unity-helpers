@@ -64,70 +64,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         }
 
         /// <summary>
-        /// Renders a dropdown that allows selecting one of the configured integer options.
-        /// When the number of options exceeds the page size, a popup window with search and
-        /// pagination is used.
-        /// </summary>
-        /// <param name="position">The rectangle reserved for drawing the control.</param>
-        /// <param name="property">The backing serialized property.</param>
-        /// <param name="label">The label displayed next to the field.</param>
-        /// <example>
-        /// <code>
-        /// [IntDropDown(1, 2, 3)]
-        /// public int qualityLevel;
-        /// </code>
-        /// </example>
-        public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
-        {
-            if (attribute is not IntDropDownAttribute dropdown)
-            {
-                return;
-            }
-
-            if (property.propertyType != SerializedPropertyType.Integer)
-            {
-                string typeMismatchMessage = GetTypeMismatchMessage(property);
-                EditorGUI.HelpBox(position, typeMismatchMessage, MessageType.Error);
-                return;
-            }
-
-            UnityEngine.Object context = property.serializedObject?.targetObject;
-            int[] options = dropdown.GetOptions(context) ?? Array.Empty<int>();
-            if (options.Length == 0)
-            {
-                EditorGUI.PropertyField(position, property, label);
-                return;
-            }
-
-            int pageSize = Mathf.Max(1, UnityHelpersSettings.GetStringInListPageLimit());
-            string[] displayedOptions = GetOrCreateDisplayOptions(options);
-
-            EditorGUI.BeginProperty(position, label, property);
-            try
-            {
-                if (pageSize < options.Length)
-                {
-                    DrawPopupDropDown(
-                        position,
-                        property,
-                        label,
-                        options,
-                        displayedOptions,
-                        pageSize
-                    );
-                }
-                else
-                {
-                    DrawGenericMenuDropDown(position, property, label, options, displayedOptions);
-                }
-            }
-            finally
-            {
-                EditorGUI.EndProperty();
-            }
-        }
-
-        /// <summary>
         /// Draws a dropdown using GenericMenu for a small number of options.
         /// </summary>
         /// <remarks>
@@ -279,6 +215,108 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             EditorGUI.showMixedValue = previousMixed;
         }
 
+        private static string GetTypeMismatchMessage(SerializedProperty property)
+        {
+            string fieldName = property.displayName;
+            string actualType = GetPropertyTypeName(property);
+            return $"[IntDropDown] Type mismatch: '{fieldName}' is {actualType}, but IntDropDown requires int. Change the field type to int.";
+        }
+
+        private static string GetPropertyTypeName(SerializedProperty property)
+        {
+            return property.propertyType switch
+            {
+                SerializedPropertyType.String => "a string",
+                SerializedPropertyType.Float => "a float",
+                SerializedPropertyType.Boolean => "a bool",
+                SerializedPropertyType.Enum => "an enum",
+                SerializedPropertyType.ObjectReference => "an object reference",
+                SerializedPropertyType.Vector2 => "a Vector2",
+                SerializedPropertyType.Vector3 => "a Vector3",
+                SerializedPropertyType.Vector4 => "a Vector4",
+                SerializedPropertyType.Color => "a Color",
+                SerializedPropertyType.Rect => "a Rect",
+                SerializedPropertyType.ArraySize => "an array size",
+                SerializedPropertyType.Character => "a char",
+                SerializedPropertyType.AnimationCurve => "an AnimationCurve",
+                SerializedPropertyType.Bounds => "a Bounds",
+                SerializedPropertyType.Quaternion => "a Quaternion",
+                SerializedPropertyType.ExposedReference => "an exposed reference",
+                SerializedPropertyType.FixedBufferSize => "a fixed buffer size",
+                SerializedPropertyType.Vector2Int => "a Vector2Int",
+                SerializedPropertyType.Vector3Int => "a Vector3Int",
+                SerializedPropertyType.RectInt => "a RectInt",
+                SerializedPropertyType.BoundsInt => "a BoundsInt",
+                SerializedPropertyType.ManagedReference => "a managed reference",
+                SerializedPropertyType.Hash128 => "a Hash128",
+                _ => $"type '{property.propertyType}'",
+            };
+        }
+
+        /// <summary>
+        /// Renders a dropdown that allows selecting one of the configured integer options.
+        /// When the number of options exceeds the page size, a popup window with search and
+        /// pagination is used.
+        /// </summary>
+        /// <param name="position">The rectangle reserved for drawing the control.</param>
+        /// <param name="property">The backing serialized property.</param>
+        /// <param name="label">The label displayed next to the field.</param>
+        /// <example>
+        /// <code>
+        /// [IntDropDown(1, 2, 3)]
+        /// public int qualityLevel;
+        /// </code>
+        /// </example>
+        public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+        {
+            if (attribute is not IntDropDownAttribute dropdown)
+            {
+                return;
+            }
+
+            if (property.propertyType != SerializedPropertyType.Integer)
+            {
+                string typeMismatchMessage = GetTypeMismatchMessage(property);
+                EditorGUI.HelpBox(position, typeMismatchMessage, MessageType.Error);
+                return;
+            }
+
+            UnityEngine.Object context = property.serializedObject?.targetObject;
+            int[] options = dropdown.GetOptions(context) ?? Array.Empty<int>();
+            if (options.Length == 0)
+            {
+                EditorGUI.PropertyField(position, property, label);
+                return;
+            }
+
+            int pageSize = Mathf.Max(1, UnityHelpersSettings.GetStringInListPageLimit());
+            string[] displayedOptions = GetOrCreateDisplayOptions(options);
+
+            EditorGUI.BeginProperty(position, label, property);
+            try
+            {
+                if (pageSize < options.Length)
+                {
+                    DrawPopupDropDown(
+                        position,
+                        property,
+                        label,
+                        options,
+                        displayedOptions,
+                        pageSize
+                    );
+                }
+                else
+                {
+                    DrawGenericMenuDropDown(position, property, label, options, displayedOptions);
+                }
+            }
+            finally
+            {
+                EditorGUI.EndProperty();
+            }
+        }
+
         /// <inheritdoc/>
         public override VisualElement CreatePropertyGUI(SerializedProperty property)
         {
@@ -319,50 +357,14 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             return selector;
         }
 
-        private static string GetTypeMismatchMessage(SerializedProperty property)
-        {
-            string fieldName = property.displayName;
-            string actualType = GetPropertyTypeName(property);
-            return $"[IntDropDown] Type mismatch: '{fieldName}' is {actualType}, but IntDropDown requires int. Change the field type to int.";
-        }
-
-        private static string GetPropertyTypeName(SerializedProperty property)
-        {
-            return property.propertyType switch
-            {
-                SerializedPropertyType.String => "a string",
-                SerializedPropertyType.Float => "a float",
-                SerializedPropertyType.Boolean => "a bool",
-                SerializedPropertyType.Enum => "an enum",
-                SerializedPropertyType.ObjectReference => "an object reference",
-                SerializedPropertyType.Vector2 => "a Vector2",
-                SerializedPropertyType.Vector3 => "a Vector3",
-                SerializedPropertyType.Vector4 => "a Vector4",
-                SerializedPropertyType.Color => "a Color",
-                SerializedPropertyType.Rect => "a Rect",
-                SerializedPropertyType.ArraySize => "an array size",
-                SerializedPropertyType.Character => "a char",
-                SerializedPropertyType.AnimationCurve => "an AnimationCurve",
-                SerializedPropertyType.Bounds => "a Bounds",
-                SerializedPropertyType.Quaternion => "a Quaternion",
-                SerializedPropertyType.ExposedReference => "an exposed reference",
-                SerializedPropertyType.FixedBufferSize => "a fixed buffer size",
-                SerializedPropertyType.Vector2Int => "a Vector2Int",
-                SerializedPropertyType.Vector3Int => "a Vector3Int",
-                SerializedPropertyType.RectInt => "a RectInt",
-                SerializedPropertyType.BoundsInt => "a BoundsInt",
-                SerializedPropertyType.ManagedReference => "a managed reference",
-                SerializedPropertyType.Hash128 => "a Hash128",
-                _ => $"type '{property.propertyType}'",
-            };
-        }
-
         /// <summary>
         /// UI Toolkit popup selector element for IntDropDown with large option lists.
         /// Uses IMGUI rendering via IMGUIContainer to show the popup button.
         /// </summary>
         private sealed class IntDropDownPopupSelectorElement : WDropDownPopupSelectorBase<int>
         {
+            protected override int OptionCount => _options.Length;
+
             private readonly int[] _options;
             private readonly string[] _displayedOptions;
 
@@ -371,8 +373,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 _options = options ?? Array.Empty<int>();
                 _displayedOptions = displayedOptions ?? Array.Empty<string>();
             }
-
-            protected override int OptionCount => _options.Length;
 
             protected override string GetDisplayValue(SerializedProperty property)
             {
@@ -419,6 +419,10 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
         /// </summary>
         private sealed class IntDropDownSelector : WDropDownSelectorBase<int>
         {
+            protected override int OptionCount => _options.Length;
+
+            protected override string UndoActionName => "Change IntDropDown Selection";
+
             private readonly int[] _options;
             private readonly string[] _displayedOptions;
 
@@ -428,8 +432,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 _displayedOptions = displayedOptions ?? Array.Empty<string>();
                 InitializeSearchVisibility();
             }
-
-            protected override int OptionCount => _options.Length;
 
             protected override string GetDisplayLabel(int optionIndex)
             {
@@ -462,8 +464,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
 
             protected override int GetDefaultValue() => 0 < _options.Length ? _options[0] : 0;
-
-            protected override string UndoActionName => "Change IntDropDown Selection";
         }
     }
 #endif

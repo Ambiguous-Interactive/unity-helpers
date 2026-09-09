@@ -46,49 +46,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
         public const int AssemblyLevelRetryCount = 5;
 
         /// <summary>
-        /// Determines whether a folder name matches the "Temp N" pattern for duplicate folders.
-        /// </summary>
-        /// <param name="folderName">The folder name to check (not the full path).</param>
-        /// <returns>True if the folder name matches the "Temp N" pattern where N is a positive integer.</returns>
-        /// <remarks>
-        /// <para>
-        /// This method checks for the exact pattern used by Unity when creating duplicate folders:
-        /// <list type="bullet">
-        /// <item>Must start with "Temp " (case-insensitive, single space)</item>
-        /// <item>Must be followed by a positive integer</item>
-        /// <item>Double spaces ("Temp  1") are rejected</item>
-        /// <item>Non-integer suffixes ("Temp abc") are rejected</item>
-        /// <item>Zero or negative numbers ("Temp 0", "Temp -1") are rejected</item>
-        /// </list>
-        /// </para>
-        /// </remarks>
-        private static bool IsTempDuplicateFolder(string folderName)
-        {
-            if (string.IsNullOrEmpty(folderName))
-            {
-                return false;
-            }
-
-            if (!folderName.StartsWith("Temp ", System.StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            string suffix = folderName.Substring(5);
-
-            /*
-                Reject if suffix starts with whitespace (handles double-space like "Temp  1") int.TryParse would
-                otherwise accept " 1" as valid since it trims whitespace
-            */
-            if (suffix.Length == 0 || char.IsWhiteSpace(suffix[0]))
-            {
-                return false;
-            }
-
-            return int.TryParse(suffix, out int number) && 0 < number;
-        }
-
-        /// <summary>
         /// Cleans up numbered duplicate Temp folders that may have been created by Unity.
         /// </summary>
         /// <returns>The number of folders that were deleted.</returns>
@@ -254,6 +211,49 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestUtils
             }
 
             return AssetDatabase.DeleteAsset("Assets/Temp");
+        }
+
+        /// <summary>
+        /// Determines whether a folder name matches the "Temp N" pattern for duplicate folders.
+        /// </summary>
+        /// <param name="folderName">The folder name to check (not the full path).</param>
+        /// <returns>True if the folder name matches the "Temp N" pattern where N is a positive integer.</returns>
+        /// <remarks>
+        /// <para>
+        /// This method checks for the exact pattern used by Unity when creating duplicate folders:
+        /// <list type="bullet">
+        /// <item>Must start with "Temp " (case-insensitive, single space)</item>
+        /// <item>Must be followed by a positive integer</item>
+        /// <item>Double spaces ("Temp  1") are rejected</item>
+        /// <item>Non-integer suffixes ("Temp abc") are rejected</item>
+        /// <item>Zero or negative numbers ("Temp 0", "Temp -1") are rejected</item>
+        /// </list>
+        /// </para>
+        /// </remarks>
+        private static bool IsTempDuplicateFolder(string folderName)
+        {
+            if (string.IsNullOrEmpty(folderName))
+            {
+                return false;
+            }
+
+            if (!folderName.StartsWith("Temp ", System.StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            string suffix = folderName.Substring(5);
+
+            /*
+                Reject if suffix starts with whitespace (handles double-space like "Temp  1") int.TryParse would
+                otherwise accept " 1" as valid since it trims whitespace
+            */
+            if (suffix.Length == 0 || char.IsWhiteSpace(suffix[0]))
+            {
+                return false;
+            }
+
+            return int.TryParse(suffix, out int number) && 0 < number;
         }
     }
 #endif

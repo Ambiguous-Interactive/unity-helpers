@@ -175,6 +175,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 #endif
 
+        private static MapContract Bare(Action<MapContract> configure = null)
+        {
+            MapContract value = new MapContract { Overwritten = null, Merged = null };
+            configure?.Invoke(value);
+            return value;
+        }
+
         [Test]
         public void AMapRoundTrips()
         {
@@ -300,13 +307,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 Assert.IsTrue(formatter.Write(ref writer, value));
                 Assert.AreEqual(predicted, writer.Position);
             }
-        }
-
-        private static MapContract Bare(Action<MapContract> configure = null)
-        {
-            MapContract value = new MapContract { Overwritten = null, Merged = null };
-            configure?.Invoke(value);
-            return value;
         }
 
 #if PROTOBUF_NET_ORACLE_V2

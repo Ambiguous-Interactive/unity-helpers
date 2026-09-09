@@ -17,6 +17,32 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
     [TestFixture]
     public sealed class SpriteAnimationHelpersTests : CommonTestBase
     {
+        private static void SetFrames(
+            AnimationClip clip,
+            string path,
+            params (float time, Sprite sprite)[] frames
+        )
+        {
+            ObjectReferenceKeyframe[] keys = new ObjectReferenceKeyframe[frames.Length];
+            for (int index = 0; index < frames.Length; index++)
+            {
+                keys[index] = new ObjectReferenceKeyframe
+                {
+                    time = frames[index].time,
+                    value = frames[index].sprite,
+                };
+            }
+            AnimationUtility.SetObjectReferenceCurve(
+                clip,
+                EditorCurveBinding.PPtrCurve(
+                    path,
+                    typeof(SpriteRenderer),
+                    UnityExtensions.SpriteBindingProperty
+                ),
+                keys
+            );
+        }
+
         [Test]
         public void KeyframesPreserveTimesDuplicatesNullsAndBindingPaths()
         {
@@ -306,32 +332,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                     0,
                     SpriteMeshType.FullRect
                 )
-            );
-        }
-
-        private static void SetFrames(
-            AnimationClip clip,
-            string path,
-            params (float time, Sprite sprite)[] frames
-        )
-        {
-            ObjectReferenceKeyframe[] keys = new ObjectReferenceKeyframe[frames.Length];
-            for (int index = 0; index < frames.Length; index++)
-            {
-                keys[index] = new ObjectReferenceKeyframe
-                {
-                    time = frames[index].time,
-                    value = frames[index].sprite,
-                };
-            }
-            AnimationUtility.SetObjectReferenceCurve(
-                clip,
-                EditorCurveBinding.PPtrCurve(
-                    path,
-                    typeof(SpriteRenderer),
-                    UnityExtensions.SpriteBindingProperty
-                ),
-                keys
             );
         }
     }

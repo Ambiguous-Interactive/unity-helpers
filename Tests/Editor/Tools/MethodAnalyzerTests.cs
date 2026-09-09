@@ -16,6 +16,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
     [TestFixture]
     public sealed class MethodAnalyzerTests
     {
+        private static CompilerMessage Message(string file)
+        {
+            return new CompilerMessage
+            {
+                file = file,
+                line = 4,
+                message =
+                    "warning WUH015: 'Game.Player.Update()' has an invalid callback signature.",
+                type = CompilerMessageType.Warning,
+            };
+        }
+
         [TestCase("WUH015", IssueCategory.UnityLifecycle)]
         [TestCase("WUH016", IssueCategory.UnityInheritance)]
         [TestCase("CS0114", IssueCategory.GeneralInheritance)]
@@ -158,18 +170,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             Assert.That(MethodAnalyzer.TryCreateIssue(message, out AnalyzerIssue issue), Is.True);
             Assert.That(issue.Severity, Is.EqualTo(IssueSeverity.Critical));
             Assert.That(issue.BaseMethodSignature, Is.EqualTo("Game.Base.Start()"));
-        }
-
-        private static CompilerMessage Message(string file)
-        {
-            return new CompilerMessage
-            {
-                file = file,
-                line = 4,
-                message =
-                    "warning WUH015: 'Game.Player.Update()' has an invalid callback signature.",
-                type = CompilerMessageType.Warning,
-            };
         }
     }
 }

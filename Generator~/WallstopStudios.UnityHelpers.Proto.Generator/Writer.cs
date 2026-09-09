@@ -20,6 +20,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private readonly StringBuilder _builder = new StringBuilder();
         private int _depth;
 
+        /// <inheritdoc />
+        public override string ToString()
+        {
+            return _builder.ToString();
+        }
+
         internal void Indent()
         {
             _depth++;
@@ -123,12 +129,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         private void Indentation()
         {
             _builder.Append(' ', _depth * 4);
-        }
-
-        /// <inheritdoc />
-        public override string ToString()
-        {
-            return _builder.ToString();
         }
     }
 }

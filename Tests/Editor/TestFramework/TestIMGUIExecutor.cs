@@ -44,6 +44,15 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
     // fixtures' OnGUI), not a test fixture, so it does not inherit CommonTestBase.
     internal static class TestIMGUIExecutor
     {
+        // Unity’s internal panel members require reflection; public IMGUIContainer operations bind normally.
+        private static bool _resolved;
+        private static bool _available;
+        private static string _resolveError;
+        private static MethodInfo _createEditorPanel;
+        private static PropertyInfo _visualTreeProperty;
+        private static MethodInfo _validateLayout;
+        private static MethodInfo _handleIMGUIEvent;
+
         internal static IEnumerator Run(Action action)
         {
             return Run(action, TestIMGUIExecutorBudget.Default);
@@ -299,15 +308,6 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
                 new Event { type = EventType.Repaint },
             };
         }
-
-        // Unity’s internal panel members require reflection; public IMGUIContainer operations bind normally.
-        private static bool _resolved;
-        private static bool _available;
-        private static string _resolveError;
-        private static MethodInfo _createEditorPanel;
-        private static PropertyInfo _visualTreeProperty;
-        private static MethodInfo _validateLayout;
-        private static MethodInfo _handleIMGUIEvent;
 
         private static bool TryResolveMechanism(out string error)
         {

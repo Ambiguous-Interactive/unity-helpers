@@ -120,21 +120,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
         private sealed class SampleComponent
         {
-            public int InstanceField;
+            public static int StaticCount { get; set; }
             public static string StaticField = null;
 
             public string Name { get; set; }
-            public static int StaticCount { get; set; }
+
+            public int InstanceField;
+
+            public static string Concat(string left, string right)
+            {
+                return string.Concat(left, right);
+            }
 
             public int Increment(int value)
             {
                 InstanceField += value;
                 return InstanceField;
-            }
-
-            public static string Concat(string left, string right)
-            {
-                return string.Concat(left, right);
             }
         }
     }

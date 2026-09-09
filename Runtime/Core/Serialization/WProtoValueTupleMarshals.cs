@@ -18,6 +18,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         : IWProtoFormatter<ValueTuple<T1, T2>>,
             IWProtoConditionalFormatter
     {
+        private static SerializableValueTuple<T1, T2> Wrap(in ValueTuple<T1, T2> value)
+        {
+            return new SerializableValueTuple<T1, T2>(value.Item1, value.Item2);
+        }
+
         /// <inheritdoc />
         public bool CanServe()
         {
@@ -56,11 +61,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             value = new ValueTuple<T1, T2>(wrapper.Item1, wrapper.Item2);
             return true;
         }
-
-        private static SerializableValueTuple<T1, T2> Wrap(in ValueTuple<T1, T2> value)
-        {
-            return new SerializableValueTuple<T1, T2>(value.Item1, value.Item2);
-        }
     }
 
     /// <summary>
@@ -73,6 +73,11 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         : IWProtoFormatter<ValueTuple<T1, T2, T3>>,
             IWProtoConditionalFormatter
     {
+        private static SerializableValueTuple<T1, T2, T3> Wrap(in ValueTuple<T1, T2, T3> value)
+        {
+            return new SerializableValueTuple<T1, T2, T3>(value.Item1, value.Item2, value.Item3);
+        }
+
         /// <inheritdoc />
         public bool CanServe()
         {
@@ -112,11 +117,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
             value = new ValueTuple<T1, T2, T3>(wrapper.Item1, wrapper.Item2, wrapper.Item3);
             return true;
-        }
-
-        private static SerializableValueTuple<T1, T2, T3> Wrap(in ValueTuple<T1, T2, T3> value)
-        {
-            return new SerializableValueTuple<T1, T2, T3>(value.Item1, value.Item2, value.Item3);
         }
     }
 }

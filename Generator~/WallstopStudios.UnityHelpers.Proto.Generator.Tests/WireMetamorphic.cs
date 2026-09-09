@@ -303,13 +303,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         /// <summary>One top-level field occurrence, as the exact bytes it occupied.</summary>
         internal readonly struct Field
         {
-            internal Field(int number, int wireType, byte[] bytes)
-            {
-                Number = number;
-                WireType = wireType;
-                Bytes = bytes;
-            }
-
             /// <summary>The field number from the key.</summary>
             internal int Number { get; }
 
@@ -318,6 +311,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             /// <summary>The key and the value, verbatim.</summary>
             internal byte[] Bytes { get; }
+
+            internal Field(int number, int wireType, byte[] bytes)
+            {
+                Number = number;
+                WireType = wireType;
+                Bytes = bytes;
+            }
         }
     }
 }

@@ -141,6 +141,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             return true;
         }
 
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
+        }
+
         /// <summary>
         /// Rolls against <see cref="CurrentChance"/> and updates the failure count.
         /// </summary>
@@ -191,11 +196,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
             FailuresSinceSuccess = failuresSinceSuccess;
             return true;
-        }
-
-        private static bool IsFinite(float value)
-        {
-            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
 
         private void IncrementFailures()

@@ -32,6 +32,19 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         private bool _originalSortedSetTweenEnabled;
         private bool _originalWGroupTweenEnabled;
 
+        private static IEnumerable<TestCaseData> IndentationTestCases()
+        {
+            yield return new TestCaseData(4f, 4f).SetName("StandardPadding4x4");
+            yield return new TestCaseData(8f, 8f).SetName("SymmetricPadding8x8");
+            yield return new TestCaseData(12f, 12f).SetName("LargePadding12x12");
+
+            yield return new TestCaseData(10f, 5f).SetName("AsymmetricPaddingLeftHeavy");
+            yield return new TestCaseData(5f, 10f).SetName("AsymmetricPaddingRightHeavy");
+
+            yield return new TestCaseData(0.5f, 0.5f).SetName("SmallPadding");
+            yield return new TestCaseData(50f, 50f).SetName("VeryLargePadding");
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -3892,19 +3905,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 $"Available width difference should equal WGroup LEFT padding only. "
                     + $"Expected: {expectedDifference}, Actual: {difference}"
             );
-        }
-
-        private static IEnumerable<TestCaseData> IndentationTestCases()
-        {
-            yield return new TestCaseData(4f, 4f).SetName("StandardPadding4x4");
-            yield return new TestCaseData(8f, 8f).SetName("SymmetricPadding8x8");
-            yield return new TestCaseData(12f, 12f).SetName("LargePadding12x12");
-
-            yield return new TestCaseData(10f, 5f).SetName("AsymmetricPaddingLeftHeavy");
-            yield return new TestCaseData(5f, 10f).SetName("AsymmetricPaddingRightHeavy");
-
-            yield return new TestCaseData(0.5f, 0.5f).SetName("SmallPadding");
-            yield return new TestCaseData(50f, 50f).SetName("VeryLargePadding");
         }
 
         [TestCaseSource(nameof(IndentationTestCases))]

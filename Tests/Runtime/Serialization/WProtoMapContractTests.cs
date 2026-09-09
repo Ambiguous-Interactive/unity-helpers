@@ -30,6 +30,62 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [NUnit.Framework.Category("Serialization")]
     public sealed class WProtoMapContractTests
     {
+        private static byte[] Parse(string hex)
+        {
+            byte[] bytes = new byte[hex.Length / 2];
+            for (int index = 0; index < bytes.Length; index++)
+            {
+                bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
+            }
+
+            return bytes;
+        }
+
+        private static WProtoMapContract Decode(string hex)
+        {
+            WProtoReader reader = new(Parse(hex));
+            Assert.IsTrue(
+                WProtoFormatterProvider
+                    .Get<WProtoMapContract>()
+                    .TryRead(ref reader, out WProtoMapContract value),
+                hex
+            );
+            return value;
+        }
+
+        private static string Encode<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+
+            return ToHex(writer.Written);
+        }
+
+        private static string ToHex(ReadOnlySpan<byte> bytes)
+        {
+            StringBuilder builder = new(bytes.Length * 2);
+            foreach (byte current in bytes)
+            {
+                builder.Append(current.ToString("X2"));
+            }
+
+            return builder.ToString();
+        }
+
+        private static T RoundTrip<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+
+            WProtoReader reader = new(buffer);
+            Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
+            return restored;
+        }
+
         [Test]
         public void AnEntryIsAMessageWithTheKeyAtOneAndTheValueAtTwo()
         {
@@ -239,62 +295,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     )
                 ]
             );
-        }
-
-        private static byte[] Parse(string hex)
-        {
-            byte[] bytes = new byte[hex.Length / 2];
-            for (int index = 0; index < bytes.Length; index++)
-            {
-                bytes[index] = Convert.ToByte(hex.Substring(index * 2, 2), 16);
-            }
-
-            return bytes;
-        }
-
-        private static WProtoMapContract Decode(string hex)
-        {
-            WProtoReader reader = new(Parse(hex));
-            Assert.IsTrue(
-                WProtoFormatterProvider
-                    .Get<WProtoMapContract>()
-                    .TryRead(ref reader, out WProtoMapContract value),
-                hex
-            );
-            return value;
-        }
-
-        private static string Encode<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-
-            return ToHex(writer.Written);
-        }
-
-        private static string ToHex(ReadOnlySpan<byte> bytes)
-        {
-            StringBuilder builder = new(bytes.Length * 2);
-            foreach (byte current in bytes)
-            {
-                builder.Append(current.ToString("X2"));
-            }
-
-            return builder.ToString();
-        }
-
-        private static T RoundTrip<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-
-            WProtoReader reader = new(buffer);
-            Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
-            return restored;
         }
     }
 }

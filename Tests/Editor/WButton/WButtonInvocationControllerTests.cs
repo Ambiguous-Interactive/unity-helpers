@@ -21,6 +21,19 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
     [NUnit.Framework.Category("Integration")]
     public sealed class WButtonInvocationControllerTests : CommonTestBase
     {
+        private static IEnumerator WaitUntil(Func<bool> condition, float timeoutSeconds)
+        {
+            float endTime = Time.realtimeSinceStartup + timeoutSeconds;
+            while (!condition())
+            {
+                if (endTime < Time.realtimeSinceStartup)
+                {
+                    Assert.Fail("Timed out while waiting for condition.");
+                }
+                yield return null;
+            }
+        }
+
         [UnityTest]
         public IEnumerator AsyncTaskInvocationCompletesAndRecordsHistory()
         {
@@ -108,19 +121,6 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             Assert.IsFalse(methodState.HasHistory, "History should be empty after ClearHistory.");
             Assert.That(methodState.History, Is.Empty);
-        }
-
-        private static IEnumerator WaitUntil(Func<bool> condition, float timeoutSeconds)
-        {
-            float endTime = Time.realtimeSinceStartup + timeoutSeconds;
-            while (!condition())
-            {
-                if (endTime < Time.realtimeSinceStartup)
-                {
-                    Assert.Fail("Timed out while waiting for condition.");
-                }
-                yield return null;
-            }
         }
     }
 }

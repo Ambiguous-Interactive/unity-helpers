@@ -483,6 +483,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
         private sealed class DisposableEnumerator : IEnumerator<int>
         {
+            public int Current => _items[_position];
+
+            public bool WasDisposed { get; private set; }
+
+            object IEnumerator.Current => Current;
+
             private readonly List<int> _items;
             private int _position = -1;
 
@@ -490,12 +496,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             {
                 _items = items;
             }
-
-            public int Current => _items[_position];
-
-            object IEnumerator.Current => Current;
-
-            public bool WasDisposed { get; private set; }
 
             public bool MoveNext()
             {
@@ -516,14 +516,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
         private sealed class DisposableEnumerable : IEnumerable<int>
         {
+            public DisposableEnumerator LastEnumerator { get; private set; }
+
             private readonly List<int> _items;
 
             public DisposableEnumerable(params int[] items)
             {
                 _items = new List<int>(items);
             }
-
-            public DisposableEnumerator LastEnumerator { get; private set; }
 
             public IEnumerator<int> GetEnumerator()
             {

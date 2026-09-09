@@ -14,6 +14,29 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
     [NUnit.Framework.Category("Fast")]
     public sealed class FeelGoodRandomnessTests
     {
+        private static double EstimateExpectedAttempts(double coefficient)
+        {
+            double expectedAttempts = 0d;
+            double survival = 1d;
+            for (int attempt = 1; attempt < 10_000; ++attempt)
+            {
+                expectedAttempts += survival;
+                double chance = coefficient * attempt;
+                if (1d <= chance)
+                {
+                    return expectedAttempts;
+                }
+
+                survival *= 1d - chance;
+                if (survival <= 1e-14d)
+                {
+                    return expectedAttempts;
+                }
+            }
+
+            return expectedAttempts;
+        }
+
         [Test]
         public void ExactAveragePrdRejectsInvalidTargets()
         {
@@ -264,29 +287,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             Assert.That(destination, Is.Empty);
         }
 
-        private static double EstimateExpectedAttempts(double coefficient)
-        {
-            double expectedAttempts = 0d;
-            double survival = 1d;
-            for (int attempt = 1; attempt < 10_000; ++attempt)
-            {
-                expectedAttempts += survival;
-                double chance = coefficient * attempt;
-                if (1d <= chance)
-                {
-                    return expectedAttempts;
-                }
-
-                survival *= 1d - chance;
-                if (survival <= 1e-14d)
-                {
-                    return expectedAttempts;
-                }
-            }
-
-            return expectedAttempts;
-        }
-
         /// <summary>
         /// A test double for <see cref="AbstractRandom"/>, and never serialized.
         /// </summary>
@@ -300,6 +300,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         [WProtoNotSerialized]
         private sealed class SequenceRandom : AbstractRandom
         {
+            public override RandomState InternalState => BuildState((ulong)_index);
+
             private readonly uint[] _values;
             private int _index;
 
@@ -307,8 +309,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             {
                 _values = values ?? Array.Empty<uint>();
             }
-
-            public override RandomState InternalState => BuildState((ulong)_index);
 
             public override uint NextUint()
             {

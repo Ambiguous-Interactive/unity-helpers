@@ -84,15 +84,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         [WProtoMember(7)]
         internal ulong _y;
 
-        private void EnsureNonZeroState()
-        {
-            if ((_x | _y) == 0)
-            {
-                _x = 0xD3833E804F4C574BUL;
-                _y = 0x94D049BB133111EBUL;
-            }
-        }
-
         public RomuDuo()
             : this(Guid.NewGuid()) { }
 
@@ -120,9 +111,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             EnsureNonZeroState();
         }
 
-        protected override void OnAfterDeserialization()
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static ulong Rol64(ulong x, int k)
         {
-            EnsureNonZeroState();
+            return (x << k) | (x >> (64 - k));
         }
 
         public override uint NextUint()
@@ -138,27 +130,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             return NextWord();
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private ulong NextWord()
-        {
-            unchecked
-            {
-                ulong xp = _x;
-                _x = 15241094284759029579UL * _y;
-                _y = Rol64(_y, 36) + Rol64(_y, 15) - xp;
-                return xp;
-            }
-        }
-
         public override IRandom Copy()
         {
             return new RomuDuo(InternalState);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong Rol64(ulong x, int k)
-        {
-            return (x << k) | (x >> (64 - k));
         }
 
         public override bool Equals(object obj)
@@ -205,6 +179,32 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
 
             return _y.CompareTo(other._y);
+        }
+
+        protected override void OnAfterDeserialization()
+        {
+            EnsureNonZeroState();
+        }
+
+        private void EnsureNonZeroState()
+        {
+            if ((_x | _y) == 0)
+            {
+                _x = 0xD3833E804F4C574BUL;
+                _y = 0x94D049BB133111EBUL;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private ulong NextWord()
+        {
+            unchecked
+            {
+                ulong xp = _x;
+                _x = 15241094284759029579UL * _y;
+                _y = Rol64(_y, 36) + Rol64(_y, 15) - xp;
+                return xp;
+            }
         }
     }
 }

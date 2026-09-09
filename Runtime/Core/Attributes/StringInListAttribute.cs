@@ -49,10 +49,11 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     {
         private static readonly string[] Empty = Array.Empty<string>();
 
-        private readonly WValueDropDownAttribute _backingAttribute;
-
-        private object[] _cachedSourceOptions;
-        private string[] _cachedStringOptions;
+        /// <summary>
+        /// Retrieves the allowed string options for the decorated field without any context.
+        /// Note: when the attribute targets an instance method, this returns an empty array.
+        /// </summary>
+        public string[] List => GetOptions(null);
 
         internal Type ProviderType => _backingAttribute?.ProviderType;
 
@@ -63,6 +64,17 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// This enables sharing of infrastructure between both attribute types.
         /// </summary>
         internal WValueDropDownAttribute BackingAttribute => _backingAttribute;
+
+        /// <summary>
+        /// Indicates whether this attribute uses an instance method provider.
+        /// </summary>
+        internal bool RequiresInstanceContext =>
+            _backingAttribute?.RequiresInstanceContext ?? false;
+
+        private readonly WValueDropDownAttribute _backingAttribute;
+
+        private object[] _cachedSourceOptions;
+        private string[] _cachedStringOptions;
 
         /// <summary>
         /// Uses a fixed list of allowed strings.
@@ -99,12 +111,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         }
 
         /// <summary>
-        /// Retrieves the allowed string options for the decorated field without any context.
-        /// Note: when the attribute targets an instance method, this returns an empty array.
-        /// </summary>
-        public string[] List => GetOptions(null);
-
-        /// <summary>
         /// Retrieves the allowed string options for the supplied context object.
         /// </summary>
         /// <param name="context">The object declaring the field/property. Required for instance providers.</param>
@@ -138,11 +144,5 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
 
             return result;
         }
-
-        /// <summary>
-        /// Indicates whether this attribute uses an instance method provider.
-        /// </summary>
-        internal bool RequiresInstanceContext =>
-            _backingAttribute?.RequiresInstanceContext ?? false;
     }
 }

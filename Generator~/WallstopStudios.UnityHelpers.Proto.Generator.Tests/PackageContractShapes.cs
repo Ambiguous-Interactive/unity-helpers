@@ -221,10 +221,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [WProtoContract]
     public sealed partial class ListShape<T> : IList<T>, IReadOnlyList<T>
     {
-        [ProtoMember(1, OverwriteList = true)]
-        [WProtoMember(1, OverwriteList = true)]
-        private List<T> _items = new List<T>();
-
         /// <summary>Gets or sets the element at <paramref name="index"/>.</summary>
         /// <param name="index">The position.</param>
         public T this[int index]
@@ -238,6 +234,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
         /// <summary>Gets whether the list rejects mutation.</summary>
         public bool IsReadOnly => false;
+
+        [ProtoMember(1, OverwriteList = true)]
+        [WProtoMember(1, OverwriteList = true)]
+        private List<T> _items = new List<T>();
 
         /// <summary>Appends an element.</summary>
         /// <param name="item">The element.</param>
@@ -298,8 +298,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [WProtoMember(3)]
         private int _setCount;
 
-        private DisjointShape() { }
-
         /// <summary>Builds a populated instance.</summary>
         /// <param name="parent">Parent indices.</param>
         /// <param name="rank">Union ranks.</param>
@@ -310,6 +308,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             _rank = rank;
             _setCount = setCount;
         }
+
+        private DisjointShape() { }
     }
 
     /// <summary>
@@ -326,6 +326,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [WProtoContract(IgnoreListHandling = true)]
     public sealed partial class BitShape : IReadOnlyList<bool>
     {
+        /// <summary>Gets the bit at <paramref name="index"/>.</summary>
+        /// <param name="index">The bit position.</param>
+        public bool this[int index] => (_bits[index >> 6] & (1UL << (index & 63))) != 0;
+
+        /// <summary>Gets the addressable bit count.</summary>
+        public int Count => _capacity;
+
         [ProtoMember(1)]
         [WProtoMember(1)]
         private ulong[] _bits;
@@ -345,13 +352,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             _bits = bits;
             _capacity = capacity;
         }
-
-        /// <summary>Gets the bit at <paramref name="index"/>.</summary>
-        /// <param name="index">The bit position.</param>
-        public bool this[int index] => (_bits[index >> 6] & (1UL << (index & 63))) != 0;
-
-        /// <summary>Gets the addressable bit count.</summary>
-        public int Count => _capacity;
 
         /// <summary>Enumerates the bits.</summary>
         public IEnumerator<bool> GetEnumerator()
@@ -532,6 +532,17 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [WProtoContract(SkipConstructor = true)]
     public sealed partial class RandomSkippingShape : RandomBaseShape
     {
+        /// <summary>
+        /// The opaque state blob, captured on write and held for the hook on read.
+        /// </summary>
+        [ProtoMember(8)]
+        [WProtoMember(8)]
+        public byte[] SerializedState
+        {
+            get => pending;
+            set => pending = value;
+        }
+
         /// <summary>How many values have been drawn.</summary>
         [ProtoMember(6)]
         [WProtoMember(6)]
@@ -556,17 +567,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [ProtoMember(11)]
         [WProtoMember(11)]
         public bool primed;
-
-        /// <summary>
-        /// The opaque state blob, captured on write and held for the hook on read.
-        /// </summary>
-        [ProtoMember(8)]
-        [WProtoMember(8)]
-        public byte[] SerializedState
-        {
-            get => pending;
-            set => pending = value;
-        }
 
         /// <summary>Where the blob waits until the hook consumes it.</summary>
         [ProtoIgnore]

@@ -27,9 +27,143 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         private float _currentTime;
         private bool _wasMemoryPressureEnabled;
 
-        private float TestTimeProvider()
+        private static IEnumerable<TestCaseData> PoolFrequencyStatisticsEqualityCases()
         {
-            return _currentTime;
+            PoolFrequencyStatistics baseStats = new PoolFrequencyStatistics(
+                rentalsPerMinute: 10f,
+                averageInterRentalTimeSeconds: 1f,
+                lastAccessTime: 100f,
+                totalRentalCount: 50,
+                isHighFrequency: true,
+                isLowFrequency: false,
+                isUnused: false
+            );
+
+            PoolFrequencyStatistics identicalStats = new PoolFrequencyStatistics(
+                rentalsPerMinute: 10f,
+                averageInterRentalTimeSeconds: 1f,
+                lastAccessTime: 100f,
+                totalRentalCount: 50,
+                isHighFrequency: true,
+                isLowFrequency: false,
+                isUnused: false
+            );
+
+            yield return new TestCaseData(baseStats, identicalStats, true).SetName(
+                "Equal.IdenticalValues"
+            );
+
+            yield return new TestCaseData(
+                baseStats,
+                new PoolFrequencyStatistics(
+                    rentalsPerMinute: 20f,
+                    averageInterRentalTimeSeconds: 1f,
+                    lastAccessTime: 100f,
+                    totalRentalCount: 50,
+                    isHighFrequency: true,
+                    isLowFrequency: false,
+                    isUnused: false
+                ),
+                false
+            ).SetName("NotEqual.DifferentRentalsPerMinute");
+
+            yield return new TestCaseData(
+                baseStats,
+                new PoolFrequencyStatistics(
+                    rentalsPerMinute: 10f,
+                    averageInterRentalTimeSeconds: 2f,
+                    lastAccessTime: 100f,
+                    totalRentalCount: 50,
+                    isHighFrequency: true,
+                    isLowFrequency: false,
+                    isUnused: false
+                ),
+                false
+            ).SetName("NotEqual.DifferentAvgInterRentalTime");
+
+            yield return new TestCaseData(
+                baseStats,
+                new PoolFrequencyStatistics(
+                    rentalsPerMinute: 10f,
+                    averageInterRentalTimeSeconds: 1f,
+                    lastAccessTime: 200f,
+                    totalRentalCount: 50,
+                    isHighFrequency: true,
+                    isLowFrequency: false,
+                    isUnused: false
+                ),
+                false
+            ).SetName("NotEqual.DifferentLastAccessTime");
+
+            yield return new TestCaseData(
+                baseStats,
+                new PoolFrequencyStatistics(
+                    rentalsPerMinute: 10f,
+                    averageInterRentalTimeSeconds: 1f,
+                    lastAccessTime: 100f,
+                    totalRentalCount: 100,
+                    isHighFrequency: true,
+                    isLowFrequency: false,
+                    isUnused: false
+                ),
+                false
+            ).SetName("NotEqual.DifferentTotalRentalCount");
+
+            yield return new TestCaseData(
+                baseStats,
+                new PoolFrequencyStatistics(
+                    rentalsPerMinute: 10f,
+                    averageInterRentalTimeSeconds: 1f,
+                    lastAccessTime: 100f,
+                    totalRentalCount: 50,
+                    isHighFrequency: false,
+                    isLowFrequency: false,
+                    isUnused: false
+                ),
+                false
+            ).SetName("NotEqual.DifferentIsHighFrequency");
+
+            yield return new TestCaseData(
+                baseStats,
+                new PoolFrequencyStatistics(
+                    rentalsPerMinute: 10f,
+                    averageInterRentalTimeSeconds: 1f,
+                    lastAccessTime: 100f,
+                    totalRentalCount: 50,
+                    isHighFrequency: true,
+                    isLowFrequency: true,
+                    isUnused: false
+                ),
+                false
+            ).SetName("NotEqual.DifferentIsLowFrequency");
+
+            yield return new TestCaseData(
+                baseStats,
+                new PoolFrequencyStatistics(
+                    rentalsPerMinute: 10f,
+                    averageInterRentalTimeSeconds: 1f,
+                    lastAccessTime: 100f,
+                    totalRentalCount: 50,
+                    isHighFrequency: true,
+                    isLowFrequency: false,
+                    isUnused: true
+                ),
+                false
+            ).SetName("NotEqual.DifferentIsUnused");
+        }
+
+        private static PoolStatistics SampleStatistics(float rentalsPerMinute)
+        {
+            return new PoolStatistics(
+                currentSize: 4,
+                peakSize: 9,
+                rentCount: 100,
+                returnCount: 98,
+                purgeCount: 2,
+                idleTimeoutPurges: 1,
+                capacityPurges: 1,
+                rentalsPerMinute: rentalsPerMinute
+            );
         }
 
         [SetUp]
@@ -532,131 +666,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             }
         }
 
-        private static IEnumerable<TestCaseData> PoolFrequencyStatisticsEqualityCases()
-        {
-            PoolFrequencyStatistics baseStats = new PoolFrequencyStatistics(
-                rentalsPerMinute: 10f,
-                averageInterRentalTimeSeconds: 1f,
-                lastAccessTime: 100f,
-                totalRentalCount: 50,
-                isHighFrequency: true,
-                isLowFrequency: false,
-                isUnused: false
-            );
-
-            PoolFrequencyStatistics identicalStats = new PoolFrequencyStatistics(
-                rentalsPerMinute: 10f,
-                averageInterRentalTimeSeconds: 1f,
-                lastAccessTime: 100f,
-                totalRentalCount: 50,
-                isHighFrequency: true,
-                isLowFrequency: false,
-                isUnused: false
-            );
-
-            yield return new TestCaseData(baseStats, identicalStats, true).SetName(
-                "Equal.IdenticalValues"
-            );
-
-            yield return new TestCaseData(
-                baseStats,
-                new PoolFrequencyStatistics(
-                    rentalsPerMinute: 20f,
-                    averageInterRentalTimeSeconds: 1f,
-                    lastAccessTime: 100f,
-                    totalRentalCount: 50,
-                    isHighFrequency: true,
-                    isLowFrequency: false,
-                    isUnused: false
-                ),
-                false
-            ).SetName("NotEqual.DifferentRentalsPerMinute");
-
-            yield return new TestCaseData(
-                baseStats,
-                new PoolFrequencyStatistics(
-                    rentalsPerMinute: 10f,
-                    averageInterRentalTimeSeconds: 2f,
-                    lastAccessTime: 100f,
-                    totalRentalCount: 50,
-                    isHighFrequency: true,
-                    isLowFrequency: false,
-                    isUnused: false
-                ),
-                false
-            ).SetName("NotEqual.DifferentAvgInterRentalTime");
-
-            yield return new TestCaseData(
-                baseStats,
-                new PoolFrequencyStatistics(
-                    rentalsPerMinute: 10f,
-                    averageInterRentalTimeSeconds: 1f,
-                    lastAccessTime: 200f,
-                    totalRentalCount: 50,
-                    isHighFrequency: true,
-                    isLowFrequency: false,
-                    isUnused: false
-                ),
-                false
-            ).SetName("NotEqual.DifferentLastAccessTime");
-
-            yield return new TestCaseData(
-                baseStats,
-                new PoolFrequencyStatistics(
-                    rentalsPerMinute: 10f,
-                    averageInterRentalTimeSeconds: 1f,
-                    lastAccessTime: 100f,
-                    totalRentalCount: 100,
-                    isHighFrequency: true,
-                    isLowFrequency: false,
-                    isUnused: false
-                ),
-                false
-            ).SetName("NotEqual.DifferentTotalRentalCount");
-
-            yield return new TestCaseData(
-                baseStats,
-                new PoolFrequencyStatistics(
-                    rentalsPerMinute: 10f,
-                    averageInterRentalTimeSeconds: 1f,
-                    lastAccessTime: 100f,
-                    totalRentalCount: 50,
-                    isHighFrequency: false,
-                    isLowFrequency: false,
-                    isUnused: false
-                ),
-                false
-            ).SetName("NotEqual.DifferentIsHighFrequency");
-
-            yield return new TestCaseData(
-                baseStats,
-                new PoolFrequencyStatistics(
-                    rentalsPerMinute: 10f,
-                    averageInterRentalTimeSeconds: 1f,
-                    lastAccessTime: 100f,
-                    totalRentalCount: 50,
-                    isHighFrequency: true,
-                    isLowFrequency: true,
-                    isUnused: false
-                ),
-                false
-            ).SetName("NotEqual.DifferentIsLowFrequency");
-
-            yield return new TestCaseData(
-                baseStats,
-                new PoolFrequencyStatistics(
-                    rentalsPerMinute: 10f,
-                    averageInterRentalTimeSeconds: 1f,
-                    lastAccessTime: 100f,
-                    totalRentalCount: 50,
-                    isHighFrequency: true,
-                    isLowFrequency: false,
-                    isUnused: true
-                ),
-                false
-            ).SetName("NotEqual.DifferentIsUnused");
-        }
-
         [Test]
         [TestCase(null, false, TestName = "Object.Null.ReturnsFalse")]
         [TestCase("not a stats object", false, TestName = "Object.WrongType.ReturnsFalse")]
@@ -844,20 +853,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                 "A snapshot must be approximately equal to itself whatever it holds"
             );
             Assert.IsFalse(infinite.ApproximatelyEquals(negativelyInfinite, 1f));
-        }
-
-        private static PoolStatistics SampleStatistics(float rentalsPerMinute)
-        {
-            return new PoolStatistics(
-                currentSize: 4,
-                peakSize: 9,
-                rentCount: 100,
-                returnCount: 98,
-                purgeCount: 2,
-                idleTimeoutPurges: 1,
-                capacityPurges: 1,
-                rentalsPerMinute: rentalsPerMinute
-            );
         }
 
         [Test]
@@ -1575,11 +1570,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
         }
 
+        private float TestTimeProvider()
+        {
+            return _currentTime;
+        }
+
         private sealed class TestPoolItem
         {
-            public int Id { get; }
-
             private static int _nextId;
+
+            public int Id { get; }
 
             public TestPoolItem()
             {
@@ -1603,11 +1603,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
     {
         private float _currentTime;
         private bool _wasMemoryPressureEnabled;
-
-        private float TestTimeProvider()
-        {
-            return _currentTime;
-        }
 
         [SetUp]
         public void SetUp()
@@ -1967,11 +1962,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             );
         }
 
+        private float TestTimeProvider()
+        {
+            return _currentTime;
+        }
+
         private sealed class TestPoolItem
         {
-            public int Id { get; }
-
             private static int _nextId;
+
+            public int Id { get; }
 
             public TestPoolItem()
             {
@@ -1996,11 +1996,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
     {
         private float _currentTime;
         private bool _wasMemoryPressureEnabled;
-
-        private float TestTimeProvider()
-        {
-            return _currentTime;
-        }
 
         [SetUp]
         public void SetUp()
@@ -2558,11 +2553,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
             }
         }
 
+        private float TestTimeProvider()
+        {
+            return _currentTime;
+        }
+
         private sealed class TestPoolItem
         {
-            public int Id { get; }
-
             private static int _nextId;
+
+            public int Id { get; }
 
             public TestPoolItem()
             {

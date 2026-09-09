@@ -25,6 +25,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
     {
         private const string Root = "Assets/Temp/SpriteCropperAdditionalTests";
 
+        private static string RelToFull(string rel)
+        {
+            return Path.Combine(
+                    Application.dataPath.Substring(
+                        0,
+                        Application.dataPath.Length - "Assets".Length
+                    ),
+                    rel
+                )
+                .SanitizePath();
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -345,73 +357,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             );
         }
 
-        private void CreatePngWithOpaqueRect(
-            string relPath,
-            int w,
-            int h,
-            int rectX,
-            int rectY,
-            int rectW,
-            int rectH,
-            Color color
-        )
-        {
-            EnsureFolder(Path.GetDirectoryName(relPath).SanitizePath());
-            Texture2D t = new(w, h, TextureFormat.RGBA32, false) { alphaIsTransparency = true };
-            Color[] pix = new Color[w * h];
-            for (int y = 0; y < h; ++y)
-            for (int x = 0; x < w; ++x)
-            {
-                bool inRect = rectX <= x && x < rectX + rectW && rectY <= y && y < rectY + rectH;
-                pix[y * w + x] = inRect ? color : new Color(0f, 0f, 0f, 0f);
-            }
-            t.SetPixels(pix);
-            t.Apply();
-            File.WriteAllBytes(RelToFull(relPath), t.EncodeToPNG());
-        }
-
-        private void CreatePngFilled(string relPath, int w, int h, Color c)
-        {
-            EnsureFolder(Path.GetDirectoryName(relPath).SanitizePath());
-            Texture2D t = new(w, h, TextureFormat.RGBA32, false) { alphaIsTransparency = true };
-            Color[] pix = new Color[w * h];
-            for (int i = 0; i < pix.Length; i++)
-            {
-                pix[i] = c;
-            }
-
-            t.SetPixels(pix);
-            t.Apply();
-            File.WriteAllBytes(RelToFull(relPath), t.EncodeToPNG());
-        }
-
-        private void CreateTransparentPng(string relPath, int w, int h)
-        {
-            EnsureFolder(Path.GetDirectoryName(relPath).SanitizePath());
-            Texture2D t = new(w, h, TextureFormat.RGBA32, false) { alphaIsTransparency = true };
-            Color[] pix = new Color[w * h];
-            for (int i = 0; i < pix.Length; i++)
-            {
-                pix[i] = new Color(0f, 0f, 0f, 0f);
-            }
-
-            t.SetPixels(pix);
-            t.Apply();
-            File.WriteAllBytes(RelToFull(relPath), t.EncodeToPNG());
-        }
-
-        private static string RelToFull(string rel)
-        {
-            return Path.Combine(
-                    Application.dataPath.Substring(
-                        0,
-                        Application.dataPath.Length - "Assets".Length
-                    ),
-                    rel
-                )
-                .SanitizePath();
-        }
-
         /// <summary>
         /// Tests that the skip count is never negative after processing.
         /// This was a regression where the formula for calculating skipped count
@@ -564,6 +509,61 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                     @"\d+ sprites processed successfully\. Skipped: \d+"
                 )
             );
+        }
+
+        private void CreatePngWithOpaqueRect(
+            string relPath,
+            int w,
+            int h,
+            int rectX,
+            int rectY,
+            int rectW,
+            int rectH,
+            Color color
+        )
+        {
+            EnsureFolder(Path.GetDirectoryName(relPath).SanitizePath());
+            Texture2D t = new(w, h, TextureFormat.RGBA32, false) { alphaIsTransparency = true };
+            Color[] pix = new Color[w * h];
+            for (int y = 0; y < h; ++y)
+            for (int x = 0; x < w; ++x)
+            {
+                bool inRect = rectX <= x && x < rectX + rectW && rectY <= y && y < rectY + rectH;
+                pix[y * w + x] = inRect ? color : new Color(0f, 0f, 0f, 0f);
+            }
+            t.SetPixels(pix);
+            t.Apply();
+            File.WriteAllBytes(RelToFull(relPath), t.EncodeToPNG());
+        }
+
+        private void CreatePngFilled(string relPath, int w, int h, Color c)
+        {
+            EnsureFolder(Path.GetDirectoryName(relPath).SanitizePath());
+            Texture2D t = new(w, h, TextureFormat.RGBA32, false) { alphaIsTransparency = true };
+            Color[] pix = new Color[w * h];
+            for (int i = 0; i < pix.Length; i++)
+            {
+                pix[i] = c;
+            }
+
+            t.SetPixels(pix);
+            t.Apply();
+            File.WriteAllBytes(RelToFull(relPath), t.EncodeToPNG());
+        }
+
+        private void CreateTransparentPng(string relPath, int w, int h)
+        {
+            EnsureFolder(Path.GetDirectoryName(relPath).SanitizePath());
+            Texture2D t = new(w, h, TextureFormat.RGBA32, false) { alphaIsTransparency = true };
+            Color[] pix = new Color[w * h];
+            for (int i = 0; i < pix.Length; i++)
+            {
+                pix[i] = new Color(0f, 0f, 0f, 0f);
+            }
+
+            t.SetPixels(pix);
+            t.Apply();
+            File.WriteAllBytes(RelToFull(relPath), t.EncodeToPNG());
         }
     }
 #endif

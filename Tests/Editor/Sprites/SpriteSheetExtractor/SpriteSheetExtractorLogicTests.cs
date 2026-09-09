@@ -31,20 +31,391 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
     [Ignore("Beta feature - SpriteSheetExtractor tests are not reliable")]
     public sealed class SpriteSheetExtractorLogicTests : CommonTestBase
     {
-        private SpriteSheetExtractor CreateExtractor()
-        {
-            SpriteSheetExtractor extractor = Track(
-                ScriptableObject.CreateInstance<SpriteSheetExtractor>()
-            );
-            return extractor;
-        }
-
         private static IEnumerable<TestCaseData> GridAutoCalculationCases()
         {
             yield return new TestCaseData(64, 64, 2, 2, 32, 32).SetName("GridAuto.64x64.2x2");
             yield return new TestCaseData(128, 64, 4, 2, 32, 32).SetName("GridAuto.128x64.4x2");
             yield return new TestCaseData(256, 256, 8, 8, 32, 32).SetName("GridAuto.256x256.8x8");
             yield return new TestCaseData(100, 100, 4, 4, 25, 25).SetName("GridAuto.100x100.4x4");
+        }
+
+        private static IEnumerable<TestCaseData> GridManualCalculationCases()
+        {
+            yield return new TestCaseData(128, 128, 4, 4, 0, 0, 32, 32).SetName(
+                "GridManual.Cols4Rows4"
+            );
+            yield return new TestCaseData(128, 128, 2, 2, 0, 0, 64, 64).SetName(
+                "GridManual.Cols2Rows2"
+            );
+            yield return new TestCaseData(128, 128, 4, 4, 32, 32, 32, 32).SetName(
+                "GridManual.ExplicitCellSize"
+            );
+            yield return new TestCaseData(128, 128, 4, 4, 16, 16, 32, 32).SetName(
+                "GridManual.SmallCellSize"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> AlphaDetectionCases()
+        {
+            yield return new TestCaseData(0.01f).SetName("AlphaDetection.Threshold0.01");
+            yield return new TestCaseData(0.1f).SetName("AlphaDetection.Threshold0.1");
+            yield return new TestCaseData(0.5f).SetName("AlphaDetection.Threshold0.5");
+        }
+
+        private static IEnumerable<TestCaseData> PreviewSizeCases()
+        {
+            yield return new TestCaseData(SpriteSheetExtractor.PreviewSizeMode.Size24, 24).SetName(
+                "PreviewSize.24"
+            );
+            yield return new TestCaseData(SpriteSheetExtractor.PreviewSizeMode.Size32, 32).SetName(
+                "PreviewSize.32"
+            );
+            yield return new TestCaseData(SpriteSheetExtractor.PreviewSizeMode.Size64, 64).SetName(
+                "PreviewSize.64"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> GetEffectiveExtractionModeCases()
+        {
+            yield return new TestCaseData(
+                SpriteSheetExtractor.ExtractionMode.GridBased,
+                true,
+                SpriteSheetExtractor.ExtractionMode.FromMetadata,
+                SpriteSheetExtractor.ExtractionMode.GridBased
+            ).SetName("EffectiveExtraction.UseGlobal.ReturnsGlobal");
+            yield return new TestCaseData(
+                SpriteSheetExtractor.ExtractionMode.GridBased,
+                false,
+                SpriteSheetExtractor.ExtractionMode.PaddedGrid,
+                SpriteSheetExtractor.ExtractionMode.PaddedGrid
+            ).SetName("EffectiveExtraction.NotUseGlobal.ReturnsOverride");
+        }
+
+        private static IEnumerable<TestCaseData> GetEffectiveGridSizeModeCases()
+        {
+            yield return new TestCaseData(
+                SpriteSheetExtractor.GridSizeMode.Manual,
+                true,
+                SpriteSheetExtractor.GridSizeMode.Auto,
+                SpriteSheetExtractor.GridSizeMode.Manual
+            ).SetName("EffectiveGridSize.UseGlobal.ReturnsGlobal");
+            yield return new TestCaseData(
+                SpriteSheetExtractor.GridSizeMode.Manual,
+                false,
+                SpriteSheetExtractor.GridSizeMode.Auto,
+                SpriteSheetExtractor.GridSizeMode.Auto
+            ).SetName("EffectiveGridSize.NotUseGlobal.ReturnsOverride");
+        }
+
+        private static IEnumerable<TestCaseData> GetEffectiveGridColumnsCases()
+        {
+            yield return new TestCaseData(4, true, 8, 4).SetName(
+                "EffectiveGridColumns.UseGlobal.ReturnsGlobal"
+            );
+            yield return new TestCaseData(4, false, 8, 8).SetName(
+                "EffectiveGridColumns.NotUseGlobal.ReturnsOverride"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> GetEffectiveGridRowsCases()
+        {
+            yield return new TestCaseData(4, true, 8, 4).SetName(
+                "EffectiveGridRows.UseGlobal.ReturnsGlobal"
+            );
+            yield return new TestCaseData(4, false, 8, 8).SetName(
+                "EffectiveGridRows.NotUseGlobal.ReturnsOverride"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> GetEffectiveCellWidthCases()
+        {
+            yield return new TestCaseData(32, true, 64, 32).SetName(
+                "EffectiveCellWidth.UseGlobal.ReturnsGlobal"
+            );
+            yield return new TestCaseData(32, false, 64, 64).SetName(
+                "EffectiveCellWidth.NotUseGlobal.ReturnsOverride"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> GetEffectiveCellHeightCases()
+        {
+            yield return new TestCaseData(32, true, 64, 32).SetName(
+                "EffectiveCellHeight.UseGlobal.ReturnsGlobal"
+            );
+            yield return new TestCaseData(32, false, 64, 64).SetName(
+                "EffectiveCellHeight.NotUseGlobal.ReturnsOverride"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> GetEffectivePaddingLeftCases()
+        {
+            yield return new TestCaseData(2, true, 4, 2).SetName(
+                "EffectivePaddingLeft.UseGlobal.ReturnsGlobal"
+            );
+            yield return new TestCaseData(2, false, 4, 4).SetName(
+                "EffectivePaddingLeft.NotUseGlobal.ReturnsOverride"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> GetEffectivePaddingRightCases()
+        {
+            yield return new TestCaseData(2, true, 4, 2).SetName(
+                "EffectivePaddingRight.UseGlobal.ReturnsGlobal"
+            );
+            yield return new TestCaseData(2, false, 4, 4).SetName(
+                "EffectivePaddingRight.NotUseGlobal.ReturnsOverride"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> GetEffectivePaddingTopCases()
+        {
+            yield return new TestCaseData(2, true, 4, 2).SetName(
+                "EffectivePaddingTop.UseGlobal.ReturnsGlobal"
+            );
+            yield return new TestCaseData(2, false, 4, 4).SetName(
+                "EffectivePaddingTop.NotUseGlobal.ReturnsOverride"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> GetEffectivePaddingBottomCases()
+        {
+            yield return new TestCaseData(2, true, 4, 2).SetName(
+                "EffectivePaddingBottom.UseGlobal.ReturnsGlobal"
+            );
+            yield return new TestCaseData(2, false, 4, 4).SetName(
+                "EffectivePaddingBottom.NotUseGlobal.ReturnsOverride"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> GetEffectiveAlphaThresholdCases()
+        {
+            yield return new TestCaseData(0.5f, true, 0.8f, 0.5f).SetName(
+                "EffectiveAlphaThreshold.UseGlobal.ReturnsGlobal"
+            );
+            yield return new TestCaseData(0.5f, false, 0.8f, 0.8f).SetName(
+                "EffectiveAlphaThreshold.NotUseGlobal.ReturnsOverride"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> PivotEdgeCases()
+        {
+            yield return new TestCaseData(new Vector2(0.0f, 0.0f), new Vector2(0.0f, 0.0f)).SetName(
+                "Pivot.EdgeCase.ExactZeroZero"
+            );
+            yield return new TestCaseData(new Vector2(1.0f, 1.0f), new Vector2(1.0f, 1.0f)).SetName(
+                "Pivot.EdgeCase.ExactOneOne"
+            );
+            yield return new TestCaseData(new Vector2(0.0f, 1.0f), new Vector2(0.0f, 1.0f)).SetName(
+                "Pivot.EdgeCase.ExactZeroOne"
+            );
+            yield return new TestCaseData(new Vector2(1.0f, 0.0f), new Vector2(1.0f, 0.0f)).SetName(
+                "Pivot.EdgeCase.ExactOneZero"
+            );
+            yield return new TestCaseData(
+                new Vector2(0.4999f, 0.4999f),
+                new Vector2(0.4999f, 0.4999f)
+            ).SetName("Pivot.EdgeCase.AlmostCenterLow");
+            yield return new TestCaseData(
+                new Vector2(0.5001f, 0.5001f),
+                new Vector2(0.5001f, 0.5001f)
+            ).SetName("Pivot.EdgeCase.AlmostCenterHigh");
+        }
+
+        private static IEnumerable<TestCaseData> GetEffectiveShowOverlayCases()
+        {
+            yield return new TestCaseData(true, true, false, true).SetName(
+                "EffectiveShowOverlay.UseGlobal.ReturnsGlobal"
+            );
+            yield return new TestCaseData(true, false, false, false).SetName(
+                "EffectiveShowOverlay.NotUseGlobal.ReturnsOverride"
+            );
+            yield return new TestCaseData(false, true, true, false).SetName(
+                "EffectiveShowOverlay.UseGlobalFalse.ReturnsGlobalFalse"
+            );
+            yield return new TestCaseData(false, false, true, true).SetName(
+                "EffectiveShowOverlay.NotUseGlobalTrueOverride.ReturnsTrue"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> CalculateTextureRectEdgeCases()
+        {
+            yield return new TestCaseData(
+                new Rect(0, 0, 1, 1),
+                1,
+                1,
+                1f,
+                new Rect(0, 0, 1, 1)
+            ).SetName("TextureRect.EdgeCase.MinimumSize");
+            yield return new TestCaseData(
+                new Rect(0, 0, 100, 100),
+                1,
+                1,
+                1f,
+                new Rect(49.5f, 49.5f, 1, 1)
+            ).SetName("TextureRect.EdgeCase.SmallTextureInLargePreview");
+        }
+
+        private static IEnumerable<TestCaseData> DetectOptimalGridNormalCases()
+        {
+            yield return new TestCaseData(
+                64,
+                64,
+                new int[] { 32 },
+                new int[] { 32 },
+                0.5f,
+                32,
+                32
+            ).SetName("GridDetection.Normal.SingleVerticalAndHorizontalLine.32x32");
+
+            yield return new TestCaseData(
+                128,
+                128,
+                new int[] { 32, 64, 96 },
+                new int[] { 32, 64, 96 },
+                0.5f,
+                32,
+                32
+            ).SetName("GridDetection.Normal.MultipleLines.32x32Grid");
+
+            yield return new TestCaseData(
+                100,
+                100,
+                new int[] { 25, 50, 75 },
+                new int[] { 25, 50, 75 },
+                0.5f,
+                25,
+                25
+            ).SetName("GridDetection.Normal.NonPowerOfTwo.25x25Grid");
+
+            yield return new TestCaseData(
+                96,
+                64,
+                new int[] { 32, 64 },
+                new int[] { 32 },
+                0.5f,
+                32,
+                32
+            ).SetName("GridDetection.Normal.RectangularTexture.32x32Grid");
+        }
+
+        private static IEnumerable<TestCaseData> DetectOptimalGridEdgeCases()
+        {
+            yield return new TestCaseData(4, 4, 0.5f).SetName("GridDetection.Edge.MinimumSize.4x4");
+            yield return new TestCaseData(3, 3, 0.5f).SetName(
+                "GridDetection.Edge.TooSmall.3x3.ShouldFail"
+            );
+            yield return new TestCaseData(2, 2, 0.5f).SetName(
+                "GridDetection.Edge.TooSmall.2x2.ShouldFail"
+            );
+            yield return new TestCaseData(1, 1, 0.5f).SetName(
+                "GridDetection.Edge.TooSmall.1x1.ShouldFail"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> AlphaThresholdEdgeCases()
+        {
+            yield return new TestCaseData(0.0f, true).SetName(
+                "GridDetection.AlphaThreshold.Zero.ShouldWork"
+            );
+            yield return new TestCaseData(0.5f, true).SetName(
+                "GridDetection.AlphaThreshold.Mid.ShouldWork"
+            );
+            yield return new TestCaseData(0.99f, true).SetName(
+                "GridDetection.AlphaThreshold.NearOne.ShouldWork"
+            );
+            yield return new TestCaseData(1.0f, false).SetName(
+                "GridDetection.AlphaThreshold.One.ShouldFail"
+            );
+            yield return new TestCaseData(1.1f, false).SetName(
+                "GridDetection.AlphaThreshold.AboveOne.ShouldFail"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> MinimumCellSizeCases()
+        {
+            /*
+                Midpoint cells fall below the eight-pixel minimum when the only usable divisor is the full
+                dimension.
+            */
+            yield return new TestCaseData(7, 7, false).SetName(
+                "GridDetection.MinCellSize.7x7.NoDivisorsAbove8"
+            );
+            yield return new TestCaseData(6, 6, false).SetName(
+                "GridDetection.MinCellSize.6x6.NoDivisorsAbove8"
+            );
+            yield return new TestCaseData(5, 5, false).SetName(
+                "GridDetection.MinCellSize.5x5.NoDivisorsAbove8"
+            );
+            yield return new TestCaseData(4, 4, false).SetName(
+                "GridDetection.MinCellSize.4x4.BelowMinimum"
+            );
+            yield return new TestCaseData(2, 2, false).SetName(
+                "GridDetection.MinCellSize.2x2.BelowMinimum"
+            );
+            yield return new TestCaseData(1, 1, false).SetName(
+                "GridDetection.MinCellSize.1x1.BelowMinimum"
+            );
+
+            yield return new TestCaseData(7, 16, false).SetName(
+                "GridDetection.MinCellSize.7x16.WidthHasNoDivisorsAbove8"
+            );
+            yield return new TestCaseData(16, 7, false).SetName(
+                "GridDetection.MinCellSize.16x7.HeightHasNoDivisorsAbove8"
+            );
+            yield return new TestCaseData(8, 7, false).SetName(
+                "GridDetection.MinCellSize.8x7.HeightBelowMinimum"
+            );
+            yield return new TestCaseData(7, 8, false).SetName(
+                "GridDetection.MinCellSize.7x8.WidthBelowMinimum"
+            );
+
+            // The only valid cell size is the whole dimension, so midpoint lines make cells below 8.
+            yield return new TestCaseData(8, 8, false).SetName(
+                "GridDetection.MinCellSize.8x8.OnlyWholeDimensionValid"
+            );
+            yield return new TestCaseData(9, 9, false).SetName(
+                "GridDetection.MinCellSize.9x9.OnlyWholeDimensionValid"
+            );
+            yield return new TestCaseData(11, 11, false).SetName(
+                "GridDetection.MinCellSize.11x11.PrimeNoValidDivisors"
+            );
+            yield return new TestCaseData(13, 13, false).SetName(
+                "GridDetection.MinCellSize.13x13.PrimeNoValidDivisors"
+            );
+            yield return new TestCaseData(11, 13, false).SetName(
+                "GridDetection.MinCellSize.11x13.BothPrimeNoValidDivisors"
+            );
+            yield return new TestCaseData(17, 17, false).SetName(
+                "GridDetection.MinCellSize.17x17.LargePrimeNoValidDivisors"
+            );
+
+            // Valid divisors of at least 8 exist and the midpoint still clears it: 16/2 = 8.
+            yield return new TestCaseData(16, 16, true).SetName(
+                "GridDetection.MinCellSize.16x16.MidpointCreates8x8Cells"
+            );
+
+            yield return new TestCaseData(24, 24, true).SetName(
+                "GridDetection.MinCellSize.24x24.MidpointCreates12x12Cells"
+            );
+
+            yield return new TestCaseData(32, 32, true).SetName(
+                "GridDetection.MinCellSize.32x32.MidpointCreates16x16Cells"
+            );
+
+            yield return new TestCaseData(64, 64, true).SetName(
+                "GridDetection.MinCellSize.64x64.MidpointCreates32x32Cells"
+            );
+
+            yield return new TestCaseData(48, 48, true).SetName(
+                "GridDetection.MinCellSize.48x48.MidpointCreates24x24Cells"
+            );
+
+            yield return new TestCaseData(32, 24, true).SetName(
+                "GridDetection.MinCellSize.32x24.NonSquareValidCells"
+            );
+            yield return new TestCaseData(24, 32, true).SetName(
+                "GridDetection.MinCellSize.24x32.NonSquareValidCells"
+            );
         }
 
         [Test]
@@ -84,22 +455,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 rows * cellHeight,
                 Is.EqualTo(textureHeight),
                 "Rows x CellHeight should equal texture height"
-            );
-        }
-
-        private static IEnumerable<TestCaseData> GridManualCalculationCases()
-        {
-            yield return new TestCaseData(128, 128, 4, 4, 0, 0, 32, 32).SetName(
-                "GridManual.Cols4Rows4"
-            );
-            yield return new TestCaseData(128, 128, 2, 2, 0, 0, 64, 64).SetName(
-                "GridManual.Cols2Rows2"
-            );
-            yield return new TestCaseData(128, 128, 4, 4, 32, 32, 32, 32).SetName(
-                "GridManual.ExplicitCellSize"
-            );
-            yield return new TestCaseData(128, 128, 4, 4, 16, 16, 32, 32).SetName(
-                "GridManual.SmallCellSize"
             );
         }
 
@@ -149,13 +504,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 Is.EqualTo(expectedCellHeight),
                 "Cell height should match expected"
             );
-        }
-
-        private static IEnumerable<TestCaseData> AlphaDetectionCases()
-        {
-            yield return new TestCaseData(0.01f).SetName("AlphaDetection.Threshold0.01");
-            yield return new TestCaseData(0.1f).SetName("AlphaDetection.Threshold0.1");
-            yield return new TestCaseData(0.5f).SetName("AlphaDetection.Threshold0.5");
         }
 
         [Test]
@@ -215,19 +563,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             SpriteSheetExtractor.DetectSpriteBoundsByAlpha(pixels, width, height, 0.01f, result);
 
             Assert.That(result.Count, Is.EqualTo(0), "Should not detect sprites with low alpha");
-        }
-
-        private static IEnumerable<TestCaseData> PreviewSizeCases()
-        {
-            yield return new TestCaseData(SpriteSheetExtractor.PreviewSizeMode.Size24, 24).SetName(
-                "PreviewSize.24"
-            );
-            yield return new TestCaseData(SpriteSheetExtractor.PreviewSizeMode.Size32, 32).SetName(
-                "PreviewSize.32"
-            );
-            yield return new TestCaseData(SpriteSheetExtractor.PreviewSizeMode.Size64, 64).SetName(
-                "PreviewSize.64"
-            );
         }
 
         [Test]
@@ -514,22 +849,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Assert.That(size, Is.EqualTo(32), "None should fall back to 32");
         }
 
-        private static IEnumerable<TestCaseData> GetEffectiveExtractionModeCases()
-        {
-            yield return new TestCaseData(
-                SpriteSheetExtractor.ExtractionMode.GridBased,
-                true,
-                SpriteSheetExtractor.ExtractionMode.FromMetadata,
-                SpriteSheetExtractor.ExtractionMode.GridBased
-            ).SetName("EffectiveExtraction.UseGlobal.ReturnsGlobal");
-            yield return new TestCaseData(
-                SpriteSheetExtractor.ExtractionMode.GridBased,
-                false,
-                SpriteSheetExtractor.ExtractionMode.PaddedGrid,
-                SpriteSheetExtractor.ExtractionMode.PaddedGrid
-            ).SetName("EffectiveExtraction.NotUseGlobal.ReturnsOverride");
-        }
-
         [Test]
         [TestCaseSource(nameof(GetEffectiveExtractionModeCases))]
         public void GetEffectiveExtractionModeReturnsCorrectValue(
@@ -565,22 +884,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Assert.That(result, Is.EqualTo(SpriteSheetExtractor.ExtractionMode.PaddedGrid));
         }
 
-        private static IEnumerable<TestCaseData> GetEffectiveGridSizeModeCases()
-        {
-            yield return new TestCaseData(
-                SpriteSheetExtractor.GridSizeMode.Manual,
-                true,
-                SpriteSheetExtractor.GridSizeMode.Auto,
-                SpriteSheetExtractor.GridSizeMode.Manual
-            ).SetName("EffectiveGridSize.UseGlobal.ReturnsGlobal");
-            yield return new TestCaseData(
-                SpriteSheetExtractor.GridSizeMode.Manual,
-                false,
-                SpriteSheetExtractor.GridSizeMode.Auto,
-                SpriteSheetExtractor.GridSizeMode.Auto
-            ).SetName("EffectiveGridSize.NotUseGlobal.ReturnsOverride");
-        }
-
         [Test]
         [TestCaseSource(nameof(GetEffectiveGridSizeModeCases))]
         public void GetEffectiveGridSizeModeReturnsCorrectValue(
@@ -612,16 +915,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             SpriteSheetExtractor.GridSizeMode result = extractor.GetEffectiveGridSizeMode(null);
 
             Assert.That(result, Is.EqualTo(SpriteSheetExtractor.GridSizeMode.Manual));
-        }
-
-        private static IEnumerable<TestCaseData> GetEffectiveGridColumnsCases()
-        {
-            yield return new TestCaseData(4, true, 8, 4).SetName(
-                "EffectiveGridColumns.UseGlobal.ReturnsGlobal"
-            );
-            yield return new TestCaseData(4, false, 8, 8).SetName(
-                "EffectiveGridColumns.NotUseGlobal.ReturnsOverride"
-            );
         }
 
         [Test]
@@ -657,16 +950,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Assert.That(result, Is.EqualTo(6));
         }
 
-        private static IEnumerable<TestCaseData> GetEffectiveGridRowsCases()
-        {
-            yield return new TestCaseData(4, true, 8, 4).SetName(
-                "EffectiveGridRows.UseGlobal.ReturnsGlobal"
-            );
-            yield return new TestCaseData(4, false, 8, 8).SetName(
-                "EffectiveGridRows.NotUseGlobal.ReturnsOverride"
-            );
-        }
-
         [Test]
         [TestCaseSource(nameof(GetEffectiveGridRowsCases))]
         public void GetEffectiveGridRowsReturnsCorrectValue(
@@ -698,16 +981,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             int result = extractor.GetEffectiveGridRows(null);
 
             Assert.That(result, Is.EqualTo(6));
-        }
-
-        private static IEnumerable<TestCaseData> GetEffectiveCellWidthCases()
-        {
-            yield return new TestCaseData(32, true, 64, 32).SetName(
-                "EffectiveCellWidth.UseGlobal.ReturnsGlobal"
-            );
-            yield return new TestCaseData(32, false, 64, 64).SetName(
-                "EffectiveCellWidth.NotUseGlobal.ReturnsOverride"
-            );
         }
 
         [Test]
@@ -743,16 +1016,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Assert.That(result, Is.EqualTo(48));
         }
 
-        private static IEnumerable<TestCaseData> GetEffectiveCellHeightCases()
-        {
-            yield return new TestCaseData(32, true, 64, 32).SetName(
-                "EffectiveCellHeight.UseGlobal.ReturnsGlobal"
-            );
-            yield return new TestCaseData(32, false, 64, 64).SetName(
-                "EffectiveCellHeight.NotUseGlobal.ReturnsOverride"
-            );
-        }
-
         [Test]
         [TestCaseSource(nameof(GetEffectiveCellHeightCases))]
         public void GetEffectiveCellHeightReturnsCorrectValue(
@@ -784,16 +1047,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             int result = extractor.GetEffectiveCellHeight(null);
 
             Assert.That(result, Is.EqualTo(48));
-        }
-
-        private static IEnumerable<TestCaseData> GetEffectivePaddingLeftCases()
-        {
-            yield return new TestCaseData(2, true, 4, 2).SetName(
-                "EffectivePaddingLeft.UseGlobal.ReturnsGlobal"
-            );
-            yield return new TestCaseData(2, false, 4, 4).SetName(
-                "EffectivePaddingLeft.NotUseGlobal.ReturnsOverride"
-            );
         }
 
         [Test]
@@ -829,16 +1082,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Assert.That(result, Is.EqualTo(3));
         }
 
-        private static IEnumerable<TestCaseData> GetEffectivePaddingRightCases()
-        {
-            yield return new TestCaseData(2, true, 4, 2).SetName(
-                "EffectivePaddingRight.UseGlobal.ReturnsGlobal"
-            );
-            yield return new TestCaseData(2, false, 4, 4).SetName(
-                "EffectivePaddingRight.NotUseGlobal.ReturnsOverride"
-            );
-        }
-
         [Test]
         [TestCaseSource(nameof(GetEffectivePaddingRightCases))]
         public void GetEffectivePaddingRightReturnsCorrectValue(
@@ -870,16 +1113,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             int result = extractor.GetEffectivePaddingRight(null);
 
             Assert.That(result, Is.EqualTo(3));
-        }
-
-        private static IEnumerable<TestCaseData> GetEffectivePaddingTopCases()
-        {
-            yield return new TestCaseData(2, true, 4, 2).SetName(
-                "EffectivePaddingTop.UseGlobal.ReturnsGlobal"
-            );
-            yield return new TestCaseData(2, false, 4, 4).SetName(
-                "EffectivePaddingTop.NotUseGlobal.ReturnsOverride"
-            );
         }
 
         [Test]
@@ -915,16 +1148,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Assert.That(result, Is.EqualTo(3));
         }
 
-        private static IEnumerable<TestCaseData> GetEffectivePaddingBottomCases()
-        {
-            yield return new TestCaseData(2, true, 4, 2).SetName(
-                "EffectivePaddingBottom.UseGlobal.ReturnsGlobal"
-            );
-            yield return new TestCaseData(2, false, 4, 4).SetName(
-                "EffectivePaddingBottom.NotUseGlobal.ReturnsOverride"
-            );
-        }
-
         [Test]
         [TestCaseSource(nameof(GetEffectivePaddingBottomCases))]
         public void GetEffectivePaddingBottomReturnsCorrectValue(
@@ -956,16 +1179,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             int result = extractor.GetEffectivePaddingBottom(null);
 
             Assert.That(result, Is.EqualTo(3));
-        }
-
-        private static IEnumerable<TestCaseData> GetEffectiveAlphaThresholdCases()
-        {
-            yield return new TestCaseData(0.5f, true, 0.8f, 0.5f).SetName(
-                "EffectiveAlphaThreshold.UseGlobal.ReturnsGlobal"
-            );
-            yield return new TestCaseData(0.5f, false, 0.8f, 0.8f).SetName(
-                "EffectiveAlphaThreshold.NotUseGlobal.ReturnsOverride"
-            );
         }
 
         [Test]
@@ -1580,30 +1793,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Assert.That(result, Is.EqualTo(new Vector2(0.5f, 0.5f)));
         }
 
-        private static IEnumerable<TestCaseData> PivotEdgeCases()
-        {
-            yield return new TestCaseData(new Vector2(0.0f, 0.0f), new Vector2(0.0f, 0.0f)).SetName(
-                "Pivot.EdgeCase.ExactZeroZero"
-            );
-            yield return new TestCaseData(new Vector2(1.0f, 1.0f), new Vector2(1.0f, 1.0f)).SetName(
-                "Pivot.EdgeCase.ExactOneOne"
-            );
-            yield return new TestCaseData(new Vector2(0.0f, 1.0f), new Vector2(0.0f, 1.0f)).SetName(
-                "Pivot.EdgeCase.ExactZeroOne"
-            );
-            yield return new TestCaseData(new Vector2(1.0f, 0.0f), new Vector2(1.0f, 0.0f)).SetName(
-                "Pivot.EdgeCase.ExactOneZero"
-            );
-            yield return new TestCaseData(
-                new Vector2(0.4999f, 0.4999f),
-                new Vector2(0.4999f, 0.4999f)
-            ).SetName("Pivot.EdgeCase.AlmostCenterLow");
-            yield return new TestCaseData(
-                new Vector2(0.5001f, 0.5001f),
-                new Vector2(0.5001f, 0.5001f)
-            ).SetName("Pivot.EdgeCase.AlmostCenterHigh");
-        }
-
         [Test]
         [TestCaseSource(nameof(PivotEdgeCases))]
         public void PivotModeToVector2ReturnsCorrectVectorForCustomPivotEdgeCases(
@@ -1870,22 +2059,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Assert.That(result, Is.False);
         }
 
-        private static IEnumerable<TestCaseData> GetEffectiveShowOverlayCases()
-        {
-            yield return new TestCaseData(true, true, false, true).SetName(
-                "EffectiveShowOverlay.UseGlobal.ReturnsGlobal"
-            );
-            yield return new TestCaseData(true, false, false, false).SetName(
-                "EffectiveShowOverlay.NotUseGlobal.ReturnsOverride"
-            );
-            yield return new TestCaseData(false, true, true, false).SetName(
-                "EffectiveShowOverlay.UseGlobalFalse.ReturnsGlobalFalse"
-            );
-            yield return new TestCaseData(false, false, true, true).SetName(
-                "EffectiveShowOverlay.NotUseGlobalTrueOverride.ReturnsTrue"
-            );
-        }
-
         [Test]
         [TestCaseSource(nameof(GetEffectiveShowOverlayCases))]
         public void GetEffectiveShowOverlayReturnsCorrectValue(
@@ -2078,24 +2251,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 
             Assert.That(result.x, Is.EqualTo(50));
             Assert.That(result.y, Is.EqualTo(100));
-        }
-
-        private static IEnumerable<TestCaseData> CalculateTextureRectEdgeCases()
-        {
-            yield return new TestCaseData(
-                new Rect(0, 0, 1, 1),
-                1,
-                1,
-                1f,
-                new Rect(0, 0, 1, 1)
-            ).SetName("TextureRect.EdgeCase.MinimumSize");
-            yield return new TestCaseData(
-                new Rect(0, 0, 100, 100),
-                1,
-                1,
-                1f,
-                new Rect(49.5f, 49.5f, 1, 1)
-            ).SetName("TextureRect.EdgeCase.SmallTextureInLargePreview");
         }
 
         [Test]
@@ -2493,49 +2648,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Assert.That(result, Is.True);
         }
 
-        private static IEnumerable<TestCaseData> DetectOptimalGridNormalCases()
-        {
-            yield return new TestCaseData(
-                64,
-                64,
-                new int[] { 32 },
-                new int[] { 32 },
-                0.5f,
-                32,
-                32
-            ).SetName("GridDetection.Normal.SingleVerticalAndHorizontalLine.32x32");
-
-            yield return new TestCaseData(
-                128,
-                128,
-                new int[] { 32, 64, 96 },
-                new int[] { 32, 64, 96 },
-                0.5f,
-                32,
-                32
-            ).SetName("GridDetection.Normal.MultipleLines.32x32Grid");
-
-            yield return new TestCaseData(
-                100,
-                100,
-                new int[] { 25, 50, 75 },
-                new int[] { 25, 50, 75 },
-                0.5f,
-                25,
-                25
-            ).SetName("GridDetection.Normal.NonPowerOfTwo.25x25Grid");
-
-            yield return new TestCaseData(
-                96,
-                64,
-                new int[] { 32, 64 },
-                new int[] { 32 },
-                0.5f,
-                32,
-                32
-            ).SetName("GridDetection.Normal.RectangularTexture.32x32Grid");
-        }
-
         [Test]
         [TestCaseSource(nameof(DetectOptimalGridNormalCases))]
         public void DetectOptimalGridFromTransparencyNormalCases(
@@ -2592,20 +2704,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 expectedCellHeight,
                 cellHeight,
                 $"Cell height should be {expectedCellHeight}"
-            );
-        }
-
-        private static IEnumerable<TestCaseData> DetectOptimalGridEdgeCases()
-        {
-            yield return new TestCaseData(4, 4, 0.5f).SetName("GridDetection.Edge.MinimumSize.4x4");
-            yield return new TestCaseData(3, 3, 0.5f).SetName(
-                "GridDetection.Edge.TooSmall.3x3.ShouldFail"
-            );
-            yield return new TestCaseData(2, 2, 0.5f).SetName(
-                "GridDetection.Edge.TooSmall.2x2.ShouldFail"
-            );
-            yield return new TestCaseData(1, 1, 0.5f).SetName(
-                "GridDetection.Edge.TooSmall.1x1.ShouldFail"
             );
         }
 
@@ -2755,25 +2853,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Assert.IsFalse(
                 result,
                 "Should return false when pixel count does not match dimensions"
-            );
-        }
-
-        private static IEnumerable<TestCaseData> AlphaThresholdEdgeCases()
-        {
-            yield return new TestCaseData(0.0f, true).SetName(
-                "GridDetection.AlphaThreshold.Zero.ShouldWork"
-            );
-            yield return new TestCaseData(0.5f, true).SetName(
-                "GridDetection.AlphaThreshold.Mid.ShouldWork"
-            );
-            yield return new TestCaseData(0.99f, true).SetName(
-                "GridDetection.AlphaThreshold.NearOne.ShouldWork"
-            );
-            yield return new TestCaseData(1.0f, false).SetName(
-                "GridDetection.AlphaThreshold.One.ShouldFail"
-            );
-            yield return new TestCaseData(1.1f, false).SetName(
-                "GridDetection.AlphaThreshold.AboveOne.ShouldFail"
             );
         }
 
@@ -2933,93 +3012,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Assert.IsFalse(
                 result,
                 "Should return false for irregular spacing that does not divide evenly"
-            );
-        }
-
-        private static IEnumerable<TestCaseData> MinimumCellSizeCases()
-        {
-            /*
-                Midpoint cells fall below the eight-pixel minimum when the only usable divisor is the full
-                dimension.
-            */
-            yield return new TestCaseData(7, 7, false).SetName(
-                "GridDetection.MinCellSize.7x7.NoDivisorsAbove8"
-            );
-            yield return new TestCaseData(6, 6, false).SetName(
-                "GridDetection.MinCellSize.6x6.NoDivisorsAbove8"
-            );
-            yield return new TestCaseData(5, 5, false).SetName(
-                "GridDetection.MinCellSize.5x5.NoDivisorsAbove8"
-            );
-            yield return new TestCaseData(4, 4, false).SetName(
-                "GridDetection.MinCellSize.4x4.BelowMinimum"
-            );
-            yield return new TestCaseData(2, 2, false).SetName(
-                "GridDetection.MinCellSize.2x2.BelowMinimum"
-            );
-            yield return new TestCaseData(1, 1, false).SetName(
-                "GridDetection.MinCellSize.1x1.BelowMinimum"
-            );
-
-            yield return new TestCaseData(7, 16, false).SetName(
-                "GridDetection.MinCellSize.7x16.WidthHasNoDivisorsAbove8"
-            );
-            yield return new TestCaseData(16, 7, false).SetName(
-                "GridDetection.MinCellSize.16x7.HeightHasNoDivisorsAbove8"
-            );
-            yield return new TestCaseData(8, 7, false).SetName(
-                "GridDetection.MinCellSize.8x7.HeightBelowMinimum"
-            );
-            yield return new TestCaseData(7, 8, false).SetName(
-                "GridDetection.MinCellSize.7x8.WidthBelowMinimum"
-            );
-
-            // The only valid cell size is the whole dimension, so midpoint lines make cells below 8.
-            yield return new TestCaseData(8, 8, false).SetName(
-                "GridDetection.MinCellSize.8x8.OnlyWholeDimensionValid"
-            );
-            yield return new TestCaseData(9, 9, false).SetName(
-                "GridDetection.MinCellSize.9x9.OnlyWholeDimensionValid"
-            );
-            yield return new TestCaseData(11, 11, false).SetName(
-                "GridDetection.MinCellSize.11x11.PrimeNoValidDivisors"
-            );
-            yield return new TestCaseData(13, 13, false).SetName(
-                "GridDetection.MinCellSize.13x13.PrimeNoValidDivisors"
-            );
-            yield return new TestCaseData(11, 13, false).SetName(
-                "GridDetection.MinCellSize.11x13.BothPrimeNoValidDivisors"
-            );
-            yield return new TestCaseData(17, 17, false).SetName(
-                "GridDetection.MinCellSize.17x17.LargePrimeNoValidDivisors"
-            );
-
-            // Valid divisors of at least 8 exist and the midpoint still clears it: 16/2 = 8.
-            yield return new TestCaseData(16, 16, true).SetName(
-                "GridDetection.MinCellSize.16x16.MidpointCreates8x8Cells"
-            );
-
-            yield return new TestCaseData(24, 24, true).SetName(
-                "GridDetection.MinCellSize.24x24.MidpointCreates12x12Cells"
-            );
-
-            yield return new TestCaseData(32, 32, true).SetName(
-                "GridDetection.MinCellSize.32x32.MidpointCreates16x16Cells"
-            );
-
-            yield return new TestCaseData(64, 64, true).SetName(
-                "GridDetection.MinCellSize.64x64.MidpointCreates32x32Cells"
-            );
-
-            yield return new TestCaseData(48, 48, true).SetName(
-                "GridDetection.MinCellSize.48x48.MidpointCreates24x24Cells"
-            );
-
-            yield return new TestCaseData(32, 24, true).SetName(
-                "GridDetection.MinCellSize.32x24.NonSquareValidCells"
-            );
-            yield return new TestCaseData(24, 32, true).SetName(
-                "GridDetection.MinCellSize.24x32.NonSquareValidCells"
             );
         }
 
@@ -3706,6 +3698,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Assert.AreEqual(50, clampedY);
             Assert.AreEqual(14, clampedWidth);
             Assert.AreEqual(14, clampedHeight);
+        }
+
+        private SpriteSheetExtractor CreateExtractor()
+        {
+            SpriteSheetExtractor extractor = Track(
+                ScriptableObject.CreateInstance<SpriteSheetExtractor>()
+            );
+            return extractor;
         }
     }
 #endif

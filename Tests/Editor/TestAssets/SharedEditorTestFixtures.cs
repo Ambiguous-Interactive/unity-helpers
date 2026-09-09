@@ -45,13 +45,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
 
         private const string DynamicAssetsDir = "Assets/Temp/DynamicEditorFixtures";
 
-        private static readonly object Lock = new();
-        private static int _referenceCount;
-        private static bool _fixturesInitialized;
-
-        private static readonly ConcurrentDictionary<string, DynamicFixture> DynamicFixtures =
-            new();
-
         /// <summary>
         /// Gets the current reference count for diagnostic purposes.
         /// </summary>
@@ -79,6 +72,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestAssets
                 }
             }
         }
+
+        private static readonly object Lock = new();
+        private static int _referenceCount;
+        private static bool _fixturesInitialized;
+
+        private static readonly ConcurrentDictionary<string, DynamicFixture> DynamicFixtures =
+            new();
 
         /// <summary>
         /// Acquires a reference to the shared fixtures. Initializes paths if this is the first call.

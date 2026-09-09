@@ -14,6 +14,8 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
     /// </summary>
     internal static class SolidButtonStyles
     {
+        internal static Color DisabledColor => ThemeDisabledColor;
+
         private static readonly Color ThemeRemoveColor = new(0.92f, 0.29f, 0.33f, 1f);
         private static readonly Color ThemeAddColor = new(0.25f, 0.68f, 0.38f, 1f);
         private static readonly Color ThemeOverwriteColor = new(0.98f, 0.82f, 0.27f, 1f);
@@ -41,8 +43,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
             }
             ColorTextureCache.Clear();
         }
-
-        internal static Color DisabledColor => ThemeDisabledColor;
 
         internal static GUIStyle GetSolidButtonStyle(string action, bool enabled)
         {

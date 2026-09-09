@@ -27,13 +27,6 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             _trackedResources.Clear();
         }
 
-        private T Track<T>(T disposable)
-            where T : IDisposable
-        {
-            _trackedResources.Add(disposable);
-            return disposable;
-        }
-
         [Test]
         public void ConstructorWithZeroCellSizeThrowsArgumentOutOfRangeException()
         {
@@ -1215,6 +1208,13 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             hash.QueryBox(new Bounds(new Vector3(2.5f, 2.5f, 2.5f), new Vector3(5, 5, 1)), results);
 
             Assert.AreEqual(25, results.Count);
+        }
+
+        private T Track<T>(T disposable)
+            where T : IDisposable
+        {
+            _trackedResources.Add(disposable);
+            return disposable;
         }
     }
 }

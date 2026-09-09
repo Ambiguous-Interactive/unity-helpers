@@ -24,6 +24,68 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     [TestFixture]
     public sealed class UnreadableAssetScanTests
     {
+        private const string AbsentScriptGuid = "ffffffffffffffffffffffffffffffff";
+
+        private string _root;
+
+        private static IEnumerable<TestCaseData> TextScans()
+        {
+            yield return new TestCaseData(
+                nameof(AuthoredRequirementValidator),
+                (Func<IReadOnlyList<string>, List<string>, bool>)ScanAuthoredRequirements
+            ).SetName("{m}.AuthoredRequirements");
+
+            yield return new TestCaseData(
+                nameof(SerializableDictionaryAssetValidator),
+                (Func<IReadOnlyList<string>, List<string>, bool>)ScanSerializableDictionaries
+            ).SetName("{m}.SerializableDictionaries");
+
+            yield return new TestCaseData(
+                nameof(StaleSerializedKeyValidator),
+                (Func<IReadOnlyList<string>, List<string>, bool>)ScanStaleSerializedKeys
+            ).SetName("{m}.StaleSerializedKeys");
+        }
+
+        private static bool ScanAuthoredRequirements(
+            IReadOnlyList<string> assetPaths,
+            List<string> unreadable
+        )
+        {
+            return AuthoredRequirementValidator.TryScan(
+                assetPaths,
+                new List<AuthoredRequirementFinding>(),
+                new List<AuthoredRequirementExemption>(),
+                unreadable,
+                out int _
+            );
+        }
+
+        private static bool ScanSerializableDictionaries(
+            IReadOnlyList<string> assetPaths,
+            List<string> unreadable
+        )
+        {
+            return SerializableDictionaryAssetValidator.TryScan(
+                assetPaths,
+                new List<SerializableDictionaryAssetFinding>(),
+                unreadable,
+                out int _
+            );
+        }
+
+        private static bool ScanStaleSerializedKeys(
+            IReadOnlyList<string> assetPaths,
+            List<string> unreadable
+        )
+        {
+            return StaleSerializedKeyValidator.TryScan(
+                assetPaths,
+                new List<StaleSerializedKeyFinding>(),
+                unreadable,
+                out int _
+            );
+        }
+
         [SetUp]
         public void CreateScanRoot()
         {
@@ -240,64 +302,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assert.AreEqual("authored dictionaries: 0 findings", message.ToString());
         }
 
-        private static IEnumerable<TestCaseData> TextScans()
-        {
-            yield return new TestCaseData(
-                nameof(AuthoredRequirementValidator),
-                (Func<IReadOnlyList<string>, List<string>, bool>)ScanAuthoredRequirements
-            ).SetName("{m}.AuthoredRequirements");
-
-            yield return new TestCaseData(
-                nameof(SerializableDictionaryAssetValidator),
-                (Func<IReadOnlyList<string>, List<string>, bool>)ScanSerializableDictionaries
-            ).SetName("{m}.SerializableDictionaries");
-
-            yield return new TestCaseData(
-                nameof(StaleSerializedKeyValidator),
-                (Func<IReadOnlyList<string>, List<string>, bool>)ScanStaleSerializedKeys
-            ).SetName("{m}.StaleSerializedKeys");
-        }
-
-        private static bool ScanAuthoredRequirements(
-            IReadOnlyList<string> assetPaths,
-            List<string> unreadable
-        )
-        {
-            return AuthoredRequirementValidator.TryScan(
-                assetPaths,
-                new List<AuthoredRequirementFinding>(),
-                new List<AuthoredRequirementExemption>(),
-                unreadable,
-                out int _
-            );
-        }
-
-        private static bool ScanSerializableDictionaries(
-            IReadOnlyList<string> assetPaths,
-            List<string> unreadable
-        )
-        {
-            return SerializableDictionaryAssetValidator.TryScan(
-                assetPaths,
-                new List<SerializableDictionaryAssetFinding>(),
-                unreadable,
-                out int _
-            );
-        }
-
-        private static bool ScanStaleSerializedKeys(
-            IReadOnlyList<string> assetPaths,
-            List<string> unreadable
-        )
-        {
-            return StaleSerializedKeyValidator.TryScan(
-                assetPaths,
-                new List<StaleSerializedKeyFinding>(),
-                unreadable,
-                out int _
-            );
-        }
-
         /// <summary>
         /// Writes one asset carrying a dictionary with no values, so a scan that read it has
         /// something to report and a scan that did not cannot look the same.
@@ -323,9 +327,5 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
             return assetPath;
         }
-
-        private const string AbsentScriptGuid = "ffffffffffffffffffffffffffffffff";
-
-        private string _root;
     }
 }

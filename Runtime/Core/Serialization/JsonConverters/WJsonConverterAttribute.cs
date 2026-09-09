@@ -43,6 +43,12 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true, Inherited = false)]
     public sealed class WJsonConverterAttribute : Attribute
     {
+        /// <summary>The unbound generic definition being serialized.</summary>
+        public Type SerializedType { get; }
+
+        /// <summary>The unbound generic definition of the converter that serializes it.</summary>
+        public Type ConverterType { get; }
+
         /// <summary>
         /// Initializes a new instance of the <see cref="WJsonConverterAttribute"/> class.
         /// </summary>
@@ -56,11 +62,5 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             SerializedType = serializedType;
             ConverterType = converterType;
         }
-
-        /// <summary>The unbound generic definition being serialized.</summary>
-        public Type SerializedType { get; }
-
-        /// <summary>The unbound generic definition of the converter that serializes it.</summary>
-        public Type ConverterType { get; }
     }
 }

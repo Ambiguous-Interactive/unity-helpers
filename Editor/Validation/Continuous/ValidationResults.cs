@@ -29,17 +29,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     /// </remarks>
     public static class ValidationResults
     {
-        private static Dictionary<string, List<ValidationFinding>> ByAsset = new Dictionary<
-            string,
-            List<ValidationFinding>
-        >(StringComparer.Ordinal);
-
-        private static readonly List<string> AssetOrder = new List<string>();
-
-        // Coalesce scoped merges so subscribers rebuild once per batch.
-        private static int _batchDepth;
-        private static bool _batchChanged;
-
         /// <summary>
         /// Raised after any change, so a window can redraw without polling.
         /// </summary>
@@ -60,6 +49,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// The assets that have a recorded result, in the order they were first recorded.
         /// </summary>
         public static IReadOnlyList<string> RecordedAssetGuids => AssetOrder;
+
+        private static Dictionary<string, List<ValidationFinding>> ByAsset = new Dictionary<
+            string,
+            List<ValidationFinding>
+        >(StringComparer.Ordinal);
+
+        private static readonly List<string> AssetOrder = new List<string>();
+
+        // Coalesce scoped merges so subscribers rebuild once per batch.
+        private static int _batchDepth;
+        private static bool _batchChanged;
 
         /// <summary>
         /// Every finding currently known, asset-major in the order assets were first recorded.

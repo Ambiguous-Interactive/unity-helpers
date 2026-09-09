@@ -198,19 +198,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         private Object _cachedOutputDirectory;
         private string _cachedOutputDirectoryPath;
 
-        /// <summary>
-        /// Gets or sets the cached output directory object. Automatically invalidates when OutputDir changes.
-        /// </summary>
-        protected Object GetCachedOutputDirectory()
-        {
-            if (_cachedOutputDirectoryPath != OutputDir)
-            {
-                _cachedOutputDirectory = null;
-                _cachedOutputDirectoryPath = OutputDir;
-            }
-
-            return _cachedOutputDirectory ??= AssetDatabase.LoadAssetAtPath<Object>(OutputDir);
-        }
+        private string _fixtureOutputDir;
+        private int _fixtureOutputSubdirCounter;
 
         /// <summary>
         /// Converts a Unity relative path to an absolute file system path.
@@ -227,6 +216,101 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                     relativePath
                 )
                 .SanitizePath();
+        }
+
+        /// <summary>
+        /// Sets the sprite sheet metadata on a texture importer.
+        /// Uses the Unity 2D Sprite package API when available.
+        /// </summary>
+        /// <param name="importer">The texture importer to configure.</param>
+        /// <param name="spritesheet">The sprite metadata array.</param>
+        protected static void SetSpriteSheet(TextureImporter importer, SpriteMetaData[] spritesheet)
+        {
+#if UNITY_2D_SPRITE
+            UnityEditor.U2D.Sprites.SpriteDataProviderFactories factory = new();
+            factory.Init();
+            UnityEditor.U2D.Sprites.ISpriteEditorDataProvider dataProvider =
+                factory.GetSpriteEditorDataProviderFromObject(importer);
+            dataProvider.InitSpriteEditorDataProvider();
+
+            UnityEditor.U2D.Sprites.SpriteRect[] spriteRects =
+                new UnityEditor.U2D.Sprites.SpriteRect[spritesheet.Length];
+            for (int i = 0; i < spritesheet.Length; i++)
+            {
+                SpriteMetaData meta = spritesheet[i];
+                spriteRects[i] = new UnityEditor.U2D.Sprites.SpriteRect
+                {
+                    name = meta.name,
+                    rect = meta.rect,
+                    alignment = (SpriteAlignment)meta.alignment,
+                    pivot = meta.pivot,
+                    border = meta.border,
+                    spriteID = GUID.Generate(),
+                };
+            }
+
+            dataProvider.SetSpriteRects(spriteRects);
+            dataProvider.Apply();
+            importer.SaveAndReimport();
+#else
+#pragma warning disable CS0618
+            importer.spritesheet = spritesheet;
+#pragma warning restore CS0618
+            importer.SaveAndReimport();
+#endif
+        }
+
+        /// <summary>
+        /// Deselects all entries and their sprites in the extractor.
+        /// Use this before <see cref="SpriteSheetExtractor.SelectAll"/> to ensure test isolation
+        /// when working with shared fixtures that contain multiple sprite sheets.
+        /// </summary>
+        /// <param name="extractor">The extractor containing discovered sheets.</param>
+        protected static void DeselectAllEntries(SpriteSheetExtractor extractor)
+        {
+            if (extractor == null || extractor._discoveredSheets == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < extractor._discoveredSheets.Count; i++)
+            {
+                SpriteSheetExtractor.SpriteSheetEntry entry = extractor._discoveredSheets[i];
+                entry._isSelected = false;
+                extractor.SelectNone(entry);
+            }
+        }
+
+        /// <summary>
+        /// Fills a texture with a solid color.
+        /// </summary>
+        /// <param name="texture">The texture to fill.</param>
+        /// <param name="color">The color to fill the texture with.</param>
+        protected static void FillTexture(Texture2D texture, Color color)
+        {
+            if (texture == null)
+            {
+                return;
+            }
+
+            Color[] pixels = new Color[texture.width * texture.height];
+            Array.Fill(pixels, color);
+            texture.SetPixels(pixels);
+            texture.Apply();
+        }
+
+        /// <summary>
+        /// Gets or sets the cached output directory object. Automatically invalidates when OutputDir changes.
+        /// </summary>
+        protected Object GetCachedOutputDirectory()
+        {
+            if (_cachedOutputDirectoryPath != OutputDir)
+            {
+                _cachedOutputDirectory = null;
+                _cachedOutputDirectoryPath = OutputDir;
+            }
+
+            return _cachedOutputDirectory ??= AssetDatabase.LoadAssetAtPath<Object>(OutputDir);
         }
 
         /// <summary>
@@ -360,48 +444,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         }
 
         /// <summary>
-        /// Sets the sprite sheet metadata on a texture importer.
-        /// Uses the Unity 2D Sprite package API when available.
-        /// </summary>
-        /// <param name="importer">The texture importer to configure.</param>
-        /// <param name="spritesheet">The sprite metadata array.</param>
-        protected static void SetSpriteSheet(TextureImporter importer, SpriteMetaData[] spritesheet)
-        {
-#if UNITY_2D_SPRITE
-            UnityEditor.U2D.Sprites.SpriteDataProviderFactories factory = new();
-            factory.Init();
-            UnityEditor.U2D.Sprites.ISpriteEditorDataProvider dataProvider =
-                factory.GetSpriteEditorDataProviderFromObject(importer);
-            dataProvider.InitSpriteEditorDataProvider();
-
-            UnityEditor.U2D.Sprites.SpriteRect[] spriteRects =
-                new UnityEditor.U2D.Sprites.SpriteRect[spritesheet.Length];
-            for (int i = 0; i < spritesheet.Length; i++)
-            {
-                SpriteMetaData meta = spritesheet[i];
-                spriteRects[i] = new UnityEditor.U2D.Sprites.SpriteRect
-                {
-                    name = meta.name,
-                    rect = meta.rect,
-                    alignment = (SpriteAlignment)meta.alignment,
-                    pivot = meta.pivot,
-                    border = meta.border,
-                    spriteID = GUID.Generate(),
-                };
-            }
-
-            dataProvider.SetSpriteRects(spriteRects);
-            dataProvider.Apply();
-            importer.SaveAndReimport();
-#else
-#pragma warning disable CS0618
-            importer.spritesheet = spritesheet;
-#pragma warning restore CS0618
-            importer.SaveAndReimport();
-#endif
-        }
-
-        /// <summary>
         /// Finds a sprite sheet entry by its asset path.
         /// </summary>
         /// <param name="extractor">The extractor containing discovered sheets.</param>
@@ -420,27 +462,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 }
             }
             return null;
-        }
-
-        /// <summary>
-        /// Deselects all entries and their sprites in the extractor.
-        /// Use this before <see cref="SpriteSheetExtractor.SelectAll"/> to ensure test isolation
-        /// when working with shared fixtures that contain multiple sprite sheets.
-        /// </summary>
-        /// <param name="extractor">The extractor containing discovered sheets.</param>
-        protected static void DeselectAllEntries(SpriteSheetExtractor extractor)
-        {
-            if (extractor == null || extractor._discoveredSheets == null)
-            {
-                return;
-            }
-
-            for (int i = 0; i < extractor._discoveredSheets.Count; i++)
-            {
-                SpriteSheetExtractor.SpriteSheetEntry entry = extractor._discoveredSheets[i];
-                entry._isSelected = false;
-                extractor.SelectNone(entry);
-            }
         }
 
         /// <summary>
@@ -566,24 +587,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         }
 
         /// <summary>
-        /// Fills a texture with a solid color.
-        /// </summary>
-        /// <param name="texture">The texture to fill.</param>
-        /// <param name="color">The color to fill the texture with.</param>
-        protected static void FillTexture(Texture2D texture, Color color)
-        {
-            if (texture == null)
-            {
-                return;
-            }
-
-            Color[] pixels = new Color[texture.width * texture.height];
-            Array.Fill(pixels, color);
-            texture.SetPixels(pixels);
-            texture.Apply();
-        }
-
-        /// <summary>
         /// Creates all standard shared fixtures for testing.
         /// Call this from <see cref="CommonOneTimeSetUp"/> after ensuring directories exist.
         /// </summary>
@@ -672,9 +675,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             TrackFolder(uniqueOutputDir);
             return uniqueOutputDir;
         }
-
-        private string _fixtureOutputDir;
-        private int _fixtureOutputSubdirCounter;
 
         /// <summary>
         /// Gets or creates a shared output directory for the entire test fixture.

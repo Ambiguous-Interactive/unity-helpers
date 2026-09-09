@@ -16,9 +16,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     public sealed class SpriteHelpersTests : BatchedEditorTestBase
     {
         private const string TestFolder = "Assets/TempSpriteHelpersTests";
+        private static readonly int[] TextureSizeCases = { 1, 2, 4, 16, 64, 256, 512 };
         private string _testTexturePath;
         private Texture2D _testTexture;
-        private static readonly int[] TextureSizeCases = { 1, 2, 4, 16, 64, 256, 512 };
 
         [OneTimeSetUp]
         public override void CommonOneTimeSetUp()

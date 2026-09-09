@@ -29,6 +29,20 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = true, Inherited = true)]
     public sealed class DetectAssetChangedAttribute : Attribute
     {
+        public Type AssetType { get; }
+
+        public AssetChangeFlags Flags { get; }
+
+        public DetectAssetChangedOptions Options { get; }
+
+        public bool IncludeAssignableTypes =>
+            (Options & DetectAssetChangedOptions.IncludeAssignableTypes) != 0;
+
+        public bool SearchPrefabs => (Options & DetectAssetChangedOptions.SearchPrefabs) != 0;
+
+        public bool SearchSceneObjects =>
+            (Options & DetectAssetChangedOptions.SearchSceneObjects) != 0;
+
         public DetectAssetChangedAttribute(Type assetType, AssetChangeFlags flags)
             : this(assetType, flags, DetectAssetChangedOptions.None) { }
 
@@ -73,19 +87,5 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                     : flags;
             Options = options;
         }
-
-        public Type AssetType { get; }
-
-        public AssetChangeFlags Flags { get; }
-
-        public DetectAssetChangedOptions Options { get; }
-
-        public bool IncludeAssignableTypes =>
-            (Options & DetectAssetChangedOptions.IncludeAssignableTypes) != 0;
-
-        public bool SearchPrefabs => (Options & DetectAssetChangedOptions.SearchPrefabs) != 0;
-
-        public bool SearchSceneObjects =>
-            (Options & DetectAssetChangedOptions.SearchSceneObjects) != 0;
     }
 }

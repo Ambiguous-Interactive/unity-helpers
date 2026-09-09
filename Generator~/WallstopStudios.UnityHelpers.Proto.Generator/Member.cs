@@ -22,11 +22,23 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         protected const string Proto =
             "global::WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto";
 
-        protected Member(string name, int tag)
-        {
-            Name = name;
-            Tag = tag;
-        }
+        /// <summary>The local naming this formatter's guard local, for emitted code.</summary>
+        internal const string SeedGuardLocal = "wprotoSeeded";
+
+        protected string Name { get; }
+
+        /// <summary>
+        /// Whether this member reads into a local that must be treated as having no seed -- a
+        /// contract built at the end of the read, unless that read constructed an instance to seed
+        /// from.
+        /// </summary>
+        protected bool Unseeded => ConstructAtEnd && !SeedsFromInstance;
+
+        /// <summary>The expression naming the seed instance's value for this member.</summary>
+        protected string SeedSource => "read." + Name;
+
+        /// <summary>The member access on the value being written.</summary>
+        protected string Access => WrapsWholeValue ? "value" : "value." + Name;
 
         internal int Tag { get; }
 
@@ -41,8 +53,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// and the loss would be silent.
         /// </remarks>
         internal bool Deferred { get; set; }
-
-        protected string Name { get; }
 
         /// <summary>
         /// The member's declared type, fully qualified — needed by a contract that has to be built
@@ -90,16 +100,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         internal bool SeedsFromInstance { get; set; }
 
         /// <summary>
-        /// Whether this member reads into a local that must be treated as having no seed -- a
-        /// contract built at the end of the read, unless that read constructed an instance to seed
-        /// from.
-        /// </summary>
-        protected bool Unseeded => ConstructAtEnd && !SeedsFromInstance;
-
-        /// <summary>The expression naming the seed instance's value for this member.</summary>
-        protected string SeedSource => "read." + Name;
-
-        /// <summary>
         /// Whether the generated read constructor is standing in for protobuf-net's uninitialized
         /// allocation because the contract declares <c>SkipConstructor</c>.
         /// </summary>
@@ -111,9 +111,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// documented, safer difference of this AOT implementation.
         /// </remarks>
         internal bool SkipConstructor { get; set; }
-
-        /// <summary>The local naming this formatter's guard local, for emitted code.</summary>
-        internal const string SeedGuardLocal = "wprotoSeeded";
 
         /// <summary>
         /// The local reporting that the instance being read into came from the CALLER, or
@@ -142,8 +139,26 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         internal bool WrapsWholeValue { get; set; }
 
-        /// <summary>The member access on the value being written.</summary>
-        protected string Access => WrapsWholeValue ? "value" : "value." + Name;
+        protected Member(string name, int tag)
+        {
+            Name = name;
+            Tag = tag;
+        }
+
+        /// <summary>
+        /// Emits the two statements that abandon a read, shared by every failure path.
+        /// </summary>
+        protected static void EmitReadFailure(Writer writer, string qualifiedContract)
+        {
+            writer.Line("value = default(" + qualifiedContract + ");");
+            writer.Line("return false;");
+        }
+
+        protected static void Close(Writer writer)
+        {
+            writer.Outdent();
+            writer.Line("}");
+        }
 
         /// <summary>
         /// Builds the member for <paramref name="type"/>, or <c>null</c> when it is not supported.
@@ -257,6 +272,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return repeated;
         }
 
+        /// <summary>
+        /// Opens a <c>case</c> section for this member at <paramref name="wireType"/>.
+        /// </summary>
+        protected void OpenCase(Writer writer, string wireType)
+        {
+            writer.Line("case " + Tag + " when wireType == " + wireType + ":" + Writer.Open);
+            writer.Indent();
+        }
+
         /// <summary>Appends this member's contribution to the formatter's <c>Measure</c>.</summary>
         internal abstract void EmitMeasure(Writer writer);
 
@@ -294,29 +318,5 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// accumulated collection.
         /// </summary>
         internal virtual void EmitReadEpilogue(Writer writer, string qualifiedContract) { }
-
-        /// <summary>
-        /// Emits the two statements that abandon a read, shared by every failure path.
-        /// </summary>
-        protected static void EmitReadFailure(Writer writer, string qualifiedContract)
-        {
-            writer.Line("value = default(" + qualifiedContract + ");");
-            writer.Line("return false;");
-        }
-
-        /// <summary>
-        /// Opens a <c>case</c> section for this member at <paramref name="wireType"/>.
-        /// </summary>
-        protected void OpenCase(Writer writer, string wireType)
-        {
-            writer.Line("case " + Tag + " when wireType == " + wireType + ":" + Writer.Open);
-            writer.Indent();
-        }
-
-        protected static void Close(Writer writer)
-        {
-            writer.Outdent();
-            writer.Line("}");
-        }
     }
 }

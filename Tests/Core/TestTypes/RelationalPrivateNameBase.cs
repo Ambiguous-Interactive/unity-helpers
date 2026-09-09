@@ -13,10 +13,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Core.TestTypes
     /// </summary>
     public abstract class RelationalPrivateNameBase : MonoBehaviour
     {
-        [SiblingComponent]
-        private BoxCollider _collider;
-
         /// <summary>The field this base declared.</summary>
         public BoxCollider BaseCollider => _collider;
+
+        [SiblingComponent]
+        private BoxCollider _collider;
     }
 }

@@ -261,6 +261,30 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             IReadOnlyDictionary<TKey, TValue>,
             ISerializableDictionaryBoxedValues
     {
+        /// <summary>
+        /// Whether Unity refuses <c>TValueCache[]</c> in a way that boxing each element repairs.
+        /// </summary>
+        /// <remarks>
+        /// Exactly the two shapes Unity drops for nesting: an array element type, and
+        /// <see cref="List{T}"/>. Other unserializable value types -- interfaces, dictionaries,
+        /// classes without <see cref="SerializableAttribute"/> -- are not repaired by boxing either,
+        /// because the box's own field would be just as unserializable, so they must keep reporting
+        /// the Inspector error rather than silently switching to a field that stores nothing.
+        /// </remarks>
+        private static readonly bool RequiresBoxedValues =
+            IsCollectionUnityRefusesToNest(typeof(TValueCache))
+            && !IsCollectionUnityRefusesToNest(NestedElementType(typeof(TValueCache)));
+
+        protected internal bool PreserveSerializedEntries => _preserveSerializedEntries;
+
+        protected internal bool HasDuplicatesOrNulls => _hasDuplicatesOrNulls;
+
+        protected internal TKey[] SerializedKeys => _keys;
+
+        protected internal TValueCache[] SerializedValues => _values;
+
+        bool ISerializableDictionaryBoxedValues.UsesBoxedValues => RequiresBoxedValues;
+
         [ProtoIgnore]
         [JsonIgnore]
         protected internal Dictionary<TKey, TValue> _dictionary;
@@ -293,44 +317,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         [JsonIgnore]
         protected internal SerializableDictionary.Cache<TValueCache>[] _boxedValues;
 
-        /// <summary>
-        /// Whether Unity refuses <c>TValueCache[]</c> in a way that boxing each element repairs.
-        /// </summary>
-        /// <remarks>
-        /// Exactly the two shapes Unity drops for nesting: an array element type, and
-        /// <see cref="List{T}"/>. Other unserializable value types -- interfaces, dictionaries,
-        /// classes without <see cref="SerializableAttribute"/> -- are not repaired by boxing either,
-        /// because the box's own field would be just as unserializable, so they must keep reporting
-        /// the Inspector error rather than silently switching to a field that stores nothing.
-        /// </remarks>
-        private static readonly bool RequiresBoxedValues =
-            IsCollectionUnityRefusesToNest(typeof(TValueCache))
-            && !IsCollectionUnityRefusesToNest(NestedElementType(typeof(TValueCache)));
-
-        bool ISerializableDictionaryBoxedValues.UsesBoxedValues => RequiresBoxedValues;
-
-        private static bool IsCollectionUnityRefusesToNest(Type type)
-        {
-            return type != null
-                && (
-                    type.IsArray
-                    || (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(List<>))
-                );
-        }
-
-        private static Type NestedElementType(Type collectionType)
-        {
-            if (collectionType.IsArray)
-            {
-                return collectionType.GetElementType();
-            }
-
-            Type[] arguments = collectionType.IsGenericType
-                ? collectionType.GetGenericArguments()
-                : Array.Empty<Type>();
-            return arguments.Length == 1 ? arguments[0] : null;
-        }
-
         [NonSerialized]
         protected internal bool _preserveSerializedEntries;
 
@@ -343,14 +329,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// </summary>
         [NonSerialized]
         protected internal List<TKey> _newKeysOrder;
-
-        protected internal bool PreserveSerializedEntries => _preserveSerializedEntries;
-
-        protected internal bool HasDuplicatesOrNulls => _hasDuplicatesOrNulls;
-
-        protected internal TKey[] SerializedKeys => _keys;
-
-        protected internal TValueCache[] SerializedValues => _values;
 
         protected SerializableDictionaryBase()
         {
@@ -376,6 +354,48 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         )
         {
             _dictionary = new Dictionary<TKey, TValue>(serializationInfo, streamingContext);
+        }
+
+        private static bool IsCollectionUnityRefusesToNest(Type type)
+        {
+            return type != null
+                && (
+                    type.IsArray
+                    || (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(List<>))
+                );
+        }
+
+        private static Type NestedElementType(Type collectionType)
+        {
+            if (collectionType.IsArray)
+            {
+                return collectionType.GetElementType();
+            }
+
+            Type[] arguments = collectionType.IsGenericType
+                ? collectionType.GetGenericArguments()
+                : Array.Empty<Type>();
+            return arguments.Length == 1 ? arguments[0] : null;
+        }
+
+        private static bool TypeSupportsNullReferences(Type type)
+        {
+            return type != null
+                && (!type.IsValueType || typeof(UnityEngine.Object).IsAssignableFrom(type));
+        }
+
+        private static void LogNullReferenceSkip(string component, int index)
+        {
+#if UNITY_EDITOR
+            if (!EditorShouldLog())
+            {
+                return;
+            }
+#endif
+
+            Debug.LogWarning(
+                $"SerializableDictionary<{typeof(TKey).FullName}, {typeof(TValue).FullName}> skipped serialized entry at index {index} because the {component} reference was null."
+            );
         }
 
         /// <summary>
@@ -470,26 +490,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             _hasDuplicatesOrNulls = hasDuplicateKeys || encounteredNullReference;
         }
 
-        private static bool TypeSupportsNullReferences(Type type)
-        {
-            return type != null
-                && (!type.IsValueType || typeof(UnityEngine.Object).IsAssignableFrom(type));
-        }
-
-        private static void LogNullReferenceSkip(string component, int index)
-        {
-#if UNITY_EDITOR
-            if (!EditorShouldLog())
-            {
-                return;
-            }
-#endif
-
-            Debug.LogWarning(
-                $"SerializableDictionary<{typeof(TKey).FullName}, {typeof(TValue).FullName}> skipped serialized entry at index {index} because the {component} reference was null."
-            );
-        }
-
 #if UNITY_EDITOR
         private static bool EditorShouldLog()
         {
@@ -503,6 +503,93 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             }
         }
 #endif
+
+        public ICollection<TKey> Keys => _dictionary.Keys;
+
+        public ICollection<TValue> Values => _dictionary.Values;
+
+        public int Count => _dictionary.Count;
+
+        public bool IsReadOnly => ((IDictionary<TKey, TValue>)_dictionary).IsReadOnly;
+
+        /// <summary>
+        /// Gets or sets a value associated with the provided key in the runtime dictionary.
+        /// Updates invalidate the serialized cache so Unity and ProtoBuf can pick up the changes.
+        /// </summary>
+        /// <param name="key">The key of the entry to access.</param>
+        /// <returns>The stored value.</returns>
+        /// <exception cref="KeyNotFoundException">Thrown when the key is absent.</exception>
+        /// <example>
+        /// <code><![CDATA[
+        /// AbilityDictionary abilityLookup = new AbilityDictionary();
+        /// abilityLookup["Dash"] = dashDefinition;
+        /// AbilityDefinition dash = abilityLookup["Dash"];
+        /// ]]></code>
+        /// </example>
+        public TValue this[TKey key]
+        {
+            get
+            {
+                if (_dictionary.TryGetValue(key, out TValue value))
+                {
+                    return value;
+                }
+
+                throw new KeyNotFoundException($"No value is stored under {key}.");
+            }
+            set
+            {
+                bool isNewKey = !_dictionary.ContainsKey(key);
+                _dictionary[key] = value;
+                if (isNewKey)
+                {
+                    TrackNewKey(key);
+                }
+                MarkSerializationCacheDirty();
+            }
+        }
+
+        /// <summary>
+        /// Indicates whether the non-generic <see cref="IDictionary"/> wrapper has a fixed size (it does not).
+        /// </summary>
+        public bool IsFixedSize => ((IDictionary)_dictionary).IsFixedSize;
+
+        /// <summary>
+        /// Indicates whether access to the dictionary is synchronized (thread-safe).
+        /// </summary>
+        public bool IsSynchronized => ((IDictionary)_dictionary).IsSynchronized;
+
+        /// <summary>
+        /// Provides an object that can be used to synchronize access when required by legacy APIs.
+        /// </summary>
+        public object SyncRoot => ((IDictionary)_dictionary).SyncRoot;
+
+        /// <summary>
+        /// Gets or sets entries through the non-generic <see cref="IDictionary"/> interface.
+        /// </summary>
+        /// <param name="key">The boxed key.</param>
+        /// <returns>The boxed value associated with the key.</returns>
+        public object this[object key]
+        {
+            get => ((IDictionary)_dictionary)[key];
+            set
+            {
+                bool isNewKey = !((IDictionary)_dictionary).Contains(key);
+                ((IDictionary)_dictionary)[key] = value;
+                if (isNewKey && key is TKey typedKey)
+                {
+                    TrackNewKey(typedKey);
+                }
+                MarkSerializationCacheDirty();
+            }
+        }
+        IEnumerable<TValue> IReadOnlyDictionary<TKey, TValue>.Values => Values;
+
+        IEnumerable<TKey> IReadOnlyDictionary<TKey, TValue>.Keys => Keys;
+
+        ICollection IDictionary.Keys => _dictionary.Keys;
+
+        ICollection IDictionary.Values => _dictionary.Values;
 
         /// <summary>
         /// Packs the runtime dictionary contents into the serialized key/value arrays prior to Unity or ProtoBuf serialization.
@@ -533,247 +620,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             OnBeforeSerializeCore();
             MirrorValuesToBoxedCache();
         }
-
-        /// <summary>
-        /// Restores <see cref="_values"/> from <see cref="_boxedValues"/> when Unity serialized the
-        /// boxed field instead. Every later read -- duplicate detection, order-preserving sync,
-        /// <see cref="GetValue"/> -- then works against <see cref="_values"/> unchanged.
-        /// </summary>
-        private void RehydrateValuesFromBoxedCache()
-        {
-            if (!RequiresBoxedValues || _boxedValues == null)
-            {
-                return;
-            }
-
-            int length = _boxedValues.Length;
-            TValueCache[] rehydrated = new TValueCache[length];
-            for (int index = 0; index < length; index++)
-            {
-                SerializableDictionary.Cache<TValueCache> box = _boxedValues[index];
-                rehydrated[index] = box == null ? default : box.Data;
-            }
-
-            _values = rehydrated;
-        }
-
-        /// <summary>
-        /// Copies <see cref="_values"/> into <see cref="_boxedValues"/> so Unity has a field it
-        /// will actually write. Boxes are reused in place, so a serialization cycle that changes
-        /// no entry allocates nothing.
-        /// </summary>
-        private void MirrorValuesToBoxedCache()
-        {
-            if (!RequiresBoxedValues)
-            {
-                return;
-            }
-
-            if (_values == null)
-            {
-                _boxedValues = null;
-                return;
-            }
-
-            int length = _values.Length;
-            if (_boxedValues == null || _boxedValues.Length != length)
-            {
-                _boxedValues = new SerializableDictionary.Cache<TValueCache>[length];
-            }
-
-            for (int index = 0; index < length; index++)
-            {
-                SerializableDictionary.Cache<TValueCache> box = _boxedValues[index];
-                if (box == null)
-                {
-                    box = new SerializableDictionary.Cache<TValueCache>();
-                    _boxedValues[index] = box;
-                }
-
-                box.Data = _values[index];
-            }
-        }
-
-        private void OnBeforeSerializeCore()
-        {
-            bool arraysIntact = _keys != null && _values != null && _keys.Length == _values.Length;
-
-            // Keep duplicate and null entries visible so the Inspector can report them.
-            if (_preserveSerializedEntries && arraysIntact && _hasDuplicatesOrNulls)
-            {
-                return;
-            }
-
-            if (_preserveSerializedEntries && arraysIntact)
-            {
-                SyncSerializedArraysPreservingOrder();
-                return;
-            }
-
-            if (arraysIntact)
-            {
-                SyncSerializedArraysPreservingOrder();
-                _preserveSerializedEntries = true;
-                return;
-            }
-
-            int count = _dictionary.Count;
-            _keys = new TKey[count];
-            _values = new TValueCache[count];
-
-            int index = 0;
-            foreach (KeyValuePair<TKey, TValue> pair in _dictionary)
-            {
-                _keys[index] = pair.Key;
-                SetValue(_values, index, pair.Value);
-                index++;
-            }
-
-            _preserveSerializedEntries = true;
-            _newKeysOrder?.Clear();
-        }
-
-        /// <summary>
-        /// Synchronizes the serialized arrays with the dictionary while preserving the existing order.
-        /// Existing keys are kept in their original positions, removed keys are filtered out,
-        /// and new keys are appended in insertion order.
-        /// </summary>
-        private void SyncSerializedArraysPreservingOrder()
-        {
-            int dictCount = _dictionary.Count;
-            int arrayLength = _keys.Length;
-
-            // Equal counts do not imply equal keys when serialized keys contain duplicates.
-            if (dictCount == arrayLength)
-            {
-                using PooledResource<HashSet<TKey>> fastPathSeenResource = SetBuffers<TKey>
-                    .GetHashSetPool(_dictionary.Comparer)
-                    .Get(out HashSet<TKey> fastPathSeenKeys);
-
-                bool allEntriesMatchAndUnique = true;
-                for (int i = 0; i < arrayLength; i++)
-                {
-                    TKey key = _keys[i];
-
-                    if (
-                        !_dictionary.TryGetValue(key, out TValue dictValue)
-                        || !fastPathSeenKeys.Add(key)
-                    )
-                    {
-                        allEntriesMatchAndUnique = false;
-                        break;
-                    }
-                }
-
-                if (allEntriesMatchAndUnique)
-                {
-                    for (int i = 0; i < arrayLength; i++)
-                    {
-                        TKey key = _keys[i];
-                        if (_dictionary.TryGetValue(key, out TValue currentValue))
-                        {
-                            SetValue(_values, i, currentValue);
-                        }
-                    }
-
-                    _newKeysOrder?.Clear();
-                    return;
-                }
-            }
-
-            using PooledResource<List<TKey>> keysResource = Buffers<TKey>.List.Get(
-                out List<TKey> newKeys
-            );
-            using PooledResource<List<TValue>> valuesResource = Buffers<TValue>.List.Get(
-                out List<TValue> newValues
-            );
-            using PooledResource<HashSet<TKey>> seenResource = SetBuffers<TKey>
-                .GetHashSetPool(_dictionary.Comparer)
-                .Get(out HashSet<TKey> seenKeys);
-
-            for (int i = 0; i < arrayLength; i++)
-            {
-                TKey key = _keys[i];
-                if (_dictionary.TryGetValue(key, out TValue value) && seenKeys.Add(key))
-                {
-                    newKeys.Add(key);
-                    newValues.Add(value);
-                }
-            }
-
-            if (_newKeysOrder is { Count: > 0 })
-            {
-                foreach (TKey key in _newKeysOrder)
-                {
-                    if (_dictionary.TryGetValue(key, out TValue value) && seenKeys.Add(key))
-                    {
-                        newKeys.Add(key);
-                        newValues.Add(value);
-                    }
-                }
-            }
-            else
-            {
-                // Untracked keys have no insertion order to recover.
-                foreach (KeyValuePair<TKey, TValue> pair in _dictionary)
-                {
-                    if (seenKeys.Add(pair.Key))
-                    {
-                        newKeys.Add(pair.Key);
-                        newValues.Add(pair.Value);
-                    }
-                }
-            }
-
-            int newCount = newKeys.Count;
-            _keys = new TKey[newCount];
-            _values = new TValueCache[newCount];
-            for (int i = 0; i < newCount; i++)
-            {
-                _keys[i] = newKeys[i];
-                SetValue(_values, i, newValues[i]);
-            }
-
-            _newKeysOrder?.Clear();
-        }
-
-        /// <summary>
-        /// Tracks a newly added key for order preservation during serialization.
-        /// </summary>
-        private void TrackNewKey(TKey key)
-        {
-            _newKeysOrder ??= new List<TKey>();
-            _newKeysOrder.Add(key);
-        }
-
-        [ProtoBeforeSerialization]
-        protected internal void OnProtoBeforeSerialization()
-        {
-            OnBeforeSerialize();
-        }
-
-        [ProtoAfterSerialization]
-        protected internal void OnProtoAfterSerialization()
-        {
-            if (_preserveSerializedEntries)
-            {
-                return;
-            }
-
-            _keys = null;
-            _values = null;
-            _boxedValues = null;
-        }
-
-        [ProtoAfterDeserialization]
-        protected internal void OnProtoAfterDeserialization()
-        {
-            OnAfterDeserializeInternal(suppressWarnings: false, rehydrateBoxedValues: false);
-        }
-
-        protected abstract void SetValue(TValueCache[] cache, int index, TValue value);
-
-        protected abstract TValue GetValue(TValueCache[] cache, int index);
 
         /// <summary>
         /// Replaces this dictionary's contents with another dictionary.
@@ -1084,61 +930,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             return result;
         }
 
-        private void MarkSerializationCacheDirty()
-        {
-            _preserveSerializedEntries = false;
-            _hasDuplicatesOrNulls = false;
-            // Retain serialized keys and values as the ordering source for the next sync.
-        }
-
-        public ICollection<TKey> Keys => _dictionary.Keys;
-        IEnumerable<TValue> IReadOnlyDictionary<TKey, TValue>.Values => Values;
-
-        IEnumerable<TKey> IReadOnlyDictionary<TKey, TValue>.Keys => Keys;
-
-        public ICollection<TValue> Values => _dictionary.Values;
-
-        public int Count => _dictionary.Count;
-
-        public bool IsReadOnly => ((IDictionary<TKey, TValue>)_dictionary).IsReadOnly;
-
-        /// <summary>
-        /// Gets or sets a value associated with the provided key in the runtime dictionary.
-        /// Updates invalidate the serialized cache so Unity and ProtoBuf can pick up the changes.
-        /// </summary>
-        /// <param name="key">The key of the entry to access.</param>
-        /// <returns>The stored value.</returns>
-        /// <exception cref="KeyNotFoundException">Thrown when the key is absent.</exception>
-        /// <example>
-        /// <code><![CDATA[
-        /// AbilityDictionary abilityLookup = new AbilityDictionary();
-        /// abilityLookup["Dash"] = dashDefinition;
-        /// AbilityDefinition dash = abilityLookup["Dash"];
-        /// ]]></code>
-        /// </example>
-        public TValue this[TKey key]
-        {
-            get
-            {
-                if (_dictionary.TryGetValue(key, out TValue value))
-                {
-                    return value;
-                }
-
-                throw new KeyNotFoundException($"No value is stored under {key}.");
-            }
-            set
-            {
-                bool isNewKey = !_dictionary.ContainsKey(key);
-                _dictionary[key] = value;
-                if (isNewKey)
-                {
-                    TrackNewKey(key);
-                }
-                MarkSerializationCacheDirty();
-            }
-        }
-
         /// <summary>
         /// Adds a new key/value pair to the runtime dictionary and marks the serialized cache as dirty so Unity can persist the change.
         /// </summary>
@@ -1380,59 +1171,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             return new Enumerator(_dictionary.GetEnumerator());
         }
 
-        /// <inheritdoc />
-        IEnumerator<KeyValuePair<TKey, TValue>> IEnumerable<
-            KeyValuePair<TKey, TValue>
-        >.GetEnumerator()
-        {
-            return _dictionary.GetEnumerator();
-        }
-
-        /// <inheritdoc />
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return _dictionary.GetEnumerator();
-        }
-
-        /// <summary>
-        /// Indicates whether the non-generic <see cref="IDictionary"/> wrapper has a fixed size (it does not).
-        /// </summary>
-        public bool IsFixedSize => ((IDictionary)_dictionary).IsFixedSize;
-
-        ICollection IDictionary.Keys => _dictionary.Keys;
-
-        ICollection IDictionary.Values => _dictionary.Values;
-
-        /// <summary>
-        /// Indicates whether access to the dictionary is synchronized (thread-safe).
-        /// </summary>
-        public bool IsSynchronized => ((IDictionary)_dictionary).IsSynchronized;
-
-        /// <summary>
-        /// Provides an object that can be used to synchronize access when required by legacy APIs.
-        /// </summary>
-        public object SyncRoot => ((IDictionary)_dictionary).SyncRoot;
-
-        /// <summary>
-        /// Gets or sets entries through the non-generic <see cref="IDictionary"/> interface.
-        /// </summary>
-        /// <param name="key">The boxed key.</param>
-        /// <returns>The boxed value associated with the key.</returns>
-        public object this[object key]
-        {
-            get => ((IDictionary)_dictionary)[key];
-            set
-            {
-                bool isNewKey = !((IDictionary)_dictionary).Contains(key);
-                ((IDictionary)_dictionary)[key] = value;
-                if (isNewKey && key is TKey typedKey)
-                {
-                    TrackNewKey(typedKey);
-                }
-                MarkSerializationCacheDirty();
-            }
-        }
-
         /// <summary>
         /// Adds a boxed key/value pair through the non-generic interface.
         /// </summary>
@@ -1470,12 +1208,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         public bool Contains(object key)
         {
             return ((IDictionary)_dictionary).Contains(key);
-        }
-
-        /// <inheritdoc />
-        IDictionaryEnumerator IDictionary.GetEnumerator()
-        {
-            return _dictionary.GetEnumerator();
         }
 
         /// <summary>
@@ -1541,6 +1273,274 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             _dictionary.GetObjectData(info, context);
         }
 
+        [ProtoBeforeSerialization]
+        protected internal void OnProtoBeforeSerialization()
+        {
+            OnBeforeSerialize();
+        }
+
+        [ProtoAfterSerialization]
+        protected internal void OnProtoAfterSerialization()
+        {
+            if (_preserveSerializedEntries)
+            {
+                return;
+            }
+
+            _keys = null;
+            _values = null;
+            _boxedValues = null;
+        }
+
+        [ProtoAfterDeserialization]
+        protected internal void OnProtoAfterDeserialization()
+        {
+            OnAfterDeserializeInternal(suppressWarnings: false, rehydrateBoxedValues: false);
+        }
+
+        protected abstract void SetValue(TValueCache[] cache, int index, TValue value);
+
+        protected abstract TValue GetValue(TValueCache[] cache, int index);
+
+        /// <summary>
+        /// Restores <see cref="_values"/> from <see cref="_boxedValues"/> when Unity serialized the
+        /// boxed field instead. Every later read -- duplicate detection, order-preserving sync,
+        /// <see cref="GetValue"/> -- then works against <see cref="_values"/> unchanged.
+        /// </summary>
+        private void RehydrateValuesFromBoxedCache()
+        {
+            if (!RequiresBoxedValues || _boxedValues == null)
+            {
+                return;
+            }
+
+            int length = _boxedValues.Length;
+            TValueCache[] rehydrated = new TValueCache[length];
+            for (int index = 0; index < length; index++)
+            {
+                SerializableDictionary.Cache<TValueCache> box = _boxedValues[index];
+                rehydrated[index] = box == null ? default : box.Data;
+            }
+
+            _values = rehydrated;
+        }
+
+        /// <summary>
+        /// Copies <see cref="_values"/> into <see cref="_boxedValues"/> so Unity has a field it
+        /// will actually write. Boxes are reused in place, so a serialization cycle that changes
+        /// no entry allocates nothing.
+        /// </summary>
+        private void MirrorValuesToBoxedCache()
+        {
+            if (!RequiresBoxedValues)
+            {
+                return;
+            }
+
+            if (_values == null)
+            {
+                _boxedValues = null;
+                return;
+            }
+
+            int length = _values.Length;
+            if (_boxedValues == null || _boxedValues.Length != length)
+            {
+                _boxedValues = new SerializableDictionary.Cache<TValueCache>[length];
+            }
+
+            for (int index = 0; index < length; index++)
+            {
+                SerializableDictionary.Cache<TValueCache> box = _boxedValues[index];
+                if (box == null)
+                {
+                    box = new SerializableDictionary.Cache<TValueCache>();
+                    _boxedValues[index] = box;
+                }
+
+                box.Data = _values[index];
+            }
+        }
+
+        private void OnBeforeSerializeCore()
+        {
+            bool arraysIntact = _keys != null && _values != null && _keys.Length == _values.Length;
+
+            // Keep duplicate and null entries visible so the Inspector can report them.
+            if (_preserveSerializedEntries && arraysIntact && _hasDuplicatesOrNulls)
+            {
+                return;
+            }
+
+            if (_preserveSerializedEntries && arraysIntact)
+            {
+                SyncSerializedArraysPreservingOrder();
+                return;
+            }
+
+            if (arraysIntact)
+            {
+                SyncSerializedArraysPreservingOrder();
+                _preserveSerializedEntries = true;
+                return;
+            }
+
+            int count = _dictionary.Count;
+            _keys = new TKey[count];
+            _values = new TValueCache[count];
+
+            int index = 0;
+            foreach (KeyValuePair<TKey, TValue> pair in _dictionary)
+            {
+                _keys[index] = pair.Key;
+                SetValue(_values, index, pair.Value);
+                index++;
+            }
+
+            _preserveSerializedEntries = true;
+            _newKeysOrder?.Clear();
+        }
+
+        /// <summary>
+        /// Synchronizes the serialized arrays with the dictionary while preserving the existing order.
+        /// Existing keys are kept in their original positions, removed keys are filtered out,
+        /// and new keys are appended in insertion order.
+        /// </summary>
+        private void SyncSerializedArraysPreservingOrder()
+        {
+            int dictCount = _dictionary.Count;
+            int arrayLength = _keys.Length;
+
+            // Equal counts do not imply equal keys when serialized keys contain duplicates.
+            if (dictCount == arrayLength)
+            {
+                using PooledResource<HashSet<TKey>> fastPathSeenResource = SetBuffers<TKey>
+                    .GetHashSetPool(_dictionary.Comparer)
+                    .Get(out HashSet<TKey> fastPathSeenKeys);
+
+                bool allEntriesMatchAndUnique = true;
+                for (int i = 0; i < arrayLength; i++)
+                {
+                    TKey key = _keys[i];
+
+                    if (
+                        !_dictionary.TryGetValue(key, out TValue dictValue)
+                        || !fastPathSeenKeys.Add(key)
+                    )
+                    {
+                        allEntriesMatchAndUnique = false;
+                        break;
+                    }
+                }
+
+                if (allEntriesMatchAndUnique)
+                {
+                    for (int i = 0; i < arrayLength; i++)
+                    {
+                        TKey key = _keys[i];
+                        if (_dictionary.TryGetValue(key, out TValue currentValue))
+                        {
+                            SetValue(_values, i, currentValue);
+                        }
+                    }
+
+                    _newKeysOrder?.Clear();
+                    return;
+                }
+            }
+
+            using PooledResource<List<TKey>> keysResource = Buffers<TKey>.List.Get(
+                out List<TKey> newKeys
+            );
+            using PooledResource<List<TValue>> valuesResource = Buffers<TValue>.List.Get(
+                out List<TValue> newValues
+            );
+            using PooledResource<HashSet<TKey>> seenResource = SetBuffers<TKey>
+                .GetHashSetPool(_dictionary.Comparer)
+                .Get(out HashSet<TKey> seenKeys);
+
+            for (int i = 0; i < arrayLength; i++)
+            {
+                TKey key = _keys[i];
+                if (_dictionary.TryGetValue(key, out TValue value) && seenKeys.Add(key))
+                {
+                    newKeys.Add(key);
+                    newValues.Add(value);
+                }
+            }
+
+            if (_newKeysOrder is { Count: > 0 })
+            {
+                foreach (TKey key in _newKeysOrder)
+                {
+                    if (_dictionary.TryGetValue(key, out TValue value) && seenKeys.Add(key))
+                    {
+                        newKeys.Add(key);
+                        newValues.Add(value);
+                    }
+                }
+            }
+            else
+            {
+                // Untracked keys have no insertion order to recover.
+                foreach (KeyValuePair<TKey, TValue> pair in _dictionary)
+                {
+                    if (seenKeys.Add(pair.Key))
+                    {
+                        newKeys.Add(pair.Key);
+                        newValues.Add(pair.Value);
+                    }
+                }
+            }
+
+            int newCount = newKeys.Count;
+            _keys = new TKey[newCount];
+            _values = new TValueCache[newCount];
+            for (int i = 0; i < newCount; i++)
+            {
+                _keys[i] = newKeys[i];
+                SetValue(_values, i, newValues[i]);
+            }
+
+            _newKeysOrder?.Clear();
+        }
+
+        /// <summary>
+        /// Tracks a newly added key for order preservation during serialization.
+        /// </summary>
+        private void TrackNewKey(TKey key)
+        {
+            _newKeysOrder ??= new List<TKey>();
+            _newKeysOrder.Add(key);
+        }
+
+        private void MarkSerializationCacheDirty()
+        {
+            _preserveSerializedEntries = false;
+            _hasDuplicatesOrNulls = false;
+            // Retain serialized keys and values as the ordering source for the next sync.
+        }
+
+        /// <inheritdoc />
+        IEnumerator<KeyValuePair<TKey, TValue>> IEnumerable<
+            KeyValuePair<TKey, TValue>
+        >.GetEnumerator()
+        {
+            return _dictionary.GetEnumerator();
+        }
+
+        /// <inheritdoc />
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return _dictionary.GetEnumerator();
+        }
+
+        /// <inheritdoc />
+        IDictionaryEnumerator IDictionary.GetEnumerator()
+        {
+            return _dictionary.GetEnumerator();
+        }
+
         /// <summary>
         /// Allocation-free enumerator used by <see cref="SerializableDictionaryBase{TKey, TValue, TValueCache}"/>.
         /// </summary>
@@ -1556,16 +1556,16 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         /// </example>
         public struct Enumerator : IEnumerator<KeyValuePair<TKey, TValue>>
         {
+            public KeyValuePair<TKey, TValue> Current => _enumerator.Current;
+
+            object IEnumerator.Current => _enumerator.Current;
+
             private Dictionary<TKey, TValue>.Enumerator _enumerator;
 
             internal Enumerator(Dictionary<TKey, TValue>.Enumerator enumerator)
             {
                 _enumerator = enumerator;
             }
-
-            public KeyValuePair<TKey, TValue> Current => _enumerator.Current;
-
-            object IEnumerator.Current => _enumerator.Current;
 
             /// <summary>
             /// Advances the enumerator to the next entry.

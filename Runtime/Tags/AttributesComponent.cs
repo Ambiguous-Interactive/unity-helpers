@@ -52,14 +52,14 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// </summary>
         public event Action<string, float, float> OnAttributeModified;
 
-        private Dictionary<string, Func<object, Attribute>> _attributeFieldGetters;
-        private readonly HashSet<EffectHandle> _effectHandles;
-
         [SiblingComponent]
         protected TagHandler _tagHandler;
 
         [SiblingComponent]
         protected EffectHandler _effectHandler;
+
+        private Dictionary<string, Func<object, Attribute>> _attributeFieldGetters;
+        private readonly HashSet<EffectHandle> _effectHandles;
 
         /// <summary>
         /// Initializes the AttributesComponent by discovering all Attribute fields in the derived class.
@@ -67,29 +67,6 @@ namespace WallstopStudios.UnityHelpers.Tags
         protected AttributesComponent()
         {
             _effectHandles = new HashSet<EffectHandle>();
-        }
-
-        /// <summary>
-        /// Initializes sibling components and registers with the EffectHandler.
-        /// Override this method in derived classes, but always call base.Awake().
-        /// </summary>
-        protected virtual void Awake()
-        {
-            EnsureAttributeFieldGettersInitialized();
-            this.AssignSiblingComponents();
-            _effectHandler.Register(this);
-        }
-
-        /// <summary>
-        /// Unregisters from the EffectHandler when destroyed.
-        /// Override this method in derived classes, but always call base.OnDestroy().
-        /// </summary>
-        protected virtual void OnDestroy()
-        {
-            if (_effectHandler != null)
-            {
-                _effectHandler.Remove(this);
-            }
         }
 
         /// <summary>
@@ -124,45 +101,6 @@ namespace WallstopStudios.UnityHelpers.Tags
         public void ForceRemoveAttributeModifications(EffectHandle handle)
         {
             InternalRemoveAttributeModifications(handle);
-        }
-
-        private void InternalApplyAttributeModifications(
-            IEnumerable<AttributeModification> attributeModifications
-        )
-        {
-            if (attributeModifications is IReadOnlyList<AttributeModification> readonlyList)
-            {
-                for (int i = 0; i < readonlyList.Count; ++i)
-                {
-                    AttributeModification modification = readonlyList[i];
-                    if (!TryGetAttribute(modification.attribute, out Attribute attribute))
-                    {
-                        continue;
-                    }
-
-                    float oldValue = attribute;
-                    attribute.ApplyAttributeModification(modification);
-                    float currentValue = attribute;
-
-                    OnAttributeModified?.Invoke(modification.attribute, oldValue, currentValue);
-                }
-
-                return;
-            }
-
-            foreach (AttributeModification modification in attributeModifications)
-            {
-                if (!TryGetAttribute(modification.attribute, out Attribute attribute))
-                {
-                    continue;
-                }
-
-                float oldValue = attribute;
-                attribute.ApplyAttributeModification(modification);
-                float currentValue = attribute;
-
-                OnAttributeModified?.Invoke(modification.attribute, oldValue, currentValue);
-            }
         }
 
         /// <summary>
@@ -235,6 +173,98 @@ namespace WallstopStudios.UnityHelpers.Tags
             }
         }
 
+        /// <summary>
+        /// Initializes sibling components and registers with the EffectHandler.
+        /// Override this method in derived classes, but always call base.Awake().
+        /// </summary>
+        protected virtual void Awake()
+        {
+            EnsureAttributeFieldGettersInitialized();
+            this.AssignSiblingComponents();
+            _effectHandler.Register(this);
+        }
+
+        /// <summary>
+        /// Unregisters from the EffectHandler when destroyed.
+        /// Override this method in derived classes, but always call base.OnDestroy().
+        /// </summary>
+        protected virtual void OnDestroy()
+        {
+            if (_effectHandler != null)
+            {
+                _effectHandler.Remove(this);
+            }
+        }
+
+        // ReSharper disable once MemberCanBePrivate.Global
+        protected bool TryGetAttribute(string attributeName, out Attribute attribute)
+        {
+            EnsureAttributeFieldGettersInitialized();
+            if (
+                !_attributeFieldGetters.TryGetValue(
+                    attributeName,
+                    out Func<object, Attribute> getter
+                )
+            )
+            {
+                attribute = default;
+                return false;
+            }
+
+            attribute = getter(this);
+            return true;
+        }
+
+        // ReSharper disable once MemberCanBePrivate.Global
+        protected void EnsureAttributeFieldGettersInitialized()
+        {
+            if (_attributeFieldGetters != null)
+            {
+                return;
+            }
+
+            _attributeFieldGetters = AttributeUtilities.GetOptimizedAttributeFields(GetType());
+        }
+
+        private void InternalApplyAttributeModifications(
+            IEnumerable<AttributeModification> attributeModifications
+        )
+        {
+            if (attributeModifications is IReadOnlyList<AttributeModification> readonlyList)
+            {
+                for (int i = 0; i < readonlyList.Count; ++i)
+                {
+                    AttributeModification modification = readonlyList[i];
+                    if (!TryGetAttribute(modification.attribute, out Attribute attribute))
+                    {
+                        continue;
+                    }
+
+                    float oldValue = attribute;
+                    attribute.ApplyAttributeModification(modification);
+                    float currentValue = attribute;
+
+                    OnAttributeModified?.Invoke(modification.attribute, oldValue, currentValue);
+                }
+
+                return;
+            }
+
+            foreach (AttributeModification modification in attributeModifications)
+            {
+                if (!TryGetAttribute(modification.attribute, out Attribute attribute))
+                {
+                    continue;
+                }
+
+                float oldValue = attribute;
+                attribute.ApplyAttributeModification(modification);
+                float currentValue = attribute;
+
+                OnAttributeModified?.Invoke(modification.attribute, oldValue, currentValue);
+            }
+        }
+
         private void InternalRemoveAttributeModifications(EffectHandle handle)
         {
             AttributeEffect effect = handle.effect;
@@ -274,36 +304,6 @@ namespace WallstopStudios.UnityHelpers.Tags
             {
                 ExceptionDispatchInfo.Capture(firstFailure).Throw();
             }
-        }
-
-        // ReSharper disable once MemberCanBePrivate.Global
-        protected bool TryGetAttribute(string attributeName, out Attribute attribute)
-        {
-            EnsureAttributeFieldGettersInitialized();
-            if (
-                !_attributeFieldGetters.TryGetValue(
-                    attributeName,
-                    out Func<object, Attribute> getter
-                )
-            )
-            {
-                attribute = default;
-                return false;
-            }
-
-            attribute = getter(this);
-            return true;
-        }
-
-        // ReSharper disable once MemberCanBePrivate.Global
-        protected void EnsureAttributeFieldGettersInitialized()
-        {
-            if (_attributeFieldGetters != null)
-            {
-                return;
-            }
-
-            _attributeFieldGetters = AttributeUtilities.GetOptimizedAttributeFields(GetType());
         }
     }
 }

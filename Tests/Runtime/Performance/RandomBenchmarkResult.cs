@@ -8,29 +8,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
     internal sealed class RandomBenchmarkResult
     {
-        public RandomBenchmarkResult(
-            Type randomType,
-            double nextBoolPerSecond,
-            double nextIntPerSecond,
-            double nextUintPerSecond,
-            double nextFloatPerSecond,
-            double nextDoublePerSecond,
-            double nextUintRangePerSecond,
-            double nextIntRangePerSecond,
-            RandomGeneratorMetadata metadata
-        )
-        {
-            RandomType = randomType ?? throw new ArgumentNullException(nameof(randomType));
-            Metadata = metadata;
-            NextBoolPerSecond = nextBoolPerSecond;
-            NextIntPerSecond = nextIntPerSecond;
-            NextUintPerSecond = nextUintPerSecond;
-            NextFloatPerSecond = nextFloatPerSecond;
-            NextDoublePerSecond = nextDoublePerSecond;
-            NextUintRangePerSecond = nextUintRangePerSecond;
-            NextIntRangePerSecond = nextIntRangePerSecond;
-        }
-
         public Type RandomType { get; }
 
         public string DisplayName => RandomType.Name;
@@ -62,5 +39,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
         public string QualityLabel => Metadata.QualityLabel;
 
         public int QualitySortValue => Metadata.QualitySortValue;
+
+        public RandomBenchmarkResult(
+            Type randomType,
+            double nextBoolPerSecond,
+            double nextIntPerSecond,
+            double nextUintPerSecond,
+            double nextFloatPerSecond,
+            double nextDoublePerSecond,
+            double nextUintRangePerSecond,
+            double nextIntRangePerSecond,
+            RandomGeneratorMetadata metadata
+        )
+        {
+            RandomType = randomType ?? throw new ArgumentNullException(nameof(randomType));
+            Metadata = metadata;
+            NextBoolPerSecond = nextBoolPerSecond;
+            NextIntPerSecond = nextIntPerSecond;
+            NextUintPerSecond = nextUintPerSecond;
+            NextFloatPerSecond = nextFloatPerSecond;
+            NextDoublePerSecond = nextDoublePerSecond;
+            NextUintRangePerSecond = nextUintRangePerSecond;
+            NextIntRangePerSecond = nextIntRangePerSecond;
+        }
     }
 }

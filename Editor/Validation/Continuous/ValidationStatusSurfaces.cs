@@ -15,67 +15,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     [InitializeOnLoad]
     internal static class ValidationStatusSurfaces
     {
+        internal static event Action StatusChanged;
+        internal static string Badge => _badge;
+
         private static readonly List<ValidationFinding> Findings = new List<ValidationFinding>();
         private static string _badge = "Sentinel · not scanned";
         private static ValidationSuppressions _suppressions = ValidationSuppressions.Empty;
-        internal static event Action StatusChanged;
-        internal static string Badge => _badge;
 
         static ValidationStatusSurfaces()
         {
             ValidationPreferences.Changed += UpdateSubscriptions;
             UpdateSubscriptions();
-        }
-
-        private static void UpdateSubscriptions()
-        {
-            ValidationResults.Changed -= Changed;
-            ValidationWorkspaceSettings.Changed -= Changed;
-            UnityEditor.Editor.finishedDefaultHeaderGUI -= InspectorHeader;
-            if (ValidationPreferences.Enabled)
-            {
-                ValidationResults.Changed += Changed;
-                ValidationWorkspaceSettings.Changed += Changed;
-                UnityEditor.Editor.finishedDefaultHeaderGUI += InspectorHeader;
-            }
-            Changed();
-        }
-
-        private static void Changed()
-        {
-            if (!ValidationPreferences.Enabled)
-            {
-                Findings.Clear();
-                _badge = "Sentinel · disabled";
-                NotifyStatusChanged();
-                return;
-            }
-            ValidationResults.CopyInto(Findings);
-            ValidationWorkspaceSettings.instance.ApplyPreferences(Findings);
-            int errors = 0;
-            int warnings = 0;
-            foreach (ValidationFinding finding in Findings)
-            {
-                if (_suppressions.IsSuppressed(in finding))
-                    continue;
-                if (finding.Severity == ValidationSeverity.Error)
-                    errors++;
-                if (finding.Severity == ValidationSeverity.Warning)
-                    warnings++;
-            }
-            _badge = ValidationResults.HasRun
-                ? "Sentinel · " + errors + " ! · " + warnings + " ⚠"
-                : "Sentinel · not scanned";
-            NotifyStatusChanged();
-        }
-
-        private static void NotifyStatusChanged()
-        {
-            StatusChanged?.Invoke();
-#if UNITY_6000_3_OR_NEWER
-            UnityEditor.Toolbars.MainToolbar.Refresh("Sentinel/Validation");
-#endif
-            SceneView.RepaintAll();
         }
 
         internal static void SuppressionsChanged(ValidationSuppressions suppressions)
@@ -133,6 +83,57 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             });
             UpdateVisibility();
             return panel;
+        }
+
+        private static void UpdateSubscriptions()
+        {
+            ValidationResults.Changed -= Changed;
+            ValidationWorkspaceSettings.Changed -= Changed;
+            UnityEditor.Editor.finishedDefaultHeaderGUI -= InspectorHeader;
+            if (ValidationPreferences.Enabled)
+            {
+                ValidationResults.Changed += Changed;
+                ValidationWorkspaceSettings.Changed += Changed;
+                UnityEditor.Editor.finishedDefaultHeaderGUI += InspectorHeader;
+            }
+            Changed();
+        }
+
+        private static void Changed()
+        {
+            if (!ValidationPreferences.Enabled)
+            {
+                Findings.Clear();
+                _badge = "Sentinel · disabled";
+                NotifyStatusChanged();
+                return;
+            }
+            ValidationResults.CopyInto(Findings);
+            ValidationWorkspaceSettings.instance.ApplyPreferences(Findings);
+            int errors = 0;
+            int warnings = 0;
+            foreach (ValidationFinding finding in Findings)
+            {
+                if (_suppressions.IsSuppressed(in finding))
+                    continue;
+                if (finding.Severity == ValidationSeverity.Error)
+                    errors++;
+                if (finding.Severity == ValidationSeverity.Warning)
+                    warnings++;
+            }
+            _badge = ValidationResults.HasRun
+                ? "Sentinel · " + errors + " ! · " + warnings + " ⚠"
+                : "Sentinel · not scanned";
+            NotifyStatusChanged();
+        }
+
+        private static void NotifyStatusChanged()
+        {
+            StatusChanged?.Invoke();
+#if UNITY_6000_3_OR_NEWER
+            UnityEditor.Toolbars.MainToolbar.Refresh("Sentinel/Validation");
+#endif
+            SceneView.RepaintAll();
         }
 
         private static void InspectorHeader(UnityEditor.Editor editor)

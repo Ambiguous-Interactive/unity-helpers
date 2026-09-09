@@ -36,14 +36,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
             ImmutableArray.Create(UnityHelpersDiagnostics.ComparerModeChangesAfterCollectionUse);
 
-        /// <inheritdoc />
-        public override void Initialize(AnalysisContext context)
-        {
-            context.EnableConcurrentExecution();
-            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
-            context.RegisterOperationBlockStartAction(OnOperationBlockStart);
-        }
-
         private static void OnOperationBlockStart(OperationBlockStartAnalysisContext context)
         {
             BlockState state = new BlockState();
@@ -280,6 +272,14 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 && IsSerializedStringComparer(invocation.TargetMethod.ContainingType);
         }
 
+        /// <inheritdoc />
+        public override void Initialize(AnalysisContext context)
+        {
+            context.EnableConcurrentExecution();
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+            context.RegisterOperationBlockStartAction(OnOperationBlockStart);
+        }
+
         private enum EventKind
         {
             Rebind = 0,
@@ -290,6 +290,20 @@ namespace WallstopStudios.UnityHelpers.Analyzers
 
         private sealed class ComparerEvent
         {
+            public ISymbol Symbol { get; }
+
+            public SyntaxNode Block { get; }
+
+            public int Position { get; }
+
+            public int Start { get; }
+
+            public EventKind Kind { get; }
+
+            public Location Location { get; }
+
+            public int Order { get; }
+
             public ComparerEvent(
                 ISymbol symbol,
                 SyntaxNode block,
@@ -308,20 +322,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 Location = location;
                 Order = order;
             }
-
-            public ISymbol Symbol { get; }
-
-            public SyntaxNode Block { get; }
-
-            public int Position { get; }
-
-            public int Start { get; }
-
-            public EventKind Kind { get; }
-
-            public Location Location { get; }
-
-            public int Order { get; }
         }
 
         private sealed class ComparerState
@@ -335,6 +335,45 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         {
             private readonly object gate = new object();
             private readonly List<ComparerEvent> events = new List<ComparerEvent>();
+
+            private static int ConstructorEnd(IObjectCreationOperation creation)
+            {
+                if (
+                    creation.Syntax is ObjectCreationExpressionSyntax objectCreation
+                    && objectCreation.ArgumentList != null
+                )
+                {
+                    return objectCreation.ArgumentList.CloseParenToken.Span.End;
+                }
+
+                if (
+                    creation.Syntax is ImplicitObjectCreationExpressionSyntax implicitCreation
+                    && implicitCreation.ArgumentList != null
+                )
+                {
+                    return implicitCreation.ArgumentList.CloseParenToken.Span.End;
+                }
+
+                return creation.Syntax.Span.End;
+            }
+
+            private static IOperation ConditionalReceiver(IInvocationOperation invocation)
+            {
+                if (!(invocation.Instance is IConditionalAccessInstanceOperation))
+                {
+                    return null;
+                }
+
+                IOperation ancestor = invocation.Parent;
+                while (ancestor != null && !(ancestor is IConditionalAccessOperation))
+                {
+                    ancestor = ancestor.Parent;
+                }
+
+                return ancestor is IConditionalAccessOperation conditionalAccess
+                    ? conditionalAccess.Operation
+                    : null;
+            }
 
             public void OnObjectCreation(OperationAnalysisContext context)
             {
@@ -696,45 +735,6 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 {
                     events.Add(comparerEvent);
                 }
-            }
-
-            private static int ConstructorEnd(IObjectCreationOperation creation)
-            {
-                if (
-                    creation.Syntax is ObjectCreationExpressionSyntax objectCreation
-                    && objectCreation.ArgumentList != null
-                )
-                {
-                    return objectCreation.ArgumentList.CloseParenToken.Span.End;
-                }
-
-                if (
-                    creation.Syntax is ImplicitObjectCreationExpressionSyntax implicitCreation
-                    && implicitCreation.ArgumentList != null
-                )
-                {
-                    return implicitCreation.ArgumentList.CloseParenToken.Span.End;
-                }
-
-                return creation.Syntax.Span.End;
-            }
-
-            private static IOperation ConditionalReceiver(IInvocationOperation invocation)
-            {
-                if (!(invocation.Instance is IConditionalAccessInstanceOperation))
-                {
-                    return null;
-                }
-
-                IOperation ancestor = invocation.Parent;
-                while (ancestor != null && !(ancestor is IConditionalAccessOperation))
-                {
-                    ancestor = ancestor.Parent;
-                }
-
-                return ancestor is IConditionalAccessOperation conditionalAccess
-                    ? conditionalAccess.Operation
-                    : null;
             }
         }
     }

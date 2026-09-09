@@ -27,13 +27,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Visuals
 
         private GUIStyle _impactButtonStyle;
 
-        protected override void OnEnable()
-        {
-            base.OnEnable();
-            _hdrColorProperty = serializedObject.FindProperty(nameof(EnhancedImage._hdrColor));
-            _shapeMaskProperty = serializedObject.FindProperty(nameof(EnhancedImage._shapeMask));
-        }
-
         public override void OnInspectorGUI()
         {
             _impactButtonStyle ??= new GUIStyle(GUI.skin.button)
@@ -116,6 +109,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Visuals
             serializedObject.Update();
             DrawDefaultInspector();
             serializedObject.ApplyModifiedProperties();
+        }
+
+        protected override void OnEnable()
+        {
+            base.OnEnable();
+            _hdrColorProperty = serializedObject.FindProperty(nameof(EnhancedImage._hdrColor));
+            _shapeMaskProperty = serializedObject.FindProperty(nameof(EnhancedImage._shapeMask));
         }
     }
 

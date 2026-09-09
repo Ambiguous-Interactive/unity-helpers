@@ -22,6 +22,54 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     [NUnit.Framework.Category("Fast")]
     public sealed class HelpersTests : CommonTestBase
     {
+        /*
+            No epsilon: this is exactly the test a spatial-tree range query applies, and an epsilon here is what
+            let these helpers return points the trees then correctly refused to find.
+        */
+        private static void AssertWithinRadius(Vector2 center, Vector2 point, float radius)
+        {
+            Assert.That(
+                (point - center).sqrMagnitude,
+                Is.LessThanOrEqualTo(radius * radius),
+                $"{point} is outside the circle of radius {radius} around {center}."
+            );
+        }
+
+        private static void AssertWithinRadius(Vector3 center, Vector3 point, float radius)
+        {
+            Assert.That(
+                (point - center).sqrMagnitude,
+                Is.LessThanOrEqualTo(radius * radius),
+                $"{point} is outside the sphere of radius {radius} around {center}."
+            );
+        }
+
+        private static IEnumerable<TestCaseData> RandomCircleSampleData()
+        {
+            yield return new TestCaseData(new[] { double.NaN, double.NaN }).SetName(
+                "Circle NaNSamples"
+            );
+            yield return new TestCaseData(new[] { 1d + double.Epsilon, 0.25d }).SetName(
+                "Circle GreaterThanOne"
+            );
+            yield return new TestCaseData(new[] { -10d, 1d + 1e-6 }).SetName(
+                "Circle NegativeAndTooLarge"
+            );
+        }
+
+        private static IEnumerable<TestCaseData> RandomSphereSampleData()
+        {
+            yield return new TestCaseData(
+                new[] { 1d + double.Epsilon, 1d + double.Epsilon, 0d }
+            ).SetName("Sphere ClampPhiAndTheta");
+            yield return new TestCaseData(new[] { double.NaN, double.NaN, double.NaN }).SetName(
+                "Sphere AllNaN"
+            );
+            yield return new TestCaseData(new[] { -5d, 0.75d, 1d + double.Epsilon }).SetName(
+                "Sphere NegativeRadiusSample"
+            );
+        }
+
         [Test]
         public void IsRunningInBatchModeReflectsApplication()
         {
@@ -913,28 +961,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             }
         }
 
-        /*
-            No epsilon: this is exactly the test a spatial-tree range query applies, and an epsilon here is what
-            let these helpers return points the trees then correctly refused to find.
-        */
-        private static void AssertWithinRadius(Vector2 center, Vector2 point, float radius)
-        {
-            Assert.That(
-                (point - center).sqrMagnitude,
-                Is.LessThanOrEqualTo(radius * radius),
-                $"{point} is outside the circle of radius {radius} around {center}."
-            );
-        }
-
-        private static void AssertWithinRadius(Vector3 center, Vector3 point, float radius)
-        {
-            Assert.That(
-                (point - center).sqrMagnitude,
-                Is.LessThanOrEqualTo(radius * radius),
-                $"{point} is outside the sphere of radius {radius} around {center}."
-            );
-        }
-
         [UnityTest]
         public IEnumerator GetPlayerObjectInChildHierarchyFindsTaggedChild()
         {
@@ -1166,32 +1192,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.AreEqual(1, bounds.yMax);
         }
 
-        private static IEnumerable<TestCaseData> RandomCircleSampleData()
-        {
-            yield return new TestCaseData(new[] { double.NaN, double.NaN }).SetName(
-                "Circle NaNSamples"
-            );
-            yield return new TestCaseData(new[] { 1d + double.Epsilon, 0.25d }).SetName(
-                "Circle GreaterThanOne"
-            );
-            yield return new TestCaseData(new[] { -10d, 1d + 1e-6 }).SetName(
-                "Circle NegativeAndTooLarge"
-            );
-        }
-
-        private static IEnumerable<TestCaseData> RandomSphereSampleData()
-        {
-            yield return new TestCaseData(
-                new[] { 1d + double.Epsilon, 1d + double.Epsilon, 0d }
-            ).SetName("Sphere ClampPhiAndTheta");
-            yield return new TestCaseData(new[] { double.NaN, double.NaN, double.NaN }).SetName(
-                "Sphere AllNaN"
-            );
-            yield return new TestCaseData(new[] { -5d, 0.75d, 1d + double.Epsilon }).SetName(
-                "Sphere NegativeRadiusSample"
-            );
-        }
-
         private CoroutineHost CreateHost()
         {
             GameObject go = Track(new GameObject("Helpers_CoroutineHost", typeof(CoroutineHost)));
@@ -1212,14 +1212,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     [WProtoNotSerialized]
     internal sealed class DeterministicRandom : AbstractRandom
     {
+        public override RandomState InternalState => new(0);
+
         private readonly Queue<double> _doubles;
 
         public DeterministicRandom(IEnumerable<double> doubles)
         {
             _doubles = new Queue<double>(doubles ?? Array.Empty<double>());
         }
-
-        public override RandomState InternalState => new(0);
 
         public override IRandom Copy()
         {

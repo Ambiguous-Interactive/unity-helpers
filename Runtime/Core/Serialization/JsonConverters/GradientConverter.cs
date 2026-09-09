@@ -12,6 +12,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
 
     public sealed class GradientConverter : JsonConverter<Gradient>
     {
+        /// <summary>The number of keys a <see cref="Gradient"/> stores per channel.</summary>
+        private const int MaximumKeys = 8;
+
         public static readonly GradientConverter Instance = new();
 
         private static readonly JsonEncodedText ModeProp = JsonEncodedText.Encode("mode");
@@ -22,10 +25,106 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
         private static readonly JsonEncodedText AlphaProp = JsonEncodedText.Encode("alpha");
         private static readonly JsonEncodedText TimeProp = JsonEncodedText.Encode("time");
 
-        /// <summary>The number of keys a <see cref="Gradient"/> stores per channel.</summary>
-        private const int MaximumKeys = 8;
-
         private GradientConverter() { }
+
+        /// <remarks>
+        /// Unity's <see cref="Gradient"/> setters do not throw past the ceiling: they log an error
+        /// and keep the first eight keys, so a payload with more silently loses the rest and fills
+        /// the player log. Refusing it names the payload instead.
+        /// </remarks>
+        private static void RefuseKeyOverflow(int count, string member)
+        {
+            if (MaximumKeys < count)
+            {
+                throw new JsonException(
+                    $"Gradient.{member} holds at most {MaximumKeys} keys, but the payload "
+                        + $"delivered {count}."
+                );
+            }
+        }
+
+        private static GradientColorKey ReadColorKey(
+            ref Utf8JsonReader reader,
+            JsonSerializerOptions options
+        )
+        {
+            if (reader.TokenType != JsonTokenType.StartObject)
+            {
+                throw new JsonException("Invalid colorKey token");
+            }
+
+            Color c = default;
+            float t = 0f;
+            bool haveColor = false;
+            bool haveTime = false;
+            while (reader.Read())
+            {
+                if (reader.TokenType == JsonTokenType.EndObject)
+                {
+                    return new GradientColorKey(haveColor ? c : default, haveTime ? t : 0f);
+                }
+                if (reader.TokenType == JsonTokenType.PropertyName)
+                {
+                    if (reader.ValueTextEquals("color"))
+                    {
+                        reader.Read();
+                        c = JsonSerializer.Deserialize<Color>(ref reader, options);
+                        haveColor = true;
+                    }
+                    else if (reader.ValueTextEquals("time"))
+                    {
+                        reader.Read();
+                        t = reader.GetSingle();
+                        haveTime = true;
+                    }
+                    else
+                    {
+                        throw new JsonException("Unknown property for GradientColorKey");
+                    }
+                }
+            }
+            throw new JsonException("Incomplete JSON for GradientColorKey");
+        }
+
+        private static GradientAlphaKey ReadAlphaKey(ref Utf8JsonReader reader)
+        {
+            if (reader.TokenType != JsonTokenType.StartObject)
+            {
+                throw new JsonException("Invalid alphaKey token");
+            }
+
+            float a = 0f;
+            float t = 0f;
+            bool haveA = false;
+            bool haveT = false;
+            while (reader.Read())
+            {
+                if (reader.TokenType == JsonTokenType.EndObject)
+                {
+                    return new GradientAlphaKey(haveA ? a : 0f, haveT ? t : 0f);
+                }
+                if (reader.TokenType == JsonTokenType.PropertyName)
+                {
+                    if (reader.ValueTextEquals("alpha"))
+                    {
+                        reader.Read();
+                        a = reader.GetSingle();
+                        haveA = true;
+                    }
+                    else if (reader.ValueTextEquals("time"))
+                    {
+                        reader.Read();
+                        t = reader.GetSingle();
+                        haveT = true;
+                    }
+                    else
+                    {
+                        throw new JsonException("Unknown property for GradientAlphaKey");
+                    }
+                }
+            }
+            throw new JsonException("Incomplete JSON for GradientAlphaKey");
+        }
 
         public override Gradient Read(
             ref Utf8JsonReader reader,
@@ -131,105 +230,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
             }
 
             throw new JsonException("Incomplete JSON for Gradient");
-        }
-
-        /// <remarks>
-        /// Unity's <see cref="Gradient"/> setters do not throw past the ceiling: they log an error
-        /// and keep the first eight keys, so a payload with more silently loses the rest and fills
-        /// the player log. Refusing it names the payload instead.
-        /// </remarks>
-        private static void RefuseKeyOverflow(int count, string member)
-        {
-            if (MaximumKeys < count)
-            {
-                throw new JsonException(
-                    $"Gradient.{member} holds at most {MaximumKeys} keys, but the payload "
-                        + $"delivered {count}."
-                );
-            }
-        }
-
-        private static GradientColorKey ReadColorKey(
-            ref Utf8JsonReader reader,
-            JsonSerializerOptions options
-        )
-        {
-            if (reader.TokenType != JsonTokenType.StartObject)
-            {
-                throw new JsonException("Invalid colorKey token");
-            }
-
-            Color c = default;
-            float t = 0f;
-            bool haveColor = false;
-            bool haveTime = false;
-            while (reader.Read())
-            {
-                if (reader.TokenType == JsonTokenType.EndObject)
-                {
-                    return new GradientColorKey(haveColor ? c : default, haveTime ? t : 0f);
-                }
-                if (reader.TokenType == JsonTokenType.PropertyName)
-                {
-                    if (reader.ValueTextEquals("color"))
-                    {
-                        reader.Read();
-                        c = JsonSerializer.Deserialize<Color>(ref reader, options);
-                        haveColor = true;
-                    }
-                    else if (reader.ValueTextEquals("time"))
-                    {
-                        reader.Read();
-                        t = reader.GetSingle();
-                        haveTime = true;
-                    }
-                    else
-                    {
-                        throw new JsonException("Unknown property for GradientColorKey");
-                    }
-                }
-            }
-            throw new JsonException("Incomplete JSON for GradientColorKey");
-        }
-
-        private static GradientAlphaKey ReadAlphaKey(ref Utf8JsonReader reader)
-        {
-            if (reader.TokenType != JsonTokenType.StartObject)
-            {
-                throw new JsonException("Invalid alphaKey token");
-            }
-
-            float a = 0f;
-            float t = 0f;
-            bool haveA = false;
-            bool haveT = false;
-            while (reader.Read())
-            {
-                if (reader.TokenType == JsonTokenType.EndObject)
-                {
-                    return new GradientAlphaKey(haveA ? a : 0f, haveT ? t : 0f);
-                }
-                if (reader.TokenType == JsonTokenType.PropertyName)
-                {
-                    if (reader.ValueTextEquals("alpha"))
-                    {
-                        reader.Read();
-                        a = reader.GetSingle();
-                        haveA = true;
-                    }
-                    else if (reader.ValueTextEquals("time"))
-                    {
-                        reader.Read();
-                        t = reader.GetSingle();
-                        haveT = true;
-                    }
-                    else
-                    {
-                        throw new JsonException("Unknown property for GradientAlphaKey");
-                    }
-                }
-            }
-            throw new JsonException("Incomplete JSON for GradientAlphaKey");
         }
 
         public override void Write(

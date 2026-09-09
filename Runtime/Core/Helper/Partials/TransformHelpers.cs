@@ -282,21 +282,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return transform.InternalIterateOverAllChildrenRecursively(buffer);
         }
 
-        private static List<Transform> InternalIterateOverAllChildrenRecursively(
-            this Transform transform,
-            List<Transform> buffer
-        )
-        {
-            for (int i = 0; i < transform.childCount; ++i)
-            {
-                Transform child = transform.GetChild(i);
-                buffer.Add(child);
-                child.InternalIterateOverAllChildrenRecursively(buffer);
-            }
-
-            return buffer;
-        }
-
         public static IEnumerable<Transform> IterateOverAllChildrenRecursivelyBreadthFirst(
             this Component component,
             bool includeSelf = false
@@ -386,6 +371,21 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     }
                 }
             }
+            return buffer;
+        }
+
+        private static List<Transform> InternalIterateOverAllChildrenRecursively(
+            this Transform transform,
+            List<Transform> buffer
+        )
+        {
+            for (int i = 0; i < transform.childCount; ++i)
+            {
+                Transform child = transform.GetChild(i);
+                buffer.Add(child);
+                child.InternalIterateOverAllChildrenRecursively(buffer);
+            }
+
             return buffer;
         }
     }

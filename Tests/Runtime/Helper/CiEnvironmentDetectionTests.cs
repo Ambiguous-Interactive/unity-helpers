@@ -18,6 +18,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     {
         private Dictionary<string, string> _originalValues;
 
+        private static void ClearAllCiEnvironmentVariables()
+        {
+            foreach (string envVar in Helpers.CiEnvironmentVariables.All)
+            {
+                Environment.SetEnvironmentVariable(envVar, null);
+            }
+        }
+
         [SetUp]
         public void SetUp()
         {
@@ -36,14 +44,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             foreach (KeyValuePair<string, string> kvp in _originalValues)
             {
                 Environment.SetEnvironmentVariable(kvp.Key, kvp.Value);
-            }
-        }
-
-        private static void ClearAllCiEnvironmentVariables()
-        {
-            foreach (string envVar in Helpers.CiEnvironmentVariables.All)
-            {
-                Environment.SetEnvironmentVariable(envVar, null);
             }
         }
 

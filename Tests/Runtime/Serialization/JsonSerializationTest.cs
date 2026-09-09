@@ -22,7 +22,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
     [DataContract]
     public sealed class TestDataObject
     {
-        public string field;
         public int Property { get; set; }
 
         [JsonPropertyName("DifferentPropertyName")]
@@ -33,6 +32,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         public List<int> ListProperty { get; set; } = new();
 
         public List<Type> TypeProperties { get; set; } = new();
+
+        public string field;
     }
 
     [TestFixture]

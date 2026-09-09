@@ -43,17 +43,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
         private static readonly Type WarmupComponentType = typeof(PrewarmTesterComponent);
         private static readonly Type SubjectComponentType = typeof(RelationalComponentTester);
 
-        [SetUp]
-        public void WarmMainThreadDependenciesThenClearCaches()
-        {
-            SiblingComponentExtensions.GetOrCreateFields(WarmupComponentType);
-            ParentComponentExtensions.GetOrCreateFields(WarmupComponentType);
-            ChildComponentExtensions.GetOrCreateFields(WarmupComponentType);
-            SiblingComponentExtensions.ClearCachedFieldMetadata();
-            ParentComponentExtensions.ClearCachedFieldMetadata();
-            ChildComponentExtensions.ClearCachedFieldMetadata();
-        }
-
         private static IEnumerable<TestCaseData> RelationalCaches()
         {
             yield return new TestCaseData(
@@ -71,6 +60,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 (Action)ChildComponentExtensions.ClearCachedFieldMetadata,
                 (Func<Type, bool>)ChildComponentExtensions.HasCachedFieldMetadata
             ).SetName("Child");
+        }
+
+        [SetUp]
+        public void WarmMainThreadDependenciesThenClearCaches()
+        {
+            SiblingComponentExtensions.GetOrCreateFields(WarmupComponentType);
+            ParentComponentExtensions.GetOrCreateFields(WarmupComponentType);
+            ChildComponentExtensions.GetOrCreateFields(WarmupComponentType);
+            SiblingComponentExtensions.ClearCachedFieldMetadata();
+            ParentComponentExtensions.ClearCachedFieldMetadata();
+            ChildComponentExtensions.ClearCachedFieldMetadata();
         }
 
         [TestCaseSource(nameof(RelationalCaches))]
@@ -149,6 +149,70 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
         }
 
 #if !SINGLE_THREADED
+
+        private static Array[] RaceLookups(Func<Type, Array> lookup)
+        {
+            Array[] observed = new Array[LookupThreadCount];
+            Exception capturedException = null;
+            int mismatchCount = 0;
+            using Barrier startLine = new(LookupThreadCount);
+            Thread[] workers = new Thread[LookupThreadCount];
+            for (int index = 0; index < LookupThreadCount; index++)
+            {
+                int slot = index;
+                workers[slot] = new Thread(() =>
+                {
+                    try
+                    {
+                        startLine.SignalAndWait(ThreadJoinTimeout);
+                        Array first = lookup(SubjectComponentType);
+                        observed[slot] = first;
+                        for (int repeat = 1; repeat < LookupsPerThread; repeat++)
+                        {
+                            if (first != lookup(SubjectComponentType))
+                            {
+                                Interlocked.Increment(ref mismatchCount);
+                            }
+                        }
+                    }
+                    catch (Exception exception)
+                    {
+                        Interlocked.CompareExchange(ref capturedException, exception, null);
+                    }
+                });
+            }
+
+            StartThenJoin(workers);
+
+            Assert.IsTrue(
+                capturedException == null,
+                "A racing lookup threw: {0}",
+                capturedException
+            );
+            Assert.AreEqual(
+                0,
+                mismatchCount,
+                "A lookup after the first fill returned a different metadata instance."
+            );
+            return observed;
+        }
+
+        private static void StartThenJoin(Thread[] workers)
+        {
+            foreach (Thread worker in workers)
+            {
+                worker.Start();
+            }
+
+            foreach (Thread worker in workers)
+            {
+                Assert.IsTrue(
+                    worker.Join(ThreadJoinTimeout),
+                    "A worker did not finish within the join timeout, which is a deadlock."
+                );
+            }
+        }
+
         [TestCaseSource(nameof(RelationalCaches))]
         public void ConcurrentFirstFillPublishesOneMetadataInstanceToEveryCaller(
             Func<Type, Array> lookup,
@@ -321,74 +385,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 "The unassigned component reported no invalid assignment, so the race had no subject."
             );
         }
-
-        private static Array[] RaceLookups(Func<Type, Array> lookup)
-        {
-            Array[] observed = new Array[LookupThreadCount];
-            Exception capturedException = null;
-            int mismatchCount = 0;
-            using Barrier startLine = new(LookupThreadCount);
-            Thread[] workers = new Thread[LookupThreadCount];
-            for (int index = 0; index < LookupThreadCount; index++)
-            {
-                int slot = index;
-                workers[slot] = new Thread(() =>
-                {
-                    try
-                    {
-                        startLine.SignalAndWait(ThreadJoinTimeout);
-                        Array first = lookup(SubjectComponentType);
-                        observed[slot] = first;
-                        for (int repeat = 1; repeat < LookupsPerThread; repeat++)
-                        {
-                            if (first != lookup(SubjectComponentType))
-                            {
-                                Interlocked.Increment(ref mismatchCount);
-                            }
-                        }
-                    }
-                    catch (Exception exception)
-                    {
-                        Interlocked.CompareExchange(ref capturedException, exception, null);
-                    }
-                });
-            }
-
-            StartThenJoin(workers);
-
-            Assert.IsTrue(
-                capturedException == null,
-                "A racing lookup threw: {0}",
-                capturedException
-            );
-            Assert.AreEqual(
-                0,
-                mismatchCount,
-                "A lookup after the first fill returned a different metadata instance."
-            );
-            return observed;
-        }
-
-        private static void StartThenJoin(Thread[] workers)
-        {
-            foreach (Thread worker in workers)
-            {
-                worker.Start();
-            }
-
-            foreach (Thread worker in workers)
-            {
-                Assert.IsTrue(
-                    worker.Join(ThreadJoinTimeout),
-                    "A worker did not finish within the join timeout, which is a deadlock."
-                );
-            }
-        }
 #endif
 
         private sealed class ReentrantValidationSource : IEnumerable<int>
         {
             private static readonly int[] SinglePayload = new int[] { 1 };
+
+            internal int ReentrantCallCount { get; private set; }
+
+            internal int DeepestObservedDepth { get; private set; }
+
+            internal bool LastReentrantResult { get; private set; }
+
+            internal Exception CapturedException { get; private set; }
 
             private readonly Func<bool> _reentrantProbe;
             private readonly int _depthLimit;
@@ -401,23 +410,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 _depthLimit = depthLimit;
             }
 
-            internal int ReentrantCallCount { get; private set; }
-
-            internal int DeepestObservedDepth { get; private set; }
-
-            internal bool LastReentrantResult { get; private set; }
-
-            internal Exception CapturedException { get; private set; }
-
             public IEnumerator<int> GetEnumerator()
             {
                 ProbeReentrantly();
                 return ((IEnumerable<int>)SinglePayload).GetEnumerator();
-            }
-
-            IEnumerator IEnumerable.GetEnumerator()
-            {
-                return GetEnumerator();
             }
 
             private void ProbeReentrantly()
@@ -446,6 +442,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
                 {
                     _activeDepth--;
                 }
+            }
+
+            IEnumerator IEnumerable.GetEnumerator()
+            {
+                return GetEnumerator();
             }
         }
     }

@@ -49,18 +49,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// </remarks>
         public const int DefaultMaxCachedWrappers = 4096;
 
-        private static readonly Cache<string, StringWrapper> Cache = CacheBuilder<
-            string,
-            StringWrapper
-        >
-            .NewBuilder()
-            .MaximumSize(DefaultMaxCachedWrappers)
-            .InitialCapacity(16)
-            .Build();
-
-        private static int _maxCachedWrappers = DefaultMaxCachedWrappers;
-        private static readonly object CacheResizeLock = new();
-
         /// <summary>
         /// Gets or sets how many distinct strings the cache retains. A value of 0 or less removes
         /// the bound.
@@ -86,6 +74,18 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
         /// The number of strings the cache currently holds.
         /// </summary>
         public static int CachedCount => Cache.Count;
+
+        private static readonly Cache<string, StringWrapper> Cache = CacheBuilder<
+            string,
+            StringWrapper
+        >
+            .NewBuilder()
+            .MaximumSize(DefaultMaxCachedWrappers)
+            .InitialCapacity(16)
+            .Build();
+
+        private static int _maxCachedWrappers = DefaultMaxCachedWrappers;
+        private static readonly object CacheResizeLock = new();
 
         public readonly string value;
 

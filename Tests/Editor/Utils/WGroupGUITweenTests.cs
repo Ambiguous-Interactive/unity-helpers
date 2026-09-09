@@ -23,6 +23,29 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
         private bool _originalTweenEnabled;
         private float _originalTweenSpeed;
 
+        /// <summary>
+        /// Creates a test <see cref="WGroupDefinition"/> with specified parameters.
+        /// </summary>
+        private static WGroupDefinition CreateTestDefinition(
+            string name,
+            string anchorPropertyPath,
+            bool collapsible,
+            bool hideHeader
+        )
+        {
+            return new WGroupDefinition(
+                name: name,
+                displayName: name,
+                collapsible: collapsible,
+                startCollapsed: false,
+                hideHeader: hideHeader,
+                propertyPaths: new List<string> { anchorPropertyPath },
+                anchorPropertyPath: anchorPropertyPath,
+                anchorIndex: 0,
+                declarationOrder: 0
+            );
+        }
+
         [SetUp]
         public void SetUp()
         {
@@ -1079,29 +1102,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils
                 anim3Before,
                 anim3After,
                 "AnimBool 3 should be new instance after clearing."
-            );
-        }
-
-        /// <summary>
-        /// Creates a test <see cref="WGroupDefinition"/> with specified parameters.
-        /// </summary>
-        private static WGroupDefinition CreateTestDefinition(
-            string name,
-            string anchorPropertyPath,
-            bool collapsible,
-            bool hideHeader
-        )
-        {
-            return new WGroupDefinition(
-                name: name,
-                displayName: name,
-                collapsible: collapsible,
-                startCollapsed: false,
-                hideHeader: hideHeader,
-                propertyPaths: new List<string> { anchorPropertyPath },
-                anchorPropertyPath: anchorPropertyPath,
-                anchorIndex: 0,
-                declarationOrder: 0
             );
         }
     }

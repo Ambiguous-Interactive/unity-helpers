@@ -28,60 +28,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return true;
         }
 
-        private static int DetermineConvexHullOrientation(List<Vector2> convexHull)
-        {
-            if (convexHull == null || convexHull.Count < 3)
-            {
-                return 0;
-            }
-            double area = 0d;
-            for (int i = 0; i < convexHull.Count; ++i)
-            {
-                Vector2 a = convexHull[i];
-                Vector2 b = convexHull[(i + 1) % convexHull.Count];
-                area += (double)a.x * b.y - (double)a.y * b.x;
-            }
-            if (Math.Abs(area) <= ConvexHullOrientationEpsilon)
-            {
-                return 0;
-            }
-            return 0d < area ? 1 : -1;
-        }
-
-        private static bool IsPointInsideConvexHull(
-            List<Vector2> convexHull,
-            Vector2 point,
-            int expectedSide
-        )
-        {
-            if (convexHull == null || convexHull.Count == 0)
-            {
-                return true;
-            }
-            int requiredSide = expectedSide;
-            for (int i = 0; i < convexHull.Count; ++i)
-            {
-                Vector2 lhs = convexHull[i];
-                Vector2 rhs = convexHull[(i + 1) % convexHull.Count];
-                float relation = Geometry.IsAPointLeftOfVectorOrOnTheLine(lhs, rhs, point);
-                if (Mathf.Abs(relation) <= ConvexHullRelationEpsilon)
-                {
-                    continue;
-                }
-                int side = requiredSide;
-                if (side == 0)
-                {
-                    side = 0f < relation ? 1 : -1;
-                    requiredSide = side;
-                }
-                if (relation * side < -ConvexHullRelationEpsilon)
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
-
         /// <summary>
         /// Determines if one convex hull is completely inside another convex hull.
         /// </summary>
@@ -195,6 +141,60 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
             }
 
+            return true;
+        }
+
+        private static int DetermineConvexHullOrientation(List<Vector2> convexHull)
+        {
+            if (convexHull == null || convexHull.Count < 3)
+            {
+                return 0;
+            }
+            double area = 0d;
+            for (int i = 0; i < convexHull.Count; ++i)
+            {
+                Vector2 a = convexHull[i];
+                Vector2 b = convexHull[(i + 1) % convexHull.Count];
+                area += (double)a.x * b.y - (double)a.y * b.x;
+            }
+            if (Math.Abs(area) <= ConvexHullOrientationEpsilon)
+            {
+                return 0;
+            }
+            return 0d < area ? 1 : -1;
+        }
+
+        private static bool IsPointInsideConvexHull(
+            List<Vector2> convexHull,
+            Vector2 point,
+            int expectedSide
+        )
+        {
+            if (convexHull == null || convexHull.Count == 0)
+            {
+                return true;
+            }
+            int requiredSide = expectedSide;
+            for (int i = 0; i < convexHull.Count; ++i)
+            {
+                Vector2 lhs = convexHull[i];
+                Vector2 rhs = convexHull[(i + 1) % convexHull.Count];
+                float relation = Geometry.IsAPointLeftOfVectorOrOnTheLine(lhs, rhs, point);
+                if (Mathf.Abs(relation) <= ConvexHullRelationEpsilon)
+                {
+                    continue;
+                }
+                int side = requiredSide;
+                if (side == 0)
+                {
+                    side = 0f < relation ? 1 : -1;
+                    requiredSide = side;
+                }
+                if (relation * side < -ConvexHullRelationEpsilon)
+                {
+                    return false;
+                }
+            }
             return true;
         }
 

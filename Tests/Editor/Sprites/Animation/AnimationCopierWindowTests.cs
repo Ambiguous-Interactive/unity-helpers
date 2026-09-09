@@ -23,6 +23,40 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         private bool _prevPrompt;
         private bool _previousEditorUiSuppress;
 
+        private static void ImportAssetIfExists(string assetPath)
+        {
+            if (string.IsNullOrEmpty(assetPath))
+            {
+                return;
+            }
+
+            if (
+                AssetDatabase.IsValidFolder(assetPath)
+                || AssetDatabase.LoadAssetAtPath<Object>(assetPath) != null
+            )
+            {
+                AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceSynchronousImport);
+            }
+        }
+
+        private static string ToFull(string rel) =>
+            Path.Combine(
+                    Application.dataPath.Substring(
+                        0,
+                        Application.dataPath.Length - "Assets".Length
+                    ),
+                    rel
+                )
+                .SanitizePath();
+
+        private static void ModifyClip(string relPath)
+        {
+            AnimationClip clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(relPath);
+            Assert.IsTrue(clip != null);
+            clip.frameRate = clip.frameRate + 1f;
+            EditorUtility.SetDirty(clip);
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -56,22 +90,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         {
             CleanupDeferredAssetsAndFolders();
             base.OneTimeTearDown();
-        }
-
-        private static void ImportAssetIfExists(string assetPath)
-        {
-            if (string.IsNullOrEmpty(assetPath))
-            {
-                return;
-            }
-
-            if (
-                AssetDatabase.IsValidFolder(assetPath)
-                || AssetDatabase.LoadAssetAtPath<Object>(assetPath) != null
-            )
-            {
-                AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceSynchronousImport);
-            }
         }
 
         [Test]
@@ -363,16 +381,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             );
         }
 
-        private static string ToFull(string rel) =>
-            Path.Combine(
-                    Application.dataPath.Substring(
-                        0,
-                        Application.dataPath.Length - "Assets".Length
-                    ),
-                    rel
-                )
-                .SanitizePath();
-
         private void CreateEmptyClip(string relPath)
         {
             string dir = Path.GetDirectoryName(relPath).SanitizePath();
@@ -402,14 +410,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             AnimationUtility.SetAnimationClipSettings(clip, settings);
             AssetDatabase.CreateAsset(clip, relPath);
             TrackAssetPath(relPath);
-        }
-
-        private static void ModifyClip(string relPath)
-        {
-            AnimationClip clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(relPath);
-            Assert.IsTrue(clip != null);
-            clip.frameRate = clip.frameRate + 1f;
-            EditorUtility.SetDirty(clip);
         }
 
         private AnimationCopierWindow CreateWindow()

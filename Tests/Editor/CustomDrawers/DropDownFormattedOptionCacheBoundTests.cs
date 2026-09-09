@@ -28,6 +28,17 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         private const string DestroyedOptionNamePrefix = "FormattedOptionDestroyed";
         private const string DestroyedOptionLabel = "(None)";
 
+        private static IEnumerable<TestCaseData> FormattedOptionCaches()
+        {
+            yield return new TestCaseData(
+                (Func<object, string>)DropDownShared.FormatOption
+            ).SetName("Cache.DropDownShared");
+
+            yield return new TestCaseData(
+                (Func<object, string>)WValueDropDownDrawer.TestHooks.FormatOptionCached
+            ).SetName("Cache.WValueDropDown");
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -210,17 +221,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                         + "entry outlived the object it keys on."
                 );
             }
-        }
-
-        private static IEnumerable<TestCaseData> FormattedOptionCaches()
-        {
-            yield return new TestCaseData(
-                (Func<object, string>)DropDownShared.FormatOption
-            ).SetName("Cache.DropDownShared");
-
-            yield return new TestCaseData(
-                (Func<object, string>)WValueDropDownDrawer.TestHooks.FormatOptionCached
-            ).SetName("Cache.WValueDropDown");
         }
     }
 }

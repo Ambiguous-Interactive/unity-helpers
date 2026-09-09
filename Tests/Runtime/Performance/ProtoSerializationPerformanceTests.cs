@@ -17,6 +17,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
     [NUnit.Framework.Category("Integration")]
     public sealed partial class ProtoSerializationPerformanceTests
     {
+        private const int Iterations = 10_000;
+
         private static SmallMsg MakeSmall(int i) => new() { Id = i, Name = "Name_" + i };
 
         private static MediumMsg MakeMedium(int i, int len) =>
@@ -35,34 +37,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 Blob = MakeBytes(blobSize, seed: i),
                 Nested = MakeMedium(i, nestedLen),
             };
-
-        private const int Iterations = 10_000;
-
-        [Test, Timeout(0)]
-        public void CompareSerializeSmallMediumLarge()
-        {
-            UnityEngine.Debug.Log(
-                "| Payload | WallstopProto (ms) | protobuf-net (ms) | Speedup | Size (bytes) |"
-            );
-            UnityEngine.Debug.Log(
-                "| ------- | ------------------:| ----------------:| -------:| ------------:|"
-            );
-
-            RunSerializeBenchmark("Small", () => MakeSmall(123), out int smallSize);
-            RunSerializeBenchmark("Medium", () => MakeMedium(123, 16), out int medSize);
-            RunSerializeBenchmark("Large", () => MakeLarge(123, 8 * 1024, 64), out int largeSize);
-        }
-
-        [Test, Timeout(0)]
-        public void CompareDeserializeSmallMediumLarge()
-        {
-            UnityEngine.Debug.Log("| Payload | WallstopProto (ms) | protobuf-net (ms) | Speedup |");
-            UnityEngine.Debug.Log("| ------- | ------------------:| ----------------:| -------:|");
-
-            RunDeserializeBenchmark("Small", MakeSmall(123));
-            RunDeserializeBenchmark("Medium", MakeMedium(123, 16));
-            RunDeserializeBenchmark("Large", MakeLarge(123, 8 * 1024, 64));
-        }
 
         private static void RunSerializeBenchmark<T>(
             string label,
@@ -167,6 +141,32 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 b[i] = (byte)(x >> 24);
             }
             return b;
+        }
+
+        [Test, Timeout(0)]
+        public void CompareSerializeSmallMediumLarge()
+        {
+            UnityEngine.Debug.Log(
+                "| Payload | WallstopProto (ms) | protobuf-net (ms) | Speedup | Size (bytes) |"
+            );
+            UnityEngine.Debug.Log(
+                "| ------- | ------------------:| ----------------:| -------:| ------------:|"
+            );
+
+            RunSerializeBenchmark("Small", () => MakeSmall(123), out int smallSize);
+            RunSerializeBenchmark("Medium", () => MakeMedium(123, 16), out int medSize);
+            RunSerializeBenchmark("Large", () => MakeLarge(123, 8 * 1024, 64), out int largeSize);
+        }
+
+        [Test, Timeout(0)]
+        public void CompareDeserializeSmallMediumLarge()
+        {
+            UnityEngine.Debug.Log("| Payload | WallstopProto (ms) | protobuf-net (ms) | Speedup |");
+            UnityEngine.Debug.Log("| ------- | ------------------:| ----------------:| -------:|");
+
+            RunDeserializeBenchmark("Small", MakeSmall(123));
+            RunDeserializeBenchmark("Medium", MakeMedium(123, 16));
+            RunDeserializeBenchmark("Large", MakeLarge(123, 8 * 1024, 64));
         }
 
         [ProtoContract]

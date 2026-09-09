@@ -22,6 +22,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
     {
         private const string Root = "Assets/Temp/SpritePivotAdjusterTests";
 
+        private static string RelToFull(string rel)
+        {
+            return Path.Combine(
+                    Application.dataPath.Substring(
+                        0,
+                        Application.dataPath.Length - "Assets".Length
+                    ),
+                    rel
+                )
+                .SanitizePath();
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -108,18 +120,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             t.SetPixels(pix);
             t.Apply();
             File.WriteAllBytes(RelToFull(relPath), t.EncodeToPNG());
-        }
-
-        private static string RelToFull(string rel)
-        {
-            return Path.Combine(
-                    Application.dataPath.Substring(
-                        0,
-                        Application.dataPath.Length - "Assets".Length
-                    ),
-                    rel
-                )
-                .SanitizePath();
         }
     }
 #endif

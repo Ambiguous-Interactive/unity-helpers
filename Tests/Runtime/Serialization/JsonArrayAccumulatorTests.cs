@@ -26,6 +26,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
         */
         private const int SlotBudget = 8;
 
+        private static void Accumulate(int count)
+        {
+            JsonArrayAccumulator<int> accumulator = default;
+            try
+            {
+                for (int index = 0; index < count; ++index)
+                {
+                    accumulator.Add(index);
+                }
+            }
+            finally
+            {
+                accumulator.Dispose();
+            }
+        }
+
         [Test]
         public void AccumulatingDoesNotLeakDisposalSlots()
         {
@@ -65,22 +81,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                 for (int index = 0; index < produced.Length; ++index)
                 {
                     Assert.AreEqual(index, produced[index], $"element {index} survived the growth");
-                }
-            }
-            finally
-            {
-                accumulator.Dispose();
-            }
-        }
-
-        private static void Accumulate(int count)
-        {
-            JsonArrayAccumulator<int> accumulator = default;
-            try
-            {
-                for (int index = 0; index < count; ++index)
-                {
-                    accumulator.Add(index);
                 }
             }
             finally

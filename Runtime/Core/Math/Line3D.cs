@@ -22,31 +22,19 @@ namespace WallstopStudios.UnityHelpers.Core.Math
     public readonly partial struct Line3D : IEquatable<Line3D>
     {
         /// <summary>
-        /// The starting point of the line segment.
+        /// Equality operator.
         /// </summary>
-        [DataMember]
-        [ProtoMember(1)]
-        [WProtoMember(1)]
-        public readonly Vector3 from;
-
-        /// <summary>
-        /// The ending point of the line segment.
-        /// </summary>
-        [DataMember]
-        [ProtoMember(2)]
-        [WProtoMember(2)]
-        public readonly Vector3 to;
-
-        /// <summary>
-        /// Constructs a line segment from two points.
-        /// </summary>
-        /// <param name="from">The starting point.</param>
-        /// <param name="to">The ending point.</param>
-        [JsonConstructor]
-        public Line3D(Vector3 from, Vector3 to)
+        public static bool operator ==(Line3D left, Line3D right)
         {
-            this.from = from;
-            this.to = to;
+            return left.Equals(right);
+        }
+
+        /// <summary>
+        /// Inequality operator.
+        /// </summary>
+        public static bool operator !=(Line3D left, Line3D right)
+        {
+            return !left.Equals(right);
         }
 
         /// <summary>
@@ -77,6 +65,43 @@ namespace WallstopStudios.UnityHelpers.Core.Math
         /// Gets the normalized direction vector from 'from' to 'to'.
         /// </summary>
         public Vector3 NormalizedDirection => (to - from).normalized;
+
+        /// <summary>
+        /// The starting point of the line segment.
+        /// </summary>
+        [DataMember]
+        [ProtoMember(1)]
+        [WProtoMember(1)]
+        public readonly Vector3 from;
+
+        /// <summary>
+        /// The ending point of the line segment.
+        /// </summary>
+        [DataMember]
+        [ProtoMember(2)]
+        [WProtoMember(2)]
+        public readonly Vector3 to;
+
+        /// <summary>
+        /// Constructs a line segment from two points.
+        /// </summary>
+        /// <param name="from">The starting point.</param>
+        /// <param name="to">The ending point.</param>
+        [JsonConstructor]
+        public Line3D(Vector3 from, Vector3 to)
+        {
+            this.from = from;
+            this.to = to;
+        }
+
+        private static Vector3 ClampToBounds(Vector3 p, BoundingBox3D bounds)
+        {
+            return new Vector3(
+                Mathf.Clamp(p.x, bounds.min.x, bounds.max.x),
+                Mathf.Clamp(p.y, bounds.min.y, bounds.max.y),
+                Mathf.Clamp(p.z, bounds.min.z, bounds.max.z)
+            );
+        }
 
         /// <summary>
         /// Checks if this line segment intersects with a sphere.
@@ -127,39 +152,6 @@ namespace WallstopStudios.UnityHelpers.Core.Math
         )
         {
             return ComputeClosestPoints(other, out thisClosest, out otherClosest);
-        }
-
-        private bool ComputeClosestPoints(
-            Line3D other,
-            out Vector3 thisClosest,
-            out Vector3 otherClosest
-        )
-        {
-            Vector3 d1 = Direction;
-            Vector3 d2 = other.Direction;
-            Vector3 r = from - other.from;
-
-            float a = Vector3.Dot(d1, d1);
-            float b = Vector3.Dot(d1, d2);
-            float c = Vector3.Dot(d1, r);
-            float e = Vector3.Dot(d2, d2);
-            float f = Vector3.Dot(d2, r);
-
-            float denom = a * e - b * b;
-
-            if (Mathf.Approximately(denom, 0))
-            {
-                thisClosest = from;
-                otherClosest = other.ClosestPointOnLine(from);
-                return false;
-            }
-
-            float s = Mathf.Clamp01((b * f - c * e) / denom);
-            float t = Mathf.Clamp01((a * f - b * c) / denom);
-
-            thisClosest = from + s * d1;
-            otherClosest = other.from + t * d2;
-            return true;
         }
 
         /// <summary>
@@ -313,13 +305,109 @@ namespace WallstopStudios.UnityHelpers.Core.Math
             }
         }
 
-        private static Vector3 ClampToBounds(Vector3 p, BoundingBox3D bounds)
+        /// <summary>
+        /// Checks if a point lies on this line segment (within a specified tolerance).
+        /// </summary>
+        /// <param name="point">The point to check.</param>
+        /// <param name="tolerance">The maximum distance from the line to consider the point as contained.</param>
+        /// <returns>True if the point lies on the line segment within the tolerance, false otherwise.</returns>
+        public bool Contains(Vector3 point, float tolerance = 0.0001f)
         {
-            return new Vector3(
-                Mathf.Clamp(p.x, bounds.min.x, bounds.max.x),
-                Mathf.Clamp(p.y, bounds.min.y, bounds.max.y),
-                Mathf.Clamp(p.z, bounds.min.z, bounds.max.z)
-            );
+            Vector3 closestPoint = ClosestPointOnLine(point);
+            return Vector3.Distance(point, closestPoint) <= tolerance;
+        }
+
+        /// <summary>
+        /// Checks if this line is equal to another line.
+        /// Two lines are equal when their endpoints match exactly, in the same order. Unity's
+        /// <c>Vector3</c> <c>==</c> is an approximate comparison and its hash is not, so exact
+        /// comparison is what keeps equal lines in the same hash bucket.
+        /// </summary>
+        public bool Equals(Line3D other)
+        {
+            return from.Equals(other.from) && to.Equals(other.to);
+        }
+
+        /// <summary>
+        /// Checks whether both endpoints sit within <paramref name="tolerance"/> of another line's,
+        /// in the same order.
+        /// </summary>
+        /// <param name="other">The other line to compare.</param>
+        /// <param name="tolerance">Maximum permitted per-component difference, and the whole of it: nothing relative to the magnitudes is added. Must be finite and non-negative.</param>
+        /// <returns>
+        /// True when both endpoints agree within <paramref name="tolerance"/>; false when
+        /// <paramref name="tolerance"/> is negative, infinite, or not a number. A non-finite
+        /// coordinate compares exactly, so two identical infinite endpoints are approximately equal
+        /// and this stays reflexive for every line.
+        /// </returns>
+        public bool ApproximatelyEquals(Line3D other, float tolerance)
+        {
+            if (float.IsNaN(tolerance) || float.IsInfinity(tolerance) || tolerance < 0f)
+            {
+                return false;
+            }
+
+            return WallMath.WithinTolerance(from, other.from, tolerance)
+                && WallMath.WithinTolerance(to, other.to, tolerance);
+        }
+
+        /// <summary>
+        /// Checks if this line is equal to another object. Only another <see cref="Line3D"/> can be
+        /// equal to a line.
+        /// </summary>
+        public override bool Equals(object obj)
+        {
+            return obj is Line3D other && Equals(other);
+        }
+
+        /// <summary>
+        /// Gets the hash code for this line, derived from exactly the members
+        /// <see cref="Equals(Line3D)"/> compares.
+        /// </summary>
+        public override int GetHashCode()
+        {
+            return Objects.HashCode(from, to);
+        }
+
+        /// <summary>
+        /// Returns a string representation of this line.
+        /// </summary>
+        public override string ToString()
+        {
+            return $"Line3D(from: {from}, to: {to})";
+        }
+
+        private bool ComputeClosestPoints(
+            Line3D other,
+            out Vector3 thisClosest,
+            out Vector3 otherClosest
+        )
+        {
+            Vector3 d1 = Direction;
+            Vector3 d2 = other.Direction;
+            Vector3 r = from - other.from;
+
+            float a = Vector3.Dot(d1, d1);
+            float b = Vector3.Dot(d1, d2);
+            float c = Vector3.Dot(d1, r);
+            float e = Vector3.Dot(d2, d2);
+            float f = Vector3.Dot(d2, r);
+
+            float denom = a * e - b * b;
+
+            if (Mathf.Approximately(denom, 0))
+            {
+                thisClosest = from;
+                otherClosest = other.ClosestPointOnLine(from);
+                return false;
+            }
+
+            float s = Mathf.Clamp01((b * f - c * e) / denom);
+            float t = Mathf.Clamp01((a * f - b * c) / denom);
+
+            thisClosest = from + s * d1;
+            otherClosest = other.from + t * d2;
+            return true;
         }
 
         private bool TryClipSegmentAABB(BoundingBox3D bounds, out float tEnter, out float tExit)
@@ -416,94 +504,6 @@ namespace WallstopStudios.UnityHelpers.Core.Math
             tEnter = enter;
             tExit = exit;
             return 0f <= exit && enter <= 1f && enter <= exit;
-        }
-
-        /// <summary>
-        /// Checks if a point lies on this line segment (within a specified tolerance).
-        /// </summary>
-        /// <param name="point">The point to check.</param>
-        /// <param name="tolerance">The maximum distance from the line to consider the point as contained.</param>
-        /// <returns>True if the point lies on the line segment within the tolerance, false otherwise.</returns>
-        public bool Contains(Vector3 point, float tolerance = 0.0001f)
-        {
-            Vector3 closestPoint = ClosestPointOnLine(point);
-            return Vector3.Distance(point, closestPoint) <= tolerance;
-        }
-
-        /// <summary>
-        /// Checks if this line is equal to another line.
-        /// Two lines are equal when their endpoints match exactly, in the same order. Unity's
-        /// <c>Vector3</c> <c>==</c> is an approximate comparison and its hash is not, so exact
-        /// comparison is what keeps equal lines in the same hash bucket.
-        /// </summary>
-        public bool Equals(Line3D other)
-        {
-            return from.Equals(other.from) && to.Equals(other.to);
-        }
-
-        /// <summary>
-        /// Checks whether both endpoints sit within <paramref name="tolerance"/> of another line's,
-        /// in the same order.
-        /// </summary>
-        /// <param name="other">The other line to compare.</param>
-        /// <param name="tolerance">Maximum permitted per-component difference, and the whole of it: nothing relative to the magnitudes is added. Must be finite and non-negative.</param>
-        /// <returns>
-        /// True when both endpoints agree within <paramref name="tolerance"/>; false when
-        /// <paramref name="tolerance"/> is negative, infinite, or not a number. A non-finite
-        /// coordinate compares exactly, so two identical infinite endpoints are approximately equal
-        /// and this stays reflexive for every line.
-        /// </returns>
-        public bool ApproximatelyEquals(Line3D other, float tolerance)
-        {
-            if (float.IsNaN(tolerance) || float.IsInfinity(tolerance) || tolerance < 0f)
-            {
-                return false;
-            }
-
-            return WallMath.WithinTolerance(from, other.from, tolerance)
-                && WallMath.WithinTolerance(to, other.to, tolerance);
-        }
-
-        /// <summary>
-        /// Checks if this line is equal to another object. Only another <see cref="Line3D"/> can be
-        /// equal to a line.
-        /// </summary>
-        public override bool Equals(object obj)
-        {
-            return obj is Line3D other && Equals(other);
-        }
-
-        /// <summary>
-        /// Gets the hash code for this line, derived from exactly the members
-        /// <see cref="Equals(Line3D)"/> compares.
-        /// </summary>
-        public override int GetHashCode()
-        {
-            return Objects.HashCode(from, to);
-        }
-
-        /// <summary>
-        /// Returns a string representation of this line.
-        /// </summary>
-        public override string ToString()
-        {
-            return $"Line3D(from: {from}, to: {to})";
-        }
-
-        /// <summary>
-        /// Equality operator.
-        /// </summary>
-        public static bool operator ==(Line3D left, Line3D right)
-        {
-            return left.Equals(right);
-        }
-
-        /// <summary>
-        /// Inequality operator.
-        /// </summary>
-        public static bool operator !=(Line3D left, Line3D right)
-        {
-            return !left.Equals(right);
         }
     }
 }

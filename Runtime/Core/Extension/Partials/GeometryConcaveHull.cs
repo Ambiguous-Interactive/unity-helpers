@@ -163,6 +163,43 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return positions.BuildConcaveHull(options);
         }
 
+        /// <summary>
+        /// Builds a convex hull from a set of Vector2 points using the Monotone Chain algorithm.
+        /// </summary>
+        /// <param name="pointsSet">The collection of points.</param>
+        /// <param name="includeColinearPoints">When true, includes colinear points along edges.</param>
+        public static List<Vector2> BuildConvexHull(
+            this IEnumerable<Vector2> pointsSet,
+            bool includeColinearPoints = true
+        )
+        {
+            return BuildConvexHullMonotoneChain(pointsSet, includeColinearPoints);
+        }
+
+        /// <summary>
+        /// Builds a convex hull from Vector2 with an explicit algorithm selection.
+        /// </summary>
+        public static List<Vector2> BuildConvexHull(
+            this IEnumerable<Vector2> pointsSet,
+            bool includeColinearPoints,
+            ConvexHullAlgorithm algorithm
+        )
+        {
+            switch (algorithm)
+            {
+                case ConvexHullAlgorithm.MonotoneChain:
+                    return BuildConvexHullMonotoneChain(pointsSet, includeColinearPoints);
+                case ConvexHullAlgorithm.Jarvis:
+                    return BuildConvexHullJarvis(pointsSet, includeColinearPoints);
+                default:
+                    throw new InvalidEnumArgumentException(
+                        nameof(algorithm),
+                        (int)algorithm,
+                        typeof(ConvexHullAlgorithm)
+                    );
+            }
+        }
+
         private static List<Vector2> BuildConvexHullJarvis(
             IEnumerable<Vector2> pointsSet,
             bool includeColinearPoints
@@ -524,43 +561,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return hull;
         }
 
-        /// <summary>
-        /// Builds a convex hull from a set of Vector2 points using the Monotone Chain algorithm.
-        /// </summary>
-        /// <param name="pointsSet">The collection of points.</param>
-        /// <param name="includeColinearPoints">When true, includes colinear points along edges.</param>
-        public static List<Vector2> BuildConvexHull(
-            this IEnumerable<Vector2> pointsSet,
-            bool includeColinearPoints = true
-        )
-        {
-            return BuildConvexHullMonotoneChain(pointsSet, includeColinearPoints);
-        }
-
-        /// <summary>
-        /// Builds a convex hull from Vector2 with an explicit algorithm selection.
-        /// </summary>
-        public static List<Vector2> BuildConvexHull(
-            this IEnumerable<Vector2> pointsSet,
-            bool includeColinearPoints,
-            ConvexHullAlgorithm algorithm
-        )
-        {
-            switch (algorithm)
-            {
-                case ConvexHullAlgorithm.MonotoneChain:
-                    return BuildConvexHullMonotoneChain(pointsSet, includeColinearPoints);
-                case ConvexHullAlgorithm.Jarvis:
-                    return BuildConvexHullJarvis(pointsSet, includeColinearPoints);
-                default:
-                    throw new InvalidEnumArgumentException(
-                        nameof(algorithm),
-                        (int)algorithm,
-                        typeof(ConvexHullAlgorithm)
-                    );
-            }
-        }
-
         public enum ConcaveHullStrategy
         {
             [Obsolete("Do not use default value; specify a strategy explicitly.")]
@@ -575,6 +575,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             private const int DefaultBucketSize = 40;
             private const float DefaultAngleThreshold = 90f;
 
+            public static ConcaveHullOptions Default => DefaultOptions;
+
             private static readonly ConcaveHullOptions DefaultOptions = new(
                 ConcaveHullStrategy.Knn,
                 DefaultNearestNeighbors,
@@ -582,12 +584,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 DefaultAngleThreshold,
                 initialized: true
             );
-
-            private readonly ConcaveHullStrategy _strategy;
-            private readonly int _nearestNeighbors;
-            private readonly int _bucketSize;
-            private readonly float _angleThreshold;
-            private readonly bool _initialized;
 
             public ConcaveHullStrategy Strategy =>
                 _initialized ? _strategy : ConcaveHullStrategy.Knn;
@@ -598,6 +594,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             public int BucketSize => _initialized ? _bucketSize : DefaultBucketSize;
 
             public float AngleThreshold => _initialized ? _angleThreshold : DefaultAngleThreshold;
+
+            private readonly ConcaveHullStrategy _strategy;
+            private readonly int _nearestNeighbors;
+            private readonly int _bucketSize;
+            private readonly float _angleThreshold;
+            private readonly bool _initialized;
 
             public ConcaveHullOptions(
                 ConcaveHullStrategy strategy,
@@ -622,8 +624,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 _angleThreshold = angleThreshold;
                 _initialized = initialized;
             }
-
-            public static ConcaveHullOptions Default => DefaultOptions;
 
             public static Builder CreateBuilder()
             {

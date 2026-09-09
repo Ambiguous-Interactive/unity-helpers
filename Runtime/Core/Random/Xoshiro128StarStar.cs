@@ -110,17 +110,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         [WProtoMember(9)]
         internal uint _s3;
 
-        private void EnsureNonZeroState()
-        {
-            if ((_s0 | _s1 | _s2 | _s3) == 0)
-            {
-                _s0 = 0x9E3779B9U;
-                _s1 = 0x243F6A88U;
-                _s2 = 0xB7E15162U;
-                _s3 = 0x85A308D3U;
-            }
-        }
-
         public Xoshiro128StarStar()
             : this(Guid.NewGuid()) { }
 
@@ -160,9 +149,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             EnsureNonZeroState();
         }
 
-        protected override void OnAfterDeserialization()
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static uint Rotl(uint x, int k)
         {
-            EnsureNonZeroState();
+            return (x << k) | (x >> (UintBitCount - k));
         }
 
         public override uint NextUint()
@@ -186,12 +176,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         public override IRandom Copy()
         {
             return new Xoshiro128StarStar(InternalState);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static uint Rotl(uint x, int k)
-        {
-            return (x << k) | (x >> (UintBitCount - k));
         }
 
         public override bool Equals(object obj)
@@ -250,6 +234,22 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
 
             return _s3.CompareTo(other._s3);
+        }
+
+        protected override void OnAfterDeserialization()
+        {
+            EnsureNonZeroState();
+        }
+
+        private void EnsureNonZeroState()
+        {
+            if ((_s0 | _s1 | _s2 | _s3) == 0)
+            {
+                _s0 = 0x9E3779B9U;
+                _s1 = 0x243F6A88U;
+                _s2 = 0xB7E15162U;
+                _s3 = 0x85A308D3U;
+            }
         }
     }
 }

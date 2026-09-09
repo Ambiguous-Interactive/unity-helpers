@@ -53,12 +53,6 @@ namespace WallstopStudios.UnityHelpers.Utils
         private const int MinObjectOverhead = 16;
 
         /// <summary>
-        /// Pointer size in bytes for reference calculations.
-        /// Used as the size for reference type fields and as a fallback for unknown types.
-        /// </summary>
-        private static readonly int PointerSize = IntPtr.Size;
-
-        /// <summary>
         /// Default typical capacity used for estimating collection sizes.
         /// Collections like List, Dictionary, HashSet, Queue, and Stack
         /// are estimated using this capacity multiplied by element size.
@@ -69,6 +63,12 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// Minimum array overhead in bytes (header + length field).
         /// </summary>
         private const int MinArrayOverhead = MinObjectOverhead + 8;
+
+        /// <summary>
+        /// Pointer size in bytes for reference calculations.
+        /// Used as the size for reference type fields and as a fallback for unknown types.
+        /// </summary>
+        private static readonly int PointerSize = IntPtr.Size;
 
         /// <summary>
         /// Cache for computed type size estimates to avoid repeated reflection.

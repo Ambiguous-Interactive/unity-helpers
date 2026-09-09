@@ -8,9 +8,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Integrations.Zenject
 
     public sealed class Consumer : MonoBehaviour
     {
+        public SpriteRenderer SR => _spriteRenderer;
+
         [SiblingComponent]
         public SpriteRenderer _spriteRenderer;
-
-        public SpriteRenderer SR => _spriteRenderer;
     }
 }

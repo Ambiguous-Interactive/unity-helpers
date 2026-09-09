@@ -33,6 +33,38 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
         private SerializedProperty _sourceFolderEntriesProperty;
         private SourceFolderEntryDrawer _drawer;
 
+        private static IEnumerable SelectionModeCases()
+        {
+            yield return new TestCaseData(SpriteSelectionMode.Regex).SetName("Regex mode");
+            yield return new TestCaseData(SpriteSelectionMode.Labels).SetName("Labels mode");
+            yield return new TestCaseData(
+                SpriteSelectionMode.Regex | SpriteSelectionMode.Labels
+            ).SetName("Combined mode");
+        }
+
+        private static IEnumerable RectSizeCases()
+        {
+            yield return new TestCaseData(400f, 300f).SetName("Normal size");
+            yield return new TestCaseData(200f, 150f).SetName("Small size");
+            yield return new TestCaseData(800f, 600f).SetName("Large size");
+            yield return new TestCaseData(100f, 50f).SetName("Very small size");
+        }
+
+        private static void SetRegexesFoldoutState(string key, bool value)
+        {
+            SourceFolderEntryDrawer.RegexesFoldoutState[key] = value;
+        }
+
+        private static void SetExcludeRegexesFoldoutState(string key, bool value)
+        {
+            SourceFolderEntryDrawer.ExcludeRegexesFoldoutState[key] = value;
+        }
+
+        private static void SetExcludePathPrefixesFoldoutState(string key, bool value)
+        {
+            SourceFolderEntryDrawer.ExcludePathPrefixesFoldoutState[key] = value;
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -522,15 +554,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             );
         }
 
-        private static IEnumerable SelectionModeCases()
-        {
-            yield return new TestCaseData(SpriteSelectionMode.Regex).SetName("Regex mode");
-            yield return new TestCaseData(SpriteSelectionMode.Labels).SetName("Labels mode");
-            yield return new TestCaseData(
-                SpriteSelectionMode.Regex | SpriteSelectionMode.Labels
-            ).SetName("Combined mode");
-        }
-
         [Test]
         [TestCaseSource(nameof(SelectionModeCases))]
         public void GetPropertyHeightExpandedIsPositiveForMode(SpriteSelectionMode mode)
@@ -568,14 +591,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 0.01f,
                 $"Collapsed property should have single line height for mode {mode}"
             );
-        }
-
-        private static IEnumerable RectSizeCases()
-        {
-            yield return new TestCaseData(400f, 300f).SetName("Normal size");
-            yield return new TestCaseData(200f, 150f).SetName("Small size");
-            yield return new TestCaseData(800f, 600f).SetName("Large size");
-            yield return new TestCaseData(100f, 50f).SetName("Very small size");
         }
 
         [UnityTest]
@@ -691,21 +706,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
                 Is.False,
                 "Repeated OnGUI calls without user interaction should not dirty the SerializedObject"
             );
-        }
-
-        private static void SetRegexesFoldoutState(string key, bool value)
-        {
-            SourceFolderEntryDrawer.RegexesFoldoutState[key] = value;
-        }
-
-        private static void SetExcludeRegexesFoldoutState(string key, bool value)
-        {
-            SourceFolderEntryDrawer.ExcludeRegexesFoldoutState[key] = value;
-        }
-
-        private static void SetExcludePathPrefixesFoldoutState(string key, bool value)
-        {
-            SourceFolderEntryDrawer.ExcludePathPrefixesFoldoutState[key] = value;
         }
     }
 #endif

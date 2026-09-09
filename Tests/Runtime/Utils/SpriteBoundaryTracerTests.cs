@@ -13,6 +13,56 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
     [Category("Fast")]
     public sealed class SpriteBoundaryTracerTests
     {
+        private static SpriteAlphaMask Parse(string input, int width)
+        {
+            bool[] pixels = new bool[input.Length];
+            for (int index = 0; index < input.Length; ++index)
+            {
+                pixels[index] = input[index] == '1';
+            }
+            return new SpriteAlphaMask(
+                pixels,
+                width,
+                input.Length / width,
+                Vector2.zero,
+                Vector2.one
+            );
+        }
+
+        private static double SignedArea(Vector2[] path)
+        {
+            double area = 0;
+            Vector2 previous = path[path.Length - 1];
+            foreach (Vector2 point in path)
+            {
+                area += (double)previous.x * point.y - (double)point.x * previous.y;
+                previous = point;
+            }
+            return area * 0.5;
+        }
+
+        private static bool Contains(Vector2[] path, Vector2 point)
+        {
+            bool inside = false;
+            Vector2 previous = path[path.Length - 1];
+            foreach (Vector2 current in path)
+            {
+                if (
+                    (point.y < current.y) != (point.y < previous.y)
+                    && point.x
+                        < (previous.x - current.x)
+                            * (point.y - current.y)
+                            / (previous.y - current.y)
+                            + current.x
+                )
+                {
+                    inside = !inside;
+                }
+                previous = current;
+            }
+            return inside;
+        }
+
         [TestCase(1, 1)]
         [TestCase(5, 3)]
         [TestCase(3840, 2160)]
@@ -152,56 +202,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 Assert.IsFalse(SpriteBoundaryTracer.TryTrace(mask, out List<Vector2[]> paths));
                 Assert.AreEqual(0, paths.Count);
             }
-        }
-
-        private static SpriteAlphaMask Parse(string input, int width)
-        {
-            bool[] pixels = new bool[input.Length];
-            for (int index = 0; index < input.Length; ++index)
-            {
-                pixels[index] = input[index] == '1';
-            }
-            return new SpriteAlphaMask(
-                pixels,
-                width,
-                input.Length / width,
-                Vector2.zero,
-                Vector2.one
-            );
-        }
-
-        private static double SignedArea(Vector2[] path)
-        {
-            double area = 0;
-            Vector2 previous = path[path.Length - 1];
-            foreach (Vector2 point in path)
-            {
-                area += (double)previous.x * point.y - (double)point.x * previous.y;
-                previous = point;
-            }
-            return area * 0.5;
-        }
-
-        private static bool Contains(Vector2[] path, Vector2 point)
-        {
-            bool inside = false;
-            Vector2 previous = path[path.Length - 1];
-            foreach (Vector2 current in path)
-            {
-                if (
-                    (point.y < current.y) != (point.y < previous.y)
-                    && point.x
-                        < (previous.x - current.x)
-                            * (point.y - current.y)
-                            / (previous.y - current.y)
-                            + current.x
-                )
-                {
-                    inside = !inside;
-                }
-                previous = current;
-            }
-            return inside;
         }
     }
 }

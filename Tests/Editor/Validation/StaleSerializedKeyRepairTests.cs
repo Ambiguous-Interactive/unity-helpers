@@ -34,6 +34,121 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     [TestFixture]
     public sealed class StaleSerializedKeyRepairTests
     {
+        private const string AssetsRoot = "Assets";
+        private const string StaleKey = "staleKeyNoFieldClaims";
+        private const string AnyDocument = "--- !u!";
+        private const string MonoBehaviourDocument = "--- !u!114 ";
+        private const int SubObjectCount = 3;
+        private const int DamagedWeight = 41;
+        private const string RewriteFailureMessage = "the reserialize refused this asset";
+
+        private string _folderName;
+        private string _folder;
+        private string _plain;
+        private string _subObjects;
+        private string _undo;
+        private string _lostSubObjects;
+        private string _undoFailed;
+        private string _rewriteThrew;
+        private string _rewriteUndoFailed;
+        private string _prefab;
+        private string _prefabControl;
+
+        /// <summary>Damages the asset on disk and in the editor, the way a real loss does.</summary>
+        /// <param name="assetPath">The asset to damage.</param>
+        private static void DamageInPlace(string assetPath)
+        {
+            AuthoredRequirementTestAsset subject =
+                AssetDatabase.LoadAssetAtPath<AuthoredRequirementTestAsset>(assetPath);
+            Assert.IsTrue(subject != null, assetPath);
+
+            subject.weight = DamagedWeight;
+            EditorUtility.SetDirty(subject);
+            AssetDatabase.SaveAssets();
+        }
+
+        /// <summary>Builds one subject, which becomes an asset the fixture folder owns.</summary>
+        /// <param name="name">The object name, which is also the asset or sub-asset name.</param>
+        /// <returns>The new instance.</returns>
+        private static AuthoredRequirementTestAsset NewSubject(string name)
+        {
+            AuthoredRequirementTestAsset created =
+                ScriptableObject.CreateInstance<AuthoredRequirementTestAsset>();
+            created.name = name; // UNH-SUPPRESS UNH002: an asset, deleted with the fixture folder.
+            return created;
+        }
+
+        /// <summary>
+        /// Leaves a key no field claims in the file's last <c>MonoBehaviour</c> document.
+        /// </summary>
+        /// <param name="assetPath">The asset to edit, which is then re-imported.</param>
+        /// <remarks>
+        /// Unity authors the file and the key is injected afterwards, rather than the whole document
+        /// being hand-written: the defect is a key left behind in a file Unity wrote, and a
+        /// hand-written header would be testing the fixture's YAML instead.
+        /// </remarks>
+        private static void InjectStaleKey(string assetPath)
+        {
+            string filePath = AuthoredAssetPaths.ToFileSystemPath(assetPath);
+            List<string> lines = new(File.ReadAllLines(filePath));
+
+            int document = -1;
+            for (int index = 0; index < lines.Count; ++index)
+            {
+                if (lines[index].StartsWith(MonoBehaviourDocument, StringComparison.Ordinal))
+                {
+                    document = index;
+                }
+            }
+
+            Assert.IsTrue(
+                0 <= document,
+                $"{assetPath} declares no MonoBehaviour document to leave a stale key in."
+            );
+
+            int end = lines.Count;
+            for (int index = document + 1; index < lines.Count; ++index)
+            {
+                if (lines[index].StartsWith(AnyDocument, StringComparison.Ordinal))
+                {
+                    end = index;
+                    break;
+                }
+            }
+
+            lines.Insert(end, $"  {StaleKey}: 7");
+            File.WriteAllLines(filePath, lines);
+            AssetDatabase.ImportAsset(
+                assetPath,
+                ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport
+            );
+        }
+
+        private static string TextOf(string assetPath)
+        {
+            return File.ReadAllText(AuthoredAssetPaths.ToFileSystemPath(assetPath));
+        }
+
+        private static int NonNullObjectCount(string assetPath)
+        {
+            Object[] loaded = AssetDatabase.LoadAllAssetsAtPath(assetPath);
+            if (loaded == null)
+            {
+                return 0;
+            }
+
+            int count = 0;
+            foreach (Object candidate in loaded)
+            {
+                if (candidate != null)
+                {
+                    ++count;
+                }
+            }
+
+            return count;
+        }
+
         [OneTimeSetUp]
         public void BuildSubjects()
         {
@@ -479,19 +594,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assert.AreEqual(StaleSerializedKeyRepairOutcome.RefusedUnreadable, outcome);
         }
 
-        /// <summary>Damages the asset on disk and in the editor, the way a real loss does.</summary>
-        /// <param name="assetPath">The asset to damage.</param>
-        private static void DamageInPlace(string assetPath)
-        {
-            AuthoredRequirementTestAsset subject =
-                AssetDatabase.LoadAssetAtPath<AuthoredRequirementTestAsset>(assetPath);
-            Assert.IsTrue(subject != null, assetPath);
-
-            subject.weight = DamagedWeight;
-            EditorUtility.SetDirty(subject);
-            AssetDatabase.SaveAssets();
-        }
-
         private string CreateStaleKeyAsset(string name)
         {
             string assetPath = $"{_folder}/{name}.asset";
@@ -517,17 +619,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             return assetPath;
         }
 
-        /// <summary>Builds one subject, which becomes an asset the fixture folder owns.</summary>
-        /// <param name="name">The object name, which is also the asset or sub-asset name.</param>
-        /// <returns>The new instance.</returns>
-        private static AuthoredRequirementTestAsset NewSubject(string name)
-        {
-            AuthoredRequirementTestAsset created =
-                ScriptableObject.CreateInstance<AuthoredRequirementTestAsset>();
-            created.name = name; // UNH-SUPPRESS UNH002: an asset, deleted with the fixture folder.
-            return created;
-        }
-
         private string CreateStaleKeyPrefab(string name)
         {
             string assetPath = $"{_folder}/{name}.prefab";
@@ -545,96 +636,5 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             InjectStaleKey(assetPath);
             return assetPath;
         }
-
-        /// <summary>
-        /// Leaves a key no field claims in the file's last <c>MonoBehaviour</c> document.
-        /// </summary>
-        /// <param name="assetPath">The asset to edit, which is then re-imported.</param>
-        /// <remarks>
-        /// Unity authors the file and the key is injected afterwards, rather than the whole document
-        /// being hand-written: the defect is a key left behind in a file Unity wrote, and a
-        /// hand-written header would be testing the fixture's YAML instead.
-        /// </remarks>
-        private static void InjectStaleKey(string assetPath)
-        {
-            string filePath = AuthoredAssetPaths.ToFileSystemPath(assetPath);
-            List<string> lines = new(File.ReadAllLines(filePath));
-
-            int document = -1;
-            for (int index = 0; index < lines.Count; ++index)
-            {
-                if (lines[index].StartsWith(MonoBehaviourDocument, StringComparison.Ordinal))
-                {
-                    document = index;
-                }
-            }
-
-            Assert.IsTrue(
-                0 <= document,
-                $"{assetPath} declares no MonoBehaviour document to leave a stale key in."
-            );
-
-            int end = lines.Count;
-            for (int index = document + 1; index < lines.Count; ++index)
-            {
-                if (lines[index].StartsWith(AnyDocument, StringComparison.Ordinal))
-                {
-                    end = index;
-                    break;
-                }
-            }
-
-            lines.Insert(end, $"  {StaleKey}: 7");
-            File.WriteAllLines(filePath, lines);
-            AssetDatabase.ImportAsset(
-                assetPath,
-                ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport
-            );
-        }
-
-        private static string TextOf(string assetPath)
-        {
-            return File.ReadAllText(AuthoredAssetPaths.ToFileSystemPath(assetPath));
-        }
-
-        private static int NonNullObjectCount(string assetPath)
-        {
-            Object[] loaded = AssetDatabase.LoadAllAssetsAtPath(assetPath);
-            if (loaded == null)
-            {
-                return 0;
-            }
-
-            int count = 0;
-            foreach (Object candidate in loaded)
-            {
-                if (candidate != null)
-                {
-                    ++count;
-                }
-            }
-
-            return count;
-        }
-
-        private const string AssetsRoot = "Assets";
-        private const string StaleKey = "staleKeyNoFieldClaims";
-        private const string AnyDocument = "--- !u!";
-        private const string MonoBehaviourDocument = "--- !u!114 ";
-        private const int SubObjectCount = 3;
-        private const int DamagedWeight = 41;
-        private const string RewriteFailureMessage = "the reserialize refused this asset";
-
-        private string _folderName;
-        private string _folder;
-        private string _plain;
-        private string _subObjects;
-        private string _undo;
-        private string _lostSubObjects;
-        private string _undoFailed;
-        private string _rewriteThrew;
-        private string _rewriteUndoFailed;
-        private string _prefab;
-        private string _prefabControl;
     }
 }

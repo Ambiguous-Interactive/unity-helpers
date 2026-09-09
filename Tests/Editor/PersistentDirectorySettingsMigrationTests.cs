@@ -59,6 +59,335 @@ namespace WallstopStudios.UnityHelpers.Tests
         private readonly List<string> _createdFolders = new();
         private bool _previousEditorUiSuppress;
 
+        private static IEnumerable<int> RootCleanupInvocationCounts()
+        {
+            yield return 1;
+            yield return 5;
+            yield return 25;
+        }
+
+        private static void SaveAndRefreshFixtureAssets()
+        {
+            AssetDatabase.SaveAssets();
+            AssetPostprocessorDeferral.FlushForTesting();
+            AssetDatabaseBatchHelper.RefreshIfNotBatching();
+            AssetPostprocessorDeferral.FlushForTesting();
+        }
+
+        private static void EnsureFolderExists(string folderPath)
+        {
+            if (string.IsNullOrWhiteSpace(folderPath))
+            {
+                return;
+            }
+
+            folderPath = folderPath.SanitizePath();
+            if (AssetDatabase.IsValidFolder(folderPath))
+            {
+                return;
+            }
+
+            string[] parts = folderPath.Split('/');
+            if (parts.Length == 0)
+            {
+                return;
+            }
+
+            string current = parts[0];
+            for (int i = 1; i < parts.Length; i++)
+            {
+                string next = current + "/" + parts[i];
+                if (!AssetDatabase.IsValidFolder(next))
+                {
+                    AssetDatabase.CreateFolder(current, parts[i]);
+                }
+                current = next;
+            }
+        }
+
+        private static void DeleteAssetIfExists(string assetPath)
+        {
+            if (string.IsNullOrWhiteSpace(assetPath))
+            {
+                return;
+            }
+
+            Object existing = AssetDatabase.LoadAssetAtPath<Object>(assetPath);
+            if (existing != null)
+            {
+                AssetDatabase.DeleteAsset(assetPath);
+            }
+        }
+
+        private static void DeleteFolderIfExists(string folderPath)
+        {
+            if (string.IsNullOrWhiteSpace(folderPath))
+            {
+                return;
+            }
+
+            if (AssetDatabase.IsValidFolder(folderPath))
+            {
+                AssetDatabase.DeleteAsset(folderPath);
+            }
+        }
+
+        private static void TryDeleteEmptyFolder(string folderPath)
+        {
+            if (string.IsNullOrWhiteSpace(folderPath))
+            {
+                return;
+            }
+
+            if (!AssetDatabase.IsValidFolder(folderPath))
+            {
+                return;
+            }
+
+            string[] subFolders = AssetDatabase.GetSubFolders(folderPath);
+            if (subFolders != null && 0 < subFolders.Length)
+            {
+                return;
+            }
+
+            string[] assets = AssetDatabase.FindAssets(string.Empty, new[] { folderPath });
+            if (assets != null && 0 < assets.Length)
+            {
+                return;
+            }
+
+            AssetDatabase.DeleteAsset(folderPath);
+        }
+
+        private static string GetWallstopRootDiagnostics()
+        {
+            if (!AssetDatabase.IsValidFolder(WallstopRoot))
+            {
+                return WallstopRoot + " [missing]";
+            }
+
+            string[] subFolders = AssetDatabase.GetSubFolders(WallstopRoot);
+            string subFolderList =
+                subFolders != null && 0 < subFolders.Length
+                    ? string.Join(", ", subFolders)
+                    : "(none)";
+
+            string[] assets = AssetDatabase.FindAssets(string.Empty, new[] { WallstopRoot });
+            int assetCount = assets != null ? assets.Length : 0;
+
+            return WallstopRoot + $" [subfolders: {subFolderList}] [assetGuids: {assetCount}]";
+        }
+
+        private static string GetExistingFixtureOwnedFolderDiagnostics()
+        {
+            List<string> existing = new();
+            foreach (string folderPath in FixtureOwnedCleanupFolders)
+            {
+                if (AssetDatabase.IsValidFolder(folderPath))
+                {
+                    existing.Add(folderPath);
+                }
+            }
+
+            return 0 < existing.Count ? string.Join(", ", existing) : "(none)";
+        }
+
+        private static string GetUnexpectedWallstopSubFolderDiagnostics()
+        {
+            if (!AssetDatabase.IsValidFolder(WallstopRoot))
+            {
+                return "(none)";
+            }
+
+            string[] subFolders = AssetDatabase.GetSubFolders(WallstopRoot);
+            if (subFolders == null || subFolders.Length == 0)
+            {
+                return "(none)";
+            }
+
+            List<string> unexpected = new();
+            foreach (string subFolder in subFolders)
+            {
+                if (
+                    string.Equals(
+                        subFolder,
+                        WallstopRoot + "/Unity Helpers",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
+                {
+                    continue;
+                }
+
+                bool isFixtureOwned = false;
+                string prefix = subFolder + "/";
+                foreach (string fixtureFolder in FixtureOwnedCleanupFolders)
+                {
+                    if (string.Equals(subFolder, fixtureFolder, StringComparison.OrdinalIgnoreCase))
+                    {
+                        isFixtureOwned = true;
+                        break;
+                    }
+
+                    if (fixtureFolder.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        isFixtureOwned = true;
+                        break;
+                    }
+                }
+
+                if (!isFixtureOwned)
+                {
+                    unexpected.Add(subFolder);
+                }
+            }
+
+            return 0 < unexpected.Count ? string.Join(", ", unexpected) : "(none)";
+        }
+
+        private static IEnumerable<CleanupScenario> CleanupScenarios()
+        {
+            /*
+                Use a TestCleanup subfolder to protect production data and preserve the shared Wallstop Studios
+                root.
+            */
+            yield return new CleanupScenario(
+                "Single empty folder is deleted",
+                new[] { "Assets/Resources/Wallstop Studios/TestCleanup/Empty" },
+                Array.Empty<string>(),
+                new[]
+                {
+                    "Assets/Resources/Wallstop Studios/TestCleanup/Empty",
+                    "Assets/Resources/Wallstop Studios/TestCleanup",
+                },
+                new[] { "Assets/Resources/Wallstop Studios" }
+            );
+
+            yield return new CleanupScenario(
+                "Deeply nested empty folders are all deleted",
+                new[] { "Assets/Resources/Wallstop Studios/TestCleanup/A/B/C/D/E" },
+                Array.Empty<string>(),
+                new[]
+                {
+                    "Assets/Resources/Wallstop Studios/TestCleanup/A/B/C/D/E",
+                    "Assets/Resources/Wallstop Studios/TestCleanup/A/B/C/D",
+                    "Assets/Resources/Wallstop Studios/TestCleanup/A/B/C",
+                    "Assets/Resources/Wallstop Studios/TestCleanup/A/B",
+                    "Assets/Resources/Wallstop Studios/TestCleanup/A",
+                    "Assets/Resources/Wallstop Studios/TestCleanup",
+                },
+                new[] { "Assets/Resources/Wallstop Studios" }
+            );
+
+            yield return new CleanupScenario(
+                "Multiple parallel empty branches are all deleted",
+                new[]
+                {
+                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchA/SubA",
+                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchB/SubB",
+                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchC",
+                },
+                Array.Empty<string>(),
+                new[]
+                {
+                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchA",
+                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchB",
+                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchC",
+                    "Assets/Resources/Wallstop Studios/TestCleanup",
+                },
+                new[] { "Assets/Resources/Wallstop Studios" }
+            );
+
+            yield return new CleanupScenario(
+                "Folder with asset is preserved while empty siblings deleted",
+                new[]
+                {
+                    "Assets/Resources/Wallstop Studios/TestCleanup/WithAsset",
+                    "Assets/Resources/Wallstop Studios/TestCleanup/Empty",
+                },
+                new[] { "Assets/Resources/Wallstop Studios/TestCleanup/WithAsset/Keep.asset" },
+                new[] { "Assets/Resources/Wallstop Studios/TestCleanup/Empty" },
+                new[]
+                {
+                    "Assets/Resources/Wallstop Studios/TestCleanup/WithAsset",
+                    "Assets/Resources/Wallstop Studios/TestCleanup",
+                    "Assets/Resources/Wallstop Studios",
+                }
+            );
+
+            yield return new CleanupScenario(
+                "Asset in deep subfolder preserves all ancestor folders",
+                new[] { "Assets/Resources/Wallstop Studios/TestCleanup/Deep/Nested/Folder" },
+                new[]
+                {
+                    "Assets/Resources/Wallstop Studios/TestCleanup/Deep/Nested/Folder/Asset.asset",
+                },
+                Array.Empty<string>(),
+                new[]
+                {
+                    "Assets/Resources/Wallstop Studios/TestCleanup/Deep/Nested/Folder",
+                    "Assets/Resources/Wallstop Studios/TestCleanup/Deep/Nested",
+                    "Assets/Resources/Wallstop Studios/TestCleanup/Deep",
+                    "Assets/Resources/Wallstop Studios/TestCleanup",
+                    "Assets/Resources/Wallstop Studios",
+                }
+            );
+
+            yield return new CleanupScenario(
+                "Empty folder with non-empty sibling preserves parent",
+                new[]
+                {
+                    "Assets/Resources/Wallstop Studios/TestCleanup/NonEmpty/Child",
+                    "Assets/Resources/Wallstop Studios/TestCleanup/Empty",
+                },
+                new[] { "Assets/Resources/Wallstop Studios/TestCleanup/NonEmpty/Child/Data.asset" },
+                new[] { "Assets/Resources/Wallstop Studios/TestCleanup/Empty" },
+                new[]
+                {
+                    "Assets/Resources/Wallstop Studios/TestCleanup/NonEmpty/Child",
+                    "Assets/Resources/Wallstop Studios/TestCleanup/NonEmpty",
+                    "Assets/Resources/Wallstop Studios/TestCleanup",
+                    "Assets/Resources/Wallstop Studios",
+                }
+            );
+
+            yield return new CleanupScenario(
+                "Multiple parallel branches all deleted when all empty",
+                new[]
+                {
+                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchX/SubX1/SubX2",
+                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchY/SubY1",
+                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchZ",
+                },
+                Array.Empty<string>(),
+                new[]
+                {
+                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchX/SubX1/SubX2",
+                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchX/SubX1",
+                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchX",
+                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchY/SubY1",
+                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchY",
+                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchZ",
+                    "Assets/Resources/Wallstop Studios/TestCleanup",
+                },
+                new[] { "Assets/Resources/Wallstop Studios" }
+            );
+
+            yield return new CleanupScenario(
+                "Repeated cleanup invocations stay idempotent",
+                new[] { "Assets/Resources/Wallstop Studios/TestCleanup/Repeat/Leaf" },
+                Array.Empty<string>(),
+                new[]
+                {
+                    "Assets/Resources/Wallstop Studios/TestCleanup/Repeat/Leaf",
+                    "Assets/Resources/Wallstop Studios/TestCleanup/Repeat",
+                    "Assets/Resources/Wallstop Studios/TestCleanup",
+                },
+                new[] { "Assets/Resources/Wallstop Studios" },
+                cleanupInvocationCount: 4
+            );
+        }
+
         [UnitySetUp]
         public IEnumerator SetUp()
         {
@@ -770,13 +1099,6 @@ namespace WallstopStudios.UnityHelpers.Tests
             );
         }
 
-        private static IEnumerable<int> RootCleanupInvocationCounts()
-        {
-            yield return 1;
-            yield return 5;
-            yield return 25;
-        }
-
         [UnityTest]
         public IEnumerator CleanupLegacyEmptyFoldersCalledMultipleTimesNeverDeletesRoot(
             [ValueSource(nameof(RootCleanupInvocationCounts))] int cleanupInvocationCount
@@ -1162,381 +1484,6 @@ namespace WallstopStudios.UnityHelpers.Tests
             Assert.AreEqual(1, importPaths.Length);
         }
 
-        private IEnumerator CleanupAllPersistentDirectorySettingsAssets()
-        {
-            string beforeDiagnostics = GetWallstopRootDiagnostics();
-
-            string[] guids = AssetDatabase.FindAssets("t:" + nameof(PersistentDirectorySettings));
-            foreach (string guid in guids)
-            {
-                string path = AssetDatabase.GUIDToAssetPath(guid);
-                if (!string.IsNullOrEmpty(path))
-                {
-                    AssetDatabase.DeleteAsset(path);
-                    yield return null;
-                }
-            }
-
-            foreach (string fixtureOwnedCleanupFoldersElement in FixtureOwnedCleanupFolders)
-            {
-                DeleteFolderIfExists(fixtureOwnedCleanupFoldersElement);
-                yield return null;
-            }
-
-            foreach (string fixtureOwnedParentFoldersElement in FixtureOwnedParentFolders)
-            {
-                TryDeleteEmptyFolder(fixtureOwnedParentFoldersElement);
-                yield return null;
-            }
-
-            SaveAndRefreshFixtureAssets();
-            yield return null;
-
-            string remainingFixtureFolders = GetExistingFixtureOwnedFolderDiagnostics();
-            string afterDiagnostics = GetWallstopRootDiagnostics();
-            string unexpectedSubFolders = GetUnexpectedWallstopSubFolderDiagnostics();
-            if (!string.Equals(remainingFixtureFolders, "(none)", StringComparison.Ordinal))
-            {
-                TestContext.WriteLine(
-                    "CleanupAllPersistentDirectorySettingsAssets left fixture folders behind. "
-                        + $"Before: {beforeDiagnostics}. "
-                        + $"After: {afterDiagnostics}. "
-                        + $"Remaining: {remainingFixtureFolders}"
-                );
-            }
-
-            if (!string.Equals(unexpectedSubFolders, "(none)", StringComparison.Ordinal))
-            {
-                TestContext.WriteLine(
-                    "CleanupAllPersistentDirectorySettingsAssets observed unexpected Wallstop root subfolders. "
-                        + $"Unexpected: {unexpectedSubFolders}. "
-                        + $"After: {afterDiagnostics}"
-                );
-            }
-        }
-
-        private static void SaveAndRefreshFixtureAssets()
-        {
-            AssetDatabase.SaveAssets();
-            AssetPostprocessorDeferral.FlushForTesting();
-            AssetDatabaseBatchHelper.RefreshIfNotBatching();
-            AssetPostprocessorDeferral.FlushForTesting();
-        }
-
-        private static void EnsureFolderExists(string folderPath)
-        {
-            if (string.IsNullOrWhiteSpace(folderPath))
-            {
-                return;
-            }
-
-            folderPath = folderPath.SanitizePath();
-            if (AssetDatabase.IsValidFolder(folderPath))
-            {
-                return;
-            }
-
-            string[] parts = folderPath.Split('/');
-            if (parts.Length == 0)
-            {
-                return;
-            }
-
-            string current = parts[0];
-            for (int i = 1; i < parts.Length; i++)
-            {
-                string next = current + "/" + parts[i];
-                if (!AssetDatabase.IsValidFolder(next))
-                {
-                    AssetDatabase.CreateFolder(current, parts[i]);
-                }
-                current = next;
-            }
-        }
-
-        private static void DeleteAssetIfExists(string assetPath)
-        {
-            if (string.IsNullOrWhiteSpace(assetPath))
-            {
-                return;
-            }
-
-            Object existing = AssetDatabase.LoadAssetAtPath<Object>(assetPath);
-            if (existing != null)
-            {
-                AssetDatabase.DeleteAsset(assetPath);
-            }
-        }
-
-        private static void DeleteFolderIfExists(string folderPath)
-        {
-            if (string.IsNullOrWhiteSpace(folderPath))
-            {
-                return;
-            }
-
-            if (AssetDatabase.IsValidFolder(folderPath))
-            {
-                AssetDatabase.DeleteAsset(folderPath);
-            }
-        }
-
-        private static void TryDeleteEmptyFolder(string folderPath)
-        {
-            if (string.IsNullOrWhiteSpace(folderPath))
-            {
-                return;
-            }
-
-            if (!AssetDatabase.IsValidFolder(folderPath))
-            {
-                return;
-            }
-
-            string[] subFolders = AssetDatabase.GetSubFolders(folderPath);
-            if (subFolders != null && 0 < subFolders.Length)
-            {
-                return;
-            }
-
-            string[] assets = AssetDatabase.FindAssets(string.Empty, new[] { folderPath });
-            if (assets != null && 0 < assets.Length)
-            {
-                return;
-            }
-
-            AssetDatabase.DeleteAsset(folderPath);
-        }
-
-        private static string GetWallstopRootDiagnostics()
-        {
-            if (!AssetDatabase.IsValidFolder(WallstopRoot))
-            {
-                return WallstopRoot + " [missing]";
-            }
-
-            string[] subFolders = AssetDatabase.GetSubFolders(WallstopRoot);
-            string subFolderList =
-                subFolders != null && 0 < subFolders.Length
-                    ? string.Join(", ", subFolders)
-                    : "(none)";
-
-            string[] assets = AssetDatabase.FindAssets(string.Empty, new[] { WallstopRoot });
-            int assetCount = assets != null ? assets.Length : 0;
-
-            return WallstopRoot + $" [subfolders: {subFolderList}] [assetGuids: {assetCount}]";
-        }
-
-        private static string GetExistingFixtureOwnedFolderDiagnostics()
-        {
-            List<string> existing = new();
-            foreach (string folderPath in FixtureOwnedCleanupFolders)
-            {
-                if (AssetDatabase.IsValidFolder(folderPath))
-                {
-                    existing.Add(folderPath);
-                }
-            }
-
-            return 0 < existing.Count ? string.Join(", ", existing) : "(none)";
-        }
-
-        private static string GetUnexpectedWallstopSubFolderDiagnostics()
-        {
-            if (!AssetDatabase.IsValidFolder(WallstopRoot))
-            {
-                return "(none)";
-            }
-
-            string[] subFolders = AssetDatabase.GetSubFolders(WallstopRoot);
-            if (subFolders == null || subFolders.Length == 0)
-            {
-                return "(none)";
-            }
-
-            List<string> unexpected = new();
-            foreach (string subFolder in subFolders)
-            {
-                if (
-                    string.Equals(
-                        subFolder,
-                        WallstopRoot + "/Unity Helpers",
-                        StringComparison.OrdinalIgnoreCase
-                    )
-                )
-                {
-                    continue;
-                }
-
-                bool isFixtureOwned = false;
-                string prefix = subFolder + "/";
-                foreach (string fixtureFolder in FixtureOwnedCleanupFolders)
-                {
-                    if (string.Equals(subFolder, fixtureFolder, StringComparison.OrdinalIgnoreCase))
-                    {
-                        isFixtureOwned = true;
-                        break;
-                    }
-
-                    if (fixtureFolder.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                    {
-                        isFixtureOwned = true;
-                        break;
-                    }
-                }
-
-                if (!isFixtureOwned)
-                {
-                    unexpected.Add(subFolder);
-                }
-            }
-
-            return 0 < unexpected.Count ? string.Join(", ", unexpected) : "(none)";
-        }
-
-        private static IEnumerable<CleanupScenario> CleanupScenarios()
-        {
-            /*
-                Use a TestCleanup subfolder to protect production data and preserve the shared Wallstop Studios
-                root.
-            */
-            yield return new CleanupScenario(
-                "Single empty folder is deleted",
-                new[] { "Assets/Resources/Wallstop Studios/TestCleanup/Empty" },
-                Array.Empty<string>(),
-                new[]
-                {
-                    "Assets/Resources/Wallstop Studios/TestCleanup/Empty",
-                    "Assets/Resources/Wallstop Studios/TestCleanup",
-                },
-                new[] { "Assets/Resources/Wallstop Studios" }
-            );
-
-            yield return new CleanupScenario(
-                "Deeply nested empty folders are all deleted",
-                new[] { "Assets/Resources/Wallstop Studios/TestCleanup/A/B/C/D/E" },
-                Array.Empty<string>(),
-                new[]
-                {
-                    "Assets/Resources/Wallstop Studios/TestCleanup/A/B/C/D/E",
-                    "Assets/Resources/Wallstop Studios/TestCleanup/A/B/C/D",
-                    "Assets/Resources/Wallstop Studios/TestCleanup/A/B/C",
-                    "Assets/Resources/Wallstop Studios/TestCleanup/A/B",
-                    "Assets/Resources/Wallstop Studios/TestCleanup/A",
-                    "Assets/Resources/Wallstop Studios/TestCleanup",
-                },
-                new[] { "Assets/Resources/Wallstop Studios" }
-            );
-
-            yield return new CleanupScenario(
-                "Multiple parallel empty branches are all deleted",
-                new[]
-                {
-                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchA/SubA",
-                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchB/SubB",
-                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchC",
-                },
-                Array.Empty<string>(),
-                new[]
-                {
-                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchA",
-                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchB",
-                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchC",
-                    "Assets/Resources/Wallstop Studios/TestCleanup",
-                },
-                new[] { "Assets/Resources/Wallstop Studios" }
-            );
-
-            yield return new CleanupScenario(
-                "Folder with asset is preserved while empty siblings deleted",
-                new[]
-                {
-                    "Assets/Resources/Wallstop Studios/TestCleanup/WithAsset",
-                    "Assets/Resources/Wallstop Studios/TestCleanup/Empty",
-                },
-                new[] { "Assets/Resources/Wallstop Studios/TestCleanup/WithAsset/Keep.asset" },
-                new[] { "Assets/Resources/Wallstop Studios/TestCleanup/Empty" },
-                new[]
-                {
-                    "Assets/Resources/Wallstop Studios/TestCleanup/WithAsset",
-                    "Assets/Resources/Wallstop Studios/TestCleanup",
-                    "Assets/Resources/Wallstop Studios",
-                }
-            );
-
-            yield return new CleanupScenario(
-                "Asset in deep subfolder preserves all ancestor folders",
-                new[] { "Assets/Resources/Wallstop Studios/TestCleanup/Deep/Nested/Folder" },
-                new[]
-                {
-                    "Assets/Resources/Wallstop Studios/TestCleanup/Deep/Nested/Folder/Asset.asset",
-                },
-                Array.Empty<string>(),
-                new[]
-                {
-                    "Assets/Resources/Wallstop Studios/TestCleanup/Deep/Nested/Folder",
-                    "Assets/Resources/Wallstop Studios/TestCleanup/Deep/Nested",
-                    "Assets/Resources/Wallstop Studios/TestCleanup/Deep",
-                    "Assets/Resources/Wallstop Studios/TestCleanup",
-                    "Assets/Resources/Wallstop Studios",
-                }
-            );
-
-            yield return new CleanupScenario(
-                "Empty folder with non-empty sibling preserves parent",
-                new[]
-                {
-                    "Assets/Resources/Wallstop Studios/TestCleanup/NonEmpty/Child",
-                    "Assets/Resources/Wallstop Studios/TestCleanup/Empty",
-                },
-                new[] { "Assets/Resources/Wallstop Studios/TestCleanup/NonEmpty/Child/Data.asset" },
-                new[] { "Assets/Resources/Wallstop Studios/TestCleanup/Empty" },
-                new[]
-                {
-                    "Assets/Resources/Wallstop Studios/TestCleanup/NonEmpty/Child",
-                    "Assets/Resources/Wallstop Studios/TestCleanup/NonEmpty",
-                    "Assets/Resources/Wallstop Studios/TestCleanup",
-                    "Assets/Resources/Wallstop Studios",
-                }
-            );
-
-            yield return new CleanupScenario(
-                "Multiple parallel branches all deleted when all empty",
-                new[]
-                {
-                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchX/SubX1/SubX2",
-                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchY/SubY1",
-                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchZ",
-                },
-                Array.Empty<string>(),
-                new[]
-                {
-                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchX/SubX1/SubX2",
-                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchX/SubX1",
-                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchX",
-                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchY/SubY1",
-                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchY",
-                    "Assets/Resources/Wallstop Studios/TestCleanup/BranchZ",
-                    "Assets/Resources/Wallstop Studios/TestCleanup",
-                },
-                new[] { "Assets/Resources/Wallstop Studios" }
-            );
-
-            yield return new CleanupScenario(
-                "Repeated cleanup invocations stay idempotent",
-                new[] { "Assets/Resources/Wallstop Studios/TestCleanup/Repeat/Leaf" },
-                Array.Empty<string>(),
-                new[]
-                {
-                    "Assets/Resources/Wallstop Studios/TestCleanup/Repeat/Leaf",
-                    "Assets/Resources/Wallstop Studios/TestCleanup/Repeat",
-                    "Assets/Resources/Wallstop Studios/TestCleanup",
-                },
-                new[] { "Assets/Resources/Wallstop Studios" },
-                cleanupInvocationCount: 4
-            );
-        }
-
         [UnityTest]
         public IEnumerator CleanupLegacyEmptyFoldersDataDriven(
             [ValueSource(nameof(CleanupScenarios))] CleanupScenario scenario
@@ -1609,6 +1556,59 @@ namespace WallstopStudios.UnityHelpers.Tests
                         + $"{diagnosticInfo}. "
                         + $"CleanupInvocationCount: {scenario.CleanupInvocationCount}. "
                         + $"After cleanup - SubFolders: [{string.Join(", ", subFoldersAfterCleanup)}]"
+                );
+            }
+        }
+
+        private IEnumerator CleanupAllPersistentDirectorySettingsAssets()
+        {
+            string beforeDiagnostics = GetWallstopRootDiagnostics();
+
+            string[] guids = AssetDatabase.FindAssets("t:" + nameof(PersistentDirectorySettings));
+            foreach (string guid in guids)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                if (!string.IsNullOrEmpty(path))
+                {
+                    AssetDatabase.DeleteAsset(path);
+                    yield return null;
+                }
+            }
+
+            foreach (string fixtureOwnedCleanupFoldersElement in FixtureOwnedCleanupFolders)
+            {
+                DeleteFolderIfExists(fixtureOwnedCleanupFoldersElement);
+                yield return null;
+            }
+
+            foreach (string fixtureOwnedParentFoldersElement in FixtureOwnedParentFolders)
+            {
+                TryDeleteEmptyFolder(fixtureOwnedParentFoldersElement);
+                yield return null;
+            }
+
+            SaveAndRefreshFixtureAssets();
+            yield return null;
+
+            string remainingFixtureFolders = GetExistingFixtureOwnedFolderDiagnostics();
+            string afterDiagnostics = GetWallstopRootDiagnostics();
+            string unexpectedSubFolders = GetUnexpectedWallstopSubFolderDiagnostics();
+            if (!string.Equals(remainingFixtureFolders, "(none)", StringComparison.Ordinal))
+            {
+                TestContext.WriteLine(
+                    "CleanupAllPersistentDirectorySettingsAssets left fixture folders behind. "
+                        + $"Before: {beforeDiagnostics}. "
+                        + $"After: {afterDiagnostics}. "
+                        + $"Remaining: {remainingFixtureFolders}"
+                );
+            }
+
+            if (!string.Equals(unexpectedSubFolders, "(none)", StringComparison.Ordinal))
+            {
+                TestContext.WriteLine(
+                    "CleanupAllPersistentDirectorySettingsAssets observed unexpected Wallstop root subfolders. "
+                        + $"Unexpected: {unexpectedSubFolders}. "
+                        + $"After: {afterDiagnostics}"
                 );
             }
         }

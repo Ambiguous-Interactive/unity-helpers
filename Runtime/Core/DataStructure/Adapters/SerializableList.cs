@@ -64,16 +64,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
     [JsonConverter(typeof(SerializableListConverterFactory))]
     public sealed partial class SerializableList<T> : IList<T>, IReadOnlyList<T>
     {
-        static SerializableList()
-        {
-            ProtobufUnityModel.EnsureInitialized();
-        }
-
-        [SerializeField]
-        [ProtoMember(1, OverwriteList = true)]
-        [WProtoMember(1, OverwriteList = true)]
-        private List<T> _items = new();
-
         /// <summary>
         /// Gets the number of elements currently stored.
         /// </summary>
@@ -114,6 +104,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             set => EnsureItems()[index] = value;
         }
 
+        [SerializeField]
+        [ProtoMember(1, OverwriteList = true)]
+        [WProtoMember(1, OverwriteList = true)]
+        private List<T> _items = new();
+
         /// <summary>
         /// Creates an empty list.
         /// </summary>
@@ -152,6 +147,40 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         public SerializableList(IEnumerable<T> items)
         {
             _items = items == null ? new List<T>() : new List<T>(items);
+        }
+
+        static SerializableList()
+        {
+            ProtobufUnityModel.EnsureInitialized();
+        }
+
+        /// <summary>
+        /// Wraps an existing list. The returned instance shares storage with <paramref name="items"/>.
+        /// </summary>
+        /// <param name="items">List to wrap.</param>
+        /// <example>
+        /// <code><![CDATA[
+        /// SerializableList<int> weights = new List<int> { 1, 2, 3 };
+        /// ]]></code>
+        /// </example>
+        public static implicit operator SerializableList<T>(List<T> items)
+        {
+            return new SerializableList<T> { _items = items ?? new List<T>() };
+        }
+
+        /// <summary>
+        /// Unwraps to the backing list. Mutating the result mutates the wrapper.
+        /// </summary>
+        /// <param name="items">Wrapper to unwrap. <c>null</c> unwraps to <c>null</c>.</param>
+        /// <example>
+        /// <code><![CDATA[
+        /// SerializableList<int> weights = new SerializableList<int> { 1, 2, 3 };
+        /// List<int> raw = weights;
+        /// ]]></code>
+        /// </example>
+        public static implicit operator List<T>(SerializableList<T> items)
+        {
+            return items?.EnsureItems();
         }
 
         /// <summary>
@@ -355,6 +384,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             return EnsureItems().GetEnumerator();
         }
 
+        // Deserializers can bypass backing-list initialization; mutations must materialize it.
+        private List<T> EnsureItems()
+        {
+            return _items ??= new List<T>();
+        }
+
         IEnumerator<T> IEnumerable<T>.GetEnumerator()
         {
             return EnsureItems().GetEnumerator();
@@ -363,41 +398,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         IEnumerator IEnumerable.GetEnumerator()
         {
             return EnsureItems().GetEnumerator();
-        }
-
-        /// <summary>
-        /// Wraps an existing list. The returned instance shares storage with <paramref name="items"/>.
-        /// </summary>
-        /// <param name="items">List to wrap.</param>
-        /// <example>
-        /// <code><![CDATA[
-        /// SerializableList<int> weights = new List<int> { 1, 2, 3 };
-        /// ]]></code>
-        /// </example>
-        public static implicit operator SerializableList<T>(List<T> items)
-        {
-            return new SerializableList<T> { _items = items ?? new List<T>() };
-        }
-
-        /// <summary>
-        /// Unwraps to the backing list. Mutating the result mutates the wrapper.
-        /// </summary>
-        /// <param name="items">Wrapper to unwrap. <c>null</c> unwraps to <c>null</c>.</param>
-        /// <example>
-        /// <code><![CDATA[
-        /// SerializableList<int> weights = new SerializableList<int> { 1, 2, 3 };
-        /// List<int> raw = weights;
-        /// ]]></code>
-        /// </example>
-        public static implicit operator List<T>(SerializableList<T> items)
-        {
-            return items?.EnsureItems();
-        }
-
-        // Deserializers can bypass backing-list initialization; mutations must materialize it.
-        private List<T> EnsureItems()
-        {
-            return _items ??= new List<T>();
         }
 
         internal static class SerializedPropertyNames

@@ -18,6 +18,23 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
     [NUnit.Framework.Category("Integration")]
     public sealed class WGuidPropertyDrawerTests : CommonTestBase
     {
+        private static WGuid ReadGuid(SerializedProperty property)
+        {
+            SerializedProperty lowProperty = property.FindPropertyRelative(WGuid.LowFieldName);
+            SerializedProperty highProperty = property.FindPropertyRelative(WGuid.HighFieldName);
+            Span<byte> buffer = stackalloc byte[16];
+            BinaryPrimitives.WriteUInt64LittleEndian(
+                buffer.Slice(0, 8),
+                unchecked((ulong)lowProperty.longValue)
+            );
+            BinaryPrimitives.WriteUInt64LittleEndian(
+                buffer.Slice(8, 8),
+                unchecked((ulong)highProperty.longValue)
+            );
+            Guid guid = new(buffer);
+            return new WGuid(guid);
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -567,23 +584,6 @@ namespace WallstopStudios.UnityHelpers.Tests.CustomDrawers
             Assert.AreEqual(guid1, guid1After);
 
             Assert.IsFalse(guid2.IsEmpty);
-        }
-
-        private static WGuid ReadGuid(SerializedProperty property)
-        {
-            SerializedProperty lowProperty = property.FindPropertyRelative(WGuid.LowFieldName);
-            SerializedProperty highProperty = property.FindPropertyRelative(WGuid.HighFieldName);
-            Span<byte> buffer = stackalloc byte[16];
-            BinaryPrimitives.WriteUInt64LittleEndian(
-                buffer.Slice(0, 8),
-                unchecked((ulong)lowProperty.longValue)
-            );
-            BinaryPrimitives.WriteUInt64LittleEndian(
-                buffer.Slice(8, 8),
-                unchecked((ulong)highProperty.longValue)
-            );
-            Guid guid = new(buffer);
-            return new WGuid(guid);
         }
     }
 }

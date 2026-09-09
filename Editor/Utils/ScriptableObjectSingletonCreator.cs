@@ -26,16 +26,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         private const string LegacyAssetImportWorkerEnvVar = "UNITY_ASSETIMPORT_WORKER";
         private const int MaxRetryAttempts = 10;
 
-        private static bool _isEnsuring;
-        private static bool _ensureScheduled;
-        private static int _retryAttempts;
-        private static int _consecutiveZeroProgressRetries;
-        private static bool? _assetImportWorkerEnvCachedValue;
-        private static Func<bool> _defaultAssetImportWorkerDetector;
-        private static bool _mainThreadConfirmed;
-        private static bool _mainThreadConfirmationPending;
-        private static int _capturedMainThreadId;
-
         internal static bool VerboseLogging { get; set; }
 
         internal static bool IncludeTestAssemblies { get; set; }
@@ -50,6 +40,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 
         // Tests can explicitly bypass compilation-state signals that lag asset operations.
         internal static bool IgnoreCompilationState { get; set; }
+
+        private static bool _isEnsuring;
+        private static bool _ensureScheduled;
+        private static int _retryAttempts;
+        private static int _consecutiveZeroProgressRetries;
+        private static bool? _assetImportWorkerEnvCachedValue;
+        private static Func<bool> _defaultAssetImportWorkerDetector;
+        private static bool _mainThreadConfirmed;
+        private static bool _mainThreadConfirmationPending;
+        private static int _capturedMainThreadId;
 
         static ScriptableObjectSingletonCreator()
         {
@@ -410,6 +410,78 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     $"ScriptableObjectSingletonCreator: Processed {singletonsProcessed} singleton types, {singletonsSucceeded} succeeded, retry={retryRequested}, progress={madeProgress}."
                 );
             }
+        }
+
+        /// <summary>
+        /// Checks if a folder name is a numbered duplicate of the desired name.
+        /// Unity creates numbered duplicates like "Resources 1", "Resources 2" when
+        /// parallel operations try to create the same folder simultaneously.
+        /// </summary>
+        /// <param name="actualName">The actual folder name that was created.</param>
+        /// <param name="desiredName">The intended folder name.</param>
+        /// <returns>True if actualName matches the pattern "desiredName N" where N is a number.</returns>
+        internal static bool IsNumberedDuplicate(string actualName, string desiredName)
+        {
+            if (
+                string.IsNullOrEmpty(actualName)
+                || string.IsNullOrEmpty(desiredName)
+                || actualName.Length <= desiredName.Length
+            )
+            {
+                return false;
+            }
+
+            if (!actualName.StartsWith(desiredName + " ", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            string suffix = actualName.Substring(desiredName.Length + 1);
+
+            // Reject extra whitespace before parsing; int.TryParse would otherwise accept it.
+            if (suffix.Length == 0 || char.IsWhiteSpace(suffix[0]))
+            {
+                return false;
+            }
+
+            return int.TryParse(suffix, out int number) && 0 < number;
+        }
+
+        [Conditional("UNITY_INCLUDE_TESTS")]
+        internal static void ResetAssetImportWorkerDetectionStateForTests()
+        {
+            _assetImportWorkerEnvCachedValue = null;
+            _defaultAssetImportWorkerDetector = null;
+            _mainThreadConfirmed = false;
+            _mainThreadConfirmationPending = false;
+            _capturedMainThreadId = 0;
+        }
+
+        [Conditional("UNITY_INCLUDE_TESTS")]
+        internal static void ResetRetryStateForTests()
+        {
+            _retryAttempts = 0;
+            _consecutiveZeroProgressRetries = 0;
+            CancelScheduledEnsureInvocation();
+        }
+
+        [Conditional("UNITY_INCLUDE_TESTS")]
+        internal static void ResetInitialEnsureStateForTests()
+        {
+            UnityHelpers.Utils.ScriptableObjectSingletonInitState.InitialEnsureCompleted = false;
+        }
+
+        /// <summary>
+        /// Resets state for testing. Cleanup of AssetDatabase batch state is now handled
+        /// by the unified <see cref="AssetDatabaseBatchHelper"/>.
+        /// </summary>
+        internal static void ResetAssetEditingScopeDepthForTesting()
+        {
+            _isEnsuring = false;
+
+            CancelScheduledEnsureInvocation();
+            _retryAttempts = 0;
+            _consecutiveZeroProgressRetries = 0;
         }
 
         private static void MarkInitialEnsureCompleted()
@@ -1586,41 +1658,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             return current;
         }
 
-        /// <summary>
-        /// Checks if a folder name is a numbered duplicate of the desired name.
-        /// Unity creates numbered duplicates like "Resources 1", "Resources 2" when
-        /// parallel operations try to create the same folder simultaneously.
-        /// </summary>
-        /// <param name="actualName">The actual folder name that was created.</param>
-        /// <param name="desiredName">The intended folder name.</param>
-        /// <returns>True if actualName matches the pattern "desiredName N" where N is a number.</returns>
-        internal static bool IsNumberedDuplicate(string actualName, string desiredName)
-        {
-            if (
-                string.IsNullOrEmpty(actualName)
-                || string.IsNullOrEmpty(desiredName)
-                || actualName.Length <= desiredName.Length
-            )
-            {
-                return false;
-            }
-
-            if (!actualName.StartsWith(desiredName + " ", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            string suffix = actualName.Substring(desiredName.Length + 1);
-
-            // Reject extra whitespace before parsing; int.TryParse would otherwise accept it.
-            if (suffix.Length == 0 || char.IsWhiteSpace(suffix[0]))
-            {
-                return false;
-            }
-
-            return int.TryParse(suffix, out int number) && 0 < number;
-        }
-
         private static bool IsRunningInsideAssetImportWorkerProcess()
         {
             Func<bool> detectorOverride = AssetImportWorkerProcessCheck;
@@ -1759,43 +1796,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             {
                 Debug.Log(message);
             }
-        }
-
-        [Conditional("UNITY_INCLUDE_TESTS")]
-        internal static void ResetAssetImportWorkerDetectionStateForTests()
-        {
-            _assetImportWorkerEnvCachedValue = null;
-            _defaultAssetImportWorkerDetector = null;
-            _mainThreadConfirmed = false;
-            _mainThreadConfirmationPending = false;
-            _capturedMainThreadId = 0;
-        }
-
-        [Conditional("UNITY_INCLUDE_TESTS")]
-        internal static void ResetRetryStateForTests()
-        {
-            _retryAttempts = 0;
-            _consecutiveZeroProgressRetries = 0;
-            CancelScheduledEnsureInvocation();
-        }
-
-        [Conditional("UNITY_INCLUDE_TESTS")]
-        internal static void ResetInitialEnsureStateForTests()
-        {
-            UnityHelpers.Utils.ScriptableObjectSingletonInitState.InitialEnsureCompleted = false;
-        }
-
-        /// <summary>
-        /// Resets state for testing. Cleanup of AssetDatabase batch state is now handled
-        /// by the unified <see cref="AssetDatabaseBatchHelper"/>.
-        /// </summary>
-        internal static void ResetAssetEditingScopeDepthForTesting()
-        {
-            _isEnsuring = false;
-
-            CancelScheduledEnsureInvocation();
-            _retryAttempts = 0;
-            _consecutiveZeroProgressRetries = 0;
         }
     }
 #endif

@@ -74,6 +74,37 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public static BlastCircuitRandom Instance => ThreadLocalRandom<BlastCircuitRandom>.Instance;
 
+        private static (ulong, ulong) ReadPayload(IReadOnlyList<byte> payload)
+        {
+            if (payload == null || payload.Count < PayloadByteCount)
+            {
+                return (0UL, 0UL);
+            }
+
+            if (payload is byte[] payloadArray)
+            {
+                ulong cValue = BinaryPrimitives.ReadUInt64LittleEndian(
+                    payloadArray.AsSpan(0, sizeof(ulong))
+                );
+                ulong dValue = BinaryPrimitives.ReadUInt64LittleEndian(
+                    payloadArray.AsSpan(sizeof(ulong), sizeof(ulong))
+                );
+                return (cValue, dValue);
+            }
+
+            Span<byte> buffer = stackalloc byte[PayloadByteCount];
+            for (int i = 0; i < PayloadByteCount; ++i)
+            {
+                buffer[i] = payload[i];
+            }
+
+            ulong c = BinaryPrimitives.ReadUInt64LittleEndian(buffer.Slice(0, sizeof(ulong)));
+            ulong d = BinaryPrimitives.ReadUInt64LittleEndian(
+                buffer.Slice(sizeof(ulong), sizeof(ulong))
+            );
+            return (c, d);
+        }
+
         public override RandomState InternalState
         {
             get
@@ -133,6 +164,25 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             RestoreCommonState(internalState);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static ulong Mix64(ulong value)
+        {
+            unchecked
+            {
+                value += GoldenGamma;
+                value = (value ^ (value >> 30)) * 0xBF58476D1CE4E5B9UL;
+                value = (value ^ (value >> 27)) * 0x94D049BB133111EBUL;
+                value ^= value >> 31;
+                return value;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static ulong RotateLeft(ulong value, int count)
+        {
+            return (value << count) | (value >> (64 - count));
+        }
+
         public override uint NextUint()
         {
             unchecked
@@ -144,6 +194,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         public override ulong NextUlong()
         {
             return NextWord();
+        }
+
+        public override IRandom Copy()
+        {
+            return new BlastCircuitRandom(InternalState);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -160,11 +215,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
                 return mix;
             }
-        }
-
-        public override IRandom Copy()
-        {
-            return new BlastCircuitRandom(InternalState);
         }
 
         private void InitializeFromGuid(Guid guid)
@@ -195,56 +245,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             _b = b;
             _c = c;
             _d = d;
-        }
-
-        private static (ulong, ulong) ReadPayload(IReadOnlyList<byte> payload)
-        {
-            if (payload == null || payload.Count < PayloadByteCount)
-            {
-                return (0UL, 0UL);
-            }
-
-            if (payload is byte[] payloadArray)
-            {
-                ulong cValue = BinaryPrimitives.ReadUInt64LittleEndian(
-                    payloadArray.AsSpan(0, sizeof(ulong))
-                );
-                ulong dValue = BinaryPrimitives.ReadUInt64LittleEndian(
-                    payloadArray.AsSpan(sizeof(ulong), sizeof(ulong))
-                );
-                return (cValue, dValue);
-            }
-
-            Span<byte> buffer = stackalloc byte[PayloadByteCount];
-            for (int i = 0; i < PayloadByteCount; ++i)
-            {
-                buffer[i] = payload[i];
-            }
-
-            ulong c = BinaryPrimitives.ReadUInt64LittleEndian(buffer.Slice(0, sizeof(ulong)));
-            ulong d = BinaryPrimitives.ReadUInt64LittleEndian(
-                buffer.Slice(sizeof(ulong), sizeof(ulong))
-            );
-            return (c, d);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong Mix64(ulong value)
-        {
-            unchecked
-            {
-                value += GoldenGamma;
-                value = (value ^ (value >> 30)) * 0xBF58476D1CE4E5B9UL;
-                value = (value ^ (value >> 27)) * 0x94D049BB133111EBUL;
-                value ^= value >> 31;
-                return value;
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong RotateLeft(ulong value, int count)
-        {
-            return (value << count) | (value >> (64 - count));
         }
     }
 }

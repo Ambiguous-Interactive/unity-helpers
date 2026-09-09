@@ -23,6 +23,123 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     [NUnit.Framework.Category("Fast")]
     public sealed class UnityMainThreadDispatcherTests : CommonTestBase
     {
+        private static IEnumerator WaitForNoLiveDispatchers(int maxFrames = 10)
+        {
+            for (int i = 0; i < maxFrames; i++)
+            {
+                UnityMainThreadDispatcher[] dispatchers =
+                    Resources.FindObjectsOfTypeAll<UnityMainThreadDispatcher>();
+                if (dispatchers.Length == 0)
+                {
+                    yield break;
+                }
+
+                yield return null;
+            }
+
+            UnityMainThreadDispatcher[] remainingDispatchers =
+                Resources.FindObjectsOfTypeAll<UnityMainThreadDispatcher>();
+            Assert.AreEqual(
+                0,
+                remainingDispatchers.Length,
+                $"Expected no live UnityMainThreadDispatcher objects after cleanup. {DescribeDispatchers(remainingDispatchers)}"
+            );
+        }
+
+        private static CancellationToken CanceledWith(Task task)
+        {
+            try
+            {
+                task.GetAwaiter().GetResult();
+            }
+            catch (OperationCanceledException canceled)
+            {
+                return canceled.CancellationToken;
+            }
+
+            return CancellationToken.None;
+        }
+
+        private static IEnumerable<CancellationCase> CancellationCases()
+        {
+            yield return new CancellationCase(
+                name: "pre-canceled caller",
+                passCallerToken: true,
+                cancelCallerBeforeStart: true,
+                cancelCallerAfterStart: false,
+                cancelDelegate: false,
+                cancelDelegateWithoutToken: false,
+                expectsCallerToken: true,
+                expectsDelegateToken: false
+            );
+            yield return new CancellationCase(
+                name: "caller cancels running work",
+                passCallerToken: true,
+                cancelCallerBeforeStart: false,
+                cancelCallerAfterStart: true,
+                cancelDelegate: false,
+                cancelDelegateWithoutToken: false,
+                expectsCallerToken: true,
+                expectsDelegateToken: false
+            );
+            yield return new CancellationCase(
+                name: "delegate cancels with its own token",
+                passCallerToken: true,
+                cancelCallerBeforeStart: false,
+                cancelCallerAfterStart: false,
+                cancelDelegate: true,
+                cancelDelegateWithoutToken: false,
+                expectsCallerToken: false,
+                expectsDelegateToken: true
+            );
+            yield return new CancellationCase(
+                name: "delegate cancels with no token",
+                passCallerToken: true,
+                cancelCallerBeforeStart: false,
+                cancelCallerAfterStart: false,
+                cancelDelegate: false,
+                cancelDelegateWithoutToken: true,
+                expectsCallerToken: false,
+                expectsDelegateToken: false
+            );
+            yield return new CancellationCase(
+                name: "no caller token, delegate cancels with its own",
+                passCallerToken: false,
+                cancelCallerBeforeStart: false,
+                cancelCallerAfterStart: false,
+                cancelDelegate: true,
+                cancelDelegateWithoutToken: false,
+                expectsCallerToken: false,
+                expectsDelegateToken: true
+            );
+        }
+
+        private static string DescribeDispatchers(UnityMainThreadDispatcher[] dispatchers)
+        {
+            if (dispatchers == null || dispatchers.Length == 0)
+            {
+                return "No dispatchers found.";
+            }
+
+            string[] descriptions = new string[dispatchers.Length];
+            for (int i = 0; i < dispatchers.Length; i++)
+            {
+                UnityMainThreadDispatcher dispatcher = dispatchers[i];
+                if (dispatcher == null)
+                {
+                    descriptions[i] = "null";
+                    continue;
+                }
+
+                GameObject dispatcherObject = dispatcher.gameObject;
+                string sceneName = dispatcherObject == null ? "null" : dispatcherObject.scene.name;
+                descriptions[i] =
+                    $"{dispatcher.name}#{dispatcher.GetUnityObjectId()} scene='{sceneName}' active={dispatcherObject != null && dispatcherObject.activeInHierarchy}";
+            }
+
+            return string.Join(", ", descriptions);
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -726,29 +843,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             );
         }
 
-        private static IEnumerator WaitForNoLiveDispatchers(int maxFrames = 10)
-        {
-            for (int i = 0; i < maxFrames; i++)
-            {
-                UnityMainThreadDispatcher[] dispatchers =
-                    Resources.FindObjectsOfTypeAll<UnityMainThreadDispatcher>();
-                if (dispatchers.Length == 0)
-                {
-                    yield break;
-                }
-
-                yield return null;
-            }
-
-            UnityMainThreadDispatcher[] remainingDispatchers =
-                Resources.FindObjectsOfTypeAll<UnityMainThreadDispatcher>();
-            Assert.AreEqual(
-                0,
-                remainingDispatchers.Length,
-                $"Expected no live UnityMainThreadDispatcher objects after cleanup. {DescribeDispatchers(remainingDispatchers)}"
-            );
-        }
-
         /// <summary>
         /// A canceled dispatcher task must name the token that actually canceled it. Reporting the
         /// caller's token whenever it merely <i>could</i> be canceled tells a caller racing its own
@@ -801,100 +895,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
                 delegateWork.TrySetResult(true);
             }
-        }
-
-        private static CancellationToken CanceledWith(Task task)
-        {
-            try
-            {
-                task.GetAwaiter().GetResult();
-            }
-            catch (OperationCanceledException canceled)
-            {
-                return canceled.CancellationToken;
-            }
-
-            return CancellationToken.None;
-        }
-
-        private static IEnumerable<CancellationCase> CancellationCases()
-        {
-            yield return new CancellationCase(
-                name: "pre-canceled caller",
-                passCallerToken: true,
-                cancelCallerBeforeStart: true,
-                cancelCallerAfterStart: false,
-                cancelDelegate: false,
-                cancelDelegateWithoutToken: false,
-                expectsCallerToken: true,
-                expectsDelegateToken: false
-            );
-            yield return new CancellationCase(
-                name: "caller cancels running work",
-                passCallerToken: true,
-                cancelCallerBeforeStart: false,
-                cancelCallerAfterStart: true,
-                cancelDelegate: false,
-                cancelDelegateWithoutToken: false,
-                expectsCallerToken: true,
-                expectsDelegateToken: false
-            );
-            yield return new CancellationCase(
-                name: "delegate cancels with its own token",
-                passCallerToken: true,
-                cancelCallerBeforeStart: false,
-                cancelCallerAfterStart: false,
-                cancelDelegate: true,
-                cancelDelegateWithoutToken: false,
-                expectsCallerToken: false,
-                expectsDelegateToken: true
-            );
-            yield return new CancellationCase(
-                name: "delegate cancels with no token",
-                passCallerToken: true,
-                cancelCallerBeforeStart: false,
-                cancelCallerAfterStart: false,
-                cancelDelegate: false,
-                cancelDelegateWithoutToken: true,
-                expectsCallerToken: false,
-                expectsDelegateToken: false
-            );
-            yield return new CancellationCase(
-                name: "no caller token, delegate cancels with its own",
-                passCallerToken: false,
-                cancelCallerBeforeStart: false,
-                cancelCallerAfterStart: false,
-                cancelDelegate: true,
-                cancelDelegateWithoutToken: false,
-                expectsCallerToken: false,
-                expectsDelegateToken: true
-            );
-        }
-
-        private static string DescribeDispatchers(UnityMainThreadDispatcher[] dispatchers)
-        {
-            if (dispatchers == null || dispatchers.Length == 0)
-            {
-                return "No dispatchers found.";
-            }
-
-            string[] descriptions = new string[dispatchers.Length];
-            for (int i = 0; i < dispatchers.Length; i++)
-            {
-                UnityMainThreadDispatcher dispatcher = dispatchers[i];
-                if (dispatcher == null)
-                {
-                    descriptions[i] = "null";
-                    continue;
-                }
-
-                GameObject dispatcherObject = dispatcher.gameObject;
-                string sceneName = dispatcherObject == null ? "null" : dispatcherObject.scene.name;
-                descriptions[i] =
-                    $"{dispatcher.name}#{dispatcher.GetUnityObjectId()} scene='{sceneName}' active={dispatcherObject != null && dispatcherObject.activeInHierarchy}";
-            }
-
-            return string.Join(", ", descriptions);
         }
 
         private readonly struct CancellationCase

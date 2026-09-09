@@ -13,13 +13,6 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
     {
         private SerializedProperty _tolerance;
 
-        private void OnEnable()
-        {
-            _tolerance = serializedObject.FindProperty(
-                nameof(PolygonCollider2DOptimizer.tolerance)
-            );
-        }
-
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
@@ -46,6 +39,13 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
             }
 
             serializedObject.ApplyModifiedProperties();
+        }
+
+        private void OnEnable()
+        {
+            _tolerance = serializedObject.FindProperty(
+                nameof(PolygonCollider2DOptimizer.tolerance)
+            );
         }
     }
 #endif

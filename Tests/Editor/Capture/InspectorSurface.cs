@@ -35,15 +35,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
 
         private static readonly Color LightSkinBackground = new(0.7608f, 0.7608f, 0.7608f, 1f);
 
+        /// <summary>The element to hand to <see cref="EditorSurfaceCapture.Capture"/>.</summary>
+        internal VisualElement Root { get; }
+
         private readonly List<UnityEditor.Editor> _editors = new();
 
         private InspectorSurface(VisualElement root)
         {
             Root = root;
         }
-
-        /// <summary>The element to hand to <see cref="EditorSurfaceCapture.Capture"/>.</summary>
-        internal VisualElement Root { get; }
 
         /// <summary>
         /// Lays out one inspector body per entry of <paramref name="targets"/>, side by side when
@@ -123,20 +123,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
             return surface;
         }
 
-        public void Dispose()
-        {
-            Root.Clear();
-            foreach (UnityEditor.Editor editor in _editors)
-            {
-                if (editor != null)
-                {
-                    Object.DestroyImmediate(editor); // UNH-SUPPRESS: this surface owns its editors
-                }
-            }
-
-            _editors.Clear();
-        }
-
         private static VisualElement BuildColumn(
             UnityEditor.Editor editor,
             float columnWidth,
@@ -176,6 +162,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Capture
             });
             column.Add(container);
             return column;
+        }
+
+        public void Dispose()
+        {
+            Root.Clear();
+            foreach (UnityEditor.Editor editor in _editors)
+            {
+                if (editor != null)
+                {
+                    Object.DestroyImmediate(editor); // UNH-SUPPRESS: this surface owns its editors
+                }
+            }
+
+            _editors.Clear();
         }
     }
 #endif

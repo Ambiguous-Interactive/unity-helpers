@@ -67,55 +67,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             new("Yam", SortAlgorithm.Yam, true, int.MaxValue),
         };
 
-        [Test]
-        [Timeout(BenchmarkTimeoutMilliseconds)]
-        public void Benchmark()
-        {
-            string operatingSystemToken = GetOperatingSystemToken();
-            string sectionName = SectionPrefix + operatingSystemToken;
-
-            List<string> readmeLines = new()
-            {
-                string.Format(
-                    CultureInfo.InvariantCulture,
-                    "_Last updated {0:yyyy-MM-dd HH:mm} UTC on {1}_",
-                    DateTime.UtcNow,
-                    SystemInfo.operatingSystem
-                ),
-                string.Empty,
-                "Times are single-pass measurements in milliseconds (lower is better). `n/a` indicates the algorithm was skipped for the dataset size.",
-                string.Empty,
-            };
-
-            IComparer<int> comparer = Comparer<int>.Default;
-            string headerLine = BuildHeaderLine();
-            string dividerLine = BuildDividerLine();
-
-            foreach (DatasetState datasetState in DatasetStates)
-            {
-                UnityEngine.Debug.Log($"IList Sorting Benchmarks - {datasetState.Label}");
-                UnityEngine.Debug.Log(headerLine);
-                UnityEngine.Debug.Log(dividerLine);
-
-                readmeLines.Add($"### {datasetState.Label}");
-                readmeLines.AddRange(BuildTableHeader());
-
-                foreach (DatasetSizeSpec sizeSpec in DatasetSizeSpecs)
-                {
-                    int[] baseData = datasetState.CreateData(sizeSpec.Count);
-                    string rowLine = BuildRowLine(sizeSpec.Label, baseData, comparer);
-                    UnityEngine.Debug.Log(rowLine);
-                    readmeLines.Add(rowLine);
-                }
-
-                readmeLines.AddRange(BuildTableFooter());
-                readmeLines.Add(string.Empty);
-                UnityEngine.Debug.Log(string.Empty);
-            }
-
-            BenchmarkReadmeUpdater.UpdateSection(sectionName, readmeLines, DocumentPath);
-        }
-
         private static List<string> BuildTableHeader()
         {
             List<string> lines = new()
@@ -351,21 +302,72 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             }
         }
 
+        [Test]
+        [Timeout(BenchmarkTimeoutMilliseconds)]
+        public void Benchmark()
+        {
+            string operatingSystemToken = GetOperatingSystemToken();
+            string sectionName = SectionPrefix + operatingSystemToken;
+
+            List<string> readmeLines = new()
+            {
+                string.Format(
+                    CultureInfo.InvariantCulture,
+                    "_Last updated {0:yyyy-MM-dd HH:mm} UTC on {1}_",
+                    DateTime.UtcNow,
+                    SystemInfo.operatingSystem
+                ),
+                string.Empty,
+                "Times are single-pass measurements in milliseconds (lower is better). `n/a` indicates the algorithm was skipped for the dataset size.",
+                string.Empty,
+            };
+
+            IComparer<int> comparer = Comparer<int>.Default;
+            string headerLine = BuildHeaderLine();
+            string dividerLine = BuildDividerLine();
+
+            foreach (DatasetState datasetState in DatasetStates)
+            {
+                UnityEngine.Debug.Log($"IList Sorting Benchmarks - {datasetState.Label}");
+                UnityEngine.Debug.Log(headerLine);
+                UnityEngine.Debug.Log(dividerLine);
+
+                readmeLines.Add($"### {datasetState.Label}");
+                readmeLines.AddRange(BuildTableHeader());
+
+                foreach (DatasetSizeSpec sizeSpec in DatasetSizeSpecs)
+                {
+                    int[] baseData = datasetState.CreateData(sizeSpec.Count);
+                    string rowLine = BuildRowLine(sizeSpec.Label, baseData, comparer);
+                    UnityEngine.Debug.Log(rowLine);
+                    readmeLines.Add(rowLine);
+                }
+
+                readmeLines.AddRange(BuildTableFooter());
+                readmeLines.Add(string.Empty);
+                UnityEngine.Debug.Log(string.Empty);
+            }
+
+            BenchmarkReadmeUpdater.UpdateSection(sectionName, readmeLines, DocumentPath);
+        }
+
         private readonly struct DatasetSizeSpec
         {
+            public string Label { get; }
+
+            public int Count { get; }
+
             public DatasetSizeSpec(string label, int count)
             {
                 Label = label;
                 Count = count;
             }
-
-            public string Label { get; }
-
-            public int Count { get; }
         }
 
         private readonly struct DatasetState
         {
+            public string Label { get; }
+
             private readonly Func<int, int[]> generator;
 
             public DatasetState(string label, Func<int, int[]> generator)
@@ -373,8 +375,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 Label = label;
                 this.generator = generator;
             }
-
-            public string Label { get; }
 
             public int[] CreateData(int count)
             {
@@ -384,6 +384,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
 
         private readonly struct SortImplementation
         {
+            public string Label { get; }
+
+            public SortAlgorithm Algorithm { get; }
+
+            public bool IsStable { get; }
+
+            public int MaxSupportedCount { get; }
+
             public SortImplementation(
                 string label,
                 SortAlgorithm algorithm,
@@ -396,14 +404,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
                 IsStable = isStable;
                 MaxSupportedCount = maxSupportedCount;
             }
-
-            public string Label { get; }
-
-            public SortAlgorithm Algorithm { get; }
-
-            public bool IsStable { get; }
-
-            public int MaxSupportedCount { get; }
 
             public void Execute(IList<int> list, IComparer<int> comparer)
             {

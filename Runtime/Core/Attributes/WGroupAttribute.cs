@@ -70,6 +70,50 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         public const int UseGlobalAutoInclude = -2;
 
         /// <summary>
+        /// Identifier shared between the start and end attributes.
+        /// </summary>
+        public string GroupName { get; }
+
+        /// <summary>
+        /// Human-readable title drawn in the inspector (defaults to <see cref="GroupName"/>).
+        /// </summary>
+        public string DisplayName { get; }
+
+        /// <summary>
+        /// Number of trailing serialized members automatically swept into the group.
+        /// </summary>
+        public int AutoIncludeCount { get; }
+
+        /// <summary>
+        /// Gets a value indicating whether the group can be collapsed with a foldout toggle.
+        /// </summary>
+        public bool Collapsible { get; }
+
+        /// <summary>
+        /// Gets or sets how the attribute resolves its initial collapse state.
+        /// </summary>
+        public WGroupCollapseBehavior CollapseBehavior { get; set; } =
+            WGroupCollapseBehavior.UseProjectSetting;
+
+        /// <summary>
+        /// Gets a value indicating whether a collapsible group should start closed.
+        /// </summary>
+        public bool StartCollapsed
+        {
+            get { return CollapseBehavior == WGroupCollapseBehavior.ForceCollapsed; }
+        }
+
+        /// <summary>
+        /// Set to <see langword="true"/> to hide the header while still wrapping the grouped fields inside the styled container.
+        /// </summary>
+        public bool HideHeader { get; }
+
+        /// <summary>
+        /// Gets the name of the parent group that this group should be nested inside, or <see langword="null"/> if this is a top-level group.
+        /// </summary>
+        public string ParentGroup { get; }
+
+        /// <summary>
         /// Creates a new grouped inspector section.
         /// </summary>
         /// <param name="groupName">Unique key that ties <see cref="WGroupAttribute"/> and <see cref="WGroupEndAttribute"/> entries together.</param>
@@ -115,50 +159,6 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
             HideHeader = hideHeader;
             ParentGroup = string.IsNullOrWhiteSpace(parentGroup) ? null : parentGroup.Trim();
         }
-
-        /// <summary>
-        /// Identifier shared between the start and end attributes.
-        /// </summary>
-        public string GroupName { get; }
-
-        /// <summary>
-        /// Human-readable title drawn in the inspector (defaults to <see cref="GroupName"/>).
-        /// </summary>
-        public string DisplayName { get; }
-
-        /// <summary>
-        /// Number of trailing serialized members automatically swept into the group.
-        /// </summary>
-        public int AutoIncludeCount { get; }
-
-        /// <summary>
-        /// Gets a value indicating whether the group can be collapsed with a foldout toggle.
-        /// </summary>
-        public bool Collapsible { get; }
-
-        /// <summary>
-        /// Gets or sets how the attribute resolves its initial collapse state.
-        /// </summary>
-        public WGroupCollapseBehavior CollapseBehavior { get; set; } =
-            WGroupCollapseBehavior.UseProjectSetting;
-
-        /// <summary>
-        /// Gets a value indicating whether a collapsible group should start closed.
-        /// </summary>
-        public bool StartCollapsed
-        {
-            get { return CollapseBehavior == WGroupCollapseBehavior.ForceCollapsed; }
-        }
-
-        /// <summary>
-        /// Set to <see langword="true"/> to hide the header while still wrapping the grouped fields inside the styled container.
-        /// </summary>
-        public bool HideHeader { get; }
-
-        /// <summary>
-        /// Gets the name of the parent group that this group should be nested inside, or <see langword="null"/> if this is a top-level group.
-        /// </summary>
-        public string ParentGroup { get; }
 
         private static int NormalizeAutoIncludeCount(int autoIncludeCount)
         {

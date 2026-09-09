@@ -369,6 +369,10 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
         private sealed class PartitionPooledEnumerator<T> : IEnumerator<PooledResource<List<T>>>
         {
+            public PooledResource<List<T>> Current { get; private set; }
+
+            object IEnumerator.Current => Current;
+
             private readonly IEnumerator<T> _source;
             private readonly int _size;
 
@@ -381,10 +385,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 _source = source;
                 _size = size;
             }
-
-            public PooledResource<List<T>> Current { get; private set; }
-
-            object IEnumerator.Current => Current;
 
             public bool MoveNext()
             {

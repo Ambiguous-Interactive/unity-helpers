@@ -37,9 +37,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             0x3F5A171FU,
         };
 
-        protected override IRandom NewRandom() =>
-            new Xoshiro128StarStar(Seed0, Seed1, Seed2, Seed3);
-
         [Test]
         public void NextUintMatchesReferenceImplementation()
         {
@@ -90,5 +87,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
                 Assert.AreEqual(source.NextUint(), restored.NextUint(), $"Draw {i} diverged.");
             }
         }
+
+        protected override IRandom NewRandom() =>
+            new Xoshiro128StarStar(Seed0, Seed1, Seed2, Seed3);
     }
 }

@@ -69,26 +69,11 @@ namespace WallstopStudios.UnityHelpers.Utils
         private static bool _duplicateMetadataWarningLogged;
 #endif
 
+        protected internal static Lazy<T> _lazyInstance = CreateLazy();
+
         static ScriptableObjectSingleton()
         {
             ScriptableObjectSingletonRegistry.Register(ClearInstance);
-        }
-
-        private static string GetResourcesPath()
-        {
-            Type type = typeof(T);
-            if (
-                ReflectionHelpers.TryGetAttributeSafe<ScriptableSingletonPathAttribute>(
-                    type,
-                    out ScriptableSingletonPathAttribute attribute,
-                    inherit: false
-                ) && !string.IsNullOrWhiteSpace(attribute.resourcesPath)
-            )
-            {
-                return attribute.resourcesPath;
-            }
-
-            return string.Empty;
         }
 
         /// <summary>
@@ -128,21 +113,26 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
         }
 
-        /// <summary>
-        /// Releases derived caches before the singleton reference is cleared.
-        /// </summary>
-        /// <remarks>
-        /// Runs on the main thread with the old live instance still available through <see cref="Instance"/>.
-        /// Nested clears of the same type are ignored. Exceptions are logged and the cache reset still completes.
-        /// This callback does not destroy the asset and is separate from Unity's <c>OnDisable()</c> message.
-        /// </remarks>
-        protected virtual void OnInstanceCleared() { }
-
-        protected internal static Lazy<T> _lazyInstance = CreateLazy();
-
         internal static Lazy<T> CreateLazy()
         {
             return new Lazy<T>(() => LoadInstance());
+        }
+
+        private static string GetResourcesPath()
+        {
+            Type type = typeof(T);
+            if (
+                ReflectionHelpers.TryGetAttributeSafe<ScriptableSingletonPathAttribute>(
+                    type,
+                    out ScriptableSingletonPathAttribute attribute,
+                    inherit: false
+                ) && !string.IsNullOrWhiteSpace(attribute.resourcesPath)
+            )
+            {
+                return attribute.resourcesPath;
+            }
+
+            return string.Empty;
         }
 
         // Factory failures and reentrant Lazy access return the documented absent result instead of poisoning public access.
@@ -285,6 +275,16 @@ namespace WallstopStudios.UnityHelpers.Utils
             return string.IsNullOrEmpty(trimmed) ? typeName : $"{trimmed}/{typeName}";
         }
 
+        /// <summary>
+        /// Releases derived caches before the singleton reference is cleared.
+        /// </summary>
+        /// <remarks>
+        /// Runs on the main thread with the old live instance still available through <see cref="Instance"/>.
+        /// Nested clears of the same type are ignored. Exceptions are logged and the cache reset still completes.
+        /// This callback does not destroy the asset and is separate from Unity's <c>OnDisable()</c> message.
+        /// </remarks>
+        protected virtual void OnInstanceCleared() { }
+
 #if UNITY_EDITOR
         private static void AddEditorCandidates(Type type, string resourcesPath, List<T> candidates)
         {
@@ -328,6 +328,82 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
         }
 #endif
+
+        /// <summary>
+        /// Gets a value indicating whether the lazy instance has been created and is non‑null.
+        /// </summary>
+        public static bool HasInstance
+        {
+            get
+            {
+                // Read the Lazy once so replacement cannot trigger an unexpected Resources load past the main-thread guard.
+                Lazy<T> lazy = _lazyInstance;
+                return lazy.IsValueCreated && lazy.Value != null;
+            }
+        }
+
+        /// <summary>
+        /// Gets the global asset instance, loading it from <c>Resources</c> on first access. Returns
+        /// <c>null</c> rather than starting that load after Unity begins application shutdown.
+        /// </summary>
+        /// <example>
+        /// <code>
+        /// [ScriptableSingletonPath("Settings/Audio")]
+        /// public sealed class AudioSettings : ScriptableObjectSingleton&lt;AudioSettings&gt;
+        /// {
+        ///     public float musicVolume = 0.8f;
+        /// }
+        ///
+        /// // Access anywhere
+        /// float volume = AudioSettings.Instance.musicVolume;
+        /// </code>
+        /// </example>
+        public static T Instance
+        {
+            get
+            {
+                Lazy<T> cachedLazy = _lazyInstance;
+                if (cachedLazy.IsValueCreated)
+                {
+                    T cached = cachedLazy.Value;
+                    if (cached != null)
+                    {
+                        return cached;
+                    }
+
+                    // Reload destroyed assets, but retain managed-null misses to avoid searching Resources on every access.
+                    if (ReferenceEquals(cached, null))
+                    {
+                        return null;
+                    }
+
+                    // Only the main thread may reload; background readers retain their previous reference until it repairs the cache.
+                    if (!UnityMainThreadGuard.IsMainThread)
+                    {
+                        return cached;
+                    }
+
+                    // A concurrent reset may be overwritten, but both outcomes contain an equivalent fresh Lazy.
+                    if (ReferenceEquals(cachedLazy, _lazyInstance))
+                    {
+                        _lazyInstance = CreateLazy();
+
+                        // Reimport can destroy metadata too; re-arm its lookup to avoid permanent full Resources searches.
+                        _metadataAsset = null;
+                        _metadataLoadAttempted = false;
+                    }
+                }
+
+                UnityMainThreadGuard.EnsureMainThread();
+
+                if (RuntimeSingletonRegistry.IsApplicationQuitting)
+                {
+                    return null;
+                }
+
+                return _lazyInstance.Value;
+            }
+        }
 
         private static void AddRuntimeDiscoveredCandidates(Type type, List<T> candidates)
         {
@@ -513,82 +589,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             flag = true;
             _ = message;
 #endif
-        }
-
-        /// <summary>
-        /// Gets a value indicating whether the lazy instance has been created and is non‑null.
-        /// </summary>
-        public static bool HasInstance
-        {
-            get
-            {
-                // Read the Lazy once so replacement cannot trigger an unexpected Resources load past the main-thread guard.
-                Lazy<T> lazy = _lazyInstance;
-                return lazy.IsValueCreated && lazy.Value != null;
-            }
-        }
-
-        /// <summary>
-        /// Gets the global asset instance, loading it from <c>Resources</c> on first access. Returns
-        /// <c>null</c> rather than starting that load after Unity begins application shutdown.
-        /// </summary>
-        /// <example>
-        /// <code>
-        /// [ScriptableSingletonPath("Settings/Audio")]
-        /// public sealed class AudioSettings : ScriptableObjectSingleton&lt;AudioSettings&gt;
-        /// {
-        ///     public float musicVolume = 0.8f;
-        /// }
-        ///
-        /// // Access anywhere
-        /// float volume = AudioSettings.Instance.musicVolume;
-        /// </code>
-        /// </example>
-        public static T Instance
-        {
-            get
-            {
-                Lazy<T> cachedLazy = _lazyInstance;
-                if (cachedLazy.IsValueCreated)
-                {
-                    T cached = cachedLazy.Value;
-                    if (cached != null)
-                    {
-                        return cached;
-                    }
-
-                    // Reload destroyed assets, but retain managed-null misses to avoid searching Resources on every access.
-                    if (ReferenceEquals(cached, null))
-                    {
-                        return null;
-                    }
-
-                    // Only the main thread may reload; background readers retain their previous reference until it repairs the cache.
-                    if (!UnityMainThreadGuard.IsMainThread)
-                    {
-                        return cached;
-                    }
-
-                    // A concurrent reset may be overwritten, but both outcomes contain an equivalent fresh Lazy.
-                    if (ReferenceEquals(cachedLazy, _lazyInstance))
-                    {
-                        _lazyInstance = CreateLazy();
-
-                        // Reimport can destroy metadata too; re-arm its lookup to avoid permanent full Resources searches.
-                        _metadataAsset = null;
-                        _metadataLoadAttempted = false;
-                    }
-                }
-
-                UnityMainThreadGuard.EnsureMainThread();
-
-                if (RuntimeSingletonRegistry.IsApplicationQuitting)
-                {
-                    return null;
-                }
-
-                return _lazyInstance.Value;
-            }
         }
 
 #if UNITY_EDITOR

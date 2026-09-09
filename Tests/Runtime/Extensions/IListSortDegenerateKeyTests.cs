@@ -49,28 +49,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             SortAlgorithm.Ips4o,
         };
 
-        [Test]
-        public void EveryKeyEqualSortsInLinearithmicComparisons(
-            [ValueSource(nameof(PartitioningAlgorithms))] SortAlgorithm algorithm
-        )
-        {
-            AssertBounded(algorithm, new int[Count]);
-        }
-
-        [Test]
-        public void NearlyEveryKeyEqualSortsInLinearithmicComparisons(
-            [ValueSource(nameof(PartitioningAlgorithms))] SortAlgorithm algorithm
-        )
-        {
-            int[] keys = new int[Count];
-            for (int index = 0; index < Count; ++index)
-            {
-                keys[index] = index % 10 == 0 ? index : 0;
-            }
-
-            AssertBounded(algorithm, keys);
-        }
-
         private static void AssertBounded(SortAlgorithm algorithm, int[] keys)
         {
             CountingIntComparer comparer = new();
@@ -98,6 +76,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 $"{algorithm} used {comparer.Comparisons} comparisons for {Count} elements, over "
                     + $"the {ComparisonCeiling} ceiling -- the partition is not separating equal keys"
             );
+        }
+
+        [Test]
+        public void EveryKeyEqualSortsInLinearithmicComparisons(
+            [ValueSource(nameof(PartitioningAlgorithms))] SortAlgorithm algorithm
+        )
+        {
+            AssertBounded(algorithm, new int[Count]);
+        }
+
+        [Test]
+        public void NearlyEveryKeyEqualSortsInLinearithmicComparisons(
+            [ValueSource(nameof(PartitioningAlgorithms))] SortAlgorithm algorithm
+        )
+        {
+            int[] keys = new int[Count];
+            for (int index = 0; index < Count; ++index)
+            {
+                keys[index] = index % 10 == 0 ? index : 0;
+            }
+
+            AssertBounded(algorithm, keys);
         }
 
         private sealed class CountingIntComparer : IComparer<int>

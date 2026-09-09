@@ -99,21 +99,6 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             RestoreCommonState(internalState);
         }
 
-        public override uint NextUint()
-        {
-            return NextUintInternal(ref _position);
-        }
-
-        public float NextNoise(int x, int y)
-        {
-            return NextNoise(x, y, _position);
-        }
-
-        public override IRandom Copy()
-        {
-            return new SquirrelRandom(InternalState);
-        }
-
         private static uint NextUintInternal(ref uint seed)
         {
             seed *= BitNoise1;
@@ -142,6 +127,21 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         private static float NextNoise(int x, int y, uint seed)
         {
             return NextNoise(x + LargePrime * y, seed);
+        }
+
+        public override uint NextUint()
+        {
+            return NextUintInternal(ref _position);
+        }
+
+        public float NextNoise(int x, int y)
+        {
+            return NextNoise(x, y, _position);
+        }
+
+        public override IRandom Copy()
+        {
+            return new SquirrelRandom(InternalState);
         }
     }
 }

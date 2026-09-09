@@ -30,6 +30,422 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
     [TestFixture]
     public sealed class SubtypeTagManifestTests
     {
+        private const string ExtraSubtype =
+            "[WProtoContract] [WProtoSubtype(typeof(Base), 400)] public partial class Other : Base { [WProtoMember(1)] public int O; }";
+
+        private static readonly WProtoSubtypeTagPlan.Entry[] NoEntries =
+            new WProtoSubtypeTagPlan.Entry[0];
+
+        /// <summary>
+        /// The asmdefs the assigner's floored ancestor walk would find, given every candidate.
+        /// </summary>
+        private static List<string> AtOrAbove(string directory, string floor, params string[] all)
+        {
+            List<string> visible = new List<string>();
+            string current = directory;
+            while (!string.IsNullOrEmpty(current))
+            {
+                foreach (string path in all)
+                {
+                    int separator = path.LastIndexOf('/');
+                    string owner = separator < 0 ? string.Empty : path.Substring(0, separator);
+                    if (string.Equals(owner, current, StringComparison.Ordinal))
+                    {
+                        visible.Add(path);
+                    }
+                }
+
+                if (string.Equals(current, floor, StringComparison.Ordinal))
+                {
+                    break;
+                }
+
+                int cut = current.LastIndexOf('/');
+                current = cut < 0 ? null : current.Substring(0, cut);
+            }
+
+            return visible;
+        }
+
+        private static IEnumerable<TestCaseData> EquivalentHierarchyValues()
+        {
+            yield return Pair("the root itself", new SubtypeFormRoot(), new ManifestFormRoot());
+            yield return Pair(
+                "the root with members",
+                new SubtypeFormRoot { Id = 1, Label = "a" },
+                new ManifestFormRoot { Id = 1, Label = "a" }
+            );
+            yield return Pair(
+                "an all-default leaf subtype",
+                new SubtypeFormAlpha(),
+                new ManifestFormAlpha()
+            );
+            yield return Pair(
+                "a leaf subtype with members",
+                new SubtypeFormAlpha
+                {
+                    Id = -1,
+                    Label = string.Empty,
+                    AlphaOnly = int.MinValue,
+                    AlphaText = "é中",
+                },
+                new ManifestFormAlpha
+                {
+                    Id = -1,
+                    Label = string.Empty,
+                    AlphaOnly = int.MinValue,
+                    AlphaText = "é中",
+                }
+            );
+            yield return Pair(
+                "a middle subtype",
+                new SubtypeFormBeta { Id = 2, BetaOnly = -0.5 },
+                new ManifestFormBeta { Id = 2, BetaOnly = -0.5 }
+            );
+            yield return Pair(
+                "an all-default deep subtype",
+                new SubtypeFormGamma(),
+                new ManifestFormGamma()
+            );
+            yield return Pair(
+                "a deep subtype with members",
+                new SubtypeFormGamma
+                {
+                    Id = 3,
+                    Label = "g",
+                    BetaOnly = double.MaxValue,
+                    GammaOnly = true,
+                },
+                new ManifestFormGamma
+                {
+                    Id = 3,
+                    Label = "g",
+                    BetaOnly = double.MaxValue,
+                    GammaOnly = true,
+                }
+            );
+        }
+
+        private static IEnumerable<int> ResolvedTagCases()
+        {
+            yield return 3;
+            yield return 100;
+            yield return 20000;
+            yield return 536870911;
+        }
+
+        private static IEnumerable<TestCaseData> CorruptManifestCases()
+        {
+            yield return new TestCaseData(
+                "two numbers for one pair",
+                "[assembly: WProtoSubtypeTag(\"Consumer.Sub\", typeof(Consumer.Base), 5)]"
+                    + "\n[assembly: WProtoSubtypeTag(\"Consumer.Sub\", typeof(Consumer.Base), 6)]",
+                "already has a number"
+            ).SetName("{m} - two numbers for one pair");
+            yield return new TestCaseData(
+                "one number for two subtypes",
+                "[assembly: WProtoSubtypeTag(\"Consumer.Sub\", typeof(Consumer.Base), 5)]"
+                    + "\n[assembly: WProtoSubtypeTag(\"Consumer.Other\", typeof(Consumer.Base), 5)]",
+                "cannot name two types"
+            ).SetName("{m} - one number for two subtypes");
+            yield return new TestCaseData(
+                "a retired number handed out again",
+                "[assembly: WProtoSubtypeTag(\"Consumer.Sub\", typeof(Consumer.Base), 5)]"
+                    + "\n[assembly: WProtoRetiredSubtypeTag(\"Consumer.Deleted\", typeof(Consumer.Base), 5)]",
+                "is retired"
+            ).SetName("{m} - a retired number handed out again");
+            yield return new TestCaseData(
+                "a number outside the protobuf range",
+                "[assembly: WProtoSubtypeTag(\"Consumer.Sub\", typeof(Consumer.Base), 19500)]",
+                "reserved 19000-19999"
+            ).SetName("{m} - a number outside the protobuf range");
+            yield return new TestCaseData(
+                "a retired entry naming no type",
+                "[assembly: WProtoSubtypeTag(\"Consumer.Sub\", typeof(Consumer.Base), 5)]"
+                    + "\n[assembly: WProtoRetiredSubtypeTag(\"\", typeof(Consumer.Base), 6)]",
+                "names no type"
+            ).SetName("{m} - a retired entry naming no type");
+        }
+
+        /// <summary>
+        /// Predefined assemblies whose only directory an <c>.asmdef</c> has taken.
+        /// </summary>
+        /// <returns>The assembly and the <c>.asmdef</c> that claims its directory.</returns>
+        /// <remarks>
+        /// Both shapes, because they fail identically and are found differently: an
+        /// <c>.asmdef</c> sitting IN the directory, and one sitting above it.
+        /// </remarks>
+        private static IEnumerable<TestCaseData> ClaimedPredefinedDirectories()
+        {
+            yield return new TestCaseData(
+                "Assembly-CSharp-Editor",
+                "Assets/Editor/Game.Editor.asmdef"
+            ).SetName("{m} - in the directory itself");
+            yield return new TestCaseData(
+                "Assembly-CSharp-Editor",
+                "Assets/Everything.asmdef"
+            ).SetName("{m} - in an ancestor");
+            yield return new TestCaseData("Assembly-CSharp", "Assets/Everything.asmdef").SetName(
+                "{m} - Assets itself"
+            );
+            yield return new TestCaseData(
+                "Assembly-CSharp-Editor-firstpass",
+                "Assets/Plugins/Vendor.asmdef"
+            ).SetName("{m} - two directories up");
+        }
+
+        private static IEnumerable<string> PredefinedAssemblyNames()
+        {
+            return WProtoSubtypeTagManifestFile.PredefinedAssemblyNames();
+        }
+
+        /// <summary>
+        /// The ManifestForm hierarchy exactly as this assembly declares it.
+        /// </summary>
+        /// <returns>One numberless declaration per live subtype.</returns>
+        /// <remarks>
+        /// Written out rather than reflected so the fixture states what it means: these three are
+        /// alive and ManifestFormOrphaned is not, which is the difference the retirement tests turn
+        /// on.
+        /// </remarks>
+        private static List<WProtoSubtypeTagPlan.Declaration> LiveManifestFormDeclarations()
+        {
+            const string Prefix = "WallstopStudios.UnityHelpers.Proto.Generator.Tests.";
+            return new List<WProtoSubtypeTagPlan.Declaration>
+            {
+                Declare(Prefix + "ManifestFormAlpha", Prefix + "ManifestFormRoot"),
+                Declare(Prefix + "ManifestFormBeta", Prefix + "ManifestFormRoot"),
+                Declare(Prefix + "ManifestFormGamma", Prefix + "ManifestFormBeta"),
+            };
+        }
+
+        private static DiagnosticSeverity Severity(ImmutableArray<Diagnostic> diagnostics)
+        {
+            return diagnostics.Single(diagnostic => diagnostic.Id == "WPROTO041").Severity;
+        }
+
+        private static string StripComments(string rendered)
+        {
+            StringBuilder builder = new StringBuilder();
+            foreach (string line in rendered.Replace("\r\n", "\n").Split('\n'))
+            {
+                if (!line.TrimStart().StartsWith("//", StringComparison.Ordinal))
+                {
+                    builder.Append(line);
+                    builder.Append("\r\n");
+                }
+            }
+
+            return builder.ToString();
+        }
+
+        private static TestCaseData Pair(
+            string label,
+            SubtypeFormRoot written,
+            ManifestFormRoot fromManifest
+        )
+        {
+            return new TestCaseData(label, written, fromManifest).SetName("{m} - " + label);
+        }
+
+        private static WProtoSubtypeTagPlan.Declaration Declare(string subType, string baseType)
+        {
+            return new WProtoSubtypeTagPlan.Declaration(subType, baseType, false, 0);
+        }
+
+        private static WProtoSubtypeTagPlan.Declaration Declare(
+            string subType,
+            string baseType,
+            int tag
+        )
+        {
+            return new WProtoSubtypeTagPlan.Declaration(subType, baseType, true, tag);
+        }
+
+        private static WProtoSubtypeTagPlan.Entry Entry(string subType, string baseType, int tag)
+        {
+            return new WProtoSubtypeTagPlan.Entry(subType, baseType, tag);
+        }
+
+        private static string[] Describe(IReadOnlyList<WProtoSubtypeTagPlan.Entry> entries)
+        {
+            return entries.Select(entry => entry.SubTypeName + "=" + entry.Tag).ToArray();
+        }
+
+        private static string[] Describe(ImmutableArray<Diagnostic> diagnostics)
+        {
+            return diagnostics.Select(entry => entry.Id + " " + entry.GetMessage()).ToArray();
+        }
+
+        /// <summary>
+        /// Turns a rendered manifest back into fixture lines the harness can hoist.
+        /// </summary>
+        /// <param name="rendered">What the assignment tool would write.</param>
+        /// <returns>The attribute lines, one per line, with comments dropped.</returns>
+        private static string ManifestBody(string rendered)
+        {
+            StringBuilder builder = new StringBuilder();
+            foreach (string line in rendered.Replace("\r\n", "\n").Split('\n'))
+            {
+                string trimmed = line.Trim();
+                if (trimmed.Length == 0 || trimmed.StartsWith("//", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                builder.Append(trimmed);
+                if (trimmed.EndsWith(")]", StringComparison.Ordinal))
+                {
+                    builder.Append('\n');
+                }
+            }
+
+            return builder.ToString();
+        }
+
+        private static string Fixture(
+            string assemblyAttributes,
+            string subtypeAttribute,
+            string extra = null
+        )
+        {
+            return assemblyAttributes
+                + "\n[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }"
+                + "\n[WProtoContract] "
+                + subtypeAttribute
+                + " public partial class Sub : Base { [WProtoMember(1)] public int B; }"
+                + (extra == null ? string.Empty : "\n" + extra);
+        }
+
+        private static string FormatterFor(string contract, Compilation generated)
+        {
+            return generated
+                .SyntaxTrees.Single(tree =>
+                    tree.FilePath.EndsWith(
+                        "global__Consumer_" + contract + ".WProtoFormatter.g.cs",
+                        StringComparison.Ordinal
+                    )
+                )
+                .ToString();
+        }
+
+        private static ImmutableArray<Diagnostic> Run(string body)
+        {
+            return Run(body, out Compilation _);
+        }
+
+        /// <summary>
+        /// Drives the shipped generator over a synthetic consumer compilation.
+        /// </summary>
+        /// <param name="body">The fixture, with any [assembly:] lines at the top.</param>
+        /// <param name="generated">The compilation including everything the generator emitted.</param>
+        /// <returns>What the generator reported.</returns>
+        /// <remarks>
+        /// The [assembly:] lines are hoisted above the namespace, because that is the only place C#
+        /// accepts them and the manifest is nothing but assembly attributes.
+        /// </remarks>
+        private static ImmutableArray<Diagnostic> Run(
+            string body,
+            out Compilation generated,
+            params string[] preprocessorSymbols
+        )
+        {
+            List<string> assemblyAttributes = new List<string>();
+            List<string> rest = new List<string>();
+            foreach (string line in body.Split('\n'))
+            {
+                (
+                    line.TrimStart().StartsWith("[assembly:", StringComparison.Ordinal)
+                        ? assemblyAttributes
+                        : rest
+                ).Add(line);
+            }
+
+            string source =
+                "using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;\n"
+                + string.Join("\n", assemblyAttributes)
+                + "\nnamespace Consumer { using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto; "
+                + string.Join("\n", rest)
+                + " }";
+
+            List<MetadataReference> references = new List<MetadataReference>();
+            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
+                {
+                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
+                }
+            }
+
+            /*
+             * Driver and syntax-tree symbols must agree because the generator reads the same defines that
+             * control source inclusion.
+             */
+            CSharpParseOptions parseOptions = new CSharpParseOptions(
+                preprocessorSymbols: preprocessorSymbols ?? new string[0]
+            );
+
+            CSharpCompilation compilation = CSharpCompilation.Create(
+                "ConsumerAssembly",
+                new[] { CSharpSyntaxTree.ParseText(source, parseOptions) },
+                references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+            );
+
+            CSharpGeneratorDriver
+                .Create(new ISourceGenerator[] { new WProtoGenerator() }, null, parseOptions, null)
+                .RunGeneratorsAndUpdateCompilation(
+                    compilation,
+                    out Compilation updated,
+                    out ImmutableArray<Diagnostic> diagnostics
+                );
+
+            generated = updated;
+            return diagnostics;
+        }
+
+        private static string OracleHex<T>(T value)
+        {
+            using (MemoryStream stream = new MemoryStream())
+            {
+                ProtoBuf.Serializer.Serialize(stream, value);
+                return ToHex(stream.ToArray());
+            }
+        }
+
+        private static string ToHex(byte[] bytes)
+        {
+            StringBuilder builder = new StringBuilder(bytes.Length * 2);
+            foreach (byte current in bytes)
+            {
+                builder.Append(current.ToString("X2"));
+            }
+
+            return builder.ToString();
+        }
+
+        private static string Encode<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new WProtoWriter(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+            Assert.AreEqual(buffer.Length, writer.Position, "Measure disagreed with Write");
+            return ToHex(buffer);
+        }
+
+        private static T RoundTrip<T>(T value)
+        {
+            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
+            byte[] buffer = new byte[formatter.Measure(value)];
+            WProtoWriter writer = new WProtoWriter(buffer);
+            Assert.IsTrue(formatter.Write(ref writer, value));
+
+            WProtoReader reader = new WProtoReader(buffer);
+            Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
+            return restored;
+        }
+
         [TestCaseSource(nameof(EquivalentHierarchyValues))]
         public void AManifestNumberedHierarchyProducesTheBytesAWrittenNumberProduces(
             string label,
@@ -1197,37 +1613,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
-        /// <summary>
-        /// The asmdefs the assigner's floored ancestor walk would find, given every candidate.
-        /// </summary>
-        private static List<string> AtOrAbove(string directory, string floor, params string[] all)
-        {
-            List<string> visible = new List<string>();
-            string current = directory;
-            while (!string.IsNullOrEmpty(current))
-            {
-                foreach (string path in all)
-                {
-                    int separator = path.LastIndexOf('/');
-                    string owner = separator < 0 ? string.Empty : path.Substring(0, separator);
-                    if (string.Equals(owner, current, StringComparison.Ordinal))
-                    {
-                        visible.Add(path);
-                    }
-                }
-
-                if (string.Equals(current, floor, StringComparison.Ordinal))
-                {
-                    break;
-                }
-
-                int cut = current.LastIndexOf('/');
-                current = cut < 0 ? null : current.Substring(0, cut);
-            }
-
-            return visible;
-        }
-
         [TestCaseSource(nameof(ClaimedPredefinedDirectories))]
         public void APredefinedDirectoryAnAsmdefClaimsIsRefusedAndTheAsmdefIsNamed(
             string assemblyName,
@@ -1410,391 +1795,6 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 WProtoWriter writer = new WProtoWriter(buffer);
                 formatter.Write(ref writer, value);
             });
-        }
-
-        private static IEnumerable<TestCaseData> EquivalentHierarchyValues()
-        {
-            yield return Pair("the root itself", new SubtypeFormRoot(), new ManifestFormRoot());
-            yield return Pair(
-                "the root with members",
-                new SubtypeFormRoot { Id = 1, Label = "a" },
-                new ManifestFormRoot { Id = 1, Label = "a" }
-            );
-            yield return Pair(
-                "an all-default leaf subtype",
-                new SubtypeFormAlpha(),
-                new ManifestFormAlpha()
-            );
-            yield return Pair(
-                "a leaf subtype with members",
-                new SubtypeFormAlpha
-                {
-                    Id = -1,
-                    Label = string.Empty,
-                    AlphaOnly = int.MinValue,
-                    AlphaText = "é中",
-                },
-                new ManifestFormAlpha
-                {
-                    Id = -1,
-                    Label = string.Empty,
-                    AlphaOnly = int.MinValue,
-                    AlphaText = "é中",
-                }
-            );
-            yield return Pair(
-                "a middle subtype",
-                new SubtypeFormBeta { Id = 2, BetaOnly = -0.5 },
-                new ManifestFormBeta { Id = 2, BetaOnly = -0.5 }
-            );
-            yield return Pair(
-                "an all-default deep subtype",
-                new SubtypeFormGamma(),
-                new ManifestFormGamma()
-            );
-            yield return Pair(
-                "a deep subtype with members",
-                new SubtypeFormGamma
-                {
-                    Id = 3,
-                    Label = "g",
-                    BetaOnly = double.MaxValue,
-                    GammaOnly = true,
-                },
-                new ManifestFormGamma
-                {
-                    Id = 3,
-                    Label = "g",
-                    BetaOnly = double.MaxValue,
-                    GammaOnly = true,
-                }
-            );
-        }
-
-        private static IEnumerable<int> ResolvedTagCases()
-        {
-            yield return 3;
-            yield return 100;
-            yield return 20000;
-            yield return 536870911;
-        }
-
-        private static IEnumerable<TestCaseData> CorruptManifestCases()
-        {
-            yield return new TestCaseData(
-                "two numbers for one pair",
-                "[assembly: WProtoSubtypeTag(\"Consumer.Sub\", typeof(Consumer.Base), 5)]"
-                    + "\n[assembly: WProtoSubtypeTag(\"Consumer.Sub\", typeof(Consumer.Base), 6)]",
-                "already has a number"
-            ).SetName("{m} - two numbers for one pair");
-            yield return new TestCaseData(
-                "one number for two subtypes",
-                "[assembly: WProtoSubtypeTag(\"Consumer.Sub\", typeof(Consumer.Base), 5)]"
-                    + "\n[assembly: WProtoSubtypeTag(\"Consumer.Other\", typeof(Consumer.Base), 5)]",
-                "cannot name two types"
-            ).SetName("{m} - one number for two subtypes");
-            yield return new TestCaseData(
-                "a retired number handed out again",
-                "[assembly: WProtoSubtypeTag(\"Consumer.Sub\", typeof(Consumer.Base), 5)]"
-                    + "\n[assembly: WProtoRetiredSubtypeTag(\"Consumer.Deleted\", typeof(Consumer.Base), 5)]",
-                "is retired"
-            ).SetName("{m} - a retired number handed out again");
-            yield return new TestCaseData(
-                "a number outside the protobuf range",
-                "[assembly: WProtoSubtypeTag(\"Consumer.Sub\", typeof(Consumer.Base), 19500)]",
-                "reserved 19000-19999"
-            ).SetName("{m} - a number outside the protobuf range");
-            yield return new TestCaseData(
-                "a retired entry naming no type",
-                "[assembly: WProtoSubtypeTag(\"Consumer.Sub\", typeof(Consumer.Base), 5)]"
-                    + "\n[assembly: WProtoRetiredSubtypeTag(\"\", typeof(Consumer.Base), 6)]",
-                "names no type"
-            ).SetName("{m} - a retired entry naming no type");
-        }
-
-        private const string ExtraSubtype =
-            "[WProtoContract] [WProtoSubtype(typeof(Base), 400)] public partial class Other : Base { [WProtoMember(1)] public int O; }";
-
-        private static readonly WProtoSubtypeTagPlan.Entry[] NoEntries =
-            new WProtoSubtypeTagPlan.Entry[0];
-
-        /// <summary>
-        /// Predefined assemblies whose only directory an <c>.asmdef</c> has taken.
-        /// </summary>
-        /// <returns>The assembly and the <c>.asmdef</c> that claims its directory.</returns>
-        /// <remarks>
-        /// Both shapes, because they fail identically and are found differently: an
-        /// <c>.asmdef</c> sitting IN the directory, and one sitting above it.
-        /// </remarks>
-        private static IEnumerable<TestCaseData> ClaimedPredefinedDirectories()
-        {
-            yield return new TestCaseData(
-                "Assembly-CSharp-Editor",
-                "Assets/Editor/Game.Editor.asmdef"
-            ).SetName("{m} - in the directory itself");
-            yield return new TestCaseData(
-                "Assembly-CSharp-Editor",
-                "Assets/Everything.asmdef"
-            ).SetName("{m} - in an ancestor");
-            yield return new TestCaseData("Assembly-CSharp", "Assets/Everything.asmdef").SetName(
-                "{m} - Assets itself"
-            );
-            yield return new TestCaseData(
-                "Assembly-CSharp-Editor-firstpass",
-                "Assets/Plugins/Vendor.asmdef"
-            ).SetName("{m} - two directories up");
-        }
-
-        private static IEnumerable<string> PredefinedAssemblyNames()
-        {
-            return WProtoSubtypeTagManifestFile.PredefinedAssemblyNames();
-        }
-
-        /// <summary>
-        /// The ManifestForm hierarchy exactly as this assembly declares it.
-        /// </summary>
-        /// <returns>One numberless declaration per live subtype.</returns>
-        /// <remarks>
-        /// Written out rather than reflected so the fixture states what it means: these three are
-        /// alive and ManifestFormOrphaned is not, which is the difference the retirement tests turn
-        /// on.
-        /// </remarks>
-        private static List<WProtoSubtypeTagPlan.Declaration> LiveManifestFormDeclarations()
-        {
-            const string Prefix = "WallstopStudios.UnityHelpers.Proto.Generator.Tests.";
-            return new List<WProtoSubtypeTagPlan.Declaration>
-            {
-                Declare(Prefix + "ManifestFormAlpha", Prefix + "ManifestFormRoot"),
-                Declare(Prefix + "ManifestFormBeta", Prefix + "ManifestFormRoot"),
-                Declare(Prefix + "ManifestFormGamma", Prefix + "ManifestFormBeta"),
-            };
-        }
-
-        private static DiagnosticSeverity Severity(ImmutableArray<Diagnostic> diagnostics)
-        {
-            return diagnostics.Single(diagnostic => diagnostic.Id == "WPROTO041").Severity;
-        }
-
-        private static string StripComments(string rendered)
-        {
-            StringBuilder builder = new StringBuilder();
-            foreach (string line in rendered.Replace("\r\n", "\n").Split('\n'))
-            {
-                if (!line.TrimStart().StartsWith("//", StringComparison.Ordinal))
-                {
-                    builder.Append(line);
-                    builder.Append("\r\n");
-                }
-            }
-
-            return builder.ToString();
-        }
-
-        private static TestCaseData Pair(
-            string label,
-            SubtypeFormRoot written,
-            ManifestFormRoot fromManifest
-        )
-        {
-            return new TestCaseData(label, written, fromManifest).SetName("{m} - " + label);
-        }
-
-        private static WProtoSubtypeTagPlan.Declaration Declare(string subType, string baseType)
-        {
-            return new WProtoSubtypeTagPlan.Declaration(subType, baseType, false, 0);
-        }
-
-        private static WProtoSubtypeTagPlan.Declaration Declare(
-            string subType,
-            string baseType,
-            int tag
-        )
-        {
-            return new WProtoSubtypeTagPlan.Declaration(subType, baseType, true, tag);
-        }
-
-        private static WProtoSubtypeTagPlan.Entry Entry(string subType, string baseType, int tag)
-        {
-            return new WProtoSubtypeTagPlan.Entry(subType, baseType, tag);
-        }
-
-        private static string[] Describe(IReadOnlyList<WProtoSubtypeTagPlan.Entry> entries)
-        {
-            return entries.Select(entry => entry.SubTypeName + "=" + entry.Tag).ToArray();
-        }
-
-        private static string[] Describe(ImmutableArray<Diagnostic> diagnostics)
-        {
-            return diagnostics.Select(entry => entry.Id + " " + entry.GetMessage()).ToArray();
-        }
-
-        /// <summary>
-        /// Turns a rendered manifest back into fixture lines the harness can hoist.
-        /// </summary>
-        /// <param name="rendered">What the assignment tool would write.</param>
-        /// <returns>The attribute lines, one per line, with comments dropped.</returns>
-        private static string ManifestBody(string rendered)
-        {
-            StringBuilder builder = new StringBuilder();
-            foreach (string line in rendered.Replace("\r\n", "\n").Split('\n'))
-            {
-                string trimmed = line.Trim();
-                if (trimmed.Length == 0 || trimmed.StartsWith("//", StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                builder.Append(trimmed);
-                if (trimmed.EndsWith(")]", StringComparison.Ordinal))
-                {
-                    builder.Append('\n');
-                }
-            }
-
-            return builder.ToString();
-        }
-
-        private static string Fixture(
-            string assemblyAttributes,
-            string subtypeAttribute,
-            string extra = null
-        )
-        {
-            return assemblyAttributes
-                + "\n[WProtoContract] public partial class Base { [WProtoMember(1)] public int A; }"
-                + "\n[WProtoContract] "
-                + subtypeAttribute
-                + " public partial class Sub : Base { [WProtoMember(1)] public int B; }"
-                + (extra == null ? string.Empty : "\n" + extra);
-        }
-
-        private static string FormatterFor(string contract, Compilation generated)
-        {
-            return generated
-                .SyntaxTrees.Single(tree =>
-                    tree.FilePath.EndsWith(
-                        "global__Consumer_" + contract + ".WProtoFormatter.g.cs",
-                        StringComparison.Ordinal
-                    )
-                )
-                .ToString();
-        }
-
-        private static ImmutableArray<Diagnostic> Run(string body)
-        {
-            return Run(body, out Compilation _);
-        }
-
-        /// <summary>
-        /// Drives the shipped generator over a synthetic consumer compilation.
-        /// </summary>
-        /// <param name="body">The fixture, with any [assembly:] lines at the top.</param>
-        /// <param name="generated">The compilation including everything the generator emitted.</param>
-        /// <returns>What the generator reported.</returns>
-        /// <remarks>
-        /// The [assembly:] lines are hoisted above the namespace, because that is the only place C#
-        /// accepts them and the manifest is nothing but assembly attributes.
-        /// </remarks>
-        private static ImmutableArray<Diagnostic> Run(
-            string body,
-            out Compilation generated,
-            params string[] preprocessorSymbols
-        )
-        {
-            List<string> assemblyAttributes = new List<string>();
-            List<string> rest = new List<string>();
-            foreach (string line in body.Split('\n'))
-            {
-                (
-                    line.TrimStart().StartsWith("[assembly:", StringComparison.Ordinal)
-                        ? assemblyAttributes
-                        : rest
-                ).Add(line);
-            }
-
-            string source =
-                "using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;\n"
-                + string.Join("\n", assemblyAttributes)
-                + "\nnamespace Consumer { using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto; "
-                + string.Join("\n", rest)
-                + " }";
-
-            List<MetadataReference> references = new List<MetadataReference>();
-            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                if (!assembly.IsDynamic && !string.IsNullOrEmpty(assembly.Location))
-                {
-                    references.Add(MetadataReference.CreateFromFile(assembly.Location));
-                }
-            }
-
-            /*
-             * Driver and syntax-tree symbols must agree because the generator reads the same defines that
-             * control source inclusion.
-             */
-            CSharpParseOptions parseOptions = new CSharpParseOptions(
-                preprocessorSymbols: preprocessorSymbols ?? new string[0]
-            );
-
-            CSharpCompilation compilation = CSharpCompilation.Create(
-                "ConsumerAssembly",
-                new[] { CSharpSyntaxTree.ParseText(source, parseOptions) },
-                references,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-            );
-
-            CSharpGeneratorDriver
-                .Create(new ISourceGenerator[] { new WProtoGenerator() }, null, parseOptions, null)
-                .RunGeneratorsAndUpdateCompilation(
-                    compilation,
-                    out Compilation updated,
-                    out ImmutableArray<Diagnostic> diagnostics
-                );
-
-            generated = updated;
-            return diagnostics;
-        }
-
-        private static string OracleHex<T>(T value)
-        {
-            using (MemoryStream stream = new MemoryStream())
-            {
-                ProtoBuf.Serializer.Serialize(stream, value);
-                return ToHex(stream.ToArray());
-            }
-        }
-
-        private static string ToHex(byte[] bytes)
-        {
-            StringBuilder builder = new StringBuilder(bytes.Length * 2);
-            foreach (byte current in bytes)
-            {
-                builder.Append(current.ToString("X2"));
-            }
-
-            return builder.ToString();
-        }
-
-        private static string Encode<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new WProtoWriter(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-            Assert.AreEqual(buffer.Length, writer.Position, "Measure disagreed with Write");
-            return ToHex(buffer);
-        }
-
-        private static T RoundTrip<T>(T value)
-        {
-            IWProtoFormatter<T> formatter = WProtoFormatterProvider.Get<T>();
-            byte[] buffer = new byte[formatter.Measure(value)];
-            WProtoWriter writer = new WProtoWriter(buffer);
-            Assert.IsTrue(formatter.Write(ref writer, value));
-
-            WProtoReader reader = new WProtoReader(buffer);
-            Assert.IsTrue(formatter.TryRead(ref reader, out T restored));
-            return restored;
         }
     }
 }

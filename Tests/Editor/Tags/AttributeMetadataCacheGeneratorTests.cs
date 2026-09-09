@@ -34,6 +34,80 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         private string _backupPath;
         private bool _previousAllowAssetCreationDuringSuppression;
 
+        private static void ImportAssetIfExists(string assetPath)
+        {
+            if (string.IsNullOrEmpty(assetPath))
+            {
+                return;
+            }
+
+            if (AssetDatabase.LoadAssetAtPath<Object>(assetPath) != null)
+            {
+                AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceSynchronousImport);
+                return;
+            }
+
+            string projectRoot = Path.GetDirectoryName(Application.dataPath);
+            if (!string.IsNullOrEmpty(projectRoot))
+            {
+                string absolutePath = Path.Combine(projectRoot, assetPath);
+                if (File.Exists(absolutePath))
+                {
+                    AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceSynchronousImport);
+                }
+            }
+        }
+
+        private static IEnumerable<TestCaseData> SuppressionFlagTestCases()
+        {
+            yield return new TestCaseData(true, false)
+                .Returns(null)
+                .SetName("Suppression.Enabled.AllowFalse");
+            yield return new TestCaseData(true, true)
+                .Returns(null)
+                .SetName("Suppression.Enabled.AllowTrue");
+            yield return new TestCaseData(false, false)
+                .Returns(null)
+                .SetName("Suppression.Disabled.AllowFalse");
+            yield return new TestCaseData(false, true)
+                .Returns(null)
+                .SetName("Suppression.Disabled.AllowTrue");
+        }
+
+        private static bool FileExistsOnDisk(string assetPath)
+        {
+            string projectRoot = Path.GetDirectoryName(Application.dataPath);
+            if (string.IsNullOrEmpty(projectRoot))
+            {
+                return false;
+            }
+
+            string absolutePath = Path.Combine(projectRoot, assetPath);
+            return File.Exists(absolutePath);
+        }
+
+        private static void DeleteFolderIfEmpty(string folderPath)
+        {
+            if (string.IsNullOrWhiteSpace(folderPath) || !AssetDatabase.IsValidFolder(folderPath))
+            {
+                return;
+            }
+
+            string[] subFolders = AssetDatabase.GetSubFolders(folderPath);
+            if (subFolders != null && 0 < subFolders.Length)
+            {
+                return;
+            }
+
+            string[] assets = AssetDatabase.FindAssets(string.Empty, new[] { folderPath });
+            if (assets != null && 0 < assets.Length)
+            {
+                return;
+            }
+
+            AssetDatabase.DeleteAsset(folderPath);
+        }
+
         [UnitySetUp]
         public IEnumerator SetUp()
         {
@@ -97,30 +171,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             ScriptableObjectSingleton<AttributeMetadataCache>.ClearInstance();
             DeleteFolderIfEmpty("Assets/Temp");
             yield return null;
-        }
-
-        private static void ImportAssetIfExists(string assetPath)
-        {
-            if (string.IsNullOrEmpty(assetPath))
-            {
-                return;
-            }
-
-            if (AssetDatabase.LoadAssetAtPath<Object>(assetPath) != null)
-            {
-                AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceSynchronousImport);
-                return;
-            }
-
-            string projectRoot = Path.GetDirectoryName(Application.dataPath);
-            if (!string.IsNullOrEmpty(projectRoot))
-            {
-                string absolutePath = Path.Combine(projectRoot, assetPath);
-                if (File.Exists(absolutePath))
-                {
-                    AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceSynchronousImport);
-                }
-            }
         }
 
         [UnityTest]
@@ -505,22 +555,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             );
         }
 
-        private static IEnumerable<TestCaseData> SuppressionFlagTestCases()
-        {
-            yield return new TestCaseData(true, false)
-                .Returns(null)
-                .SetName("Suppression.Enabled.AllowFalse");
-            yield return new TestCaseData(true, true)
-                .Returns(null)
-                .SetName("Suppression.Enabled.AllowTrue");
-            yield return new TestCaseData(false, false)
-                .Returns(null)
-                .SetName("Suppression.Disabled.AllowFalse");
-            yield return new TestCaseData(false, true)
-                .Returns(null)
-                .SetName("Suppression.Disabled.AllowTrue");
-        }
-
         [UnityTest]
         [TestCaseSource(nameof(SuppressionFlagTestCases))]
         public IEnumerator GenerateCacheRespectsSuppressionFlags(
@@ -625,40 +659,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
                         + $"AllowAssetCreationDuringSuppression={ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression}"
                 );
             }
-        }
-
-        private static bool FileExistsOnDisk(string assetPath)
-        {
-            string projectRoot = Path.GetDirectoryName(Application.dataPath);
-            if (string.IsNullOrEmpty(projectRoot))
-            {
-                return false;
-            }
-
-            string absolutePath = Path.Combine(projectRoot, assetPath);
-            return File.Exists(absolutePath);
-        }
-
-        private static void DeleteFolderIfEmpty(string folderPath)
-        {
-            if (string.IsNullOrWhiteSpace(folderPath) || !AssetDatabase.IsValidFolder(folderPath))
-            {
-                return;
-            }
-
-            string[] subFolders = AssetDatabase.GetSubFolders(folderPath);
-            if (subFolders != null && 0 < subFolders.Length)
-            {
-                return;
-            }
-
-            string[] assets = AssetDatabase.FindAssets(string.Empty, new[] { folderPath });
-            if (assets != null && 0 < assets.Length)
-            {
-                return;
-            }
-
-            AssetDatabase.DeleteAsset(folderPath);
         }
     }
 #endif

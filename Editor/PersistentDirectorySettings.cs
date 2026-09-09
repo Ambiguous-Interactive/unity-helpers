@@ -131,26 +131,6 @@ namespace WallstopStudios.UnityHelpers.Editor
         [SerializeField]
         private List<ToolHistory> _allToolHistories = new();
 
-        [InitializeOnLoadMethod]
-        private static void EnsureSingletonAndMigrate()
-        {
-            // Defer asset operations until Unity initialization finishes.
-            EditorApplication.delayCall += () =>
-            {
-                // Automatic migration can open modal failure dialogs during tests; require explicit test opt-in.
-                if (
-                    Utils.EditorUi.Suppress
-                    && !Utils.ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression
-                )
-                {
-                    return;
-                }
-
-                RunMigration();
-                CleanupLegacyEmptyFolders();
-            };
-        }
-
         /// <summary>
         /// Scans for and removes empty folders under Assets/Resources/Wallstop Studios that may have been
         /// left behind from previous versions of this package. This is safe to call at any time.
@@ -178,130 +158,6 @@ namespace WallstopStudios.UnityHelpers.Editor
                     $"CleanupLegacyEmptyFolders encountered an issue: {e.Message}"
                 );
             }
-        }
-
-        private static bool CleanupEmptyFoldersRecursive(string folderPath)
-        {
-            return CleanupEmptyFoldersRecursive(
-                folderPath,
-                new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            );
-        }
-
-        private static bool CleanupEmptyFoldersRecursive(
-            string folderPath,
-            HashSet<string> deletedFolders
-        )
-        {
-            if (string.IsNullOrWhiteSpace(folderPath) || !AssetDatabase.IsValidFolder(folderPath))
-            {
-                return false;
-            }
-
-            // The root contains production data and must survive recursive cleanup.
-            string normalizedPath = SanitizePath(folderPath);
-            if (
-                string.Equals(
-                    normalizedPath,
-                    WallstopStudiosRoot,
-                    StringComparison.OrdinalIgnoreCase
-                )
-            )
-            {
-                bool anyDeleted = false;
-                string[] subFolders = AssetDatabase.GetSubFolders(folderPath);
-                if (subFolders != null)
-                {
-                    foreach (string subFolder in subFolders)
-                    {
-                        if (CleanupEmptyFoldersRecursive(subFolder, deletedFolders))
-                        {
-                            anyDeleted = true;
-                        }
-                    }
-                }
-
-                return anyDeleted;
-            }
-
-            if (string.Equals(normalizedPath, ResourcesRoot, StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            bool deleted = false;
-
-            string[] childFolders = AssetDatabase.GetSubFolders(folderPath);
-            if (childFolders != null)
-            {
-                foreach (string subFolder in childFolders)
-                {
-                    if (CleanupEmptyFoldersRecursive(subFolder, deletedFolders))
-                    {
-                        deleted = true;
-                    }
-                }
-            }
-
-            // GetSubFolders can remain stale after deletions; exclude folders deleted in this pass.
-            string[] remainingSubFolders = AssetDatabase.GetSubFolders(folderPath);
-            int actualSubFolderCount = 0;
-            if (remainingSubFolders != null)
-            {
-                foreach (string subFolder in remainingSubFolders)
-                {
-                    if (!deletedFolders.Contains(subFolder))
-                    {
-                        actualSubFolderCount++;
-                    }
-                }
-            }
-
-            if (!AssetDatabase.IsValidFolder(folderPath))
-            {
-                return deleted;
-            }
-
-            string[] assets = AssetDatabase.FindAssets(string.Empty, new[] { folderPath });
-
-            // FindAssets includes descendants, so check which results are direct children.
-            bool hasDirectAssets = false;
-            if (assets != null)
-            {
-                foreach (string guid in assets)
-                {
-                    string assetPath = AssetDatabase.GUIDToAssetPath(guid);
-                    if (string.IsNullOrEmpty(assetPath))
-                    {
-                        continue;
-                    }
-
-                    string assetDir = Path.GetDirectoryName(assetPath);
-                    if (assetDir != null)
-                    {
-                        assetDir = SanitizePath(assetDir);
-                    }
-
-                    if (string.Equals(assetDir, folderPath, StringComparison.OrdinalIgnoreCase))
-                    {
-                        hasDirectAssets = true;
-                        break;
-                    }
-                }
-            }
-
-            bool hasSubFolders = 0 < actualSubFolderCount;
-
-            if (!hasDirectAssets && !hasSubFolders)
-            {
-                if (AssetDatabase.DeleteAsset(folderPath))
-                {
-                    deletedFolders.Add(folderPath);
-                    deleted = true;
-                }
-            }
-
-            return deleted;
         }
 
         /// <summary>
@@ -463,124 +319,6 @@ namespace WallstopStudios.UnityHelpers.Editor
             }
         }
 
-        private ToolHistory GetOrAddToolHistory(string toolName)
-        {
-            ToolHistory toolHistory = _allToolHistories.Find(toolHistory =>
-                string.Equals(toolHistory.toolName, toolName, StringComparison.Ordinal)
-            );
-            if (toolHistory != null)
-            {
-                return toolHistory;
-            }
-
-            toolHistory = new ToolHistory(toolName);
-            _allToolHistories.Add(toolHistory);
-
-            return toolHistory;
-        }
-
-        public void RecordPath(string toolName, string contextKey, string path)
-        {
-            if (
-                string.IsNullOrWhiteSpace(toolName)
-                || string.IsNullOrWhiteSpace(contextKey)
-                || string.IsNullOrWhiteSpace(path)
-            )
-            {
-                this.LogWarn($"RecordPath: toolName, contextKey, or path cannot be empty");
-                return;
-            }
-
-            string sanitizedPath = PathHelper.Sanitize(path);
-            if (
-                !sanitizedPath.StartsWith("Assets/", StringComparison.Ordinal)
-                || !AssetDatabase.IsValidFolder(sanitizedPath)
-            )
-            {
-                if (
-                    !Path.IsPathRooted(sanitizedPath)
-                    && !sanitizedPath.StartsWith("Assets/", StringComparison.Ordinal)
-                )
-                {
-                    this.LogWarn(
-                        $"Recording path '{sanitizedPath}' that is not an 'Assets/' relative path or an absolute path. This might be intentional"
-                    );
-                }
-            }
-
-            ToolHistory tool = GetOrAddToolHistory(toolName);
-            ContextHistory context = tool.GetOrAddContext(contextKey);
-            DirectoryUsageData dirData = context.GetOrAddDirectory(sanitizedPath);
-            dirData.MarkUsed();
-            EditorUtility.SetDirty(this);
-        }
-
-        public DirectoryUsageData[] GetPaths(
-            string toolName,
-            string contextKey,
-            bool topOnly = false,
-            int topN = 5
-        )
-        {
-            ToolHistory tool = _allToolHistories.Find(th =>
-                string.Equals(th.toolName, toolName, StringComparison.Ordinal)
-            );
-            if (tool == null)
-            {
-                return Array.Empty<DirectoryUsageData>();
-            }
-
-            ContextHistory context = tool.contexts.Find(c =>
-                string.Equals(c.contextKey, contextKey, StringComparison.Ordinal)
-            );
-            if (context == null)
-            {
-                return Array.Empty<DirectoryUsageData>();
-            }
-
-            List<DirectoryUsageData> list = context.directories;
-            if (list == null || list.Count == 0)
-            {
-                return Array.Empty<DirectoryUsageData>();
-            }
-
-            DirectoryUsageData[] sortedDirectories = new DirectoryUsageData[list.Count];
-            for (int i = 0; i < list.Count; i++)
-            {
-                sortedDirectories[i] = list[i];
-            }
-            Array.Sort(
-                sortedDirectories,
-                static (a, b) =>
-                {
-                    int cmp = b.count.CompareTo(a.count);
-                    if (cmp != 0)
-                    {
-                        return cmp;
-                    }
-                    return b.lastUsedTicks.CompareTo(a.lastUsedTicks);
-                }
-            );
-
-            if (!topOnly)
-            {
-                return sortedDirectories;
-            }
-
-            int n =
-                topN < 0 ? 0 : (sortedDirectories.Length < topN ? sortedDirectories.Length : topN);
-            if (n == sortedDirectories.Length)
-            {
-                return sortedDirectories;
-            }
-            DirectoryUsageData[] result = new DirectoryUsageData[n];
-            for (int i = 0; i < n; i++)
-            {
-                result[i] = sortedDirectories[i];
-            }
-            return result;
-        }
-
         internal static void MergeSettings(
             PersistentDirectorySettings target,
             PersistentDirectorySettings other
@@ -708,6 +446,150 @@ namespace WallstopStudios.UnityHelpers.Editor
             }
         }
 
+        [InitializeOnLoadMethod]
+        private static void EnsureSingletonAndMigrate()
+        {
+            // Defer asset operations until Unity initialization finishes.
+            EditorApplication.delayCall += () =>
+            {
+                // Automatic migration can open modal failure dialogs during tests; require explicit test opt-in.
+                if (
+                    Utils.EditorUi.Suppress
+                    && !Utils.ScriptableObjectSingletonCreator.AllowAssetCreationDuringSuppression
+                )
+                {
+                    return;
+                }
+
+                RunMigration();
+                CleanupLegacyEmptyFolders();
+            };
+        }
+
+        private static bool CleanupEmptyFoldersRecursive(string folderPath)
+        {
+            return CleanupEmptyFoldersRecursive(
+                folderPath,
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            );
+        }
+
+        private static bool CleanupEmptyFoldersRecursive(
+            string folderPath,
+            HashSet<string> deletedFolders
+        )
+        {
+            if (string.IsNullOrWhiteSpace(folderPath) || !AssetDatabase.IsValidFolder(folderPath))
+            {
+                return false;
+            }
+
+            // The root contains production data and must survive recursive cleanup.
+            string normalizedPath = SanitizePath(folderPath);
+            if (
+                string.Equals(
+                    normalizedPath,
+                    WallstopStudiosRoot,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+            {
+                bool anyDeleted = false;
+                string[] subFolders = AssetDatabase.GetSubFolders(folderPath);
+                if (subFolders != null)
+                {
+                    foreach (string subFolder in subFolders)
+                    {
+                        if (CleanupEmptyFoldersRecursive(subFolder, deletedFolders))
+                        {
+                            anyDeleted = true;
+                        }
+                    }
+                }
+
+                return anyDeleted;
+            }
+
+            if (string.Equals(normalizedPath, ResourcesRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            bool deleted = false;
+
+            string[] childFolders = AssetDatabase.GetSubFolders(folderPath);
+            if (childFolders != null)
+            {
+                foreach (string subFolder in childFolders)
+                {
+                    if (CleanupEmptyFoldersRecursive(subFolder, deletedFolders))
+                    {
+                        deleted = true;
+                    }
+                }
+            }
+
+            // GetSubFolders can remain stale after deletions; exclude folders deleted in this pass.
+            string[] remainingSubFolders = AssetDatabase.GetSubFolders(folderPath);
+            int actualSubFolderCount = 0;
+            if (remainingSubFolders != null)
+            {
+                foreach (string subFolder in remainingSubFolders)
+                {
+                    if (!deletedFolders.Contains(subFolder))
+                    {
+                        actualSubFolderCount++;
+                    }
+                }
+            }
+
+            if (!AssetDatabase.IsValidFolder(folderPath))
+            {
+                return deleted;
+            }
+
+            string[] assets = AssetDatabase.FindAssets(string.Empty, new[] { folderPath });
+
+            // FindAssets includes descendants, so check which results are direct children.
+            bool hasDirectAssets = false;
+            if (assets != null)
+            {
+                foreach (string guid in assets)
+                {
+                    string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                    if (string.IsNullOrEmpty(assetPath))
+                    {
+                        continue;
+                    }
+
+                    string assetDir = Path.GetDirectoryName(assetPath);
+                    if (assetDir != null)
+                    {
+                        assetDir = SanitizePath(assetDir);
+                    }
+
+                    if (string.Equals(assetDir, folderPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        hasDirectAssets = true;
+                        break;
+                    }
+                }
+            }
+
+            bool hasSubFolders = 0 < actualSubFolderCount;
+
+            if (!hasDirectAssets && !hasSubFolders)
+            {
+                if (AssetDatabase.DeleteAsset(folderPath))
+                {
+                    deletedFolders.Add(folderPath);
+                    deleted = true;
+                }
+            }
+
+            return deleted;
+        }
+
         private static string SanitizePath(string path)
         {
             return PathHelper.Sanitize(path);
@@ -783,6 +665,124 @@ namespace WallstopStudios.UnityHelpers.Editor
                     $"Failed to delete {assetOrFolderPath} with error: {e}."
                 );
             }
+        }
+
+        public void RecordPath(string toolName, string contextKey, string path)
+        {
+            if (
+                string.IsNullOrWhiteSpace(toolName)
+                || string.IsNullOrWhiteSpace(contextKey)
+                || string.IsNullOrWhiteSpace(path)
+            )
+            {
+                this.LogWarn($"RecordPath: toolName, contextKey, or path cannot be empty");
+                return;
+            }
+
+            string sanitizedPath = PathHelper.Sanitize(path);
+            if (
+                !sanitizedPath.StartsWith("Assets/", StringComparison.Ordinal)
+                || !AssetDatabase.IsValidFolder(sanitizedPath)
+            )
+            {
+                if (
+                    !Path.IsPathRooted(sanitizedPath)
+                    && !sanitizedPath.StartsWith("Assets/", StringComparison.Ordinal)
+                )
+                {
+                    this.LogWarn(
+                        $"Recording path '{sanitizedPath}' that is not an 'Assets/' relative path or an absolute path. This might be intentional"
+                    );
+                }
+            }
+
+            ToolHistory tool = GetOrAddToolHistory(toolName);
+            ContextHistory context = tool.GetOrAddContext(contextKey);
+            DirectoryUsageData dirData = context.GetOrAddDirectory(sanitizedPath);
+            dirData.MarkUsed();
+            EditorUtility.SetDirty(this);
+        }
+
+        public DirectoryUsageData[] GetPaths(
+            string toolName,
+            string contextKey,
+            bool topOnly = false,
+            int topN = 5
+        )
+        {
+            ToolHistory tool = _allToolHistories.Find(th =>
+                string.Equals(th.toolName, toolName, StringComparison.Ordinal)
+            );
+            if (tool == null)
+            {
+                return Array.Empty<DirectoryUsageData>();
+            }
+
+            ContextHistory context = tool.contexts.Find(c =>
+                string.Equals(c.contextKey, contextKey, StringComparison.Ordinal)
+            );
+            if (context == null)
+            {
+                return Array.Empty<DirectoryUsageData>();
+            }
+
+            List<DirectoryUsageData> list = context.directories;
+            if (list == null || list.Count == 0)
+            {
+                return Array.Empty<DirectoryUsageData>();
+            }
+
+            DirectoryUsageData[] sortedDirectories = new DirectoryUsageData[list.Count];
+            for (int i = 0; i < list.Count; i++)
+            {
+                sortedDirectories[i] = list[i];
+            }
+            Array.Sort(
+                sortedDirectories,
+                static (a, b) =>
+                {
+                    int cmp = b.count.CompareTo(a.count);
+                    if (cmp != 0)
+                    {
+                        return cmp;
+                    }
+                    return b.lastUsedTicks.CompareTo(a.lastUsedTicks);
+                }
+            );
+
+            if (!topOnly)
+            {
+                return sortedDirectories;
+            }
+
+            int n =
+                topN < 0 ? 0 : (sortedDirectories.Length < topN ? sortedDirectories.Length : topN);
+            if (n == sortedDirectories.Length)
+            {
+                return sortedDirectories;
+            }
+            DirectoryUsageData[] result = new DirectoryUsageData[n];
+            for (int i = 0; i < n; i++)
+            {
+                result[i] = sortedDirectories[i];
+            }
+            return result;
+        }
+
+        private ToolHistory GetOrAddToolHistory(string toolName)
+        {
+            ToolHistory toolHistory = _allToolHistories.Find(toolHistory =>
+                string.Equals(toolHistory.toolName, toolName, StringComparison.Ordinal)
+            );
+            if (toolHistory != null)
+            {
+                return toolHistory;
+            }
+
+            toolHistory = new ToolHistory(toolName);
+            _allToolHistories.Add(toolHistory);
+
+            return toolHistory;
         }
     }
 #endif

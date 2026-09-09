@@ -16,11 +16,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         private float _currentTime;
         private bool _wasMemoryPressureEnabled;
 
-        private float TestTimeProvider()
-        {
-            return _currentTime;
-        }
-
         [SetUp]
         public void SetUp()
         {
@@ -556,6 +551,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
             Assert.AreEqual(4, purged);
             Assert.AreEqual(1, pool.Count);
+        }
+
+        private float TestTimeProvider()
+        {
+            return _currentTime;
         }
 
 #if !SINGLE_THREADED
@@ -1175,11 +1175,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
 
         private sealed class TestPoolItem
         {
+            private static int _nextId;
+
             public int Id { get; }
             public bool WasReset { get; set; }
             public bool WasDisposed { get; set; }
-
-            private static int _nextId;
 
             public TestPoolItem()
             {
