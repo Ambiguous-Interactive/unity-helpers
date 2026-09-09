@@ -96,7 +96,8 @@ const classificationCases = [
       resourceSafe: false,
       cleanupStatus: "unknown",
       health: "blocked",
-      reason: "unity-account-limit-20111"
+      reason: "unity-account-limit-20111",
+      licensingCodeMatched: "20111"
     }
   },
   {
@@ -122,7 +123,8 @@ const classificationCases = [
       resourceSafe: false,
       cleanupStatus: "unknown",
       health: "healthy",
-      reason: "unity-return-400006"
+      reason: "unity-return-400006",
+      licensingCodeMatched: "400006"
     }
   },
   {
@@ -161,7 +163,8 @@ const classificationCases = [
       resourceSafe: false,
       cleanupStatus: "unknown",
       health: "healthy",
-      reason: "unity-20113-unclassified"
+      reason: "unity-20113-unclassified",
+      licensingCodeMatched: "20113"
     }
   },
   {
@@ -220,18 +223,32 @@ const classificationCases = [
 ];
 
 for (const testCase of classificationCases) {
-  assert.deepEqual(
-    classifyEvidence({
-      exitCode: testCase.exitCode,
-      returnLog: Buffer.from(testCase.returnLog),
-      supplemental: (testCase.supplemental || []).map((value) => Buffer.from(value)),
-      commandCompleted: testCase.commandCompleted,
-      captureComplete: testCase.captureComplete
-    }),
-    testCase.expected,
-    testCase.name
-  );
+  // The central classifier reviews its verdict shape and may add evidence
+  // fields. Pin the reviewed fields per case without forbidding that
+  // reviewed evolution, so a repin never breaks on additive central output.
+  const verdict = classifyEvidence({
+    exitCode: testCase.exitCode,
+    returnLog: Buffer.from(testCase.returnLog),
+    supplemental: (testCase.supplemental || []).map((value) => Buffer.from(value)),
+    commandCompleted: testCase.commandCompleted,
+    captureComplete: testCase.captureComplete
+  });
+  for (const [field, expected] of Object.entries(testCase.expected)) {
+    assert.equal(verdict[field], expected, `${testCase.name}: ${field}`);
+  }
 }
+
+// The reviewed attribution vocabulary travels with every verdict.
+assert.equal(
+  classifyEvidence({
+    exitCode: 0,
+    returnLog: Buffer.from(positive),
+    supplemental: [],
+    commandCompleted: true,
+    captureComplete: true
+  }).licensingCodesChecked,
+  "20111,20113,400006"
+);
 
 const safeGate = {
   acquired: "true",
