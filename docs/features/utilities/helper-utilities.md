@@ -16,7 +16,7 @@ Static helper classes and utilities that solve common programming problems witho
 - [Threading](#threading): Main thread dispatcher, single-threaded pool teardown
 - [Path & File Helpers](#path--file-helpers): Path resolution, file operations
 - [Scene Helpers](#scene-helpers): Scene queries and loading
-- [Advanced Utilities](#advanced-utilities): `RestorableGlobal<T>`, `BitOps`, null checks, hashing, formatting
+- [Advanced Utilities](#advanced-utilities): `RestorableGlobal<T>`, `BitOps`, statistics, null checks, hashing, SHA-256, formatting
 - [Environment Detection](#environment-detection): CI, batch mode, and runtime environment
 
 ---
@@ -1162,6 +1162,44 @@ detection, never for security.
 
 ---
 
+### SHA-256 Digests (`Objects`)
+
+**When identity needs to survive a hostile reader:** `Objects.Sha256Hex` hashes text (as UTF-8) or
+bytes into the standard 64-character lowercase hex digest, and `Objects.TrySha256HexOfFile` hashes a
+file, reporting a missing or unreadable file with `false` instead of throwing.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+string digest = Objects.Sha256Hex("save-slot-3");
+// "af3a7b3f7a85f558898483659933264fe4180ccf7eef520d37df1ad063e9128d"
+```
+
+Use it where a 32-bit stable hash is not enough: content-addressed cache keys, detecting whether a
+download or import actually changed, and tamper checks on player-supplied data. Unlike
+`StableHash32V1`, no adversary can craft a second input with the same digest, and unlike the
+`HashCode` family, the value is stable across processes and platforms.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.Helper;
+using UnityEngine;
+
+string texturePath = "Assets/Sprites/hero.png";
+string previousDigest = "af3a7b3f7a85f558898483659933264fe4180ccf7eef520d37df1ad063e9128d";
+
+bool changed =
+    !Objects.TrySha256HexOfFile(texturePath, out string fileDigest)
+    || fileDigest != previousDigest;
+
+Debug.Log($"Texture changed: {changed}");
+```
+
+---
+
 ### Formatting
 
 **Human-readable byte counts:**
@@ -1269,6 +1307,55 @@ bool isFlag = BitOps.IsPowerOfTwo(1UL << 7); // exactly one bit set
 `NextPowerOfTwo` throws `ArgumentOutOfRangeException` when no exact power of two is representable
 (negative values, or values beyond 2^30 / 2^31 / 2^62 / 2^63 for int / uint / long / ulong) instead
 of overflowing silently.
+
+---
+
+### Descriptive Statistics (`WallMath`)
+
+**One home for the numbers gameplay code keeps re-deriving:** `WallMath.Median`, `Percentile`,
+`Mean` and `StandardDeviation` read an `IReadOnlyList` directly, so a `List<T>`, a `T[]` or a pooled
+buffer all work with no intermediate copy on your side. Sorting for median and percentile happens
+on a pooled internal copy, so your list is never reordered.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using System.Collections.Generic;
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+List<float> runTimes = new List<float> { 2.1f, 0.9f, 1.7f, 3.3f, 1.2f };
+
+float median = runTimes.Median(); // 1.7
+float p95 = runTimes.Percentile(0.95f); // near the slowest run
+float mean = runTimes.Mean(); // 1.84
+float spread = runTimes.StandardDeviation(); // population spread around the mean
+```
+
+Conventions, chosen once so callers do not have to guess:
+
+- `Median` of an even count averages the two middle elements; the halving is done in `double`, so
+  extreme magnitudes cannot overflow.
+- `Percentile` interpolates linearly between closest ranks (`0` is the minimum, `1` the maximum);
+  a NaN or out-of-range percentile throws.
+- `Mean` accumulates in `double`, so a float sum cannot lose magnitude and an int sum cannot
+  overflow. Integral data returns `double`, matching `Enumerable.Average`.
+- `StandardDeviation` is the population standard deviation by default; pass `sample: true` for
+  Bessel's correction when the data is a sample of a larger population.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+int[] waveSizes = { 8, 12, 10, 15, 9, 11, 14, 10 };
+
+double averageWave = waveSizes.Mean(); // 11.125
+double medianWave = waveSizes.Median(); // 10.5
+double p90Wave = waveSizes.Percentile(0.9); // 14.3
+```
+
+Every method throws on an empty list and a null receiver: a statistic of nothing is undefined, and
+the package fails closed rather than inventing a zero.
 
 ---
 

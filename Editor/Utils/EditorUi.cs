@@ -29,7 +29,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             {
                 _suppressAuto =
                     Application.isBatchMode
-                    || IsInvokedByTestRunner()
+                    || EditorUtilities.IsInvokedByTestRunner()
                     || Helpers.IsRunningInContinuousIntegration;
             }
             catch
@@ -109,23 +109,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return string.Empty;
             }
             return EditorUtility.OpenFolderPanel(title, directory, defaultName);
-        }
-
-        private static bool IsInvokedByTestRunner()
-        {
-            string[] args = Environment.GetCommandLineArgs();
-            foreach (string a in args)
-            {
-                if (
-                    0 <= a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
-                    || 0 <= a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)
-                    || 0 <= a.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase)
-                )
-                {
-                    return true;
-                }
-            }
-            return false;
         }
 
         // Intentionally no hard dependency on TestRunner API to keep Editor asmdef clean.

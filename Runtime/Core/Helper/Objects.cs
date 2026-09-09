@@ -5,7 +5,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 {
     using System;
     using System.Collections.Generic;
+    using System.IO;
     using System.Runtime.CompilerServices;
+    using System.Security.Cryptography;
+    using System.Text;
 
     /// <summary>
     /// Utilities for null checks (including UnityEngine.Object overloads) and hash code composition.
@@ -871,6 +874,97 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             return hash;
+        }
+
+        /// <summary>
+        /// Computes the SHA-256 digest of <paramref name="text"/> as a lowercase hex string.
+        /// </summary>
+        /// <param name="text">The text to hash. Encoded as UTF-8 before hashing.</param>
+        /// <returns>The 64-character lowercase hexadecimal SHA-256 digest.</returns>
+        /// <remarks>
+        /// <para>
+        /// Unlike the <c>HashCode</c> family and <see cref="StableHash32V1"/>, SHA-256 is
+        /// cryptographic: it is for content identity, cache keys and tamper detection, not for
+        /// hash buckets. The answer depends only on the bytes of <paramref name="text"/>.
+        /// </para>
+        /// <para>
+        /// UTF-8 is the encoding, so the same string hashes the same on every platform. Hash bytes
+        /// yourself with the <c>byte[]</c> overload when the encoding is part of your format.
+        /// </para>
+        /// </remarks>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="text"/> is null.</exception>
+        public static string Sha256Hex(string text)
+        {
+            if (text == null)
+            {
+                throw new ArgumentNullException(nameof(text));
+            }
+
+            return Sha256Hex(Encoding.UTF8.GetBytes(text));
+        }
+
+        /// <summary>
+        /// Computes the SHA-256 digest of <paramref name="bytes"/> as a lowercase hex string.
+        /// </summary>
+        /// <param name="bytes">The bytes to hash. Not mutated.</param>
+        /// <returns>The 64-character lowercase hexadecimal SHA-256 digest.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="bytes"/> is null.</exception>
+        public static string Sha256Hex(byte[] bytes)
+        {
+            if (bytes == null)
+            {
+                throw new ArgumentNullException(nameof(bytes));
+            }
+
+            using SHA256 sha256 = SHA256.Create();
+            byte[] digest = sha256.ComputeHash(bytes);
+            return ToHex(digest);
+        }
+
+        /// <summary>
+        /// Computes the SHA-256 digest of a file's contents as a lowercase hex string.
+        /// </summary>
+        /// <param name="filePath">The path of the file to hash.</param>
+        /// <param name="hex">
+        /// When this method returns true, the 64-character lowercase hexadecimal SHA-256 digest of
+        /// the file's contents. When it returns false, null.
+        /// </param>
+        /// <returns>
+        /// True when the file was read and hashed; false when <paramref name="filePath"/> is null
+        /// or empty, the file does not exist, or reading it failed.
+        /// </returns>
+        public static bool TrySha256HexOfFile(string filePath, out string hex)
+        {
+            hex = null;
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+            {
+                return false;
+            }
+
+            try
+            {
+                using SHA256 sha256 = SHA256.Create();
+                using FileStream stream = File.OpenRead(filePath);
+                byte[] digest = sha256.ComputeHash(stream);
+                hex = ToHex(digest);
+                return true;
+            }
+            catch
+            {
+                hex = null;
+                return false;
+            }
+        }
+
+        private static string ToHex(byte[] digest)
+        {
+            StringBuilder builder = new(digest.Length * 2);
+            for (int i = 0; i < digest.Length; ++i)
+            {
+                _ = builder.Append(digest[i].ToString("x2"));
+            }
+
+            return builder.ToString();
         }
 
         private struct HashCodeBuilder
