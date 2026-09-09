@@ -14,7 +14,14 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
     public sealed class PerlinNoise
     {
-        public static readonly PerlinNoise Instance = new();
+        /// <summary>
+        /// Shared instance backed by the default permutation table. A property over a private
+        /// field, rather than an eagerly-initialized public field, because static initializers run
+        /// in textual order and the constructor reads <see cref="DefaultPermutations"/>; the
+        /// ordering rule puts public members first, which would otherwise initialize the singleton
+        /// before its table.
+        /// </summary>
+        public static PerlinNoise Instance => _instance;
 
         private static readonly int[] DefaultPermutations =
         {
@@ -275,6 +282,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             156,
             180,
         };
+
+        private static readonly PerlinNoise _instance = new();
 
         private readonly int[] _permutations = new int[DefaultPermutations.Length];
 

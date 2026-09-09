@@ -958,6 +958,48 @@ function analyzeFile(text) {
         }
         run = [];
       };
+      // Static members whose initializer runs real code at type-initialization time are
+      // initialization-order hazards: static initializers execute in textual order, so moving
+      // such a member past another static member it can read changes what is null when it runs
+      // (#672: `Instance = new()` before the permutation table it copies was a standalone-leg
+      // NRE). A self-typed construction, or an initializer that names another member of this
+      // body, is treated as able to read any of them and becomes a barrier.
+      const staticMemberNames = [];
+      for (const member of members) {
+        if (member.isType || member.trailing) continue;
+        const prefix = declarationPrefix(masked, member.headerStart, member.end);
+        if (!prefix) continue;
+        const name = /([A-Za-z_]\w*)\s*(<[^<>]*>)?\s*$/.exec(prefix.prefix)?.[1];
+        if (name) {
+          staticMemberNames.push(name);
+        }
+      }
+      const initializesAtTypeLoad = (member) => {
+        const prefix = declarationPrefix(masked, member.headerStart, member.end);
+        if (!prefix || !/\bstatic\b/.test(prefix.prefix) || prefix.breakChar === "(") {
+          return false;
+        }
+        const slice = masked.slice(member.headerStart, member.end);
+        const match = /[^=!<>]([+|&^]?|\|\||&&)=([^=>]|$)/.exec(slice);
+        if (!match) return false;
+        const eq = match.index + 1;
+        const init = slice.slice(eq);
+        const name = /([A-Za-z_]\w*)\s*(<[^<>]*>)?\s*$/.exec(prefix.prefix)?.[1] ?? "";
+        const declaredType = prefix.prefix.slice(
+          0,
+          Math.max(0, prefix.prefix.lastIndexOf(name))
+        );
+        const selfTyped =
+          new RegExp("\\bnew\\s+" + body.name + "\\b").test(init) ||
+          (/=\s*new\s*\(\s*\)/.test(init) && declaredType.includes(body.name));
+        const readsSibling =
+          !selfTyped &&
+          staticMemberNames.some(
+            (sibling) => sibling !== name && new RegExp("\\b" + sibling + "\\b").test(init)
+          );
+        return selfTyped || readsSibling;
+      };
+
       for (const member of members) {
         const directiveEnd = directivePrefixEnd(text, member.start, member.end);
         if (0 < directiveEnd) {
@@ -986,7 +1028,8 @@ function analyzeFile(text) {
           slice.trim().length !== 0 &&
           !/^[ \t]*#/.test(slice) &&
           keys[start] === keys[Math.max(member.end - 1, 0)] &&
-          !memberRank(masked, member, body.name).unclassifiable;
+          !memberRank(masked, member, body.name).unclassifiable &&
+          !initializesAtTypeLoad(member);
         if (movable) {
           run.push({ ...member, start });
         } else {

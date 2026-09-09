@@ -528,6 +528,46 @@ runTest("--fix still moves a type whose siblings carry a whole conditional insid
   assert.strictEqual(result.length, source.length);
 });
 
+runTest("ordering: --fix never moves a self-typed singleton past its dependencies", () => {
+  // Static initializers run in textual order: `Instance = new()` reads DefaultPermutations in
+  // its constructor, so reordering them into accessibility order is a NullReferenceException
+  // (#672, caught by the IL2CPP standalone leg). The fixer must refuse the move even though the
+  // accessibility ordering asks for it; the fix is the property-over-backing-field reshape.
+  const source = [
+    "class Noise",
+    "{",
+    "    public static readonly Noise Instance = new();",
+    "",
+    "    private static readonly int[] DefaultPermutations = { 151, 160 };",
+    "",
+    "    private readonly int[] _permutations = new int[DefaultPermutations.Length];",
+    "}"
+  ].join("\n");
+  // The accessibility ordering itself asks for public-before-private here, so no violation is
+  // reported and no edit is possible; the assertion is that no fix run ever reorders it either.
+  assert.strictEqual(
+    fixedText(source),
+    source,
+    "moving Instance before its table changes what is null when the cctor runs"
+  );
+});
+
+runTest("ordering: --fix never moves a static field whose initializer names a sibling", () => {
+  const source = [
+    "class Registry",
+    "{",
+    "    private static readonly Registry Combined = Build(DefaultEntries);",
+    "",
+    "    private static readonly int[] DefaultEntries = { 1, 2 };",
+    "}"
+  ].join("\n");
+  assert.strictEqual(
+    fixedText(source),
+    source,
+    "an initializer that names a sibling must not sort past it"
+  );
+});
+
 runTest("region keys separate the two branches of one conditional", () => {
   const source = "int before;\n#if A\nint x;\n#else\nint y;\n#endif\nint after;\n";
   const keys = regionKeys(source);
