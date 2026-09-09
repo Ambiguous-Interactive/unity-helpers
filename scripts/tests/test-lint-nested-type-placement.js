@@ -19,13 +19,7 @@ const { spawnSync } = require("child_process");
 
 const repoRoot = path.resolve(__dirname, "..", "..");
 const linterPath = path.join(repoRoot, "scripts", "lint-nested-type-placement.js");
-const {
-  maskNoise,
-  regionKeys,
-  analyzeFile,
-  applyEdits,
-  ORDER_TIERS
-} = require(linterPath);
+const { maskNoise, regionKeys, analyzeFile, applyEdits, ORDER_TIERS } = require(linterPath);
 
 let passed = 0;
 let failed = 0;
@@ -110,10 +104,7 @@ const SILENT = [
       "}"
     ].join("\n")
   ],
-  [
-    "an expression-bodied property before a field",
-    "class A { int Count => 5; int _y; }"
-  ],
+  ["an expression-bodied property before a field", "class A { int Count => 5; int _y; }"],
   [
     "a tuple-typed field and a tuple-typed property",
     "class A { (int X, int Y) Point { get; set; } (int X, int Y) _point; }"
@@ -124,10 +115,7 @@ const SILENT = [
     "class A { public static A operator +(A left, A right) => left; }"
   ],
   ["a static constructor sorts with the constructors", "class A { static A() { } A(int v) { } }"],
-  [
-    "a destructor sorts with the constructors",
-    "class A { ~A() { } public void Method() { } }"
-  ],
+  ["a destructor sorts with the constructors", "class A { ~A() { } public void Method() { } }"],
   [
     "an event and a delegate sort after const, before static properties",
     "class A { private const int C = 1; private event System.Action Happened; private delegate void Handler(int value); private static int P { get; set; } }"
@@ -171,7 +159,7 @@ const SILENT = [
       "{",
       "    private const char C = 'x';",
       "    private int _z;",
-      '    private static string Describe(string platformName, string v) =>',
+      "    private static string Describe(string platformName, string v) =>",
       "        TestContext.WriteLine(",
       '            $"Input: {(platformName == null ? "(null)" : $"\\u0022{platformName}\\u0022")}, "',
       '                + $"Serialized: \\u0022{v}\\u0022"',
@@ -222,18 +210,8 @@ const ORDER_REPORTED = [
     "static property",
     "P"
   ],
-  [
-    "a property after a field",
-    "class A { private int _f; private int P => 1; }",
-    "property",
-    "P"
-  ],
-  [
-    "a field after a method",
-    "class A { private void M() { } private int _f; }",
-    "field",
-    "_f"
-  ],
+  ["a property after a field", "class A { private int _f; private int P => 1; }", "property", "P"],
+  ["a field after a method", "class A { private void M() { } private int _f; }", "field", "_f"],
   [
     "an internal field after a private field of the same tier",
     "class A { private int _f; internal int _g; }",
