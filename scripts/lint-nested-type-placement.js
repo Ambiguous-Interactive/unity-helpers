@@ -985,10 +985,7 @@ function analyzeFile(text) {
         const eq = match.index + 1;
         const init = slice.slice(eq);
         const name = /([A-Za-z_]\w*)\s*(<[^<>]*>)?\s*$/.exec(prefix.prefix)?.[1] ?? "";
-        const declaredType = prefix.prefix.slice(
-          0,
-          Math.max(0, prefix.prefix.lastIndexOf(name))
-        );
+        const declaredType = prefix.prefix.slice(0, Math.max(0, prefix.prefix.lastIndexOf(name)));
         const selfTyped =
           new RegExp("\\bnew\\s+" + body.name + "\\b").test(init) ||
           (/=\s*new\s*\(\s*\)/.test(init) && declaredType.includes(body.name));
