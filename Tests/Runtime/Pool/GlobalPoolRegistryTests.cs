@@ -358,6 +358,78 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         }
 
         [Test]
+        public void EnforceBudgetInvokesCallbacksOutsideRegistryLock()
+        {
+            bool purgeCallbackHeldRegistryLock = true;
+            bool disposalCallbackHeldRegistryLock = true;
+            PoolOptions<TestPoolItem> options = new()
+            {
+                TimeProvider = TestTimeProvider,
+                Triggers = PurgeTrigger.Explicit,
+                OnPurge = (_, _) =>
+                {
+                    purgeCallbackHeldRegistryLock =
+                        GlobalPoolRegistry.IsRegistryLockHeldByCurrentThread();
+                },
+            };
+
+            using WallstopGenericPool<TestPoolItem> pool = new(
+                () => new TestPoolItem(),
+                preWarmCount: 2,
+                onDisposal: _ =>
+                {
+                    disposalCallbackHeldRegistryLock =
+                        GlobalPoolRegistry.IsRegistryLockHeldByCurrentThread();
+                },
+                options: options
+            );
+
+            GlobalPoolRegistry.GlobalMaxPooledItems = 1;
+            int purged = GlobalPoolRegistry.EnforceBudget();
+
+            Assert.AreEqual(1, purged);
+            Assert.IsFalse(purgeCallbackHeldRegistryLock);
+            Assert.IsFalse(disposalCallbackHeldRegistryLock);
+        }
+
+        [Test]
+        public void EnforceBudgetReentrantCallDoesNotStartOverlappingEnforcement()
+        {
+            int reentrantResult = -1;
+            WallstopGenericPool<TestPoolItem> addedDuringCallback = null;
+            PoolOptions<TestPoolItem> options = new()
+            {
+                TimeProvider = TestTimeProvider,
+                Triggers = PurgeTrigger.Explicit,
+                OnPurge = (_, _) =>
+                {
+                    addedDuringCallback = CreateTestPool(preWarmCount: 5);
+                    reentrantResult = GlobalPoolRegistry.EnforceBudget();
+                },
+            };
+
+            using WallstopGenericPool<TestPoolItem> pool = new(
+                () => new TestPoolItem(),
+                preWarmCount: 2,
+                options: options
+            );
+
+            try
+            {
+                GlobalPoolRegistry.GlobalMaxPooledItems = 1;
+                int purged = GlobalPoolRegistry.EnforceBudget();
+
+                Assert.AreEqual(1, purged);
+                Assert.AreEqual(0, reentrantResult);
+                Assert.AreEqual(5, addedDuringCallback.Count);
+            }
+            finally
+            {
+                addedDuringCallback?.Dispose();
+            }
+        }
+
+        [Test]
         public void PurgeForBudgetInvokesOnDisposalCallback()
         {
             List<TestPoolItem> disposedItems = new();
@@ -588,6 +660,66 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
                     pool.Dispose();
                 }
             }
+        }
+
+        [Test, Timeout(15000)]
+        public void ConcurrentEnforceBudgetCallsRemainSingleFlight()
+        {
+            using ManualResetEventSlim callbackEntered = new(false);
+            using ManualResetEventSlim callbackMayFinish = new(false);
+            WallstopGenericPool<TestPoolItem> addedDuringCallback = null;
+            int callbackCount = 0;
+            PoolOptions<TestPoolItem> options = new()
+            {
+                TimeProvider = TestTimeProvider,
+                Triggers = PurgeTrigger.Explicit,
+                OnPurge = (_, _) =>
+                {
+                    if (Interlocked.Increment(ref callbackCount) != 1)
+                    {
+                        return;
+                    }
+
+                    addedDuringCallback = CreateTestPool(preWarmCount: 5);
+                    callbackEntered.Set();
+                    callbackMayFinish.Wait(TimeSpan.FromSeconds(5));
+                },
+            };
+
+            using WallstopGenericPool<TestPoolItem> pool = new(
+                () => new TestPoolItem(),
+                preWarmCount: 2,
+                options: options
+            );
+            GlobalPoolRegistry.GlobalMaxPooledItems = 1;
+            Task<int> activeEnforcement = Task.Run(GlobalPoolRegistry.EnforceBudget);
+
+            bool callbackStarted;
+            int overlappingResult = -1;
+            int addedPoolCount = -1;
+            bool activeEnforcementCompleted;
+
+            try
+            {
+                callbackStarted = callbackEntered.Wait(TimeSpan.FromSeconds(5));
+                if (callbackStarted)
+                {
+                    overlappingResult = GlobalPoolRegistry.EnforceBudget();
+                    addedPoolCount = addedDuringCallback?.Count ?? -1;
+                }
+            }
+            finally
+            {
+                callbackMayFinish.Set();
+                activeEnforcementCompleted = activeEnforcement.Wait(TimeSpan.FromSeconds(5));
+                addedDuringCallback?.Dispose();
+            }
+
+            Assert.IsTrue(callbackStarted);
+            Assert.IsTrue(activeEnforcementCompleted);
+            Assert.AreEqual(1, activeEnforcement.Result);
+            Assert.AreEqual(0, overlappingResult);
+            Assert.AreEqual(5, addedPoolCount);
         }
 
         [Test]

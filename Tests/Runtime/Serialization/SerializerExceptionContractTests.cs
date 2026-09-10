@@ -252,6 +252,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             );
         }
 
+        [Test, Timeout(5000)]
+        public void PooledArrayBufferWriterDisposedOperationsFailFast()
+        {
+            using WallstopStudios.UnityHelpers.Utils.PooledResource<PooledArrayBufferWriter> lease =
+                PooledArrayBufferWriter.Rent(out PooledArrayBufferWriter writer);
+            writer.Dispose();
+
+            Assert.Throws<ObjectDisposedException>(() => _ = writer.WrittenCount);
+            Assert.Throws<ObjectDisposedException>(() => _ = writer.WrittenSpan);
+            Assert.Throws<ObjectDisposedException>(() => writer.Advance(1));
+            Assert.Throws<ObjectDisposedException>(() => writer.GetMemory(1));
+            Assert.Throws<ObjectDisposedException>(() => writer.GetSpan(1));
+            Assert.Throws<ObjectDisposedException>(() => writer.Preallocate(1));
+            byte[] destination = null;
+            Assert.Throws<ObjectDisposedException>(() => writer.ToArrayExact(ref destination));
+        }
+
         [Test]
         public void ProtoDeserializeWithTypeNullTypeThrowsConfiguration()
         {

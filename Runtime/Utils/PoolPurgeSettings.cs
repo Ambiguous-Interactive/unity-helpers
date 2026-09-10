@@ -1687,6 +1687,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private static long _globalMaxPooledItems = DefaultGlobalMaxPooledItems;
         private static int _budgetEnforcementEnabled = 1;
+        private static int _budgetEnforcementInProgress;
         private static float _budgetEnforcementIntervalSeconds =
             DefaultBudgetEnforcementIntervalSeconds;
         private static float _lastBudgetEnforcementTime;
@@ -1781,7 +1782,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 {
                     // One pool failure must not prevent cleanup of the others.
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-                    Debug.LogWarning($"[PoolPurgeSettings] Failed to purge pool: {e.Message}");
+                    Debug.LogWarning($"[PoolPurgeSettings] Failed to purge pool: {e}");
 #endif
                     _ = e;
                 }
@@ -1838,9 +1839,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 {
                     // One pool failure must not prevent cleanup of the others.
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-                    Debug.LogWarning(
-                        $"[PoolPurgeSettings] Failed to force-purge pool: {e.Message}"
-                    );
+                    Debug.LogWarning($"[PoolPurgeSettings] Failed to force-purge pool: {e}");
 #endif
                     _ = e;
                 }
@@ -1864,6 +1863,9 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// and items are purged starting from the oldest pools. Each pool's
         /// <see cref="PoolOptions{T}.MinRetainCount"/> is respected.
         /// </para>
+        /// <para>
+        /// Pool purge and disposal callbacks run after the registry releases its lock.
+        /// </para>
         /// </remarks>
         public static int EnforceBudget()
         {
@@ -1873,77 +1875,20 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return 0;
             }
 
-            long currentTotal = 0;
-            int totalPurged = 0;
-
-            lock (RegistryLock)
+            if (Interlocked.CompareExchange(ref _budgetEnforcementInProgress, 1, 0) != 0)
             {
-                BudgetEnforcementPools.Clear();
-
-                for (int i = RegisteredPools.Count - 1; 0 <= i; i--)
-                {
-                    if (!RegisteredPools[i].TryGetTarget(out IPurgeable pool))
-                    {
-                        RegisteredPools.RemoveAt(i);
-                        continue;
-                    }
-
-                    if (pool is IPoolStatistics stats)
-                    {
-                        BudgetEnforcementPools.Add(stats);
-                        currentTotal += stats.CurrentPooledCount;
-                    }
-                }
-
-                if (currentTotal <= maxItems)
-                {
-                    BudgetEnforcementPools.Clear();
-                    return 0;
-                }
-
-                long excess = currentTotal - maxItems;
-
-                SortPoolsByLastAccessTime(BudgetEnforcementPools);
-
-                long remaining = excess;
-
-                for (int i = 0; i < BudgetEnforcementPools.Count && 0 < remaining; i++)
-                {
-                    IPoolStatistics pool = BudgetEnforcementPools[i];
-                    int poolCount = pool.CurrentPooledCount;
-                    if (poolCount <= 0)
-                    {
-                        continue;
-                    }
-
-                    int toPurge = (int)System.Math.Min(remaining, poolCount);
-                    if (toPurge <= 0)
-                    {
-                        continue;
-                    }
-
-                    try
-                    {
-                        int purged = pool.PurgeForBudget(toPurge);
-                        totalPurged += purged;
-                        remaining -= purged;
-                    }
-                    catch (Exception e)
-                    {
-                        // One pool failure must not prevent cleanup of the others.
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-                        Debug.LogWarning(
-                            $"[PoolPurgeSettings] Failed to purge pool for budget: {e.Message}"
-                        );
-#endif
-                        _ = e;
-                    }
-                }
-
-                BudgetEnforcementPools.Clear();
+                return 0;
             }
 
-            return totalPurged;
+            try
+            {
+                return EnforceBudgetSingleFlight(maxItems);
+            }
+            finally
+            {
+                BudgetEnforcementPools.Clear();
+                Volatile.Write(ref _budgetEnforcementInProgress, 0);
+            }
         }
 
         /// <summary>
@@ -2066,6 +2011,78 @@ namespace WallstopStudios.UnityHelpers.Utils
                 RegisteredPools.Clear();
             }
             Volatile.Write(ref _lastBudgetEnforcementTime, 0f);
+        }
+
+        internal static bool IsRegistryLockHeldByCurrentThread()
+        {
+            return Monitor.IsEntered(RegistryLock);
+        }
+
+        private static int EnforceBudgetSingleFlight(long maxItems)
+        {
+            long currentTotal = 0;
+            int totalPurged = 0;
+
+            lock (RegistryLock)
+            {
+                BudgetEnforcementPools.Clear();
+
+                for (int i = RegisteredPools.Count - 1; 0 <= i; i--)
+                {
+                    if (!RegisteredPools[i].TryGetTarget(out IPurgeable pool))
+                    {
+                        RegisteredPools.RemoveAt(i);
+                        continue;
+                    }
+
+                    if (pool is IPoolStatistics stats)
+                    {
+                        BudgetEnforcementPools.Add(stats);
+                        currentTotal += stats.CurrentPooledCount;
+                    }
+                }
+
+                if (currentTotal <= maxItems)
+                {
+                    return 0;
+                }
+
+                SortPoolsByLastAccessTime(BudgetEnforcementPools);
+            }
+
+            long remaining = currentTotal - maxItems;
+            for (int i = 0; i < BudgetEnforcementPools.Count && 0 < remaining; i++)
+            {
+                IPoolStatistics pool = BudgetEnforcementPools[i];
+                int currentPoolCount = pool.CurrentPooledCount;
+                if (currentPoolCount <= 0)
+                {
+                    continue;
+                }
+
+                int toPurge = (int)System.Math.Min(remaining, currentPoolCount);
+                if (toPurge <= 0)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    int purged = pool.PurgeForBudget(toPurge);
+                    totalPurged += purged;
+                    remaining -= purged;
+                }
+                catch (Exception e)
+                {
+                    // One pool failure must not prevent cleanup of the others.
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                    Debug.LogWarning($"[PoolPurgeSettings] Failed to purge pool for budget: {e}");
+#endif
+                    _ = e;
+                }
+            }
+
+            return totalPurged;
         }
 
         private static void SortPoolsByLastAccessTime(List<IPoolStatistics> pools)
