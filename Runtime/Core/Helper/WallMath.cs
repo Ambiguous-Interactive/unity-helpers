@@ -1168,52 +1168,182 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private static double Sum(IReadOnlyList<float> values, int count)
         {
-            double sum = 0.0;
-            for (int i = 0; i < count; ++i)
+            if (values is float[] array)
             {
-                sum += values[i];
+                double sum = 0.0;
+                for (int i = 0; i < count; ++i)
+                {
+                    sum += array[i];
+                }
+
+                return sum;
             }
 
-            return sum;
+            if (values is List<float> list)
+            {
+                using PooledArray<float> lease = SystemArrayPool<float>.Get(
+                    count,
+                    out float[] copy
+                );
+                list.CopyTo(copy, 0);
+                double pooledSum = 0.0;
+                for (int i = 0; i < count; ++i)
+                {
+                    pooledSum += copy[i];
+                }
+
+                return pooledSum;
+            }
+
+            double interfaceSum = 0.0;
+            for (int i = 0; i < count; ++i)
+            {
+                interfaceSum += values[i];
+            }
+
+            return interfaceSum;
         }
 
         private static double Sum(IReadOnlyList<double> values, int count)
         {
-            double sum = 0.0;
-            for (int i = 0; i < count; ++i)
+            if (values is double[] array)
             {
-                sum += values[i];
+                double sum = 0.0;
+                for (int i = 0; i < count; ++i)
+                {
+                    sum += array[i];
+                }
+
+                return sum;
             }
 
-            return sum;
+            if (values is List<double> list)
+            {
+                using PooledArray<double> lease = SystemArrayPool<double>.Get(
+                    count,
+                    out double[] copy
+                );
+                list.CopyTo(copy, 0);
+                double pooledSum = 0.0;
+                for (int i = 0; i < count; ++i)
+                {
+                    pooledSum += copy[i];
+                }
+
+                return pooledSum;
+            }
+
+            double interfaceSum = 0.0;
+            for (int i = 0; i < count; ++i)
+            {
+                interfaceSum += values[i];
+            }
+
+            return interfaceSum;
         }
 
         private static double Sum(IReadOnlyList<int> values, int count)
         {
-            double sum = 0.0;
-            for (int i = 0; i < count; ++i)
+            if (values is int[] array)
             {
-                sum += values[i];
+                double sum = 0.0;
+                for (int i = 0; i < count; ++i)
+                {
+                    sum += array[i];
+                }
+
+                return sum;
             }
 
-            return sum;
+            if (values is List<int> list)
+            {
+                using PooledArray<int> lease = SystemArrayPool<int>.Get(count, out int[] copy);
+                list.CopyTo(copy, 0);
+                double pooledSum = 0.0;
+                for (int i = 0; i < count; ++i)
+                {
+                    pooledSum += copy[i];
+                }
+
+                return pooledSum;
+            }
+
+            double interfaceSum = 0.0;
+            for (int i = 0; i < count; ++i)
+            {
+                interfaceSum += values[i];
+            }
+
+            return interfaceSum;
         }
 
         private static double Sum(IReadOnlyList<long> values, int count)
         {
-            double sum = 0.0;
-            for (int i = 0; i < count; ++i)
+            if (values is long[] array)
             {
-                sum += values[i];
+                double sum = 0.0;
+                for (int i = 0; i < count; ++i)
+                {
+                    sum += array[i];
+                }
+
+                return sum;
             }
 
-            return sum;
+            if (values is List<long> list)
+            {
+                using PooledArray<long> lease = SystemArrayPool<long>.Get(count, out long[] copy);
+                list.CopyTo(copy, 0);
+                double pooledSum = 0.0;
+                for (int i = 0; i < count; ++i)
+                {
+                    pooledSum += copy[i];
+                }
+
+                return pooledSum;
+            }
+
+            double interfaceSum = 0.0;
+            for (int i = 0; i < count; ++i)
+            {
+                interfaceSum += values[i];
+            }
+
+            return interfaceSum;
         }
 
         private static double Variance(IReadOnlyList<float> values, bool sample)
         {
             int count = ValidateStatisticReceiver(values);
             ValidateSampleSize(count, sample);
+            if (values is float[] array)
+            {
+                return VarianceOf(array, count, sample);
+            }
+
+            if (values is List<float> list)
+            {
+                using PooledArray<float> lease = SystemArrayPool<float>.Get(
+                    count,
+                    out float[] copy
+                );
+                list.CopyTo(copy, 0);
+                return VarianceOf(copy, count, sample);
+            }
+
+            double mean = Sum(values, count) / count;
+            double squaredDifferenceSum = 0.0;
+            for (int i = 0; i < count; ++i)
+            {
+                double difference = values[i] - mean;
+                squaredDifferenceSum += difference * difference;
+            }
+
+            return squaredDifferenceSum / (sample ? count - 1 : count);
+        }
+
+        private static double VarianceOf(float[] values, int count, bool sample)
+        {
             double mean = Sum(values, count) / count;
             double squaredDifferenceSum = 0.0;
             for (int i = 0; i < count; ++i)
@@ -1229,6 +1359,34 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             int count = ValidateStatisticReceiver(values);
             ValidateSampleSize(count, sample);
+            if (values is double[] array)
+            {
+                return VarianceOf(array, count, sample);
+            }
+
+            if (values is List<double> list)
+            {
+                using PooledArray<double> lease = SystemArrayPool<double>.Get(
+                    count,
+                    out double[] copy
+                );
+                list.CopyTo(copy, 0);
+                return VarianceOf(copy, count, sample);
+            }
+
+            double mean = Sum(values, count) / count;
+            double squaredDifferenceSum = 0.0;
+            for (int i = 0; i < count; ++i)
+            {
+                double difference = values[i] - mean;
+                squaredDifferenceSum += difference * difference;
+            }
+
+            return squaredDifferenceSum / (sample ? count - 1 : count);
+        }
+
+        private static double VarianceOf(double[] values, int count, bool sample)
+        {
             double mean = Sum(values, count) / count;
             double squaredDifferenceSum = 0.0;
             for (int i = 0; i < count; ++i)
