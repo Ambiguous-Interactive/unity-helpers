@@ -243,7 +243,9 @@
         "unityci",
         "uielements",
         "sqr",
-        "MonoBehaviours"
+        "MonoBehaviours",
+        "ARGB32",
+        "BGRA32"
       ]
     },
     {

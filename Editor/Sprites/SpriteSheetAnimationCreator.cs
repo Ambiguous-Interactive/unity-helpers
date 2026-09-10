@@ -93,9 +93,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         static SpriteSheetAnimationCreator()
         {
+            /* Application.isBatchMode throws from a ScriptableObject static initializer in
+            the editor Test Runner; the catch keeps the type initializable there. */
             try
             {
-                if (Application.isBatchMode || IsInvokedByTestRunner())
+                if (Application.isBatchMode || EditorUtilities.IsInvokedByTestRunner())
                 {
                     SuppressUserPrompts = true;
                 }
@@ -109,23 +111,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             SpriteSheetAnimationCreator window = GetWindow<SpriteSheetAnimationCreator>();
             window.titleContent = new GUIContent("Sprite Animation Creator");
             window.minSize = new Vector2(600, 700);
-        }
-
-        private static bool IsInvokedByTestRunner()
-        {
-            string[] args = Environment.GetCommandLineArgs();
-            foreach (string a in args)
-            {
-                if (
-                    0 <= a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
-                    || 0 <= a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)
-                    || 0 <= a.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase)
-                )
-                {
-                    return true;
-                }
-            }
-            return false;
         }
 
         private static VisualElement MakeAnimationDefinitionItem()

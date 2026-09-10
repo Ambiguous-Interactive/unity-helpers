@@ -18,7 +18,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// </summary>
         /// <remarks>
         /// Implementation reference: JesseSort by Jesse Lew, https://github.com/lewj85/jessesort.
-        /// This adaptation records pile assignments before reconstructing contiguous piles for a k-way merge.
+        /// This adaptation records pile assignments, reconstructs contiguous ascending piles, then
+        /// merges adjacent pile pairs bottom-up with ordered-boundary and reverse-disjoint shortcuts.
         /// It does not implement the upstream live-phase routing pipeline. See docs/performance/ilist-sorting-performance.md.
         /// </remarks>
         public static void JesseSort<T, TComparer>(this IList<T> list, TComparer comparer)
@@ -119,11 +120,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             using PooledArray<T> storageLease = SystemArrayPool<T>.Get(count, out T[] storage);
-            using PooledResource<List<JesseCursor>> heapLease = Buffers<JesseCursor>.List.Get(
-                out List<JesseCursor> heap
+            using PooledResource<List<JesseRun>> runLease = Buffers<JesseRun>.List.Get(
+                out List<JesseRun> runs
             );
-            int offset = InitializeJessePiles(ascending, 0, false, heap);
-            InitializeJessePiles(descending, offset, true, heap);
+            int offset = CollectJesseRuns(ascending, 0, false, runs);
+            CollectJesseRuns(descending, offset, true, runs);
             for (int index = 0; index < count; ++index)
             {
                 int tag = blueprint[index];
@@ -135,42 +136,54 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 pile.Position += reversed ? -1 : 1;
                 piles[pileIndex] = pile;
             }
-            for (int index = heap.Count / 2 - 1; 0 <= index; --index)
+
+            T[] source = storage;
+            T[] target = array;
+            int runCount = runs.Count;
+            while (1 < runCount)
             {
-                JesseHeapSiftDown(heap, index, storage, comparer);
+                int mergedCount = 0;
+                for (int index = 0; index < runCount; index += 2)
+                {
+                    JesseRun left = runs[index];
+                    if (runCount - 1 == index)
+                    {
+                        System.Array.Copy(
+                            source,
+                            left.Start,
+                            target,
+                            left.Start,
+                            left.End - left.Start
+                        );
+                        runs[mergedCount++] = left;
+                        continue;
+                    }
+                    JesseRun right = runs[index + 1];
+                    MergeJesseRuns(source, target, left, right, comparer);
+                    runs[mergedCount++] = new JesseRun { Start = left.Start, End = right.End };
+                }
+                runCount = mergedCount;
+                (source, target) = (target, source);
             }
-            for (int index = 0; index < count; ++index)
+
+            if (!ReferenceEquals(source, array))
             {
-                JesseCursor cursor = heap[0];
-                array[index] = storage[cursor.Position++];
-                if (cursor.Position < cursor.End)
-                {
-                    heap[0] = cursor;
-                }
-                else
-                {
-                    heap[0] = heap[heap.Count - 1];
-                    heap.RemoveAt(heap.Count - 1);
-                }
-                if (0 < heap.Count)
-                {
-                    JesseHeapSiftDown(heap, 0, storage, comparer);
-                }
+                System.Array.Copy(source, 0, array, 0, count);
             }
         }
 
-        private static int InitializeJessePiles(
+        private static int CollectJesseRuns(
             List<JessePile> piles,
             int offset,
             bool reversed,
-            List<JesseCursor> heap
+            List<JesseRun> runs
         )
         {
             for (int index = 0; index < piles.Count; ++index)
             {
                 JessePile pile = piles[index];
                 int end = offset + pile.Count;
-                heap.Add(new JesseCursor { Position = offset, End = end });
+                runs.Add(new JesseRun { Start = offset, End = end });
                 pile.Position = reversed ? end - 1 : offset;
                 piles[index] = pile;
                 offset = end;
@@ -178,40 +191,65 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return offset;
         }
 
-        private static void JesseHeapSiftDown<T, TComparer>(
-            List<JesseCursor> heap,
-            int index,
-            T[] storage,
+        private static void MergeJesseRuns<T, TComparer>(
+            T[] source,
+            T[] target,
+            JesseRun left,
+            JesseRun right,
             TComparer comparer
         )
             where TComparer : IComparer<T>
         {
-            int count = heap.Count;
-            while (index < count / 2)
+            int leftStart = left.Start;
+            int leftEnd = left.End;
+            int rightStart = leftEnd;
+            int rightEnd = right.End;
+            if (comparer.Compare(source[leftEnd - 1], source[rightStart]) <= 0)
             {
-                int child = (index << 1) + 1;
-                int right = child + 1;
-                if (
-                    right < count
-                    && comparer.Compare(
-                        storage[heap[right].Position],
-                        storage[heap[child].Position]
-                    ) < 0
-                )
-                {
-                    child = right;
-                }
-                if (
-                    comparer.Compare(storage[heap[index].Position], storage[heap[child].Position])
-                    <= 0
-                )
-                {
-                    return;
-                }
-                JesseCursor cursor = heap[index];
-                heap[index] = heap[child];
-                heap[child] = cursor;
-                index = child;
+                System.Array.Copy(source, leftStart, target, leftStart, rightEnd - leftStart);
+                return;
+            }
+            if (comparer.Compare(source[rightEnd - 1], source[leftStart]) <= 0)
+            {
+                System.Array.Copy(source, rightStart, target, leftStart, rightEnd - rightStart);
+                System.Array.Copy(
+                    source,
+                    leftStart,
+                    target,
+                    leftStart + (rightEnd - rightStart),
+                    leftEnd - leftStart
+                );
+                return;
+            }
+            int leftPosition = leftStart;
+            int rightPosition = rightStart;
+            int targetPosition = leftStart;
+            while (leftPosition < leftEnd && rightPosition < rightEnd)
+            {
+                target[targetPosition++] =
+                    comparer.Compare(source[leftPosition], source[rightPosition]) <= 0
+                        ? source[leftPosition++]
+                        : source[rightPosition++];
+            }
+            if (leftPosition < leftEnd)
+            {
+                System.Array.Copy(
+                    source,
+                    leftPosition,
+                    target,
+                    targetPosition,
+                    leftEnd - leftPosition
+                );
+            }
+            else if (rightPosition < rightEnd)
+            {
+                System.Array.Copy(
+                    source,
+                    rightPosition,
+                    target,
+                    targetPosition,
+                    rightEnd - rightPosition
+                );
             }
         }
 
@@ -222,9 +260,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             public int Position;
         }
 
-        private struct JesseCursor
+        private struct JesseRun
         {
-            public int Position;
+            public int Start;
             public int End;
         }
     }

@@ -119,6 +119,7 @@ START: What are you serializing?
 ```csharp
 using System.Collections.Generic;
 using UnityEngine;
+using WallstopStudios.UnityHelpers.Core.Extension;
 using WallstopStudios.UnityHelpers.Core.Serialization;
 
 public class SaveData
@@ -142,7 +143,7 @@ byte[] jsonBytes = Serializer.JsonSerialize(data);
 string jsonText = Serializer.JsonStringify(data, pretty: true);
 
 // Parse from string (convert to bytes first)
-byte[] textBytes = System.Text.Encoding.UTF8.GetBytes(jsonText);
+byte[] textBytes = jsonText.GetBytes();
 SaveData fromText = Serializer.JsonDeserialize<SaveData>(textBytes);
 
 // File helpers

@@ -4,8 +4,10 @@
 namespace WallstopStudios.UnityHelpers.Core.Helper
 {
     using System;
+    using System.Collections.Generic;
     using System.Runtime.CompilerServices;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
     /// Numeric helpers for safe bounds, positive modulo, and wrap-around arithmetic.
@@ -755,6 +757,302 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         /// <summary>
+        /// Returns the median of the values: the middle element of the sorted data, or the mean of
+        /// the two middle elements when the count is even.
+        /// </summary>
+        /// <param name="values">The values to measure. Not mutated.</param>
+        /// <returns>The median of <paramref name="values"/>.</returns>
+        /// <remarks>
+        /// Sorting is performed on a pooled copy, so <paramref name="values"/> is never reordered.
+        /// Results are undefined if the data contains NaN.
+        /// </remarks>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="values"/> is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> is empty.</exception>
+        public static float Median(this IReadOnlyList<float> values)
+        {
+            using PooledResource<List<float>> lease = CopySorted(values, out List<float> sorted);
+            int middle = sorted.Count / 2;
+            float lower = sorted[middle];
+            if (sorted.Count % 2 == 1)
+            {
+                return lower;
+            }
+
+            // Halve each term before adding so extreme magnitudes cannot overflow the sum.
+            return (float)(lower / 2.0 + sorted[middle - 1] / 2.0);
+        }
+
+        /// <summary>
+        /// Returns the median of the values: the middle element of the sorted data, or the mean of
+        /// the two middle elements when the count is even.
+        /// </summary>
+        /// <param name="values">The values to measure. Not mutated.</param>
+        /// <returns>The median of <paramref name="values"/>.</returns>
+        /// <remarks>
+        /// Sorting is performed on a pooled copy, so <paramref name="values"/> is never reordered.
+        /// Results are undefined if the data contains NaN.
+        /// </remarks>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="values"/> is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> is empty.</exception>
+        public static double Median(this IReadOnlyList<double> values)
+        {
+            using PooledResource<List<double>> lease = CopySorted(values, out List<double> sorted);
+            int middle = sorted.Count / 2;
+            double lower = sorted[middle];
+            if (sorted.Count % 2 == 1)
+            {
+                return lower;
+            }
+
+            return lower / 2.0 + sorted[middle - 1] / 2.0;
+        }
+
+        /// <summary>
+        /// Returns the median of the values: the middle element of the sorted data, or the mean of
+        /// the two middle elements when the count is even.
+        /// </summary>
+        /// <param name="values">The values to measure. Not mutated.</param>
+        /// <returns>
+        /// The median of <paramref name="values"/>. An even count can produce a half step between
+        /// elements, so the answer is <see cref="double"/> even though the elements are integral.
+        /// </returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="values"/> is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> is empty.</exception>
+        public static double Median(this IReadOnlyList<int> values)
+        {
+            using PooledResource<List<int>> lease = CopySorted(values, out List<int> sorted);
+            int middle = sorted.Count / 2;
+            if (sorted.Count % 2 == 1)
+            {
+                return sorted[middle];
+            }
+
+            return sorted[middle - 1] / 2.0 + sorted[middle] / 2.0;
+        }
+
+        /// <summary>
+        /// Returns the median of the values: the middle element of the sorted data, or the mean of
+        /// the two middle elements when the count is even.
+        /// </summary>
+        /// <param name="values">The values to measure. Not mutated.</param>
+        /// <returns>
+        /// The median of <paramref name="values"/>. An even count can produce a half step between
+        /// elements, so the answer is <see cref="double"/> even though the elements are integral.
+        /// </returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="values"/> is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> is empty.</exception>
+        public static double Median(this IReadOnlyList<long> values)
+        {
+            using PooledResource<List<long>> lease = CopySorted(values, out List<long> sorted);
+            int middle = sorted.Count / 2;
+            if (sorted.Count % 2 == 1)
+            {
+                return sorted[middle];
+            }
+
+            return sorted[middle - 1] / 2.0 + sorted[middle] / 2.0;
+        }
+
+        /// <summary>
+        /// Returns the <paramref name="percentile"/> of the values by linear interpolation between
+        /// closest ranks.
+        /// </summary>
+        /// <param name="values">The values to measure. Not mutated.</param>
+        /// <param name="percentile">
+        /// The percentile to read, where <c>0</c> is the minimum and <c>1</c> is the maximum.
+        /// </param>
+        /// <returns>The interpolated percentile of <paramref name="values"/>.</returns>
+        /// <remarks>
+        /// Sorting is performed on a pooled copy, so <paramref name="values"/> is never reordered.
+        /// Results are undefined if the data contains NaN.
+        /// </remarks>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="values"/> is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> is empty.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// Thrown when <paramref name="percentile"/> is NaN or outside <c>[0, 1]</c>.
+        /// </exception>
+        public static float Percentile(this IReadOnlyList<float> values, float percentile)
+        {
+            ValidatePercentile(percentile);
+            using PooledResource<List<float>> lease = CopySorted(values, out List<float> sorted);
+            return (float)InterpolatePercentile(sorted, percentile);
+        }
+
+        /// <summary>
+        /// Returns the <paramref name="percentile"/> of the values by linear interpolation between
+        /// closest ranks.
+        /// </summary>
+        /// <param name="values">The values to measure. Not mutated.</param>
+        /// <param name="percentile">
+        /// The percentile to read, where <c>0</c> is the minimum and <c>1</c> is the maximum.
+        /// </param>
+        /// <returns>The interpolated percentile of <paramref name="values"/>.</returns>
+        /// <remarks>
+        /// Sorting is performed on a pooled copy, so <paramref name="values"/> is never reordered.
+        /// Results are undefined if the data contains NaN.
+        /// </remarks>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="values"/> is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> is empty.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// Thrown when <paramref name="percentile"/> is NaN or outside <c>[0, 1]</c>.
+        /// </exception>
+        public static double Percentile(this IReadOnlyList<double> values, double percentile)
+        {
+            ValidatePercentile(percentile);
+            using PooledResource<List<double>> lease = CopySorted(values, out List<double> sorted);
+            return InterpolatePercentile(sorted, percentile);
+        }
+
+        /// <summary>
+        /// Returns the <paramref name="percentile"/> of the values by linear interpolation between
+        /// closest ranks.
+        /// </summary>
+        /// <param name="values">The values to measure. Not mutated.</param>
+        /// <param name="percentile">
+        /// The percentile to read, where <c>0</c> is the minimum and <c>1</c> is the maximum.
+        /// </param>
+        /// <returns>
+        /// The interpolated percentile of <paramref name="values"/>. Interpolated half steps are
+        /// possible, so the answer is <see cref="double"/> even though the elements are integral.
+        /// </returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="values"/> is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> is empty.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// Thrown when <paramref name="percentile"/> is NaN or outside <c>[0, 1]</c>.
+        /// </exception>
+        public static double Percentile(this IReadOnlyList<int> values, double percentile)
+        {
+            ValidatePercentile(percentile);
+            using PooledResource<List<int>> lease = CopySorted(values, out List<int> sorted);
+            return InterpolatePercentile(sorted, percentile);
+        }
+
+        /// <summary>
+        /// Returns the <paramref name="percentile"/> of the values by linear interpolation between
+        /// closest ranks.
+        /// </summary>
+        /// <param name="values">The values to measure. Not mutated.</param>
+        /// <param name="percentile">
+        /// The percentile to read, where <c>0</c> is the minimum and <c>1</c> is the maximum.
+        /// </param>
+        /// <returns>
+        /// The interpolated percentile of <paramref name="values"/>. Interpolated half steps are
+        /// possible, so the answer is <see cref="double"/> even though the elements are integral.
+        /// </returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="values"/> is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> is empty.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// Thrown when <paramref name="percentile"/> is NaN or outside <c>[0, 1]</c>.
+        /// </exception>
+        public static double Percentile(this IReadOnlyList<long> values, double percentile)
+        {
+            ValidatePercentile(percentile);
+            using PooledResource<List<long>> lease = CopySorted(values, out List<long> sorted);
+            return InterpolatePercentile(sorted, percentile);
+        }
+
+        /// <summary>
+        /// Returns the arithmetic mean of the values.
+        /// </summary>
+        /// <param name="values">The values to measure.</param>
+        /// <returns>The mean of <paramref name="values"/>.</returns>
+        /// <remarks>The sum is accumulated in <see cref="double"/>, so summing large float lists does not lose magnitude.</remarks>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="values"/> is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> is empty.</exception>
+        public static float Mean(this IReadOnlyList<float> values)
+        {
+            int count = ValidateStatisticReceiver(values);
+            return (float)(Sum(values, count) / count);
+        }
+
+        /// <summary>
+        /// Returns the arithmetic mean of the values.
+        /// </summary>
+        /// <param name="values">The values to measure.</param>
+        /// <returns>The mean of <paramref name="values"/>.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="values"/> is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> is empty.</exception>
+        public static double Mean(this IReadOnlyList<double> values)
+        {
+            int count = ValidateStatisticReceiver(values);
+            return Sum(values, count) / count;
+        }
+
+        /// <summary>
+        /// Returns the arithmetic mean of the values.
+        /// </summary>
+        /// <param name="values">The values to measure.</param>
+        /// <returns>The mean of <paramref name="values"/> as <see cref="double"/>, matching <c>Enumerable.Average</c>.</returns>
+        /// <remarks>The sum is accumulated in <see cref="double"/>, so sums beyond 2^53 lose low bits.</remarks>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="values"/> is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> is empty.</exception>
+        public static double Mean(this IReadOnlyList<int> values)
+        {
+            int count = ValidateStatisticReceiver(values);
+            return Sum(values, count) / count;
+        }
+
+        /// <summary>
+        /// Returns the arithmetic mean of the values.
+        /// </summary>
+        /// <param name="values">The values to measure.</param>
+        /// <returns>The mean of <paramref name="values"/> as <see cref="double"/>, matching <c>Enumerable.Average</c>.</returns>
+        /// <remarks>The sum is accumulated in <see cref="double"/>, so sums beyond 2^53 lose low bits.</remarks>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="values"/> is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> is empty.</exception>
+        public static double Mean(this IReadOnlyList<long> values)
+        {
+            int count = ValidateStatisticReceiver(values);
+            return Sum(values, count) / count;
+        }
+
+        /// <summary>
+        /// Returns the standard deviation of the values around their mean.
+        /// </summary>
+        /// <param name="values">The values to measure.</param>
+        /// <param name="sample">
+        /// When true, divides by <c>count - 1</c> (Bessel's correction) for data that is a sample
+        /// of a larger population. When false, the default, divides by <c>count</c> for data that
+        /// is the whole population.
+        /// </param>
+        /// <returns>The standard deviation of <paramref name="values"/>.</returns>
+        /// <remarks>Computed in <see cref="double"/> with the two-pass algorithm around the mean.</remarks>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="values"/> is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> is empty.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// Thrown when <paramref name="sample"/> is true and <paramref name="values"/> holds fewer
+        /// than two elements, because <c>count - 1</c> would divide by zero.
+        /// </exception>
+        public static float StandardDeviation(this IReadOnlyList<float> values, bool sample = false)
+        {
+            return (float)Math.Sqrt(Variance(values, sample));
+        }
+
+        /// <summary>
+        /// Returns the standard deviation of the values around their mean.
+        /// </summary>
+        /// <param name="values">The values to measure.</param>
+        /// <param name="sample">
+        /// When true, divides by <c>count - 1</c> (Bessel's correction) for data that is a sample
+        /// of a larger population. When false, the default, divides by <c>count</c> for data that
+        /// is the whole population.
+        /// </param>
+        /// <returns>The standard deviation of <paramref name="values"/>.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="values"/> is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> is empty.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// Thrown when <paramref name="sample"/> is true and <paramref name="values"/> holds fewer
+        /// than two elements, because <c>count - 1</c> would divide by zero.
+        /// </exception>
+        public static double StandardDeviation(
+            this IReadOnlyList<double> values,
+            bool sample = false
+        )
+        {
+            return Math.Sqrt(Variance(values, sample));
+        }
+
+        /// <summary>
         /// Reports whether two values differ by no more than <paramref name="tolerance"/>, with no
         /// relative cushion of any kind. Unlike <see cref="Approximately(float, float, float)"/>,
         /// the tolerance is the whole of the permitted difference, so a caller passing zero gets an
@@ -806,6 +1104,326 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return WithinTolerance(lhs.x, rhs.x, tolerance)
                 && WithinTolerance(lhs.y, rhs.y, tolerance)
                 && WithinTolerance(lhs.z, rhs.z, tolerance);
+        }
+
+        /// <summary>
+        /// Validates the receiver of a statistic and copies it into a sorted pooled list.
+        /// </summary>
+        private static PooledResource<List<T>> CopySorted<T>(
+            IReadOnlyList<T> values,
+            out List<T> sorted
+        )
+            where T : IComparable<T>
+        {
+            if (values == null)
+            {
+                throw new ArgumentNullException(nameof(values));
+            }
+
+            int count = values.Count;
+            if (count == 0)
+            {
+                throw new ArgumentException("At least one value is required.", nameof(values));
+            }
+
+            PooledResource<List<T>> lease = Buffers<T>.GetList(count, out sorted);
+            for (int i = 0; i < count; ++i)
+            {
+                sorted.Add(values[i]);
+            }
+
+            sorted.Sort();
+            return lease;
+        }
+
+        private static double InterpolatePercentile<T>(List<T> sorted, double percentile)
+            where T : IComparable<T>
+        {
+            int count = sorted.Count;
+            double rank = percentile * (count - 1);
+            int lower = (int)rank;
+            int upper = lower == count - 1 ? lower : lower + 1;
+            double fraction = rank - lower;
+            if (fraction == 0)
+            {
+                return Convert.ToDouble(sorted[lower]);
+            }
+
+            double lhs = Convert.ToDouble(sorted[lower]);
+            double rhs = Convert.ToDouble(sorted[upper]);
+            return lhs + (rhs - lhs) * fraction;
+        }
+
+        private static void ValidatePercentile(double percentile)
+        {
+            if (double.IsNaN(percentile) || percentile < 0.0 || 1.0 < percentile)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(percentile),
+                    percentile,
+                    "Percentile must be within [0, 1]."
+                );
+            }
+        }
+
+        private static double Sum(IReadOnlyList<float> values, int count)
+        {
+            if (values is float[] array)
+            {
+                double sum = 0.0;
+                for (int i = 0; i < count; ++i)
+                {
+                    sum += array[i];
+                }
+
+                return sum;
+            }
+
+            if (values is List<float> list)
+            {
+                using PooledArray<float> lease = SystemArrayPool<float>.Get(
+                    count,
+                    out float[] copy
+                );
+                list.CopyTo(copy, 0);
+                double pooledSum = 0.0;
+                for (int i = 0; i < count; ++i)
+                {
+                    pooledSum += copy[i];
+                }
+
+                return pooledSum;
+            }
+
+            double interfaceSum = 0.0;
+            for (int i = 0; i < count; ++i)
+            {
+                interfaceSum += values[i];
+            }
+
+            return interfaceSum;
+        }
+
+        private static double Sum(IReadOnlyList<double> values, int count)
+        {
+            if (values is double[] array)
+            {
+                double sum = 0.0;
+                for (int i = 0; i < count; ++i)
+                {
+                    sum += array[i];
+                }
+
+                return sum;
+            }
+
+            if (values is List<double> list)
+            {
+                using PooledArray<double> lease = SystemArrayPool<double>.Get(
+                    count,
+                    out double[] copy
+                );
+                list.CopyTo(copy, 0);
+                double pooledSum = 0.0;
+                for (int i = 0; i < count; ++i)
+                {
+                    pooledSum += copy[i];
+                }
+
+                return pooledSum;
+            }
+
+            double interfaceSum = 0.0;
+            for (int i = 0; i < count; ++i)
+            {
+                interfaceSum += values[i];
+            }
+
+            return interfaceSum;
+        }
+
+        private static double Sum(IReadOnlyList<int> values, int count)
+        {
+            if (values is int[] array)
+            {
+                double sum = 0.0;
+                for (int i = 0; i < count; ++i)
+                {
+                    sum += array[i];
+                }
+
+                return sum;
+            }
+
+            if (values is List<int> list)
+            {
+                using PooledArray<int> lease = SystemArrayPool<int>.Get(count, out int[] copy);
+                list.CopyTo(copy, 0);
+                double pooledSum = 0.0;
+                for (int i = 0; i < count; ++i)
+                {
+                    pooledSum += copy[i];
+                }
+
+                return pooledSum;
+            }
+
+            double interfaceSum = 0.0;
+            for (int i = 0; i < count; ++i)
+            {
+                interfaceSum += values[i];
+            }
+
+            return interfaceSum;
+        }
+
+        private static double Sum(IReadOnlyList<long> values, int count)
+        {
+            if (values is long[] array)
+            {
+                double sum = 0.0;
+                for (int i = 0; i < count; ++i)
+                {
+                    sum += array[i];
+                }
+
+                return sum;
+            }
+
+            if (values is List<long> list)
+            {
+                using PooledArray<long> lease = SystemArrayPool<long>.Get(count, out long[] copy);
+                list.CopyTo(copy, 0);
+                double pooledSum = 0.0;
+                for (int i = 0; i < count; ++i)
+                {
+                    pooledSum += copy[i];
+                }
+
+                return pooledSum;
+            }
+
+            double interfaceSum = 0.0;
+            for (int i = 0; i < count; ++i)
+            {
+                interfaceSum += values[i];
+            }
+
+            return interfaceSum;
+        }
+
+        private static double Variance(IReadOnlyList<float> values, bool sample)
+        {
+            int count = ValidateStatisticReceiver(values);
+            ValidateSampleSize(count, sample);
+            if (values is float[] array)
+            {
+                return VarianceOf(array, count, sample);
+            }
+
+            if (values is List<float> list)
+            {
+                using PooledArray<float> lease = SystemArrayPool<float>.Get(
+                    count,
+                    out float[] copy
+                );
+                list.CopyTo(copy, 0);
+                return VarianceOf(copy, count, sample);
+            }
+
+            double mean = Sum(values, count) / count;
+            double squaredDifferenceSum = 0.0;
+            for (int i = 0; i < count; ++i)
+            {
+                double difference = values[i] - mean;
+                squaredDifferenceSum += difference * difference;
+            }
+
+            return squaredDifferenceSum / (sample ? count - 1 : count);
+        }
+
+        private static double VarianceOf(float[] values, int count, bool sample)
+        {
+            double mean = Sum(values, count) / count;
+            double squaredDifferenceSum = 0.0;
+            for (int i = 0; i < count; ++i)
+            {
+                double difference = values[i] - mean;
+                squaredDifferenceSum += difference * difference;
+            }
+
+            return squaredDifferenceSum / (sample ? count - 1 : count);
+        }
+
+        private static double Variance(IReadOnlyList<double> values, bool sample)
+        {
+            int count = ValidateStatisticReceiver(values);
+            ValidateSampleSize(count, sample);
+            if (values is double[] array)
+            {
+                return VarianceOf(array, count, sample);
+            }
+
+            if (values is List<double> list)
+            {
+                using PooledArray<double> lease = SystemArrayPool<double>.Get(
+                    count,
+                    out double[] copy
+                );
+                list.CopyTo(copy, 0);
+                return VarianceOf(copy, count, sample);
+            }
+
+            double mean = Sum(values, count) / count;
+            double squaredDifferenceSum = 0.0;
+            for (int i = 0; i < count; ++i)
+            {
+                double difference = values[i] - mean;
+                squaredDifferenceSum += difference * difference;
+            }
+
+            return squaredDifferenceSum / (sample ? count - 1 : count);
+        }
+
+        private static double VarianceOf(double[] values, int count, bool sample)
+        {
+            double mean = Sum(values, count) / count;
+            double squaredDifferenceSum = 0.0;
+            for (int i = 0; i < count; ++i)
+            {
+                double difference = values[i] - mean;
+                squaredDifferenceSum += difference * difference;
+            }
+
+            return squaredDifferenceSum / (sample ? count - 1 : count);
+        }
+
+        private static int ValidateStatisticReceiver<T>(IReadOnlyList<T> values)
+        {
+            if (values == null)
+            {
+                throw new ArgumentNullException(nameof(values));
+            }
+
+            int count = values.Count;
+            if (count == 0)
+            {
+                throw new ArgumentException("At least one value is required.", nameof(values));
+            }
+
+            return count;
+        }
+
+        private static void ValidateSampleSize(int count, bool sample)
+        {
+            if (sample && count < 2)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(count),
+                    count,
+                    "Sample standard deviation requires at least two values."
+                );
+            }
         }
 
         /// <summary>

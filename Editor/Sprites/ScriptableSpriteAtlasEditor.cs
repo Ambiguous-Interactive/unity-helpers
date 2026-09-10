@@ -62,9 +62,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         static ScriptableSpriteAtlasEditor()
         {
+            /* Application.isBatchMode throws from a ScriptableObject static initializer in
+            the editor Test Runner; the catch keeps the type initializable there. */
             try
             {
-                if (Application.isBatchMode || IsInvokedByTestRunner())
+                if (Application.isBatchMode || EditorUtilities.IsInvokedByTestRunner())
                 {
                     SuppressUserPrompts = true;
                 }
@@ -76,23 +78,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         public static void ShowWindow()
         {
             GetWindow<ScriptableSpriteAtlasEditor>("Sprite Atlas Generator");
-        }
-
-        private static bool IsInvokedByTestRunner()
-        {
-            string[] args = Environment.GetCommandLineArgs();
-            foreach (string a in args)
-            {
-                if (
-                    0 <= a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
-                    || 0 <= a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)
-                    || 0 <= a.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase)
-                )
-                {
-                    return true;
-                }
-            }
-            return false;
         }
 
         private static void AppendNonEmptyStrings(

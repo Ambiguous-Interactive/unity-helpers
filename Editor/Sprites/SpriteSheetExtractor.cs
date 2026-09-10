@@ -7,7 +7,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using System;
     using System.Collections.Generic;
     using System.IO;
-    using System.Security.Cryptography;
     using System.Text;
     using System.Text.Json;
     using System.Text.RegularExpressions;
@@ -1073,27 +1072,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// <returns>The SHA256 hash as a lowercase hex string, or null if the file cannot be read.</returns>
         internal static string ComputeFileHash(string filePath)
         {
-            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
-            {
-                return null;
-            }
-
-            try
-            {
-                using SHA256 sha256 = SHA256.Create();
-                using FileStream stream = File.OpenRead(filePath);
-                byte[] hashBytes = sha256.ComputeHash(stream);
-                StringBuilder builder = new(hashBytes.Length * 2);
-                for (int i = 0; i < hashBytes.Length; ++i)
-                {
-                    _ = builder.Append(hashBytes[i].ToString("x2"));
-                }
-                return builder.ToString();
-            }
-            catch
-            {
-                return null;
-            }
+            return Objects.TrySha256HexOfFile(filePath, out string hex) ? hex : null;
         }
 
         /// <summary>

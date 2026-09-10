@@ -647,7 +647,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return string.Empty;
             }
 
-            byte[] bytes = Encoding.UTF8.GetBytes(input);
+            byte[] bytes = input.GetBytes();
             return Convert.ToBase64String(bytes);
         }
 

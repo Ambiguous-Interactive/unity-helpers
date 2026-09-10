@@ -107,11 +107,13 @@ head_sha = pull.get("head", {}).get("sha", "") if isinstance(pull, dict) else ""
 
 heading("1. INLINE REVIEW THREADS  (file + line; NOT returned by /issues/{n}/comments)")
 inline = get("/pulls/%s/comments?per_page=100" % NUMBER)
-if not inline:
-    print("  (none)")
-for comment in inline:
-    if UNRESOLVED_ONLY and comment.get("in_reply_to_id") is not None:
-        continue
+
+
+def is_bot(comment):
+    return ((comment.get("user") or {}).get("login") or "").endswith("[bot]")
+
+
+def print_thread(comment):
     print("")
     print(
         "  #%s  %s  %s:%s"
@@ -128,8 +130,37 @@ for comment in inline:
         print("    " + line)
     print("    %s" % comment.get("html_url", ""))
 
+
+# A review thread started by a non-bot account is the highest-priority surface: bots repost stale
+# findings on every push, but a human thread is a person waiting. Print those first, newest
+# author-side last so the freshest thread is adjacent to section 2, and say the counts out loud so
+# "no human threads" is affirmative evidence rather than something a reader has to scroll to
+# disprove. Agent-posted replies share the human's login, so this splits on bot-vs-non-bot, not
+# human-vs-agent.
+threads = [
+    comment
+    for comment in inline
+    if not (UNRESOLVED_ONLY and comment.get("in_reply_to_id") is not None)
+]
+human_threads = [comment for comment in threads if not is_bot(comment)]
+bot_threads = [comment for comment in threads if is_bot(comment)]
+if not threads:
+    print("  (none)")
+else:
+    print(
+        "  %d thread(s): %d from non-bot accounts (%s), %d from bots"
+        % (
+            len(threads),
+            len(human_threads),
+            ", ".join(sorted({comment["user"]["login"] for comment in human_threads})) or "none",
+            len(bot_threads),
+        )
+    )
+for comment in human_threads + bot_threads:
+    print_thread(comment)
+
 heading("2. REVIEW SUBMISSIONS  (approve / request-changes / comment bodies)")
-reviews = [r for r in get("/pulls/%s/reviews?per_page=100" % NUMBER) if (r.get("body") or "").strip()]
+reviews = get("/pulls/%s/reviews?per_page=100" % NUMBER)
 # Keyed by the bot's login with the "[bot]" suffix dropped, because that is what a check run
 # calls it: the Copilot reviewer runs under the github-actions app, so app.slug is "github-actions"
 # and only the run's NAME carries the bot's identity.
@@ -139,12 +170,25 @@ for review in reviews:
     if login.endswith("[bot]"):
         reviews_by_bot.setdefault(login[: -len("[bot]")], []).append(review)
 if not reviews:
-    print("  (none with a body)")
+    print("  (none)")
 for review in reviews:
     print("")
-    print("  %s  %s" % (review["user"]["login"], review.get("state", "")))
-    for line in (review.get("body") or "").splitlines():
-        print("    " + line)
+    print(
+        "  %s  %s  commit %s"
+        % (
+            review["user"]["login"],
+            review.get("state", ""),
+            (review.get("commit_id") or "")[:8] or "unknown",
+        )
+    )
+    body = (review.get("body") or "").strip()
+    if body:
+        for line in body.splitlines():
+            print("    " + line)
+    else:
+        # An empty review body carries its feedback in inline threads (section 1); hide it and a
+        # human's line-scoped review looks like "no feedback".
+        print("    (no body -- inline comments only, see section 1)")
 
 heading("3. CONVERSATION COMMENTS  (/issues/{n}/comments)")
 conversation = get("/issues/%s/comments?per_page=100" % NUMBER)
@@ -176,7 +220,10 @@ if head_sha:
         for bot, said_reviews in reviews_by_bot.items():
             if bot not in identity:
                 continue
-            for review in said_reviews[:1]:
+            # Reviews print unfiltered in section 2 (an empty body points at section 1), so the
+            # helper must skip empties itself: grabbing [:1] can land on a bodyless review and
+            # hide the quota/refusal reason a failing check's own log omits (#661).
+            for review in [r for r in said_reviews if (r.get("body") or "").strip()][:1]:
                 said = [line for line in (review.get("body") or "").splitlines() if line.strip()]
                 if said:
                     print(

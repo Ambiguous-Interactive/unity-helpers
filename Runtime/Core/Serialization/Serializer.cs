@@ -3974,7 +3974,8 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             onRelease: w =>
             {
                 w.Reset();
-            }
+            },
+            onDisposal: w => w.Dispose()
         );
 
         public int WrittenCount => _written;

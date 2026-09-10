@@ -61,6 +61,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.AreEqual(expected.a, actual.a, tolerance, $"{context} A");
         }
 
+        private static IEnumerable<TestCaseData> TextureFormatCases()
+        {
+            foreach (ColorAveragingMethod method in Enum.GetValues(typeof(ColorAveragingMethod)))
+            {
+                yield return new TestCaseData(TextureFormat.RGBA32, method).SetName(
+                    $"GetAverageColor.Texture.{method}.RGBA32"
+                );
+                yield return new TestCaseData(TextureFormat.ARGB32, method).SetName(
+                    $"GetAverageColor.Texture.{method}.ARGB32"
+                );
+            }
+        }
+
         [Test]
         public void ToHexFormatsCorrectly()
         {
@@ -420,6 +433,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Color expected = new(expectedR, expectedG, expectedB, expectedA);
             Color result = sprites.GetAverageColor(method);
             AssertColorsApproximatelyEqual(expected, result, 1e-6f, method.ToString());
+        }
+
+        [Test]
+        [TestCaseSource(nameof(TextureFormatCases))]
+        public void GetAverageColorReadsChannelsInColor32Order(
+            TextureFormat format,
+            ColorAveragingMethod method
+        )
+        {
+            Color expected = new(1f, 0f, 0f, 1f);
+            Texture2D texture = Track(new Texture2D(2, 2, format, false));
+            Color32 pixel = new(byte.MaxValue, 0, 0, byte.MaxValue);
+            texture.SetPixels32(new[] { pixel, pixel, pixel, pixel });
+            texture.Apply();
+            Sprite sprite = Track(
+                Sprite.Create(texture, new Rect(0, 0, 2, 2), new Vector2(0.5f, 0.5f))
+            );
+
+            Color result = sprite.GetAverageColor(method);
+            AssertColorsApproximatelyEqual(expected, result, 2e-2f, $"{method} on {format}");
         }
 
         [Test]

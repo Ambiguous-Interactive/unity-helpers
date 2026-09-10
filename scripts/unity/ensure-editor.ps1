@@ -1019,8 +1019,10 @@ function Get-UnityCliOutput {
     # CAPTURING, NON-THROWING invoker for getter-style commands (install-path,
     # editors -i --format json). Returns an array of output lines (strings) on
     # success, or $null on any failure. Does NOT echo to the success pipeline
-    # of this script: the caller (run-ci-tests.ps1) reads our LAST stdout line
-    # as the resolved editor path, so getter output must never leak there.
+    # of this script: a caller reading the resolved editor path (the script's
+    # final stdout line -- local operators and runner maintenance, not CI; CI
+    # uses the central ensure-unity-editor action) must get only that path, so
+    # getter output must never leak there.
     param(
         [Parameter(Mandatory = $true)][string[]]$Arguments,
         [switch]$AcceptCapturedOutputOnTimeout

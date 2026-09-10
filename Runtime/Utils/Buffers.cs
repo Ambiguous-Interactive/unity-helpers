@@ -1354,7 +1354,14 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// <param name="preWarmCount">Number of instances to create and add to the pool during initialization. Default is 0.</param>
         /// <param name="onGet">Optional callback invoked when an instance is retrieved from the pool.</param>
         /// <param name="onRelease">Optional callback invoked when an instance is returned to the pool.</param>
-        /// <param name="onDisposal">Optional callback invoked when the pool is disposed for each pooled instance.</param>
+        /// <param name="onDisposal">
+        /// Optional callback invoked on every instance that leaves the pool forever -- pool
+        /// <see cref="Dispose"/>, budget purge, memory-pressure purge, idle-timeout purge or a
+        /// return into an already-disposed pool. Without it, such instances are dropped as-is, so
+        /// an <c>IDisposable</c> <c>T</c> requires this callback to release its resources. May run
+        /// inside GlobalPoolRegistry's budget lock and again from <c>onRelease</c>; keep it
+        /// short and non-throwing.
+        /// </param>
         /// <param name="options">Optional pool configuration for auto-purging behavior.</param>
         /// <exception cref="ArgumentNullException">Thrown when producer is null.</exception>
         public WallstopGenericPool(
@@ -2306,7 +2313,14 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// <param name="preWarmCount">Number of instances to create and add to the pool during initialization. Default is 0.</param>
         /// <param name="onGet">Optional callback invoked when an instance is retrieved from the pool.</param>
         /// <param name="onRelease">Optional callback invoked when an instance is returned to the pool.</param>
-        /// <param name="onDisposal">Optional callback invoked when the pool is disposed for each pooled instance.</param>
+        /// <param name="onDisposal">
+        /// Optional callback invoked on every instance that leaves the pool forever -- pool
+        /// <see cref="Dispose"/>, budget purge, memory-pressure purge, idle-timeout purge or a
+        /// return into an already-disposed pool. Without it, such instances are dropped as-is, so
+        /// an <c>IDisposable</c> <c>T</c> requires this callback to release its resources. May run
+        /// inside GlobalPoolRegistry's budget lock and again from <c>onRelease</c>; keep it
+        /// short and non-throwing.
+        /// </param>
         /// <param name="options">Optional pool configuration for auto-purging behavior.</param>
         /// <exception cref="ArgumentNullException">Thrown when producer is null.</exception>
         public WallstopGenericPool(
@@ -3695,8 +3709,10 @@ namespace WallstopStudios.UnityHelpers.Utils
         }
 
         /// <summary>
-        /// Disposes the resource by invoking the disposal action, typically returning it to the pool.
-        /// This method is automatically called at the end of a 'using' block.
+        /// Returns the resource to its pool. This method is automatically called at the end of a
+        /// 'using' block. It does not call <see cref="IDisposable.Dispose"/> on the resource
+        /// itself; disposing an <c>IDisposable</c> resource that leaves the pool forever is the
+        /// pool's <c>onDisposal</c> callback's job.
         /// </summary>
         /// <remarks>
         /// The resource is released at most once per <c>Get</c>, however many copies of this struct

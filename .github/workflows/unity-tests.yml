@@ -8,11 +8,13 @@ on:
       - master
       - main
   push:
+    # Enrollment contract: licensed Unity work is reachable only through
+    # protected branches. `main` is the repository's protected default branch;
+    # scheduled runs are never an eligible trusted trigger, so the weekly cron
+    # was removed (nightly/weekly coverage comes from the protected-branch push
+    # and from manual dispatch).
     branches:
-      - master
       - main
-  schedule:
-    - cron: "17 8 * * 1"
   workflow_dispatch:
     inputs:
       unity-version:
@@ -213,7 +215,7 @@ jobs:
       # skipped the licensed matrix when a PR touched ONLY its perf-numbers doc
       # + baseline. unity-helpers has no such CI-owned perf-doc auto-commit on
       # the PR path (the unity-benchmarks workflow commits perf results from a
-      # SCHEDULED run, not a PR), so that detection is intentionally DROPPED for
+      # DISPATCH run, not a PR), so that detection is intentionally DROPPED for
       # simplicity. If a perf-doc auto-update PR flow is added later, repoint a
       # docs-only gate at docs/performance/ rather than DxMessaging's
       # docs/architecture/performance.md path.
@@ -223,6 +225,11 @@ jobs:
         run: |
           $version = (Get-Content .github/unity-versions.json -Raw | ConvertFrom-Json).release
           if ($version -notmatch '^\d+\.\d+\.\d+f\d+$') { throw 'Invalid release Unity version.' }
+          # The unitypackage-smoke editor gate and central return pin this
+          # version literally (enrollment contract); fail closed on drift.
+          if ($version -ne '2022.3.45f1') {
+            throw "unity-versions.json release '$version' drifted from the pinned unitypackage-smoke editor version '2022.3.45f1'; update the smoke ensure/return pin in the same change."
+          }
           "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Resolve dispatch overrides
@@ -230,6 +237,7 @@ jobs:
         env:
           INPUT_UNITY_VERSION: ${{ inputs.unity-version }}
           INPUT_TEST_MODE: ${{ inputs.test-mode }}
+          INPUT_ACCEPTANCE: ${{ inputs.acceptance }}
         run: node scripts/unity/resolve-test-matrix.js
 
       # NOTE: this job deliberately holds NO `secrets.*` reference. It used to read
@@ -244,73 +252,24 @@ jobs:
 
   runner-preflight:
     name: Self-hosted runner access preflight
-    if: >-
-      ${{
-        (github.event_name != 'pull_request' ||
-          github.event.pull_request.head.repo.full_name == github.repository) &&
-        (github.event_name != 'push' || github.ref_protected)
-      }}
+    # Enrollment contract (Preconditions item 2): fork and Dependabot runs must
+    # remain unlicensed because organization secrets are unavailable to them, so
+    # this hosted registration preflight carries the trusted-revision guard at
+    # the job level and runs its single approved availability action
+    # unconditionally. A same-repository run is expected to hold the
+    # organization credential set, and a run without it fails closed at the
+    # preflight instead of silently skipping every licensed tier.
+    if: ${{ github.event.pull_request.user.login != 'dependabot[bot]' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
     concurrency:
       group: ${{ github.workflow }}-runner-preflight-${{ github.ref }}
       cancel-in-progress: true
-    outputs:
-      # "Does this run carry the organization CI credential store?" -- the single
-      # gate every licensed tier reads. It is answered HERE because this job
-      # already holds build-lock credentials to do its own work, so publishing the
-      # answer adds no credential to any additional scope and no dependency edge
-      # (every licensed job already `needs:` this one).
-      #
-      # The reader App, the writer App and the Unity serial are provisioned
-      # together as one organization credential set, so the reader's presence is
-      # the run's access to that set. It is not a claim that the other halves are
-      # individually correct, and it does not have to be: every licensed job runs
-      # `Validate Unity license secrets` before it acquires the lock, and that
-      # step names exactly which of UNITY_SERIAL / UNITY_EMAIL / UNITY_PASSWORD /
-      # BUILD_LOCK_APP_ID / BUILD_LOCK_APP_PRIVATE_KEY is missing and fails the
-      # job in seconds.
-      #
-      # It cannot run any earlier than it does, and the ordering is deliberate:
-      # `Validate Unity license secrets` is a LOCAL composite action, so it needs
-      # `Checkout` first, while `Require manually installed Unity editor` runs
-      # before `Checkout` on purpose -- the editor authority has to settle before
-      # any repository-controlled code is on disk. Both halves of that ordering
-      # are enforced by scripts/tests/test-unity-workflow-matrix-contract.ps1
-      # (Test-UnityJobUsesCentralEditorGate). So a half-configured repository
-      # pays one ensure-unity-editor step -- capped at ten minutes, and a no-op on
-      # a runner that already holds the editor -- and then gets a loud, actionable
-      # red instead of a doomed activation.
-      org-credentials: ${{ steps.credentials.outputs.present }}
     steps:
-      # This job is the only one in the workflow that reached for organization
-      # secrets without first asking whether this run has any. Dependabot runs use
-      # a separate secret store, so `reader-app-id` arrived empty and the action
-      # failed closed with "Missing required input" -- on every dependency PR,
-      # forever, while `matrix-config` had already (correctly) skipped the licensed
-      # tiers those credentials exist to serve. Preflighting a runner fleet nothing
-      # is going to dispatch to is not a gate, it is a guaranteed red.
-      #
-      # The check is done here rather than in the job's `if:` on purpose: the
-      # `secrets` context is unavailable in a job-level condition, and reading it
-      # through `needs.matrix-config` would put this job behind a barrier it does
-      # not otherwise need.
-      - name: Detect build-lock reader credentials
-        id: credentials
-        env:
-          READER_APP_ID: ${{ secrets.BUILD_LOCK_READER_APP_ID }}
-          READER_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_READER_APP_PRIVATE_KEY }}
-        run: |
-          set -euo pipefail
-          if [ -n "${READER_APP_ID:-}" ] && [ -n "${READER_APP_PRIVATE_KEY:-}" ]; then
-            echo "present=true" >> "${GITHUB_OUTPUT}"
-            exit 0
-          fi
-          echo "present=false" >> "${GITHUB_OUTPUT}"
-          echo "::notice::No build-lock reader credentials on this run, so the licensed Unity tiers are skipped and there is no runner fleet to preflight."
-
+      # Verifies only that every required label set has a registered runner
+      # visible to the repository; the licensed jobs below depend on this job so
+      # an impossible label set fails instead of queueing forever.
       - name: Require an online Unity runner
-        if: ${{ steps.credentials.outputs.present == 'true' }}
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/check-unity-runner-availability@d79e1cc2acc892b619db2ca46f78291ca427016b # v1.14.2
         with:
           reader-app-id: ${{ secrets.BUILD_LOCK_READER_APP_ID }}
@@ -330,7 +289,6 @@ jobs:
         (github.event_name != 'pull_request' ||
           github.event.pull_request.head.repo.full_name == github.repository) &&
         (github.event_name != 'push' || github.ref_protected) &&
-        needs.runner-preflight.outputs.org-credentials == 'true' &&
         needs.matrix-config.outputs.test-modes != '[]' &&
         needs.matrix-config.outputs.superseded != 'true'
       }}
@@ -362,6 +320,15 @@ jobs:
           - 2022.3.45f1
           - 6000.3.16f1
           - 6000.5.2f1
+        # Enrollment contract (Workflow contract item 3): this reviewed STATIC
+        # test-mode axis lets the central editor gate provision the
+        # StandaloneWindowsIl2Cpp profile on standalone legs, so IL2CPP player
+        # builds are verified at gate time. Values must stay the exact reviewed
+        # triple; the central analyzer rejects dynamic or extra modes.
+        test-mode:
+          - editmode
+          - playmode
+          - standalone
         exclude: ${{ fromJSON(needs.matrix-config.outputs.matrix-exclude) }}
     steps:
       - name: Require current PR head before setup
@@ -379,9 +346,11 @@ jobs:
         with:
           unity-version: ${{ matrix.unity-version }}
           install-root: ${{ runner.tool_cache }}\u6-v3
-          provisioning-profile: >-
-            ${{ (contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') ||
-            inputs.acceptance == 'intmap' || inputs.acceptance == 'serialization' || inputs.acceptance == 'all') && 'StandaloneWindowsIl2Cpp' || 'EditorOnly' }}
+          # Enrollment contract (Workflow contract item 3): the reviewed static
+          # matrix.test-mode map selects StandaloneWindowsIl2Cpp for the
+          # standalone leg, so IL2CPP player builds are verified at gate time.
+          # editmode and playmode legs keep the EditorOnly profile.
+          provisioning-profile: ${{ fromJSON('{"editmode":"EditorOnly","playmode":"EditorOnly","standalone":"StandaloneWindowsIl2Cpp"}')[matrix.test-mode] }}
           diagnostics-path: unity-editor-check.json
           ci-managed-only: true
           require-healthy-existing: true
@@ -432,7 +401,9 @@ jobs:
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@d79e1cc2acc892b619db2ca46f78291ca427016b # v1.14.2
         with:
           lock-name: wallstop-organization-builds
-          holder-id-suffix: ${{ matrix.unity-version }}-tests
+          # The static matrix axes both appear in the holder identity so every
+          # version x mode leg holds and releases its own lock entry.
+          holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
           runner-id: ${{ runner.name }}
           github-token: ${{ github.token }}
           pull-request-number: ${{ github.event.pull_request.number }}
@@ -455,7 +426,7 @@ jobs:
 
       - name: Run EditMode tests
         id: run_editmode
-        if: ${{ !cancelled() && steps.unity_lock.outputs.acquired == 'true' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'editmode') }}
+        if: ${{ !cancelled() && matrix.test-mode == 'editmode' && steps.unity_lock.outputs.acquired == 'true' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'editmode') }}
         continue-on-error: true
         # Per-mode timeout, sized from measurement rather than fear. Across the 60
         # most recent Unity Tests runs (~430 leg instances) the slowest this step
@@ -507,7 +478,7 @@ jobs:
 
       - name: Require current PR head before PlayMode
         id: playmode_head
-        if: ${{ !cancelled() && steps.unity_lock.outputs.acquired == 'true' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode') }}
+        if: ${{ !cancelled() && matrix.test-mode == 'playmode' && steps.unity_lock.outputs.acquired == 'true' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode') }}
         continue-on-error: true
         timeout-minutes: 2
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@d79e1cc2acc892b619db2ca46f78291ca427016b
@@ -518,7 +489,9 @@ jobs:
 
       - name: Run PlayMode tests
         id: run_playmode
-        if: ${{ !cancelled() && steps.unity_lock.outputs.acquired == 'true' && steps.playmode_head.outcome == 'success' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode') }}
+        if: >-
+          ${{ !cancelled() && matrix.test-mode == 'playmode' && steps.unity_lock.outputs.acquired == 'true'
+          && steps.playmode_head.outcome == 'success' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode') }}
         continue-on-error: true
         timeout-minutes: 40
         shell: pwsh
@@ -548,7 +521,7 @@ jobs:
 
       - name: Require current PR head before Standalone
         id: standalone_head
-        if: ${{ !cancelled() && steps.unity_lock.outputs.acquired == 'true' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') }}
+        if: ${{ !cancelled() && matrix.test-mode == 'standalone' && steps.unity_lock.outputs.acquired == 'true' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') }}
         continue-on-error: true
         timeout-minutes: 2
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@d79e1cc2acc892b619db2ca46f78291ca427016b
@@ -559,7 +532,9 @@ jobs:
 
       - name: Run Standalone tests
         id: run_standalone
-        if: ${{ !cancelled() && steps.unity_lock.outputs.acquired == 'true' && steps.standalone_head.outcome == 'success' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') }}
+        if: >-
+          ${{ !cancelled() && matrix.test-mode == 'standalone' && steps.unity_lock.outputs.acquired == 'true'
+          && steps.standalone_head.outcome == 'success' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') }}
         continue-on-error: true
         timeout-minutes: 60
         shell: pwsh
@@ -589,7 +564,14 @@ jobs:
 
       - name: Run additional native acceptance
         id: run_acceptance
-        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none' && steps.unity_lock.outputs.acquired == 'true' }}
+        # Acceptance runs once per version, in the standalone leg: the intmap
+        # and serialization kinds build IL2CPP standalone players, so this leg's
+        # editor gate provisions the StandaloneWindowsIl2Cpp profile the player
+        # builds need. resolve-test-matrix.js guarantees the standalone leg is
+        # selected whenever acceptance is requested.
+        if: >-
+          ${{ !cancelled() && matrix.test-mode == 'standalone' && github.event_name == 'workflow_dispatch'
+          && inputs.acceptance != '' && inputs.acceptance != 'none' && steps.unity_lock.outputs.acquired == 'true' }}
         continue-on-error: true
         timeout-minutes: 120
         shell: pwsh
@@ -644,7 +626,7 @@ jobs:
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@d79e1cc2acc892b619db2ca46f78291ca427016b # v1.14.2
         with:
           lock-name: wallstop-organization-builds
-          holder-id-suffix: ${{ matrix.unity-version }}-tests
+          holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
           runner-id: ${{ runner.name }}
           resource-cleanup-status: ${{ steps.cleanup_classification.outputs.resource-cleanup-status }}
           resource-health: ${{ steps.cleanup_classification.outputs.resource-health }}
@@ -654,7 +636,7 @@ jobs:
           BUILD_LOCK_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_APP_PRIVATE_KEY }}
 
       - name: Report slowest EditMode tests
-        if: ${{ always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'editmode') }}
+        if: ${{ always() && matrix.test-mode == 'editmode' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'editmode') }}
         shell: pwsh
         run: |
           $results = '.artifacts/unity/${{ matrix.unity-version }}-editmode/results.xml'
@@ -665,7 +647,7 @@ jobs:
           }
 
       - name: Report slowest PlayMode tests
-        if: ${{ always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode') }}
+        if: ${{ always() && matrix.test-mode == 'playmode' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode') }}
         shell: pwsh
         run: |
           $results = '.artifacts/unity/${{ matrix.unity-version }}-playmode/results.xml'
@@ -676,7 +658,7 @@ jobs:
           }
 
       - name: Report slowest Standalone tests
-        if: ${{ always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') }}
+        if: ${{ always() && matrix.test-mode == 'standalone' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') }}
         shell: pwsh
         run: |
           $results = '.artifacts/unity/${{ matrix.unity-version }}-standalone/results.xml'
@@ -689,7 +671,8 @@ jobs:
       - name: Dump EditMode log tail on failure
         if: >-
           ${{ steps.checkout.outcome == 'success' && (always()
-          && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'editmode') && steps.run_editmode.outcome != 'success' && steps.run_editmode.outcome != 'skipped') }}
+          && matrix.test-mode == 'editmode' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'editmode')
+          && steps.run_editmode.outcome != 'success' && steps.run_editmode.outcome != 'skipped') }}
         uses: ./.github/actions/dump-unity-log-tail
         with:
           results-dir: .artifacts/unity/${{ matrix.unity-version }}-editmode
@@ -698,7 +681,8 @@ jobs:
       - name: Dump PlayMode log tail on failure
         if: >-
           ${{ steps.checkout.outcome == 'success' && (always()
-          && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode') && steps.run_playmode.outcome != 'success' && steps.run_playmode.outcome != 'skipped') }}
+          && matrix.test-mode == 'playmode' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode')
+          && steps.run_playmode.outcome != 'success' && steps.run_playmode.outcome != 'skipped') }}
         uses: ./.github/actions/dump-unity-log-tail
         with:
           results-dir: .artifacts/unity/${{ matrix.unity-version }}-playmode
@@ -707,7 +691,8 @@ jobs:
       - name: Dump Standalone log tail on failure
         if: >-
           ${{ steps.checkout.outcome == 'success' && (always()
-          && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') && steps.run_standalone.outcome != 'success' && steps.run_standalone.outcome != 'skipped') }}
+          && matrix.test-mode == 'standalone' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone')
+          && steps.run_standalone.outcome != 'success' && steps.run_standalone.outcome != 'skipped') }}
         uses: ./.github/actions/dump-unity-log-tail
         with:
           results-dir: .artifacts/unity/${{ matrix.unity-version }}-standalone
@@ -715,7 +700,7 @@ jobs:
 
       - name: Verify EditMode tests actually ran
         id: verify_editmode
-        if: ${{ always() && !cancelled() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'editmode') && steps.run_editmode.outcome != 'skipped' }}
+        if: ${{ always() && !cancelled() && matrix.test-mode == 'editmode' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'editmode') && steps.run_editmode.outcome != 'skipped' }}
         continue-on-error: true
         uses: ./.github/actions/verify-unity-results
         with:
@@ -725,7 +710,7 @@ jobs:
 
       - name: Verify PlayMode tests actually ran
         id: verify_playmode
-        if: ${{ always() && !cancelled() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode') && steps.run_playmode.outcome != 'skipped' }}
+        if: ${{ always() && !cancelled() && matrix.test-mode == 'playmode' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode') && steps.run_playmode.outcome != 'skipped' }}
         continue-on-error: true
         uses: ./.github/actions/verify-unity-results
         with:
@@ -735,7 +720,7 @@ jobs:
 
       - name: Verify Standalone tests actually ran
         id: verify_standalone
-        if: ${{ always() && !cancelled() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') && steps.run_standalone.outcome != 'skipped' }}
+        if: ${{ always() && !cancelled() && matrix.test-mode == 'standalone' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') && steps.run_standalone.outcome != 'skipped' }}
         continue-on-error: true
         uses: ./.github/actions/verify-unity-results
         with:
@@ -752,7 +737,7 @@ jobs:
 
       - name: Redact credentials from EditMode artifacts
         id: redact_editmode
-        if: ${{ steps.checkout.outcome == 'success' && (always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'editmode')) }}
+        if: ${{ steps.checkout.outcome == 'success' && (always() && matrix.test-mode == 'editmode' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'editmode')) }}
         continue-on-error: true
         timeout-minutes: 2
         uses: ./.github/actions/redact-unity-artifacts
@@ -761,7 +746,7 @@ jobs:
 
       - name: Upload EditMode artifacts
         id: upload_editmode
-        if: ${{ always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'editmode') && steps.redact_editmode.outcome == 'success' }}
+        if: ${{ always() && matrix.test-mode == 'editmode' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'editmode') && steps.redact_editmode.outcome == 'success' }}
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -772,7 +757,7 @@ jobs:
 
       - name: Redact credentials from PlayMode artifacts
         id: redact_playmode
-        if: ${{ steps.checkout.outcome == 'success' && (always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode')) }}
+        if: ${{ steps.checkout.outcome == 'success' && (always() && matrix.test-mode == 'playmode' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode')) }}
         continue-on-error: true
         timeout-minutes: 2
         uses: ./.github/actions/redact-unity-artifacts
@@ -781,7 +766,7 @@ jobs:
 
       - name: Upload PlayMode artifacts
         id: upload_playmode
-        if: ${{ always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode') && steps.redact_playmode.outcome == 'success' }}
+        if: ${{ always() && matrix.test-mode == 'playmode' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'playmode') && steps.redact_playmode.outcome == 'success' }}
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -792,7 +777,7 @@ jobs:
 
       - name: Redact credentials from Standalone artifacts
         id: redact_standalone
-        if: ${{ steps.checkout.outcome == 'success' && (always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone')) }}
+        if: ${{ steps.checkout.outcome == 'success' && (always() && matrix.test-mode == 'standalone' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone')) }}
         continue-on-error: true
         timeout-minutes: 2
         uses: ./.github/actions/redact-unity-artifacts
@@ -801,7 +786,7 @@ jobs:
 
       - name: Upload Standalone artifacts
         id: upload_standalone
-        if: ${{ always() && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') && steps.redact_standalone.outcome == 'success' }}
+        if: ${{ always() && matrix.test-mode == 'standalone' && contains(fromJSON(needs.matrix-config.outputs.test-modes), 'standalone') && steps.redact_standalone.outcome == 'success' }}
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -812,7 +797,7 @@ jobs:
 
       - name: Verify additional native acceptance
         id: verify_acceptance
-        if: ${{ always() && !cancelled() && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none' }}
+        if: ${{ always() && !cancelled() && matrix.test-mode == 'standalone' && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none' }}
         continue-on-error: true
         shell: pwsh
         env:
@@ -828,7 +813,10 @@ jobs:
 
       - name: Redact credentials from acceptance artifacts
         id: redact_acceptance
-        if: ${{ steps.checkout.outcome == 'success' && (always() && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none') }}
+        if: >-
+          ${{ steps.checkout.outcome == 'success' && (always()
+          && matrix.test-mode == 'standalone' && github.event_name == 'workflow_dispatch'
+          && inputs.acceptance != '' && inputs.acceptance != 'none') }}
         continue-on-error: true
         timeout-minutes: 2
         uses: ./.github/actions/redact-unity-artifacts
@@ -837,7 +825,9 @@ jobs:
 
       - name: Upload acceptance artifacts
         id: upload_acceptance
-        if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none' && steps.redact_acceptance.outcome == 'success' }}
+        if: >-
+          ${{ always() && matrix.test-mode == 'standalone' && github.event_name == 'workflow_dispatch'
+          && inputs.acceptance != '' && inputs.acceptance != 'none' && steps.redact_acceptance.outcome == 'success' }}
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -847,7 +837,7 @@ jobs:
           retention-days: 30
 
       - name: Require requested native acceptance
-        if: ${{ always() && !cancelled() && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none' }}
+        if: ${{ always() && !cancelled() && matrix.test-mode == 'standalone' && github.event_name == 'workflow_dispatch' && inputs.acceptance != '' && inputs.acceptance != 'none' }}
         shell: pwsh
         env:
           ACCEPTANCE_RUN: ${{ steps.run_acceptance.outcome }}
@@ -862,10 +852,14 @@ jobs:
 
       - name: Require every selected Unity mode
         id: require_selected_modes
-        if: ${{ always() && !cancelled() }}
+        # Per-leg gate: each leg runs exactly its own matrix.test-mode, and only
+        # when matrix-config selected it. SELECTED_MODES is that single mode, so
+        # the shared assertion script still fails closed on any skipped or
+        # failing stage of the mode this leg owns.
+        if: ${{ always() && !cancelled() && contains(fromJSON(needs.matrix-config.outputs.test-modes), matrix.test-mode) }}
         shell: pwsh
         env:
-          SELECTED_MODES: ${{ needs.matrix-config.outputs.test-modes }}
+          SELECTED_MODES: ${{ format('["{0}"]', matrix.test-mode) }}
           EDITMODE_RUN: ${{ steps.run_editmode.outcome }}
           EDITMODE_VERIFY: ${{ steps.verify_editmode.outcome }}
           EDITMODE_REDACT: ${{ steps.redact_editmode.outcome }}
@@ -935,7 +929,6 @@ jobs:
         (github.event_name != 'push' || github.ref_protected) &&
         needs.matrix-config.result == 'success' &&
         needs.runner-preflight.result == 'success' &&
-        needs.runner-preflight.outputs.org-credentials == 'true' &&
         needs.matrix-config.outputs.superseded != 'true'
       }}
     runs-on: [self-hosted, Windows, RAM-64GB]
@@ -1319,7 +1312,6 @@ jobs:
         (github.event_name != 'push' || github.ref_protected) &&
         needs.matrix-config.result == 'success' &&
         needs.runner-preflight.result == 'success' &&
-        needs.runner-preflight.outputs.org-credentials == 'true' &&
         needs.matrix-config.outputs.superseded != 'true'
       }}
     runs-on: [self-hosted, Windows, RAM-64GB]
@@ -1338,7 +1330,12 @@ jobs:
         timeout-minutes: 10
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/ensure-unity-editor@d79e1cc2acc892b619db2ca46f78291ca427016b # v1.14.2
         with:
-          unity-version: ${{ needs.matrix-config.outputs.release-unity-version }}
+          # Enrollment contract (Workflow contract item 3): the editor gate and
+          # the central license return must carry a literal reviewed Unity
+          # version. Keep this pin identical to `release` in
+          # .github/unity-versions.json; matrix-config's drift assert below
+          # fails the run if they diverge.
+          unity-version: "2022.3.45f1"
           install-root: ${{ runner.tool_cache }}\u6-v3
           provisioning-profile: EditorOnly
           diagnostics-path: unity-editor-check.json
@@ -1432,7 +1429,9 @@ jobs:
         timeout-minutes: 5
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/return-unity-license@d79e1cc2acc892b619db2ca46f78291ca427016b # v1.14.2
         with:
-          unity-version: ${{ needs.matrix-config.outputs.release-unity-version }}
+          # Must match the ensure-unity-editor pin above exactly (see the
+          # enrollment contract's central-return version rule).
+          unity-version: "2022.3.45f1"
           tool-cache: ${{ runner.tool_cache }}
           unity-email: ${{ secrets.UNITY_EMAIL }}
           unity-password: ${{ secrets.UNITY_PASSWORD }}
@@ -1521,6 +1520,94 @@ jobs:
           reservation-id: ${{ steps.release_unity_lock.outputs.reservation-id }}
           incident-id: ${{ steps.release_unity_lock.outputs.incident-id }}
 
+  # Enrollment contract (Workflow contract item 10): one stable, always-reporting
+  # aggregate per licensed job. Each hosted gate carries the central trusted-skip
+  # script shape: it green-reports ONLY an exact untrusted skip (fork or
+  # Dependabot pull request, where organization secrets are unavailable by
+  # design -- see .github/dependabot.yml) or fully successful licensed work. On
+  # any other result -- failure, cancellation, partial, or an unexpected skip --
+  # the gate exits non-zero, so a skipped or cancelled leg can never disappear
+  # silently into the required-checks summary. The three gates are separate
+  # single-step jobs because the accepted shape binds one licensed job's result
+  # per gate.
+  unity-tests-aggregate:
+    name: Unity CI aggregate gate (tests)
+    if: ${{ always() }}
+    needs:
+      - runner-preflight
+      - unity-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require Unity tests result
+        shell: bash
+        env:
+          RUNNER_PREFLIGHT_RESULT: ${{ needs.runner-preflight.result }}
+          UNITY_TESTS_RESULT: ${{ needs.unity-tests.result }}
+          FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          DEPENDABOT_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]' }}
+        run: |
+          set -euo pipefail
+          if [ "${FORK_PR}" = "true" ] || [ "${DEPENDABOT_PR}" = "true" ]; then
+            test "${RUNNER_PREFLIGHT_RESULT}" = skipped
+            test "${UNITY_TESTS_RESULT}" = skipped
+          else
+            test "${RUNNER_PREFLIGHT_RESULT}" = success
+            test "${UNITY_TESTS_RESULT}" = success
+          fi
+
+  unity-tests-single-threaded-aggregate:
+    name: Unity CI aggregate gate (single-threaded)
+    if: ${{ always() }}
+    needs:
+      - runner-preflight
+      - unity-tests-single-threaded
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require single-threaded result
+        shell: bash
+        env:
+          RUNNER_PREFLIGHT_RESULT: ${{ needs.runner-preflight.result }}
+          UNITY_TESTS_RESULT: ${{ needs.unity-tests-single-threaded.result }}
+          FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          DEPENDABOT_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]' }}
+        run: |
+          set -euo pipefail
+          if [ "${FORK_PR}" = "true" ] || [ "${DEPENDABOT_PR}" = "true" ]; then
+            test "${RUNNER_PREFLIGHT_RESULT}" = skipped
+            test "${UNITY_TESTS_RESULT}" = skipped
+          else
+            test "${RUNNER_PREFLIGHT_RESULT}" = success
+            test "${UNITY_TESTS_RESULT}" = success
+          fi
+
+  unitypackage-smoke-aggregate:
+    name: Unity CI aggregate gate (package smoke)
+    if: ${{ always() }}
+    needs:
+      - runner-preflight
+      - unitypackage-smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require package smoke result
+        shell: bash
+        env:
+          RUNNER_PREFLIGHT_RESULT: ${{ needs.runner-preflight.result }}
+          UNITY_TESTS_RESULT: ${{ needs.unitypackage-smoke.result }}
+          FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          DEPENDABOT_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]' }}
+        run: |
+          set -euo pipefail
+          if [ "${FORK_PR}" = "true" ] || [ "${DEPENDABOT_PR}" = "true" ]; then
+            test "${RUNNER_PREFLIGHT_RESULT}" = skipped
+            test "${UNITY_TESTS_RESULT}" = skipped
+          else
+            test "${RUNNER_PREFLIGHT_RESULT}" = success
+            test "${UNITY_TESTS_RESULT}" = success
+          fi
+
   unity-ci-success:
     name: Unity CI Success
     if: ${{ always() }}
@@ -1585,9 +1672,9 @@ jobs:
           PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
           CURRENT_REPOSITORY: ${{ github.repository }}
           REF_PROTECTED: ${{ github.ref_protected }}
+          DEPENDABOT_PR: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}
           MATRIX_CONFIG_RESULT: ${{ needs.matrix-config.result }}
           MATRIX_CONFIG_SUPERSEDED: ${{ needs.matrix-config.outputs.superseded }}
-          HAS_ORG_CREDENTIALS: ${{ needs.runner-preflight.outputs.org-credentials }}
           LATE_SUPERSEDED: ${{ steps.late_superseded.outputs.superseded }}
           RUNNER_PREFLIGHT_RESULT: ${{ needs.runner-preflight.result }}
           UNITY_TESTS_RESULT: ${{ needs.unity-tests.result }}
@@ -1613,44 +1700,31 @@ jobs:
             exit 0
           fi
 
-          if [ "${EVENT_NAME}" = "push" ] && [ "${REF_PROTECTED}" != "true" ]; then
-            echo "Unprotected push intentionally omitted licensed Unity jobs."
-            exit 0
-          fi
-
-          # A run with no organization secrets -- Dependabot's separate secret
-          # store is the case that reaches this -- cannot dispatch a licensed leg,
-          # so every one of them is skipped by design. That is the same situation
-          # as a fork PR above and is reported the same way: green, because nothing
-          # failed, with the summary saying plainly that no Unity validation ran.
-          #
-          # It is still an assertion, not a waiver. Both hosted gates must have
-          # passed and every licensed job must be `skipped`; anything else means a
-          # leg ran that could not have, or a gate broke, and that is a real red.
-          if [ "${HAS_ORG_CREDENTIALS}" != "true" ]; then
-            if [ "${MATRIX_CONFIG_RESULT}" != "success" ] || [ "${RUNNER_PREFLIGHT_RESULT}" != "success" ]; then
-              echo "::error::Run without Unity credentials, but a hosted gate did not pass: matrix-config=${MATRIX_CONFIG_RESULT}, runner-preflight=${RUNNER_PREFLIGHT_RESULT}."
+          # Same-repository Dependabot PRs are the other documented unlicensed
+          # path (.github/dependabot.yml): runner-preflight carries the
+          # Dependabot guard and skips, which skips every licensed tier with
+          # it, while the hosted matrix-config gate still runs and must pass.
+          if [ "${EVENT_NAME}" = "pull_request" ] && [ "${DEPENDABOT_PR}" = "true" ]; then
+            if [ "${MATRIX_CONFIG_RESULT}" != "success" ]; then
+              echo "::error::Dependabot PR, but the hosted matrix gate did not pass: matrix-config=${MATRIX_CONFIG_RESULT}."
               exit 1
             fi
-            for pair in \
-              "unity-tests=${UNITY_TESTS_RESULT}" \
-              "unity-tests-single-threaded=${SINGLE_THREADED_RESULT}" \
-              "unitypackage-smoke=${UNITYPACKAGE_SMOKE_RESULT}"; do
-              if [ "${pair#*=}" != "skipped" ]; then
-                echo "::error::Run without Unity credentials, but a licensed job did not skip: ${pair}."
+            for result in \
+              "${RUNNER_PREFLIGHT_RESULT}" \
+              "${UNITY_TESTS_RESULT}" \
+              "${SINGLE_THREADED_RESULT}" \
+              "${UNITYPACKAGE_SMOKE_RESULT}"; do
+              if [ "${result}" != "skipped" ]; then
+                echo "::error::Unexpected Unity CI job result for an intentionally unlicensed Dependabot PR: ${result}."
                 exit 1
               fi
             done
-            echo "No Unity credentials on this run; the licensed Unity tiers were skipped."
-            {
-              echo "## Unity validation did not run"
-              echo ""
-              echo "This run had no Unity credentials, so every licensed tier was skipped and **no Unity test executed**."
-              echo ""
-              echo "The hosted gates passed and every licensed job skipped as designed, so this is reported as a pass rather than a failure."
-              echo ""
-              echo "Unity coverage for these changes comes from the protected-branch push after merge."
-            } >> "${GITHUB_STEP_SUMMARY}"
+            echo "Dependabot PR intentionally omitted licensed Unity jobs."
+            exit 0
+          fi
+
+          if [ "${EVENT_NAME}" = "push" ] && [ "${REF_PROTECTED}" != "true" ]; then
+            echo "Unprotected push intentionally omitted licensed Unity jobs."
             exit 0
           fi
 

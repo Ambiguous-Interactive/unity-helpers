@@ -232,7 +232,11 @@ name, not a better sentence. Spell names out -- `attributeMetadataCache`, not `a
 the descriptive form over the short one everywhere
 ([#635](https://github.com/Ambiguous-Interactive/unity-helpers/issues/635)).
 
-When one does survive that test, it explains **why**, never **what**.
+When one does survive that test, it explains **why**, never **what**, and stays
+extremely minimal: one short sentence, common words, active voice
+([Simplified Technical English](./ship-changes.md#step-9b-open-the-pull-request-yourself)).
+If it takes two sentences, either the code needs a better name or the reason
+belongs in a commit message, the PR, or an issue.
 
 - ✅ Comments explaining **why** a non-obvious approach is used
 - ✅ Comments documenting Unity quirks or platform-specific behavior

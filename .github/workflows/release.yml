@@ -336,6 +336,11 @@ jobs:
             $version = (Get-Content .github/unity-versions.json -Raw | ConvertFrom-Json).release
           }
           if ($version -notmatch '^\d+\.\d+\.\d+f\d+$') { throw 'Invalid release Unity version.' }
+          # The unitypackage editor gate and central return pin this version
+          # literally (enrollment contract); fail closed on drift.
+          if ($version -ne '2022.3.45f1') {
+            throw "Release Unity version '$version' drifted from the pinned unitypackage editor version '2022.3.45f1'; update the unitypackage ensure/return pin in the same change."
+          }
           "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Require an online Unity export runner
@@ -359,7 +364,12 @@ jobs:
         timeout-minutes: 10
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/ensure-unity-editor@d79e1cc2acc892b619db2ca46f78291ca427016b # v1.14.2
         with:
-          unity-version: ${{ needs.runner-preflight.outputs.unity-version }}
+          # Enrollment contract (Workflow contract item 3): the editor gate and
+          # the central license return must carry a literal reviewed Unity
+          # version. Keep this pin identical to `release` in
+          # .github/unity-versions.json (the runner-preflight job resolves the
+          # same value and the export below consumes it).
+          unity-version: "2022.3.45f1"
           install-root: ${{ runner.tool_cache }}\u6-v3
           provisioning-profile: EditorOnly
           diagnostics-path: unity-editor-check.json
@@ -443,7 +453,9 @@ jobs:
         timeout-minutes: 5
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/return-unity-license@d79e1cc2acc892b619db2ca46f78291ca427016b # v1.14.2
         with:
-          unity-version: ${{ needs.runner-preflight.outputs.unity-version }}
+          # Must match the ensure-unity-editor pin above exactly (see the
+          # enrollment contract's central-return version rule).
+          unity-version: "2022.3.45f1"
           tool-cache: ${{ runner.tool_cache }}
           unity-email: ${{ secrets.UNITY_EMAIL }}
           unity-password: ${{ secrets.UNITY_PASSWORD }}
@@ -559,6 +571,25 @@ jobs:
           reservation-state: ${{ steps.release_unity_lock.outputs.reservation-state }}
           reservation-id: ${{ steps.release_unity_lock.outputs.reservation-id }}
           incident-id: ${{ steps.release_unity_lock.outputs.incident-id }}
+
+  # Enrollment contract (Workflow contract item 10): a stable, always-reporting
+  # aggregate covering the licensed export job and its runner preflight, so a
+  # skipped or cancelled export can never disappear silently from the
+  # required-checks summary.
+  unitypackage-aggregate:
+    name: Require Unity package export result
+    if: ${{ always() }}
+    needs:
+      - runner-preflight
+      - unitypackage
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Enforce Unity package export and preflight results
+        shell: bash
+        run: |
+          test "${{ needs.unitypackage.result }}" = success
+          test "${{ needs.runner-preflight.result }}" = success
 
   prepare-tag:
     name: Prepare release tag

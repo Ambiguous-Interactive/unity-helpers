@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Tests.Utils
 {
 #if UNITY_EDITOR
+    using System;
     using System.Collections;
     using NUnit.Framework;
     using UnityEditor;
@@ -46,6 +47,32 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.IsTrue(
                 EditorUi.Suppress,
                 "EditorUi.Suppress should be true during test execution."
+            );
+        }
+
+        [Test]
+        public void IsInvokedByTestRunnerAgreesWithCommandLineTokens()
+        {
+            bool expected = false;
+            foreach (string argument in Environment.GetCommandLineArgs())
+            {
+                if (
+                    0 <= argument.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
+                    || 0 <= argument.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)
+                    || 0 <= argument.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase)
+                )
+                {
+                    expected = true;
+                    break;
+                }
+            }
+
+            // A public environment query must answer without throwing even on a locked-down host.
+            Assert.DoesNotThrow(() => EditorUtilities.IsInvokedByTestRunner());
+            Assert.AreEqual(
+                expected,
+                EditorUtilities.IsInvokedByTestRunner(),
+                "The predicate disagreed with the command-line tokens it documents."
             );
         }
 

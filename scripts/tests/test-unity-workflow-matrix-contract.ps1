@@ -547,9 +547,16 @@ function Test-UnityLockCleanupIsGated {
         if ($jobText -notmatch $returnPattern) {
             $failures += "$($job.Key): return-unity-license must be identified, success-gated, bounded to five minutes, and non-masking"
         }
+        # Enrollment contract: the unitypackage editor gate and central return
+        # pin the reviewed release version LITERALLY (a resolver output could
+        # drift between the ensure and return pins inside one job). The pinned
+        # version must stay identical to `release` in .github/unity-versions.json,
+        # which matrix-config's drift assert and the release workflow enforce.
+        # Quoting is prettier's canonical double-quote form; the contract checks
+        # the literal pin, not the quote style.
         $expectedVersion = switch ($job.Key) {
-            'unitypackage-smoke' { '${{ needs.matrix-config.outputs.release-unity-version }}' }
-            'unitypackage' { '${{ needs.runner-preflight.outputs.unity-version }}' }
+            'unitypackage-smoke' { '"2022.3.45f1"' }
+            'unitypackage' { '"2022.3.45f1"' }
             default { '${{ matrix.unity-version }}' }
         }
         if (
@@ -1735,7 +1742,10 @@ $defaultMatrixIsVersionGrouped = (
     [regex]::Matches($unityTestsMatrixJob, '(?m)^      matrix:\s*$').Count -eq 1 -and
     [regex]::Matches($unityTestsMatrixJob, '(?m)^        unity-version:\s*$').Count -eq 1 -and
     [regex]::Matches($unityTestsMatrixJob, '(?m)^          - \d+\.\d+\.\d+f\d+\s*$').Count -eq 4 -and
-    [regex]::Matches($unityTestsMatrixJob, '(?m)^        test-mode:\s*$').Count -eq 0 -and
+    [regex]::Matches($unityTestsMatrixJob, '(?m)^        test-mode:\s*$').Count -eq 1 -and
+    [regex]::Matches($unityTestsMatrixJob, '(?m)^          - editmode\s*$').Count -eq 1 -and
+    [regex]::Matches($unityTestsMatrixJob, '(?m)^          - playmode\s*$').Count -eq 1 -and
+    [regex]::Matches($unityTestsMatrixJob, '(?m)^          - standalone\s*$').Count -eq 1 -and
     $unityTestsMatrixJob.Contains('exclude: ${{ fromJSON(needs.matrix-config.outputs.matrix-exclude) }}') -and
     $unityTestsMatrixJob.Contains('needs.matrix-config.outputs.test-modes') -and
     -not $workflowContent.Contains('matrix-exclude-standalone') -and
@@ -1748,10 +1758,10 @@ foreach ($version in @('2021.3.45f1', '2022.3.45f1', '6000.3.16f1', '6000.5.2f1'
     )
 }
 if (-not $defaultMatrixIsVersionGrouped) {
-    Write-Host '::error file=.github/workflows/unity-tests.yml::The default Unity matrix must contain exactly the four supported Unity versions, exclude only unselected versions through matrix-config, and run selected modes as steps inside each version job. Do not restore a test-mode matrix or standalone job.'
+    Write-Host '::error file=.github/workflows/unity-tests.yml::The default Unity matrix must contain exactly the four supported Unity versions and the reviewed STATIC test-mode triple (editmode, playmode, standalone), and exclude unselected versions and unselected modes through matrix-config. The static test-mode axis is what authorizes the central editor gate to provision the StandaloneWindowsIl2Cpp profile on standalone legs (enrollment contract item 3); its values must stay static and exact.'
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info 'Checked the default Unity matrix groups selected modes into four version jobs.'
+    Write-Info 'Checked the default Unity matrix groups the reviewed static test-mode axis into four version legs.'
 }
 
 $groupedDefaultModesAreComplete = $true
@@ -1772,11 +1782,16 @@ foreach ($mode in $defaultModeContracts) {
     $reportIndex = $unityTestsMatrixJob.IndexOf("- name: Report slowest $label tests", [StringComparison]::Ordinal)
     $path = ".artifacts/unity/`${{ matrix.unity-version }}-$key"
     $selection = "contains(fromJSON(needs.matrix-config.outputs.test-modes), '$key')"
+    # Each version job now fans out over the reviewed static test-mode axis, so
+    # every mode-specific step must ALSO pin its own leg. Without the leg guard
+    # a single leg would run (or gate) all three modes.
+    $legGuard = "matrix.test-mode == '$key'"
 
     $modeIsComplete = (
         $runStep -match "(?m)^\s+id:\s+run_$key\s*$" -and
         $runStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
         $runStep.Contains('!cancelled()') -and
+        $runStep.Contains($legGuard) -and
         $runStep.Contains("steps.unity_lock.outputs.acquired == 'true'") -and
         $runStep.Contains($selection) -and
         $runStep -notmatch 'steps\.run_(?:editmode|playmode|standalone)\.(?:outcome|conclusion)' -and
@@ -1788,19 +1803,23 @@ foreach ($mode in $defaultModeContracts) {
         $runStep.Contains('-IncludeIntegrations') -and
         $runStep.Contains('UH_UNITY_TEST_CATEGORY: "!Performance;!Stress"') -and
         $runStep.Contains('./scripts/unity/assert-no-active-unity-editor.ps1') -and
+        $reportStep.Contains($legGuard) -and
         $reportStep.Contains($selection) -and
         $reportStep.Contains("$path/results.xml") -and
         $verifyStep -match "(?m)^\s+id:\s+verify_$key\s*$" -and
         $verifyStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
+        $verifyStep.Contains($legGuard) -and
         $verifyStep.Contains($selection) -and
         $verifyStep.Contains("steps.run_$key.outcome != 'skipped'") -and
         $verifyStep.Contains("results-dir: $path") -and
         $redactStep -match "(?m)^\s+id:\s+redact_$key\s*$" -and
         $redactStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
+        $redactStep.Contains($legGuard) -and
         $redactStep.Contains($selection) -and
         $redactStep.Contains("paths: $path") -and
         $uploadStep -match "(?m)^\s+id:\s+upload_$key\s*$" -and
         $uploadStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
+        $uploadStep.Contains($legGuard) -and
         $uploadStep.Contains($selection) -and
         $uploadStep.Contains("steps.redact_$key.outcome == 'success'") -and
         $uploadStep.Contains("name: unity-`${{ matrix.unity-version }}-$key") -and
@@ -1815,6 +1834,7 @@ foreach ($mode in $defaultModeContracts) {
             $modeIsComplete -and
             $headStep -match "(?m)^\s+id:\s+$($key)_head\s*$" -and
             $headStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
+            $headStep.Contains($legGuard) -and
             $headStep.Contains($selection) -and
             $headStep -notmatch 'steps\.run_(?:editmode|playmode|standalone)\.(?:outcome|conclusion)' -and
             $runStep.Contains("steps.$($key)_head.outcome == 'success'")
@@ -1830,8 +1850,9 @@ foreach ($mode in $defaultModeContracts) {
 $defaultOutcomeGate = Get-UnityWorkflowStepText -JobText $unityTestsMatrixJob -StepName 'Require every selected Unity mode'
 $defaultOutcomeGateIsComplete = (
     $defaultOutcomeGate -match '(?m)^\s+id:\s+require_selected_modes\s*$' -and
-    $defaultOutcomeGate.Contains('if: ${{ always() && !cancelled() }}') -and
-    $defaultOutcomeGate.Contains('SELECTED_MODES: ${{ needs.matrix-config.outputs.test-modes }}') -and
+    $defaultOutcomeGate.Contains('if: ${{ always() && !cancelled() && contains(fromJSON(needs.matrix-config.outputs.test-modes), matrix.test-mode) }}') -and
+    # Per-leg gate: the leg runs exactly its own mode, selected by matrix-config.
+    $defaultOutcomeGate.Contains('SELECTED_MODES: ${{ format(''["{0}"]'', matrix.test-mode) }}') -and
     $defaultOutcomeGate.Contains('./scripts/unity/assert-test-mode-outcomes.ps1') -and
     -not $defaultOutcomeGate.Contains('.conclusion')
 )
@@ -1955,7 +1976,6 @@ $matrixConfigAssemblyDiscoveryIsCentralized = (
     $workflowContent.Contains('test-modes: ${{ steps.resolve.outputs.test-modes }}') -and
     $workflowContent.Contains('matrix-exclude: ${{ steps.resolve.outputs.matrix-exclude }}') -and
     $unityTestsMatrixJob.Contains('exclude: ${{ fromJSON(needs.matrix-config.outputs.matrix-exclude) }}') -and
-    -not $unityTestsMatrixJob.Contains('test-mode:') -and
     $unityTestsMatrixJob.Contains('UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.editmode-integration-assemblies }}') -and
     $unityTestsMatrixJob.Contains('UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.playmode-integration-assemblies }}') -and
     $unityTestsMatrixJob.Contains('UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.standalone-integration-assemblies }}') -and
@@ -1973,7 +1993,12 @@ if (-not $matrixConfigAssemblyDiscoveryIsCentralized) {
     Write-Info "Checked Unity test assembly discovery is centralized on the hosted matrix job."
 }
 
-$trustedEditorMatrixProfile = '${{ (contains(fromJSON(needs.matrix-config.outputs.test-modes), ''standalone'') || inputs.acceptance == ''intmap'' || inputs.acceptance == ''serialization'' || inputs.acceptance == ''all'') && ''StandaloneWindowsIl2Cpp'' || ''EditorOnly'' }}'
+# Enrollment contract (Workflow contract item 3): the profile must be the exact
+# reviewed static matrix.test-mode map -- the analyzer admits no other dynamic
+# form -- so standalone legs verify the IL2CPP module set at gate time while
+# editmode and playmode legs keep EditorOnly. Jobs without the static axis stay
+# on the literal EditorOnly profile.
+$trustedEditorMatrixProfile = '${{ fromJSON(''{"editmode":"EditorOnly","playmode":"EditorOnly","standalone":"StandaloneWindowsIl2Cpp"}'')[matrix.test-mode] }}'
 $unityWorkflowsUseCentralEditorAuthority = (
     -not $jobTexts.ContainsKey('runner-maintenance') -and
     -not $benchmarksJobTexts.ContainsKey('runner-maintenance') -and
@@ -1983,7 +2008,7 @@ $unityWorkflowsUseCentralEditorAuthority = (
     (Test-UnityJobUsesCentralEditorGate -JobText $benchmarksMatrixJob -ProvisioningProfile 'EditorOnly')
 )
 if (-not $unityWorkflowsUseCentralEditorAuthority) {
-    Write-Host "::error file=.github/workflows/unity-tests.yml::Every Windows licensed job must run the exact central ensure-unity-editor action first, or immediately after the immutable current-head guard, with a ten-minute fail-closed health check under the runner tool cache. CI must not maintain or provision editors, the Unity command must consume the action's bound editor-path output, and the operator bootstrap must provision the same runner.tool_cache\\u6-v3 root. Keep .github/workflows/unity-benchmarks.yml in sync."
+    Write-Host "::error file=.github/workflows/unity-tests.yml::Every Windows licensed job must run the exact central ensure-unity-editor action first, or immediately after the immutable current-head guard, with a ten-minute fail-closed health check under the runner tool cache. The version-grouped job must pass the exact reviewed static matrix.test-mode map as provisioning-profile; jobs without that static axis must pass literal EditorOnly. CI must not maintain or provision editors, the Unity command must consume the action's bound editor-path output, and the operator bootstrap must provision the same runner.tool_cache\\u6-v3 root. Keep .github/workflows/unity-benchmarks.yml in sync."
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked Windows Unity workflows use the central editor authority before repository-controlled code."
@@ -3322,6 +3347,36 @@ $supersededDecisions = @(
         'superseded=(?<value>true|false)'
     ) | ForEach-Object { $_.Groups['value'].Value }
 )
+
+$benchmarksAggregateJobText = if ($benchmarksJobTexts.ContainsKey('benchmarks-aggregate')) { [string]$benchmarksJobTexts['benchmarks-aggregate'] } else { '' }
+
+# Asserts the central trusted-skip aggregate shape for one single-step hosted
+# job: exact env bindings for the preflight and licensed results plus the
+# fork/Dependabot skip keys, and the exact skip-or-success verdict script.
+function Test-TrustedSkipAggregateJobText {
+    param(
+        [Parameter(Mandatory = $true)][string]$JobText,
+        [Parameter(Mandatory = $true)][string]$LicensedJobResult
+    )
+
+    return (
+        $JobText -match '(?m)^\s+if:\s*\$\{\{\s*always\(\)\s*\}\}\s*$' -and
+        $JobText.Contains('runs-on: ubuntu-latest') -and
+        $JobText.Contains('needs:') -and
+        $JobText.Contains('shell: bash') -and
+        $JobText.Contains('RUNNER_PREFLIGHT_RESULT: ${{ needs.runner-preflight.result }}') -and
+        $JobText.Contains("UNITY_TESTS_RESULT: `${{ $LicensedJobResult }}") -and
+        $JobText.Contains("FORK_PR: `${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}") -and
+        $JobText.Contains("DEPENDABOT_PR: `${{ github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]' }}") -and
+        $JobText.Contains('if [ "${FORK_PR}" = "true" ] || [ "${DEPENDABOT_PR}" = "true" ]; then') -and
+        $JobText.Contains('test "${RUNNER_PREFLIGHT_RESULT}" = skipped') -and
+        $JobText.Contains('test "${UNITY_TESTS_RESULT}" = skipped') -and
+        $JobText.Contains('test "${RUNNER_PREFLIGHT_RESULT}" = success') -and
+        $JobText.Contains('test "${UNITY_TESTS_RESULT}" = success') -and
+        -not $JobText.Contains('continue-on-error')
+    )
+}
+
 $supersededGateContracts = @(
     @{
         Name = 'matrix-config exposes the superseded output'
@@ -3380,39 +3435,52 @@ $supersededGateContracts = @(
         Message = 'unity-ci-success must exit 0 for a superseded run: it never ran the licensed tiers and its check belongs to the head SHA it was queued for, so it can neither gate nor authorize the current head.'
     },
     @{
-        # Dependabot runs draw from a separate secret store, so
-        # BUILD_LOCK_READER_APP_ID arrived empty and the availability action failed
-        # closed with "Missing required input" -- permanently red on every
-        # dependency PR, while matrix-config had already skipped the licensed tiers
-        # those credentials exist to serve. The `secrets` context is unavailable in
-        # a job-level `if:`, so the guard has to be a step.
-        Name = 'runner-preflight skips the fleet probe when the reader credentials are absent'
+        # Enrollment contract: a Dependabot pull request draws from a separate
+        # secret store, so it must stay unlicensed BY SKIPPING, not by probing
+        # credentials at run time. The old `id: credentials` probe output was
+        # removed intentionally: a same-repository run is expected to hold the
+        # organization credential set, and a run without it fails closed at the
+        # preflight. The trusted-revision guard now lives in the job-level `if:`
+        # and the availability action runs unconditionally inside the job.
+        Name = 'runner-preflight carries the job-level trusted-revision guard with no credentials probe'
         Ok = (
-            $unityTestsRunnerPreflightJob -match '(?m)^\s+id:\s*credentials\s*$' -and
-            $unityTestsRunnerPreflightJob.Contains('READER_APP_ID: ${{ secrets.BUILD_LOCK_READER_APP_ID }}') -and
-            $unityTestsRunnerPreflightJob -match "(?m)^\s+if:\s*\`$\{\{\s*steps\.credentials\.outputs\.present\s*==\s*'true'\s*\}\}\s*$"
+            $unityTestsRunnerPreflightJob -match "(?m)^\s+if:\s*\`$\{\{ github\.event\.pull_request\.user\.login != 'dependabot\[bot\]' && \(github\.event_name != 'pull_request' \|\| github\.event\.pull_request\.head\.repo\.full_name == github\.repository\) \}\}\s*$" -and
+            $benchmarksRunnerPreflightJob -match "(?m)^\s+if:\s*\`$\{\{ github\.event\.pull_request\.user\.login != 'dependabot\[bot\]' && \(github\.event_name != 'pull_request' \|\| github\.event\.pull_request\.head\.repo\.full_name == github\.repository\) \}\}\s*$" -and
+            -not $unityTestsRunnerPreflightJob.Contains('id: credentials') -and
+            -not $unityTestsRunnerPreflightJob.Contains('steps.credentials') -and
+            -not $unityTestsRunnerPreflightJob.Contains('org-credentials') -and
+            -not $workflowContent.Contains('HAS_ORG_CREDENTIALS')
         )
-        Message = 'runner-preflight must detect whether this run carries build-lock reader credentials and skip the fleet probe when it does not. Probing a runner fleet no licensed leg is going to be dispatched to is not a gate, it is a guaranteed red on every Dependabot pull request.'
+        Message = 'runner-preflight must skip on Dependabot and fork pull requests through its job-level guard and run its single approved availability action unconditionally inside the job. The removed credentials probe must stay removed: reintroducing it would put licensing credentials into an unlicensed job''s scope and hide the skip behind a runtime boolean.'
     },
     @{
-        Name = 'Unity CI Success reports a run without Unity credentials instead of failing it'
+        # Enrollment contract (Workflow contract item 10): each aggregate is a
+        # single-step hosted job carrying the central trusted-skip script shape.
+        # It green-reports ONLY an exact untrusted skip (fork or Dependabot PR)
+        # or full success, so a Dependabot PR stays green while a failure,
+        # cancellation, or unexpected skip of a licensed tier turns red.
+        Name = 'each licensed job has a hosted trusted-skip aggregate'
         Ok = (
-            $workflowContent.Contains('HAS_ORG_CREDENTIALS: ${{ needs.runner-preflight.outputs.org-credentials }}') -and
-            $workflowContent -match '(?m)^          if \[ "\$\{HAS_ORG_CREDENTIALS\}" != "true" \]; then\s*$' -and
-            $workflowContent.Contains('## Unity validation did not run')
+            (Test-TrustedSkipAggregateJobText -JobText $jobTexts['unity-tests-aggregate'] -LicensedJobResult "needs.unity-tests.result") -and
+            (Test-TrustedSkipAggregateJobText -JobText $jobTexts['unity-tests-single-threaded-aggregate'] -LicensedJobResult "needs.unity-tests-single-threaded.result") -and
+            (Test-TrustedSkipAggregateJobText -JobText $jobTexts['unitypackage-smoke-aggregate'] -LicensedJobResult "needs.unitypackage-smoke.result") -and
+            (Test-TrustedSkipAggregateJobText -JobText $benchmarksAggregateJobText -LicensedJobResult "needs.benchmarks.result")
         )
-        Message = 'unity-ci-success must have an explicit branch for a run with no Unity credentials, and its step summary must say plainly that no Unity test executed. Without it the verdict demands success from licensed jobs that were skipped by design.'
+        Message = 'unity-tests, unity-tests-single-threaded, unitypackage-smoke, and benchmarks must each be covered by a single-step always-reporting aggregate that binds RUNNER_PREFLIGHT_RESULT and UNITY_TESTS_RESULT to the exact needs results and green-reports only an exact untrusted skip (FORK_PR/DEPENDABOT_PR) or full success. Any other script shape hides a skipped or cancelled licensed tier.'
     },
     @{
-        # The branch above is a waiver only if it asserts nothing; these two errors
-        # are what keep it an assertion. A licensed job that reported anything but
-        # `skipped` on a credential-less run means a leg ran that could not have.
-        Name = 'the no-credentials branch still asserts the hosted gates and the skips'
+        # A same-repository Dependabot PR skips runner-preflight (job-level
+        # guard), which skips every licensed tier with it, while matrix-config
+        # still runs on a hosted runner. The verdict must green-report that
+        # exact shape and nothing else -- an unexpected result stays an error.
+        Name = 'Unity CI Success green-reports an unlicensed Dependabot pull request'
         Ok = (
-            $workflowContent.Contains('Run without Unity credentials, but a hosted gate did not pass') -and
-            $workflowContent.Contains('Run without Unity credentials, but a licensed job did not skip')
+            $workflowContent.Contains('DEPENDABOT_PR: ${{ github.event.pull_request.user.login == ''dependabot[bot]'' }}') -and
+            $workflowContent.Contains('Dependabot PR, but the hosted matrix gate did not pass') -and
+            $workflowContent.Contains('Unexpected Unity CI job result for an intentionally unlicensed Dependabot PR') -and
+            $workflowContent.Contains('Dependabot PR intentionally omitted licensed Unity jobs.')
         )
-        Message = 'The no-credentials branch of unity-ci-success must require both hosted gates to have passed and every licensed job to have skipped. Exiting 0 without those checks would report green for a broken gate.'
+        Message = 'unity-ci-success must exit 0 for a same-repository Dependabot pull request only when matrix-config succeeded and every licensed tier plus runner-preflight skipped. Any other result is an error, so the documented Dependabot green path cannot mask a broken gate.'
     }
 )
 foreach ($licensedJobId in $licensedJobIds) {

@@ -105,9 +105,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
         static UnityMethodAnalyzerWindow()
         {
+            /* Application.isBatchMode throws from a ScriptableObject static initializer in
+            the editor Test Runner; the catch keeps the type initializable there. */
             try
             {
-                if (Application.isBatchMode || IsInvokedByTestRunner())
+                if (Application.isBatchMode || EditorUtilities.IsInvokedByTestRunner())
                 {
                     SuppressUserPrompts = true;
                 }
@@ -156,23 +158,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             }
         }
 
-        private static bool IsInvokedByTestRunner()
-        {
-            string[] args = Environment.GetCommandLineArgs();
-            foreach (string a in args)
-            {
-                if (
-                    0 <= a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
-                    || 0 <= a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)
-                    || 0 <= a.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase)
-                )
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
 #pragma warning restore CS0649 // Field is never assigned to, and will always have its default value
 
         private static string GetProjectRoot()

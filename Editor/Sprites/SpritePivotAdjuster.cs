@@ -101,24 +101,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             GetWindow<SpritePivotAdjuster>("Sprite Pivot Adjuster");
         }
 
-        private static bool IsInvokedByTestRunner()
-        {
-            // Heuristic: Unity test runs pass -runTests/-testResults on the command line
-            string[] args = Environment.GetCommandLineArgs();
-            foreach (string a in args)
-            {
-                if (
-                    0 <= a.IndexOf("runTests", StringComparison.OrdinalIgnoreCase)
-                    || 0 <= a.IndexOf("testResults", StringComparison.OrdinalIgnoreCase)
-                    || 0 <= a.IndexOf("testPlatform", StringComparison.OrdinalIgnoreCase)
-                )
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-
         private static bool ShowCancelableProgress(string title, string info, float progress)
         {
             return Utils.EditorUi.CancelableProgress(title, info, progress);

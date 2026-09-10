@@ -43,8 +43,6 @@ param(
 
     [string]$UnityEditorPath = $env:UNITY_EDITOR_PATH,
 
-    [string]$UnityInstallRoot = $(if ($env:UNITY_EDITOR_INSTALL_ROOT) { $env:UNITY_EDITOR_INSTALL_ROOT } else { 'C:\Unity\Editors' }),
-
     [string]$TestFilter = '',
 
     [string]$TestCategory = $(if ($env:UH_UNITY_TEST_CATEGORY) { $env:UH_UNITY_TEST_CATEGORY } else { '' }),
@@ -3898,18 +3896,14 @@ if ($GenerateOnly) {
     exit 0
 }
 
+# CI never provisions an editor here: the workflow's central ensure-unity-editor
+# gate is the only editor authority, and it publishes the validated executable
+# through UNITY_EDITOR_PATH. Failing closed keeps this script from silently
+# installing, repairing, or quarantining editors behind an audited workflow's
+# back; resolve a CI-managed editor first (locally, run the repository's
+# ensure-editor helper yourself with -CiManagedOnly -RequireHealthyExisting).
 if (-not $UnityEditorPath -or $UnityEditorPath.Trim().Length -eq 0) {
-    $ensureEditor = Join-Path $PSScriptRoot 'ensure-editor.ps1'
-    $provisioningProfile = if ($TestMode -eq 'standalone') { 'StandaloneWindowsIl2Cpp' } else { 'EditorOnly' }
-    $ensureArgs = @{
-        UnityVersion         = $UnityVersion
-        InstallRoot          = $UnityInstallRoot
-        ProvisioningProfile = $provisioningProfile
-    }
-    if ($env:GITHUB_ACTIONS -eq 'true') {
-        $ensureArgs.RequireHealthyExisting = $true
-    }
-    $UnityEditorPath = (& $ensureEditor @ensureArgs | Select-Object -Last 1)
+    throw 'UNITY_EDITOR_PATH is required and must point at an existing CI-managed Unity editor; resolve a managed editor before invoking this script.'
 }
 
 if (-not (Test-Path -LiteralPath $UnityEditorPath -PathType Leaf)) {

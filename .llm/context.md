@@ -19,17 +19,8 @@ Procedural skills are in the [skills/](./skills/) directory.
 
 ```text
 Runtime/                   # Runtime C# libraries
-  Core/
-    Attributes/            # Inspector & component attributes
-    DataStructure/         # Spatial trees, heaps, queues, tries, cyclic buffers
-    Extension/             # Extension methods for Unity types, collections, strings, math
-    Helper/                # Buffers, pooling, singletons, compression, logging
-    Math/                  # Math utilities, ballistics, geometry
-    Model/                 # Serializable types (Dictionary, HashSet, Nullable, Type, Guid)
-    OneOf/                 # Discriminated unions
-    Random/                # 20+ PRNG implementations with IRandom interface
-    Serialization/         # JSON/Protobuf serialization with Unity type converters
-    Threading/             # Thread pools, main thread dispatcher, guards
+  Core/                    # Attributes, DataStructure, Extension, Helper, Math,
+                           # Model, OneOf, Random, Serialization, Threading
   Tags/                    # Effects/attribute system (AttributeEffect, TagHandler, Cosmetics)
   Visuals/                 # Visual components (EnhancedImage, LayeredImage)
 
@@ -38,10 +29,7 @@ Editor/                    # Editor-only tooling
   CustomEditors/           # Custom inspectors (including Odin inspectors)
   Tools/                   # Editor windows (Animation Creator, Texture tools, etc.)
 
-Tests/
-  Runtime/                 # PlayMode tests mirroring Runtime/ structure
-  Editor/                  # EditMode tests mirroring Editor/ structure
-  Core/                    # Shared test utilities and helper types
+Tests/                     # Runtime/ (PlayMode), Editor/ (EditMode), Core/ (shared utilities)
 
 Samples~/                  # Sample projects (imported via Package Manager)
 ```
@@ -85,12 +73,9 @@ See [create-csharp-file](./skills/create-csharp-file.md) for detailed C# rules.
     taking a package upgrade must never fail a consumer's build. On by default, with TWO exceptions --
     `WUH010` (a dictionary read by indexer) and `WUH013` (a counting loop that can use `foreach`)
     remain opt-in for consumers because their correct shapes are ubiquitous. **The package opts
-    into WUH013 in its shared check-project ruleset**; all five source projects enforce it, and the
-    editor build additionally audits ten files excluded for old Unity reference gaps. The sweep
-    inventoried 321 sites: 318 conversions, two compaction exclusions, and one scoped callback
-    suppression. Retain indexed loops when the index is needed or enumeration changes behavior.
-    Both DLLs are committed under `Runtime/Analyzers`,
-    byte-compared in CI against a fresh `dotnet build -c Release` (SDK 9.0.306), and **an edit to
+    into WUH013 in its shared check-project ruleset**; all five source projects enforce it.
+    Retain indexed loops when the index is needed or enumeration changes behavior.
+    Both DLLs are committed under `Runtime/Analyzers`, byte-compared in CI, and **an edit to
     either is not finished until you rebuild it**. See [analyzers](../docs/performance/analyzers.md)
 18. NEVER size an allocation from a number a payload states -- only from what it delivers. A length prefix is safe because the reader refuses one longer than the bytes it holds; a capacity is a bare claim, and six bytes can ask for 8 GB. Clamp it with `SerializationCapacityLimits.Clamp` where it is a growth hint, refuse it with `TryAccept` where it is semantic. **A `stackalloc` sized from a caller's argument is the same rule with a worse failure** -- `StackOverflowException` is caught by nothing, so a length must be a compile-time constant or compared against one in the same statement, with a `SystemArrayPool` rent above `StackAllocation.MaxByteBudget`; `npm run lint:unsafe-code` holds it over 56 sites ([#637](https://github.com/Ambiguous-Interactive/unity-helpers/issues/637)). See [untrusted-payload-limits](./skills/untrusted-payload-limits.md). **The same gate refuses `[Il2CppSetOption(Option.NullChecks, false)]`** and the `ArrayBoundsChecks`/`DivideByZeroChecks` forms, however spelled -- deleting IL2CPP's runtime checks reaches the same undefined behaviour as `unsafe` with neither the keyword nor `allowUnsafeCode`, so nothing else can see it. Writing one with `true`, or with no value, leaves the check on and stays green. Zero sites exist and there is no baseline: the first one reds the build, and the gate carries a positive control because a zero-subject scan cannot prove itself
 
@@ -127,9 +112,8 @@ Run formatters/linters **immediately after each file change**, not batched at ta
   `npm run agent:preflight`; use `npm run validate:local` only when a complete repository-wide
   aggregate is warranted. When hook or agent-preflight behavior changes, also run
   `npm run validate:tests:hook-regressions`. CI always runs the combined `validate:tests`
-  aggregate. Treat git hooks as last-resort only. For
-  the push step itself (setup, redirection, rejection handling) follow
-  [ship-changes Step 9](./skills/ship-changes.md#step-9-push-to-remote)
+  aggregate. Treat git hooks as last-resort only. Follow
+  [ship-changes Step 9](./skills/ship-changes.md#step-9-push-to-remote) for the push step.
 
 See [formatting](./skills/formatting.md) and [validate-before-commit](./skills/validate-before-commit.md) for details.
 
@@ -339,15 +323,31 @@ Lint-error-code prefixes (`^[A-Z]{2,}\d{3}$` tokens like `UNH001`, `PWS002`) mus
 - **Do not commit**: `Library/`, `obj/`, secrets, tokens. **Do commit**: `.meta` files for all assets
 - **Verify `.asmdef` references** when adding new namespaces
 - Commits: short, imperative summaries (e.g., "Fix JSON serialization for FastVector"); group related changes
+- **User-facing copy is STE-simple.** PRs, titles, commits, comments, ship summaries -- anything a
+  person reads -- use Simplified Technical English: common words, short sentences (one idea each),
+  active voice, no filler. State **why**, **how**, **what** -- and only in PRs and git messages.
+  Code comments stay extremely minimal
+  ([create-csharp-file](./skills/create-csharp-file.md) holds the bar).
+  See [ship-changes](./skills/ship-changes.md#step-9b-open-the-pull-request-yourself)
 - PRs: **short and plain.** A title of 50 characters or fewer naming the effect the user sees,
   then one `**Why:**` sentence, two to five one-line `**What:**` bullets, and `Fixes #123`.
   Nothing else -- no root causes, no measurements, no validation reports. Those go in the commit
   body, the progress log, or the linked issue. Include before/after screenshots for UI changes.
   See [ship-changes](./skills/ship-changes.md#step-9b-open-the-pull-request-yourself)
+- **File follow-ups as GitHub issues, never as local-only notes.** A session remainder -- latent
+  bug, stale comment, design decision, scoped sweep -- becomes a tracked issue (verified file:line
+  evidence, fix shape, acceptance criteria, provenance link) BEFORE the work is declared done.
+  Local notes let it evaporate; issues survive and stay searchable. Search first (`search_issues`)
+  for duplicates, pick the type (Bug/Feature/Task), and cross-link the issue where it was raised.
+  The progress notes and work plan then carry the issue NUMBER, not the finding.
 - **`npm run pr:feedback -- <number>` after every push and before declaring done.** Inline review
   threads are `GET /pulls/{n}/comments`, a DIFFERENT endpoint from PR comments, so polling only the
-  latter reports "no feedback" while a human waits. Treat a line-scoped comment as a policy: fix the
-  line, sweep the class, decide whether a rule should carry it
+  latter reports "no feedback" while a human waits. The thread section leads with a non-bot count
+  and prints non-bot threads first; empty review bodies list in the submissions section. READ THE
+  WHOLE OUTPUT -- sampling the head of the thread section missed fresh human threads under stale
+  bot ones (session 267); prefer the GitHub MCP first per
+  [github-operations](./skills/github-operations.md). Treat a line-scoped comment as a policy: fix
+  the line, sweep the class, decide whether a rule should carry it
 
 ### Re-running local aggregates costs your session -- CI runs them anyway
 
