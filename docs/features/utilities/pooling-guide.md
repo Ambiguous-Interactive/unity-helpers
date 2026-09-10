@@ -484,6 +484,11 @@ least-recently-used pools, while 0 or less removes the bound. All four caches us
 `DestroyHashSetPool`, `DestroySortedSetPool`, `DestroyDictionaryPool` and `DestroySortedDictionaryPool`
 remain available to drop and dispose one pool explicitly.
 
+Cache eviction intentionally stops tracking a comparer-keyed pool without disposing it. Callers
+receive and may retain that pool directly, so the cache cannot know when disposal is safe. Use the
+matching `Destroy*Pool` method when the caller owns the pool lifetime and can prove no borrower
+still uses it.
+
 `PoolTypeResolver` uses the same shared cache for simplified type-name parsing. Set
 `PoolTypeResolver.MaxCachedTypeNames` to tune its live default-512 bound; lowering it evicts
 least-recently-used spellings immediately, and 0 or less removes the bound.
@@ -511,8 +516,9 @@ Do not type-check `is IDisposable` inside a pool and dispose on clear: eviction 
 also drop objects that are merely cached for reuse -- the comparer-keyed caches above store pools
 of pools, and their `WallstopGenericPool` values are themselves `IDisposable` that callers hold
 directly. Ownership belongs to whoever dropped the instance from the pool, which is exactly what
-`onDisposal` expresses. The callback may run while the global budget registry holds its lock and
-may re-enter from `onRelease`, so keep it short and non-throwing.
+`onDisposal` expresses. Global budget enforcement snapshots its work before it invokes callbacks,
+so a callback can query or update the global registry without running under the registry lock. A
+callback may still re-enter from `onRelease`, so keep it short and non-throwing.
 
 ---
 

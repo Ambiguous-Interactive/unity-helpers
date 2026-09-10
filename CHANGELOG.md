@@ -215,6 +215,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix global budget enforcement running pool purge and disposal callbacks while holding the registry lock ([#752](https://github.com/Ambiguous-Interactive/unity-helpers/issues/752)).
+- Fix a disposed pooled serialization writer hanging when code tries to use it again ([#753](https://github.com/Ambiguous-Interactive/unity-helpers/issues/753)).
 - Fix the protobuf byte-writer pool abandoning its rented buffer on purge: writers now return their `ArrayPool<byte>` rental when they leave the pool, and the pooling guide documents when a pool needs `onDisposal` ([#749](https://github.com/Ambiguous-Interactive/unity-helpers/pull/749)).
 - Fix collection-inspector button textures leaking across script reloads. See [Property Drawers](./docs/features/editor-tools/editor-tools-guide.md#property-drawers-attributes) ([#648](https://github.com/Ambiguous-Interactive/unity-helpers/issues/648)).
 - Fix unbounded sprite preview retention in Animation Creator and Animation Event Editor while preserving full-resolution previews. See [Animation Tools](./docs/features/editor-tools/editor-tools-guide.md#animation-tools) ([#648](https://github.com/Ambiguous-Interactive/unity-helpers/issues/648)).

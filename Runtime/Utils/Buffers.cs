@@ -1275,6 +1275,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         /// <summary>
         /// Gets or sets the callback invoked when an item is purged from the pool.
+        /// Global budget enforcement invokes this callback after releasing the registry lock.
         /// </summary>
         public Action<T, PurgeReason> OnPurge { get; set; }
 
@@ -1358,9 +1359,9 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// Optional callback invoked on every instance that leaves the pool forever -- pool
         /// <see cref="Dispose"/>, budget purge, memory-pressure purge, idle-timeout purge or a
         /// return into an already-disposed pool. Without it, such instances are dropped as-is, so
-        /// an <c>IDisposable</c> <c>T</c> requires this callback to release its resources. May run
-        /// inside GlobalPoolRegistry's budget lock and again from <c>onRelease</c>; keep it
-        /// short and non-throwing.
+        /// an <c>IDisposable</c> <c>T</c> requires this callback to release its resources. Global
+        /// budget enforcement invokes it after releasing the registry lock. It may run again from
+        /// <c>onRelease</c>, so keep it short and non-throwing.
         /// </param>
         /// <param name="options">Optional pool configuration for auto-purging behavior.</param>
         /// <exception cref="ArgumentNullException">Thrown when producer is null.</exception>
@@ -2208,6 +2209,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         /// <summary>
         /// Gets or sets the callback invoked when an item is purged from the pool.
+        /// Global budget enforcement invokes this callback after releasing the registry lock.
         /// This property is thread-safe.
         /// </summary>
         public Action<T, PurgeReason> OnPurge
@@ -2317,9 +2319,9 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// Optional callback invoked on every instance that leaves the pool forever -- pool
         /// <see cref="Dispose"/>, budget purge, memory-pressure purge, idle-timeout purge or a
         /// return into an already-disposed pool. Without it, such instances are dropped as-is, so
-        /// an <c>IDisposable</c> <c>T</c> requires this callback to release its resources. May run
-        /// inside GlobalPoolRegistry's budget lock and again from <c>onRelease</c>; keep it
-        /// short and non-throwing.
+        /// an <c>IDisposable</c> <c>T</c> requires this callback to release its resources. Global
+        /// budget enforcement invokes it after releasing the registry lock. It may run again from
+        /// <c>onRelease</c>, so keep it short and non-throwing.
         /// </param>
         /// <param name="options">Optional pool configuration for auto-purging behavior.</param>
         /// <exception cref="ArgumentNullException">Thrown when producer is null.</exception>

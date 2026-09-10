@@ -143,6 +143,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// Use this for cleanup, logging, or resource disposal.
         /// </summary>
         /// <remarks>
+        /// Global budget enforcement invokes this callback after releasing the registry lock.
         /// Exceptions thrown by this callback are swallowed to prevent pool corruption.
         /// </remarks>
         public Action<T, PurgeReason> OnPurge { get; set; }

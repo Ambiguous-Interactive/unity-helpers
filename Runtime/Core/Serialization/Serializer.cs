@@ -3978,12 +3978,26 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             onDisposal: w => w.Dispose()
         );
 
-        public int WrittenCount => _written;
+        public int WrittenCount
+        {
+            get
+            {
+                ThrowIfDisposed();
+                return _written;
+            }
+        }
 
         /// <summary>
         /// The bytes written so far, without copying them out. Valid until the lease is returned.
         /// </summary>
-        public ReadOnlySpan<byte> WrittenSpan => _buffer.AsSpan(0, _written);
+        public ReadOnlySpan<byte> WrittenSpan
+        {
+            get
+            {
+                ThrowIfDisposed();
+                return _buffer.AsSpan(0, _written);
+            }
+        }
         private byte[] _buffer;
         private int _written;
         private bool _disposed;
@@ -4000,28 +4014,33 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
         public void Advance(int count)
         {
+            ThrowIfDisposed();
             _written += count;
         }
 
         public Memory<byte> GetMemory(int sizeHint = 0)
         {
+            ThrowIfDisposed();
             EnsureCapacity(sizeHint);
             return _buffer.AsMemory(_written);
         }
 
         public Span<byte> GetSpan(int sizeHint = 0)
         {
+            ThrowIfDisposed();
             EnsureCapacity(sizeHint);
             return _buffer.AsSpan(_written);
         }
 
         public void Preallocate(int sizeHint)
         {
+            ThrowIfDisposed();
             EnsureCapacity(sizeHint);
         }
 
         public int ToArrayExact(ref byte[] buffer)
         {
+            ThrowIfDisposed();
             if (buffer == null || buffer.Length < _written)
             {
                 buffer = new byte[_written];
@@ -4083,6 +4102,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             }
             _written = 0;
             _disposed = false;
+        }
+
+        private void ThrowIfDisposed()
+        {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(PooledArrayBufferWriter));
+            }
         }
     }
 
