@@ -220,7 +220,10 @@ if head_sha:
         for bot, said_reviews in reviews_by_bot.items():
             if bot not in identity:
                 continue
-            for review in said_reviews[:1]:
+            # Reviews print unfiltered in section 2 (an empty body points at section 1), so the
+            # helper must skip empties itself: grabbing [:1] can land on a bodyless review and
+            # hide the quota/refusal reason a failing check's own log omits (#661).
+            for review in [r for r in said_reviews if (r.get("body") or "").strip()][:1]:
                 said = [line for line in (review.get("body") or "").splitlines() if line.strip()]
                 if said:
                     print(
