@@ -7,7 +7,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
     using UnityEngine;
     using UnityEngine.UIElements;
 
-    public sealed class GlitchProgressBar : VisualElement
+#if UNITY_6000_0_OR_NEWER
+    [UxmlElement]
+#endif
+    public sealed partial class GlitchProgressBar : VisualElement
     {
         public const string USSClassName = "glitch-progress-bar";
         public const string USSNormalColorVarName = "--gpb-normal-color";
@@ -17,6 +20,7 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private float _progress = 0.5f;
         private float _visualProgress;
+
         public float Progress
         {
             get => _progress;
@@ -41,7 +45,29 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
             }
         }
 
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("progress")]
+        private float UxmlProgress
+        {
+            get => _progress;
+            set
+            {
+                if (float.IsNaN(value) || float.IsInfinity(value))
+                {
+                    return;
+                }
+                _progress = Mathf.Clamp01(value);
+                _visualProgress = _progress;
+                _targetProgress = _progress;
+            }
+        }
+#endif
+
         private Color _normalColor = Color.green;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("normal-color")]
+#endif
         public Color NormalColor
         {
             get => _normalColor;
@@ -53,6 +79,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private Color _glitchColor1 = Color.red;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("glitch-color1")]
+#endif
         public Color GlitchColor1
         {
             get => _glitchColor1;
@@ -64,6 +94,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private Color _glitchColor2 = Color.blue;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("glitch-color2")]
+#endif
         public Color GlitchColor2
         {
             get => _glitchColor2;
@@ -75,6 +109,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private Color _trackColor = Color.black;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("track-color")]
+#endif
         public Color TrackColor
         {
             get => _trackColor;
@@ -85,9 +123,24 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
             }
         }
 
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("glitch-intensity")]
+#endif
         public float glitchIntensity = 0.1f;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("glitch-frequency")]
+#endif
         public float glitchFrequency = 0.15f;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("glitch-duration-frames")]
+#endif
         public int glitchDurationFrames = 3;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("progress-animation-speed")]
+#endif
         public float progressAnimationSpeed = 5f;
 
         private bool _isGlitching;
@@ -97,6 +150,7 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private readonly IRandom _random;
 
+#if !UNITY_6000_0_OR_NEWER
         public new class UxmlFactory : UxmlFactory<GlitchProgressBar, UxmlTraits> { }
 
         public new class UxmlTraits : VisualElement.UxmlTraits
@@ -193,6 +247,7 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
                 }
             }
         }
+#endif
 
         public GlitchProgressBar()
             : this(PRNG.Instance) { }

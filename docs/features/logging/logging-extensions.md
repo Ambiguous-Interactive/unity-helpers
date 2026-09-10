@@ -43,6 +43,7 @@ public sealed class EnemyHUD : MonoBehaviour
 - Pass interpolated strings directly; the formatter applies tags before Unity renders the message.
 - Use `pretty: false` if you only want the decorated text without the timestamp (or optional thread) prefix.
 - Call `this.LogWarn`, `this.LogError`, or `this.LogDebug` for severity-specific output; all overloads accept `Exception e` to append stack traces.
+- Diagnostic catch blocks log the full exception with their operation context, so the Console keeps its type, inner exceptions, and original stack trace.
 
 ### Enabling logging in builds
 

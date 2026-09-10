@@ -779,7 +779,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                     $"[UnityHelpers] protobuf-net already bound {typeof(TReal).Name}, so its "
                         + $"{typeof(TSurrogate).Name} could not be registered and the type will be "
                         + $"encoded with different bytes than this package documents. Something "
-                        + $"serialized it before UnityHelpers' Serializer was first touched. {error.Message}"
+                        + $"serialized it before UnityHelpers' Serializer was first touched. {error}"
                 );
 #endif
             }

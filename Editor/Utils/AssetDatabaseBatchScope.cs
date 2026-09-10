@@ -136,7 +136,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 {
                     allowAutoRefreshFailed = true;
                     Debug.LogError(
-                        $"[{nameof(AssetDatabaseBatchScope)}] {nameof(AssetDatabase.AllowAutoRefresh)} threw during Dispose: {allowAutoRefreshException.Message}"
+                        $"[{nameof(AssetDatabaseBatchScope)}] {nameof(AssetDatabase.AllowAutoRefresh)} threw during Dispose: {allowAutoRefreshException}"
                     );
                 }
 
@@ -148,7 +148,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 {
                     stopAssetEditingFailed = true;
                     Debug.LogError(
-                        $"[{nameof(AssetDatabaseBatchScope)}] {nameof(AssetDatabase.StopAssetEditing)} threw during Dispose: {stopAssetEditingException.Message}"
+                        $"[{nameof(AssetDatabaseBatchScope)}] {nameof(AssetDatabase.StopAssetEditing)} threw during Dispose: {stopAssetEditingException}"
                     );
                 }
 
@@ -168,7 +168,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     catch (Exception refreshException)
                     {
                         Debug.LogError(
-                            $"[{nameof(AssetDatabaseBatchScope)}] {nameof(AssetDatabase.Refresh)} threw during Dispose: {refreshException.Message}"
+                            $"[{nameof(AssetDatabaseBatchScope)}] {nameof(AssetDatabase.Refresh)} threw during Dispose: {refreshException}"
                         );
                     }
                 }
@@ -247,7 +247,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 catch (Exception resumeBatchException)
                 {
                     Debug.LogError(
-                        $"[{nameof(AssetDatabasePauseScope)}] {nameof(AssetDatabaseBatchHelper.ResumeBatch)} threw during Dispose: {resumeBatchException.Message}"
+                        $"[{nameof(AssetDatabasePauseScope)}] {nameof(AssetDatabaseBatchHelper.ResumeBatch)} threw during Dispose: {resumeBatchException}"
                     );
                 }
             }
@@ -603,7 +603,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 {
                     allowAutoRefreshFailed = true;
                     Debug.LogError(
-                        $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.AllowAutoRefresh)} threw during {nameof(PauseBatch)}: {allowAutoRefreshException.Message}"
+                        $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.AllowAutoRefresh)} threw during {nameof(PauseBatch)}: {allowAutoRefreshException}"
                     );
                 }
 
@@ -614,7 +614,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 catch (Exception stopAssetEditingException)
                 {
                     Debug.LogError(
-                        $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.StopAssetEditing)} threw during {nameof(PauseBatch)}: {stopAssetEditingException.Message}"
+                        $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.StopAssetEditing)} threw during {nameof(PauseBatch)}: {stopAssetEditingException}"
                     );
 
                     if (allowAutoRefreshFailed)
@@ -777,7 +777,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 {
                     allowAutoRefreshFailures++;
                     Debug.LogError(
-                        $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.AllowAutoRefresh)} threw during {nameof(ResetBatchDepth)} (iteration {i + 1}/{depthToCleanup}): {allowAutoRefreshException.Message}"
+                        $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.AllowAutoRefresh)} threw during {nameof(ResetBatchDepth)} (iteration {i + 1}/{depthToCleanup}): {allowAutoRefreshException}"
                     );
                 }
 
@@ -789,7 +789,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 {
                     stopAssetEditingFailures++;
                     Debug.LogError(
-                        $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.StopAssetEditing)} threw during {nameof(ResetBatchDepth)} (iteration {i + 1}/{depthToCleanup}): {stopAssetEditingException.Message}"
+                        $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.StopAssetEditing)} threw during {nameof(ResetBatchDepth)} (iteration {i + 1}/{depthToCleanup}): {stopAssetEditingException}"
                     );
                 }
             }
@@ -908,7 +908,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             catch (Exception startAssetEditingException)
             {
                 Debug.LogError(
-                    $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.StartAssetEditing)} threw during {nameof(ResumeBatch)}: {startAssetEditingException.Message}"
+                    $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.StartAssetEditing)} threw during {nameof(ResumeBatch)}: {startAssetEditingException}"
                 );
             }
 
@@ -920,7 +920,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             catch (Exception disallowAutoRefreshException)
             {
                 Debug.LogError(
-                    $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.DisallowAutoRefresh)} threw during {nameof(ResumeBatch)}: {disallowAutoRefreshException.Message}"
+                    $"[{nameof(AssetDatabaseBatchHelper)}] {nameof(AssetDatabase.DisallowAutoRefresh)} threw during {nameof(ResumeBatch)}: {disallowAutoRefreshException}"
                 );
             }
 

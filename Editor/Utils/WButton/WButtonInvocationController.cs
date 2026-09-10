@@ -787,7 +787,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils.WButton
                         {
                             didLog = true;
                             Debug.LogWarning(
-                                $"[WButton] Failed to serialize result of type {(valueType ?? value.GetType()).Name}: {ex.Message}"
+                                $"[WButton] Failed to serialize result of type {(valueType ?? value.GetType()).Name}: {ex}"
                             );
                             summary = "(see console)";
                         }

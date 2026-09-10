@@ -168,7 +168,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
             catch (Exception exception)
             {
-                sprite.LogError($"Failed to read the sprite's textureRect: {exception.Message}");
+                sprite.LogError($"Failed to read the sprite's textureRect: {exception}");
                 return null;
             }
 
@@ -229,7 +229,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 {
                     UnityEngine.Object.DestroyImmediate(result);
                 }
-                source.LogError($"{operation} failed to write pixels: {exception.Message}");
+                source.LogError($"{operation} failed to write pixels: {exception}");
                 return null;
             }
         }

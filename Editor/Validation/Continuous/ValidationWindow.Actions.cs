@@ -211,9 +211,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                             }
                             catch (Exception thrown)
                             {
-                                UnityEngine.Debug.LogWarning(
-                                    "[Sentinel] Undo failed: " + thrown.Message
-                                );
+                                UnityEngine.Debug.LogWarning("[Sentinel] Undo failed: " + thrown);
                             }
                         }
                         RunOrCancel();

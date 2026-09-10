@@ -319,7 +319,7 @@ jobs:
           - 2021.3.45f1
           - 2022.3.45f1
           - 6000.3.16f1
-          - 6000.5.2f1
+          - 6000.6.0f1
         # Enrollment contract (Workflow contract item 3): this reviewed STATIC
         # test-mode axis lets the central editor gate provision the
         # StandaloneWindowsIl2Cpp profile on standalone legs, so IL2CPP player

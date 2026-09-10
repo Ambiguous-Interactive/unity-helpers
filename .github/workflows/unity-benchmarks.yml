@@ -179,7 +179,7 @@ jobs:
           - 2021.3.45f1
           - 2022.3.45f1
           - 6000.3.16f1
-          - 6000.5.2f1
+          - 6000.6.0f1
         test-mode:
           - playmode
         exclude: ${{ fromJSON(needs.matrix-config.outputs.matrix-exclude) }}

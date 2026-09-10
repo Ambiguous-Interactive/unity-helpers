@@ -7,7 +7,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
     using UnityEngine;
     using UnityEngine.UIElements;
 
-    public sealed class CircularProgressBar : VisualElement
+#if UNITY_6000_0_OR_NEWER
+    [UxmlElement]
+#endif
+    public sealed partial class CircularProgressBar : VisualElement
     {
         public enum StartPointLocation
         {
@@ -29,6 +32,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         public const string USSThicknessVarName = "--thickness";
 
         private float _progress = 0.5f;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("progress")]
+#endif
         public float Progress
         {
             get => _progress;
@@ -44,6 +51,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private float _radius = 50f;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("radius")]
+#endif
         public float Radius
         {
             get => _radius;
@@ -60,6 +71,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private float _thickness = 10f;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("thickness")]
+#endif
         public float Thickness
         {
             get => _thickness;
@@ -76,6 +91,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private float _startPoint = GetStartAngleInDegrees(StartPointLocation.Top);
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("start-at")]
+#endif
         public float StartAt
         {
             get => _startPoint;
@@ -91,6 +110,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private FillDirection _fillDirection = FillDirection.Clockwise;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("direction")]
+#endif
         public FillDirection Direction
         {
             get => _fillDirection;
@@ -102,6 +125,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private Color _trackColor = Color.gray;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("track-color-attr")]
+#endif
         public Color TrackColor
         {
             get => _trackColor;
@@ -113,6 +140,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private Color _progressColor = Color.green;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("progress-color-attr")]
+#endif
         public Color ProgressColor
         {
             get => _progressColor;
@@ -123,6 +154,7 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
             }
         }
 
+#if !UNITY_6000_0_OR_NEWER
         public new class UxmlFactory : UxmlFactory<CircularProgressBar, UxmlTraits> { }
 
         public new class UxmlTraits : VisualElement.UxmlTraits
@@ -186,6 +218,7 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
                 bar.ProgressColor = _progressColorAttribute.GetValueFromBag(bag, cc);
             }
         }
+#endif
 
         public CircularProgressBar()
         {

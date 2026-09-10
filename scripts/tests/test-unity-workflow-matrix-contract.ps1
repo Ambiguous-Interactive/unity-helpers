@@ -766,7 +766,7 @@ $benchmarkAssemblyDiscoveryIsCentralized = (
     $benchmarkJob.Contains('- 2021.3.45f1') -and
     $benchmarkJob.Contains('- 2022.3.45f1') -and
     $benchmarkJob.Contains('- 6000.3.16f1') -and
-    $benchmarkJob.Contains('- 6000.5.2f1') -and
+    $benchmarkJob.Contains('- 6000.6.0f1') -and
     $benchmarkJob.Contains('- playmode') -and
     $benchmarksWorkflowContent.Contains('matrix-exclude: ${{ steps.resolve.outputs.matrix-exclude }}') -and
     $benchmarkJob.Contains('exclude: ${{ fromJSON(needs.matrix-config.outputs.matrix-exclude) }}') -and
@@ -954,11 +954,11 @@ function Get-CommandIndex {
 if ($unityVersions.Count -lt 1) {
     Write-Host "::error file=.github/unity-versions.json::Unity CI version config must define at least one entry in all[]."
     $failed = $true
-} elseif ($unityVersions[-1] -ne '6000.5.2f1') {
-    Write-Host "::error file=.github/unity-versions.json::Unity 6000.5.2f1 must be the latest tracked Unity version so Unity 6000.5 regressions are caught in CI."
+} elseif ($unityVersions[-1] -ne '6000.6.0f1') {
+    Write-Host "::error file=.github/unity-versions.json::Unity 6000.6.0f1 must be the latest tracked Unity version so Unity 6000.6 regressions are caught in CI."
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info "Checked Unity version source of truth includes Unity 6000.5.2f1 as the latest version."
+    Write-Info "Checked Unity version source of truth includes Unity 6000.6.0f1 as the latest version."
 }
 
 # Every Unity version CI actually tests has to be selectable when someone files a bug against it.
@@ -975,7 +975,7 @@ foreach ($templateName in @('bug_report.yml', 'feature_request.yml')) {
 
     $templateText = Get-Content -LiteralPath $templatePath -Raw
     foreach ($unityVersion in $unityVersions) {
-        # "6000.5.2f1" is offered to users as "Unity 6.5 (6000.5)"; match on the stream, which is
+        # "6000.6.0f1" is offered to users as "Unity 6.6 (6000.6)"; match on the stream, which is
         # what the label carries, rather than on the patch the matrix pins.
         $stream = ($unityVersion -split '\.')[0..1] -join '.'
         if ($templateText -notmatch [regex]::Escape($stream)) {
@@ -1751,7 +1751,7 @@ $defaultMatrixIsVersionGrouped = (
     -not $workflowContent.Contains('matrix-exclude-standalone') -and
     -not $workflowContent.Contains('matrix-include-standalone')
 )
-foreach ($version in @('2021.3.45f1', '2022.3.45f1', '6000.3.16f1', '6000.5.2f1')) {
+foreach ($version in @('2021.3.45f1', '2022.3.45f1', '6000.3.16f1', '6000.6.0f1')) {
     $defaultMatrixIsVersionGrouped = (
         $defaultMatrixIsVersionGrouped -and
         [regex]::Matches($unityTestsMatrixJob, "(?m)^          - $([regex]::Escape($version))\s*$").Count -eq 1

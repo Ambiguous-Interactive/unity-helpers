@@ -215,6 +215,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix the seven UI Toolkit progress controls failing to compile on Unity 6000.6. Their UXML tags and attributes remain available on Unity 2021.3 and newer ([#759](https://github.com/Ambiguous-Interactive/unity-helpers/issues/759)).
+- Fix pooled serialization writes accepting negative or oversized advances and overflowing capacity calculations ([#760](https://github.com/Ambiguous-Interactive/unity-helpers/issues/760)).
+- Fix caught exceptions losing their type, inner exceptions, and stack trace in diagnostic logs ([#762](https://github.com/Ambiguous-Interactive/unity-helpers/issues/762)).
 - Fix global budget enforcement running pool purge and disposal callbacks while holding the registry lock ([#752](https://github.com/Ambiguous-Interactive/unity-helpers/issues/752)).
 - Fix a disposed pooled serialization writer hanging when code tries to use it again ([#753](https://github.com/Ambiguous-Interactive/unity-helpers/issues/753)).
 - Fix the protobuf byte-writer pool abandoning its rented buffer on purge: writers now return their `ArrayPool<byte>` rental when they leave the pool, and the pooling guide documents when a pool needs `onDisposal` ([#749](https://github.com/Ambiguous-Interactive/unity-helpers/pull/749)).

@@ -155,7 +155,7 @@ namespace WallstopStudios.UnityHelpers.Editor
             catch (Exception e)
             {
                 UnityEngine.Debug.LogWarning(
-                    $"CleanupLegacyEmptyFolders encountered an issue: {e.Message}"
+                    $"CleanupLegacyEmptyFolders encountered an issue: {e}"
                 );
             }
         }
@@ -313,7 +313,7 @@ namespace WallstopStudios.UnityHelpers.Editor
             catch (Exception e)
             {
                 UnityEngine.Debug.LogWarning(
-                    $"{nameof(PersistentDirectorySettings)} migration encountered an issue: {e.Message}\n{e}"
+                    $"{nameof(PersistentDirectorySettings)} migration encountered an issue: {e}"
                 );
                 return null;
             }

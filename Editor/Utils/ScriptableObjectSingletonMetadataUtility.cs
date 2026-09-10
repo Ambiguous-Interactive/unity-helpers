@@ -76,7 +76,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 catch (Exception ex)
                 {
                     Debug.LogWarning(
-                        $"ScriptableObjectSingletonMetadataUtility: Failed to create metadata asset: {ex.Message}"
+                        $"ScriptableObjectSingletonMetadataUtility: Failed to create metadata asset: {ex}"
                     );
                     if (created != null)
                     {
@@ -446,7 +446,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 catch (Exception ex)
                 {
                     Debug.LogWarning(
-                        $"ScriptableObjectSingletonMetadataUtility: Failed to create new metadata asset during migration: {ex.Message}. Keeping legacy metadata."
+                        $"ScriptableObjectSingletonMetadataUtility: Failed to create new metadata asset during migration: {ex}. Keeping legacy metadata."
                     );
                     if (created != null)
                     {
@@ -519,7 +519,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             }
             catch (Exception e)
             {
-                Debug.LogWarning($"Failed to clean up empty folders after migration: {e.Message}");
+                Debug.LogWarning($"Failed to clean up empty folders after migration: {e}");
             }
         }
 

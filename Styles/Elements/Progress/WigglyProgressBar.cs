@@ -7,7 +7,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
     using UnityEngine;
     using UnityEngine.UIElements;
 
-    public sealed class WigglyProgressBar : VisualElement
+#if UNITY_6000_0_OR_NEWER
+    [UxmlElement]
+#endif
+    public sealed partial class WigglyProgressBar : VisualElement
     {
         public const string USSClassName = "wiggly-progress-bar";
         public const string USSTrackColorVarName = "--wiggly-track-color";
@@ -28,6 +31,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private float _progress = 0.5f;
 
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("progress")]
+#endif
         public float Progress
         {
             get => _progress;
@@ -48,6 +54,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private float _amplitude = 10f;
 
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("amplitude")]
+#endif
         public float Amplitude
         {
             get => _amplitude;
@@ -65,6 +74,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private float _wavelength = 50f;
 
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("wavelength")]
+#endif
         public float Wavelength
         {
             get => _wavelength;
@@ -81,6 +93,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private float _thickness = 5f;
 
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("thickness")]
+#endif
         public float Thickness
         {
             get => _thickness;
@@ -98,6 +113,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private bool _roundedCaps = true;
 
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("rounded-caps")]
+#endif
         public bool RoundedCaps
         {
             get => _roundedCaps;
@@ -110,6 +128,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private FillDirection _fillDirection = FillDirection.Forward;
 
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("fill-direction")]
+#endif
         public FillDirection Direction
         {
             get => _fillDirection;
@@ -122,6 +143,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private Color _trackColor = Color.gray;
 
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("track-color-attr")]
+#endif
         public Color TrackColor
         {
             get => _trackColor;
@@ -134,6 +158,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private Color _progressColor = new(0.2f, 0.6f, 1f);
 
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("progress-color-attr")]
+#endif
         public Color ProgressColor
         {
             get => _progressColor;
@@ -146,6 +173,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private int _segmentsPerWavelength = 20;
 
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("segments-per-wavelength")]
+#endif
         public int SegmentsPerWavelength
         {
             get => _segmentsPerWavelength;
@@ -158,6 +188,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private bool _animatePhase;
 
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("animate-phase")]
+#endif
         public bool AnimatePhase
         {
             get => _animatePhase;
@@ -184,6 +217,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private float _phaseSpeed = Mathf.PI;
 
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("phase-speed")]
+#endif
         public float PhaseSpeed
         {
             get => _phaseSpeed;
@@ -199,6 +235,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private bool _animateWithProgress;
 
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("animate-with-progress")]
+#endif
         public bool AnimateWithProgress
         {
             get => _animateWithProgress;
@@ -216,6 +255,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private float _progressPhaseFactor = 1.0f;
 
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("progress-phase-factor")]
+#endif
         public float ProgressPhaseFactor
         {
             get => _progressPhaseFactor;
@@ -232,6 +274,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private OrientationType _orientation = OrientationType.Horizontal;
 
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("orientation")]
+#endif
         public OrientationType Orientation
         {
             get => _orientation;
@@ -250,6 +295,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private float _arcRadius;
 
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("arc-radius")]
+#endif
         public float ArcRadius
         {
             get => _arcRadius;
@@ -267,6 +315,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private bool _arcBottom = true;
 
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("arc-bottom")]
+#endif
         public bool ArcBottom
         {
             get => _arcBottom;
@@ -284,6 +335,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private float _length = 200f;
 
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("length")]
+#endif
         public float Length
         {
             get => _length;
@@ -301,6 +355,7 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         private float _timeBasedPhaseOffset;
         private IVisualElementScheduledItem _animationUpdateItem;
 
+#if !UNITY_6000_0_OR_NEWER
         public new class UxmlFactory : UxmlFactory<WigglyProgressBar, UxmlTraits> { }
 
         public new class UxmlTraits : VisualElement.UxmlTraits
@@ -437,6 +492,7 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
                 bar.UpdateSizeAndOrientation();
             }
         }
+#endif
 
         public WigglyProgressBar()
         {
