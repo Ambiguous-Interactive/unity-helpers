@@ -15,7 +15,8 @@ Param(
     - .llm/context.md links to ./skills/index.md, carries no stale embedded-index
       markers, and has exactly one H1.
     - Every supported agent entrypoint delegates to context.md, whose GitHub
-      policy and shipping skill require MCP-first remote operations.
+      policy and shipping skill require MCP-first remote operations, first-line
+      LLM disclosure, and user input before outside-human interactions.
     - The linter PASSES on the clean repo and FAILS (red) on a non-ASCII trigger,
       index drift, lost MCP priority or fallback announcements, and frontend
       delegation drift (each mutation is restored in a finally block).
@@ -61,6 +62,7 @@ $skillsDir = Join-Path $repoRoot '.llm' 'skills'
 $indexFile = Join-Path $skillsDir 'index.md'
 $githubOperationsSkill = Join-Path $skillsDir 'github-operations.md'
 $shipChangesSkill = Join-Path $skillsDir 'ship-changes.md'
+$prFeedbackFile = Join-Path $repoRoot 'scripts' 'pr-feedback.sh'
 
 Write-Host "Testing generate-skills-index.ps1 and lint-llm-instructions.ps1..." -ForegroundColor White
 
@@ -225,10 +227,54 @@ try {
   Write-TestResult "Context.AnnouncesMcpCapabilityGap" $contextAnnouncesFallback `
     "context.md must require announcing an MCP capability gap in the same message as the fallback"
 
+  Write-TestResult "Context.RequiresFirstLineDisclosure" `
+    ($contextRaw -match '(?is)Disclose agent-written GitHub prose.*?DISCLOSURE: LLM-GENERATED TEXT.*?line one') `
+    "context.md must require the exact first-line LLM disclosure"
+  Write-TestResult "Context.PausesForOutsideHumans" `
+    ($contextRaw -match '(?is)Pause for outside humans.*?authenticated login.*?issue-specific user direction') `
+    "context.md must pause for issue-specific input on outside-human work"
+
   $shipChangesRaw = Get-Content -LiteralPath $shipChangesSkill -Raw
   Write-TestResult "ShipChanges.LinksGitHubOperations" `
     ($shipChangesRaw.Contains('](./github-operations.md)')) `
     "ship-changes.md must link to ./github-operations.md"
+  Write-TestResult "ShipChanges.TemplateStartsWithDisclosure" `
+    ($shipChangesRaw -match '(?s)```markdown\s+DISCLOSURE: LLM-GENERATED TEXT\s+\*\*Why:') `
+    "The agent PR body template must start with the exact disclosure"
+  Write-TestResult "ShipChanges.ValidatesFallbackDisclosure" `
+    ($shipChangesRaw -match 'body\.startswith\("DISCLOSURE: LLM-GENERATED TEXT\\n\\n"\)') `
+    "The fallback API example must reject a body without the disclosure"
+
+  if ($githubOperationsExists) {
+    Write-TestResult "GitHubOperationsSkill.PausesForOutsideHumans" `
+      ($githubOperationsRaw -match '(?is)authenticated GitHub login.*?outside human.*?issue-specific direction') `
+      "GitHub operations must compare logins and require issue-specific direction"
+    Write-TestResult "GitHubOperationsSkill.DoesNotTrustAssociation" `
+      ($githubOperationsRaw -match '(?is)author_association.*?still another person') `
+      "GitHub operations must not use author_association as identity"
+    Write-TestResult "GitHubOperationsSkill.ExemptsDeterministicBots" `
+      ($githubOperationsRaw -match '(?is)Only deterministic automation explicitly trusted.*?unknown third-party bot as\s+outside') `
+      "GitHub operations must exempt only trusted deterministic automation"
+  }
+
+  $prFeedbackRaw = Get-Content -LiteralPath $prFeedbackFile -Raw
+  Write-TestResult "PrFeedback.ResolvesAuthenticatedLogin" `
+    ($prFeedbackRaw -match 'get_root\("/user"\)') `
+    "pr-feedback must resolve the authenticated GitHub login"
+  Write-TestResult "PrFeedback.AuditsPaginatedCommitsAndCoauthors" `
+    (($prFeedbackRaw -match '(?s)def get_all\(path, key=None, requester=.*?\):.*?rel="next"') -and `
+      ($prFeedbackRaw -match 'get_all\("/pulls/%s/commits\?per_page=100"') -and `
+      ($prFeedbackRaw -match 'audit\("commit committer"') -and `
+      ($prFeedbackRaw -match 'Co-authored-by') -and `
+      ($prFeedbackRaw -match 'get_all\("/commits/%s/check-runs\?per_page=100".*?"check_runs"')) `
+    "pr-feedback must paginate and inspect commit authors and co-authors"
+  Write-TestResult "PrFeedback.WarnsBeforeOutsideAction" `
+    ($prFeedbackRaw -match 'USER INPUT REQUIRED BEFORE ACTION OR REPLY') `
+    "pr-feedback must foreground outside or unknown authors"
+  $prFeedbackSelfTestOutput = & bash $prFeedbackFile --self-test 2>&1
+  Write-TestResult "PrFeedback.OfflineBehaviorFixtures" `
+    (($LASTEXITCODE -eq 0) -and ($prFeedbackSelfTestOutput -match 'self-tests passed: 18')) `
+    "pr-feedback offline fixtures must cover pagination, identities, provenance, failures, and sanitization: $prFeedbackSelfTestOutput"
 
   # ===========================================================================
   Write-Host "`n  Section: Linter green path" -ForegroundColor White
@@ -301,8 +347,7 @@ try {
     [System.IO.File]::WriteAllBytes($contextFile, $contextBackup)
   }
 
-  # Red 4b: a silent MCP fallback -- guidance that no longer requires naming the
-  # capability gap before running the fallback -- must fail the lint, in both files.
+  # Red 4b: a silent MCP fallback in context must still fail the guidance-only lint.
   $contextBackup4b = [System.IO.File]::ReadAllBytes($contextFile)
   try {
     $contextText4b = [System.IO.File]::ReadAllText($contextFile)
@@ -314,13 +359,40 @@ try {
       $contextMutation4b,
       [System.StringComparison]::Ordinal)
     [System.IO.File]::WriteAllText($contextFile, $contextMutation4b, (New-Object System.Text.UTF8Encoding($false)))
-    & pwsh -NoProfile -File $lintScript | Out-Null
+    & pwsh -NoProfile -File $lintScript -AuthorshipPolicyOnly | Out-Null
     Write-TestResult "Lint.FailsWithoutContextFallbackAnnouncement" `
       ($contextMutationApplied -and $LASTEXITCODE -ne 0) `
       "Lint should fail after context.md's fallback announcement is removed; mutation applied=$contextMutationApplied"
   }
   finally {
     [System.IO.File]::WriteAllBytes($contextFile, $contextBackup4b)
+  }
+
+  # Red 4c-f: each governed authorship surface independently fails when its policy marker drifts.
+  $authorshipMutations = @(
+    @{ Name = 'Context'; Path = $contextFile; From = 'DISCLOSURE: LLM-GENERATED TEXT'; To = 'REMOVED DISCLOSURE' }
+    @{ Name = 'GitHubOperations'; Path = $githubOperationsSkill; From = 'DISCLOSURE: LLM-GENERATED TEXT'; To = 'REMOVED DISCLOSURE' }
+    @{ Name = 'ShipChanges'; Path = $shipChangesSkill; From = 'DISCLOSURE: LLM-GENERATED TEXT'; To = 'REMOVED DISCLOSURE' }
+    @{ Name = 'PrFeedback'; Path = $prFeedbackFile; From = 'OUTSIDE OR UNKNOWN -- USER INPUT REQUIRED'; To = 'AUTOMATIC ACTION ALLOWED' }
+  )
+  foreach ($mutation in $authorshipMutations) {
+    $authorshipBackup = [System.IO.File]::ReadAllBytes($mutation.Path)
+    try {
+      $authorshipText = [System.IO.File]::ReadAllText($mutation.Path)
+      $authorshipMutation = $authorshipText.Replace($mutation.From, $mutation.To)
+      $authorshipMutationApplied = -not [string]::Equals(
+        $authorshipText,
+        $authorshipMutation,
+        [System.StringComparison]::Ordinal)
+      [System.IO.File]::WriteAllText($mutation.Path, $authorshipMutation, (New-Object System.Text.UTF8Encoding($false)))
+      & pwsh -NoProfile -File $lintScript -AuthorshipPolicyOnly | Out-Null
+      Write-TestResult "Lint.FailsWithout$($mutation.Name)AuthorshipPolicy" `
+        ($authorshipMutationApplied -and $LASTEXITCODE -ne 0) `
+        "Authorship policy lint should fail when $($mutation.Name) drifts; mutation applied=$authorshipMutationApplied"
+    }
+    finally {
+      [System.IO.File]::WriteAllBytes($mutation.Path, $authorshipBackup)
+    }
   }
 
   $githubOperationsBackup = [System.IO.File]::ReadAllBytes($githubOperationsSkill)

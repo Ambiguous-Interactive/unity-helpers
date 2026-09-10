@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - ".llm/**"
+      - "scripts/pr-feedback.sh"
       - "scripts/lint-llm-instructions.ps1"
       - "scripts/generate-skills-index.ps1"
       - "scripts/tests/test-lint-skill-sizes.ps1"
@@ -15,6 +16,7 @@ on:
   pull_request:
     paths:
       - ".llm/**"
+      - "scripts/pr-feedback.sh"
       - "scripts/lint-llm-instructions.ps1"
       - "scripts/generate-skills-index.ps1"
       - "scripts/tests/test-lint-skill-sizes.ps1"
@@ -70,13 +72,13 @@ jobs:
             npm i --no-audit --no-fund
           fi
 
-      - name: Lint LLM instructions
-        shell: pwsh
-        run: ./scripts/lint-llm-instructions.ps1 -VerboseOutput
-
       - name: Test LLM instructions lint
         shell: pwsh
         run: ./scripts/tests/test-llm-instructions-lint.ps1 -VerboseOutput
+
+      - name: Validate authorship policy
+        shell: pwsh
+        run: ./scripts/lint-llm-instructions.ps1 -AuthorshipPolicyOnly
 
       - name: Test skill size linter
         shell: pwsh

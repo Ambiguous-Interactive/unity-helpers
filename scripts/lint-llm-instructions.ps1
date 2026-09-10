@@ -16,12 +16,20 @@
     6. Every supported agent frontend delegates to .llm/context.md.
     7. Context and shipping guidance preserve the GitHub MCP-first policy and
        its local Git, direct API, credential, and local-gh boundaries.
+    8. Shared guidance requires first-line LLM disclosure and issue-specific
+       user input before acting on outside-human GitHub input.
+    9. The PR feedback helper identifies the authenticated login, outside or
+       unknown authors, commits, co-authors, and paginated feedback.
 
 .PARAMETER Fix
     Regenerate .llm/skills/index.md to fix an out-of-date index.
 
 .PARAMETER VerboseOutput
     Emit detailed progress.
+
+.PARAMETER AuthorshipPolicyOnly
+    Skip generator and trigger checks. Used by the fast direct CI ownership check
+    and mutation tests that exercise one governed GitHub surface at a time.
 
 .EXAMPLE
     pwsh -NoProfile -File scripts/lint-llm-instructions.ps1
@@ -32,7 +40,8 @@
 # stdout-encoding nondeterminism and preserves the child's `exit` semantics.
 Param(
     [switch]$Fix,
-    [switch]$VerboseOutput
+    [switch]$VerboseOutput,
+    [switch]$AuthorshipPolicyOnly
 )
 
 Set-StrictMode -Version Latest
@@ -65,6 +74,7 @@ $indexFileName = 'index.md'
 $indexFile = Join-Path -Path $skillsDir -ChildPath $indexFileName
 $githubOperationsFile = Join-Path -Path $skillsDir -ChildPath 'github-operations.md'
 $shipChangesFile = Join-Path -Path $skillsDir -ChildPath 'ship-changes.md'
+$prFeedbackFile = Join-Path -Path $repoRoot -ChildPath 'scripts/pr-feedback.sh'
 $agentEntrypoints = @(
     @{ Path = (Join-Path $repoRoot 'AGENTS.md'); Link = '](./.llm/context.md)'; Label = 'Codex, OpenCode, and nanocoder entrypoint' }
     @{ Path = (Join-Path $repoRoot 'CLAUDE.md'); Link = '](./.llm/context.md)'; Label = 'Claude Code entrypoint' }
@@ -84,6 +94,7 @@ foreach ($required in @(
         @{ Path = $generateScript; Label = 'generate-skills-index.ps1' }
         @{ Path = $githubOperationsFile; Label = 'GitHub operations skill' }
         @{ Path = $shipChangesFile; Label = 'ship-changes.md' }
+        @{ Path = $prFeedbackFile; Label = 'PR feedback helper' }
         $agentEntrypoints
     )) {
     if (-not (Test-Path -LiteralPath $required.Path)) {
@@ -100,6 +111,7 @@ $skillFiles = Get-ChildItem -LiteralPath $skillsDir -Filter '*.md' |
 # =============================================================================
 # 2. Trigger comments present + ASCII-only
 # =============================================================================
+if (-not $AuthorshipPolicyOnly) {
 Write-Host ""
 Write-Host "Validating skill trigger comments..." -ForegroundColor Blue
 
@@ -285,6 +297,7 @@ if (Test-Path -LiteralPath $indexFile) {
         Write-Info "$indexFileName encoding OK (UTF-8 no BOM, LF)."
     }
 }
+}
 
 # =============================================================================
 # 6 & 7. Shared context, frontend delegation, and GitHub MCP-first policy
@@ -326,6 +339,19 @@ if ($contextContent -notmatch '(?is)### GitHub Operations.*?announce the\s+capab
     $exitCode = 1
 }
 
+$contextAuthorshipRequirements = @(
+    @{ Pattern = '(?is)Disclose agent-written GitHub prose.*?DISCLOSURE: LLM-GENERATED TEXT.*?line one'; Label = 'first-line LLM disclosure' }
+    @{ Pattern = '(?is)Pause for outside humans.*?authenticated login.*?issue-specific user direction'; Label = 'outside-human user-input gate' }
+    @{ Pattern = '(?is)never trust `author_association`'; Label = 'login comparison instead of association trust' }
+    @{ Pattern = '(?is)repository-trusted deterministic automation.*?unknown bots are outside'; Label = 'trusted-automation-only exemption' }
+)
+foreach ($requirement in $contextAuthorshipRequirements) {
+    if ($contextContent -notmatch $requirement.Pattern) {
+        Write-ErrorMsg "context.md is missing required GitHub authorship policy: $($requirement.Label)."
+        $exitCode = 1
+    }
+}
+
 foreach ($entrypoint in $agentEntrypoints) {
     $entrypointContent = Get-Content -LiteralPath $entrypoint.Path -Raw
     if (-not $entrypointContent.Contains($entrypoint.Link)) {
@@ -345,6 +371,10 @@ $githubOperationsRequirements = @(
         Pattern = '(?is)announce the missing\s+capability in the same message that runs the fallback'
         Label   = 'fallback announced before it runs'
     }
+    @{ Pattern = '(?is)(first\s+line.*?DISCLOSURE: LLM-GENERATED TEXT|DISCLOSURE: LLM-GENERATED TEXT.*?first\s+line)'; Label = 'first-line LLM disclosure' }
+    @{ Pattern = '(?is)authenticated GitHub login.*?outside human.*?issue-specific direction'; Label = 'outside-human user-input gate' }
+    @{ Pattern = '(?is)author_association.*?still another person'; Label = 'login comparison instead of association trust' }
+    @{ Pattern = '(?is)Only deterministic automation explicitly trusted.*?unknown third-party bot as\s+outside'; Label = 'trusted-automation-only exemption' }
 )
 foreach ($requirement in $githubOperationsRequirements) {
     if ($githubOperationsContent -notmatch $requirement.Pattern) {
@@ -359,8 +389,45 @@ if (-not $shipChangesContent.Contains('](./github-operations.md)')) {
     $exitCode = 1
 }
 
+$shipChangesRequirements = @(
+    @{ Pattern = '(?s)```markdown\s+DISCLOSURE: LLM-GENERATED TEXT\s+\*\*Why:'; Label = 'agent PR body starts with disclosure' }
+    @{ Pattern = 'body\.startswith\("DISCLOSURE: LLM-GENERATED TEXT\\n\\n"\)'; Label = 'fallback body validates disclosure' }
+    @{ Pattern = '(?is)outside human.*?issue-specific user direction'; Label = 'outside-human shipping gate' }
+    @{ Pattern = '(?is)Begin an agent-written reply with `DISCLOSURE: LLM-GENERATED TEXT`'; Label = 'review reply disclosure' }
+)
+foreach ($requirement in $shipChangesRequirements) {
+    if ($shipChangesContent -notmatch $requirement.Pattern) {
+        Write-ErrorMsg "ship-changes.md is missing required guidance: $($requirement.Label)."
+        $exitCode = 1
+    }
+}
+
+$prFeedbackContent = Get-Content -LiteralPath $prFeedbackFile -Raw
+$prFeedbackRequirements = @(
+    @{ Pattern = 'get_root\("/user"\)'; Label = 'authenticated viewer lookup' }
+    @{ Pattern = '(?is)OUTSIDE OR UNKNOWN -- USER INPUT REQUIRED'; Label = 'outside-author warning' }
+    @{ Pattern = '(?is)author_association is not identity'; Label = 'association distrust' }
+    @{ Pattern = 'get_all\("/pulls/%s/commits\?per_page=100"'; Label = 'paginated commit audit' }
+    @{ Pattern = 'audit\("commit committer"'; Label = 'commit committer audit' }
+    @{ Pattern = '(?is)Co-authored-by'; Label = 'co-author audit' }
+    @{ Pattern = '(?s)def get_all\(path, key=None, requester=.*?\):.*?rel="next"'; Label = 'REST pagination' }
+    @{ Pattern = 'get_all\("/commits/%s/check-runs\?per_page=100".*?"check_runs"'; Label = 'paginated check-run audit' }
+    @{ Pattern = '(?is)(?=.*raise FeedbackError\("HTTP)(?=.*raise FeedbackError\("invalid JSON)'; Label = 'fail-closed HTTP and JSON handling' }
+    @{ Pattern = '(?is)incomplete GitHub data.*?SystemExit\(4\)'; Label = 'nonzero incomplete-data exit' }
+    @{ Pattern = '(?is)TRUSTED_AUTOMATION.*?third-party bot'; Label = 'trusted and third-party bot fixtures' }
+    @{ Pattern = '(?is)def safe\(value\).*?terminal sanitization'; Label = 'terminal control sanitization fixture' }
+    @{ Pattern = '(?is)--root-comments-only.*?REST comments do not expose thread resolution'; Label = 'truthful root-comment filter' }
+    @{ Pattern = '(?is)run_self_tests.*?page failure.*?JSON failure'; Label = 'offline failure fixtures' }
+)
+foreach ($requirement in $prFeedbackRequirements) {
+    if ($prFeedbackContent -notmatch $requirement.Pattern) {
+        Write-ErrorMsg "pr-feedback.sh is missing required authorship coverage: $($requirement.Label)."
+        $exitCode = 1
+    }
+}
+
 if ($exitCode -eq 0) {
-    Write-SuccessMsg "context.md and every agent entrypoint enforce GitHub MCP-first operations"
+    Write-SuccessMsg "Agent guidance enforces GitHub tool order, LLM disclosure, and outside-human input gates"
 }
 
 # =============================================================================
