@@ -348,11 +348,11 @@ Lint-error-code prefixes (`^[A-Z]{2,}\d{3}$` tokens like `UNH001`, `PWS002`) mus
   session -- a latent bug, a stale comment, a design decision, a scoped sweep -- becomes a tracked
   issue in this repository with verified file:line evidence, a fix shape, acceptance criteria and a
   provenance link to where it was found, BEFORE the session's work is declared done. Recording it
-  only in `progress/` notes or `PLAN.md` prose lets it evaporate with the session; issues survive,
+  only in progress notes or work-plan prose lets it evaporate with the session; issues survive,
   are searchable, and can be picked up by anyone. Search first (`search_issues`) to avoid
   duplicates, pick the matching issue type (Bug/Feature/Task), and cross-link the issue from the
-  PR thread or issue where the follow-up was raised. `progress/` and `PLAN.md` then carry the
-  issue NUMBER, not the whole finding.
+  PR thread or issue where the follow-up was raised. The progress notes and the work plan then
+  carry the issue NUMBER, not the whole finding.
 - **`npm run pr:feedback -- <number>` after every push and before declaring done.** Inline review
   threads are `GET /pulls/{n}/comments`, a DIFFERENT endpoint from PR comments, so polling only the
   latter reports "no feedback" while a human waits. The thread section leads with a non-bot count
