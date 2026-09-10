@@ -1782,7 +1782,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 {
                     // One pool failure must not prevent cleanup of the others.
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-                    Debug.LogWarning($"[PoolPurgeSettings] Failed to purge pool: {e.Message}");
+                    Debug.LogWarning($"[PoolPurgeSettings] Failed to purge pool: {e}");
 #endif
                     _ = e;
                 }
@@ -1839,9 +1839,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 {
                     // One pool failure must not prevent cleanup of the others.
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-                    Debug.LogWarning(
-                        $"[PoolPurgeSettings] Failed to force-purge pool: {e.Message}"
-                    );
+                    Debug.LogWarning($"[PoolPurgeSettings] Failed to force-purge pool: {e}");
 #endif
                     _ = e;
                 }
@@ -2078,9 +2076,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 {
                     // One pool failure must not prevent cleanup of the others.
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-                    Debug.LogWarning(
-                        $"[PoolPurgeSettings] Failed to purge pool for budget: {e.Message}"
-                    );
+                    Debug.LogWarning($"[PoolPurgeSettings] Failed to purge pool for budget: {e}");
 #endif
                     _ = e;
                 }
