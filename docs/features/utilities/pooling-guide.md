@@ -21,6 +21,7 @@
 - [Access Frequency Tracking](#access-frequency-tracking)
 - [Application Lifecycle Hooks](#application-lifecycle-hooks)
 - [Global Pool Registry](#global-pool-registry)
+- [Pooling IDisposable Objects](#pooling-idisposable-objects)
 - [Renting an Array](#renting-an-array)
 - [Best Practices](#best-practices)
 
@@ -486,6 +487,32 @@ remain available to drop and dispose one pool explicitly.
 `PoolTypeResolver` uses the same shared cache for simplified type-name parsing. Set
 `PoolTypeResolver.MaxCachedTypeNames` to tune its live default-512 bound; lowering it evicts
 least-recently-used spellings immediately, and 0 or less removes the bound.
+
+### Pooling IDisposable Objects
+
+Disposing is decided by the drop **path**, never by the type. A lease's `Dispose()` returns the
+instance to its pool so it can be handed out again -- it does not call `Dispose()` on the instance.
+The pool's `onDisposal` callback is the hook for that: it fires on every path an instance leaves
+the pool forever (pool `Dispose`, budget purge, memory-pressure purge, idle-timeout purge, or a
+return into an already-disposed pool). Pool an `IDisposable` without passing `onDisposal` and every
+one of those paths drops it unreleased:
+
+```csharp
+using WallstopStudios.UnityHelpers.Utils;
+
+var pool = new WallstopGenericPool<MyExportHandle>(
+    producer: () => MyExportHandle.Create(),
+    onRelease: handle => handle.Reset(),
+    onDisposal: handle => handle.Dispose()
+);
+```
+
+Do not type-check `is IDisposable` inside a pool and dispose on clear: eviction and purge paths
+also drop objects that are merely cached for reuse -- the comparer-keyed caches above store pools
+of pools, and their `WallstopGenericPool` values are themselves `IDisposable` that callers hold
+directly. Ownership belongs to whoever dropped the instance from the pool, which is exactly what
+`onDisposal` expresses. The callback may run while the global budget registry holds its lock and
+may re-enter from `onRelease`, so keep it short and non-throwing.
 
 ---
 

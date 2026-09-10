@@ -215,6 +215,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix the protobuf byte-writer pool abandoning its rented buffer on purge: writers now return their `ArrayPool<byte>` rental when they leave the pool, and the pooling guide documents when a pool needs `onDisposal` ([#749](https://github.com/Ambiguous-Interactive/unity-helpers/pull/749)).
 - Fix collection-inspector button textures leaking across script reloads. See [Property Drawers](./docs/features/editor-tools/editor-tools-guide.md#property-drawers-attributes) ([#648](https://github.com/Ambiguous-Interactive/unity-helpers/issues/648)).
 - Fix unbounded sprite preview retention in Animation Creator and Animation Event Editor while preserving full-resolution previews. See [Animation Tools](./docs/features/editor-tools/editor-tools-guide.md#animation-tools) ([#648](https://github.com/Ambiguous-Interactive/unity-helpers/issues/648)).
 - Fix `WyRandom.Copy()` losing pending Gaussian, bool, and byte values, so a copied generator continues the same mixed draw sequence ([#638](https://github.com/Ambiguous-Interactive/unity-helpers/issues/638)).
