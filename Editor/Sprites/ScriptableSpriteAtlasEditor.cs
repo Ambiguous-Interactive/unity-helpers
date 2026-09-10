@@ -62,10 +62,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         static ScriptableSpriteAtlasEditor()
         {
-            if (Application.isBatchMode || EditorUtilities.IsInvokedByTestRunner())
+            /* Application.isBatchMode throws from a ScriptableObject static initializer in
+            the editor Test Runner; the catch keeps the type initializable there. */
+            try
             {
-                SuppressUserPrompts = true;
+                if (Application.isBatchMode || EditorUtilities.IsInvokedByTestRunner())
+                {
+                    SuppressUserPrompts = true;
+                }
             }
+            catch { }
         }
 
         [MenuItem("Tools/Wallstop Studios/Unity Helpers/Sprite Atlas Generator")]
