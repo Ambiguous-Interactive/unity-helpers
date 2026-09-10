@@ -117,6 +117,7 @@ Ensure commits are bisectable:
 | **Each commit compiles**  | No commit should leave the project in a broken state     |
 | **Each commit is atomic** | One logical change per commit                            |
 | **Message format**        | Imperative mood, <72 chars first line, body explains why |
+| **Body is STE-simple**    | Short sentences, active voice, why first. No narration   |
 | **No fixup commits**      | Squash "fix typo" commits into the original              |
 
 ### Step 8: Ship Summary
@@ -227,6 +228,13 @@ Fixes #123
 
 Write short sentences. Use the active voice. Use common words. Give a number
 only when the number is the point (`60% smaller`, `2x faster`).
+
+Write in Simplified Technical English. One idea per sentence -- about 15
+words, never more than 25. Common words over jargon (`change`, not
+`refactor/adjust/modify`). Active voice: someone did something. No filler --
+cut `basically`, `additionally`, `in order to`, `it should be noted that`,
+and every sentence that only warms up the next one. Answer **why**, **how**,
+and **what**, in that order, then stop.
 
 **Never put these in a pull request:** root causes, measurements, run IDs,
 session numbers, CI results, a list of what you validated, byte traces, the
@@ -383,6 +391,9 @@ Rules:
 - **Then measure one step out.** A suggestion can be wrong where it points and right about the
   problem. Answering only the literal question hides that.
 - **Reply with the table**, and say plainly which parts you did and did not take.
+- **Keep the reply short.** Same STE bar as the pull request body: the table, one
+  line per decision (fix / sweep / rule / declined, with the number), and the
+  linked issue. No narration of the investigation.
 - **A win you decline needs a home.** File the issue with the numbers and the reason, and link it.
   "Measured, rejected" that nobody wrote down gets re-asked next quarter.
 - **Record the answer where the question arose** -- a `<remarks>` block on the method, and the skill

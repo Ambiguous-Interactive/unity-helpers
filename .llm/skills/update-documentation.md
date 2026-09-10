@@ -23,6 +23,13 @@ This skill applies **every time** you make changes to the codebase. Documentatio
 
 For markdown formatting and link rules, see [markdown-reference](./markdown-reference.md).
 
+**Docs prose uses Simplified Technical English** -- the same bar as pull
+requests ([ship-changes](./ship-changes.md#step-9b-open-the-pull-request-yourself)):
+common words, short sentences (one idea each), active voice, no filler. A docs
+sentence exists to answer **why** or **how**, and the shortest true sentence
+wins. When touching a page, cut the filler you find around your change; do not
+rewrite the whole page in the same pass.
+
 ---
 
 ## Documentation Types
