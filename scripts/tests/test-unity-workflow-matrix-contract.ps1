@@ -376,6 +376,11 @@ function Import-EnsureEditorWatchdogFunctions {
         'Get-UnityCliUpdateRetryAttempts',
         'Get-UnityCliUpdateStallSeconds',
         'Get-UnityCliInstallStallSeconds',
+        'Update-SessionPathFromRegistry',
+        'Get-UnityCliCompatibilityMarkerPath',
+        'Test-UnityCliCompatibilityHoldActive',
+        'Test-UnityCliWriterKindSchemaFailure',
+        'Invoke-UnityCliWriterKindCompatibilityRollback',
         'Set-UnityCliAutomationEnvironment',
         'Invoke-WithRetry',
         'Test-IsPathInsideDirectory',
@@ -390,6 +395,7 @@ function Import-EnsureEditorWatchdogFunctions {
         'Get-LastCliProgressMessage',
         'Write-CiNotice',
         'Install-UnityEditorWithCiModules',
+        'Invoke-UnityCliCapture',
         'Invoke-UnityCliCaptureWithTimeout',
         'Invoke-UnityCliSafe',
         'Get-UnityCliOutput',
@@ -1174,10 +1180,13 @@ $unityCliMaintenanceIsZeroTouch = (
     $ensureEditorContent.Contains('UH_UNITY_CLI_UPDATE_TIMEOUT_SECONDS') -and
     $ensureEditorContent.Contains('UH_UNITY_CLI_UPDATE_RETRY_ATTEMPTS') -and
     $ensureEditorContent.Contains('Invoke-UnityCliCaptureWithTimeout') -and
-    $ensureEditorContent.Contains('$script:UnityCliUpdateCompleted')
+    $ensureEditorContent.Contains('$script:UnityCliUpdateCompleted') -and
+    $ensureEditorContent.Contains("'1.0.0-beta.8'") -and
+    $ensureEditorContent.Contains('installs has no column named writer_kind') -and
+    $ensureEditorContent.Contains('Test-UnityCliCompatibilityHoldActive')
 )
 if (-not $unityCliMaintenanceIsZeroTouch) {
-    Write-Host "::error file=scripts/unity/ensure-editor.ps1::Runner maintenance must put Unity CLI in non-interactive mode, update it through the bounded watchdog with retries, support the legacy upgrade alias, and update only once per provisioning process."
+    Write-Host "::error file=scripts/unity/ensure-editor.ps1::Runner maintenance must put Unity CLI in non-interactive mode, update it through the bounded watchdog with retries, support the legacy upgrade alias, recover safely from the beta.9 writer_kind regression, and update only once per provisioning process."
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info 'Checked Unity CLI maintenance is bounded, retrying, current, and non-interactive.'
@@ -2666,6 +2675,129 @@ if ($ensureEditorWatchdogImported) {
         }
     }
 
+    $originalCompatibilityCapture = ${function:Invoke-UnityCliCaptureWithTimeout}
+    $originalCompatibilityRollback = ${function:Invoke-UnityCliWriterKindCompatibilityRollback}
+    $oldCompatibilityDeadlineVariable = Get-Variable -Name ProvisioningDeadlineUtc -Scope Script -ErrorAction SilentlyContinue
+    $oldCompatibilityDeadline = if ($oldCompatibilityDeadlineVariable) { $oldCompatibilityDeadlineVariable.Value } else { $null }
+    try {
+        $script:ProvisioningDeadlineUtc = [DateTime]::MaxValue
+        $script:compatibilityCaptureCalls = 0
+        $script:compatibilityRollbackCalls = 0
+        function script:Invoke-UnityCliCaptureWithTimeout {
+            param([string[]]$Arguments, [int]$TimeoutSeconds)
+            $script:compatibilityCaptureCalls++
+            if ($script:compatibilityCaptureCalls -eq 1) {
+                return @{
+                    Success = $false; ExitCode = 6
+                    Output = @("SQLite Error 1: 'table installs has no column named writer_kind'.")
+                    StallKilled = $false; TimedOutWallClock = $false
+                }
+            }
+            return @{
+                Success = $true; ExitCode = 0; Output = @('installed')
+                StallKilled = $false; TimedOutWallClock = $false
+            }
+        }
+        function script:Invoke-UnityCliWriterKindCompatibilityRollback {
+            $script:compatibilityRollbackCalls++
+            return $true
+        }
+
+        $compatibilityRecovered = Invoke-UnityCliCapture -Arguments @('install', '6000.6.0f1')
+        if (
+            -not $compatibilityRecovered.Success -or
+            $script:compatibilityCaptureCalls -ne 2 -or
+            $script:compatibilityRollbackCalls -ne 1
+        ) {
+            Write-Host "::error file=scripts/unity/ensure-editor.ps1::The beta.9 writer_kind regression must trigger one compatibility rollback and transparently retry the interrupted CLI command. CaptureCalls=$script:compatibilityCaptureCalls RollbackCalls=$script:compatibilityRollbackCalls Success=$($compatibilityRecovered.Success)."
+            $failed = $true
+        }
+
+        $script:compatibilityCaptureCalls = 0
+        $script:compatibilityRollbackCalls = 0
+        function script:Invoke-UnityCliCaptureWithTimeout {
+            param([string[]]$Arguments, [int]$TimeoutSeconds)
+            $script:compatibilityCaptureCalls++
+            return @{
+                Success = $false; ExitCode = 6; Output = @('ordinary install failure')
+                StallKilled = $false; TimedOutWallClock = $false
+            }
+        }
+        $ordinaryFailure = Invoke-UnityCliCapture -Arguments @('install', '6000.6.0f1')
+        if ($ordinaryFailure.Success -or $script:compatibilityCaptureCalls -ne 1 -or $script:compatibilityRollbackCalls -ne 0) {
+            Write-Host '::error file=scripts/unity/ensure-editor.ps1::Compatibility rollback must be restricted to the exact beta.9 writer_kind database signature.'
+            $failed = $true
+        }
+    } catch {
+        Write-Host "::error file=scripts/unity/ensure-editor.ps1::Unity CLI beta.9 compatibility recovery regression failed: $($_.Exception.Message)"
+        $failed = $true
+    } finally {
+        ${function:Invoke-UnityCliCaptureWithTimeout} = $originalCompatibilityCapture
+        ${function:Invoke-UnityCliWriterKindCompatibilityRollback} = $originalCompatibilityRollback
+        if ($oldCompatibilityDeadlineVariable) {
+            $script:ProvisioningDeadlineUtc = $oldCompatibilityDeadline
+        } else {
+            Remove-Variable -Name ProvisioningDeadlineUtc -Scope Script -ErrorAction SilentlyContinue
+        }
+        Remove-Variable -Name compatibilityCaptureCalls -Scope Script -ErrorAction SilentlyContinue
+        Remove-Variable -Name compatibilityRollbackCalls -Scope Script -ErrorAction SilentlyContinue
+    }
+
+    $originalRollbackCapture = ${function:Invoke-UnityCliCaptureWithTimeout}
+    $originalRollbackVersion = ${function:Get-UnityCliVersionText}
+    $originalRollbackMarker = ${function:Get-UnityCliCompatibilityMarkerPath}
+    $compatibilityMarkerFixture = Join-Path ([System.IO.Path]::GetTempPath()) "unity-cli-compat-$PID-$(Get-Random)"
+    try {
+        $script:rollbackApplied = $false
+        $script:rollbackArguments = @()
+        $script:UnityCliCompatibilityRollbackCompleted = $false
+        $script:UnityCliUpdateCompleted = $false
+        function script:Get-UnityCliVersionText {
+            if ($script:rollbackApplied) { return '1.0.0-beta.8' }
+            return '1.0.0-beta.9'
+        }
+        function script:Get-UnityCliCompatibilityMarkerPath { return $compatibilityMarkerFixture }
+        function script:Invoke-UnityCliCaptureWithTimeout {
+            param(
+                [string[]]$Arguments,
+                [int]$TimeoutSeconds,
+                [string]$TimeoutKnob,
+                [int]$StallSeconds,
+                [string]$StallKnob
+            )
+            $script:rollbackArguments = @($Arguments)
+            $script:rollbackApplied = $true
+            return @{
+                Success = $true; ExitCode = 0; Output = @('rolled back')
+                StallKilled = $false; TimedOutWallClock = $false
+            }
+        }
+
+        $rollbackSucceeded = Invoke-UnityCliWriterKindCompatibilityRollback
+        $rollbackArgumentText = @($script:rollbackArguments) -join ' '
+        if (
+            -not $rollbackSucceeded -or
+            $rollbackArgumentText -ne 'self-update --target 1.0.0-beta.8 --format ndjson' -or
+            -not (Test-Path -LiteralPath $compatibilityMarkerFixture -PathType Leaf) -or
+            -not $script:UnityCliUpdateCompleted
+        ) {
+            Write-Host "::error file=scripts/unity/ensure-editor.ps1::Writer-kind recovery must target beta.8, verify the resulting version, persist the cross-process hold, and mark the update complete. Args='$rollbackArgumentText' Success=$rollbackSucceeded."
+            $failed = $true
+        }
+    } catch {
+        Write-Host "::error file=scripts/unity/ensure-editor.ps1::Unity CLI compatibility rollback command regression failed: $($_.Exception.Message)"
+        $failed = $true
+    } finally {
+        ${function:Invoke-UnityCliCaptureWithTimeout} = $originalRollbackCapture
+        ${function:Get-UnityCliVersionText} = $originalRollbackVersion
+        ${function:Get-UnityCliCompatibilityMarkerPath} = $originalRollbackMarker
+        Remove-Item -LiteralPath $compatibilityMarkerFixture -Force -ErrorAction SilentlyContinue
+        Remove-Variable -Name rollbackApplied -Scope Script -ErrorAction SilentlyContinue
+        Remove-Variable -Name rollbackArguments -Scope Script -ErrorAction SilentlyContinue
+        $script:UnityCliCompatibilityRollbackCompleted = $false
+        $script:UnityCliUpdateCompleted = $false
+    }
+
     $expectedFullRequestedModules = @(
         'windows-il2cpp',
         'webgl',
@@ -2693,9 +2825,9 @@ if ($ensureEditorWatchdogImported) {
     try {
         $editorPath = Join-Path $modulePresenceRoot 'Editor\Unity.exe'
         $iosExtension = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\iOSSupport\UnityEditor.iOS.Extensions.dll'
-        $iosToolchain = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\iOSSupport\Tools\Windows\MapFileParser.exe'
+        $iosToolchain = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\iOSSupport\Trampoline\Classes\UnityAppController.mm'
         $macExtension = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\MacStandaloneSupport\UnityEditor.OSXStandalone.Extensions.dll'
-        $macPlayer = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\MacStandaloneSupport\Variations\macosx64_nondevelopment_mono\UnityPlayer.app\Contents\MacOS\UnityPlayer'
+        $macPlayer = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\MacStandaloneSupport\Variations\macosx64_player_development_mono\UnityPlayer.app\Contents\MacOS\UnityPlayer'
         $androidExtension = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\AndroidPlayer\UnityEditor.Android.Extensions.dll'
         $androidPlayerTools = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\AndroidPlayer\Tools\Source.properties'
         foreach ($path in @($editorPath, $iosExtension, $macExtension, $androidExtension)) {

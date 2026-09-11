@@ -64,6 +64,7 @@ $script:ProvisioningProcessCleanupEvents = New-Object System.Collections.Generic
 $script:ProvisioningCommandClasses = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
 $script:UnityCliVersionText = ''
 $script:UnityCliUpdateCompleted = $false
+$script:UnityCliCompatibilityRollbackCompleted = $false
 
 # PowerShell 7.4 introduced $PSNativeCommandUseErrorActionPreference (stabilizing
 # the native-error experimental feature). Its default is $false on current builds,
@@ -997,6 +998,95 @@ function Get-UnityCliInstallStallSeconds {
     return $Default
 }
 
+function Get-UnityCliCompatibilityMarkerPath {
+    $cliDirectory = Split-Path -Parent $script:UnityCliPath
+    if (-not $cliDirectory) {
+        return $null
+    }
+    return Join-Path $cliDirectory '.unity-helpers-beta9-writer-kind-workaround'
+}
+
+function Test-UnityCliCompatibilityHoldActive {
+    # beta.9 has a confirmed upstream Windows regression when it reads an older
+    # Unity Hub installation database: install operations fail because the
+    # `installs` table lacks `writer_kind`. A short-lived marker prevents every
+    # editor leg in one maintenance run from upgrading back to the broken build.
+    # The marker expires so a fixed beta is picked up automatically without an
+    # operator having to remove anything.
+    $marker = Get-UnityCliCompatibilityMarkerPath
+    if (-not $marker -or -not (Test-Path -LiteralPath $marker -PathType Leaf)) {
+        return $false
+    }
+
+    try {
+        $age = [DateTime]::UtcNow - (Get-Item -LiteralPath $marker).LastWriteTimeUtc
+        if ($age.TotalHours -ge 12) {
+            Remove-Item -LiteralPath $marker -Force -ErrorAction SilentlyContinue
+            return $false
+        }
+        return (Get-UnityCliVersionText) -match '(?i)\b1\.0\.0-beta\.8\b'
+    } catch {
+        return $false
+    }
+}
+
+function Test-UnityCliWriterKindSchemaFailure {
+    param([string[]]$Output)
+
+    return ((@($Output) -join "`n") -match "(?i)SQLite Error 1:\s*['‘’]?table installs has no column named writer_kind")
+}
+
+function Invoke-UnityCliWriterKindCompatibilityRollback {
+    if ($script:UnityCliCompatibilityRollbackCompleted) {
+        return (Get-UnityCliVersionText) -match '(?i)\b1\.0\.0-beta\.8\b'
+    }
+
+    $currentVersion = Get-UnityCliVersionText
+    if ($currentVersion -notmatch '(?i)\b1\.0\.0-beta\.9\b') {
+        return $false
+    }
+
+    $script:UnityCliCompatibilityRollbackCompleted = $true
+    Write-Host '::warning::Unity CLI 1.0.0-beta.9 hit its confirmed Windows writer_kind database regression. Rolling back to 1.0.0-beta.8 and retrying without modifying any Unity editor installation.'
+    $timeout = Get-UnityCliUpdateTimeoutSeconds
+    foreach ($verb in @('self-update', 'upgrade')) {
+        $result = Invoke-UnityCliCaptureWithTimeout `
+            -Arguments @($verb, '--target', '1.0.0-beta.8', '--format', 'ndjson') `
+            -TimeoutSeconds $timeout `
+            -TimeoutKnob 'UH_UNITY_CLI_UPDATE_TIMEOUT_SECONDS' `
+            -StallSeconds ([Math]::Min((Get-UnityCliUpdateStallSeconds), $timeout)) `
+            -StallKnob 'UH_UNITY_CLI_UPDATE_STALL_SECONDS'
+        if ($result.ExitCode -ne 0) {
+            continue
+        }
+
+        Update-SessionPathFromRegistry
+        $updatedCommand = Get-Command unity -ErrorAction SilentlyContinue
+        if ($updatedCommand) {
+            $script:UnityCliPath = $updatedCommand.Source
+        }
+        $script:UnityCliVersionText = ''
+        if ((Get-UnityCliVersionText) -notmatch '(?i)\b1\.0\.0-beta\.8\b') {
+            continue
+        }
+
+        $marker = Get-UnityCliCompatibilityMarkerPath
+        if ($marker) {
+            try {
+                Set-Content -LiteralPath $marker -Value 'Temporary hold at 1.0.0-beta.8 for the beta.9 writer_kind database regression.' -Encoding UTF8
+            } catch {
+                Write-Host "::warning::Unity CLI compatibility rollback succeeded, but its short-lived marker could not be written at '$marker': $($_.Exception.Message)"
+            }
+        }
+        $script:UnityCliUpdateCompleted = $true
+        Write-CiNotice 'Unity CLI compatibility recovery succeeded at 1.0.0-beta.8; retrying the failed command. A fixed newer beta will be checked automatically after 12 hours.'
+        return $true
+    }
+
+    Write-Host '::error::Unity CLI beta.9 writer_kind compatibility recovery failed. Refusing to classify this as editor corruption; no editor should be uninstalled or quarantined for this CLI database failure.'
+    return $false
+}
+
 function Set-UnityCliAutomationEnvironment {
     # These are the Unity CLI's documented automation controls. Set them in the
     # process before install/update so a runner can never wait for a pager,
@@ -1049,6 +1139,12 @@ function Install-UnityCliStandalone {
 
 function Update-UnityCliStandalone {
     if ($script:UnityCliUpdateCompleted) {
+        return
+    }
+
+    if (Test-UnityCliCompatibilityHoldActive) {
+        $script:UnityCliUpdateCompleted = $true
+        Write-CiNotice 'Keeping Unity CLI 1.0.0-beta.8 for this maintenance run because beta.9 previously hit its confirmed writer_kind database regression. The compatibility hold expires automatically within 12 hours.'
         return
     }
 
@@ -1263,7 +1359,13 @@ function Invoke-UnityCliCapture {
     } else {
         $requestedTimeout
     }
-    return Invoke-UnityCliCaptureWithTimeout -Arguments $Arguments -TimeoutSeconds $effectiveTimeout
+    $result = Invoke-UnityCliCaptureWithTimeout -Arguments $Arguments -TimeoutSeconds $effectiveTimeout
+    if (Test-UnityCliWriterKindSchemaFailure -Output $result.Output) {
+        if (Invoke-UnityCliWriterKindCompatibilityRollback) {
+            return Invoke-UnityCliCaptureWithTimeout -Arguments $Arguments -TimeoutSeconds $effectiveTimeout
+        }
+    }
+    return $result
 }
 
 function Invoke-UnityCliCaptureWithTimeout {
@@ -2732,20 +2834,42 @@ function Test-UnityCiModuleGroupPresent {
             'ios' {
                 $iosRoot = Join-Path $dataRoot 'PlaybackEngines\iOSSupport'
                 $hasEditorExtension = Test-Path -LiteralPath (Join-Path $iosRoot 'UnityEditor.iOS.Extensions.dll') -PathType Leaf
-                $hasToolchain = Test-AnyUnityLeafPresent -Paths @(
-                    (Join-Path $iosRoot 'Tools\OSX\MapFileParser'),
-                    (Join-Path $iosRoot 'Tools\Windows\MapFileParser.exe')
+                # MapFileParser moved between Tools\OSX, Tools\Windows, and a
+                # nested Tools\MapFileParser directory across supported Editors.
+                # Search by payload name so an installed 2021/2022 module is not
+                # rejected solely because its version uses a different layout.
+                $toolchainLeaves = @(
+                    Get-ChildItem -LiteralPath $iosRoot -Recurse -File -ErrorAction SilentlyContinue |
+                        Where-Object { $_.Name -match '(?i)^MapFileParser(?:\.exe)?$' } |
+                        Select-Object -First 1
                 )
+                $hasToolchain = $toolchainLeaves.Count -gt 0
+                if (-not $hasToolchain) {
+                    # On older Windows editor packages MapFileParser lives in the
+                    # editor-wide Data\Tools tree rather than below iOSSupport.
+                    # A non-empty Trampoline template is independent module proof.
+                    $trampolineRoot = Join-Path $iosRoot 'Trampoline'
+                    $trampolineLeaves = @(
+                        Get-ChildItem -LiteralPath $trampolineRoot -Recurse -File -ErrorAction SilentlyContinue |
+                            Select-Object -First 1
+                    )
+                    $hasToolchain = $trampolineLeaves.Count -gt 0
+                }
                 return $hasEditorExtension -and $hasToolchain
             }
             'mac-mono' {
                 $macRoot = Join-Path $dataRoot 'PlaybackEngines\MacStandaloneSupport'
                 $variationRoot = Join-Path $macRoot 'Variations'
                 $hasEditorExtension = Test-Path -LiteralPath (Join-Path $macRoot 'UnityEditor.OSXStandalone.Extensions.dll') -PathType Leaf
-                $hasMonoPlayer = Test-AnyUnityLeafPresent -Paths @(
-                    (Join-Path $variationRoot 'macosx64_development_mono\UnityPlayer.app\Contents\MacOS\UnityPlayer'),
-                    (Join-Path $variationRoot 'macosx64_nondevelopment_mono\UnityPlayer.app\Contents\MacOS\UnityPlayer')
+                # Variation directory names gained/lost a `player` component over
+                # time. Require a real player leaf, independent of that container
+                # spelling; the extension-only partial-install guard remains.
+                $monoPlayerLeaves = @(
+                    Get-ChildItem -LiteralPath $variationRoot -Recurse -File -ErrorAction SilentlyContinue |
+                        Where-Object { $_.Name -match '(?i)^(?:UnityPlayer(?:\.dylib)?|MacStandalonePlayer)$' } |
+                        Select-Object -First 1
                 )
+                $hasMonoPlayer = $monoPlayerLeaves.Count -gt 0
                 return $hasEditorExtension -and $hasMonoPlayer
             }
             'android' {
@@ -3227,6 +3351,9 @@ function Install-UnityEditorWithCiModules {
     $resolved = $null
     for ($attempt = 1; $attempt -le 2; $attempt++) {
         $installResult = Invoke-UnityCliCapture -Arguments $installArgs
+        if (Test-UnityCliWriterKindSchemaFailure -Output $installResult.Output) {
+            throw "Unity CLI metadata is incompatible with beta.9 (missing installs.writer_kind), and the automatic beta.8 compatibility rollback did not recover it. Refusing to uninstall or quarantine Unity $Version because this is CLI state corruption, not editor corruption."
+        }
         if ($installResult.Success) {
             $resolved = Resolve-InstalledEditor -Version $Version -Root $InstallRoot -ManagedOnly:$ManagedOnly
             if ($resolved) {
@@ -4286,6 +4413,9 @@ function Install-UnityAndroidModules {
         }
 
         $result = Invoke-UnityCliCapture -Arguments $installArgs
+        if (Test-UnityCliWriterKindSchemaFailure -Output $result.Output) {
+            throw "Unity CLI metadata is incompatible with beta.9 (missing installs.writer_kind), and the automatic beta.8 compatibility rollback did not recover it. Refusing to clear Android payloads or repair Unity $Version because this is CLI state corruption, not editor corruption."
+        }
 
         # Disk is the source of truth: re-verify the android tier groups. If none
         # are missing, the install succeeded regardless of the CLI exit code (an
@@ -4545,6 +4675,9 @@ function Install-UnityEditorModulesViaAtomicReinstall {
             return Install-UnityEditorWithCiModules -Version $Version -InstallRoot $InstallRoot -Reason $Reason -Profile $Profile -ManagedOnly:$ManagedOnly
         } catch {
             $inPlaceMessage = $_.Exception.Message
+            if ($inPlaceMessage -match '(?i)missing installs\.writer_kind') {
+                throw
+            }
             if ($env:UH_UNITY_DISABLE_EDITOR_REPAIR -eq '1') {
                 throw
             }
@@ -4680,6 +4813,9 @@ function Ensure-UnityCiModules {
         # Attempt the install via the capturing (non-throwing) path so we can inspect
         # BOTH the exit code AND the output text before deciding whether it was fatal.
         $result = Invoke-UnityCliCapture -Arguments $installArgs
+        if (Test-UnityCliWriterKindSchemaFailure -Output $result.Output) {
+            throw "Unity CLI metadata is incompatible with beta.9 (missing installs.writer_kind), and the automatic beta.8 compatibility rollback did not recover it. Refusing to uninstall or quarantine Unity $Version because this is CLI state corruption, not editor corruption."
+        }
 
         # Re-verify the core tier on disk (disk is the source of truth; an exit 6
         # with everything present is the idempotent no-op).
