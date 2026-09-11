@@ -1,4 +1,4 @@
-<!-- cspell:ignore winget pwsh prereqs redist UCRT WSL Redistributables MSVCP MSVCR VCRUNTIME -->
+<!-- cspell:ignore winget pwsh prereqs redist UCRT WSL Redistributables MSVCP MSVCR VCRUNTIME NDK -->
 
 # Unity Runners After Repository Transfer Runbook
 
@@ -109,6 +109,36 @@ The bootstrap job requests `self-hosted`, `Windows`, `RAM-64GB`, and the selecte
 
 If a bootstrap dispatch stays queued after selecting a runner, verify the runner is online and that the matching machine-name label is present in Settings -> Actions -> Runners. Do not work around the queue by removing the machine-name label from the workflow; that reintroduces wrong-runner maintenance.
 
+## Install a new Windows runner agent
+
+The workflow bootstrap can maintain only an agent that is already online. For a new machine, `scripts/unity/install-windows-actions-runner.ps1` separates the work that requires elevation from the package download that should run as the ordinary runner owner. Obtain the current Windows x64 runner version, its published SHA-256, and a short-lived registration token from **Settings -> Actions -> Runners -> New self-hosted runner**. Never commit or transcribe the token into logs.
+
+First, open Windows PowerShell 5.1 as administrator and prepare the service directory. Replace the account and machine name examples with the actual runner owner and one of the repository's expected runner names:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\unity\install-windows-actions-runner.ps1 `
+  -Phase AdminPrepare -InstallRoot C:\actions-runner -RunnerUser runner-owner
+```
+
+Then sign in as `runner-owner` and install the checksum-verified runner package without elevation:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\unity\install-windows-actions-runner.ps1 `
+  -Phase UserInstall -InstallRoot C:\actions-runner `
+  -RunnerVersion <version-from-github> -ArchiveSha256 <sha256-from-github>
+```
+
+Finally, return to an administrator prompt and register the agent as a Windows service. Pass the token only at invocation time; the script deliberately does not print it. The runner-name label is added automatically alongside `RAM-64GB`, which makes the machine eligible for both Unity jobs and targeted maintenance:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\unity\install-windows-actions-runner.ps1 `
+  -Phase AdminConfigure -InstallRoot C:\actions-runner `
+  -RegistrationUrl https://github.com/Ambiguous-Interactive `
+  -RegistrationToken <short-lived-token> -RunnerName DAD-MACHINE
+```
+
+Once the agent reports online, dispatch **Runner Bootstrap (Windows)** in maintenance mode. That installs the host prerequisites and every Unity editor from `.github/unity-versions.json`, including all supported build-target components.
+
 ## Run maintenance directly on a Windows runner
 
 When you are already on the runner host, you do not need to run YAML. From a checkout of this repository, run the same maintenance backend directly:
@@ -117,7 +147,7 @@ When you are already on the runner host, you do not need to run YAML. From a che
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\unity\maintain-windows-runner.ps1
 ```
 
-The script reads `.github\unity-versions.json` when `-UnityVersions` is omitted, uses `C:\Unity\Editors` unless `UNITY_EDITOR_INSTALL_ROOT` is set, provisions the `StandaloneWindowsIl2Cpp` profile, and writes diagnostics under `.artifacts\runner-bootstrap`.
+The script reads `.github\unity-versions.json` when `-UnityVersions` is omitted, uses `C:\Unity\Editors` unless `UNITY_EDITOR_INSTALL_ROOT` is set, and writes diagnostics under `.artifacts\runner-bootstrap`. Its default `Full` profile installs and verifies Windows IL2CPP, Android (including SDK/NDK/OpenJDK), WebGL, iOS, Linux Mono/IL2CPP, and macOS Mono build support; the workflow uses the same profile.
 
 For an audit that never installs or repairs anything:
 

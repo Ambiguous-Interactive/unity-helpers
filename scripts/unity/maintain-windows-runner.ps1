@@ -6,7 +6,7 @@ param(
     [string[]]$RunnerMaintenanceUnityVersions = @(),
     [ValidateSet('EditorOnly', 'StandaloneWindowsIl2Cpp', 'Android', 'Full')]
     [Alias('ProvisioningProfile')]
-    [string]$RunnerMaintenanceProvisioningProfile = 'StandaloneWindowsIl2Cpp',
+    [string]$RunnerMaintenanceProvisioningProfile = 'Full',
     [Alias('InstallRoot')]
     [string]$RunnerMaintenanceInstallRoot = $(if ($env:UNITY_EDITOR_INSTALL_ROOT) { $env:UNITY_EDITOR_INSTALL_ROOT } else { 'C:\Unity\Editors' }),
     [Alias('DetectOnly')]
@@ -126,7 +126,7 @@ function Invoke-WindowsRunnerMaintenance {
     param(
         [string[]]$UnityVersions = @(),
         [ValidateSet('EditorOnly', 'StandaloneWindowsIl2Cpp', 'Android', 'Full')]
-        [string]$ProvisioningProfile = 'StandaloneWindowsIl2Cpp',
+        [string]$ProvisioningProfile = 'Full',
         [string]$InstallRoot = $(if ($env:UNITY_EDITOR_INSTALL_ROOT) { $env:UNITY_EDITOR_INSTALL_ROOT } else { 'C:\Unity\Editors' }),
         [switch]$DetectOnly,
         [string]$DiagnosticsRoot = ''

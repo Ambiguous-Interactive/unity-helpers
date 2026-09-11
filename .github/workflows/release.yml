@@ -338,8 +338,8 @@ jobs:
           if ($version -notmatch '^\d+\.\d+\.\d+f\d+$') { throw 'Invalid release Unity version.' }
           # The unitypackage editor gate and central return pin this version
           # literally (enrollment contract); fail closed on drift.
-          if ($version -ne '2022.3.45f1') {
-            throw "Release Unity version '$version' drifted from the pinned unitypackage editor version '2022.3.45f1'; update the unitypackage ensure/return pin in the same change."
+          if ($version -ne '6000.6.0f1') {
+            throw "Release Unity version '$version' drifted from the pinned unitypackage editor version '6000.6.0f1'; update the unitypackage ensure/return pin in the same change."
           }
           "version=$version" >> $env:GITHUB_OUTPUT
 
@@ -369,7 +369,7 @@ jobs:
           # version. Keep this pin identical to `release` in
           # .github/unity-versions.json (the runner-preflight job resolves the
           # same value and the export below consumes it).
-          unity-version: "2022.3.45f1"
+          unity-version: "6000.6.0f1"
           install-root: ${{ runner.tool_cache }}\u6-v3
           provisioning-profile: EditorOnly
           diagnostics-path: unity-editor-check.json
@@ -455,7 +455,7 @@ jobs:
         with:
           # Must match the ensure-unity-editor pin above exactly (see the
           # enrollment contract's central-return version rule).
-          unity-version: "2022.3.45f1"
+          unity-version: "6000.6.0f1"
           tool-cache: ${{ runner.tool_cache }}
           unity-email: ${{ secrets.UNITY_EMAIL }}
           unity-password: ${{ secrets.UNITY_PASSWORD }}

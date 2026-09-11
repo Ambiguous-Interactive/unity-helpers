@@ -284,6 +284,7 @@ $unityVersionsPath = Join-Path $repoRoot '.github/unity-versions.json'
 $integrationPackagesPath = Join-Path $repoRoot '.github/integration-packages.json'
 $windowsRunnerBootstrapPath = Join-Path $repoRoot 'scripts/unity/bootstrap-windows-runner.ps1'
 $windowsRunnerMaintenancePath = Join-Path $repoRoot 'scripts/unity/maintain-windows-runner.ps1'
+$windowsActionsRunnerInstallPath = Join-Path $repoRoot 'scripts/unity/install-windows-actions-runner.ps1'
 $ensureEditorPath = Join-Path $repoRoot 'scripts/unity/ensure-editor.ps1'
 $runCiTestsPath = Join-Path $repoRoot 'scripts/unity/run-ci-tests.ps1'
 $runUnityDockerPath = Join-Path $repoRoot 'scripts/unity/run-unity-docker.sh'
@@ -331,6 +332,10 @@ if (-not (Test-Path -LiteralPath $windowsRunnerBootstrapPath)) {
 }
 if (-not (Test-Path -LiteralPath $windowsRunnerMaintenancePath)) {
     Write-Host "::error::Windows runner maintenance script not found: $windowsRunnerMaintenancePath"
+    exit 1
+}
+if (-not (Test-Path -LiteralPath $windowsActionsRunnerInstallPath)) {
+    Write-Host "::error::Windows Actions runner install script not found: $windowsActionsRunnerInstallPath"
     exit 1
 }
 if (-not (Test-Path -LiteralPath $ensureEditorPath)) {
@@ -384,7 +389,12 @@ function Import-EnsureEditorWatchdogFunctions {
         'Invoke-UnityCliSafe',
         'Get-UnityCliOutput',
         'Move-UnityInstallDirectoryToQuarantine',
-        'Get-UnityProvisioningProfile'
+        'Get-UnityProvisioningProfile',
+        'Assert-UnityProvisioningProfile',
+        'Get-UnityCiModuleSpec',
+        'Get-UnityCiModuleSpecForProfile',
+        'Get-UnityCiModuleIds',
+        'Get-UnityCiVerifiedModuleGroups'
     )) {
         $functionAst = $ast.FindAll(
             {
@@ -556,8 +566,8 @@ function Test-UnityLockCleanupIsGated {
         # the literal pin, not the quote style.
         $expectedVersion = switch ($job.Key) {
             'benchmarks' { '"6000.6.0f1"' }
-            'unitypackage-smoke' { '"2022.3.45f1"' }
-            'unitypackage' { '"2022.3.45f1"' }
+            'unitypackage-smoke' { '"6000.6.0f1"' }
+            'unitypackage' { '"6000.6.0f1"' }
             default { '${{ matrix.unity-version }}' }
         }
         if (
@@ -692,6 +702,7 @@ function Test-UnityLockAppConfiguration {
 [string]$runnerDiagnosticsActionContent = Get-Content -LiteralPath $runnerDiagnosticsActionPath -Raw
 [string]$windowsRunnerBootstrapContent = Get-Content -LiteralPath $windowsRunnerBootstrapPath -Raw
 [string]$windowsRunnerMaintenanceContent = Get-Content -LiteralPath $windowsRunnerMaintenancePath -Raw
+[string]$windowsActionsRunnerInstallContent = Get-Content -LiteralPath $windowsActionsRunnerInstallPath -Raw
 [string]$ensureEditorContent = Get-Content -LiteralPath $ensureEditorPath -Raw
 [string]$runCiTestsContent = Get-Content -LiteralPath $runCiTestsPath -Raw
 [string]$runUnityDockerContent = Get-Content -LiteralPath $runUnityDockerPath -Raw
@@ -927,6 +938,13 @@ if ($unityVersions.Count -lt 1) {
     Write-Info "Checked Unity version source of truth includes Unity 6000.6.0f1 as the latest version."
 }
 
+if ([string]$unityVersionsConfig.release -ne '6000.6.0f1') {
+    Write-Host "::error file=.github/unity-versions.json::Release and unitypackage smoke coverage must target the latest supported editor, 6000.6.0f1, rather than a legacy compatibility editor."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info 'Checked release and unitypackage smoke target Unity 6000.6.0f1.'
+}
+
 # Every Unity version CI actually tests has to be selectable when someone files a bug against it,
 # and the hand-maintained dropdowns must remain newest-first.
 $orderedUnityLabels = @(
@@ -1069,6 +1087,37 @@ if (-not $runnerBootstrapBackendPresent) {
     Write-Info "Checked runner bootstrap Windows maintenance backend contract."
 }
 
+$actionsRunnerInstallTokens = $null
+$actionsRunnerInstallParseErrors = $null
+[void][System.Management.Automation.Language.Parser]::ParseFile(
+    $windowsActionsRunnerInstallPath,
+    [ref]$actionsRunnerInstallTokens,
+    [ref]$actionsRunnerInstallParseErrors
+)
+$actionsRunnerInstallContract = (
+    (-not $actionsRunnerInstallParseErrors -or $actionsRunnerInstallParseErrors.Count -eq 0) -and
+    $windowsActionsRunnerInstallContent.Contains("[ValidateSet('AdminPrepare', 'UserInstall', 'AdminConfigure')]") -and
+    $windowsActionsRunnerInstallContent.Contains('Assert-RunnerInstallAdministrator') -and
+    $windowsActionsRunnerInstallContent.Contains("'*S-1-5-20:(OI)(CI)M'") -and
+    $windowsActionsRunnerInstallContent.Contains("'*S-1-5-32-544:(OI)(CI)F'") -and
+    $windowsActionsRunnerInstallContent.Contains("'*S-1-5-18:(OI)(CI)F'") -and
+    $windowsActionsRunnerInstallContent.Contains('Get-FileHash -LiteralPath $archivePath -Algorithm SHA256') -and
+    $windowsActionsRunnerInstallContent.Contains("'--runasservice'") -and
+    $windowsActionsRunnerInstallContent.Contains("'--replace'") -and
+    $windowsActionsRunnerInstallContent.Contains('$customLabels += $RunnerName') -and
+    $windowsActionsRunnerInstallContent.Contains('The registration token will not be logged') -and
+    $runnerRunbookContent.Contains('-Phase AdminPrepare') -and
+    $runnerRunbookContent.Contains('-Phase UserInstall') -and
+    $runnerRunbookContent.Contains('-Phase AdminConfigure')
+)
+if (-not $actionsRunnerInstallContract) {
+    $parseDetails = @($actionsRunnerInstallParseErrors | ForEach-Object { "$($_.Extent.StartLineNumber): $($_.Message)" }) -join '; '
+    Write-Host "::error file=scripts/unity/install-windows-actions-runner.ps1::A new runner must use the documented admin/user/admin flow, checksum-verify the official package, configure service ACLs, add the machine-name label, and register as a Windows service. Parse errors: $parseDetails"
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info 'Checked checksum-verified Windows Actions runner installation and admin/user handoff.'
+}
+
 $runnerBootstrapDocsCurrent = (
     $runnerRunbookContent.Contains('.github/workflows/runner-bootstrap.yml') -and
     $runnerRunbookContent.Contains('scripts/unity/bootstrap-windows-runner.ps1') -and
@@ -1093,6 +1142,7 @@ $runnerBootstrapInvokesMaintenanceFunction = (
     $runnerBootstrapContent.Contains('. $script') -and
     $runnerBootstrapContent.Contains('$maintenanceArgs = @{') -and
     $runnerBootstrapContent.Contains('UnityVersions = $unityVersions') -and
+    $runnerBootstrapContent.Contains('$provisioningProfile = ''Full''') -and
     $runnerBootstrapContent.Contains('$maintenanceArgs.DetectOnly = $true') -and
     $runnerBootstrapContent.Contains('$code = Invoke-WindowsRunnerMaintenance @maintenanceArgs') -and
     -not $runnerBootstrapContent.Contains('& $script @maintenanceArgs') -and
@@ -2436,7 +2486,7 @@ if ($UnityVersion -notin @('2021.3.45f1', '6000.5.2f1')) {
 if ($InstallRoot -ne 'C:\Unity\Editors') {
     throw "Bad InstallRoot: $InstallRoot"
 }
-if ($ProvisioningProfile -ne 'StandaloneWindowsIl2Cpp') {
+if ($ProvisioningProfile -ne 'Full') {
     throw "Bad ProvisioningProfile: $ProvisioningProfile"
 }
 if (-not $CiManagedOnly) {
@@ -2497,6 +2547,29 @@ try {
 }
 
 if ($ensureEditorWatchdogImported) {
+    $expectedFullRequestedModules = @(
+        'windows-il2cpp',
+        'webgl',
+        'ios',
+        'mac-mono',
+        'linux-mono',
+        'linux-il2cpp',
+        'android',
+        'android-sdk-ndk-tools'
+    )
+    $expectedFullVerifiedModules = @($expectedFullRequestedModules + 'android-open-jdk')
+    $actualFullRequestedModules = @(Get-UnityCiModuleIds -Profile 'Full')
+    $actualFullVerifiedModules = @(Get-UnityCiVerifiedModuleGroups -Profile 'Full')
+    if (
+        (Compare-Object $expectedFullRequestedModules $actualFullRequestedModules) -or
+        (Compare-Object $expectedFullVerifiedModules $actualFullVerifiedModules)
+    ) {
+        Write-Host "::error file=scripts/unity/ensure-editor.ps1::The Full runner provisioning profile must install and verify Windows IL2CPP, WebGL, iOS, macOS Mono, Linux Mono/IL2CPP, and Android with SDK/NDK/OpenJDK. Requested='$($actualFullRequestedModules -join ',')' Verified='$($actualFullVerifiedModules -join ',')'."
+        $failed = $true
+    } elseif ($VerboseOutput) {
+        Write-Info 'Checked Full runner provisioning installs every supported build target.'
+    }
+
     $alternateInstallFunctionAst = Get-FunctionAstByName -Ast $ensureEditorAst -Name 'Install-UnityEditorWithCiModulesInAlternateRoot'
     $alternateInstallContent = if ($alternateInstallFunctionAst) { $alternateInstallFunctionAst.Extent.Text } else { '' }
     $requiredPayloadRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("unity-required-payload-" + [guid]::NewGuid().ToString('N'))

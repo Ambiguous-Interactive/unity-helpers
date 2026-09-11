@@ -309,19 +309,11 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
                 bar.AnimationSpeed = _animationSpeedAttribute.GetValueFromBag(bag, cc);
                 bar.Animate = _animateAttribute.GetValueFromBag(bag, cc);
                 bar.Progress = _progressAttribute.GetValueFromBag(bag, cc);
-                if (
-                    !bar.style.height.Equals(StyleKeyword.Initial)
-                    && bar.style.height.value == 0
-                    && bar.style.height.keyword == StyleKeyword.None
-                )
+                if (bar.style.height.keyword == StyleKeyword.Auto || bar.style.height.value == 0)
                 {
                     bar.style.height = 20;
                 }
-                if (
-                    !bar.style.width.Equals(StyleKeyword.Initial)
-                    && bar.style.width.value == 0
-                    && bar.style.width.keyword == StyleKeyword.None
-                )
+                if (bar.style.width.keyword == StyleKeyword.Auto || bar.style.width.value == 0)
                 {
                     bar.style.width = 200;
                 }

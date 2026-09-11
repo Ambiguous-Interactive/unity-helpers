@@ -267,7 +267,10 @@ jobs:
                   exit 1
               }
               Write-Host "Unity versions from .github/unity-versions.json: $($unityVersions -join ', ')"
-              $provisioningProfile = 'StandaloneWindowsIl2Cpp'
+              # Bootstrap is the fleet-preparation path, so provision every build
+              # target used by maintainers rather than only the test matrix's
+              # Windows standalone requirement.
+              $provisioningProfile = 'Full'
               $installRoot = if ($env:UNITY_EDITOR_INSTALL_ROOT) { $env:UNITY_EDITOR_INSTALL_ROOT } else { 'C:\Unity\Editors' }
               $maintenanceArgs = @{
                   UnityVersions = $unityVersions

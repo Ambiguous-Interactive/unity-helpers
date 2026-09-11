@@ -2370,6 +2370,8 @@ function Get-UnityCiModuleSpec {
     return @(
         [pscustomobject]@{ Id = 'windows-il2cpp';        Requested = $true;  Verified = $true; Tier = 'core';    Profiles = @('StandaloneWindowsIl2Cpp', 'Full') },
         [pscustomobject]@{ Id = 'webgl';                 Requested = $true;  Verified = $true; Tier = 'core';    Profiles = @('Full') },
+        [pscustomobject]@{ Id = 'ios';                   Requested = $true;  Verified = $true; Tier = 'core';    Profiles = @('Full') },
+        [pscustomobject]@{ Id = 'mac-mono';              Requested = $true;  Verified = $true; Tier = 'core';    Profiles = @('Full') },
         [pscustomobject]@{ Id = 'linux-mono';            Requested = $true;  Verified = $true; Tier = 'core';    Profiles = @('Full') },
         [pscustomobject]@{ Id = 'linux-il2cpp';          Requested = $true;  Verified = $true; Tier = 'core';    Profiles = @('Full') },
         [pscustomobject]@{ Id = 'android';               Requested = $true;  Verified = $true; Tier = 'android'; Profiles = @('Android', 'Full') },
@@ -2571,6 +2573,23 @@ function Test-UnityCiModuleGroupPresent {
                     (Join-Path $webGlRoot 'BuildTools\Emscripten\emcc.py')
                 )
                 return $hasEditorExtension -and $hasEmscriptenToolchain
+            }
+            'ios' {
+                $iosRoot = Join-Path $dataRoot 'PlaybackEngines\iOSSupport'
+                return Test-AnyUnityLeafPresent -Paths @(
+                    (Join-Path $iosRoot 'UnityEditor.iOS.Extensions.dll'),
+                    (Join-Path $iosRoot 'Tools\OSX\MapFileParser'),
+                    (Join-Path $iosRoot 'Tools\Windows\MapFileParser.exe')
+                )
+            }
+            'mac-mono' {
+                $macRoot = Join-Path $dataRoot 'PlaybackEngines\MacStandaloneSupport'
+                $variationRoot = Join-Path $macRoot 'Variations'
+                return Test-AnyUnityLeafPresent -Paths @(
+                    (Join-Path $macRoot 'UnityEditor.OSXStandalone.Extensions.dll'),
+                    (Join-Path $variationRoot 'macosx64_development_mono\UnityPlayer.app\Contents\MacOS\UnityPlayer'),
+                    (Join-Path $variationRoot 'macosx64_nondevelopment_mono\UnityPlayer.app\Contents\MacOS\UnityPlayer')
+                )
             }
             'android' {
                 $androidRoot = Join-Path $dataRoot 'PlaybackEngines\AndroidPlayer'
