@@ -3165,21 +3165,29 @@ if ($sparseRegistryExitCode -ne 0) {
     Write-Info "Checked Windows runner bootstrap sparse uninstall registry entries."
 }
 
-# Two properties, and they pull against each other. `cancel-in-progress: false` is mandatory --
-# cancelling a licensed job can skip license return and lock release. But that alone makes every new
-# run queue behind its predecessor, and a superseded predecessor holds the group for as long as its
-# legs sit in the runner queue, where they cannot reach the head guard that would end them. On PR
-# #351 the head carried no Unity check at all for two hours while every other check was green.
-# Scoping the group to the head is what keeps the second property from costing the first.
-$preservesLicensedPrRuns = (
-    $workflowContent.Contains('group: unity-tests-${{ github.event.pull_request.number || github.ref }}-${{ github.event.pull_request.head.sha || github.sha }}') -and
-    $workflowContent.Contains('cancel-in-progress: false')
+# One stable group per PR/ref lets GitHub cancel both running and queued legs from an older
+# revision. The licensed jobs' `always()` cleanup path is responsible for returning the license
+# and releasing the organization lock when cancellation arrives after acquisition.
+$cancelsSupersededLicensedRuns = (
+    $workflowContent.Contains('group: unity-tests-${{ github.event.pull_request.number || github.ref }}') -and
+    $workflowContent.Contains('cancel-in-progress: true')
 )
-if (-not $preservesLicensedPrRuns) {
-    Write-Host "::error file=.github/workflows/unity-tests.yml::Unity Tests must not cancel an in-progress licensed run (cancellation can skip license return and lock release), and its concurrency group must be scoped to the head SHA so a superseded run cannot block the current head from being validated at all."
+if (-not $cancelsSupersededLicensedRuns) {
+    Write-Host "::error file=.github/workflows/unity-tests.yml::Unity Tests must group by pull request/ref and cancel in-progress runs so superseded licensed legs cannot starve the self-hosted runners."
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info "Checked Unity Tests preserves in-progress licensed runs and scopes concurrency per head."
+    Write-Info "Checked Unity Tests cancels superseded runs within a stable pull request/ref group."
+}
+
+$cancelsSupersededBenchmarkRuns = (
+    $benchmarksWorkflowContent.Contains('group: unity-benchmarks-${{ github.ref }}') -and
+    $benchmarksWorkflowContent.Contains('cancel-in-progress: true')
+)
+if (-not $cancelsSupersededBenchmarkRuns) {
+    Write-Host "::error file=.github/workflows/unity-benchmarks.yml::Unity Benchmarks must group by ref and cancel in-progress runs so repeated dispatches cannot starve the self-hosted runners."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked Unity Benchmarks cancels superseded runs within a stable ref group."
 }
 
 $currentPrHeadGuardUses = "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@$currentPrHeadGuardCommit"
@@ -3423,11 +3431,10 @@ foreach ($licensedJobId in $licensedJobIds) {
 }
 
 # The per-leg guards above fire only after a leg has been dispatched, which means
-# waiting in line for the single self-hosted Unity seat. The concurrency group is
-# scoped per head so that queue can no longer block the successor run outright,
-# but a superseded iteration that dispatches its legs anyway still burns runner
-# slots to fail version-job guards. The hosted matrix-config job must resolve
-# supersession once and skip the licensed tiers outright.
+# waiting in line for the single self-hosted Unity seat. Workflow concurrency now
+# cancels a superseded iteration, but the hosted matrix-config guard remains a
+# defense in depth for runs superseded around dispatch and for historical runs
+# created before cancellation was enabled.
 $matrixConfigJob = if ($jobTexts.ContainsKey('matrix-config')) { [string]$jobTexts['matrix-config'] } else { '' }
 $supersededStep = [regex]::Match(
     $matrixConfigJob,

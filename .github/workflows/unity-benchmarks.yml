@@ -20,6 +20,12 @@ permissions:
   checks: write
   issues: write
 
+# Repeated dispatches target the same ref and supersede older benchmark iterations. Licensed jobs
+# use the same cancellation-safe central return/classification/lock-release path as Unity Tests.
+concurrency:
+  group: unity-benchmarks-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   matrix-config:
     name: Resolve benchmark target
