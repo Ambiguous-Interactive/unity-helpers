@@ -19,6 +19,13 @@ foreach ($name in @('Test-NUnitResults', 'Get-UnityFailedNodeCount')) {
     Invoke-Expression $function.Extent.Text
 }
 
+$verifier = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../../.github/actions/verify-unity-results/action.yml') -Raw
+foreach ($diagnosticSource in @($source, $verifier)) {
+    if ([regex]::Matches($diagnosticSource, [regex]::Escape("not(@site='Child')")).Count -ne 2) {
+        throw 'Both Unity result readers must exclude rolled-up child suite failures from annotations and counts.'
+    }
+}
+
 # Diagnostics are not the subject; the actual XML gate and invocation sites are.
 function Write-CiError { param([string]$Message) }
 function Write-CiNotice { param([string]$Message) }
@@ -68,6 +75,31 @@ $invocations = @($ast.FindAll({
             $node.GetCommandName() -eq 'Test-NUnitResults'
         }, $true))
 if ($invocations.Count -ne 2) { throw 'Both editor and standalone result invocation sites must be tested.' }
+
+[xml]$failedChildSuite = @'
+<test-run>
+  <test-suite fullname="Parent" result="Failed" site="Child">
+    <failure><message>One or more child tests had errors</message></failure>
+    <test-case fullname="Broken" result="Failed" />
+  </test-suite>
+</test-run>
+'@
+if ((Get-UnityFailedNodeCount -Xml $failedChildSuite) -ne 1) {
+    throw 'Failed child suites must not inflate the failed test count.'
+}
+
+[xml]$failedTearDownSuite = @'
+<test-run>
+  <test-suite fullname="Fixture" result="Failed" site="TearDown">
+    <failure><message>Fixture cleanup failed</message></failure>
+    <test-case fullname="Broken" result="Failed" />
+  </test-suite>
+</test-run>
+'@
+if ((Get-UnityFailedNodeCount -Xml $failedTearDownSuite) -ne 2) {
+    throw 'A suite with its own lifecycle failure must remain actionable.'
+}
+
 $temporary = Join-Path ([IO.Path]::GetTempPath()) ('unity-filter-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $temporary | Out-Null
 $checks = 0

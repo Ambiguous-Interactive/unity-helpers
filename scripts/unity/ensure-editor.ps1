@@ -2595,10 +2595,9 @@ function Test-UnityCiModuleGroupPresent {
             }
             'android' {
                 $androidRoot = Join-Path $dataRoot 'PlaybackEngines\AndroidPlayer'
-                return Test-AnyUnityLeafPresent -Paths @(
-                    (Join-Path $androidRoot 'UnityEditor.Android.Extensions.dll'),
-                    (Join-Path $androidRoot 'Tools\Source.properties')
-                )
+                $hasEditorExtension = Test-Path -LiteralPath (Join-Path $androidRoot 'UnityEditor.Android.Extensions.dll') -PathType Leaf
+                $hasPlayerTools = Test-Path -LiteralPath (Join-Path $androidRoot 'Tools\Source.properties') -PathType Leaf
+                return $hasEditorExtension -and $hasPlayerTools
             }
             'android-sdk-ndk-tools' {
                 $androidRoot = Join-Path $dataRoot 'PlaybackEngines\AndroidPlayer'
