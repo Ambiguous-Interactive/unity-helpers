@@ -11,6 +11,10 @@ param(
     [string]$RunnerMaintenanceInstallRoot = $(if ($env:UNITY_EDITOR_INSTALL_ROOT) { $env:UNITY_EDITOR_INSTALL_ROOT } else { 'C:\Unity\Editors' }),
     [Alias('DetectOnly')]
     [switch]$RunnerMaintenanceDetectOnly,
+    [Alias('HostOnly')]
+    [switch]$RunnerMaintenanceHostOnly,
+    [Alias('SkipHostBootstrap')]
+    [switch]$RunnerMaintenanceSkipHostBootstrap,
     [Alias('DiagnosticsRoot')]
     [string]$RunnerMaintenanceDiagnosticsRoot = '',
     [Parameter(ValueFromRemainingArguments = $true)]
@@ -129,18 +133,24 @@ function Invoke-WindowsRunnerMaintenance {
         [string]$ProvisioningProfile = 'Full',
         [string]$InstallRoot = $(if ($env:UNITY_EDITOR_INSTALL_ROOT) { $env:UNITY_EDITOR_INSTALL_ROOT } else { 'C:\Unity\Editors' }),
         [switch]$DetectOnly,
+        [switch]$HostOnly,
+        [switch]$SkipHostBootstrap,
         [string]$DiagnosticsRoot = ''
     )
 
+    if ($HostOnly -and $SkipHostBootstrap) {
+        throw '-HostOnly and -SkipHostBootstrap are mutually exclusive.'
+    }
+
     $repoRoot = Get-UnityMaintenanceRepoRoot
-    $versions = @(Resolve-RunnerMaintenanceUnityVersions -UnityVersions $UnityVersions -RepoRoot $repoRoot)
+    $versions = if ($HostOnly) { @() } else { @(Resolve-RunnerMaintenanceUnityVersions -UnityVersions $UnityVersions -RepoRoot $repoRoot) }
     $scriptRoot = Get-UnityMaintenanceScriptRoot
     $bootstrapScript = Join-Path $scriptRoot 'bootstrap-windows-runner.ps1'
     $ensureEditorScript = Join-Path $scriptRoot 'ensure-editor.ps1'
-    if (-not (Test-Path -LiteralPath $bootstrapScript -PathType Leaf)) {
+    if (-not $SkipHostBootstrap -and -not (Test-Path -LiteralPath $bootstrapScript -PathType Leaf)) {
         throw "Missing runner bootstrap script: $bootstrapScript"
     }
-    if (-not (Test-Path -LiteralPath $ensureEditorScript -PathType Leaf)) {
+    if (-not $HostOnly -and -not (Test-Path -LiteralPath $ensureEditorScript -PathType Leaf)) {
         throw "Missing Unity editor provisioning script: $ensureEditorScript"
     }
 
@@ -153,25 +163,32 @@ function Invoke-WindowsRunnerMaintenance {
     $maintenanceInstallRoot = [string]$InstallRoot
     $maintenanceProvisioningProfile = [string]$ProvisioningProfile
 
-    . $bootstrapScript
-    $bootstrapOutput = @(Invoke-WindowsRunnerBootstrap `
-        -DetectOnly:$maintenanceDetectOnly `
-        -UnityInstallRoot $maintenanceInstallRoot `
-        -DiagnosticsRoot $maintenanceDiagnosticsRoot)
-    if ($bootstrapOutput.Count -lt 1) {
-        throw 'Windows runner bootstrap did not return an exit code.'
-    }
-    if ($bootstrapOutput.Count -gt 1) {
-        foreach ($line in @($bootstrapOutput[0..($bootstrapOutput.Count - 2)])) {
-            if ($null -ne $line) {
-                Write-RunnerMaintenanceInfo "[bootstrap] $line"
+    if (-not $SkipHostBootstrap) {
+        . $bootstrapScript
+        $bootstrapOutput = @(Invoke-WindowsRunnerBootstrap `
+            -DetectOnly:$maintenanceDetectOnly `
+            -UnityInstallRoot $maintenanceInstallRoot `
+            -DiagnosticsRoot $maintenanceDiagnosticsRoot)
+        if ($bootstrapOutput.Count -lt 1) {
+            throw 'Windows runner bootstrap did not return an exit code.'
+        }
+        if ($bootstrapOutput.Count -gt 1) {
+            foreach ($line in @($bootstrapOutput[0..($bootstrapOutput.Count - 2)])) {
+                if ($null -ne $line) {
+                    Write-RunnerMaintenanceInfo "[bootstrap] $line"
+                }
             }
+        }
+
+        [int]$bootstrapCode = $bootstrapOutput[-1]
+        if ($bootstrapCode -ne 0) {
+            return $bootstrapCode
         }
     }
 
-    [int]$bootstrapCode = $bootstrapOutput[-1]
-    if ($bootstrapCode -ne 0) {
-        return $bootstrapCode
+    if ($HostOnly) {
+        Write-RunnerMaintenanceInfo 'Windows host prerequisites are ready.'
+        return 0
     }
 
     $failedVersions = New-Object System.Collections.Generic.List[string]
@@ -227,6 +244,8 @@ if ($MyInvocation.InvocationName -ne '.') {
         -ProvisioningProfile $RunnerMaintenanceProvisioningProfile `
         -InstallRoot $RunnerMaintenanceInstallRoot `
         -DetectOnly:$RunnerMaintenanceDetectOnly `
+        -HostOnly:$RunnerMaintenanceHostOnly `
+        -SkipHostBootstrap:$RunnerMaintenanceSkipHostBootstrap `
         -DiagnosticsRoot $RunnerMaintenanceDiagnosticsRoot
     exit $exitCode
 }

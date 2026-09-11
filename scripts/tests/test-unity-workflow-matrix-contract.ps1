@@ -372,6 +372,10 @@ function Import-EnsureEditorWatchdogFunctions {
         'Get-EnsureEditorProgressStallSeconds',
         'Get-EnsureEditorProgressNoticeIntervalSeconds',
         'Get-EnsureEditorQuarantineMoveRetryAttempts',
+        'Get-UnityCliUpdateTimeoutSeconds',
+        'Get-UnityCliUpdateRetryAttempts',
+        'Get-UnityCliUpdateStallSeconds',
+        'Set-UnityCliAutomationEnvironment',
         'Invoke-WithRetry',
         'Test-IsPathInsideDirectory',
         'Get-UnityCiAlternateInstallRoot',
@@ -1025,13 +1029,13 @@ if ([string]::IsNullOrWhiteSpace($reflexVersionText)) {
 }
 
 $runnerUsesUnityVersionsConfig = (
-    $runnerBootstrapContent.Contains('.github\unity-versions.json') -and
-    $runnerBootstrapContent.Contains('ConvertFrom-Json') -and
-    $runnerBootstrapContent.Contains('@($unityVersionsConfig.all)') -and
-    $runnerBootstrapContent.Contains('Unity versions from .github/unity-versions.json')
+    $runnerBootstrapContent.Contains('.github/unity-versions.json') -and
+    $runnerBootstrapContent.Contains('jq -c ''{"unity-version": .all}''') -and
+    $runnerBootstrapContent.Contains('fromJSON(needs.matrix-config.outputs.matrix)') -and
+    $runnerBootstrapContent.Contains('matrix.unity-version')
 )
 if (-not $runnerUsesUnityVersionsConfig) {
-    Write-Host "::error file=.github/workflows/runner-bootstrap.yml::Runner bootstrap must read .github/unity-versions.json through an array wrapper so self-hosted runner provisioning cannot drift from the Unity test matrix or split one-element arrays incorrectly."
+    Write-Host "::error file=.github/workflows/runner-bootstrap.yml::Runner bootstrap must build its per-version matrix from .github/unity-versions.json so self-hosted runner provisioning cannot drift from the Unity test matrix."
     $failed = $true
 } elseif ($runnerBootstrapContent -match "(?s)\`$unityVersions\s*=\s*@\(\s*'\d+\.\d+\.\d+f\d+'") {
     Write-Host "::error file=.github/workflows/runner-bootstrap.yml::Runner bootstrap must not hardcode a Unity version array; update .github/unity-versions.json instead."
@@ -1143,8 +1147,10 @@ if (-not $runnerBootstrapDocsCurrent) {
 $runnerBootstrapInvokesMaintenanceFunction = (
     $runnerBootstrapContent.Contains('. $script') -and
     $runnerBootstrapContent.Contains('$maintenanceArgs = @{') -and
-    $runnerBootstrapContent.Contains('UnityVersions = $unityVersions') -and
-    $runnerBootstrapContent.Contains('$provisioningProfile = ''Full''') -and
+    $runnerBootstrapContent.Contains('UnityVersions = @($env:UH_MAINTENANCE_UNITY_VERSION)') -and
+    $runnerBootstrapContent.Contains("ProvisioningProfile = 'Full'") -and
+    $runnerBootstrapContent.Contains('HostOnly = $true') -and
+    $runnerBootstrapContent.Contains('SkipHostBootstrap = $true') -and
     $runnerBootstrapContent.Contains('$maintenanceArgs.DetectOnly = $true') -and
     $runnerBootstrapContent.Contains('$code = Invoke-WindowsRunnerMaintenance @maintenanceArgs') -and
     -not $runnerBootstrapContent.Contains('& $script @maintenanceArgs') -and
@@ -1155,6 +1161,44 @@ if (-not $runnerBootstrapInvokesMaintenanceFunction) {
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked runner bootstrap calls maintenance function without losing cleanup control."
+}
+
+$unityCliMaintenanceIsZeroTouch = (
+    $ensureEditorContent.Contains("'self-update'") -and
+    $ensureEditorContent.Contains("'upgrade'") -and
+    $ensureEditorContent.Contains('UNITY_NON_INTERACTIVE') -and
+    $ensureEditorContent.Contains('UNITY_NO_PAGER') -and
+    $ensureEditorContent.Contains('UNITY_NO_CONSENT_PROMPT') -and
+    $ensureEditorContent.Contains('UNITY_INSTALL_RETRIES') -and
+    $ensureEditorContent.Contains('UH_UNITY_CLI_UPDATE_TIMEOUT_SECONDS') -and
+    $ensureEditorContent.Contains('UH_UNITY_CLI_UPDATE_RETRY_ATTEMPTS') -and
+    $ensureEditorContent.Contains('Invoke-UnityCliCaptureWithTimeout') -and
+    $ensureEditorContent.Contains('$script:UnityCliUpdateCompleted')
+)
+if (-not $unityCliMaintenanceIsZeroTouch) {
+    Write-Host "::error file=scripts/unity/ensure-editor.ps1::Runner maintenance must put Unity CLI in non-interactive mode, update it through the bounded watchdog with retries, support the legacy upgrade alias, and update only once per provisioning process."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info 'Checked Unity CLI maintenance is bounded, retrying, current, and non-interactive.'
+}
+
+$runnerMaintenanceIsSplitByVersion = (
+    $runnerBootstrapJobTexts.ContainsKey('bootstrap-host') -and
+    $runnerBootstrapJobTexts.ContainsKey('maintain-unity') -and
+    $runnerBootstrapJobTexts['maintain-unity'].Contains('matrix.unity-version') -and
+    $runnerBootstrapJobTexts['maintain-unity'].Contains('max-parallel: 1') -and
+    $runnerBootstrapJobTexts['maintain-unity'].Contains('fail-fast: false') -and
+    $runnerBootstrapJobTexts['maintain-unity'].Contains('timeout-minutes: 360') -and
+    $runnerBootstrapContent.Contains('HostOnly = $true') -and
+    $runnerBootstrapContent.Contains('SkipHostBootstrap = $true') -and
+    $windowsRunnerMaintenanceContent.Contains('[switch]$HostOnly') -and
+    $windowsRunnerMaintenanceContent.Contains('[switch]$SkipHostBootstrap')
+)
+if (-not $runnerMaintenanceIsSplitByVersion) {
+    Write-Host "::error file=.github/workflows/runner-bootstrap.yml::Runner maintenance must bootstrap the host once and give each Unity version its own serialized six-hour job so one slow editor cannot exhaust a shared workflow timeout."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info 'Checked runner maintenance isolates every Unity version behind its own timeout.'
 }
 
 $runnerMaintenanceForceParameters = @(
@@ -1587,18 +1631,21 @@ if ($VerboseOutput) {
 }
 
 $runnerPreflightJob = if ($runnerBootstrapJobTexts.ContainsKey('runner-preflight')) { $runnerBootstrapJobTexts['runner-preflight'] } else { '' }
-$bootstrapJob = if ($runnerBootstrapJobTexts.ContainsKey('bootstrap')) { $runnerBootstrapJobTexts['bootstrap'] } else { '' }
+$bootstrapHostJob = if ($runnerBootstrapJobTexts.ContainsKey('bootstrap-host')) { $runnerBootstrapJobTexts['bootstrap-host'] } else { '' }
+$maintainUnityJob = if ($runnerBootstrapJobTexts.ContainsKey('maintain-unity')) { $runnerBootstrapJobTexts['maintain-unity'] } else { '' }
 $bootstrapRunsOnPattern = '(?m)^\s+runs-on:\s*\[self-hosted,\s*Windows,\s*RAM-64GB,\s*"\$\{\{\s*inputs\.runner-label\s*\}\}"\]\s*$'
 $runnerPreflightAction = "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/check-unity-runner-availability@$runnerAvailabilityActionCommit"
 $readerAppCredentialsPattern = '(?ms)reader-app-id:\s*\$\{\{\s*secrets\.BUILD_LOCK_READER_APP_ID\s*\}\}.*reader-app-private-key:\s*\$\{\{\s*secrets\.BUILD_LOCK_READER_APP_PRIVATE_KEY\s*\}\}'
 $runnerBootstrapPinsRequestedMachine = (
     $runnerBootstrapJobTexts.ContainsKey('runner-preflight') -and
-    $runnerBootstrapJobTexts.ContainsKey('bootstrap') -and
+    $runnerBootstrapJobTexts.ContainsKey('bootstrap-host') -and
+    $runnerBootstrapJobTexts.ContainsKey('maintain-unity') -and
     $runnerPreflightJob.Contains("uses: $runnerPreflightAction # $runnerAvailabilityActionVersion") -and
     $runnerPreflightJob -match $readerAppCredentialsPattern -and
     $runnerPreflightJob.Contains('required-label-sets: ''[["self-hosted","Windows","RAM-64GB","${{ inputs.runner-label }}"]]''') -and
-    $bootstrapJob -match $bootstrapRunsOnPattern -and
-    $bootstrapJob.Contains('custom ''$requested'' label') -and
+    $bootstrapHostJob -match $bootstrapRunsOnPattern -and
+    $maintainUnityJob -match $bootstrapRunsOnPattern -and
+    $bootstrapHostJob.Contains('custom ''$requested'' label') -and
     $actionlintContent.Contains('- DAD-MACHINE') -and
     $actionlintContent.Contains('- ELI-MACHINE') -and
     -not $runnerBootstrapContent.Contains('take the unwanted runner offline') -and
@@ -2352,6 +2399,10 @@ if ($workflowShapeExitCode -ne 2 -or (($workflowShapeOutput -join ' ') -notmatch
 $ensureEditorShapeRoot = ''
 $ensureEditorShapeOutput = @()
 $ensureEditorShapeExitCode = 1
+$hostOnlyShapeOutput = @()
+$hostOnlyShapeExitCode = 1
+$skipHostShapeOutput = @()
+$skipHostShapeExitCode = 1
 try {
     $ensureEditorShapeRoot = Join-Path ([System.IO.Path]::GetTempPath()) "unity-runner-ensure-shape-$PID-$(Get-Random)"
     New-Item -ItemType Directory -Force -Path $ensureEditorShapeRoot | Out-Null
@@ -2405,16 +2456,39 @@ Write-Output "fake ensure-editor ok: `$UnityVersion"
         -DetectOnly `
         -DiagnosticsRoot $ensureEditorShapeDiagnostics 2>&1
     $ensureEditorShapeExitCode = $LASTEXITCODE
+
+    $hostOnlyShapeOutput = & pwsh -NoProfile -File (Join-Path $ensureEditorShapeRoot 'maintain-windows-runner.ps1') `
+        -HostOnly `
+        -DiagnosticsRoot $ensureEditorShapeDiagnostics 2>&1
+    $hostOnlyShapeExitCode = $LASTEXITCODE
+
+    $skipHostShapeOutput = & pwsh -NoProfile -File (Join-Path $ensureEditorShapeRoot 'maintain-windows-runner.ps1') `
+        -UnityVersions '2022.3.45f1' `
+        -ProvisioningProfile 'StandaloneWindowsIl2Cpp' `
+        -InstallRoot 'C:\Unity\Editors' `
+        -DetectOnly `
+        -SkipHostBootstrap `
+        -DiagnosticsRoot $ensureEditorShapeDiagnostics 2>&1
+    $skipHostShapeExitCode = $LASTEXITCODE
 } finally {
     if ($ensureEditorShapeRoot -and (Test-Path -LiteralPath $ensureEditorShapeRoot -PathType Container)) {
         Remove-Item -LiteralPath $ensureEditorShapeRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
-if ($ensureEditorShapeExitCode -ne 0 -or (($ensureEditorShapeOutput -join ' ') -notmatch 'fake ensure-editor ok: 2022\.3\.45f1')) {
+if (
+    $ensureEditorShapeExitCode -ne 0 -or
+    (($ensureEditorShapeOutput -join ' ') -notmatch 'fake ensure-editor ok: 2022\.3\.45f1') -or
+    $hostOnlyShapeExitCode -ne 0 -or
+    (($hostOnlyShapeOutput -join ' ') -notmatch 'Windows host prerequisites are ready') -or
+    (($hostOnlyShapeOutput -join ' ') -match 'fake ensure-editor') -or
+    $skipHostShapeExitCode -ne 0 -or
+    (($skipHostShapeOutput -join ' ') -notmatch 'fake ensure-editor ok: 2022\.3\.45f1') -or
+    (($skipHostShapeOutput -join ' ') -match '\[bootstrap\]')
+) {
     Write-Host "::error file=scripts/unity/maintain-windows-runner.ps1::Runner maintenance must pass named parameters to ensure-editor.ps1 so Windows PowerShell 5.1 does not bind '-UnityVersion' as the UnityVersion value. Exit $ensureEditorShapeExitCode. Output: $($ensureEditorShapeOutput -join ' ')"
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info "Checked maintenance passes named parameters to ensure-editor."
+    Write-Info "Checked maintenance passes named parameters and separates host-only from editor-only work."
 }
 
 $manualDefaultsRoot = ''
@@ -2538,6 +2612,51 @@ try {
 }
 
 if ($ensureEditorWatchdogImported) {
+    $oldUnityNonInteractive = $env:UNITY_NON_INTERACTIVE
+    $oldUnityNoPager = $env:UNITY_NO_PAGER
+    $oldUnityNoConsentPrompt = $env:UNITY_NO_CONSENT_PROMPT
+    $oldUnityCliChannel = $env:UNITY_CLI_CHANNEL
+    $oldUnityInstallRetries = $env:UNITY_INSTALL_RETRIES
+    try {
+        Remove-Item Env:\UNITY_NON_INTERACTIVE -ErrorAction SilentlyContinue
+        Remove-Item Env:\UNITY_NO_PAGER -ErrorAction SilentlyContinue
+        Remove-Item Env:\UNITY_NO_CONSENT_PROMPT -ErrorAction SilentlyContinue
+        Remove-Item Env:\UNITY_CLI_CHANNEL -ErrorAction SilentlyContinue
+        Remove-Item Env:\UNITY_INSTALL_RETRIES -ErrorAction SilentlyContinue
+        Set-UnityCliAutomationEnvironment
+        if (
+            $env:UNITY_NON_INTERACTIVE -ne '1' -or
+            $env:UNITY_NO_PAGER -ne '1' -or
+            $env:UNITY_NO_CONSENT_PROMPT -ne '1' -or
+            $env:UNITY_CLI_CHANNEL -ne 'beta' -or
+            $env:UNITY_INSTALL_RETRIES -ne '5'
+        ) {
+            Write-Host '::error file=scripts/unity/ensure-editor.ps1::Unity CLI automation environment must disable every prompt and provide built-in download retries.'
+            $failed = $true
+        }
+
+        $env:UNITY_INSTALL_RETRIES = '9'
+        Set-UnityCliAutomationEnvironment
+        if ($env:UNITY_INSTALL_RETRIES -ne '9') {
+            Write-Host '::error file=scripts/unity/ensure-editor.ps1::Unity CLI automation setup must preserve an explicit operator retry count.'
+            $failed = $true
+        }
+    } finally {
+        foreach ($setting in @(
+                @{ Name = 'UNITY_NON_INTERACTIVE'; Value = $oldUnityNonInteractive },
+                @{ Name = 'UNITY_NO_PAGER'; Value = $oldUnityNoPager },
+                @{ Name = 'UNITY_NO_CONSENT_PROMPT'; Value = $oldUnityNoConsentPrompt },
+                @{ Name = 'UNITY_CLI_CHANNEL'; Value = $oldUnityCliChannel },
+                @{ Name = 'UNITY_INSTALL_RETRIES'; Value = $oldUnityInstallRetries }
+            )) {
+            if ($null -eq $setting.Value) {
+                Remove-Item "Env:\$($setting.Name)" -ErrorAction SilentlyContinue
+            } else {
+                Set-Item "Env:\$($setting.Name)" ([string]$setting.Value)
+            }
+        }
+    }
+
     $expectedFullRequestedModules = @(
         'windows-il2cpp',
         'webgl',

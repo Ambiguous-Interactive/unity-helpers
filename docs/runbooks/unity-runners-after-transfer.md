@@ -137,7 +137,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\unity\install-wind
   -RegistrationToken <short-lived-token> -RunnerName DAD-MACHINE
 ```
 
-Once the agent reports online, dispatch **Runner Bootstrap (Windows)** in maintenance mode. That installs the host prerequisites and every Unity editor from `.github/unity-versions.json`, including all supported build-target components.
+Once the agent reports online, dispatch **Runner Bootstrap (Windows)** in maintenance mode. That installs the host prerequisites and every Unity editor from `.github/unity-versions.json`, including all supported build-target components. Host preparation runs once, then each editor runs in its own serialized six-hour job. A slow editor therefore cannot consume the timeout for later versions, and GitHub can rerun only the failed version leg.
 
 ## Run maintenance directly on a Windows runner
 
@@ -147,7 +147,7 @@ When you are already on the runner host, you do not need to run YAML. From a che
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\unity\maintain-windows-runner.ps1
 ```
 
-The script reads `.github\unity-versions.json` when `-UnityVersions` is omitted, uses `C:\Unity\Editors` unless `UNITY_EDITOR_INSTALL_ROOT` is set, and writes diagnostics under `.artifacts\runner-bootstrap`. Its default `Full` profile installs and verifies Windows IL2CPP, Android (including SDK/NDK/OpenJDK), WebGL, iOS, Linux Mono/IL2CPP, and macOS Mono build support; the workflow uses the same profile.
+The script reads `.github\unity-versions.json` when `-UnityVersions` is omitted, uses `C:\Unity\Editors` unless `UNITY_EDITOR_INSTALL_ROOT` is set, and writes diagnostics under `.artifacts\runner-bootstrap`. Its default `Full` profile installs and verifies Windows IL2CPP, Android (including SDK/NDK/OpenJDK), WebGL, iOS, Linux Mono/IL2CPP, and macOS Mono build support; the workflow uses the same profile. Maintenance installs the standalone Unity CLI when absent and otherwise runs its current `self-update` command before provisioning. All CLI operations are non-interactive, use built-in download retries, stream progress, and have bounded wall-clock and no-output timeouts. `UH_UNITY_CLI_UPDATE_TIMEOUT_SECONDS`, `UH_UNITY_CLI_UPDATE_STALL_SECONDS`, and `UH_UNITY_CLI_UPDATE_RETRY_ATTEMPTS` override the update defaults for diagnosis.
 
 For an audit that never installs or repairs anything:
 

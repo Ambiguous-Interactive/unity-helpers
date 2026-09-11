@@ -63,6 +63,7 @@ $script:ProvisioningTimeoutEvents = New-Object System.Collections.Generic.List[o
 $script:ProvisioningProcessCleanupEvents = New-Object System.Collections.Generic.List[object]
 $script:ProvisioningCommandClasses = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
 $script:UnityCliVersionText = ''
+$script:UnityCliUpdateCompleted = $false
 
 # PowerShell 7.4 introduced $PSNativeCommandUseErrorActionPreference (stabilizing
 # the native-error experimental feature). Its default is $false on current builds,
@@ -944,39 +945,178 @@ function Update-SessionPathFromRegistry {
     $env:PATH = (($segments | Where-Object { $_ -and $_.Trim().Length -gt 0 }) -join ';')
 }
 
-function Ensure-UnityCli {
-    $command = Get-Command unity -ErrorAction SilentlyContinue
-    if ($command) {
-        $script:UnityCliPath = $command.Source
-        return $command.Source
+function Get-UnityCliUpdateTimeoutSeconds {
+    param([int]$Default = 900)
+
+    if ($env:UH_UNITY_CLI_UPDATE_TIMEOUT_SECONDS) {
+        $parsed = 0
+        if ([int]::TryParse($env:UH_UNITY_CLI_UPDATE_TIMEOUT_SECONDS, [ref]$parsed) -and $parsed -ge 1) {
+            return $parsed
+        }
+        Write-Host "::warning::Ignoring invalid UH_UNITY_CLI_UPDATE_TIMEOUT_SECONDS='$env:UH_UNITY_CLI_UPDATE_TIMEOUT_SECONDS'; using $Default second(s)."
+    }
+    return $Default
+}
+
+function Get-UnityCliUpdateRetryAttempts {
+    param([int]$Default = 3)
+
+    if ($env:UH_UNITY_CLI_UPDATE_RETRY_ATTEMPTS) {
+        $parsed = 0
+        if ([int]::TryParse($env:UH_UNITY_CLI_UPDATE_RETRY_ATTEMPTS, [ref]$parsed) -and $parsed -ge 1) {
+            return $parsed
+        }
+        Write-Host "::warning::Ignoring invalid UH_UNITY_CLI_UPDATE_RETRY_ATTEMPTS='$env:UH_UNITY_CLI_UPDATE_RETRY_ATTEMPTS'; using $Default attempt(s)."
+    }
+    return $Default
+}
+
+function Get-UnityCliUpdateStallSeconds {
+    param([int]$Default = 300)
+
+    if ($env:UH_UNITY_CLI_UPDATE_STALL_SECONDS) {
+        $parsed = 0
+        if ([int]::TryParse($env:UH_UNITY_CLI_UPDATE_STALL_SECONDS, [ref]$parsed) -and $parsed -ge 1) {
+            return $parsed
+        }
+        Write-Host "::warning::Ignoring invalid UH_UNITY_CLI_UPDATE_STALL_SECONDS='$env:UH_UNITY_CLI_UPDATE_STALL_SECONDS'; using $Default second(s)."
+    }
+    return $Default
+}
+
+function Set-UnityCliAutomationEnvironment {
+    # These are the Unity CLI's documented automation controls. Set them in the
+    # process before install/update so a runner can never wait for a pager,
+    # consent prompt, or interactive question. Preserve an operator's explicit
+    # download retry count, otherwise use a resilient default.
+    $env:UNITY_NON_INTERACTIVE = '1'
+    $env:UNITY_NO_PAGER = '1'
+    $env:UNITY_NO_CONSENT_PROMPT = '1'
+    if (-not $env:UNITY_CLI_CHANNEL) {
+        $env:UNITY_CLI_CHANNEL = 'beta'
+    }
+    if (-not $env:UNITY_INSTALL_RETRIES) {
+        $env:UNITY_INSTALL_RETRIES = '5'
+    }
+}
+
+function Install-UnityCliStandalone {
+    $installerUri = 'https://public-cdn.cloud.unity3d.com/hub/prod/cli/install.ps1'
+    $installerPath = Join-Path ([System.IO.Path]::GetTempPath()) "unity-cli-install-$PID-$([Guid]::NewGuid().ToString('N')).ps1"
+    try {
+        Invoke-WithRetry -MaxAttempts (Get-UnityCliUpdateRetryAttempts) -DelaySeconds (Get-EnsureEditorRetryDelaySeconds) -Action {
+            Invoke-WebRequest -Uri $installerUri -UseBasicParsing -TimeoutSec 120 -OutFile $installerPath
+            if (-not (Test-Path -LiteralPath $installerPath -PathType Leaf) -or (Get-Item -LiteralPath $installerPath).Length -lt 100) {
+                throw 'The downloaded Unity CLI installer is missing or unexpectedly small.'
+            }
+        } | Out-Null
+
+        $powershellCommand = Get-Command powershell.exe -ErrorAction SilentlyContinue
+        if (-not $powershellCommand) {
+            $powershellCommand = Get-Command powershell -ErrorAction Stop
+        }
+        $powershell = $powershellCommand.Source
+        Invoke-WithRetry -MaxAttempts (Get-UnityCliUpdateRetryAttempts) -DelaySeconds (Get-EnsureEditorRetryDelaySeconds) -Action {
+            $result = Invoke-UnityCliCaptureWithTimeout `
+                -ExecutablePath $powershell `
+                -Arguments @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $installerPath) `
+                -TimeoutSeconds (Get-UnityCliUpdateTimeoutSeconds) `
+                -TimeoutKnob 'UH_UNITY_CLI_UPDATE_TIMEOUT_SECONDS' `
+                -StallSeconds (Get-UnityCliUpdateStallSeconds -Default 180) `
+                -StallKnob 'UH_UNITY_CLI_INSTALL_STALL_SECONDS'
+            if ($result.ExitCode -ne 0) {
+                $tail = Get-CollapsedCliOutputTail -Output $result.Output -MaxLines 40
+                throw "Unity CLI installer failed with exit code $($result.ExitCode). Output tail:`n$tail"
+            }
+        } | Out-Null
+    } finally {
+        Remove-Item -LiteralPath $installerPath -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Update-UnityCliStandalone {
+    if ($script:UnityCliUpdateCompleted) {
+        return
     }
 
-    Write-CiNotice "Unity CLI was not found on PATH; installing the standalone Unity CLI for this runner."
-    $env:UNITY_CLI_CHANNEL = if ($env:UNITY_CLI_CHANNEL) { $env:UNITY_CLI_CHANNEL } else { 'beta' }
-    Invoke-Expression (Invoke-RestMethod 'https://public-cdn.cloud.unity3d.com/hub/prod/cli/install.ps1')
+    $timeout = Get-UnityCliUpdateTimeoutSeconds
+    $attempts = Get-UnityCliUpdateRetryAttempts
+    $delay = Get-EnsureEditorRetryDelaySeconds
+    $verbs = @('self-update', 'upgrade')
+    foreach ($verb in $verbs) {
+        $updateOutcome = Invoke-WithRetry -MaxAttempts $attempts -DelaySeconds $delay -Action {
+            $result = Invoke-UnityCliCaptureWithTimeout `
+                -Arguments @($verb, '--format', 'ndjson') `
+                -TimeoutSeconds $timeout `
+                -TimeoutKnob 'UH_UNITY_CLI_UPDATE_TIMEOUT_SECONDS' `
+                -StallSeconds ([Math]::Min((Get-UnityCliUpdateStallSeconds), $timeout)) `
+                -StallKnob 'UH_UNITY_CLI_UPDATE_STALL_SECONDS'
+            if ($result.ExitCode -eq 0) {
+                return 'updated'
+            }
 
-    $maxTries = 3
-    for ($try = 1; $try -le $maxTries; $try++) {
+            $output = @($result.Output) -join "`n"
+            if ($verb -eq 'self-update' -and $output -match '(?i)unknown command|unrecognized command|invalid command') {
+                return 'legacy-fallback'
+            }
+            $tail = Get-CollapsedCliOutputTail -Output $result.Output -MaxLines 40
+            throw "Unity CLI $verb failed with exit code $($result.ExitCode). Output tail:`n$tail"
+        }
+
+        if ($updateOutcome -eq 'legacy-fallback') {
+            Write-CiNotice "This Unity CLI predates 'self-update'; retrying through the legacy 'upgrade' alias."
+            continue
+        }
+
         Update-SessionPathFromRegistry
-        $command = Get-Command unity -ErrorAction SilentlyContinue
-        if ($command) {
-            $script:UnityCliPath = $command.Source
-            return $command.Source
+        $updatedCommand = Get-Command unity -ErrorAction SilentlyContinue
+        if (-not $updatedCommand) {
+            throw "Unity CLI updated successfully but 'unity' is no longer resolvable on PATH."
         }
-        if ($try -lt $maxTries) {
-            Start-Sleep -Seconds 2
+        $script:UnityCliPath = $updatedCommand.Source
+        $script:UnityCliVersionText = ''
+        $script:UnityCliUpdateCompleted = $true
+        Write-CiNotice "Unity CLI is current: $(Get-UnityCliVersionText)"
+        return
+    }
+
+    throw 'Unity CLI could not be updated through self-update or the legacy upgrade alias.'
+}
+
+function Ensure-UnityCli {
+    Set-UnityCliAutomationEnvironment
+    $command = Get-Command unity -ErrorAction SilentlyContinue
+    if (-not $command) {
+        Write-CiNotice "Unity CLI was not found on PATH; installing the standalone Unity CLI for this runner."
+        Install-UnityCliStandalone
+
+        $maxTries = 3
+        for ($try = 1; $try -le $maxTries; $try++) {
+            Update-SessionPathFromRegistry
+            $command = Get-Command unity -ErrorAction SilentlyContinue
+            if ($command) {
+                break
+            }
+            if ($try -lt $maxTries) {
+                Start-Sleep -Seconds 2
+            }
+        }
+
+        if (-not $command -and $env:LOCALAPPDATA) {
+            $fallback = Join-Path $env:LOCALAPPDATA 'Unity\bin\unity.exe'
+            if (Test-Path -LiteralPath $fallback -PathType Leaf) {
+                $command = [pscustomobject]@{ Source = (Resolve-Path -LiteralPath $fallback).Path }
+            }
+        }
+
+        if (-not $command) {
+            throw "Unity CLI installation completed but 'unity' is still not on PATH. Reopen the runner shell or add the Unity CLI install directory to PATH."
         }
     }
 
-    if ($env:LOCALAPPDATA) {
-        $fallback = Join-Path $env:LOCALAPPDATA 'Unity\bin\unity.exe'
-        if (Test-Path -LiteralPath $fallback -PathType Leaf) {
-            $script:UnityCliPath = (Resolve-Path -LiteralPath $fallback).Path
-            return $script:UnityCliPath
-        }
-    }
-
-    throw "Unity CLI installation completed but 'unity' is still not on PATH. Reopen the runner shell or add the Unity CLI install directory to PATH."
+    $script:UnityCliPath = $command.Source
+    Update-UnityCliStandalone
+    return $script:UnityCliPath
 }
 
 function Invoke-UnityCliSafe {
@@ -1191,6 +1331,7 @@ function Invoke-UnityCliCaptureWithTimeout {
     #                                   a NATIVE 124 from the CLI.
     param(
         [Parameter(Mandatory = $true)][string[]]$Arguments,
+        [string]$ExecutablePath = '',
         [int]$TimeoutSeconds = 2700,
         [string]$TimeoutKnob = 'UH_ENSURE_EDITOR_INSTALL_TIMEOUT_SECONDS',
         [int]$StallSeconds = -1,
@@ -1205,10 +1346,11 @@ function Invoke-UnityCliCaptureWithTimeout {
         $StallSeconds = Get-EnsureEditorProgressStallSeconds
     }
 
-    if (Get-Command Register-UnityCliCommandAttempt -ErrorAction SilentlyContinue) {
+    $resolvedExecutablePath = if ([string]::IsNullOrWhiteSpace($ExecutablePath)) { $script:UnityCliPath } else { $ExecutablePath }
+    if ([string]::IsNullOrWhiteSpace($ExecutablePath) -and (Get-Command Register-UnityCliCommandAttempt -ErrorAction SilentlyContinue)) {
         Register-UnityCliCommandAttempt -Arguments $Arguments
     }
-    Write-Host "$script:UnityCliPath $($Arguments -join ' ')"
+    Write-Host "$resolvedExecutablePath $($Arguments -join ' ')"
 
     # Sentinel exit code for a WALL-CLOCK TIMEOUT kill. 124 mirrors GNU coreutils
     # `timeout` (it exits 124 when the command times out), so the code is
@@ -1258,7 +1400,7 @@ function Invoke-UnityCliCaptureWithTimeout {
     $stalled = $false
     try {
         $psi = New-Object System.Diagnostics.ProcessStartInfo
-        $psi.FileName = $script:UnityCliPath
+        $psi.FileName = $resolvedExecutablePath
         $psi.Arguments = ConvertTo-ProcessArgumentLine -Arguments $Arguments
         $psi.RedirectStandardOutput = $true
         $psi.RedirectStandardError = $true
