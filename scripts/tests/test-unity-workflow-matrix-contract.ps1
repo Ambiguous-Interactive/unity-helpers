@@ -375,6 +375,7 @@ function Import-EnsureEditorWatchdogFunctions {
         'Get-UnityCliUpdateTimeoutSeconds',
         'Get-UnityCliUpdateRetryAttempts',
         'Get-UnityCliUpdateStallSeconds',
+        'Get-UnityCliInstallStallSeconds',
         'Set-UnityCliAutomationEnvironment',
         'Invoke-WithRetry',
         'Test-IsPathInsideDirectory',
@@ -2617,6 +2618,7 @@ if ($ensureEditorWatchdogImported) {
     $oldUnityNoConsentPrompt = $env:UNITY_NO_CONSENT_PROMPT
     $oldUnityCliChannel = $env:UNITY_CLI_CHANNEL
     $oldUnityInstallRetries = $env:UNITY_INSTALL_RETRIES
+    $oldUnityCliInstallStallSeconds = $env:UH_UNITY_CLI_INSTALL_STALL_SECONDS
     try {
         Remove-Item Env:\UNITY_NON_INTERACTIVE -ErrorAction SilentlyContinue
         Remove-Item Env:\UNITY_NO_PAGER -ErrorAction SilentlyContinue
@@ -2641,13 +2643,20 @@ if ($ensureEditorWatchdogImported) {
             Write-Host '::error file=scripts/unity/ensure-editor.ps1::Unity CLI automation setup must preserve an explicit operator retry count.'
             $failed = $true
         }
+
+        $env:UH_UNITY_CLI_INSTALL_STALL_SECONDS = '47'
+        if ((Get-UnityCliInstallStallSeconds) -ne 47) {
+            Write-Host '::error file=scripts/unity/ensure-editor.ps1::The installer watchdog must honor UH_UNITY_CLI_INSTALL_STALL_SECONDS.'
+            $failed = $true
+        }
     } finally {
         foreach ($setting in @(
                 @{ Name = 'UNITY_NON_INTERACTIVE'; Value = $oldUnityNonInteractive },
                 @{ Name = 'UNITY_NO_PAGER'; Value = $oldUnityNoPager },
                 @{ Name = 'UNITY_NO_CONSENT_PROMPT'; Value = $oldUnityNoConsentPrompt },
                 @{ Name = 'UNITY_CLI_CHANNEL'; Value = $oldUnityCliChannel },
-                @{ Name = 'UNITY_INSTALL_RETRIES'; Value = $oldUnityInstallRetries }
+                @{ Name = 'UNITY_INSTALL_RETRIES'; Value = $oldUnityInstallRetries },
+                @{ Name = 'UH_UNITY_CLI_INSTALL_STALL_SECONDS'; Value = $oldUnityCliInstallStallSeconds }
             )) {
             if ($null -eq $setting.Value) {
                 Remove-Item "Env:\$($setting.Name)" -ErrorAction SilentlyContinue

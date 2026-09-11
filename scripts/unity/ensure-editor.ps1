@@ -984,6 +984,19 @@ function Get-UnityCliUpdateStallSeconds {
     return $Default
 }
 
+function Get-UnityCliInstallStallSeconds {
+    param([int]$Default = 180)
+
+    if ($env:UH_UNITY_CLI_INSTALL_STALL_SECONDS) {
+        $parsed = 0
+        if ([int]::TryParse($env:UH_UNITY_CLI_INSTALL_STALL_SECONDS, [ref]$parsed) -and $parsed -ge 1) {
+            return $parsed
+        }
+        Write-Host "::warning::Ignoring invalid UH_UNITY_CLI_INSTALL_STALL_SECONDS='$env:UH_UNITY_CLI_INSTALL_STALL_SECONDS'; using $Default second(s)."
+    }
+    return $Default
+}
+
 function Set-UnityCliAutomationEnvironment {
     # These are the Unity CLI's documented automation controls. Set them in the
     # process before install/update so a runner can never wait for a pager,
@@ -1022,7 +1035,7 @@ function Install-UnityCliStandalone {
                 -Arguments @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $installerPath) `
                 -TimeoutSeconds (Get-UnityCliUpdateTimeoutSeconds) `
                 -TimeoutKnob 'UH_UNITY_CLI_UPDATE_TIMEOUT_SECONDS' `
-                -StallSeconds (Get-UnityCliUpdateStallSeconds -Default 180) `
+                -StallSeconds (Get-UnityCliInstallStallSeconds) `
                 -StallKnob 'UH_UNITY_CLI_INSTALL_STALL_SECONDS'
             if ($result.ExitCode -ne 0) {
                 $tail = Get-CollapsedCliOutputTail -Output $result.Output -MaxLines 40
