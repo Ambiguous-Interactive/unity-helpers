@@ -2520,7 +2520,7 @@ if (-not $installRootResolverAst) {
         $overrideRoot = Resolve-RunnerMaintenanceInstallRoot -InstallRoot '' -RepoRoot 'F:\src\unity-helpers'
         $explicitRoot = Resolve-RunnerMaintenanceInstallRoot -InstallRoot 'H:\explicit\editors' -RepoRoot 'F:\src\unity-helpers'
         if (
-            $checkoutRoot -ne 'E:\actions-runner\_work\_tool\u6-v3' -or
+            $checkoutRoot -ne 'E:\actions-runner\_tool\u6-v3' -or
             $sameDriveRoot -ne 'F:\Unity\Editors' -or
             $overrideRoot -ne 'G:\operator\editors' -or
             $explicitRoot -ne 'H:\explicit\editors'
@@ -2545,7 +2545,7 @@ $oldRunnerToolCache = $env:RUNNER_TOOL_CACHE
 $oldUnityEditorInstallRoot = $env:UNITY_EDITOR_INSTALL_ROOT
 try {
     $env:UH_RUNNER_DISABLE_AUTO_BOOTSTRAP = '1'
-    $env:RUNNER_TOOL_CACHE = 'D:\actions-runner\_work\_tool'
+    $env:RUNNER_TOOL_CACHE = 'D:\actions-runner\_tool'
     Remove-Item Env:\UNITY_EDITOR_INSTALL_ROOT -ErrorAction SilentlyContinue
     $manualDefaultsRoot = Join-Path ([System.IO.Path]::GetTempPath()) "unity-runner-manual-defaults-$PID-$(Get-Random)"
     $manualScriptsRoot = Join-Path $manualDefaultsRoot 'scripts/unity'
@@ -2598,7 +2598,7 @@ $ErrorActionPreference = 'Stop'
 if ($UnityVersion -notin @('2021.3.45f1', '6000.5.2f1')) {
     throw "Bad UnityVersion: $UnityVersion"
 }
-if ($InstallRoot -ne 'D:\actions-runner\_work\_tool\u6-v3') {
+if ($InstallRoot -ne 'D:\actions-runner\_tool\u6-v3') {
     throw "Bad InstallRoot: $InstallRoot"
 }
 if ($ProvisioningProfile -ne 'Full') {

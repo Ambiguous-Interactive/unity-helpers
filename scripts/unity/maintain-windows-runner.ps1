@@ -107,10 +107,10 @@ function Resolve-RunnerMaintenanceInstallRoot {
     }
 
     # Interactive shells do not inherit RUNNER_TOOL_CACHE. An Actions checkout
-    # still reveals <runner>\_work, whose sibling _tool directory is the cache.
+    # still reveals <runner>\_work, so derive <runner>\_tool from it.
     $normalizedRepoRoot = $RepoRoot.Replace('/', '\').TrimEnd('\')
-    if ($normalizedRepoRoot -match '^(?<work>[A-Za-z]:\\.*?\\_work)(?:\\|$)') {
-        return ($Matches['work'].TrimEnd('\') + '\_tool\u6-v3')
+    if ($normalizedRepoRoot -match '^(?<runner>[A-Za-z]:\\.*)\\_work(?:\\|$)') {
+        return ($Matches['runner'].TrimEnd('\') + '\_tool\u6-v3')
     }
 
     # A manually cloned checkout still keeps editor payloads on its own drive.
