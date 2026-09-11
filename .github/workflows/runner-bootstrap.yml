@@ -233,6 +233,7 @@ jobs:
         env:
           UH_BOOTSTRAP_DETECT_ONLY: ${{ inputs.detect-only }}
           UNITY_EDITOR_INSTALL_ROOT: ${{ runner.tool_cache }}\u6-v3
+          UH_RUNNER_TOOL_CACHE: ${{ runner.tool_cache }}
         run: |
           Set-StrictMode -Version Latest
           $ErrorActionPreference = 'Stop'
@@ -272,9 +273,7 @@ jobs:
           $code = 0
           try {
               Start-Transcript -Path $logPath -Force | Out-Null
-              $installRoot = if ($env:UNITY_EDITOR_INSTALL_ROOT) { $env:UNITY_EDITOR_INSTALL_ROOT } else { 'C:\Unity\Editors' }
               $maintenanceArgs = @{
-                  InstallRoot = $installRoot
                   DiagnosticsRoot = $artifactDir
                   HostOnly = $true
               }

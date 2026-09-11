@@ -2501,12 +2501,52 @@ if (
     Write-Info "Checked maintenance passes named parameters and separates host-only from editor-only work."
 }
 
+$installRootResolverAst = Get-FunctionAstByName -Ast $windowsRunnerMaintenanceAst -Name 'Resolve-RunnerMaintenanceInstallRoot'
+if (-not $installRootResolverAst) {
+    Write-Host '::error file=scripts/unity/maintain-windows-runner.ps1::Runner maintenance must define Resolve-RunnerMaintenanceInstallRoot.'
+    $failed = $true
+} else {
+    Invoke-Expression "function script:Resolve-RunnerMaintenanceInstallRoot $($installRootResolverAst.Body.Extent.Text)"
+    $resolverOldToolCache = $env:RUNNER_TOOL_CACHE
+    $resolverOldFallbackToolCache = $env:UH_RUNNER_TOOL_CACHE
+    $resolverOldOverride = $env:UNITY_EDITOR_INSTALL_ROOT
+    try {
+        Remove-Item Env:\RUNNER_TOOL_CACHE -ErrorAction SilentlyContinue
+        Remove-Item Env:\UH_RUNNER_TOOL_CACHE -ErrorAction SilentlyContinue
+        Remove-Item Env:\UNITY_EDITOR_INSTALL_ROOT -ErrorAction SilentlyContinue
+        $checkoutRoot = Resolve-RunnerMaintenanceInstallRoot -InstallRoot '' -RepoRoot 'E:\actions-runner\_work\unity-helpers\unity-helpers'
+        $sameDriveRoot = Resolve-RunnerMaintenanceInstallRoot -InstallRoot '' -RepoRoot 'F:\src\unity-helpers'
+        $env:UNITY_EDITOR_INSTALL_ROOT = 'G:\operator\editors'
+        $overrideRoot = Resolve-RunnerMaintenanceInstallRoot -InstallRoot '' -RepoRoot 'F:\src\unity-helpers'
+        $explicitRoot = Resolve-RunnerMaintenanceInstallRoot -InstallRoot 'H:\explicit\editors' -RepoRoot 'F:\src\unity-helpers'
+        if (
+            $checkoutRoot -ne 'E:\actions-runner\_work\_tool\u6-v3' -or
+            $sameDriveRoot -ne 'F:\Unity\Editors' -or
+            $overrideRoot -ne 'G:\operator\editors' -or
+            $explicitRoot -ne 'H:\explicit\editors'
+        ) {
+            Write-Host "::error file=scripts/unity/maintain-windows-runner.ps1::Install-root resolution must prefer explicit/operator roots, reuse the runner tool cache for _work checkouts, and otherwise stay on the checkout drive. Checkout=$checkoutRoot SameDrive=$sameDriveRoot Override=$overrideRoot Explicit=$explicitRoot"
+            $failed = $true
+        } elseif ($VerboseOutput) {
+            Write-Info 'Checked runner maintenance keeps Unity on the Actions runner drive with deterministic override precedence.'
+        }
+    } finally {
+        if ($resolverOldToolCache) { $env:RUNNER_TOOL_CACHE = $resolverOldToolCache } else { Remove-Item Env:\RUNNER_TOOL_CACHE -ErrorAction SilentlyContinue }
+        if ($resolverOldFallbackToolCache) { $env:UH_RUNNER_TOOL_CACHE = $resolverOldFallbackToolCache } else { Remove-Item Env:\UH_RUNNER_TOOL_CACHE -ErrorAction SilentlyContinue }
+        if ($resolverOldOverride) { $env:UNITY_EDITOR_INSTALL_ROOT = $resolverOldOverride } else { Remove-Item Env:\UNITY_EDITOR_INSTALL_ROOT -ErrorAction SilentlyContinue }
+    }
+}
+
 $manualDefaultsRoot = ''
 $manualDefaultsOutput = @()
 $manualDefaultsExitCode = 1
 $oldDisableAutoBootstrap = $env:UH_RUNNER_DISABLE_AUTO_BOOTSTRAP
+$oldRunnerToolCache = $env:RUNNER_TOOL_CACHE
+$oldUnityEditorInstallRoot = $env:UNITY_EDITOR_INSTALL_ROOT
 try {
     $env:UH_RUNNER_DISABLE_AUTO_BOOTSTRAP = '1'
+    $env:RUNNER_TOOL_CACHE = 'D:\actions-runner\_work\_tool'
+    Remove-Item Env:\UNITY_EDITOR_INSTALL_ROOT -ErrorAction SilentlyContinue
     $manualDefaultsRoot = Join-Path ([System.IO.Path]::GetTempPath()) "unity-runner-manual-defaults-$PID-$(Get-Random)"
     $manualScriptsRoot = Join-Path $manualDefaultsRoot 'scripts/unity'
     $manualGithubRoot = Join-Path $manualDefaultsRoot '.github'
@@ -2558,7 +2598,7 @@ $ErrorActionPreference = 'Stop'
 if ($UnityVersion -notin @('2021.3.45f1', '6000.5.2f1')) {
     throw "Bad UnityVersion: $UnityVersion"
 }
-if ($InstallRoot -ne 'C:\Unity\Editors') {
+if ($InstallRoot -ne 'D:\actions-runner\_work\_tool\u6-v3') {
     throw "Bad InstallRoot: $InstallRoot"
 }
 if ($ProvisioningProfile -ne 'Full') {
@@ -2593,6 +2633,16 @@ Write-Output "fake ensure-editor ok: $UnityVersion diagnostics=$DiagnosticsPath"
     } else {
         Remove-Item Env:\UH_RUNNER_DISABLE_AUTO_BOOTSTRAP -ErrorAction SilentlyContinue
     }
+    if ($oldRunnerToolCache) {
+        $env:RUNNER_TOOL_CACHE = $oldRunnerToolCache
+    } else {
+        Remove-Item Env:\RUNNER_TOOL_CACHE -ErrorAction SilentlyContinue
+    }
+    if ($oldUnityEditorInstallRoot) {
+        $env:UNITY_EDITOR_INSTALL_ROOT = $oldUnityEditorInstallRoot
+    } else {
+        Remove-Item Env:\UNITY_EDITOR_INSTALL_ROOT -ErrorAction SilentlyContinue
+    }
     if ($manualDefaultsRoot -and (Test-Path -LiteralPath $manualDefaultsRoot -PathType Container)) {
         Remove-Item -LiteralPath $manualDefaultsRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
@@ -2605,7 +2655,7 @@ if (
     $manualDefaultsText -notmatch 'fake ensure-editor ok: 2021\.3\.45f1' -or
     $manualDefaultsText -notmatch 'fake ensure-editor ok: 6000\.5\.2f1'
 ) {
-    Write-Host "::error file=scripts/unity/maintain-windows-runner.ps1::Direct manual maintenance must load .github/unity-versions.json by default, use a repo-local diagnostics root, and honor UH_RUNNER_DISABLE_AUTO_BOOTSTRAP=1 without requiring YAML-supplied arguments. Exit $manualDefaultsExitCode. Output: $manualDefaultsText"
+    Write-Host "::error file=scripts/unity/maintain-windows-runner.ps1::Direct manual maintenance must load .github/unity-versions.json by default, reuse the Actions runner tool cache, use a repo-local diagnostics root, and honor UH_RUNNER_DISABLE_AUTO_BOOTSTRAP=1 without requiring YAML-supplied arguments. Exit $manualDefaultsExitCode. Output: $manualDefaultsText"
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked direct manual maintenance defaults match workflow provisioning inputs."

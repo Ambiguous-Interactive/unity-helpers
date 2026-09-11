@@ -8,7 +8,7 @@ param(
     [Alias('ProvisioningProfile')]
     [string]$RunnerMaintenanceProvisioningProfile = 'Full',
     [Alias('InstallRoot')]
-    [string]$RunnerMaintenanceInstallRoot = $(if ($env:UNITY_EDITOR_INSTALL_ROOT) { $env:UNITY_EDITOR_INSTALL_ROOT } else { 'C:\Unity\Editors' }),
+    [string]$RunnerMaintenanceInstallRoot = '',
     [Alias('DetectOnly')]
     [switch]$RunnerMaintenanceDetectOnly,
     [Alias('HostOnly')]
@@ -80,6 +80,47 @@ function Get-RunnerMaintenanceDefaultDiagnosticsRoot {
     return Join-Path $RepoRoot '.artifacts/runner-bootstrap'
 }
 
+function Resolve-RunnerMaintenanceInstallRoot {
+    param(
+        [AllowEmptyString()][string]$InstallRoot,
+        [Parameter(Mandatory = $true)][string]$RepoRoot
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($InstallRoot)) {
+        return $InstallRoot
+    }
+    if (-not [string]::IsNullOrWhiteSpace($env:UNITY_EDITOR_INSTALL_ROOT)) {
+        return $env:UNITY_EDITOR_INSTALL_ROOT
+    }
+
+    # The tool cache is on the runner's storage volume and is also the root
+    # consumed by every licensed Unity workflow in this repository.
+    $runnerToolCache = if (-not [string]::IsNullOrWhiteSpace($env:RUNNER_TOOL_CACHE)) {
+        $env:RUNNER_TOOL_CACHE
+    } elseif (-not [string]::IsNullOrWhiteSpace($env:UH_RUNNER_TOOL_CACHE)) {
+        $env:UH_RUNNER_TOOL_CACHE
+    } else {
+        ''
+    }
+    if ($runnerToolCache) {
+        return ($runnerToolCache.TrimEnd('\', '/') + '\u6-v3')
+    }
+
+    # Interactive shells do not inherit RUNNER_TOOL_CACHE. An Actions checkout
+    # still reveals <runner>\_work, whose sibling _tool directory is the cache.
+    $normalizedRepoRoot = $RepoRoot.Replace('/', '\').TrimEnd('\')
+    if ($normalizedRepoRoot -match '^(?<work>[A-Za-z]:\\.*?\\_work)(?:\\|$)') {
+        return ($Matches['work'].TrimEnd('\') + '\_tool\u6-v3')
+    }
+
+    # A manually cloned checkout still keeps editor payloads on its own drive.
+    if ($normalizedRepoRoot -match '^(?<drive>[A-Za-z]:)\\') {
+        return ($Matches['drive'] + '\Unity\Editors')
+    }
+
+    return 'C:\Unity\Editors'
+}
+
 function Resolve-RunnerMaintenanceUnityVersions {
     param(
         [AllowNull()][string[]]$UnityVersions,
@@ -131,7 +172,7 @@ function Invoke-WindowsRunnerMaintenance {
         [string[]]$UnityVersions = @(),
         [ValidateSet('EditorOnly', 'StandaloneWindowsIl2Cpp', 'Android', 'Full')]
         [string]$ProvisioningProfile = 'Full',
-        [string]$InstallRoot = $(if ($env:UNITY_EDITOR_INSTALL_ROOT) { $env:UNITY_EDITOR_INSTALL_ROOT } else { 'C:\Unity\Editors' }),
+        [string]$InstallRoot = '',
         [switch]$DetectOnly,
         [switch]$HostOnly,
         [switch]$SkipHostBootstrap,
@@ -160,7 +201,7 @@ function Invoke-WindowsRunnerMaintenance {
     } else {
         [string]$DiagnosticsRoot
     }
-    $maintenanceInstallRoot = [string]$InstallRoot
+    $maintenanceInstallRoot = Resolve-RunnerMaintenanceInstallRoot -InstallRoot $InstallRoot -RepoRoot $repoRoot
     $maintenanceProvisioningProfile = [string]$ProvisioningProfile
 
     if (-not $SkipHostBootstrap) {
