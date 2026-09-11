@@ -394,7 +394,9 @@ function Import-EnsureEditorWatchdogFunctions {
         'Get-UnityCiModuleSpec',
         'Get-UnityCiModuleSpecForProfile',
         'Get-UnityCiModuleIds',
-        'Get-UnityCiVerifiedModuleGroups'
+        'Get-UnityCiVerifiedModuleGroups',
+        'Test-AnyUnityLeafPresent',
+        'Test-UnityCiModuleGroupPresent'
     )) {
         $functionAst = $ast.FindAll(
             {
@@ -2568,6 +2570,36 @@ if ($ensureEditorWatchdogImported) {
         $failed = $true
     } elseif ($VerboseOutput) {
         Write-Info 'Checked Full runner provisioning installs every supported build target.'
+    }
+
+    $modulePresenceRoot = Join-Path ([System.IO.Path]::GetTempPath()) "unity-module-presence-$PID-$(Get-Random)"
+    try {
+        $editorPath = Join-Path $modulePresenceRoot 'Editor\Unity.exe'
+        $iosExtension = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\iOSSupport\UnityEditor.iOS.Extensions.dll'
+        $iosToolchain = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\iOSSupport\Tools\Windows\MapFileParser.exe'
+        $macExtension = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\MacStandaloneSupport\UnityEditor.OSXStandalone.Extensions.dll'
+        $macPlayer = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\MacStandaloneSupport\Variations\macosx64_nondevelopment_mono\UnityPlayer.app\Contents\MacOS\UnityPlayer'
+        foreach ($path in @($editorPath, $iosExtension, $macExtension)) {
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $path) | Out-Null
+            New-Item -ItemType File -Force -Path $path | Out-Null
+        }
+
+        $partialIosAccepted = Test-UnityCiModuleGroupPresent -EditorPath $editorPath -Group 'ios'
+        $partialMacAccepted = Test-UnityCiModuleGroupPresent -EditorPath $editorPath -Group 'mac-mono'
+        foreach ($path in @($iosToolchain, $macPlayer)) {
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $path) | Out-Null
+            New-Item -ItemType File -Force -Path $path | Out-Null
+        }
+        $completeIosAccepted = Test-UnityCiModuleGroupPresent -EditorPath $editorPath -Group 'ios'
+        $completeMacAccepted = Test-UnityCiModuleGroupPresent -EditorPath $editorPath -Group 'mac-mono'
+        if ($partialIosAccepted -or $partialMacAccepted -or -not $completeIosAccepted -or -not $completeMacAccepted) {
+            Write-Host "::error file=scripts/unity/ensure-editor.ps1::iOS and macOS Mono module checks must reject an editor-extension-only partial install and accept only the extension plus its toolchain/player payload. PartialIos=$partialIosAccepted PartialMac=$partialMacAccepted CompleteIos=$completeIosAccepted CompleteMac=$completeMacAccepted."
+            $failed = $true
+        } elseif ($VerboseOutput) {
+            Write-Info 'Checked iOS and macOS Mono module verification rejects partial installs.'
+        }
+    } finally {
+        Remove-Item -LiteralPath $modulePresenceRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
 
     $alternateInstallFunctionAst = Get-FunctionAstByName -Ast $ensureEditorAst -Name 'Install-UnityEditorWithCiModulesInAlternateRoot'

@@ -2576,20 +2576,22 @@ function Test-UnityCiModuleGroupPresent {
             }
             'ios' {
                 $iosRoot = Join-Path $dataRoot 'PlaybackEngines\iOSSupport'
-                return Test-AnyUnityLeafPresent -Paths @(
-                    (Join-Path $iosRoot 'UnityEditor.iOS.Extensions.dll'),
+                $hasEditorExtension = Test-Path -LiteralPath (Join-Path $iosRoot 'UnityEditor.iOS.Extensions.dll') -PathType Leaf
+                $hasToolchain = Test-AnyUnityLeafPresent -Paths @(
                     (Join-Path $iosRoot 'Tools\OSX\MapFileParser'),
                     (Join-Path $iosRoot 'Tools\Windows\MapFileParser.exe')
                 )
+                return $hasEditorExtension -and $hasToolchain
             }
             'mac-mono' {
                 $macRoot = Join-Path $dataRoot 'PlaybackEngines\MacStandaloneSupport'
                 $variationRoot = Join-Path $macRoot 'Variations'
-                return Test-AnyUnityLeafPresent -Paths @(
-                    (Join-Path $macRoot 'UnityEditor.OSXStandalone.Extensions.dll'),
+                $hasEditorExtension = Test-Path -LiteralPath (Join-Path $macRoot 'UnityEditor.OSXStandalone.Extensions.dll') -PathType Leaf
+                $hasMonoPlayer = Test-AnyUnityLeafPresent -Paths @(
                     (Join-Path $variationRoot 'macosx64_development_mono\UnityPlayer.app\Contents\MacOS\UnityPlayer'),
                     (Join-Path $variationRoot 'macosx64_nondevelopment_mono\UnityPlayer.app\Contents\MacOS\UnityPlayer')
                 )
+                return $hasEditorExtension -and $hasMonoPlayer
             }
             'android' {
                 $androidRoot = Join-Path $dataRoot 'PlaybackEngines\AndroidPlayer'
