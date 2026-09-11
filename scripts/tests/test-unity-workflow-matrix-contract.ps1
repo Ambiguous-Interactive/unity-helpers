@@ -1781,10 +1781,8 @@ $defaultMatrixIsVersionGrouped = (
     [regex]::Matches($unityTestsMatrixJob, '(?m)^      matrix:\s*$').Count -eq 1 -and
     [regex]::Matches($unityTestsMatrixJob, '(?m)^        unity-version:\s*$').Count -eq 1 -and
     [regex]::Matches($unityTestsMatrixJob, '(?m)^          - \d+\.\d+\.\d+f\d+\s*$').Count -eq 4 -and
-    [regex]::Matches($unityTestsMatrixJob, '(?m)^        test-mode:\s*$').Count -eq 1 -and
-    [regex]::Matches($unityTestsMatrixJob, '(?m)^          - editmode\s*$').Count -eq 1 -and
-    [regex]::Matches($unityTestsMatrixJob, '(?m)^          - playmode\s*$').Count -eq 1 -and
-    [regex]::Matches($unityTestsMatrixJob, '(?m)^          - standalone\s*$').Count -eq 1 -and
+    [regex]::Matches($unityTestsMatrixJob, '(?m)^        test-mode:\s*$').Count -eq 0 -and
+    -not $unityTestsMatrixJob.Contains('matrix.test-mode') -and
     $unityTestsMatrixJob.Contains('exclude: ${{ fromJSON(needs.matrix-config.outputs.matrix-exclude) }}') -and
     $unityTestsMatrixJob.Contains('needs.matrix-config.outputs.test-modes') -and
     -not $workflowContent.Contains('matrix-exclude-standalone') -and
@@ -1797,10 +1795,10 @@ foreach ($version in @('2021.3.45f1', '2022.3.45f1', '6000.5.2f1', '6000.6.0f1')
     )
 }
 if (-not $defaultMatrixIsVersionGrouped) {
-    Write-Host '::error file=.github/workflows/unity-tests.yml::The default Unity matrix must contain exactly the four supported Unity versions and the reviewed STATIC test-mode triple (editmode, playmode, standalone), and exclude unselected versions and unselected modes through matrix-config. The static test-mode axis is what authorizes the central editor gate to provision the StandaloneWindowsIl2Cpp profile on standalone legs (enrollment contract item 3); its values must stay static and exact.'
+    Write-Host '::error file=.github/workflows/unity-tests.yml::The default Unity matrix must contain exactly one axis with the four supported Unity versions. Modes must be sequential steps within each version job, never a second matrix axis that multiplies the licensed runner queue.'
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info 'Checked the default Unity matrix groups the reviewed static test-mode axis into four version legs.'
+    Write-Info 'Checked the default Unity matrix creates exactly one job per supported version.'
 }
 
 $groupedDefaultModesAreComplete = $true
@@ -1821,16 +1819,11 @@ foreach ($mode in $defaultModeContracts) {
     $reportIndex = $unityTestsMatrixJob.IndexOf("- name: Report slowest $label tests", [StringComparison]::Ordinal)
     $path = ".artifacts/unity/`${{ matrix.unity-version }}-$key"
     $selection = "contains(fromJSON(needs.matrix-config.outputs.test-modes), '$key')"
-    # Each version job now fans out over the reviewed static test-mode axis, so
-    # every mode-specific step must ALSO pin its own leg. Without the leg guard
-    # a single leg would run (or gate) all three modes.
-    $legGuard = "matrix.test-mode == '$key'"
-
     $modeIsComplete = (
         $runStep -match "(?m)^\s+id:\s+run_$key\s*$" -and
         $runStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
         $runStep.Contains('!cancelled()') -and
-        $runStep.Contains($legGuard) -and
+        -not $runStep.Contains('matrix.test-mode') -and
         $runStep.Contains("steps.unity_lock.outputs.acquired == 'true'") -and
         $runStep.Contains($selection) -and
         $runStep -notmatch 'steps\.run_(?:editmode|playmode|standalone)\.(?:outcome|conclusion)' -and
@@ -1842,23 +1835,23 @@ foreach ($mode in $defaultModeContracts) {
         $runStep.Contains('-IncludeIntegrations') -and
         $runStep.Contains('UH_UNITY_TEST_CATEGORY: "!Performance;!Stress"') -and
         $runStep.Contains('./scripts/unity/assert-no-active-unity-editor.ps1') -and
-        $reportStep.Contains($legGuard) -and
+        -not $reportStep.Contains('matrix.test-mode') -and
         $reportStep.Contains($selection) -and
         $reportStep.Contains("$path/results.xml") -and
         $verifyStep -match "(?m)^\s+id:\s+verify_$key\s*$" -and
         $verifyStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
-        $verifyStep.Contains($legGuard) -and
+        -not $verifyStep.Contains('matrix.test-mode') -and
         $verifyStep.Contains($selection) -and
         $verifyStep.Contains("steps.run_$key.outcome != 'skipped'") -and
         $verifyStep.Contains("results-dir: $path") -and
         $redactStep -match "(?m)^\s+id:\s+redact_$key\s*$" -and
         $redactStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
-        $redactStep.Contains($legGuard) -and
+        -not $redactStep.Contains('matrix.test-mode') -and
         $redactStep.Contains($selection) -and
         $redactStep.Contains("paths: $path") -and
         $uploadStep -match "(?m)^\s+id:\s+upload_$key\s*$" -and
         $uploadStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
-        $uploadStep.Contains($legGuard) -and
+        -not $uploadStep.Contains('matrix.test-mode') -and
         $uploadStep.Contains($selection) -and
         $uploadStep.Contains("steps.redact_$key.outcome == 'success'") -and
         $uploadStep.Contains("name: unity-`${{ matrix.unity-version }}-$key") -and
@@ -1873,7 +1866,7 @@ foreach ($mode in $defaultModeContracts) {
             $modeIsComplete -and
             $headStep -match "(?m)^\s+id:\s+$($key)_head\s*$" -and
             $headStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
-            $headStep.Contains($legGuard) -and
+            -not $headStep.Contains('matrix.test-mode') -and
             $headStep.Contains($selection) -and
             $headStep -notmatch 'steps\.run_(?:editmode|playmode|standalone)\.(?:outcome|conclusion)' -and
             $runStep.Contains("steps.$($key)_head.outcome == 'success'")
@@ -1889,9 +1882,8 @@ foreach ($mode in $defaultModeContracts) {
 $defaultOutcomeGate = Get-UnityWorkflowStepText -JobText $unityTestsMatrixJob -StepName 'Require every selected Unity mode'
 $defaultOutcomeGateIsComplete = (
     $defaultOutcomeGate -match '(?m)^\s+id:\s+require_selected_modes\s*$' -and
-    $defaultOutcomeGate.Contains('if: ${{ always() && !cancelled() && contains(fromJSON(needs.matrix-config.outputs.test-modes), matrix.test-mode) }}') -and
-    # Per-leg gate: the leg runs exactly its own mode, selected by matrix-config.
-    $defaultOutcomeGate.Contains('SELECTED_MODES: ${{ format(''["{0}"]'', matrix.test-mode) }}') -and
+    $defaultOutcomeGate.Contains('if: ${{ always() && !cancelled() }}') -and
+    $defaultOutcomeGate.Contains('SELECTED_MODES: ${{ needs.matrix-config.outputs.test-modes }}') -and
     $defaultOutcomeGate.Contains('./scripts/unity/assert-test-mode-outcomes.ps1') -and
     -not $defaultOutcomeGate.Contains('.conclusion')
 )
@@ -2032,12 +2024,9 @@ if (-not $matrixConfigAssemblyDiscoveryIsCentralized) {
     Write-Info "Checked Unity test assembly discovery is centralized on the hosted matrix job."
 }
 
-# Enrollment contract (Workflow contract item 3): the profile must be the exact
-# reviewed static matrix.test-mode map -- the analyzer admits no other dynamic
-# form -- so standalone legs verify the IL2CPP module set at gate time while
-# editmode and playmode legs keep EditorOnly. Jobs without the static axis stay
-# on the literal EditorOnly profile.
-$trustedEditorMatrixProfile = '${{ fromJSON(''{"editmode":"EditorOnly","playmode":"EditorOnly","standalone":"StandaloneWindowsIl2Cpp"}'')[matrix.test-mode] }}'
+# Each version job can execute standalone coverage, so its editor gate verifies
+# the IL2CPP player module before any selected mode starts.
+$trustedEditorMatrixProfile = 'StandaloneWindowsIl2Cpp'
 $unityWorkflowsUseCentralEditorAuthority = (
     -not $jobTexts.ContainsKey('runner-maintenance') -and
     -not $benchmarksJobTexts.ContainsKey('runner-maintenance') -and
@@ -2047,7 +2036,7 @@ $unityWorkflowsUseCentralEditorAuthority = (
     (Test-UnityJobUsesCentralEditorGate -JobText $benchmarksMatrixJob -ProvisioningProfile 'EditorOnly' -UnityVersion '"6000.6.0f1"')
 )
 if (-not $unityWorkflowsUseCentralEditorAuthority) {
-    Write-Host "::error file=.github/workflows/unity-tests.yml::Every Windows licensed job must run the exact central ensure-unity-editor action first, or immediately after the immutable current-head guard, with a ten-minute fail-closed health check under the runner tool cache. The version-grouped job must pass the exact reviewed static matrix.test-mode map as provisioning-profile; jobs without that static axis must pass literal EditorOnly. CI must not maintain or provision editors, the Unity command must consume the action's bound editor-path output, and the operator bootstrap must provision the same runner.tool_cache\\u6-v3 root. Keep .github/workflows/unity-benchmarks.yml in sync."
+    Write-Host "::error file=.github/workflows/unity-tests.yml::Every Windows licensed job must run the exact central ensure-unity-editor action first, or immediately after the immutable current-head guard, with a ten-minute fail-closed health check under the runner tool cache. The version-grouped default job must pass StandaloneWindowsIl2Cpp because it owns all selected modes; EditorOnly jobs must remain literal. CI must not maintain or provision editors, the Unity command must consume the action's bound editor-path output, and the operator bootstrap must provision the same runner.tool_cache\\u6-v3 root. Keep .github/workflows/unity-benchmarks.yml in sync."
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked Windows Unity workflows use the central editor authority before repository-controlled code."
