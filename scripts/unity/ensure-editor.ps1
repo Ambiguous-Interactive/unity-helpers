@@ -2862,11 +2862,17 @@ function Test-UnityCiModuleGroupPresent {
                 $variationRoot = Join-Path $macRoot 'Variations'
                 $hasEditorExtension = Test-Path -LiteralPath (Join-Path $macRoot 'UnityEditor.OSXStandalone.Extensions.dll') -PathType Leaf
                 # Variation directory names gained/lost a `player` component over
-                # time. Require a real player leaf, independent of that container
-                # spelling; the extension-only partial-install guard remains.
+                # time. Require both a Mono variation segment and a real player
+                # leaf so an IL2CPP payload cannot masquerade as macOS Mono.
                 $monoPlayerLeaves = @(
                     Get-ChildItem -LiteralPath $variationRoot -Recurse -File -ErrorAction SilentlyContinue |
-                        Where-Object { $_.Name -match '(?i)^(?:UnityPlayer(?:\.dylib)?|MacStandalonePlayer)$' } |
+                        Where-Object {
+                            $relativeSegments = $_.FullName.Substring($variationRoot.Length).TrimStart('\', '/').Split([char[]]@('\', '/'))
+                            $hasMonoVariationSegment = @(
+                                $relativeSegments | Where-Object { $_ -match '(?i)(?:^|[_-])mono(?:$|[_-])' }
+                            ).Count -gt 0
+                            $_.Name -match '(?i)^(?:UnityPlayer(?:\.dylib)?|MacStandalonePlayer)$' -and $hasMonoVariationSegment
+                        } |
                         Select-Object -First 1
                 )
                 $hasMonoPlayer = $monoPlayerLeaves.Count -gt 0

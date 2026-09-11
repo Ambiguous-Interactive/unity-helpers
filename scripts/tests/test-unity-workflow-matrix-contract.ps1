@@ -2827,6 +2827,7 @@ if ($ensureEditorWatchdogImported) {
         $iosExtension = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\iOSSupport\UnityEditor.iOS.Extensions.dll'
         $iosToolchain = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\iOSSupport\Trampoline\Classes\UnityAppController.mm'
         $macExtension = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\MacStandaloneSupport\UnityEditor.OSXStandalone.Extensions.dll'
+        $macIl2CppPlayer = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\MacStandaloneSupport\Variations\macosx64_player_development_il2cpp\UnityPlayer.app\Contents\MacOS\UnityPlayer'
         $macPlayer = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\MacStandaloneSupport\Variations\macosx64_player_development_mono\UnityPlayer.app\Contents\MacOS\UnityPlayer'
         $androidExtension = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\AndroidPlayer\UnityEditor.Android.Extensions.dll'
         $androidPlayerTools = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\AndroidPlayer\Tools\Source.properties'
@@ -2839,10 +2840,13 @@ if ($ensureEditorWatchdogImported) {
         $partialMacAccepted = Test-UnityCiModuleGroupPresent -EditorPath $editorPath -Group 'mac-mono'
         $partialAndroidExtensionOnlyAccepted = Test-UnityCiModuleGroupPresent -EditorPath $editorPath -Group 'android'
         Remove-Item -LiteralPath $androidExtension -Force
-        foreach ($path in @($iosToolchain, $macPlayer, $androidPlayerTools)) {
+        foreach ($path in @($iosToolchain, $macIl2CppPlayer, $androidPlayerTools)) {
             New-Item -ItemType Directory -Force -Path (Split-Path -Parent $path) | Out-Null
             New-Item -ItemType File -Force -Path $path | Out-Null
         }
+        $il2CppOnlyMacAccepted = Test-UnityCiModuleGroupPresent -EditorPath $editorPath -Group 'mac-mono'
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $macPlayer) | Out-Null
+        New-Item -ItemType File -Force -Path $macPlayer | Out-Null
         $partialAndroidToolsOnlyAccepted = Test-UnityCiModuleGroupPresent -EditorPath $editorPath -Group 'android'
         New-Item -ItemType File -Force -Path $androidExtension | Out-Null
         $completeIosAccepted = Test-UnityCiModuleGroupPresent -EditorPath $editorPath -Group 'ios'
@@ -2851,13 +2855,14 @@ if ($ensureEditorWatchdogImported) {
         if (
             $partialIosAccepted -or
             $partialMacAccepted -or
+            $il2CppOnlyMacAccepted -or
             $partialAndroidExtensionOnlyAccepted -or
             $partialAndroidToolsOnlyAccepted -or
             -not $completeIosAccepted -or
             -not $completeMacAccepted -or
             -not $completeAndroidAccepted
         ) {
-            Write-Host "::error file=scripts/unity/ensure-editor.ps1::iOS, macOS Mono, and Android module checks must reject partial installs and accept only the extension plus its toolchain/player payload. PartialIos=$partialIosAccepted PartialMac=$partialMacAccepted PartialAndroidExtensionOnly=$partialAndroidExtensionOnlyAccepted PartialAndroidToolsOnly=$partialAndroidToolsOnlyAccepted CompleteIos=$completeIosAccepted CompleteMac=$completeMacAccepted CompleteAndroid=$completeAndroidAccepted."
+            Write-Host "::error file=scripts/unity/ensure-editor.ps1::iOS, macOS Mono, and Android module checks must reject partial installs and accept only the extension plus its toolchain/player payload. PartialIos=$partialIosAccepted PartialMac=$partialMacAccepted Il2CppOnlyMac=$il2CppOnlyMacAccepted PartialAndroidExtensionOnly=$partialAndroidExtensionOnlyAccepted PartialAndroidToolsOnly=$partialAndroidToolsOnlyAccepted CompleteIos=$completeIosAccepted CompleteMac=$completeMacAccepted CompleteAndroid=$completeAndroidAccepted."
             $failed = $true
         } elseif ($VerboseOutput) {
             Write-Info 'Checked iOS, macOS Mono, and Android module verification rejects partial installs.'
