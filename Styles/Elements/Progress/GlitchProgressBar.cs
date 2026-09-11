@@ -256,6 +256,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         {
             _random = random ?? PRNG.Instance;
             AddToClassList(USSClassName);
+#if UNITY_6000_0_OR_NEWER
+            style.height = 20;
+            style.width = 200;
+#endif
 #if UNITY_2022_1_OR_NEWER
             generateVisualContent += OnGenerateVisualContent;
 #endif

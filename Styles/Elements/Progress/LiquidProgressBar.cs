@@ -291,6 +291,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         public LiquidProgressBar()
         {
             AddToClassList(USSClassName);
+#if UNITY_6000_0_OR_NEWER
+            style.height = 22;
+            style.width = 200;
+#endif
 #if UNITY_2022_1_OR_NEWER
             generateVisualContent += OnGenerateVisualContent;
 #endif

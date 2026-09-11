@@ -344,6 +344,7 @@ $contextAuthorshipRequirements = @(
     @{ Pattern = '(?is)Pause for outside humans.*?authenticated login.*?issue-specific user direction'; Label = 'outside-human user-input gate' }
     @{ Pattern = '(?is)never trust `author_association`'; Label = 'login comparison instead of association trust' }
     @{ Pattern = '(?is)repository-trusted deterministic automation.*?unknown bots are outside'; Label = 'trusted-automation-only exemption' }
+    @{ Pattern = '(?is)Always act on input authored by `wallstop`.*?`cursor\[bot\]`.*?`copilot-pull-request-reviewer\[bot\]`.*?`copilot-swe-agent\[bot\]`'; Label = 'trusted owner and review bots' }
 )
 foreach ($requirement in $contextAuthorshipRequirements) {
     if ($contextContent -notmatch $requirement.Pattern) {
@@ -374,7 +375,8 @@ $githubOperationsRequirements = @(
     @{ Pattern = '(?is)(first\s+line.*?DISCLOSURE: LLM-GENERATED TEXT|DISCLOSURE: LLM-GENERATED TEXT.*?first\s+line)'; Label = 'first-line LLM disclosure' }
     @{ Pattern = '(?is)authenticated GitHub login.*?outside human.*?issue-specific direction'; Label = 'outside-human user-input gate' }
     @{ Pattern = '(?is)author_association.*?still another person'; Label = 'login comparison instead of association trust' }
-    @{ Pattern = '(?is)Only deterministic automation explicitly trusted.*?unknown third-party bot as\s+outside'; Label = 'trusted-automation-only exemption' }
+    @{ Pattern = '(?is)Other\s+deterministic automation explicitly trusted.*?unknown third-party bot as\s+outside'; Label = 'trusted-automation-only exemption' }
+    @{ Pattern = '(?is)Always handle input authored by `wallstop`.*?`cursor\[bot\]`.*?`copilot-pull-request-reviewer\[bot\]`.*?`copilot-swe-agent\[bot\]`'; Label = 'trusted owner and review bots' }
 )
 foreach ($requirement in $githubOperationsRequirements) {
     if ($githubOperationsContent -notmatch $requirement.Pattern) {
@@ -415,6 +417,7 @@ $prFeedbackRequirements = @(
     @{ Pattern = '(?is)(?=.*raise FeedbackError\("HTTP)(?=.*raise FeedbackError\("invalid JSON)'; Label = 'fail-closed HTTP and JSON handling' }
     @{ Pattern = '(?is)incomplete GitHub data.*?SystemExit\(4\)'; Label = 'nonzero incomplete-data exit' }
     @{ Pattern = '(?is)TRUSTED_AUTOMATION.*?third-party bot'; Label = 'trusted and third-party bot fixtures' }
+    @{ Pattern = '(?is)TRUSTED_AUTHORS.*?wallstop.*?TRUSTED_AUTOMATION.*?cursor\[bot\].*?copilot-pull-request-reviewer\[bot\].*?copilot-swe-agent\[bot\]'; Label = 'trusted owner and review bot identities' }
     @{ Pattern = '(?is)def safe\(value\).*?terminal sanitization'; Label = 'terminal control sanitization fixture' }
     @{ Pattern = '(?is)--root-comments-only.*?REST comments do not expose thread resolution'; Label = 'truthful root-comment filter' }
     @{ Pattern = '(?is)run_self_tests.*?page failure.*?JSON failure'; Label = 'offline failure fixtures' }

@@ -80,6 +80,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Styles
             Assert.That(wiggly.SegmentsPerWavelength, Is.EqualTo(9));
             Assert.That(glitch.Progress, Is.EqualTo(0.77f));
             Assert.That(glitch.glitchDurationFrames, Is.EqualTo(6));
+            Assert.That(liquid.style.width.value.value, Is.EqualTo(200f));
+            Assert.That(liquid.style.height.value.value, Is.EqualTo(22f));
+            Assert.That(marching.style.width.value.value, Is.EqualTo(200f));
+            Assert.That(marching.style.height.value.value, Is.EqualTo(20f));
+            Assert.That(glitch.style.width.value.value, Is.EqualTo(200f));
+            Assert.That(glitch.style.height.value.value, Is.EqualTo(20f));
         }
     }
 }

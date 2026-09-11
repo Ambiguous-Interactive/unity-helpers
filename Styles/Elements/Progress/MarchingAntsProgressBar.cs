@@ -337,6 +337,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         public MarchingAntsProgressBar()
         {
             AddToClassList(USSClassName);
+#if UNITY_6000_0_OR_NEWER
+            style.height = 20;
+            style.width = 200;
+#endif
             _trackElement = new VisualElement { name = "track", pickingMode = PickingMode.Ignore };
             _trackElement.AddToClassList(USSTrackClassName);
             _trackElement.style.position = Position.Absolute;
