@@ -225,6 +225,9 @@ function covers(redactionPaths, uploadedPath) {
  */
 function redactionScopeFor(uploadedPath) {
   const trimmed = uploadedPath.replace(/\/+$/, "");
+  if (trimmed !== uploadedPath) {
+    return trimmed;
+  }
   const lastSegment = trimmed.slice(trimmed.lastIndexOf("/") + 1);
   const namesOneEntry = lastSegment.includes(".") || lastSegment.includes("*");
   return namesOneEntry ? trimmed.slice(0, trimmed.lastIndexOf("/")) : trimmed;

@@ -555,6 +555,7 @@ function Test-UnityLockCleanupIsGated {
         # Quoting is prettier's canonical double-quote form; the contract checks
         # the literal pin, not the quote style.
         $expectedVersion = switch ($job.Key) {
+            'benchmarks' { '"6000.6.0f1"' }
             'unitypackage-smoke' { '"2022.3.45f1"' }
             'unitypackage' { '"2022.3.45f1"' }
             default { '${{ matrix.unity-version }}' }
@@ -753,70 +754,35 @@ $benchmarkAssemblyDiscoveryIsCentralized = (
     $benchmarksJobTexts['matrix-config'].Contains('const performanceAssembly = "WallstopStudios.UnityHelpers.Tests.Runtime.Performance"') -and
     $benchmarksJobTexts['matrix-config'].Contains('const randomAssembly = "WallstopStudios.UnityHelpers.Tests.Runtime.Random"') -and
     $benchmarksJobTexts['matrix-config'].Contains('for (const required of [performanceAssembly, randomAssembly])') -and
-    # PlayMode only, and asserted rather than assumed. Both benchmark assemblies are
-    # platform-neutral, and Unity's EditMode runner takes only assemblies flagged
-    # EditorAssembly -- so an editmode benchmark leg is handed two assembly names, runs zero
-    # tests, and fails "Verify tests actually ran" on every scheduled run (#570).
-    $benchmarksJobTexts['matrix-config'].Contains('for (const mode of ["playmode"])') -and
+    $benchmarksJobTexts['matrix-config'].Contains('benchmarkProfile("playmode")') -and
     -not $benchmarksJobTexts['matrix-config'].Contains('editmode: benchmarkProfile("editmode")') -and
-    $benchmarksWorkflowContent.Contains('matrix-include: ${{ steps.resolve.outputs.matrix-include }}') -and
     $benchmarksWorkflowContent.Contains('expected-result-files: ${{ steps.resolve.outputs.expected-result-files }}') -and
     $benchmarksWorkflowContent.Contains('allow-baseline-refresh: ${{ steps.resolve.outputs.allow-baseline-refresh }}') -and
-    $benchmarkJob.Contains('unity-version:') -and
-    $benchmarkJob.Contains('- 2021.3.45f1') -and
-    $benchmarkJob.Contains('- 2022.3.45f1') -and
-    $benchmarkJob.Contains('- 6000.3.16f1') -and
-    $benchmarkJob.Contains('- 6000.6.0f1') -and
-    $benchmarkJob.Contains('- playmode') -and
-    $benchmarksWorkflowContent.Contains('matrix-exclude: ${{ steps.resolve.outputs.matrix-exclude }}') -and
-    $benchmarkJob.Contains('exclude: ${{ fromJSON(needs.matrix-config.outputs.matrix-exclude) }}') -and
-    -not $benchmarkJob.Contains('include: ${{ fromJSON(needs.matrix-config.outputs.matrix-include) }}') -and
+    $benchmarksJobTexts['matrix-config'].Contains('latest="$(jq -r ''.all[-1]'' .github/unity-versions.json)"') -and
+    $benchmarksJobTexts['matrix-config'].Contains('if [ "${latest}" != "6000.6.0f1" ]') -and
+    $benchmarkJob.Contains('name: Benchmarks 6000.6.0f1 playmode') -and
+    $benchmarkJob.Contains('unity-version: "6000.6.0f1"') -and
+    $benchmarkJob.Contains("-TestMode 'playmode'") -and
+    -not $benchmarkJob.Contains('strategy:') -and
+    -not $benchmarkJob.Contains('matrix.') -and
     $benchmarkJob.Contains('expected-empty: false') -and
     (Test-JobInstallsOnlyRedactionNode -JobText $benchmarkJob) -and
     -not $benchmarkJob.Contains('./.github/actions/compute-unity-assemblies') -and
     -not $benchmarkJob.Contains('steps.compute')
 )
 if (-not $benchmarkAssemblyDiscoveryIsCentralized) {
-    Write-Host '::error file=.github/workflows/unity-benchmarks.yml::Resolve and validate the exact non-empty Performance and Random benchmark profile in hosted matrix-config, use the reviewed static Unity-version/playmode matrix required by the central editor authority, and do not install Node or rediscover asmdefs on self-hosted legs.'
+    Write-Host '::error file=.github/workflows/unity-benchmarks.yml::Resolve and validate the exact non-empty Performance and Random benchmark profile in hosted configuration, run one pinned latest-Unity PlayMode benchmark job, and do not install Node or rediscover asmdefs on the self-hosted leg.'
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info 'Checked benchmark assembly discovery is authoritative and centralized.'
 }
 
-$expectedResultFilesLines = @(
-    $benchmarksWorkflowContent -split "`r?`n" |
-        Where-Object { $_.Contains('echo "expected-result-files=') }
+$benchmarkExpectedResultFilesAreLatestOnly = (
+    [regex]::Matches($benchmarksWorkflowContent, [regex]::Escape('echo "expected-result-count=1"')).Count -eq 1 -and
+    [regex]::Matches($benchmarksWorkflowContent, [regex]::Escape('echo "expected-result-files=[\"results-${latest}-playmode.xml\"]"')).Count -eq 1
 )
-$expectedResultFilesFilter = ''
-if ($expectedResultFilesLines.Count -eq 1) {
-    $expectedResultFilesFilterMatch = [regex]::Match(
-        $expectedResultFilesLines[0],
-        "jq -c '([^']+)'"
-    )
-    if ($expectedResultFilesFilterMatch.Success) {
-        $expectedResultFilesFilter = $expectedResultFilesFilterMatch.Groups[1].Value
-    }
-}
-$expectedResultFilesFixture = '[{"result-file":"results-b.xml"},{"result-file":"results-a.xml"}]'
-$expectedResultFilesOutput = if ([string]::IsNullOrWhiteSpace($expectedResultFilesFilter)) {
-    @()
-}
-else {
-    @($expectedResultFilesFixture | & jq -c $expectedResultFilesFilter 2>&1)
-}
-$expectedResultFilesFilterExitCode = if ([string]::IsNullOrWhiteSpace($expectedResultFilesFilter)) {
-    -1
-}
-else {
-    $LASTEXITCODE
-}
-$benchmarkExpectedResultFilesFilterIsExecutable = (
-    $expectedResultFilesFilter -eq 'map(."result-file") | sort' -and
-    $expectedResultFilesFilterExitCode -eq 0 -and
-    ($expectedResultFilesOutput -join "`n").Trim() -eq '["results-a.xml","results-b.xml"]'
-)
-if (-not $benchmarkExpectedResultFilesFilterIsExecutable) {
-    Write-Host '::error file=.github/workflows/unity-benchmarks.yml::The expected-result-files jq program must be extracted exactly once, execute successfully with a hyphenated result-file key, and return sorted identities. Do not backslash-escape double quotes inside its single-quoted jq program.'
+if (-not $benchmarkExpectedResultFilesAreLatestOnly) {
+    Write-Host '::error file=.github/workflows/unity-benchmarks.yml::The benchmark configuration must expect exactly the latest-version PlayMode result identity.'
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info 'Executed the benchmark expected-result-files jq program against a hyphenated-key fixture.'
@@ -961,10 +927,19 @@ if ($unityVersions.Count -lt 1) {
     Write-Info "Checked Unity version source of truth includes Unity 6000.6.0f1 as the latest version."
 }
 
-# Every Unity version CI actually tests has to be selectable when someone files a bug against it.
-# The dropdowns are hand-maintained and drifted: 6000.1 and 6000.2 were offered while 6000.3 and
-# 6000.5 -- both in the matrix -- were not, so a report against a tested version had to say "Other"
-# and lost the one field that makes a repro reproducible (#283).
+# Every Unity version CI actually tests has to be selectable when someone files a bug against it,
+# and the hand-maintained dropdowns must remain newest-first.
+$orderedUnityLabels = @(
+    'Unity 6.6 (6000.6)',
+    'Unity 6.5 (6000.5)',
+    'Unity 6.4 (6000.4)',
+    'Unity 6.3 (6000.3)',
+    'Unity 6.2 (6000.2)',
+    'Unity 6.1 (6000.1)',
+    'Unity 6 (6000.0) LTS',
+    '2022.3 LTS',
+    '2021.3 LTS'
+)
 foreach ($templateName in @('bug_report.yml', 'feature_request.yml')) {
     $templatePath = Join-Path $repoRoot ".github/ISSUE_TEMPLATE/$templateName"
     if (-not (Test-Path -LiteralPath $templatePath)) {
@@ -983,10 +958,21 @@ foreach ($templateName in @('bug_report.yml', 'feature_request.yml')) {
             $failed = $true
         }
     }
+
+    $previousLabelIndex = -1
+    foreach ($label in $orderedUnityLabels) {
+        $labelIndex = $templateText.IndexOf("- `"$label`"", [StringComparison]::Ordinal)
+        if ($labelIndex -le $previousLabelIndex) {
+            Write-Host "::error file=.github/ISSUE_TEMPLATE/$templateName::Unity Version options must be ordered newest-first; '$label' is missing or out of order."
+            $failed = $true
+            break
+        }
+        $previousLabelIndex = $labelIndex
+    }
 }
 
 if ($VerboseOutput -and -not $failed) {
-    Write-Info "Checked every Unity version in the source of truth is selectable in both issue templates."
+    Write-Info "Checked every tested Unity version is selectable and both issue templates are newest-first."
 }
 
 $integrationPackagesNode = $integrationPackagesConfig.PSObject.Properties['packages']
@@ -1668,7 +1654,8 @@ if (-not $computeUnityAssembliesActionUsesBootstrapSafeShell) {
 function Test-UnityJobUsesCentralEditorGate {
     param(
         [Parameter(Mandatory = $true)][string]$JobText,
-        [Parameter(Mandatory = $true)][string]$ProvisioningProfile
+        [Parameter(Mandatory = $true)][string]$ProvisioningProfile,
+        [string]$UnityVersion = '${{ matrix.unity-version }}'
     )
 
     $editorUses = "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/ensure-unity-editor@$centralEditorActionCommit"
@@ -1713,7 +1700,7 @@ function Test-UnityJobUsesCentralEditorGate {
         $editorStep.Value -match '(?m)^\s+id:\s+ensure_unity_editor\s*$' -and
         $editorStep.Value -match '(?m)^\s+timeout-minutes:\s+10\s*$' -and
         $editorStep.Value.Contains("uses: $editorUses") -and
-        $editorStep.Value -match '(?m)^\s+unity-version:\s+\$\{\{ matrix\.unity-version \}\}\s*$' -and
+        $editorStep.Value.Contains("unity-version: $UnityVersion") -and
         $editorStep.Value -match '(?m)^\s+install-root:\s+\$\{\{ runner\.tool_cache \}\}\\u6-v3\s*$' -and
         $profileMatch.Success -and $actualProfile -ceq $ProvisioningProfile -and
         $editorStep.Value -match '(?m)^\s+diagnostics-path:\s+unity-editor-check\.json\s*$' -and
@@ -1751,7 +1738,7 @@ $defaultMatrixIsVersionGrouped = (
     -not $workflowContent.Contains('matrix-exclude-standalone') -and
     -not $workflowContent.Contains('matrix-include-standalone')
 )
-foreach ($version in @('2021.3.45f1', '2022.3.45f1', '6000.3.16f1', '6000.6.0f1')) {
+foreach ($version in @('2021.3.45f1', '2022.3.45f1', '6000.5.2f1', '6000.6.0f1')) {
     $defaultMatrixIsVersionGrouped = (
         $defaultMatrixIsVersionGrouped -and
         [regex]::Matches($unityTestsMatrixJob, "(?m)^          - $([regex]::Escape($version))\s*$").Count -eq 1
@@ -1875,7 +1862,7 @@ if (-not $groupedDefaultModesAreComplete -or -not $defaultOutcomeGateIsComplete)
 
 $singleThreadedMatrixIsVersionGrouped = (
     [regex]::Matches($unityTestsSingleThreadedJob, '(?m)^        unity-version:\s*$').Count -eq 1 -and
-    [regex]::Matches($unityTestsSingleThreadedJob, '(?m)^          - 6000\.3\.16f1\s*$').Count -eq 1 -and
+    [regex]::Matches($unityTestsSingleThreadedJob, '(?m)^          - 6000\.6\.0f1\s*$').Count -eq 1 -and
     [regex]::Matches($unityTestsSingleThreadedJob, '(?m)^        test-mode:\s*$').Count -eq 0
 )
 $singleThreadedModesAreComplete = $singleThreadedMatrixIsVersionGrouped
@@ -2005,7 +1992,7 @@ $unityWorkflowsUseCentralEditorAuthority = (
     $runnerBootstrapContent -match '(?m)^\s+UNITY_EDITOR_INSTALL_ROOT:\s+\$\{\{ runner\.tool_cache \}\}\\u6-v3\s*$' -and
     (Test-UnityJobUsesCentralEditorGate -JobText $unityTestsMatrixJob -ProvisioningProfile $trustedEditorMatrixProfile) -and
     (Test-UnityJobUsesCentralEditorGate -JobText $unityTestsSingleThreadedJob -ProvisioningProfile 'EditorOnly') -and
-    (Test-UnityJobUsesCentralEditorGate -JobText $benchmarksMatrixJob -ProvisioningProfile 'EditorOnly')
+    (Test-UnityJobUsesCentralEditorGate -JobText $benchmarksMatrixJob -ProvisioningProfile 'EditorOnly' -UnityVersion '"6000.6.0f1"')
 )
 if (-not $unityWorkflowsUseCentralEditorAuthority) {
     Write-Host "::error file=.github/workflows/unity-tests.yml::Every Windows licensed job must run the exact central ensure-unity-editor action first, or immediately after the immutable current-head guard, with a ten-minute fail-closed health check under the runner tool cache. The version-grouped job must pass the exact reviewed static matrix.test-mode map as provisioning-profile; jobs without that static axis must pass literal EditorOnly. CI must not maintain or provision editors, the Unity command must consume the action's bound editor-path output, and the operator bootstrap must provision the same runner.tool_cache\\u6-v3 root. Keep .github/workflows/unity-benchmarks.yml in sync."

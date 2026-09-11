@@ -318,7 +318,7 @@ jobs:
         unity-version:
           - 2021.3.45f1
           - 2022.3.45f1
-          - 6000.3.16f1
+          - 6000.5.2f1
           - 6000.6.0f1
         # Enrollment contract (Workflow contract item 3): this reviewed STATIC
         # test-mode axis lets the central editor gate provision the
@@ -899,7 +899,7 @@ jobs:
   # single-threaded behavior on `#if SINGLE_THREADED`, OFF by default). This job
   # builds+tests with SINGLE_THREADED (and WALLSTOP_CONCAVE_HULL_STATS) defined as
   # GLOBAL scripting symbols so EVERY asmdef test assembly compiles the
-  # single-threaded path. Restricted to Unity 6 (6000.3.16f1) editmode+playmode to
+  # single-threaded path. Restricted to the latest Unity 6 (6000.6.0f1) editmode+playmode to
   # keep time small (no IL2CPP standalone build). Core-only (no integrations): the
   # single-threaded toggle is a core-runtime concern, so installing the DI packages
   # would only add cost. It is a SEPARATE job from unity-tests but shares the SAME
@@ -915,7 +915,7 @@ jobs:
   # provisioning, perf-category exclusion, verify-results, and artifact-upload
   # scaffolding as unity-tests, with DISTINCT project/Library/artifact paths
   # (suffix `-single-threaded`) so its differently-compiled Library never collides
-  # with or poisons the default matrix's `6000.3.16f1-{mode}` cache.
+  # with or poisons the default matrix's `6000.6.0f1-{mode}` cache.
   unity-tests-single-threaded:
     name: Unity ${{ matrix.unity-version }} (SINGLE_THREADED modes)
     needs:
@@ -938,7 +938,7 @@ jobs:
       # No max-parallel, for the reason recorded on the default grouped job above.
       matrix:
         unity-version:
-          - 6000.3.16f1
+          - 6000.6.0f1
     steps:
       - name: Require current PR head before setup
         timeout-minutes: 2
