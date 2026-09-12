@@ -90,7 +90,10 @@ unconditionally.
 `System.Runtime.CompilerServices.Unsafe` is used across the runtime (`EnumExtensions`,
 `ReflectionHelpers`, `Objects`, `AbstractRandom`, `RuntimeSingleton`) and is **not** bundled. Every
 editor in the support matrix provides it, which the CI matrix demonstrates on every run: 2021.3,
-2022.3, 6000.3, and 6000.5 all compile the package. Adding a copy would put a fourth source in play
+2022.3, 6000.5, and 6000.6 all compile the package. CI rejects package-owned compiler and analyzer
+warnings emitted by the supported-version test runs and the staged release export. Test assembly
+and third-party dependency diagnostics remain outside that consumer-facing gate. Adding a copy
+would put a fourth source in play
 for a contested name, and competing sources are the mechanism behind every failure on this page.
 
 Both decisions (which assemblies are constrained and which are deliberately absent) are enforced

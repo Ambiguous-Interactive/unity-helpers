@@ -19,7 +19,9 @@ namespace Samples.UnityHelpers.SpatialStructures
 
         [Header("Gridless (Vector2)")]
         [SerializeField]
+#pragma warning disable WPROTO028 // Inspector-only sample input; this component is not a proto contract.
         private Vector2 gridlessBounds = new Vector2(10f, 5f);
+#pragma warning restore WPROTO028
 
         [SerializeField]
         [Range(4, 32)]
@@ -30,7 +32,9 @@ namespace Samples.UnityHelpers.SpatialStructures
         private Grid grid;
 
         [SerializeField]
+#pragma warning disable WPROTO028 // Inspector-only sample input; this component is not a proto contract.
         private Vector2Int gridFootprint = new Vector2Int(6, 4);
+#pragma warning restore WPROTO028
 
         [SerializeField]
         [Range(3, 12)]
@@ -97,6 +101,7 @@ namespace Samples.UnityHelpers.SpatialStructures
                 return;
             }
 
+#pragma warning disable WPROTO028 // Transient debug geometry is never serialized by WallstopProto.
             List<Vector3> loop = new List<Vector3>(hull.Count);
             for (int i = 0; i < hull.Count; i++)
             {
@@ -105,6 +110,7 @@ namespace Samples.UnityHelpers.SpatialStructures
             }
 
             DrawLoop(loop, Color.cyan);
+#pragma warning restore WPROTO028
         }
 
         private List<FastVector3Int> RunGridAwareExample()
@@ -159,6 +165,7 @@ namespace Samples.UnityHelpers.SpatialStructures
                 return;
             }
 
+#pragma warning disable WPROTO028 // Transient debug geometry is never serialized by WallstopProto.
             List<Vector3> loop = new List<Vector3>(hull.Count);
             for (int i = 0; i < hull.Count; i++)
             {
@@ -167,6 +174,7 @@ namespace Samples.UnityHelpers.SpatialStructures
             }
 
             DrawLoop(loop, Color.yellow);
+#pragma warning restore WPROTO028
         }
 
         private static void DrawLoop(IReadOnlyList<Vector3> points, Color color)

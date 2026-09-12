@@ -340,7 +340,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     .ThenBy(ContractDisplayName, StringComparer.Ordinal)
             );
             _assemblyNames.AddRange(assemblyNames.OrderBy(name => name, StringComparer.Ordinal));
-            foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+#if UNITY_6000_6_OR_NEWER
+            IReadOnlyList<System.Reflection.Assembly> loadedAssemblies =
+                UnityEngine.Assemblies.CurrentAssemblies.GetLoadedAssemblies();
+#else
+            IReadOnlyList<System.Reflection.Assembly> loadedAssemblies =
+                AppDomain.CurrentDomain.GetAssemblies();
+#endif
+            foreach (System.Reflection.Assembly assembly in loadedAssemblies)
             {
                 foreach (
                     WProtoSurrogateAttribute surrogate in assembly.GetCustomAttributes<WProtoSurrogateAttribute>()

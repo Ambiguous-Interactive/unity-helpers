@@ -32,6 +32,7 @@ const REQUIRED_ENTRIES = [
 const EXPORTER_SOURCE = `using System;
 using System.IO;
 using UnityEditor;
+using UnityEditor.AssetPackage;
 
 public static class UnityHelpersPackageExporter
 {
@@ -51,11 +52,11 @@ public static class UnityHelpersPackageExporter
 
         Directory.CreateDirectory(outputDirectory);
         AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
-        AssetDatabase.ExportPackage(
+        Package.Export(new ExportPackageParameters(
             "Assets/WallstopStudios/UnityHelpers",
             outputPath,
-            ExportPackageOptions.Recurse
-        );
+            flags: ExportPackageOptions.Recurse
+        ));
 
         FileInfo exported = new FileInfo(outputPath);
         if (!exported.Exists || exported.Length <= 0)

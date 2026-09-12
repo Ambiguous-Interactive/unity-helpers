@@ -222,8 +222,12 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private float _currentDashOffset;
         private IVisualElementScheduledItem _animationUpdateItem;
+
         private readonly List<Vector2> _pathPoints = new();
+#if UNITY_2022_1_OR_NEWER
         private bool _pathDirty = true;
+#endif
+
         private Rect _lastKnownRect = Rect.zero;
 
 #if !UNITY_6000_0_OR_NEWER
@@ -318,7 +322,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
                     bar.style.width = 200;
                 }
 
+#if UNITY_2022_1_OR_NEWER
                 bar._pathDirty = true;
+#endif
                 bar.schedule.Execute(() => bar.UpdateFillElementSize(bar.contentRect))
                     .ExecuteLater(0);
                 bar.UpdateFillContainerSize();
@@ -387,7 +393,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
             if (_lastKnownRect != evt.newRect)
             {
+#if UNITY_2022_1_OR_NEWER
                 _pathDirty = true;
+#endif
                 _lastKnownRect = evt.newRect;
                 UpdateFillElementSize(evt.newRect);
                 UpdateTrackAndFillElements();
@@ -456,7 +464,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private void UpdateTrackAndFillElements()
         {
+#if UNITY_2022_1_OR_NEWER
             _pathDirty = true;
+#endif
             _trackElement?.MarkDirtyRepaint();
             _fillElement?.MarkDirtyRepaint();
         }

@@ -178,9 +178,9 @@
         reason: `Tests/Editor/TestTypes/BackingFieldGroupAsset.cs` declares
         `[SerializeField] private int _outside`, a field Unity serializes and C# cannot see used.
         The real Unity build judges these; here they are noise.
-      * CS0436, CS1701 and NU1701 are the three harness artifacts EditorCheck's header enumerates -
-        the DoesNotReturnAttribute polyfill under UNITY_2021, `UnityEditor.dll`'s
-        `UnityEngine 0.0.0.0` reference binding to the facade, and `Unity3D.SDK`'s bare `lib/` folder.
+      * CS1701 and NU1701 are the two harness artifacts EditorCheck's header enumerates -
+        `UnityEditor.dll`'s `UnityEngine 0.0.0.0` reference binding to the facade, and
+        `Unity3D.SDK`'s bare `lib/` folder.
 
     Like its three siblings this project lives under `Generator~`, which Unity ignores by the
     trailing-tilde convention, and ships to nobody.
@@ -207,9 +207,9 @@
          `defineConstraints` entry, and the package gates test-only internals on it. -->
     <DefineConstants>$(DefineConstants);UNITY_INCLUDE_TESTS</DefineConstants>
     <NoWarn>$(NoWarn);CS0414;CS0649;CS0169;CS0219;CS0618;CS0612;CS1591;CS1573</NoWarn>
-    <!-- The three harness artifacts EditorCheck enumerates. Each is one diagnostic with one named
+    <!-- The two harness artifacts EditorCheck enumerates. Each is one diagnostic with one named
          cause, not a category swept under the rug. -->
-    <NoWarn>$(NoWarn);CS0436;CS1701;NU1701</NoWarn>
+    <NoWarn>$(NoWarn);CS1701;NU1701</NoWarn>
     <WallstopProto Condition="'$(WallstopProto)' == ''">true</WallstopProto>
     <DefineConstants Condition="'$(WallstopProto)' == 'true'"
       >$(DefineConstants);WALLSTOP_PROTO</DefineConstants>
@@ -238,8 +238,7 @@
     <!--
       UNITY_EDITOR plus the symbol set a real Unity 2021.3 editor defines, identical to EditorCheck's.
       These are not decoration: `Editor/Tools/UnityMethodAnalyzer/*` branches on bare `UNITY_2021`,
-      so does the DoesNotReturnAttribute polyfill in Runtime/Core/Serialization, and the editmode
-      fixtures live behind `UNITY_EDITOR` end to end.
+      and the editmode fixtures live behind `UNITY_EDITOR` end to end.
     -->
     <UnityVersionDefines>UNITY_2021;UNITY_2021_3;UNITY_2021_3_OR_NEWER;UNITY_2021_2_OR_NEWER;UNITY_2021_1_OR_NEWER;UNITY_2020_3_OR_NEWER;UNITY_2020_2_OR_NEWER;UNITY_2020_1_OR_NEWER;UNITY_2019_4_OR_NEWER;UNITY_2019_1_OR_NEWER;UNITY_2018_1_OR_NEWER;UNITY_5_3_OR_NEWER</UnityVersionDefines>
     <DefineConstants>$(DefineConstants);UNITY_EDITOR;$(UnityVersionDefines)</DefineConstants>

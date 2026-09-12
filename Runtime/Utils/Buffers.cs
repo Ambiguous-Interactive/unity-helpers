@@ -1,6 +1,12 @@
 // MIT License - Copyright (c) 2023 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
+#pragma warning disable UAC0009 // Preserve diagnostics in development players.
+#if DEVELOPMENT_BUILD
+#define WALLSTOP_DEVELOPMENT_BUILD
+#endif
+#pragma warning restore UAC0009
+
 // ReSharper disable ConvertClosureToMethodGroup
 namespace WallstopStudios.UnityHelpers.Utils
 {
@@ -440,7 +446,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         private static void ReportCacheLimit(string cacheName, ref int limitHits)
         {
             int hits = Interlocked.Increment(ref limitHits);
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || WALLSTOP_DEVELOPMENT_BUILD
             int maxEntries = WaitInstructionMaxDistinctEntries;
             if (0 < maxEntries && (hits == 1 || hits % WaitInstructionLimitWarningInterval == 0))
             {

@@ -1554,15 +1554,34 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             public AnimationCurve FrameRateCurve = AnimationCurve.Constant(0, 1, 12f);
             public List<Sprite> SpritesToAnimate = new();
 
+            [NonSerialized]
             public TextField nameField;
+
+            [NonSerialized]
             public IntegerField startIndexField;
+
+            [NonSerialized]
             public IntegerField endIndexField;
+
+            [NonSerialized]
             public FloatField defaultFrameRateField;
+
+            [NonSerialized]
             public CurveField frameRateCurveField;
+
+            [NonSerialized]
             public Label spriteCountLabel;
+
+            [NonSerialized]
             public Button previewButton;
+
+            [NonSerialized]
             public Button removeButton;
+
+            [NonSerialized]
             public Toggle loopingField;
+
+            [NonSerialized]
             public FloatField cycleOffsetField;
         }
 

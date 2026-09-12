@@ -325,8 +325,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
             }
 
             Painter2D painter = mgc.painter2D;
+#pragma warning disable WPROTO028 // Transient paint geometry is never serialized by WallstopProto.
             Rect rect = contentRect;
             Vector2 center = rect.center;
+#pragma warning restore WPROTO028
 
             painter.lineWidth = _thickness;
             painter.lineCap = _roundedCaps ? LineCap.Round : LineCap.Butt;

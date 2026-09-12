@@ -140,7 +140,9 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
         /// </remarks>
         // Keep validation in development players; Release players intentionally omit warning-only calls.
         [System.Diagnostics.Conditional(CompilationSymbols.EnableUberLogging)]
+#pragma warning disable UAC0009 // Development builds retain the established validation contract.
         [System.Diagnostics.Conditional(CompilationSymbols.DevelopmentBuild)]
+#pragma warning restore UAC0009
         [System.Diagnostics.Conditional(CompilationSymbols.Debug)]
         [System.Diagnostics.Conditional(CompilationSymbols.UnityEditor)]
         [System.Diagnostics.Conditional(CompilationSymbols.WarnLogging)]

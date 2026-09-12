@@ -9,7 +9,8 @@ $tokens = $null
 $errors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($sourcePath, [ref]$tokens, [ref]$errors)
 if ($errors.Count) { throw 'Unity runner must parse.' }
-foreach ($name in @('Assert-UnityRunMode', 'Invoke-UnityPackageExport')) {
+. (Join-Path $PSScriptRoot '../unity/lib/credential-redaction.ps1')
+foreach ($name in @('Write-CiError', 'Assert-NoUnityCompilerWarnings', 'Assert-UnityRunMode', 'Invoke-UnityPackageExport')) {
     $definition = $ast.Find({ param($node)
         $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name
     }, $true)
@@ -84,6 +85,7 @@ try {
         } elseif ($script:Outcome -eq 'empty') {
             [IO.File]::WriteAllText($ExportPackagePath, '')
         }
+        [IO.File]::WriteAllText($LogPath, 'Compilation completed successfully')
         if ($script:Outcome -like 'failure*') { return 1 }
         return 0
     }
@@ -92,7 +94,7 @@ try {
         New-Item -ItemType Directory -Force -Path (Split-Path $ExportPackagePath -Parent) | Out-Null
         Set-Content -LiteralPath $ExportPackagePath -Value 'stale package'
         Set-Content -LiteralPath "$ExportPackagePath.sha256" -Value 'stale hash'
-        $action = { Invoke-UnityPackageExport -EditorPath 'fake editor' -Project $ProjectPath -OutputPath $ExportPackagePath -LogPath $logPath }
+        $action = { Invoke-UnityPackageExport -EditorPath 'fake editor' -Project $ProjectPath -OutputPath $ExportPackagePath -LogPath $logPath -PackageRoot $temporary }
         if ($script:Outcome -eq 'success') {
             & $action
             $expected = (Get-FileHash -LiteralPath $ExportPackagePath -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -126,12 +128,13 @@ try {
     function Invoke-UnityLicenseActivate { param($EditorPath, $Serial, $Email, $Password, $LogPath) $script:Events.Add('activate') }
     function Invoke-UnityLicenseReturn { param($EditorPath, $Email, $Password, $LogPath) $script:Events.Add('return') }
     function Invoke-UnityPackageExport {
-        param($EditorPath, $Project, $OutputPath, $LogPath, $ExtraArguments)
+        param($EditorPath, $Project, $OutputPath, $LogPath, $PackageRoot, $ExtraArguments)
         $script:Events.Add('export')
         if ($script:ExportFails) { throw 'injected export failure' }
     }
     function Write-UnityCompilationSourceInventoryMarker { throw 'Export changed the test compilation inventory.' }
     $UnityEditorPath = 'fake editor'
+    $RepoRoot = $temporary
     $startupProbeLogPath = $logPath
     $activateLogPath = $logPath
     $returnLogPath = $logPath

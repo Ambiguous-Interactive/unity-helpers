@@ -361,8 +361,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             Func<byte[], object>
         > SpecialCollectionDeserializerFactory = BuildSpecialCollectionDeserializer;
 
+#pragma warning disable UAC0023 // Intentional legacy, trusted-only compatibility API; see SystemBinary docs.
         private static readonly Utils.WallstopGenericPool<BinaryFormatter> BinaryFormatterPool =
             new(() => new BinaryFormatter());
+#pragma warning restore UAC0023
 
         private static readonly Utils.WallstopGenericPool<Utf8JsonWriter> JsonWriterPool = new(
             () => new Utf8JsonWriter(Stream.Null, new JsonWriterOptions { SkipValidation = true }),
@@ -815,7 +817,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 using Utils.PooledResource<BinaryFormatter> fmtLease = BinaryFormatterPool.Get(
                     out BinaryFormatter binaryFormatter
                 );
+#pragma warning disable UAC0023 // Intentional legacy, trusted-only compatibility API.
                 return (T)binaryFormatter.Deserialize(stream);
+#pragma warning restore UAC0023
             }
             catch (SerializationFailureException)
             {
@@ -875,7 +879,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             using Utils.PooledResource<BinaryFormatter> fmtLease = BinaryFormatterPool.Get(
                 out BinaryFormatter binaryFormatter
             );
+#pragma warning disable UAC0023 // Intentional legacy, trusted-only compatibility API.
             binaryFormatter.Serialize(stream, input);
+#pragma warning restore UAC0023
             byte[] buffer = null;
             stream.ToArrayExact(ref buffer);
             return buffer;
@@ -896,7 +902,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             using Utils.PooledResource<BinaryFormatter> fmtLease = BinaryFormatterPool.Get(
                 out BinaryFormatter binaryFormatter
             );
+#pragma warning disable UAC0023 // Intentional legacy, trusted-only compatibility API.
             binaryFormatter.Serialize(stream, input);
+#pragma warning restore UAC0023
             return stream.ToArrayExact(ref buffer);
         }
 

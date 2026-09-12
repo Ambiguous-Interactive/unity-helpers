@@ -19,7 +19,9 @@ namespace Samples.UnityHelpers.UIToolkit.Editor
         {
             MultiFileSelectorSampleWindow window = GetWindow<MultiFileSelectorSampleWindow>();
             window.titleContent = new GUIContent("MultiFile Selector Sample");
+#pragma warning disable WPROTO028 // Editor-window layout is never serialized by WallstopProto.
             window.minSize = new Vector2(640f, 420f);
+#pragma warning restore WPROTO028
         }
 
         private void CreateGUI()

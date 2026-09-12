@@ -16,7 +16,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
     [ProtoContract]
     [WProtoContract]
-    internal partial struct Vector2Surrogate
+    public partial struct Vector2Surrogate
     {
         [ProtoMember(1)]
         [WProtoMember(1)]
@@ -33,7 +33,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
     [ProtoContract]
     [WProtoContract]
-    internal partial struct Vector3Surrogate
+    public partial struct Vector3Surrogate
     {
         [ProtoMember(1)]
         [WProtoMember(1)]
@@ -60,7 +60,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
     [ProtoContract]
     [WProtoContract]
-    internal partial struct QuaternionSurrogate
+    public partial struct QuaternionSurrogate
     {
         [ProtoMember(1)]
         [WProtoMember(1)]
@@ -93,7 +93,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
     [ProtoContract]
     [WProtoContract]
-    internal partial struct ColorSurrogate
+    public partial struct ColorSurrogate
     {
         [ProtoMember(1)]
         [WProtoMember(1)]
@@ -125,7 +125,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
     [ProtoContract]
     [WProtoContract]
-    internal partial struct Color32Surrogate
+    public partial struct Color32Surrogate
     {
         [ProtoMember(1)]
         [WProtoMember(1)]
@@ -157,7 +157,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
     [ProtoContract]
     [WProtoContract]
-    internal partial struct RectSurrogate
+    public partial struct RectSurrogate
     {
         [ProtoMember(1)]
         [WProtoMember(1)]
@@ -189,7 +189,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
     [ProtoContract]
     [WProtoContract]
-    internal partial struct RectIntSurrogate
+    public partial struct RectIntSurrogate
     {
         [ProtoMember(1)]
         [WProtoMember(1)]
@@ -222,7 +222,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
     [ProtoContract]
     [WProtoContract]
-    internal partial struct BoundsSurrogate
+    public partial struct BoundsSurrogate
     {
         [ProtoMember(1)]
         [WProtoMember(1)]
@@ -265,7 +265,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
     [ProtoContract]
     [WProtoContract]
-    internal partial struct BoundsIntSurrogate
+    public partial struct BoundsIntSurrogate
     {
         [ProtoMember(1)]
         [WProtoMember(1)]
@@ -308,7 +308,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
     [ProtoContract]
     [WProtoContract]
-    internal partial struct Vector2IntSurrogate
+    public partial struct Vector2IntSurrogate
     {
         [ProtoMember(1)]
         [WProtoMember(1)]
@@ -326,7 +326,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
     [ProtoContract]
     [WProtoContract]
-    internal partial struct Vector3IntSurrogate
+    public partial struct Vector3IntSurrogate
     {
         [ProtoMember(1)]
         [WProtoMember(1)]
@@ -353,7 +353,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
     [ProtoContract]
     [WProtoContract]
-    internal partial struct ResolutionSurrogate
+    public partial struct ResolutionSurrogate
     {
         [ProtoMember(1)]
         [WProtoMember(1)]
@@ -462,7 +462,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
     [ProtoContract]
     [WProtoContract]
-    internal partial struct ParabolaSurrogate
+    public partial struct ParabolaSurrogate
     {
         [ProtoMember(1)]
         [WProtoMember(1)]
@@ -496,7 +496,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
     [ProtoContract]
     [WProtoContract]
-    internal partial struct ImmutableBitSetSurrogate
+    public partial struct ImmutableBitSetSurrogate
     {
         [ProtoMember(1)]
         [WProtoMember(1)]
@@ -773,7 +773,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             catch (Exception error)
             {
                 RegistrationFailures.Add(typeof(TReal).Name);
-#if !ENABLE_IL2CPP
+#if ENABLE_IL2CPP
+                _ = error;
+#else
                 // AOT always uses WallstopProto; expected protobuf-net refusals must not log startup errors.
                 Debug.LogError(
                     $"[UnityHelpers] protobuf-net already bound {typeof(TReal).Name}, so its "

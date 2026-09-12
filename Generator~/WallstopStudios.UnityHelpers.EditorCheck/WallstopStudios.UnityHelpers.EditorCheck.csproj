@@ -95,14 +95,9 @@
      10. IL2CPP and behaviour. A green build here is necessary and NOT sufficient; the Unity legs
          remain the real proof.
 
-    THREE NoWarn entries are harness artifacts rather than judgments about the sources, and each is
+    TWO NoWarn entries are harness artifacts rather than judgments about the sources, and each is
     a specific diagnostic rather than a category:
 
-      * CS0436, exactly one site: `Runtime/Core/Serialization/SerializationFailureException.cs`
-        polyfills `DoesNotReturnAttribute` under `UNITY_2021 || UNITY_2022 || UNITY_2023`. This
-        project defines `UNITY_2021` (Unity does), so the polyfill activates and collides with the
-        copy in Microsoft's `netstandard.dll`. The compiler picks the source type, which is the
-        outcome the polyfill wants. TypeCheck never sees this because it defines no UNITY_* symbols.
       * CS1701: `UnityEditor.dll` names `UnityEngine 0.0.0.0` and binds to the facade above.
       * NU1701: `Unity3D.SDK` publishes a bare `lib/` folder with no target framework, so restoring
         it into a netstandard2.1 project is a framework mismatch by construction. Scoped to that one
@@ -152,9 +147,9 @@
     -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS0414;CS0649;CS0219;CS0618;CS0612;CS1591;CS1573</NoWarn>
-    <!-- The three harness artifacts enumerated at the top of this file. Each is one diagnostic with
+    <!-- The two harness artifacts enumerated at the top of this file. Each is one diagnostic with
          one named cause, not a category swept under the rug. -->
-    <NoWarn>$(NoWarn);CS0436;CS1701;NU1701</NoWarn>
+    <NoWarn>$(NoWarn);CS1701;NU1701</NoWarn>
     <!-- Same split as TypeCheck: EPS01 is at zero and is escalated, the rest of the family is
          silenced because measured most of it is wrong about Span. Inventory on #517. -->
     <NoWarn>$(NoWarn);EPS02;EPS03;EPS04;EPS05;EPS06;EPS07;EPS08;EPS09;EPS10;EPS11;EPS12</NoWarn>
@@ -177,9 +172,8 @@
       >$(DefineConstants);SINGLE_THREADED</DefineConstants>
     <!--
       UNITY_EDITOR plus the symbol set a real Unity 2021.3 editor defines. These are not decoration:
-      `Editor/Tools/UnityMethodAnalyzer/*` branches on bare `UNITY_2021`, and so does the
-      DoesNotReturnAttribute polyfill in Runtime/Core/Serialization. Compiling the editor tree
-      without them would compile a configuration nobody runs.
+      `Editor/Tools/UnityMethodAnalyzer/*` branches on bare `UNITY_2021`. Compiling the editor tree
+      without these symbols would compile a configuration nobody runs.
     -->
     <UnityVersionDefines>UNITY_2021;UNITY_2021_3;UNITY_2021_3_OR_NEWER;UNITY_2021_2_OR_NEWER;UNITY_2021_1_OR_NEWER;UNITY_2020_3_OR_NEWER;UNITY_2020_2_OR_NEWER;UNITY_2020_1_OR_NEWER;UNITY_2019_4_OR_NEWER;UNITY_2019_1_OR_NEWER;UNITY_2018_1_OR_NEWER;UNITY_5_3_OR_NEWER</UnityVersionDefines>
     <DefineConstants>$(DefineConstants);UNITY_EDITOR;$(UnityVersionDefines)</DefineConstants>

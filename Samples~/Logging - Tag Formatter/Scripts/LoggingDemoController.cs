@@ -7,6 +7,7 @@ namespace Samples.UnityHelpers.Logging
     using System.Runtime.CompilerServices;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Extension;
+    using WallstopStudios.UnityHelpers.Core.Random;
 
     /// <summary>
     /// Runtime MonoBehaviour that exercises the logging extensions and exposes toggleable controls.
@@ -35,7 +36,9 @@ namespace Samples.UnityHelpers.Logging
         private string reportMessage = "Intruder spotted near maintenance tunnel";
 
         [SerializeField]
+#pragma warning disable WPROTO028 // Inspector-only sample input; this component is not a proto contract.
         private Vector2 sectorRange = new Vector2(1f, 6f);
+#pragma warning restore WPROTO028
 
         private bool localLoggingEnabled = true;
 
@@ -62,7 +65,9 @@ namespace Samples.UnityHelpers.Logging
 
         private void OnGUI()
         {
+#pragma warning disable WPROTO028 // Transient IMGUI layout is never serialized by WallstopProto.
             GUILayout.BeginArea(new Rect(16f, 16f, 360f, 260f), GUI.skin.box);
+#pragma warning restore WPROTO028
             GUILayout.Label("Logging Demo Controls", GUI.skin.label);
 
             HandlePrettyToggle();
@@ -151,8 +156,7 @@ namespace Samples.UnityHelpers.Logging
             string npc = string.IsNullOrWhiteSpace(npcCallsign) ? "Scout-17" : npcCallsign.Trim();
             string status = string.IsNullOrWhiteSpace(statusLabel) ? "alert" : statusLabel.Trim();
             string statusFormat = $"status={status}";
-            string location =
-                $"Sector-{UnityEngine.Random.Range(sectorRange.x, sectorRange.y):0.0}";
+            string location = $"Sector-{PRNG.Instance.NextFloat(sectorRange.x, sectorRange.y):0.0}";
 
             return FormattableStringFactory.Create(
                 "{0:npc} :: {1:" + statusFormat + "} @ {2:color=#7AD7FF}",

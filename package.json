@@ -339,6 +339,7 @@
     "test:wiki-generation": "bash scripts/tests/test-wiki-generation.sh",
     "test:shell-portability": "bash scripts/tests/test-shell-portability.sh",
     "test:unity-nunit-results": "bash scripts/tests/test-unity-nunit-results.sh",
+    "test:unity-compiler-warnings": "pwsh -NoProfile -File scripts/tests/test-unity-compiler-warnings.ps1 -VerboseOutput",
     "sync:upm-changelog": "pwsh -NoProfile -File scripts/release-tools/sync-upm-changelog.ps1",
     "check:upm-changelog": "pwsh -NoProfile -File scripts/release-tools/sync-upm-changelog.ps1 -Check",
     "test:npm-package-signature": "pwsh -NoProfile -File scripts/tests/test-npm-package-signature.ps1 -VerboseOutput",
