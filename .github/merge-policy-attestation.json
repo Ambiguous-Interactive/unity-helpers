@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "repository": "Ambiguous-Interactive/unity-helpers",
+  "rulesets": [
+    {
+      "rulesetId": 22983578,
+      "rulesetName": "Required CI - Success (default branch)",
+      "enforcement": "active",
+      "requiredContexts": ["Unity CI Success"],
+      "bypassActors": []
+    }
+  ]
+}
