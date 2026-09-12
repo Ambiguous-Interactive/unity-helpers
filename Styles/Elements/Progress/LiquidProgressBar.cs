@@ -6,7 +6,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
     using UnityEngine;
     using UnityEngine.UIElements;
 
-    public sealed class LiquidProgressBar : VisualElement
+#if UNITY_6000_0_OR_NEWER
+    [UxmlElement]
+#endif
+    public sealed partial class LiquidProgressBar : VisualElement
     {
         public const string USSClassName = "liquid-progress-bar";
         public const string USSTrackColorVarName = "--lpb-track-color";
@@ -15,6 +18,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         public const string USSBorderRadiusVarName = "--lpb-border-radius";
 
         private float _progress = 0.5f;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("progress")]
+#endif
         public float Progress
         {
             get => _progress;
@@ -30,6 +37,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private Color _trackColor = new(0.4f, 0.4f, 0.4f, 1f);
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("track-color")]
+#endif
         public Color TrackColor
         {
             get => _trackColor;
@@ -41,6 +52,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private float _trackThickness = 2f;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("track-thickness")]
+#endif
         public float TrackThickness
         {
             get => _trackThickness;
@@ -56,6 +71,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private Color _progressColor = new(0.3f, 0.7f, 1f, 1f);
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("progress-color")]
+#endif
         public Color ProgressColor
         {
             get => _progressColor;
@@ -67,6 +86,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private float _borderRadius = 7f;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("border-radius")]
+#endif
         public float BorderRadius
         {
             get => _borderRadius;
@@ -82,6 +105,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private float _leadingEdgeCurvature = 0.6f;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("leading-edge-curvature")]
+#endif
         public float LeadingEdgeCurvature
         {
             get => _leadingEdgeCurvature;
@@ -97,6 +124,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private float _animationSpeed = 2.5f;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("animation-speed")]
+#endif
         public float AnimationSpeed
         {
             get => _animationSpeed;
@@ -111,6 +142,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private float _wobbleMagnitude = 0.3f;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("wobble-magnitude")]
+#endif
         public float WobbleMagnitude
         {
             get => _wobbleMagnitude;
@@ -125,6 +160,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private bool _animateLeadingEdge = true;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("animate-leading-edge")]
+#endif
         public bool AnimateLeadingEdge
         {
             get => _animateLeadingEdge;
@@ -155,6 +194,7 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         private float _wobbleOffset;
         private IVisualElementScheduledItem _animationUpdateItem;
 
+#if !UNITY_6000_0_OR_NEWER
         public new class UxmlFactory : UxmlFactory<LiquidProgressBar, UxmlTraits> { }
 
         public new class UxmlTraits : VisualElement.UxmlTraits
@@ -246,10 +286,15 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
                 }
             }
         }
+#endif
 
         public LiquidProgressBar()
         {
             AddToClassList(USSClassName);
+#if UNITY_6000_0_OR_NEWER
+            style.height = 22;
+            style.width = 200;
+#endif
 #if UNITY_2022_1_OR_NEWER
             generateVisualContent += OnGenerateVisualContent;
 #endif

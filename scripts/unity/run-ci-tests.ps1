@@ -1050,8 +1050,8 @@ function Get-NUnitNodeFullName {
 # Two classes of failed node are enumerated:
 #   (1) Failed leaf cases: //test-case[@result='Failed'] -- the ordinary
 #       assertion failure.
-#   (2) Failed suites that carry their OWN direct <failure> child:
-#       //test-suite[@result='Failed'] with a direct <failure> element. This is
+#   (2) Failed suites that carry their OWN direct <failure> child and whose
+#       failure site is not Child. This is
 #       the OneTimeSetUp / OneTimeTearDown failure shape (e.g.
 #       SuiteWallClockBudgetTest's [OneTimeTearDown] Assert.Fail) -- a suite can
 #       carry its OWN teardown failure message EVEN WHEN it also has a failed
@@ -1075,7 +1075,7 @@ function Write-UnityFailedTestAnnotations {
 
     try {
         $failedCases = @($Xml.SelectNodes("//test-case[@result='Failed']"))
-        $failedSuites = @($Xml.SelectNodes("//test-suite[@result='Failed']"))
+        $failedSuites = @($Xml.SelectNodes("//test-suite[@result='Failed'][not(@site='Child')]"))
 
         # A failed suite is reported on its OWN merits whenever it carries a
         # direct <failure> child element. This captures the OneTimeSetUp /
@@ -1179,7 +1179,7 @@ function Get-UnityFailedNodeCount {
 
     try {
         $failedCases = @($Xml.SelectNodes("//test-case[@result='Failed']"))
-        $failedSuitesWithOwnFailure = @($Xml.SelectNodes("//test-suite[@result='Failed'][failure]"))
+        $failedSuitesWithOwnFailure = @($Xml.SelectNodes("//test-suite[@result='Failed'][failure][not(@site='Child')]"))
         return $failedCases.Count + $failedSuitesWithOwnFailure.Count
     } catch {
         return 0

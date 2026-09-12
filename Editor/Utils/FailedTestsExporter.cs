@@ -160,7 +160,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     {
                         Debug.LogWarning(
                             "[Unity Helpers] The failed tests exporter could not unregister from "
-                                + $"the Test Runner: {exception.Message}."
+                                + $"the Test Runner: {exception}."
                         );
                     }
                 }
@@ -211,7 +211,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 ArmRetries();
                 Debug.LogWarning(
                     "[Unity Helpers] The failed tests exporter could not register with the Test "
-                        + $"Runner yet: {exception.Message}. It will try again after the next "
+                        + $"Runner yet: {exception}. It will try again after the next "
                         + "assembly reload."
                 );
             }

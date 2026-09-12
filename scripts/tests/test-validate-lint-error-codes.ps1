@@ -155,9 +155,8 @@ Write-Host "UNH001: something"
         ExpectExitZero = $true
     },
     @{
-        # XYZ is never a real English word; cspell will not accept it via
-        # compound splitting. A synthetic prefix guarantees the failure is for
-        # the right reason (missing cspell registration), not a false positive.
+        # Explicitly flag the probe token in this fixture's cspell config. This
+        # keeps the negative control deterministic as dictionaries evolve.
         Name           = 'Fixture.UnregisteredPrefix.Fails'
         Files          = [ordered]@{
             'scripts/lint-fake-novel.ps1' = @"
@@ -165,6 +164,7 @@ Write-Host "UNH001: something"
 Write-Host "XYZ001: unregistered prefix should fail the validator"
 "@
         }
+        FlagWords      = @('XYZ001')
         ExpectExitZero = $false
         MustMatch      = @('\bXYZ\b', 'add_to_root_words', 'lint-fake-novel\.ps1:')
     },
@@ -267,6 +267,12 @@ foreach ($scenario in $scenarios) {
     }
     else {
         $workingDirectory = New-FixtureRoot
+        if ($scenario.Contains('FlagWords')) {
+            $fixtureCspellPath = Join-Path $workingDirectory 'cspell.json'
+            $fixtureCspell = Get-Content -LiteralPath $fixtureCspellPath -Raw | ConvertFrom-Json
+            $fixtureCspell.flagWords = @($scenario.FlagWords)
+            $fixtureCspell | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $fixtureCspellPath -NoNewline
+        }
         foreach ($relativePath in $scenario.Files.Keys) {
             $destination = Join-Path $workingDirectory $relativePath
             Set-Content -LiteralPath $destination -Value $scenario.Files[$relativePath]

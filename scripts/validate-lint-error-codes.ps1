@@ -199,7 +199,8 @@ try {
     #
     # The -Raw output from cspell --no-color is stable enough to parse:
     #   `<stdin>:<line>:<col> - Unknown word (<word>)`
-    # We only care about the presence of "Unknown word" lines.
+    #   `<stdin>:<line>:<col> - Forbidden word (<word>)`
+    # Either verdict means cspell rejects the error-code family.
     $probeInputLines = @()
     foreach ($prefix in $sortedPrefixes) {
         $probe = "${prefix}001"
@@ -212,7 +213,7 @@ try {
 
     $unknownPrefixes = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
     foreach ($line in @($output)) {
-        $regexMatch = [regex]::Match([string]$line, 'Unknown word \(([A-Z]{2,})(?:[0-9]{3})?\)')
+        $regexMatch = [regex]::Match([string]$line, '(?:Unknown|Forbidden) word \(([A-Z]{2,})(?:[0-9]{3})?\)')
         if ($regexMatch.Success) {
             $unknownPrefixes.Add($regexMatch.Groups[1].Value) | Out-Null
         }

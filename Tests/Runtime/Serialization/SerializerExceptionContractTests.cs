@@ -269,6 +269,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.Throws<ObjectDisposedException>(() => writer.ToArrayExact(ref destination));
         }
 
+        [Test, Timeout(5000)]
+        public void PooledArrayBufferWriterInvalidAdvanceLeavesStateUnchanged()
+        {
+            using WallstopStudios.UnityHelpers.Utils.PooledResource<PooledArrayBufferWriter> lease =
+                PooledArrayBufferWriter.Rent(out PooledArrayBufferWriter writer);
+            int available = writer.GetSpan().Length;
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => writer.Advance(-1));
+            Assert.AreEqual(0, writer.WrittenCount);
+            Assert.Throws<ArgumentOutOfRangeException>(() => writer.Advance(available + 1));
+            Assert.AreEqual(0, writer.WrittenCount);
+        }
+
+        [Test, Timeout(5000)]
+        public void PooledArrayBufferWriterNegativeSizeHintsLeaveStateUnchanged()
+        {
+            using WallstopStudios.UnityHelpers.Utils.PooledResource<PooledArrayBufferWriter> lease =
+                PooledArrayBufferWriter.Rent(out PooledArrayBufferWriter writer);
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => writer.GetMemory(-1));
+            Assert.Throws<ArgumentOutOfRangeException>(() => writer.GetSpan(-1));
+            Assert.Throws<ArgumentOutOfRangeException>(() => writer.Preallocate(-1));
+            Assert.AreEqual(0, writer.WrittenCount);
+        }
+
+        [Test, Timeout(5000)]
+        public void PooledArrayBufferWriterCapacityOverflowLeavesStateUnchanged()
+        {
+            using WallstopStudios.UnityHelpers.Utils.PooledResource<PooledArrayBufferWriter> lease =
+                PooledArrayBufferWriter.Rent(out PooledArrayBufferWriter writer);
+            int available = writer.GetSpan().Length;
+            writer.Advance(available);
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => writer.GetSpan(int.MaxValue));
+            Assert.AreEqual(available, writer.WrittenCount);
+        }
+
         [Test]
         public void ProtoDeserializeWithTypeNullTypeThrowsConfiguration()
         {

@@ -463,7 +463,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             byte[] original = File.ReadAllBytes(filePath);
             LogAssert.Expect(
                 LogType.Error,
-                new Regex(Regex.Escape($"Rewriting {_rewriteThrew} threw: {RewriteFailureMessage}"))
+                new Regex(
+                    Regex.Escape(
+                        $"Rewriting {_rewriteThrew} threw: {typeof(InvalidOperationException).FullName}: {RewriteFailureMessage}"
+                    )
+                )
             );
 
             int rewrites = 0;
@@ -512,8 +516,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             LogAssert.Expect(
                 LogType.Error,
                 new Regex(
-                    Regex.Escape($"Rewriting {_rewriteUndoFailed} threw: {RewriteFailureMessage}")
-                        + "(?!.*being put back).*Nothing was repaired\\."
+                    "(?![\\s\\S]*being put back)"
+                        + Regex.Escape(
+                            $"Rewriting {_rewriteUndoFailed} threw: {typeof(InvalidOperationException).FullName}: {RewriteFailureMessage}"
+                        )
+                        + "[\\s\\S]*Nothing was repaired\\."
                 )
             );
             LogAssert.Expect(

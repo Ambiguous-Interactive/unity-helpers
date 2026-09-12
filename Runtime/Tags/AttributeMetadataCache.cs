@@ -148,7 +148,7 @@ namespace WallstopStudios.UnityHelpers.Tags
             catch (Exception e)
             {
                 Debug.LogError(
-                    $"AttributeMetadataCache: Exception during relational prewarm on load: {e.Message}\n{e}"
+                    $"AttributeMetadataCache: Exception during relational prewarm on load: {e}"
                 );
             }
         }

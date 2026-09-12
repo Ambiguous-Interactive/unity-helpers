@@ -35,26 +35,17 @@ function resolveTestMatrix(
   const selectedModes = !mode || mode === "all" ? [...TEST_MODES] : [mode];
   if (acceptanceRequested && !selectedModes.includes("standalone")) {
     // Native acceptance builds IL2CPP standalone players (intmap, serialization),
-    // so the standalone leg -- the only leg whose editor gate provisions the
-    // StandaloneWindowsIl2Cpp profile -- must exist whenever acceptance runs.
+    // so standalone coverage must be selected whenever acceptance runs.
     selectedModes.push("standalone");
   }
   return {
     "unity-versions": selectedVersions,
     "test-modes": selectedModes,
-    // Excluding an unselected MODE removes the leg entirely. The per-step guards already skip
-    // an unselected mode's tests, but the leg itself still provisioned the editor and acquired
-    // the organization lock before reaching them, so a lock or editor failure on an unused leg
-    // failed the whole job after the requested mode had already passed. A leg that never starts
-    // can do neither.
-    "matrix-exclude": [
-      ...versions
-        .filter((entry) => !selectedVersions.includes(entry))
-        .map((entry) => ({ "unity-version": entry })),
-      ...TEST_MODES.filter((mode) => !selectedModes.includes(mode)).map((mode) => ({
-        "test-mode": mode
-      }))
-    ]
+    // The workflow matrix has only a version axis. Mode selection gates steps
+    // inside each version job, so only unselected versions need exclusions.
+    "matrix-exclude": versions
+      .filter((entry) => !selectedVersions.includes(entry))
+      .map((entry) => ({ "unity-version": entry }))
   };
 }
 

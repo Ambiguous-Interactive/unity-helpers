@@ -8,7 +8,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
     using UnityEngine;
     using UnityEngine.UIElements;
 
-    public sealed class MarchingAntsProgressBar : VisualElement
+#if UNITY_6000_0_OR_NEWER
+    [UxmlElement]
+#endif
+    public sealed partial class MarchingAntsProgressBar : VisualElement
     {
         public enum OrientationType
         {
@@ -31,6 +34,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         private readonly VisualElement _fillContainer;
         private readonly VisualElement _fillElement;
         private float _progress = 0.5f;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("progress")]
+#endif
         public float Progress
         {
             get => _progress;
@@ -46,6 +53,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private Color _trackColor = new(0.4f, 0.4f, 0.4f, 1f);
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("track-color")]
+#endif
         public Color TrackColor
         {
             get => _trackColor;
@@ -57,6 +68,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private Color _progressColor = Color.white;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("progress-color")]
+#endif
         public Color ProgressColor
         {
             get => _progressColor;
@@ -68,6 +83,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private float _thickness = 3f;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("thickness")]
+#endif
         public float Thickness
         {
             get => _thickness;
@@ -83,6 +102,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private float _borderRadius = 5f;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("border-radius")]
+#endif
         public float BorderRadius
         {
             get => _borderRadius;
@@ -94,6 +117,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private OrientationType _orientation = OrientationType.Horizontal;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("orientation")]
+#endif
         public OrientationType Orientation
         {
             get => _orientation;
@@ -111,6 +138,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private float _dashOnLength = 4f;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("dash-on")]
+#endif
         public float DashOnLength
         {
             get => _dashOnLength;
@@ -126,6 +157,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private float _dashOffLength = 4f;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("dash-off")]
+#endif
         public float DashOffLength
         {
             get => _dashOffLength;
@@ -141,6 +176,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private bool _animate = true;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("animate")]
+#endif
         public bool Animate
         {
             get => _animate;
@@ -164,6 +203,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private float _animationSpeed = 40f;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("animation-speed")]
+#endif
         public float AnimationSpeed
         {
             get => _animationSpeed;
@@ -183,6 +226,7 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         private bool _pathDirty = true;
         private Rect _lastKnownRect = Rect.zero;
 
+#if !UNITY_6000_0_OR_NEWER
         public new class UxmlFactory : UxmlFactory<MarchingAntsProgressBar, UxmlTraits> { }
 
         public new class UxmlTraits : VisualElement.UxmlTraits
@@ -265,19 +309,11 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
                 bar.AnimationSpeed = _animationSpeedAttribute.GetValueFromBag(bag, cc);
                 bar.Animate = _animateAttribute.GetValueFromBag(bag, cc);
                 bar.Progress = _progressAttribute.GetValueFromBag(bag, cc);
-                if (
-                    !bar.style.height.Equals(StyleKeyword.Initial)
-                    && bar.style.height.value == 0
-                    && bar.style.height.keyword == StyleKeyword.None
-                )
+                if (bar.style.height.keyword == StyleKeyword.Auto || bar.style.height.value == 0)
                 {
                     bar.style.height = 20;
                 }
-                if (
-                    !bar.style.width.Equals(StyleKeyword.Initial)
-                    && bar.style.width.value == 0
-                    && bar.style.width.keyword == StyleKeyword.None
-                )
+                if (bar.style.width.keyword == StyleKeyword.Auto || bar.style.width.value == 0)
                 {
                     bar.style.width = 200;
                 }
@@ -288,10 +324,15 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
                 bar.UpdateFillContainerSize();
             }
         }
+#endif
 
         public MarchingAntsProgressBar()
         {
             AddToClassList(USSClassName);
+#if UNITY_6000_0_OR_NEWER
+            style.height = 20;
+            style.width = 200;
+#endif
             _trackElement = new VisualElement { name = "track", pickingMode = PickingMode.Ignore };
             _trackElement.AddToClassList(USSTrackClassName);
             _trackElement.style.position = Position.Absolute;

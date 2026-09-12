@@ -92,6 +92,29 @@ permissions:
   actions: read
 
 jobs:
+  matrix-config:
+    name: Resolve Unity maintenance matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Read Unity versions
+        id: matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          matrix="$(jq -c '{"unity-version": .all}' .github/unity-versions.json)"
+          if [[ "$(jq '."unity-version" | length' <<<"$matrix")" -lt 1 ]]; then
+            echo '::error::.github/unity-versions.json must define at least one Unity version in all[].'
+            exit 1
+          fi
+          echo "matrix=$matrix" >>"$GITHUB_OUTPUT"
+
   # Preflight convention: every job whose runs-on declares `self-hosted`
   # must `needs:` a runner-access preflight (see
   # docs/runbooks/unity-runners-after-transfer.md). This mirrors the
@@ -111,11 +134,11 @@ jobs:
           reader-app-private-key: ${{ secrets.BUILD_LOCK_READER_APP_PRIVATE_KEY }}
           required-label-sets: '[["self-hosted","Windows","RAM-64GB","${{ inputs.runner-label }}"]]'
 
-  bootstrap:
+  bootstrap-host:
     # F9: surface the mode (Audit vs Maintenance) in the job display name so
     # operators reading the Actions UI immediately see which mode this run is
     # without expanding the inputs.
-    name: ${{ inputs.detect-only && 'Audit' || 'Maintain' }} ${{ inputs.runner-label }}
+    name: ${{ inputs.detect-only && 'Audit' || 'Maintain' }} host on ${{ inputs.runner-label }}
     needs:
       - runner-preflight
     # The selected runner name is a required custom label. GitHub's runner
@@ -183,7 +206,7 @@ jobs:
               Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value $summary
           }
 
-      - name: Run runner maintenance (single-step transcript)
+      - name: Maintain host prerequisites
         # F5/F7: a single PowerShell 5.1 step opens the transcript, invokes
         # the bootstrap script, and Stop-Transcripts in a finally{} -- the
         # previous design split Start-Transcript and the bootstrap into
@@ -210,13 +233,14 @@ jobs:
         env:
           UH_BOOTSTRAP_DETECT_ONLY: ${{ inputs.detect-only }}
           UNITY_EDITOR_INSTALL_ROOT: ${{ runner.tool_cache }}\u6-v3
+          UH_RUNNER_TOOL_CACHE: ${{ runner.tool_cache }}
         run: |
           Set-StrictMode -Version Latest
           $ErrorActionPreference = 'Stop'
           $artifactDir = Join-Path $env:GITHUB_WORKSPACE '.artifacts\runner-bootstrap'
           New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
           $timestamp = (Get-Date -Format 'yyyyMMdd-HHmmss')
-          $logPath = Join-Path $artifactDir ("maintenance-{0}-{1}-{2}.log" -f $timestamp, $env:GITHUB_RUN_ID, $env:GITHUB_RUN_ATTEMPT)
+          $logPath = Join-Path $artifactDir ("host-{0}-{1}-{2}.log" -f $timestamp, $env:GITHUB_RUN_ID, $env:GITHUB_RUN_ATTEMPT)
           Write-Host "Transcript: $logPath"
 
           # F4: normalize detect-only to a single bool. Accepts true/True/1/yes/y.
@@ -237,11 +261,9 @@ jobs:
           # We are inside a workflow (not a composite), so $GITHUB_WORKSPACE is
           # reliably the repo root post-checkout (actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 above).
           #
-          # The maintenance script audits/remediates host prerequisites first
-          # (VC++ redists, UCRT, long paths, pwsh, Defender exclusions), then
-          # verifies every Unity version from .github/unity-versions.json through
-          # ensure-editor.ps1 so installed editors, required modules, and native
-          # startup health stay aligned with the CI matrix.
+          # This job owns only machine-wide prerequisites (VC++ redists, UCRT,
+          # long paths, pwsh, and Defender exclusions). The serialized matrix
+          # below gives each Unity editor an independent timeout and transcript.
           $script = Join-Path $env:GITHUB_WORKSPACE 'scripts\unity\maintain-windows-runner.ps1'
           if (-not (Test-Path -LiteralPath $script)) {
               Write-Host "::error::Runner maintenance script not found at $script."
@@ -251,29 +273,9 @@ jobs:
           $code = 0
           try {
               Start-Transcript -Path $logPath -Force | Out-Null
-              $unityVersionsPath = Join-Path $env:GITHUB_WORKSPACE '.github\unity-versions.json'
-              if (-not (Test-Path -LiteralPath $unityVersionsPath)) {
-                  Write-Host "::error::Unity versions file not found at $unityVersionsPath."
-                  exit 1
-              }
-              $unityVersionsConfig = Get-Content -LiteralPath $unityVersionsPath -Raw | ConvertFrom-Json
-              $unityVersions = @(
-                  @($unityVersionsConfig.all) |
-                      ForEach-Object { [string]$_ } |
-                      Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-              )
-              if ($unityVersions.Count -lt 1) {
-                  Write-Host "::error::.github/unity-versions.json must define at least one Unity version in all[]."
-                  exit 1
-              }
-              Write-Host "Unity versions from .github/unity-versions.json: $($unityVersions -join ', ')"
-              $provisioningProfile = 'StandaloneWindowsIl2Cpp'
-              $installRoot = if ($env:UNITY_EDITOR_INSTALL_ROOT) { $env:UNITY_EDITOR_INSTALL_ROOT } else { 'C:\Unity\Editors' }
               $maintenanceArgs = @{
-                  UnityVersions = $unityVersions
-                  ProvisioningProfile = $provisioningProfile
-                  InstallRoot = $installRoot
                   DiagnosticsRoot = $artifactDir
+                  HostOnly = $true
               }
               if ($detectOnly) {
                   $maintenanceArgs.DetectOnly = $true
@@ -293,7 +295,7 @@ jobs:
                   4 { 'runner-busy' }
                   default { "fail($code)" }
               }
-              Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ("- Runner maintenance result: ``" + $label + "`` (exit $code)")
+              Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ("- Host maintenance result: ``" + $label + "`` (exit $code)")
               Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ("- Transcript: ``" + $logPath + "``")
           }
           if ($code -ne 0) { exit $code }
@@ -302,11 +304,108 @@ jobs:
       # version used by unity-tests.yml/unity-benchmarks.yml.
       # F19: if-no-files-found is `error` (not `warn`) so a missing transcript
       # is a HARD failure rather than a silent empty artifact upload.
-      - name: Upload bootstrap transcript
+      - name: Upload host transcript
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: runner-bootstrap-${{ inputs.runner-label }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: runner-bootstrap-host-${{ inputs.runner-label }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: .artifacts/runner-bootstrap/**
+          if-no-files-found: error
+          retention-days: 30
+
+  maintain-unity:
+    name: ${{ inputs.detect-only && 'Audit' || 'Maintain' }} Unity ${{ matrix.unity-version }} on ${{ inputs.runner-label }}
+    needs:
+      - matrix-config
+      - runner-preflight
+      - bootstrap-host
+    runs-on: [self-hosted, Windows, RAM-64GB, "${{ inputs.runner-label }}"]
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix: ${{ fromJSON(needs.matrix-config.outputs.matrix) }}
+    steps:
+      - name: Enable Git long paths
+        shell: powershell
+        env:
+          GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
+        run: git config --global core.longpaths true
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        env:
+          GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
+        with:
+          persist-credentials: false
+
+      - name: Confirm runner identity (hard-fail on wrong target)
+        shell: powershell
+        env:
+          UH_BOOTSTRAP_REQUESTED_RUNNER: ${{ inputs.runner-label }}
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+          $actual = $env:RUNNER_NAME
+          $requested = $env:UH_BOOTSTRAP_REQUESTED_RUNNER
+          if (-not [string]::IsNullOrWhiteSpace($actual) -and -not [string]::IsNullOrWhiteSpace($requested)) {
+              if (-not [string]::Equals($actual, $requested, [System.StringComparison]::OrdinalIgnoreCase)) {
+                  Write-Host "::error::Maintenance dispatched to '$actual' but requested '$requested'. Fix the machine-name runner labels."
+                  exit 1
+              }
+          }
+
+      - name: Maintain Unity ${{ matrix.unity-version }}
+        shell: powershell
+        env:
+          UH_BOOTSTRAP_DETECT_ONLY: ${{ inputs.detect-only }}
+          UH_MAINTENANCE_UNITY_VERSION: ${{ matrix.unity-version }}
+          UNITY_EDITOR_INSTALL_ROOT: ${{ runner.tool_cache }}\u6-v3
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+          $safeVersion = $env:UH_MAINTENANCE_UNITY_VERSION -replace '[^A-Za-z0-9_.-]', '_'
+          $artifactDir = Join-Path $env:GITHUB_WORKSPACE ".artifacts\runner-bootstrap\unity-$safeVersion"
+          New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+          $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+          $logPath = Join-Path $artifactDir ("maintenance-{0}-{1}-{2}.log" -f $timestamp, $env:GITHUB_RUN_ID, $env:GITHUB_RUN_ATTEMPT)
+          $rawDetect = '' + $env:UH_BOOTSTRAP_DETECT_ONLY
+          $normalizedDetect = $rawDetect.Trim().ToLowerInvariant()
+          $detectOnly = $normalizedDetect -in @('true', '1', 'yes', 'y')
+          if ($env:UH_RUNNER_DISABLE_AUTO_BOOTSTRAP -eq '1') {
+              $detectOnly = $true
+          }
+
+          $script = Join-Path $env:GITHUB_WORKSPACE 'scripts\unity\maintain-windows-runner.ps1'
+          $code = 0
+          try {
+              Start-Transcript -Path $logPath -Force | Out-Null
+              $maintenanceArgs = @{
+                  UnityVersions = @($env:UH_MAINTENANCE_UNITY_VERSION)
+                  ProvisioningProfile = 'Full'
+                  InstallRoot = $env:UNITY_EDITOR_INSTALL_ROOT
+                  DiagnosticsRoot = $artifactDir
+                  SkipHostBootstrap = $true
+              }
+              if ($detectOnly) {
+                  $maintenanceArgs.DetectOnly = $true
+              }
+              . $script
+              $code = Invoke-WindowsRunnerMaintenance @maintenanceArgs
+          } finally {
+              try { Stop-Transcript | Out-Null } catch { Write-Host "::notice::Stop-Transcript: $($_.Exception.Message) (non-fatal)" }
+          }
+          if ($env:GITHUB_STEP_SUMMARY) {
+              Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ("- Unity ``$env:UH_MAINTENANCE_UNITY_VERSION`` maintenance exit: ``$code``")
+              Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ("- Transcript: ``$logPath``")
+          }
+          if ($code -ne 0) { exit $code }
+
+      - name: Upload Unity maintenance transcript
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: runner-bootstrap-unity-${{ matrix.unity-version }}-${{ inputs.runner-label }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .artifacts/runner-bootstrap/unity-${{ matrix.unity-version }}/**
           if-no-files-found: error
           retention-days: 30

@@ -1,4 +1,4 @@
-<!-- cspell:ignore winget pwsh prereqs redist UCRT WSL Redistributables MSVCP MSVCR VCRUNTIME -->
+<!-- cspell:ignore winget pwsh prereqs redist UCRT WSL Redistributables MSVCP MSVCR VCRUNTIME NDK -->
 
 # Unity Runners After Repository Transfer Runbook
 
@@ -109,6 +109,36 @@ The bootstrap job requests `self-hosted`, `Windows`, `RAM-64GB`, and the selecte
 
 If a bootstrap dispatch stays queued after selecting a runner, verify the runner is online and that the matching machine-name label is present in Settings -> Actions -> Runners. Do not work around the queue by removing the machine-name label from the workflow; that reintroduces wrong-runner maintenance.
 
+## Install a new Windows runner agent
+
+The workflow bootstrap can maintain only an agent that is already online. For a new machine, `scripts/unity/install-windows-actions-runner.ps1` separates the work that requires elevation from the package download that should run as the ordinary runner owner. Obtain the current Windows x64 runner version, its published SHA-256, and a short-lived registration token from **Settings -> Actions -> Runners -> New self-hosted runner**. Never commit or transcribe the token into logs.
+
+First, open Windows PowerShell 5.1 as administrator and prepare the service directory. Replace the account and machine name examples with the actual runner owner and one of the repository's expected runner names:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\unity\install-windows-actions-runner.ps1 `
+  -Phase AdminPrepare -InstallRoot C:\actions-runner -RunnerUser runner-owner
+```
+
+Then sign in as `runner-owner` and install the checksum-verified runner package without elevation:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\unity\install-windows-actions-runner.ps1 `
+  -Phase UserInstall -InstallRoot C:\actions-runner `
+  -RunnerVersion <version-from-github> -ArchiveSha256 <sha256-from-github>
+```
+
+Finally, return to an administrator prompt and register the agent as a Windows service. Pass the token only at invocation time; the script deliberately does not print it. The runner-name label is added automatically alongside `RAM-64GB`, which makes the machine eligible for both Unity jobs and targeted maintenance:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\unity\install-windows-actions-runner.ps1 `
+  -Phase AdminConfigure -InstallRoot C:\actions-runner `
+  -RegistrationUrl https://github.com/Ambiguous-Interactive `
+  -RegistrationToken <short-lived-token> -RunnerName DAD-MACHINE
+```
+
+Once the agent reports online, dispatch **Runner Bootstrap (Windows)** in maintenance mode. That installs the host prerequisites and every Unity editor from `.github/unity-versions.json`, including all supported build-target components. Host preparation runs once, then each editor runs in its own serialized six-hour job. A slow editor therefore cannot consume the timeout for later versions, and GitHub can rerun only the failed version leg.
+
 ## Run maintenance directly on a Windows runner
 
 When you are already on the runner host, you do not need to run YAML. From a checkout of this repository, run the same maintenance backend directly:
@@ -117,7 +147,9 @@ When you are already on the runner host, you do not need to run YAML. From a che
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\unity\maintain-windows-runner.ps1
 ```
 
-The script reads `.github\unity-versions.json` when `-UnityVersions` is omitted, uses `C:\Unity\Editors` unless `UNITY_EDITOR_INSTALL_ROOT` is set, provisions the `StandaloneWindowsIl2Cpp` profile, and writes diagnostics under `.artifacts\runner-bootstrap`.
+The script reads `.github\unity-versions.json` when `-UnityVersions` is omitted and writes diagnostics under `.artifacts\runner-bootstrap`. Its Unity install-root precedence is explicit `-InstallRoot`, `UNITY_EDITOR_INSTALL_ROOT`, the Actions runner tool-cache environment, the runner service's `.env` tool-cache setting, the Actions default `<runner>\_work\_tool\u6-v3`, then `Unity\Editors` on the checkout's drive. A runner whose `.env` sets `RUNNER_TOOL_CACHE=<runner>\_tool` therefore uses `<runner>\_tool\u6-v3`, exactly like its workflow jobs. This keeps large editor payloads off `C:` when the runner lives on another drive and makes interactive maintenance reuse the same editors as workflow jobs. Its default `Full` profile installs and verifies Windows IL2CPP, Android (including SDK/NDK/OpenJDK), WebGL, iOS, Linux Mono/IL2CPP, and macOS Mono build support; the workflow uses the same profile. Maintenance installs the standalone Unity CLI when absent and otherwise runs its current `self-update` command before provisioning. All CLI operations are non-interactive, use built-in download retries, stream progress, and have bounded wall-clock and no-output timeouts. `UH_UNITY_CLI_UPDATE_TIMEOUT_SECONDS`, `UH_UNITY_CLI_INSTALL_STALL_SECONDS`, `UH_UNITY_CLI_UPDATE_STALL_SECONDS`, and `UH_UNITY_CLI_UPDATE_RETRY_ATTEMPTS` override the install/update defaults for diagnosis.
+
+Unity CLI `1.0.0-beta.9` has a [confirmed upstream Windows compatibility defect](https://discussions.unity.com/t/unity-cli-1-0-0-beta-9-is-rolling-out/1736105/7) where an older installation database can fail with `table installs has no column named writer_kind`. Maintenance recognizes only that exact signature, rolls back to `1.0.0-beta.8`, retries the interrupted command, and writes a 12-hour compatibility marker beside the CLI executable so subsequent editor legs do not immediately reinstall the broken build. The hold expires automatically, allowing a fixed newer beta to be adopted without operator cleanup. If rollback fails, maintenance refuses to uninstall, quarantine, or clear payloads because the failure is CLI metadata—not editor corruption.
 
 For an audit that never installs or repairs anything:
 

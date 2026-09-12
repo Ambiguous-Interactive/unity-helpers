@@ -20,18 +20,13 @@ for (const requestedVersion of ["", ...versions]) {
     const selectedModes = TEST_MODES.includes(requestedMode) ? [requestedMode] : TEST_MODES;
     assert.deepEqual(result["unity-versions"], selectedVersions);
     assert.deepEqual(result["test-modes"], selectedModes);
-    // An unselected MODE is excluded like an unselected version: the leg would otherwise start,
-    // provision the editor, and acquire the organization lock only to skip every test step.
-    assert.deepEqual(result["matrix-exclude"], [
-      ...versions
+    // Modes are steps inside each version job, not a second matrix axis.
+    assert.deepEqual(
+      result["matrix-exclude"],
+      versions
         .filter((version) => !selectedVersions.includes(version))
-        .map((version) => ({
-          "unity-version": version
-        })),
-      ...TEST_MODES.filter((mode) => !selectedModes.includes(mode)).map((mode) => ({
-        "test-mode": mode
-      }))
-    ]);
+        .map((version) => ({ "unity-version": version }))
+    );
     cases++;
   }
 }
@@ -44,9 +39,8 @@ for (const invalid of [[], null, [""], ["version", "version"], [123]]) {
   assert.throws(() => resolveTestMatrix(invalid), /Unity versions must/);
   cases++;
 }
-// Requested native acceptance always selects the standalone leg: intmap and
-// serialization acceptance build IL2CPP standalone players, so the only leg
-// whose editor gate provisions StandaloneWindowsIl2Cpp must exist.
+// Requested native acceptance always selects standalone coverage because intmap
+// and serialization acceptance build IL2CPP standalone players.
 for (const acceptance of ["", "none"]) {
   assert.deepEqual(resolveTestMatrix(versions, "", "all", acceptance)["test-modes"], TEST_MODES);
   assert.deepEqual(resolveTestMatrix(versions, "", "playmode", acceptance)["test-modes"], [
@@ -72,7 +66,7 @@ for (const acceptance of ["sentinel", "intmap", "serialization", "all"]) {
 const matrix = resolveTestMatrix(versions);
 matrix["unity-versions"].pop();
 assert.deepEqual(resolveTestMatrix(versions)["unity-versions"], versions);
-assert.equal(resolveTestMatrix(versions)["test-modes"].length * versions.length, 12);
+assert.equal(resolveTestMatrix(versions)["unity-versions"].length, 4);
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "unity-grouped-modes-"));
 try {

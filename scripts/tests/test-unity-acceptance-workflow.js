@@ -94,10 +94,9 @@ for (const event of ["pull_request", "push", "schedule", "workflow_dispatch"]) {
           const context = {
             github: { event_name: event },
             inputs: { acceptance },
-            // Acceptance runs once per version, in the standalone leg: the
-            // intmap and serialization kinds build IL2CPP standalone players,
-            // so the leg's editor gate must provision StandaloneWindowsIl2Cpp.
-            matrix: { "test-mode": "standalone" },
+            // Acceptance runs once in each selected version job after its
+            // standard modes; the editor gate verifies StandaloneWindowsIl2Cpp.
+            matrix: {},
             cancelled,
             success: false,
             steps: {
@@ -130,37 +129,15 @@ for (const event of ["pull_request", "push", "schedule", "workflow_dispatch"]) {
   }
 }
 
-// Enrollment contract (Workflow contract item 3): the provisioning profile is
-// the reviewed STATIC matrix.test-mode map -- the exact form the central
-// analyzer accepts. Standalone legs verify the IL2CPP module set at gate time;
-// editmode and playmode legs keep EditorOnly. The old resolver-driven dynamic
-// expression is gone on purpose: a source-free audit cannot bound it.
-const profileLine = named("Require manually installed Unity editor").match(
-  /^          provisioning-profile:\s*(?:>-\s*)?(\$\{\{[\s\S]*?\}\})/m
-)?.[1];
-const profile = expression(profileLine);
-for (const [testMode, expected] of [
-  ["editmode", "EditorOnly"],
-  ["playmode", "EditorOnly"],
-  ["standalone", "StandaloneWindowsIl2Cpp"]
-]) {
-  assert.equal(
-    profile({
-      matrix: { "test-mode": testMode },
-      needs: {
-        "matrix-config": {
-          outputs: { "test-modes": JSON.stringify(["editmode", "playmode", "standalone"]) }
-        }
-      }
-    }),
-    expected,
-    `Wrong provisioning profile for the ${testMode} leg`
-  );
-  controls++;
-}
+// Every version job can execute standalone coverage, so the profile is a
+// bounded literal and verifies the IL2CPP module once before all selected modes.
+assert.match(
+  named("Require manually installed Unity editor"),
+  /^          provisioning-profile: StandaloneWindowsIl2Cpp$/m
+);
+controls++;
 
-// The standalone leg must exist whenever acceptance is requested: the resolver
-// receives the dispatch acceptance input and adds 'standalone' to test-modes.
+// Standalone coverage must be selected whenever acceptance is requested.
 assert.match(
   workflow,
   /INPUT_ACCEPTANCE: \$\{\{ inputs\.acceptance \}\}/,
@@ -296,10 +273,6 @@ for (const file of fs.readdirSync(workflowDirectory).filter((name) => /\.ya?ml$/
         .trim();
       assert.ok(condition, `${file}/${match[1]} diagnostic predicate missing`);
       const evaluate = expression(condition);
-      // Per-leg guards scope diagnostics to their own matrix.test-mode leg, so
-      // evaluate each condition against the leg its text pins (editmode is the
-      // default for conditions without a leg guard).
-      const legMode = condition.match(/matrix\.test-mode == '(\w+)'/)?.[1] ?? "editmode";
       for (const checkoutOutcome of ["skipped", "failure", "cancelled", "success"]) {
         for (const status of ["success", "failure", "cancelled"]) {
           const context = {
@@ -308,7 +281,7 @@ for (const file of fs.readdirSync(workflowDirectory).filter((name) => /\.ya?ml$/
             needs: {
               "matrix-config": { outputs: { "test-modes": '["editmode","playmode","standalone"]' } }
             },
-            matrix: { "test-mode": legMode },
+            matrix: {},
             success: status === "success",
             failure: status === "failure",
             cancelled: status === "cancelled",

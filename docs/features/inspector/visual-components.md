@@ -10,6 +10,35 @@ These components solve the problem of creating complex, multi-layer sprite anima
 
 ---
 
+## UI Toolkit Progress Controls
+
+The Styles assembly provides seven UXML-ready progress controls:
+
+- `RegularProgressBar`
+- `CircularProgressBar`
+- `ArcedProgressBar`
+- `LiquidProgressBar`
+- `MarchingAntsProgressBar`
+- `WigglyProgressBar`
+- `GlitchProgressBar`
+
+Add the control namespace to a UXML document, then set the same attributes shown by UI Builder:
+
+```xml
+<ui:UXML
+    xmlns:ui="UnityEngine.UIElements"
+    xmlns:progress="WallstopStudios.UnityHelpers.Styles.Elements.Progress">
+    <progress:RegularProgressBar
+        progress="0.75"
+        direction="Forward"
+        thickness="18" />
+</ui:UXML>
+```
+
+The controls use Unity's generated UXML serialization on Unity 6 and retain the legacy factory path on Unity 2021.3 and 2022.3. Attribute names stay the same across both paths.
+
+---
+
 ## AnimatedSpriteLayer
 
 **What it is:** An immutable data structure (struct) that packages a sprite animation sequence with per-frame position offsets and layer-wide alpha transparency.

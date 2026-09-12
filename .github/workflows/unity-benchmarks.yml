@@ -8,15 +8,9 @@ on:
   # on controlled manual dispatch; refreshed results land via the
   # protected-branch push of the perf-results commit.
   workflow_dispatch:
-    inputs:
-      unity-version:
-        description: "Pin a single Unity version. Empty = full matrix."
-        required: false
-        default: ""
-        type: string
 
 # Top-level permissions are least-privilege and mirror unity-tests.yml. The
-# licensed matrix jobs (matrix-config, runner-preflight, benchmarks) only need
+# licensed benchmark jobs (matrix-config, runner-preflight, benchmarks) only need
 # read access plus checks:write for NUnit annotations and issues:write for
 # benchmark-failure notifications; they must NOT inherit write scope. The
 # dedicated commit-perf-results job below opts into contents:write at the JOB
@@ -26,16 +20,18 @@ permissions:
   checks: write
   issues: write
 
+# Repeated dispatches target the same ref and supersede older benchmark iterations. Licensed jobs
+# use the same cancellation-safe central return/classification/lock-release path as Unity Tests.
+concurrency:
+  group: unity-benchmarks-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   matrix-config:
-    name: Resolve benchmark matrix
+    name: Resolve benchmark target
     runs-on: ubuntu-latest
     timeout-minutes: 2
     outputs:
-      unity-versions: ${{ steps.resolve.outputs.unity-versions }}
-      latest-version: ${{ steps.resolve.outputs.latest-version }}
-      matrix-include: ${{ steps.resolve.outputs.matrix-include }}
-      matrix-exclude: ${{ steps.resolve.outputs.matrix-exclude }}
       expected-result-count: ${{ steps.resolve.outputs.expected-result-count }}
       expected-result-files: ${{ steps.resolve.outputs.expected-result-files }}
       allow-baseline-refresh: ${{ steps.resolve.outputs.allow-baseline-refresh }}
@@ -48,28 +44,20 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: "22.18.0"
-      - name: Resolve dispatch overrides
+      - name: Resolve benchmark target
         id: resolve
-        env:
-          INPUT_UNITY_VERSION: ${{ inputs.unity-version }}
-        # The benchmark matrix list and the latest entry both come from the
-        # canonical source (.github/unity-versions.json), so the dispatched perf
-        # coverage tracks every supported runtime and the latest-vs-list pair
-        # cannot drift. The LAST entry is the latest Unity version. A dispatch
-        # override pins a single version.
+        # Benchmarks measure one stable environment: the latest version in the
+        # canonical source. Keep the literal central-editor pin below synchronized
+        # so a version bump fails here instead of benchmarking a stale editor.
         run: |
           set -euo pipefail
-          all_versions="$(jq -c '.all' .github/unity-versions.json)"
-          if [ -n "${INPUT_UNITY_VERSION:-}" ]; then
-            versions="[\"${INPUT_UNITY_VERSION}\"]"
-            latest="${INPUT_UNITY_VERSION}"
-          else
-            versions="$(jq -c '.all' .github/unity-versions.json)"
-            latest="$(jq -r '.all[-1]' .github/unity-versions.json)"
+          latest="$(jq -r '.all[-1]' .github/unity-versions.json)"
+          if [ "${latest}" != "6000.6.0f1" ]; then
+            echo "::error::Latest Unity version '${latest}' drifted from the pinned benchmark editor '6000.6.0f1'."
+            exit 1
           fi
-          matrix_include="$(VERSIONS="${versions}" node <<'NODE'
+          node <<'NODE'
           const discovery = require("./scripts/unity/lib/asmdef-discovery.js");
-          const versions = JSON.parse(process.env.VERSIONS);
           const performanceAssembly = "WallstopStudios.UnityHelpers.Tests.Runtime.Performance";
           const randomAssembly = "WallstopStudios.UnityHelpers.Tests.Runtime.Random";
 
@@ -93,41 +81,12 @@ jobs:
             return [performanceAssembly, randomAssembly].join(";");
           }
 
-          const profiles = {
-            playmode: benchmarkProfile("playmode")
-          };
-          const include = [];
-          for (const version of versions) {
-            for (const mode of ["playmode"]) {
-              include.push({
-                "unity-version": version,
-                "test-mode": mode,
-                assemblies: profiles[mode],
-                "result-file": `results-${version}-${mode}.xml`
-              });
-            }
-          }
-          process.stdout.write(JSON.stringify(include));
+          benchmarkProfile("playmode");
           NODE
-          )"
-          matrix_exclude="$(jq -cn \
-            --argjson allVersions "${all_versions}" \
-            --argjson selectedVersions "${versions}" \
-            '[ $allVersions[] as $version |
-               select(($selectedVersions | index($version)) == null) |
-               { "unity-version": $version, "test-mode": "playmode" } ]')"
           {
-            echo "unity-versions=${versions}"
-            echo "latest-version=${latest}"
-            echo "matrix-include=${matrix_include}"
-            echo "matrix-exclude=${matrix_exclude}"
-            echo "expected-result-count=$(jq 'length' <<< "${matrix_include}")"
-            echo "expected-result-files=$(jq -c 'map(."result-file") | sort' <<< "${matrix_include}")"
-            if [ -z "${INPUT_UNITY_VERSION:-}" ]; then
-              echo "allow-baseline-refresh=true"
-            else
-              echo "allow-baseline-refresh=false"
-            fi
+            echo "expected-result-count=1"
+            echo "expected-result-files=[\"results-${latest}-playmode.xml\"]"
+            echo "allow-baseline-refresh=true"
           } >> "${GITHUB_OUTPUT}"
 
       # NOTE: this job deliberately holds NO `secrets.*` reference, for the reason
@@ -143,7 +102,7 @@ jobs:
     # single approved availability action unconditionally. A same-repository
     # dispatch is expected to hold the organization credential set; a run
     # without it now fails closed here instead of silently skipping the
-    # benchmark matrix.
+    # benchmark run.
     if: ${{ github.event.pull_request.user.login != 'dependabot[bot]' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
@@ -162,34 +121,19 @@ jobs:
           required-label-sets: '[["self-hosted","Windows","RAM-64GB"]]'
 
   benchmarks:
-    name: Benchmarks ${{ matrix.unity-version }} ${{ matrix.test-mode }}
+    name: Benchmarks 6000.6.0f1 playmode
     needs:
       - matrix-config
       - runner-preflight
     runs-on: [self-hosted, Windows, RAM-64GB]
     timeout-minutes: 1200
-    strategy:
-      fail-fast: false
-      # No max-parallel, kept in sync with .github/workflows/unity-tests.yml, where
-      # the measurement behind it is recorded: capping eligibility to the runner
-      # count makes every completion a fresh self-hosted dispatch transition, and
-      # that transition is what leaves both runners idle with legs queued.
-      matrix:
-        unity-version:
-          - 2021.3.45f1
-          - 2022.3.45f1
-          - 6000.3.16f1
-          - 6000.5.2f1
-        test-mode:
-          - playmode
-        exclude: ${{ fromJSON(needs.matrix-config.outputs.matrix-exclude) }}
     steps:
       - name: Require manually installed Unity editor
         id: ensure_unity_editor
         timeout-minutes: 10
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/ensure-unity-editor@d79e1cc2acc892b619db2ca46f78291ca427016b # v1.14.2
         with:
-          unity-version: ${{ matrix.unity-version }}
+          unity-version: "6000.6.0f1"
           install-root: ${{ runner.tool_cache }}\u6-v3
           provisioning-profile: EditorOnly
           diagnostics-path: unity-editor-check.json
@@ -231,7 +175,7 @@ jobs:
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@d79e1cc2acc892b619db2ca46f78291ca427016b # v1.14.2
         with:
           lock-name: wallstop-organization-builds
-          holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
+          holder-id-suffix: 6000.6.0f1-playmode
           runner-id: ${{ runner.name }}
           timeout-minutes: "300"
         env:
@@ -275,10 +219,10 @@ jobs:
           # churn would land directly in the numbers. See unity-tests.yml for why
           # the project cannot live under .artifacts/ at all.
           ./scripts/unity/run-ci-tests.ps1 `
-            -UnityVersion '${{ matrix.unity-version }}' `
-            -TestMode '${{ matrix.test-mode }}' `
+            -UnityVersion '6000.6.0f1' `
+            -TestMode 'playmode' `
             -AssemblyNames $env:UH_BENCHMARK_ASSEMBLIES `
-            -ArtifactsPath '.artifacts/unity/benchmarks/${{ matrix.unity-version }}-${{ matrix.test-mode }}' `
+            -ArtifactsPath '.artifacts/unity/benchmarks/6000.6.0f1-playmode' `
             -ProjectRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace') `
             -ProjectScope 'benchmarks' `
             -ReleaseCodeOptimization `
@@ -290,7 +234,7 @@ jobs:
         timeout-minutes: 5
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/return-unity-license@d79e1cc2acc892b619db2ca46f78291ca427016b # v1.14.2
         with:
-          unity-version: ${{ matrix.unity-version }}
+          unity-version: "6000.6.0f1"
           tool-cache: ${{ runner.tool_cache }}
           unity-email: ${{ secrets.UNITY_EMAIL }}
           unity-password: ${{ secrets.UNITY_PASSWORD }}
@@ -314,7 +258,7 @@ jobs:
         uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@d79e1cc2acc892b619db2ca46f78291ca427016b # v1.14.2
         with:
           lock-name: wallstop-organization-builds
-          holder-id-suffix: ${{ matrix.unity-version }}-${{ matrix.test-mode }}
+          holder-id-suffix: 6000.6.0f1-playmode
           runner-id: ${{ runner.name }}
           resource-cleanup-status: ${{ steps.cleanup_classification.outputs.resource-cleanup-status }}
           resource-health: ${{ steps.cleanup_classification.outputs.resource-health }}
@@ -327,8 +271,8 @@ jobs:
         if: ${{ steps.checkout.outcome == 'success' && (failure() || cancelled()) }}
         uses: ./.github/actions/dump-unity-log-tail
         with:
-          results-dir: .artifacts/unity/benchmarks/${{ matrix.unity-version }}-${{ matrix.test-mode }}
-          label: Benchmarks ${{ matrix.unity-version }} ${{ matrix.test-mode }}
+          results-dir: .artifacts/unity/benchmarks/6000.6.0f1-playmode
+          label: Benchmarks 6000.6.0f1 playmode
 
       - name: Verify tests actually ran
         if: >-
@@ -338,8 +282,8 @@ jobs:
           }}
         uses: ./.github/actions/verify-unity-results
         with:
-          results-dir: .artifacts/unity/benchmarks/${{ matrix.unity-version }}-${{ matrix.test-mode }}
-          label: Benchmarks ${{ matrix.unity-version }} ${{ matrix.test-mode }}
+          results-dir: .artifacts/unity/benchmarks/6000.6.0f1-playmode
+          label: Benchmarks 6000.6.0f1 playmode
           expected-empty: false
 
       # Stage the raw NUnit results for this leg into a deterministic path so
@@ -354,14 +298,14 @@ jobs:
         if: ${{ !cancelled() && steps.run_tests.outcome == 'success' }}
         shell: pwsh
         run: |
-          $src = '.artifacts/unity/benchmarks/${{ matrix.unity-version }}-${{ matrix.test-mode }}/results.xml'
+          $src = '.artifacts/unity/benchmarks/6000.6.0f1-playmode/results.xml'
           $stageDir = 'perf-staging'
           New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
           if (Test-Path -LiteralPath $src -PathType Leaf) {
-            Copy-Item -LiteralPath $src -Destination (Join-Path $stageDir 'results-${{ matrix.unity-version }}-${{ matrix.test-mode }}.xml') -Force
-            Write-Host "::notice::Staged perf results for ${{ matrix.unity-version }} ${{ matrix.test-mode }}."
+            Copy-Item -LiteralPath $src -Destination (Join-Path $stageDir 'results-6000.6.0f1-playmode.xml') -Force
+            Write-Host "::notice::Staged perf results for 6000.6.0f1 playmode."
           } else {
-            Write-Host "::warning::No results.xml to stage for ${{ matrix.unity-version }} ${{ matrix.test-mode }}."
+            Write-Host "::warning::No results.xml to stage for 6000.6.0f1 playmode."
           }
 
       # LEAK GUARD: Unity writes its license identity into unity.log and
@@ -391,7 +335,7 @@ jobs:
         uses: ./.github/actions/redact-unity-artifacts
         with:
           paths: |
-            .artifacts/unity/benchmarks/${{ matrix.unity-version }}-${{ matrix.test-mode }}
+            .artifacts/unity/benchmarks/6000.6.0f1-playmode
             perf-staging
 
       - name: Upload staged perf results
@@ -400,7 +344,7 @@ jobs:
           && steps.redact_unity_artifacts.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: perf-results-${{ matrix.unity-version }}-${{ matrix.test-mode }}
+          name: perf-results-6000.6.0f1-playmode
           path: perf-staging
           if-no-files-found: warn
           retention-days: 90
@@ -409,8 +353,8 @@ jobs:
         if: ${{ always() && steps.redact_unity_artifacts.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: unity-benchmarks-${{ matrix.unity-version }}-${{ matrix.test-mode }}
-          path: .artifacts/unity/benchmarks/${{ matrix.unity-version }}-${{ matrix.test-mode }}
+          name: unity-benchmarks-6000.6.0f1-playmode
+          path: .artifacts/unity/benchmarks/6000.6.0f1-playmode/
           if-no-files-found: warn
           retention-days: 90
 
@@ -434,7 +378,7 @@ jobs:
 
   # Enrollment contract (Workflow contract item 10): a stable, always-reporting
   # aggregate covering the licensed benchmark job and its runner preflight, so a
-  # skipped or cancelled benchmark matrix can never disappear silently from the
+  # skipped or cancelled benchmark run can never disappear silently from the
   # required-checks summary. It carries the central trusted-skip script shape:
   # green ONLY for an exact untrusted skip (fork or Dependabot pull request --
   # unreachable here today because the workflow has no pull_request trigger, but
@@ -476,8 +420,8 @@ jobs:
     # requires write access), so no repo-slug guard is needed (avoids hardcoding
     # a slug that breaks after an org transfer). The weekly cron was removed:
     # scheduled runs are never an eligible trusted trigger for licensed Unity
-    # work. Run even if some benchmark legs failed (!cancelled, not
-    # success()) so a partial result set is still captured; if there are no
+    # work. Run even if the benchmark failed (!cancelled, not success()) so a
+    # partial result is still captured; if there are no
     # artifacts at all, git-auto-commit-action is a no-op.
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
@@ -543,20 +487,20 @@ jobs:
             rm -f "${dest}"/results-*.xml "${dest}"/partial-results-*.xml
             find "${candidate}" -maxdepth 1 -type f -name 'results-*.xml' -exec cp -f {} "${dest}/" \;
             echo "complete-matrix=true" >> "${GITHUB_OUTPUT}"
-            echo "Assembled a fresh, successful benchmark matrix."
+            echo "Assembled a fresh, successful benchmark result."
           elif [ "${actual_count}" -gt 0 ]; then
             rm -f "${dest}"/partial-results-*.xml
             for result_file in "${actual_files[@]}"; do
               cp -f "${candidate}/${result_file}" "${dest}/partial-${result_file}"
             done
             echo "complete-matrix=false" >> "${GITHUB_OUTPUT}"
-            echo "::warning::Benchmark matrix is incomplete or failed; diagnostic XML is retained separately and the canonical baseline/report will not change."
+            echo "::warning::Benchmark run is incomplete or failed; diagnostic XML is retained separately and the canonical baseline/report will not change."
           else
             echo "complete-matrix=false" >> "${GITHUB_OUTPUT}"
             echo "::notice::No staged perf results were downloaded; existing results remain untouched."
           fi
           if [ "${invalid_successful_matrix}" = "true" ]; then
-            echo "::error::A successful canonical benchmark matrix produced invalid result identities or missing metrics."
+            echo "::error::A successful canonical benchmark run produced an invalid result identity or missing metrics."
             exit 1
           fi
 

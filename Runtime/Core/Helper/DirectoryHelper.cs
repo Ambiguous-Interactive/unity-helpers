@@ -66,7 +66,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 catch (Exception e)
                 {
                     Debug.LogWarning(
-                        $"DirectoryHelper: Failed to create directory on disk '{absoluteDirectory}': {e.Message}"
+                        $"DirectoryHelper: Failed to create directory on disk '{absoluteDirectory}': {e}"
                     );
                 }
             }

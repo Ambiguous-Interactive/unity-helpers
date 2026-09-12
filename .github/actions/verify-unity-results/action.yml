@@ -300,7 +300,8 @@ runs:
         # annotation per failed test plus a ::group:: console block with the full
         # multi-line message + stack trace. Two classes are enumerated:
         #   (1) failed leaf cases: //test-case[@result='Failed'], and
-        #   (2) failed suites with their OWN direct <failure> child (the
+        #   (2) failed suites with their OWN direct <failure> child whose
+        #       failure site is not Child (the
         #       OneTimeSetUp/OneTimeTearDown shape, e.g. a [OneTimeTearDown]
         #       Assert.Fail), which manifest as a failed SUITE. Reported even when
         #       the suite also has a failed child case, so the teardown's own
@@ -383,7 +384,7 @@ runs:
 
           try {
             $failedCases = @($Doc.SelectNodes("//test-case[@result='Failed']"))
-            $failedSuites = @($Doc.SelectNodes("//test-suite[@result='Failed']"))
+            $failedSuites = @($Doc.SelectNodes("//test-suite[@result='Failed'][not(@site='Child')]"))
             # Report a failed suite on its OWN merits whenever it carries a
             # direct <failure> child (even if it also has a failed descendant
             # case) so a [OneTimeTearDown] message is not lost. fullname de-dup
@@ -471,7 +472,7 @@ runs:
 
           try {
             $failedCases = @($Doc.SelectNodes("//test-case[@result='Failed']"))
-            $failedSuitesWithOwnFailure = @($Doc.SelectNodes("//test-suite[@result='Failed'][failure]"))
+            $failedSuitesWithOwnFailure = @($Doc.SelectNodes("//test-suite[@result='Failed'][failure][not(@site='Child')]"))
             return $failedCases.Count + $failedSuitesWithOwnFailure.Count
           } catch {
             return 0

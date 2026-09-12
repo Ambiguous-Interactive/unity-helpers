@@ -6,11 +6,15 @@ param(
     [string[]]$RunnerMaintenanceUnityVersions = @(),
     [ValidateSet('EditorOnly', 'StandaloneWindowsIl2Cpp', 'Android', 'Full')]
     [Alias('ProvisioningProfile')]
-    [string]$RunnerMaintenanceProvisioningProfile = 'StandaloneWindowsIl2Cpp',
+    [string]$RunnerMaintenanceProvisioningProfile = 'Full',
     [Alias('InstallRoot')]
-    [string]$RunnerMaintenanceInstallRoot = $(if ($env:UNITY_EDITOR_INSTALL_ROOT) { $env:UNITY_EDITOR_INSTALL_ROOT } else { 'C:\Unity\Editors' }),
+    [string]$RunnerMaintenanceInstallRoot = '',
     [Alias('DetectOnly')]
     [switch]$RunnerMaintenanceDetectOnly,
+    [Alias('HostOnly')]
+    [switch]$RunnerMaintenanceHostOnly,
+    [Alias('SkipHostBootstrap')]
+    [switch]$RunnerMaintenanceSkipHostBootstrap,
     [Alias('DiagnosticsRoot')]
     [string]$RunnerMaintenanceDiagnosticsRoot = '',
     [Parameter(ValueFromRemainingArguments = $true)]
@@ -76,6 +80,74 @@ function Get-RunnerMaintenanceDefaultDiagnosticsRoot {
     return Join-Path $RepoRoot '.artifacts/runner-bootstrap'
 }
 
+function Resolve-RunnerMaintenanceInstallRoot {
+    param(
+        [AllowEmptyString()][string]$InstallRoot,
+        [Parameter(Mandatory = $true)][string]$RepoRoot
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($InstallRoot)) {
+        return $InstallRoot
+    }
+    if (-not [string]::IsNullOrWhiteSpace($env:UNITY_EDITOR_INSTALL_ROOT)) {
+        return $env:UNITY_EDITOR_INSTALL_ROOT
+    }
+
+    # The tool cache is on the runner's storage volume and is also the root
+    # consumed by every licensed Unity workflow in this repository.
+    $runnerToolCache = ''
+    foreach ($variableName in @('RUNNER_TOOL_CACHE', 'RUNNER_TOOLSDIRECTORY', 'AGENT_TOOLSDIRECTORY', 'UH_RUNNER_TOOL_CACHE')) {
+        $candidate = [Environment]::GetEnvironmentVariable($variableName)
+        if (-not [string]::IsNullOrWhiteSpace($candidate)) {
+            $runnerToolCache = $candidate
+            break
+        }
+    }
+    if ($runnerToolCache) {
+        $separator = if ($runnerToolCache -match '^[A-Za-z]:' -or $runnerToolCache.Contains('\')) { '\' } else { [IO.Path]::DirectorySeparatorChar }
+        return ($runnerToolCache.TrimEnd('\', '/') + $separator + 'u6-v3')
+    }
+
+    # Interactive shells do not inherit the service's environment. Load only
+    # the runner tool-cache keys from its .env file, using the same precedence
+    # as actions/runner. Without an override, actions/runner defaults to
+    # <work folder>\_tool.
+    $normalizedRepoRoot = $RepoRoot.TrimEnd('\', '/')
+    if ($normalizedRepoRoot -match '^(?<runner>.*)(?<separator>[\\/])_work(?:[\\/]|$)') {
+        $runnerRoot = $Matches['runner'].TrimEnd('\', '/')
+        $separator = $Matches['separator']
+        $runnerEnvironmentPath = $runnerRoot + $separator + '.env'
+        if (Test-Path -LiteralPath $runnerEnvironmentPath -PathType Leaf) {
+            $runnerEnvironment = @{}
+            foreach ($line in @(Get-Content -LiteralPath $runnerEnvironmentPath -ErrorAction Stop)) {
+                $equalsIndex = $line.IndexOf('=')
+                if (0 -lt $equalsIndex) {
+                    $name = $line.Substring(0, $equalsIndex)
+                    if ($name -in @('RUNNER_TOOL_CACHE', 'RUNNER_TOOLSDIRECTORY', 'AGENT_TOOLSDIRECTORY')) {
+                        $runnerEnvironment[$name] = $line.Substring($equalsIndex + 1)
+                    }
+                }
+            }
+            foreach ($variableName in @('RUNNER_TOOL_CACHE', 'RUNNER_TOOLSDIRECTORY', 'AGENT_TOOLSDIRECTORY')) {
+                $candidate = [string]$runnerEnvironment[$variableName]
+                if (-not [string]::IsNullOrWhiteSpace($candidate)) {
+                    $cacheSeparator = if ($candidate -match '^[A-Za-z]:' -or $candidate.Contains('\')) { '\' } else { [IO.Path]::DirectorySeparatorChar }
+                    return ($candidate.TrimEnd('\', '/') + $cacheSeparator + 'u6-v3')
+                }
+            }
+        }
+
+        return ($runnerRoot + $separator + '_work' + $separator + '_tool' + $separator + 'u6-v3')
+    }
+
+    # A manually cloned checkout still keeps editor payloads on its own drive.
+    if ($normalizedRepoRoot -match '^(?<drive>[A-Za-z]:)\\') {
+        return ($Matches['drive'] + '\Unity\Editors')
+    }
+
+    return 'C:\Unity\Editors'
+}
+
 function Resolve-RunnerMaintenanceUnityVersions {
     param(
         [AllowNull()][string[]]$UnityVersions,
@@ -126,21 +198,27 @@ function Invoke-WindowsRunnerMaintenance {
     param(
         [string[]]$UnityVersions = @(),
         [ValidateSet('EditorOnly', 'StandaloneWindowsIl2Cpp', 'Android', 'Full')]
-        [string]$ProvisioningProfile = 'StandaloneWindowsIl2Cpp',
-        [string]$InstallRoot = $(if ($env:UNITY_EDITOR_INSTALL_ROOT) { $env:UNITY_EDITOR_INSTALL_ROOT } else { 'C:\Unity\Editors' }),
+        [string]$ProvisioningProfile = 'Full',
+        [string]$InstallRoot = '',
         [switch]$DetectOnly,
+        [switch]$HostOnly,
+        [switch]$SkipHostBootstrap,
         [string]$DiagnosticsRoot = ''
     )
 
+    if ($HostOnly -and $SkipHostBootstrap) {
+        throw '-HostOnly and -SkipHostBootstrap are mutually exclusive.'
+    }
+
     $repoRoot = Get-UnityMaintenanceRepoRoot
-    $versions = @(Resolve-RunnerMaintenanceUnityVersions -UnityVersions $UnityVersions -RepoRoot $repoRoot)
+    $versions = if ($HostOnly) { @() } else { @(Resolve-RunnerMaintenanceUnityVersions -UnityVersions $UnityVersions -RepoRoot $repoRoot) }
     $scriptRoot = Get-UnityMaintenanceScriptRoot
     $bootstrapScript = Join-Path $scriptRoot 'bootstrap-windows-runner.ps1'
     $ensureEditorScript = Join-Path $scriptRoot 'ensure-editor.ps1'
-    if (-not (Test-Path -LiteralPath $bootstrapScript -PathType Leaf)) {
+    if (-not $SkipHostBootstrap -and -not (Test-Path -LiteralPath $bootstrapScript -PathType Leaf)) {
         throw "Missing runner bootstrap script: $bootstrapScript"
     }
-    if (-not (Test-Path -LiteralPath $ensureEditorScript -PathType Leaf)) {
+    if (-not $HostOnly -and -not (Test-Path -LiteralPath $ensureEditorScript -PathType Leaf)) {
         throw "Missing Unity editor provisioning script: $ensureEditorScript"
     }
 
@@ -150,28 +228,35 @@ function Invoke-WindowsRunnerMaintenance {
     } else {
         [string]$DiagnosticsRoot
     }
-    $maintenanceInstallRoot = [string]$InstallRoot
+    $maintenanceInstallRoot = Resolve-RunnerMaintenanceInstallRoot -InstallRoot $InstallRoot -RepoRoot $repoRoot
     $maintenanceProvisioningProfile = [string]$ProvisioningProfile
 
-    . $bootstrapScript
-    $bootstrapOutput = @(Invoke-WindowsRunnerBootstrap `
-        -DetectOnly:$maintenanceDetectOnly `
-        -UnityInstallRoot $maintenanceInstallRoot `
-        -DiagnosticsRoot $maintenanceDiagnosticsRoot)
-    if ($bootstrapOutput.Count -lt 1) {
-        throw 'Windows runner bootstrap did not return an exit code.'
-    }
-    if ($bootstrapOutput.Count -gt 1) {
-        foreach ($line in @($bootstrapOutput[0..($bootstrapOutput.Count - 2)])) {
-            if ($null -ne $line) {
-                Write-RunnerMaintenanceInfo "[bootstrap] $line"
+    if (-not $SkipHostBootstrap) {
+        . $bootstrapScript
+        $bootstrapOutput = @(Invoke-WindowsRunnerBootstrap `
+            -DetectOnly:$maintenanceDetectOnly `
+            -UnityInstallRoot $maintenanceInstallRoot `
+            -DiagnosticsRoot $maintenanceDiagnosticsRoot)
+        if ($bootstrapOutput.Count -lt 1) {
+            throw 'Windows runner bootstrap did not return an exit code.'
+        }
+        if ($bootstrapOutput.Count -gt 1) {
+            foreach ($line in @($bootstrapOutput[0..($bootstrapOutput.Count - 2)])) {
+                if ($null -ne $line) {
+                    Write-RunnerMaintenanceInfo "[bootstrap] $line"
+                }
             }
+        }
+
+        [int]$bootstrapCode = $bootstrapOutput[-1]
+        if ($bootstrapCode -ne 0) {
+            return $bootstrapCode
         }
     }
 
-    [int]$bootstrapCode = $bootstrapOutput[-1]
-    if ($bootstrapCode -ne 0) {
-        return $bootstrapCode
+    if ($HostOnly) {
+        Write-RunnerMaintenanceInfo 'Windows host prerequisites are ready.'
+        return 0
     }
 
     $failedVersions = New-Object System.Collections.Generic.List[string]
@@ -227,6 +312,8 @@ if ($MyInvocation.InvocationName -ne '.') {
         -ProvisioningProfile $RunnerMaintenanceProvisioningProfile `
         -InstallRoot $RunnerMaintenanceInstallRoot `
         -DetectOnly:$RunnerMaintenanceDetectOnly `
+        -HostOnly:$RunnerMaintenanceHostOnly `
+        -SkipHostBootstrap:$RunnerMaintenanceSkipHostBootstrap `
         -DiagnosticsRoot $RunnerMaintenanceDiagnosticsRoot
     exit $exitCode
 }

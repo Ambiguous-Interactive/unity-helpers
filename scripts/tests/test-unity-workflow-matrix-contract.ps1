@@ -284,6 +284,7 @@ $unityVersionsPath = Join-Path $repoRoot '.github/unity-versions.json'
 $integrationPackagesPath = Join-Path $repoRoot '.github/integration-packages.json'
 $windowsRunnerBootstrapPath = Join-Path $repoRoot 'scripts/unity/bootstrap-windows-runner.ps1'
 $windowsRunnerMaintenancePath = Join-Path $repoRoot 'scripts/unity/maintain-windows-runner.ps1'
+$windowsActionsRunnerInstallPath = Join-Path $repoRoot 'scripts/unity/install-windows-actions-runner.ps1'
 $ensureEditorPath = Join-Path $repoRoot 'scripts/unity/ensure-editor.ps1'
 $runCiTestsPath = Join-Path $repoRoot 'scripts/unity/run-ci-tests.ps1'
 $runUnityDockerPath = Join-Path $repoRoot 'scripts/unity/run-unity-docker.sh'
@@ -333,6 +334,10 @@ if (-not (Test-Path -LiteralPath $windowsRunnerMaintenancePath)) {
     Write-Host "::error::Windows runner maintenance script not found: $windowsRunnerMaintenancePath"
     exit 1
 }
+if (-not (Test-Path -LiteralPath $windowsActionsRunnerInstallPath)) {
+    Write-Host "::error::Windows Actions runner install script not found: $windowsActionsRunnerInstallPath"
+    exit 1
+}
 if (-not (Test-Path -LiteralPath $ensureEditorPath)) {
     Write-Host "::error::Unity ensure-editor script not found: $ensureEditorPath"
     exit 1
@@ -367,6 +372,16 @@ function Import-EnsureEditorWatchdogFunctions {
         'Get-EnsureEditorProgressStallSeconds',
         'Get-EnsureEditorProgressNoticeIntervalSeconds',
         'Get-EnsureEditorQuarantineMoveRetryAttempts',
+        'Get-UnityCliUpdateTimeoutSeconds',
+        'Get-UnityCliUpdateRetryAttempts',
+        'Get-UnityCliUpdateStallSeconds',
+        'Get-UnityCliInstallStallSeconds',
+        'Update-SessionPathFromRegistry',
+        'Get-UnityCliCompatibilityMarkerPath',
+        'Test-UnityCliCompatibilityHoldActive',
+        'Test-UnityCliWriterKindSchemaFailure',
+        'Invoke-UnityCliWriterKindCompatibilityRollback',
+        'Set-UnityCliAutomationEnvironment',
         'Invoke-WithRetry',
         'Test-IsPathInsideDirectory',
         'Get-UnityCiAlternateInstallRoot',
@@ -380,11 +395,19 @@ function Import-EnsureEditorWatchdogFunctions {
         'Get-LastCliProgressMessage',
         'Write-CiNotice',
         'Install-UnityEditorWithCiModules',
+        'Invoke-UnityCliCapture',
         'Invoke-UnityCliCaptureWithTimeout',
         'Invoke-UnityCliSafe',
         'Get-UnityCliOutput',
         'Move-UnityInstallDirectoryToQuarantine',
-        'Get-UnityProvisioningProfile'
+        'Get-UnityProvisioningProfile',
+        'Assert-UnityProvisioningProfile',
+        'Get-UnityCiModuleSpec',
+        'Get-UnityCiModuleSpecForProfile',
+        'Get-UnityCiModuleIds',
+        'Get-UnityCiVerifiedModuleGroups',
+        'Test-AnyUnityLeafPresent',
+        'Test-UnityCiModuleGroupPresent'
     )) {
         $functionAst = $ast.FindAll(
             {
@@ -555,8 +578,9 @@ function Test-UnityLockCleanupIsGated {
         # Quoting is prettier's canonical double-quote form; the contract checks
         # the literal pin, not the quote style.
         $expectedVersion = switch ($job.Key) {
-            'unitypackage-smoke' { '"2022.3.45f1"' }
-            'unitypackage' { '"2022.3.45f1"' }
+            'benchmarks' { '"6000.6.0f1"' }
+            'unitypackage-smoke' { '"6000.6.0f1"' }
+            'unitypackage' { '"6000.6.0f1"' }
             default { '${{ matrix.unity-version }}' }
         }
         if (
@@ -691,6 +715,7 @@ function Test-UnityLockAppConfiguration {
 [string]$runnerDiagnosticsActionContent = Get-Content -LiteralPath $runnerDiagnosticsActionPath -Raw
 [string]$windowsRunnerBootstrapContent = Get-Content -LiteralPath $windowsRunnerBootstrapPath -Raw
 [string]$windowsRunnerMaintenanceContent = Get-Content -LiteralPath $windowsRunnerMaintenancePath -Raw
+[string]$windowsActionsRunnerInstallContent = Get-Content -LiteralPath $windowsActionsRunnerInstallPath -Raw
 [string]$ensureEditorContent = Get-Content -LiteralPath $ensureEditorPath -Raw
 [string]$runCiTestsContent = Get-Content -LiteralPath $runCiTestsPath -Raw
 [string]$runUnityDockerContent = Get-Content -LiteralPath $runUnityDockerPath -Raw
@@ -753,70 +778,35 @@ $benchmarkAssemblyDiscoveryIsCentralized = (
     $benchmarksJobTexts['matrix-config'].Contains('const performanceAssembly = "WallstopStudios.UnityHelpers.Tests.Runtime.Performance"') -and
     $benchmarksJobTexts['matrix-config'].Contains('const randomAssembly = "WallstopStudios.UnityHelpers.Tests.Runtime.Random"') -and
     $benchmarksJobTexts['matrix-config'].Contains('for (const required of [performanceAssembly, randomAssembly])') -and
-    # PlayMode only, and asserted rather than assumed. Both benchmark assemblies are
-    # platform-neutral, and Unity's EditMode runner takes only assemblies flagged
-    # EditorAssembly -- so an editmode benchmark leg is handed two assembly names, runs zero
-    # tests, and fails "Verify tests actually ran" on every scheduled run (#570).
-    $benchmarksJobTexts['matrix-config'].Contains('for (const mode of ["playmode"])') -and
+    $benchmarksJobTexts['matrix-config'].Contains('benchmarkProfile("playmode")') -and
     -not $benchmarksJobTexts['matrix-config'].Contains('editmode: benchmarkProfile("editmode")') -and
-    $benchmarksWorkflowContent.Contains('matrix-include: ${{ steps.resolve.outputs.matrix-include }}') -and
     $benchmarksWorkflowContent.Contains('expected-result-files: ${{ steps.resolve.outputs.expected-result-files }}') -and
     $benchmarksWorkflowContent.Contains('allow-baseline-refresh: ${{ steps.resolve.outputs.allow-baseline-refresh }}') -and
-    $benchmarkJob.Contains('unity-version:') -and
-    $benchmarkJob.Contains('- 2021.3.45f1') -and
-    $benchmarkJob.Contains('- 2022.3.45f1') -and
-    $benchmarkJob.Contains('- 6000.3.16f1') -and
-    $benchmarkJob.Contains('- 6000.5.2f1') -and
-    $benchmarkJob.Contains('- playmode') -and
-    $benchmarksWorkflowContent.Contains('matrix-exclude: ${{ steps.resolve.outputs.matrix-exclude }}') -and
-    $benchmarkJob.Contains('exclude: ${{ fromJSON(needs.matrix-config.outputs.matrix-exclude) }}') -and
-    -not $benchmarkJob.Contains('include: ${{ fromJSON(needs.matrix-config.outputs.matrix-include) }}') -and
+    $benchmarksJobTexts['matrix-config'].Contains('latest="$(jq -r ''.all[-1]'' .github/unity-versions.json)"') -and
+    $benchmarksJobTexts['matrix-config'].Contains('if [ "${latest}" != "6000.6.0f1" ]') -and
+    $benchmarkJob.Contains('name: Benchmarks 6000.6.0f1 playmode') -and
+    $benchmarkJob.Contains('unity-version: "6000.6.0f1"') -and
+    $benchmarkJob.Contains("-TestMode 'playmode'") -and
+    -not $benchmarkJob.Contains('strategy:') -and
+    -not $benchmarkJob.Contains('matrix.') -and
     $benchmarkJob.Contains('expected-empty: false') -and
     (Test-JobInstallsOnlyRedactionNode -JobText $benchmarkJob) -and
     -not $benchmarkJob.Contains('./.github/actions/compute-unity-assemblies') -and
     -not $benchmarkJob.Contains('steps.compute')
 )
 if (-not $benchmarkAssemblyDiscoveryIsCentralized) {
-    Write-Host '::error file=.github/workflows/unity-benchmarks.yml::Resolve and validate the exact non-empty Performance and Random benchmark profile in hosted matrix-config, use the reviewed static Unity-version/playmode matrix required by the central editor authority, and do not install Node or rediscover asmdefs on self-hosted legs.'
+    Write-Host '::error file=.github/workflows/unity-benchmarks.yml::Resolve and validate the exact non-empty Performance and Random benchmark profile in hosted configuration, run one pinned latest-Unity PlayMode benchmark job, and do not install Node or rediscover asmdefs on the self-hosted leg.'
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info 'Checked benchmark assembly discovery is authoritative and centralized.'
 }
 
-$expectedResultFilesLines = @(
-    $benchmarksWorkflowContent -split "`r?`n" |
-        Where-Object { $_.Contains('echo "expected-result-files=') }
+$benchmarkExpectedResultFilesAreLatestOnly = (
+    [regex]::Matches($benchmarksWorkflowContent, [regex]::Escape('echo "expected-result-count=1"')).Count -eq 1 -and
+    [regex]::Matches($benchmarksWorkflowContent, [regex]::Escape('echo "expected-result-files=[\"results-${latest}-playmode.xml\"]"')).Count -eq 1
 )
-$expectedResultFilesFilter = ''
-if ($expectedResultFilesLines.Count -eq 1) {
-    $expectedResultFilesFilterMatch = [regex]::Match(
-        $expectedResultFilesLines[0],
-        "jq -c '([^']+)'"
-    )
-    if ($expectedResultFilesFilterMatch.Success) {
-        $expectedResultFilesFilter = $expectedResultFilesFilterMatch.Groups[1].Value
-    }
-}
-$expectedResultFilesFixture = '[{"result-file":"results-b.xml"},{"result-file":"results-a.xml"}]'
-$expectedResultFilesOutput = if ([string]::IsNullOrWhiteSpace($expectedResultFilesFilter)) {
-    @()
-}
-else {
-    @($expectedResultFilesFixture | & jq -c $expectedResultFilesFilter 2>&1)
-}
-$expectedResultFilesFilterExitCode = if ([string]::IsNullOrWhiteSpace($expectedResultFilesFilter)) {
-    -1
-}
-else {
-    $LASTEXITCODE
-}
-$benchmarkExpectedResultFilesFilterIsExecutable = (
-    $expectedResultFilesFilter -eq 'map(."result-file") | sort' -and
-    $expectedResultFilesFilterExitCode -eq 0 -and
-    ($expectedResultFilesOutput -join "`n").Trim() -eq '["results-a.xml","results-b.xml"]'
-)
-if (-not $benchmarkExpectedResultFilesFilterIsExecutable) {
-    Write-Host '::error file=.github/workflows/unity-benchmarks.yml::The expected-result-files jq program must be extracted exactly once, execute successfully with a hyphenated result-file key, and return sorted identities. Do not backslash-escape double quotes inside its single-quoted jq program.'
+if (-not $benchmarkExpectedResultFilesAreLatestOnly) {
+    Write-Host '::error file=.github/workflows/unity-benchmarks.yml::The benchmark configuration must expect exactly the latest-version PlayMode result identity.'
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info 'Executed the benchmark expected-result-files jq program against a hyphenated-key fixture.'
@@ -954,17 +944,33 @@ function Get-CommandIndex {
 if ($unityVersions.Count -lt 1) {
     Write-Host "::error file=.github/unity-versions.json::Unity CI version config must define at least one entry in all[]."
     $failed = $true
-} elseif ($unityVersions[-1] -ne '6000.5.2f1') {
-    Write-Host "::error file=.github/unity-versions.json::Unity 6000.5.2f1 must be the latest tracked Unity version so Unity 6000.5 regressions are caught in CI."
+} elseif ($unityVersions[-1] -ne '6000.6.0f1') {
+    Write-Host "::error file=.github/unity-versions.json::Unity 6000.6.0f1 must be the latest tracked Unity version so Unity 6000.6 regressions are caught in CI."
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info "Checked Unity version source of truth includes Unity 6000.5.2f1 as the latest version."
+    Write-Info "Checked Unity version source of truth includes Unity 6000.6.0f1 as the latest version."
 }
 
-# Every Unity version CI actually tests has to be selectable when someone files a bug against it.
-# The dropdowns are hand-maintained and drifted: 6000.1 and 6000.2 were offered while 6000.3 and
-# 6000.5 -- both in the matrix -- were not, so a report against a tested version had to say "Other"
-# and lost the one field that makes a repro reproducible (#283).
+if ([string]$unityVersionsConfig.release -ne '6000.6.0f1') {
+    Write-Host "::error file=.github/unity-versions.json::Release and unitypackage smoke coverage must target the latest supported editor, 6000.6.0f1, rather than a legacy compatibility editor."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info 'Checked release and unitypackage smoke target Unity 6000.6.0f1.'
+}
+
+# Every Unity version CI actually tests has to be selectable when someone files a bug against it,
+# and the hand-maintained dropdowns must remain newest-first.
+$orderedUnityLabels = @(
+    'Unity 6.6 (6000.6)',
+    'Unity 6.5 (6000.5)',
+    'Unity 6.4 (6000.4)',
+    'Unity 6.3 (6000.3)',
+    'Unity 6.2 (6000.2)',
+    'Unity 6.1 (6000.1)',
+    'Unity 6 (6000.0) LTS',
+    '2022.3 LTS',
+    '2021.3 LTS'
+)
 foreach ($templateName in @('bug_report.yml', 'feature_request.yml')) {
     $templatePath = Join-Path $repoRoot ".github/ISSUE_TEMPLATE/$templateName"
     if (-not (Test-Path -LiteralPath $templatePath)) {
@@ -975,7 +981,7 @@ foreach ($templateName in @('bug_report.yml', 'feature_request.yml')) {
 
     $templateText = Get-Content -LiteralPath $templatePath -Raw
     foreach ($unityVersion in $unityVersions) {
-        # "6000.5.2f1" is offered to users as "Unity 6.5 (6000.5)"; match on the stream, which is
+        # "6000.6.0f1" is offered to users as "Unity 6.6 (6000.6)"; match on the stream, which is
         # what the label carries, rather than on the patch the matrix pins.
         $stream = ($unityVersion -split '\.')[0..1] -join '.'
         if ($templateText -notmatch [regex]::Escape($stream)) {
@@ -983,10 +989,21 @@ foreach ($templateName in @('bug_report.yml', 'feature_request.yml')) {
             $failed = $true
         }
     }
+
+    $previousLabelIndex = -1
+    foreach ($label in $orderedUnityLabels) {
+        $labelIndex = $templateText.IndexOf("- `"$label`"", [StringComparison]::Ordinal)
+        if ($labelIndex -le $previousLabelIndex) {
+            Write-Host "::error file=.github/ISSUE_TEMPLATE/$templateName::Unity Version options must be ordered newest-first; '$label' is missing or out of order."
+            $failed = $true
+            break
+        }
+        $previousLabelIndex = $labelIndex
+    }
 }
 
 if ($VerboseOutput -and -not $failed) {
-    Write-Info "Checked every Unity version in the source of truth is selectable in both issue templates."
+    Write-Info "Checked every tested Unity version is selectable and both issue templates are newest-first."
 }
 
 $integrationPackagesNode = $integrationPackagesConfig.PSObject.Properties['packages']
@@ -1019,13 +1036,13 @@ if ([string]::IsNullOrWhiteSpace($reflexVersionText)) {
 }
 
 $runnerUsesUnityVersionsConfig = (
-    $runnerBootstrapContent.Contains('.github\unity-versions.json') -and
-    $runnerBootstrapContent.Contains('ConvertFrom-Json') -and
-    $runnerBootstrapContent.Contains('@($unityVersionsConfig.all)') -and
-    $runnerBootstrapContent.Contains('Unity versions from .github/unity-versions.json')
+    $runnerBootstrapContent.Contains('.github/unity-versions.json') -and
+    $runnerBootstrapContent.Contains('jq -c ''{"unity-version": .all}''') -and
+    $runnerBootstrapContent.Contains('fromJSON(needs.matrix-config.outputs.matrix)') -and
+    $runnerBootstrapContent.Contains('matrix.unity-version')
 )
 if (-not $runnerUsesUnityVersionsConfig) {
-    Write-Host "::error file=.github/workflows/runner-bootstrap.yml::Runner bootstrap must read .github/unity-versions.json through an array wrapper so self-hosted runner provisioning cannot drift from the Unity test matrix or split one-element arrays incorrectly."
+    Write-Host "::error file=.github/workflows/runner-bootstrap.yml::Runner bootstrap must build its per-version matrix from .github/unity-versions.json so self-hosted runner provisioning cannot drift from the Unity test matrix."
     $failed = $true
 } elseif ($runnerBootstrapContent -match "(?s)\`$unityVersions\s*=\s*@\(\s*'\d+\.\d+\.\d+f\d+'") {
     Write-Host "::error file=.github/workflows/runner-bootstrap.yml::Runner bootstrap must not hardcode a Unity version array; update .github/unity-versions.json instead."
@@ -1083,6 +1100,37 @@ if (-not $runnerBootstrapBackendPresent) {
     Write-Info "Checked runner bootstrap Windows maintenance backend contract."
 }
 
+$actionsRunnerInstallTokens = $null
+$actionsRunnerInstallParseErrors = $null
+[void][System.Management.Automation.Language.Parser]::ParseFile(
+    $windowsActionsRunnerInstallPath,
+    [ref]$actionsRunnerInstallTokens,
+    [ref]$actionsRunnerInstallParseErrors
+)
+$actionsRunnerInstallContract = (
+    (-not $actionsRunnerInstallParseErrors -or $actionsRunnerInstallParseErrors.Count -eq 0) -and
+    $windowsActionsRunnerInstallContent.Contains("[ValidateSet('AdminPrepare', 'UserInstall', 'AdminConfigure')]") -and
+    $windowsActionsRunnerInstallContent.Contains('Assert-RunnerInstallAdministrator') -and
+    $windowsActionsRunnerInstallContent.Contains("'*S-1-5-20:(OI)(CI)M'") -and
+    $windowsActionsRunnerInstallContent.Contains("'*S-1-5-32-544:(OI)(CI)F'") -and
+    $windowsActionsRunnerInstallContent.Contains("'*S-1-5-18:(OI)(CI)F'") -and
+    $windowsActionsRunnerInstallContent.Contains('Get-FileHash -LiteralPath $archivePath -Algorithm SHA256') -and
+    $windowsActionsRunnerInstallContent.Contains("'--runasservice'") -and
+    $windowsActionsRunnerInstallContent.Contains("'--replace'") -and
+    $windowsActionsRunnerInstallContent.Contains('$customLabels += $RunnerName') -and
+    $windowsActionsRunnerInstallContent.Contains('The registration token will not be logged') -and
+    $runnerRunbookContent.Contains('-Phase AdminPrepare') -and
+    $runnerRunbookContent.Contains('-Phase UserInstall') -and
+    $runnerRunbookContent.Contains('-Phase AdminConfigure')
+)
+if (-not $actionsRunnerInstallContract) {
+    $parseDetails = @($actionsRunnerInstallParseErrors | ForEach-Object { "$($_.Extent.StartLineNumber): $($_.Message)" }) -join '; '
+    Write-Host "::error file=scripts/unity/install-windows-actions-runner.ps1::A new runner must use the documented admin/user/admin flow, checksum-verify the official package, configure service ACLs, add the machine-name label, and register as a Windows service. Parse errors: $parseDetails"
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info 'Checked checksum-verified Windows Actions runner installation and admin/user handoff.'
+}
+
 $runnerBootstrapDocsCurrent = (
     $runnerRunbookContent.Contains('.github/workflows/runner-bootstrap.yml') -and
     $runnerRunbookContent.Contains('scripts/unity/bootstrap-windows-runner.ps1') -and
@@ -1106,7 +1154,10 @@ if (-not $runnerBootstrapDocsCurrent) {
 $runnerBootstrapInvokesMaintenanceFunction = (
     $runnerBootstrapContent.Contains('. $script') -and
     $runnerBootstrapContent.Contains('$maintenanceArgs = @{') -and
-    $runnerBootstrapContent.Contains('UnityVersions = $unityVersions') -and
+    $runnerBootstrapContent.Contains('UnityVersions = @($env:UH_MAINTENANCE_UNITY_VERSION)') -and
+    $runnerBootstrapContent.Contains("ProvisioningProfile = 'Full'") -and
+    $runnerBootstrapContent.Contains('HostOnly = $true') -and
+    $runnerBootstrapContent.Contains('SkipHostBootstrap = $true') -and
     $runnerBootstrapContent.Contains('$maintenanceArgs.DetectOnly = $true') -and
     $runnerBootstrapContent.Contains('$code = Invoke-WindowsRunnerMaintenance @maintenanceArgs') -and
     -not $runnerBootstrapContent.Contains('& $script @maintenanceArgs') -and
@@ -1117,6 +1168,47 @@ if (-not $runnerBootstrapInvokesMaintenanceFunction) {
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked runner bootstrap calls maintenance function without losing cleanup control."
+}
+
+$unityCliMaintenanceIsZeroTouch = (
+    $ensureEditorContent.Contains("'self-update'") -and
+    $ensureEditorContent.Contains("'upgrade'") -and
+    $ensureEditorContent.Contains('UNITY_NON_INTERACTIVE') -and
+    $ensureEditorContent.Contains('UNITY_NO_PAGER') -and
+    $ensureEditorContent.Contains('UNITY_NO_CONSENT_PROMPT') -and
+    $ensureEditorContent.Contains('UNITY_INSTALL_RETRIES') -and
+    $ensureEditorContent.Contains('UH_UNITY_CLI_UPDATE_TIMEOUT_SECONDS') -and
+    $ensureEditorContent.Contains('UH_UNITY_CLI_UPDATE_RETRY_ATTEMPTS') -and
+    $ensureEditorContent.Contains('Invoke-UnityCliCaptureWithTimeout') -and
+    $ensureEditorContent.Contains('$script:UnityCliUpdateCompleted') -and
+    $ensureEditorContent.Contains("'1.0.0-beta.8'") -and
+    $ensureEditorContent.Contains('installs has no column named writer_kind') -and
+    $ensureEditorContent.Contains('Test-UnityCliCompatibilityHoldActive')
+)
+if (-not $unityCliMaintenanceIsZeroTouch) {
+    Write-Host "::error file=scripts/unity/ensure-editor.ps1::Runner maintenance must put Unity CLI in non-interactive mode, update it through the bounded watchdog with retries, support the legacy upgrade alias, recover safely from the beta.9 writer_kind regression, and update only once per provisioning process."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info 'Checked Unity CLI maintenance is bounded, retrying, current, and non-interactive.'
+}
+
+$runnerMaintenanceIsSplitByVersion = (
+    $runnerBootstrapJobTexts.ContainsKey('bootstrap-host') -and
+    $runnerBootstrapJobTexts.ContainsKey('maintain-unity') -and
+    $runnerBootstrapJobTexts['maintain-unity'].Contains('matrix.unity-version') -and
+    $runnerBootstrapJobTexts['maintain-unity'].Contains('max-parallel: 1') -and
+    $runnerBootstrapJobTexts['maintain-unity'].Contains('fail-fast: false') -and
+    $runnerBootstrapJobTexts['maintain-unity'].Contains('timeout-minutes: 360') -and
+    $runnerBootstrapContent.Contains('HostOnly = $true') -and
+    $runnerBootstrapContent.Contains('SkipHostBootstrap = $true') -and
+    $windowsRunnerMaintenanceContent.Contains('[switch]$HostOnly') -and
+    $windowsRunnerMaintenanceContent.Contains('[switch]$SkipHostBootstrap')
+)
+if (-not $runnerMaintenanceIsSplitByVersion) {
+    Write-Host "::error file=.github/workflows/runner-bootstrap.yml::Runner maintenance must bootstrap the host once and give each Unity version its own serialized six-hour job so one slow editor cannot exhaust a shared workflow timeout."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info 'Checked runner maintenance isolates every Unity version behind its own timeout.'
 }
 
 $runnerMaintenanceForceParameters = @(
@@ -1549,18 +1641,21 @@ if ($VerboseOutput) {
 }
 
 $runnerPreflightJob = if ($runnerBootstrapJobTexts.ContainsKey('runner-preflight')) { $runnerBootstrapJobTexts['runner-preflight'] } else { '' }
-$bootstrapJob = if ($runnerBootstrapJobTexts.ContainsKey('bootstrap')) { $runnerBootstrapJobTexts['bootstrap'] } else { '' }
+$bootstrapHostJob = if ($runnerBootstrapJobTexts.ContainsKey('bootstrap-host')) { $runnerBootstrapJobTexts['bootstrap-host'] } else { '' }
+$maintainUnityJob = if ($runnerBootstrapJobTexts.ContainsKey('maintain-unity')) { $runnerBootstrapJobTexts['maintain-unity'] } else { '' }
 $bootstrapRunsOnPattern = '(?m)^\s+runs-on:\s*\[self-hosted,\s*Windows,\s*RAM-64GB,\s*"\$\{\{\s*inputs\.runner-label\s*\}\}"\]\s*$'
 $runnerPreflightAction = "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/check-unity-runner-availability@$runnerAvailabilityActionCommit"
 $readerAppCredentialsPattern = '(?ms)reader-app-id:\s*\$\{\{\s*secrets\.BUILD_LOCK_READER_APP_ID\s*\}\}.*reader-app-private-key:\s*\$\{\{\s*secrets\.BUILD_LOCK_READER_APP_PRIVATE_KEY\s*\}\}'
 $runnerBootstrapPinsRequestedMachine = (
     $runnerBootstrapJobTexts.ContainsKey('runner-preflight') -and
-    $runnerBootstrapJobTexts.ContainsKey('bootstrap') -and
+    $runnerBootstrapJobTexts.ContainsKey('bootstrap-host') -and
+    $runnerBootstrapJobTexts.ContainsKey('maintain-unity') -and
     $runnerPreflightJob.Contains("uses: $runnerPreflightAction # $runnerAvailabilityActionVersion") -and
     $runnerPreflightJob -match $readerAppCredentialsPattern -and
     $runnerPreflightJob.Contains('required-label-sets: ''[["self-hosted","Windows","RAM-64GB","${{ inputs.runner-label }}"]]''') -and
-    $bootstrapJob -match $bootstrapRunsOnPattern -and
-    $bootstrapJob.Contains('custom ''$requested'' label') -and
+    $bootstrapHostJob -match $bootstrapRunsOnPattern -and
+    $maintainUnityJob -match $bootstrapRunsOnPattern -and
+    $bootstrapHostJob.Contains('custom ''$requested'' label') -and
     $actionlintContent.Contains('- DAD-MACHINE') -and
     $actionlintContent.Contains('- ELI-MACHINE') -and
     -not $runnerBootstrapContent.Contains('take the unwanted runner offline') -and
@@ -1668,7 +1763,8 @@ if (-not $computeUnityAssembliesActionUsesBootstrapSafeShell) {
 function Test-UnityJobUsesCentralEditorGate {
     param(
         [Parameter(Mandatory = $true)][string]$JobText,
-        [Parameter(Mandatory = $true)][string]$ProvisioningProfile
+        [Parameter(Mandatory = $true)][string]$ProvisioningProfile,
+        [string]$UnityVersion = '${{ matrix.unity-version }}'
     )
 
     $editorUses = "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/ensure-unity-editor@$centralEditorActionCommit"
@@ -1713,7 +1809,7 @@ function Test-UnityJobUsesCentralEditorGate {
         $editorStep.Value -match '(?m)^\s+id:\s+ensure_unity_editor\s*$' -and
         $editorStep.Value -match '(?m)^\s+timeout-minutes:\s+10\s*$' -and
         $editorStep.Value.Contains("uses: $editorUses") -and
-        $editorStep.Value -match '(?m)^\s+unity-version:\s+\$\{\{ matrix\.unity-version \}\}\s*$' -and
+        $editorStep.Value.Contains("unity-version: $UnityVersion") -and
         $editorStep.Value -match '(?m)^\s+install-root:\s+\$\{\{ runner\.tool_cache \}\}\\u6-v3\s*$' -and
         $profileMatch.Success -and $actualProfile -ceq $ProvisioningProfile -and
         $editorStep.Value -match '(?m)^\s+diagnostics-path:\s+unity-editor-check\.json\s*$' -and
@@ -1742,26 +1838,24 @@ $defaultMatrixIsVersionGrouped = (
     [regex]::Matches($unityTestsMatrixJob, '(?m)^      matrix:\s*$').Count -eq 1 -and
     [regex]::Matches($unityTestsMatrixJob, '(?m)^        unity-version:\s*$').Count -eq 1 -and
     [regex]::Matches($unityTestsMatrixJob, '(?m)^          - \d+\.\d+\.\d+f\d+\s*$').Count -eq 4 -and
-    [regex]::Matches($unityTestsMatrixJob, '(?m)^        test-mode:\s*$').Count -eq 1 -and
-    [regex]::Matches($unityTestsMatrixJob, '(?m)^          - editmode\s*$').Count -eq 1 -and
-    [regex]::Matches($unityTestsMatrixJob, '(?m)^          - playmode\s*$').Count -eq 1 -and
-    [regex]::Matches($unityTestsMatrixJob, '(?m)^          - standalone\s*$').Count -eq 1 -and
+    [regex]::Matches($unityTestsMatrixJob, '(?m)^        test-mode:\s*$').Count -eq 0 -and
+    -not $unityTestsMatrixJob.Contains('matrix.test-mode') -and
     $unityTestsMatrixJob.Contains('exclude: ${{ fromJSON(needs.matrix-config.outputs.matrix-exclude) }}') -and
     $unityTestsMatrixJob.Contains('needs.matrix-config.outputs.test-modes') -and
     -not $workflowContent.Contains('matrix-exclude-standalone') -and
     -not $workflowContent.Contains('matrix-include-standalone')
 )
-foreach ($version in @('2021.3.45f1', '2022.3.45f1', '6000.3.16f1', '6000.5.2f1')) {
+foreach ($version in @('2021.3.45f1', '2022.3.45f1', '6000.5.2f1', '6000.6.0f1')) {
     $defaultMatrixIsVersionGrouped = (
         $defaultMatrixIsVersionGrouped -and
         [regex]::Matches($unityTestsMatrixJob, "(?m)^          - $([regex]::Escape($version))\s*$").Count -eq 1
     )
 }
 if (-not $defaultMatrixIsVersionGrouped) {
-    Write-Host '::error file=.github/workflows/unity-tests.yml::The default Unity matrix must contain exactly the four supported Unity versions and the reviewed STATIC test-mode triple (editmode, playmode, standalone), and exclude unselected versions and unselected modes through matrix-config. The static test-mode axis is what authorizes the central editor gate to provision the StandaloneWindowsIl2Cpp profile on standalone legs (enrollment contract item 3); its values must stay static and exact.'
+    Write-Host '::error file=.github/workflows/unity-tests.yml::The default Unity matrix must contain exactly one axis with the four supported Unity versions. Modes must be sequential steps within each version job, never a second matrix axis that multiplies the licensed runner queue.'
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info 'Checked the default Unity matrix groups the reviewed static test-mode axis into four version legs.'
+    Write-Info 'Checked the default Unity matrix creates exactly one job per supported version.'
 }
 
 $groupedDefaultModesAreComplete = $true
@@ -1782,16 +1876,11 @@ foreach ($mode in $defaultModeContracts) {
     $reportIndex = $unityTestsMatrixJob.IndexOf("- name: Report slowest $label tests", [StringComparison]::Ordinal)
     $path = ".artifacts/unity/`${{ matrix.unity-version }}-$key"
     $selection = "contains(fromJSON(needs.matrix-config.outputs.test-modes), '$key')"
-    # Each version job now fans out over the reviewed static test-mode axis, so
-    # every mode-specific step must ALSO pin its own leg. Without the leg guard
-    # a single leg would run (or gate) all three modes.
-    $legGuard = "matrix.test-mode == '$key'"
-
     $modeIsComplete = (
         $runStep -match "(?m)^\s+id:\s+run_$key\s*$" -and
         $runStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
         $runStep.Contains('!cancelled()') -and
-        $runStep.Contains($legGuard) -and
+        -not $runStep.Contains('matrix.test-mode') -and
         $runStep.Contains("steps.unity_lock.outputs.acquired == 'true'") -and
         $runStep.Contains($selection) -and
         $runStep -notmatch 'steps\.run_(?:editmode|playmode|standalone)\.(?:outcome|conclusion)' -and
@@ -1803,23 +1892,23 @@ foreach ($mode in $defaultModeContracts) {
         $runStep.Contains('-IncludeIntegrations') -and
         $runStep.Contains('UH_UNITY_TEST_CATEGORY: "!Performance;!Stress"') -and
         $runStep.Contains('./scripts/unity/assert-no-active-unity-editor.ps1') -and
-        $reportStep.Contains($legGuard) -and
+        -not $reportStep.Contains('matrix.test-mode') -and
         $reportStep.Contains($selection) -and
         $reportStep.Contains("$path/results.xml") -and
         $verifyStep -match "(?m)^\s+id:\s+verify_$key\s*$" -and
         $verifyStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
-        $verifyStep.Contains($legGuard) -and
+        -not $verifyStep.Contains('matrix.test-mode') -and
         $verifyStep.Contains($selection) -and
         $verifyStep.Contains("steps.run_$key.outcome != 'skipped'") -and
         $verifyStep.Contains("results-dir: $path") -and
         $redactStep -match "(?m)^\s+id:\s+redact_$key\s*$" -and
         $redactStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
-        $redactStep.Contains($legGuard) -and
+        -not $redactStep.Contains('matrix.test-mode') -and
         $redactStep.Contains($selection) -and
         $redactStep.Contains("paths: $path") -and
         $uploadStep -match "(?m)^\s+id:\s+upload_$key\s*$" -and
         $uploadStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
-        $uploadStep.Contains($legGuard) -and
+        -not $uploadStep.Contains('matrix.test-mode') -and
         $uploadStep.Contains($selection) -and
         $uploadStep.Contains("steps.redact_$key.outcome == 'success'") -and
         $uploadStep.Contains("name: unity-`${{ matrix.unity-version }}-$key") -and
@@ -1834,7 +1923,7 @@ foreach ($mode in $defaultModeContracts) {
             $modeIsComplete -and
             $headStep -match "(?m)^\s+id:\s+$($key)_head\s*$" -and
             $headStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
-            $headStep.Contains($legGuard) -and
+            -not $headStep.Contains('matrix.test-mode') -and
             $headStep.Contains($selection) -and
             $headStep -notmatch 'steps\.run_(?:editmode|playmode|standalone)\.(?:outcome|conclusion)' -and
             $runStep.Contains("steps.$($key)_head.outcome == 'success'")
@@ -1850,9 +1939,8 @@ foreach ($mode in $defaultModeContracts) {
 $defaultOutcomeGate = Get-UnityWorkflowStepText -JobText $unityTestsMatrixJob -StepName 'Require every selected Unity mode'
 $defaultOutcomeGateIsComplete = (
     $defaultOutcomeGate -match '(?m)^\s+id:\s+require_selected_modes\s*$' -and
-    $defaultOutcomeGate.Contains('if: ${{ always() && !cancelled() && contains(fromJSON(needs.matrix-config.outputs.test-modes), matrix.test-mode) }}') -and
-    # Per-leg gate: the leg runs exactly its own mode, selected by matrix-config.
-    $defaultOutcomeGate.Contains('SELECTED_MODES: ${{ format(''["{0}"]'', matrix.test-mode) }}') -and
+    $defaultOutcomeGate.Contains('if: ${{ always() && !cancelled() }}') -and
+    $defaultOutcomeGate.Contains('SELECTED_MODES: ${{ needs.matrix-config.outputs.test-modes }}') -and
     $defaultOutcomeGate.Contains('./scripts/unity/assert-test-mode-outcomes.ps1') -and
     -not $defaultOutcomeGate.Contains('.conclusion')
 )
@@ -1875,7 +1963,7 @@ if (-not $groupedDefaultModesAreComplete -or -not $defaultOutcomeGateIsComplete)
 
 $singleThreadedMatrixIsVersionGrouped = (
     [regex]::Matches($unityTestsSingleThreadedJob, '(?m)^        unity-version:\s*$').Count -eq 1 -and
-    [regex]::Matches($unityTestsSingleThreadedJob, '(?m)^          - 6000\.3\.16f1\s*$').Count -eq 1 -and
+    [regex]::Matches($unityTestsSingleThreadedJob, '(?m)^          - 6000\.6\.0f1\s*$').Count -eq 1 -and
     [regex]::Matches($unityTestsSingleThreadedJob, '(?m)^        test-mode:\s*$').Count -eq 0
 )
 $singleThreadedModesAreComplete = $singleThreadedMatrixIsVersionGrouped
@@ -1993,22 +2081,19 @@ if (-not $matrixConfigAssemblyDiscoveryIsCentralized) {
     Write-Info "Checked Unity test assembly discovery is centralized on the hosted matrix job."
 }
 
-# Enrollment contract (Workflow contract item 3): the profile must be the exact
-# reviewed static matrix.test-mode map -- the analyzer admits no other dynamic
-# form -- so standalone legs verify the IL2CPP module set at gate time while
-# editmode and playmode legs keep EditorOnly. Jobs without the static axis stay
-# on the literal EditorOnly profile.
-$trustedEditorMatrixProfile = '${{ fromJSON(''{"editmode":"EditorOnly","playmode":"EditorOnly","standalone":"StandaloneWindowsIl2Cpp"}'')[matrix.test-mode] }}'
+# Each version job can execute standalone coverage, so its editor gate verifies
+# the IL2CPP player module before any selected mode starts.
+$trustedEditorMatrixProfile = 'StandaloneWindowsIl2Cpp'
 $unityWorkflowsUseCentralEditorAuthority = (
     -not $jobTexts.ContainsKey('runner-maintenance') -and
     -not $benchmarksJobTexts.ContainsKey('runner-maintenance') -and
     $runnerBootstrapContent -match '(?m)^\s+UNITY_EDITOR_INSTALL_ROOT:\s+\$\{\{ runner\.tool_cache \}\}\\u6-v3\s*$' -and
     (Test-UnityJobUsesCentralEditorGate -JobText $unityTestsMatrixJob -ProvisioningProfile $trustedEditorMatrixProfile) -and
     (Test-UnityJobUsesCentralEditorGate -JobText $unityTestsSingleThreadedJob -ProvisioningProfile 'EditorOnly') -and
-    (Test-UnityJobUsesCentralEditorGate -JobText $benchmarksMatrixJob -ProvisioningProfile 'EditorOnly')
+    (Test-UnityJobUsesCentralEditorGate -JobText $benchmarksMatrixJob -ProvisioningProfile 'EditorOnly' -UnityVersion '"6000.6.0f1"')
 )
 if (-not $unityWorkflowsUseCentralEditorAuthority) {
-    Write-Host "::error file=.github/workflows/unity-tests.yml::Every Windows licensed job must run the exact central ensure-unity-editor action first, or immediately after the immutable current-head guard, with a ten-minute fail-closed health check under the runner tool cache. The version-grouped job must pass the exact reviewed static matrix.test-mode map as provisioning-profile; jobs without that static axis must pass literal EditorOnly. CI must not maintain or provision editors, the Unity command must consume the action's bound editor-path output, and the operator bootstrap must provision the same runner.tool_cache\\u6-v3 root. Keep .github/workflows/unity-benchmarks.yml in sync."
+    Write-Host "::error file=.github/workflows/unity-tests.yml::Every Windows licensed job must run the exact central ensure-unity-editor action first, or immediately after the immutable current-head guard, with a ten-minute fail-closed health check under the runner tool cache. The version-grouped default job must pass StandaloneWindowsIl2Cpp because it owns all selected modes; EditorOnly jobs must remain literal. CI must not maintain or provision editors, the Unity command must consume the action's bound editor-path output, and the operator bootstrap must provision the same runner.tool_cache\\u6-v3 root. Keep .github/workflows/unity-benchmarks.yml in sync."
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked Windows Unity workflows use the central editor authority before repository-controlled code."
@@ -2324,6 +2409,10 @@ if ($workflowShapeExitCode -ne 2 -or (($workflowShapeOutput -join ' ') -notmatch
 $ensureEditorShapeRoot = ''
 $ensureEditorShapeOutput = @()
 $ensureEditorShapeExitCode = 1
+$hostOnlyShapeOutput = @()
+$hostOnlyShapeExitCode = 1
+$skipHostShapeOutput = @()
+$skipHostShapeExitCode = 1
 try {
     $ensureEditorShapeRoot = Join-Path ([System.IO.Path]::GetTempPath()) "unity-runner-ensure-shape-$PID-$(Get-Random)"
     New-Item -ItemType Directory -Force -Path $ensureEditorShapeRoot | Out-Null
@@ -2377,24 +2466,103 @@ Write-Output "fake ensure-editor ok: `$UnityVersion"
         -DetectOnly `
         -DiagnosticsRoot $ensureEditorShapeDiagnostics 2>&1
     $ensureEditorShapeExitCode = $LASTEXITCODE
+
+    $hostOnlyShapeOutput = & pwsh -NoProfile -File (Join-Path $ensureEditorShapeRoot 'maintain-windows-runner.ps1') `
+        -HostOnly `
+        -DiagnosticsRoot $ensureEditorShapeDiagnostics 2>&1
+    $hostOnlyShapeExitCode = $LASTEXITCODE
+
+    $skipHostShapeOutput = & pwsh -NoProfile -File (Join-Path $ensureEditorShapeRoot 'maintain-windows-runner.ps1') `
+        -UnityVersions '2022.3.45f1' `
+        -ProvisioningProfile 'StandaloneWindowsIl2Cpp' `
+        -InstallRoot 'C:\Unity\Editors' `
+        -DetectOnly `
+        -SkipHostBootstrap `
+        -DiagnosticsRoot $ensureEditorShapeDiagnostics 2>&1
+    $skipHostShapeExitCode = $LASTEXITCODE
 } finally {
     if ($ensureEditorShapeRoot -and (Test-Path -LiteralPath $ensureEditorShapeRoot -PathType Container)) {
         Remove-Item -LiteralPath $ensureEditorShapeRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
-if ($ensureEditorShapeExitCode -ne 0 -or (($ensureEditorShapeOutput -join ' ') -notmatch 'fake ensure-editor ok: 2022\.3\.45f1')) {
+if (
+    $ensureEditorShapeExitCode -ne 0 -or
+    (($ensureEditorShapeOutput -join ' ') -notmatch 'fake ensure-editor ok: 2022\.3\.45f1') -or
+    $hostOnlyShapeExitCode -ne 0 -or
+    (($hostOnlyShapeOutput -join ' ') -notmatch 'Windows host prerequisites are ready') -or
+    (($hostOnlyShapeOutput -join ' ') -match 'fake ensure-editor') -or
+    $skipHostShapeExitCode -ne 0 -or
+    (($skipHostShapeOutput -join ' ') -notmatch 'fake ensure-editor ok: 2022\.3\.45f1') -or
+    (($skipHostShapeOutput -join ' ') -match '\[bootstrap\]')
+) {
     Write-Host "::error file=scripts/unity/maintain-windows-runner.ps1::Runner maintenance must pass named parameters to ensure-editor.ps1 so Windows PowerShell 5.1 does not bind '-UnityVersion' as the UnityVersion value. Exit $ensureEditorShapeExitCode. Output: $($ensureEditorShapeOutput -join ' ')"
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info "Checked maintenance passes named parameters to ensure-editor."
+    Write-Info "Checked maintenance passes named parameters and separates host-only from editor-only work."
+}
+
+$installRootResolverAst = Get-FunctionAstByName -Ast $windowsRunnerMaintenanceAst -Name 'Resolve-RunnerMaintenanceInstallRoot'
+if (-not $installRootResolverAst) {
+    Write-Host '::error file=scripts/unity/maintain-windows-runner.ps1::Runner maintenance must define Resolve-RunnerMaintenanceInstallRoot.'
+    $failed = $true
+} else {
+    Invoke-Expression "function script:Resolve-RunnerMaintenanceInstallRoot $($installRootResolverAst.Body.Extent.Text)"
+    $resolverOldToolCache = $env:RUNNER_TOOL_CACHE
+    $resolverOldToolsDirectory = $env:RUNNER_TOOLSDIRECTORY
+    $resolverOldAgentToolsDirectory = $env:AGENT_TOOLSDIRECTORY
+    $resolverOldFallbackToolCache = $env:UH_RUNNER_TOOL_CACHE
+    $resolverOldOverride = $env:UNITY_EDITOR_INSTALL_ROOT
+    $runnerEnvironmentRoot = ''
+    try {
+        Remove-Item Env:\RUNNER_TOOL_CACHE -ErrorAction SilentlyContinue
+        Remove-Item Env:\RUNNER_TOOLSDIRECTORY -ErrorAction SilentlyContinue
+        Remove-Item Env:\AGENT_TOOLSDIRECTORY -ErrorAction SilentlyContinue
+        Remove-Item Env:\UH_RUNNER_TOOL_CACHE -ErrorAction SilentlyContinue
+        Remove-Item Env:\UNITY_EDITOR_INSTALL_ROOT -ErrorAction SilentlyContinue
+        $checkoutRoot = Resolve-RunnerMaintenanceInstallRoot -InstallRoot '' -RepoRoot 'E:\actions-runner\_work\unity-helpers\unity-helpers'
+        $runnerEnvironmentRoot = Join-Path ([System.IO.Path]::GetTempPath()) "unity-runner-environment-$PID-$(Get-Random)"
+        $runnerEnvironmentCheckout = Join-Path $runnerEnvironmentRoot '_work/unity-helpers/unity-helpers'
+        $runnerEnvironmentToolCache = Join-Path $runnerEnvironmentRoot '_tool'
+        New-Item -ItemType Directory -Force -Path $runnerEnvironmentCheckout | Out-Null
+        Set-Content -LiteralPath (Join-Path $runnerEnvironmentRoot '.env') -Value "RUNNER_TOOL_CACHE=$runnerEnvironmentToolCache"
+        $runnerEnvironmentResolvedRoot = Resolve-RunnerMaintenanceInstallRoot -InstallRoot '' -RepoRoot $runnerEnvironmentCheckout
+        $runnerEnvironmentExpectedRoot = Join-Path $runnerEnvironmentToolCache 'u6-v3'
+        $sameDriveRoot = Resolve-RunnerMaintenanceInstallRoot -InstallRoot '' -RepoRoot 'F:\src\unity-helpers'
+        $env:UNITY_EDITOR_INSTALL_ROOT = 'G:\operator\editors'
+        $overrideRoot = Resolve-RunnerMaintenanceInstallRoot -InstallRoot '' -RepoRoot 'F:\src\unity-helpers'
+        $explicitRoot = Resolve-RunnerMaintenanceInstallRoot -InstallRoot 'H:\explicit\editors' -RepoRoot 'F:\src\unity-helpers'
+        if (
+            $checkoutRoot -ne 'E:\actions-runner\_work\_tool\u6-v3' -or
+            $runnerEnvironmentResolvedRoot -ne $runnerEnvironmentExpectedRoot -or
+            $sameDriveRoot -ne 'F:\Unity\Editors' -or
+            $overrideRoot -ne 'G:\operator\editors' -or
+            $explicitRoot -ne 'H:\explicit\editors'
+        ) {
+            Write-Host "::error file=scripts/unity/maintain-windows-runner.ps1::Install-root resolution must prefer explicit/operator roots, honor the runner's service .env tool-cache override, use the Actions default for _work checkouts, and otherwise stay on the checkout drive. Checkout=$checkoutRoot RunnerEnvironment=$runnerEnvironmentResolvedRoot SameDrive=$sameDriveRoot Override=$overrideRoot Explicit=$explicitRoot"
+            $failed = $true
+        } elseif ($VerboseOutput) {
+            Write-Info 'Checked runner maintenance keeps Unity on the Actions runner drive with deterministic override precedence.'
+        }
+    } finally {
+        if ($resolverOldToolCache) { $env:RUNNER_TOOL_CACHE = $resolverOldToolCache } else { Remove-Item Env:\RUNNER_TOOL_CACHE -ErrorAction SilentlyContinue }
+        if ($resolverOldToolsDirectory) { $env:RUNNER_TOOLSDIRECTORY = $resolverOldToolsDirectory } else { Remove-Item Env:\RUNNER_TOOLSDIRECTORY -ErrorAction SilentlyContinue }
+        if ($resolverOldAgentToolsDirectory) { $env:AGENT_TOOLSDIRECTORY = $resolverOldAgentToolsDirectory } else { Remove-Item Env:\AGENT_TOOLSDIRECTORY -ErrorAction SilentlyContinue }
+        if ($resolverOldFallbackToolCache) { $env:UH_RUNNER_TOOL_CACHE = $resolverOldFallbackToolCache } else { Remove-Item Env:\UH_RUNNER_TOOL_CACHE -ErrorAction SilentlyContinue }
+        if ($resolverOldOverride) { $env:UNITY_EDITOR_INSTALL_ROOT = $resolverOldOverride } else { Remove-Item Env:\UNITY_EDITOR_INSTALL_ROOT -ErrorAction SilentlyContinue }
+        if ($runnerEnvironmentRoot) { Remove-Item -LiteralPath $runnerEnvironmentRoot -Recurse -Force -ErrorAction SilentlyContinue }
+    }
 }
 
 $manualDefaultsRoot = ''
 $manualDefaultsOutput = @()
 $manualDefaultsExitCode = 1
 $oldDisableAutoBootstrap = $env:UH_RUNNER_DISABLE_AUTO_BOOTSTRAP
+$oldRunnerToolCache = $env:RUNNER_TOOL_CACHE
+$oldUnityEditorInstallRoot = $env:UNITY_EDITOR_INSTALL_ROOT
 try {
     $env:UH_RUNNER_DISABLE_AUTO_BOOTSTRAP = '1'
+    $env:RUNNER_TOOL_CACHE = 'D:\actions-runner\_tool'
+    Remove-Item Env:\UNITY_EDITOR_INSTALL_ROOT -ErrorAction SilentlyContinue
     $manualDefaultsRoot = Join-Path ([System.IO.Path]::GetTempPath()) "unity-runner-manual-defaults-$PID-$(Get-Random)"
     $manualScriptsRoot = Join-Path $manualDefaultsRoot 'scripts/unity'
     $manualGithubRoot = Join-Path $manualDefaultsRoot '.github'
@@ -2446,10 +2614,10 @@ $ErrorActionPreference = 'Stop'
 if ($UnityVersion -notin @('2021.3.45f1', '6000.5.2f1')) {
     throw "Bad UnityVersion: $UnityVersion"
 }
-if ($InstallRoot -ne 'C:\Unity\Editors') {
+if ($InstallRoot -ne 'D:\actions-runner\_tool\u6-v3') {
     throw "Bad InstallRoot: $InstallRoot"
 }
-if ($ProvisioningProfile -ne 'StandaloneWindowsIl2Cpp') {
+if ($ProvisioningProfile -ne 'Full') {
     throw "Bad ProvisioningProfile: $ProvisioningProfile"
 }
 if (-not $CiManagedOnly) {
@@ -2481,6 +2649,16 @@ Write-Output "fake ensure-editor ok: $UnityVersion diagnostics=$DiagnosticsPath"
     } else {
         Remove-Item Env:\UH_RUNNER_DISABLE_AUTO_BOOTSTRAP -ErrorAction SilentlyContinue
     }
+    if ($oldRunnerToolCache) {
+        $env:RUNNER_TOOL_CACHE = $oldRunnerToolCache
+    } else {
+        Remove-Item Env:\RUNNER_TOOL_CACHE -ErrorAction SilentlyContinue
+    }
+    if ($oldUnityEditorInstallRoot) {
+        $env:UNITY_EDITOR_INSTALL_ROOT = $oldUnityEditorInstallRoot
+    } else {
+        Remove-Item Env:\UNITY_EDITOR_INSTALL_ROOT -ErrorAction SilentlyContinue
+    }
     if ($manualDefaultsRoot -and (Test-Path -LiteralPath $manualDefaultsRoot -PathType Container)) {
         Remove-Item -LiteralPath $manualDefaultsRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
@@ -2493,7 +2671,7 @@ if (
     $manualDefaultsText -notmatch 'fake ensure-editor ok: 2021\.3\.45f1' -or
     $manualDefaultsText -notmatch 'fake ensure-editor ok: 6000\.5\.2f1'
 ) {
-    Write-Host "::error file=scripts/unity/maintain-windows-runner.ps1::Direct manual maintenance must load .github/unity-versions.json by default, use a repo-local diagnostics root, and honor UH_RUNNER_DISABLE_AUTO_BOOTSTRAP=1 without requiring YAML-supplied arguments. Exit $manualDefaultsExitCode. Output: $manualDefaultsText"
+    Write-Host "::error file=scripts/unity/maintain-windows-runner.ps1::Direct manual maintenance must load .github/unity-versions.json by default, reuse the Actions runner tool cache, use a repo-local diagnostics root, and honor UH_RUNNER_DISABLE_AUTO_BOOTSTRAP=1 without requiring YAML-supplied arguments. Exit $manualDefaultsExitCode. Output: $manualDefaultsText"
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info "Checked direct manual maintenance defaults match workflow provisioning inputs."
@@ -2510,6 +2688,261 @@ try {
 }
 
 if ($ensureEditorWatchdogImported) {
+    $oldUnityNonInteractive = $env:UNITY_NON_INTERACTIVE
+    $oldUnityNoPager = $env:UNITY_NO_PAGER
+    $oldUnityNoConsentPrompt = $env:UNITY_NO_CONSENT_PROMPT
+    $oldUnityCliChannel = $env:UNITY_CLI_CHANNEL
+    $oldUnityInstallRetries = $env:UNITY_INSTALL_RETRIES
+    $oldUnityCliInstallStallSeconds = $env:UH_UNITY_CLI_INSTALL_STALL_SECONDS
+    try {
+        Remove-Item Env:\UNITY_NON_INTERACTIVE -ErrorAction SilentlyContinue
+        Remove-Item Env:\UNITY_NO_PAGER -ErrorAction SilentlyContinue
+        Remove-Item Env:\UNITY_NO_CONSENT_PROMPT -ErrorAction SilentlyContinue
+        Remove-Item Env:\UNITY_CLI_CHANNEL -ErrorAction SilentlyContinue
+        Remove-Item Env:\UNITY_INSTALL_RETRIES -ErrorAction SilentlyContinue
+        Set-UnityCliAutomationEnvironment
+        if (
+            $env:UNITY_NON_INTERACTIVE -ne '1' -or
+            $env:UNITY_NO_PAGER -ne '1' -or
+            $env:UNITY_NO_CONSENT_PROMPT -ne '1' -or
+            $env:UNITY_CLI_CHANNEL -ne 'beta' -or
+            $env:UNITY_INSTALL_RETRIES -ne '5'
+        ) {
+            Write-Host '::error file=scripts/unity/ensure-editor.ps1::Unity CLI automation environment must disable every prompt and provide built-in download retries.'
+            $failed = $true
+        }
+
+        $env:UNITY_INSTALL_RETRIES = '9'
+        Set-UnityCliAutomationEnvironment
+        if ($env:UNITY_INSTALL_RETRIES -ne '9') {
+            Write-Host '::error file=scripts/unity/ensure-editor.ps1::Unity CLI automation setup must preserve an explicit operator retry count.'
+            $failed = $true
+        }
+
+        $env:UH_UNITY_CLI_INSTALL_STALL_SECONDS = '47'
+        if ((Get-UnityCliInstallStallSeconds) -ne 47) {
+            Write-Host '::error file=scripts/unity/ensure-editor.ps1::The installer watchdog must honor UH_UNITY_CLI_INSTALL_STALL_SECONDS.'
+            $failed = $true
+        }
+    } finally {
+        foreach ($setting in @(
+                @{ Name = 'UNITY_NON_INTERACTIVE'; Value = $oldUnityNonInteractive },
+                @{ Name = 'UNITY_NO_PAGER'; Value = $oldUnityNoPager },
+                @{ Name = 'UNITY_NO_CONSENT_PROMPT'; Value = $oldUnityNoConsentPrompt },
+                @{ Name = 'UNITY_CLI_CHANNEL'; Value = $oldUnityCliChannel },
+                @{ Name = 'UNITY_INSTALL_RETRIES'; Value = $oldUnityInstallRetries },
+                @{ Name = 'UH_UNITY_CLI_INSTALL_STALL_SECONDS'; Value = $oldUnityCliInstallStallSeconds }
+            )) {
+            if ($null -eq $setting.Value) {
+                Remove-Item "Env:\$($setting.Name)" -ErrorAction SilentlyContinue
+            } else {
+                Set-Item "Env:\$($setting.Name)" ([string]$setting.Value)
+            }
+        }
+    }
+
+    $originalCompatibilityCapture = ${function:Invoke-UnityCliCaptureWithTimeout}
+    $originalCompatibilityRollback = ${function:Invoke-UnityCliWriterKindCompatibilityRollback}
+    $oldCompatibilityDeadlineVariable = Get-Variable -Name ProvisioningDeadlineUtc -Scope Script -ErrorAction SilentlyContinue
+    $oldCompatibilityDeadline = if ($oldCompatibilityDeadlineVariable) { $oldCompatibilityDeadlineVariable.Value } else { $null }
+    try {
+        $script:ProvisioningDeadlineUtc = [DateTime]::MaxValue
+        $script:compatibilityCaptureCalls = 0
+        $script:compatibilityRollbackCalls = 0
+        function script:Invoke-UnityCliCaptureWithTimeout {
+            param([string[]]$Arguments, [int]$TimeoutSeconds)
+            $script:compatibilityCaptureCalls++
+            if ($script:compatibilityCaptureCalls -eq 1) {
+                return @{
+                    Success = $false; ExitCode = 6
+                    Output = @("SQLite Error 1: 'table installs has no column named writer_kind'.")
+                    StallKilled = $false; TimedOutWallClock = $false
+                }
+            }
+            return @{
+                Success = $true; ExitCode = 0; Output = @('installed')
+                StallKilled = $false; TimedOutWallClock = $false
+            }
+        }
+        function script:Invoke-UnityCliWriterKindCompatibilityRollback {
+            $script:compatibilityRollbackCalls++
+            return $true
+        }
+
+        $compatibilityRecovered = Invoke-UnityCliCapture -Arguments @('install', '6000.6.0f1')
+        if (
+            -not $compatibilityRecovered.Success -or
+            $script:compatibilityCaptureCalls -ne 2 -or
+            $script:compatibilityRollbackCalls -ne 1
+        ) {
+            Write-Host "::error file=scripts/unity/ensure-editor.ps1::The beta.9 writer_kind regression must trigger one compatibility rollback and transparently retry the interrupted CLI command. CaptureCalls=$script:compatibilityCaptureCalls RollbackCalls=$script:compatibilityRollbackCalls Success=$($compatibilityRecovered.Success)."
+            $failed = $true
+        }
+
+        $script:compatibilityCaptureCalls = 0
+        $script:compatibilityRollbackCalls = 0
+        function script:Invoke-UnityCliCaptureWithTimeout {
+            param([string[]]$Arguments, [int]$TimeoutSeconds)
+            $script:compatibilityCaptureCalls++
+            return @{
+                Success = $false; ExitCode = 6; Output = @('ordinary install failure')
+                StallKilled = $false; TimedOutWallClock = $false
+            }
+        }
+        $ordinaryFailure = Invoke-UnityCliCapture -Arguments @('install', '6000.6.0f1')
+        if ($ordinaryFailure.Success -or $script:compatibilityCaptureCalls -ne 1 -or $script:compatibilityRollbackCalls -ne 0) {
+            Write-Host '::error file=scripts/unity/ensure-editor.ps1::Compatibility rollback must be restricted to the exact beta.9 writer_kind database signature.'
+            $failed = $true
+        }
+    } catch {
+        Write-Host "::error file=scripts/unity/ensure-editor.ps1::Unity CLI beta.9 compatibility recovery regression failed: $($_.Exception.Message)"
+        $failed = $true
+    } finally {
+        ${function:Invoke-UnityCliCaptureWithTimeout} = $originalCompatibilityCapture
+        ${function:Invoke-UnityCliWriterKindCompatibilityRollback} = $originalCompatibilityRollback
+        if ($oldCompatibilityDeadlineVariable) {
+            $script:ProvisioningDeadlineUtc = $oldCompatibilityDeadline
+        } else {
+            Remove-Variable -Name ProvisioningDeadlineUtc -Scope Script -ErrorAction SilentlyContinue
+        }
+        Remove-Variable -Name compatibilityCaptureCalls -Scope Script -ErrorAction SilentlyContinue
+        Remove-Variable -Name compatibilityRollbackCalls -Scope Script -ErrorAction SilentlyContinue
+    }
+
+    $originalRollbackCapture = ${function:Invoke-UnityCliCaptureWithTimeout}
+    $originalRollbackVersion = ${function:Get-UnityCliVersionText}
+    $originalRollbackMarker = ${function:Get-UnityCliCompatibilityMarkerPath}
+    $compatibilityMarkerFixture = Join-Path ([System.IO.Path]::GetTempPath()) "unity-cli-compat-$PID-$(Get-Random)"
+    try {
+        $script:rollbackApplied = $false
+        $script:rollbackArguments = @()
+        $script:UnityCliCompatibilityRollbackCompleted = $false
+        $script:UnityCliUpdateCompleted = $false
+        function script:Get-UnityCliVersionText {
+            if ($script:rollbackApplied) { return '1.0.0-beta.8' }
+            return '1.0.0-beta.9'
+        }
+        function script:Get-UnityCliCompatibilityMarkerPath { return $compatibilityMarkerFixture }
+        function script:Invoke-UnityCliCaptureWithTimeout {
+            param(
+                [string[]]$Arguments,
+                [int]$TimeoutSeconds,
+                [string]$TimeoutKnob,
+                [int]$StallSeconds,
+                [string]$StallKnob
+            )
+            $script:rollbackArguments = @($Arguments)
+            $script:rollbackApplied = $true
+            return @{
+                Success = $true; ExitCode = 0; Output = @('rolled back')
+                StallKilled = $false; TimedOutWallClock = $false
+            }
+        }
+
+        $rollbackSucceeded = Invoke-UnityCliWriterKindCompatibilityRollback
+        $rollbackArgumentText = @($script:rollbackArguments) -join ' '
+        if (
+            -not $rollbackSucceeded -or
+            $rollbackArgumentText -ne 'self-update --target 1.0.0-beta.8 --format ndjson' -or
+            -not (Test-Path -LiteralPath $compatibilityMarkerFixture -PathType Leaf) -or
+            -not $script:UnityCliUpdateCompleted
+        ) {
+            Write-Host "::error file=scripts/unity/ensure-editor.ps1::Writer-kind recovery must target beta.8, verify the resulting version, persist the cross-process hold, and mark the update complete. Args='$rollbackArgumentText' Success=$rollbackSucceeded."
+            $failed = $true
+        }
+    } catch {
+        Write-Host "::error file=scripts/unity/ensure-editor.ps1::Unity CLI compatibility rollback command regression failed: $($_.Exception.Message)"
+        $failed = $true
+    } finally {
+        ${function:Invoke-UnityCliCaptureWithTimeout} = $originalRollbackCapture
+        ${function:Get-UnityCliVersionText} = $originalRollbackVersion
+        ${function:Get-UnityCliCompatibilityMarkerPath} = $originalRollbackMarker
+        Remove-Item -LiteralPath $compatibilityMarkerFixture -Force -ErrorAction SilentlyContinue
+        Remove-Variable -Name rollbackApplied -Scope Script -ErrorAction SilentlyContinue
+        Remove-Variable -Name rollbackArguments -Scope Script -ErrorAction SilentlyContinue
+        $script:UnityCliCompatibilityRollbackCompleted = $false
+        $script:UnityCliUpdateCompleted = $false
+    }
+
+    $expectedFullRequestedModules = @(
+        'windows-il2cpp',
+        'webgl',
+        'ios',
+        'mac-mono',
+        'linux-mono',
+        'linux-il2cpp',
+        'android',
+        'android-sdk-ndk-tools'
+    )
+    $expectedFullVerifiedModules = @($expectedFullRequestedModules + 'android-open-jdk')
+    $actualFullRequestedModules = @(Get-UnityCiModuleIds -Profile 'Full')
+    $actualFullVerifiedModules = @(Get-UnityCiVerifiedModuleGroups -Profile 'Full')
+    if (
+        (Compare-Object $expectedFullRequestedModules $actualFullRequestedModules) -or
+        (Compare-Object $expectedFullVerifiedModules $actualFullVerifiedModules)
+    ) {
+        Write-Host "::error file=scripts/unity/ensure-editor.ps1::The Full runner provisioning profile must install and verify Windows IL2CPP, WebGL, iOS, macOS Mono, Linux Mono/IL2CPP, and Android with SDK/NDK/OpenJDK. Requested='$($actualFullRequestedModules -join ',')' Verified='$($actualFullVerifiedModules -join ',')'."
+        $failed = $true
+    } elseif ($VerboseOutput) {
+        Write-Info 'Checked Full runner provisioning installs every supported build target.'
+    }
+
+    $modulePresenceRoot = Join-Path ([System.IO.Path]::GetTempPath()) "unity-module-presence-$PID-$(Get-Random)"
+    try {
+        $editorPath = Join-Path $modulePresenceRoot 'Editor\Unity.exe'
+        $iosExtension = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\iOSSupport\UnityEditor.iOS.Extensions.dll'
+        $iosToolchain = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\iOSSupport\Trampoline\Classes\UnityAppController.mm'
+        $macExtension = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\MacStandaloneSupport\UnityEditor.OSXStandalone.Extensions.dll'
+        $macIl2CppPlayer = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\MacStandaloneSupport\Variations\macosx64_player_development_il2cpp\UnityPlayer.app\Contents\MacOS\UnityPlayer'
+        $macPlayer = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\MacStandaloneSupport\Variations\macosx64_player_development_mono\UnityPlayer.app\Contents\MacOS\UnityPlayer'
+        $androidExtension = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\AndroidPlayer\UnityEditor.Android.Extensions.dll'
+        $androidLegacyPlayerTools = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\AndroidPlayer\Tools\Source.properties'
+        $androidPlayerTools = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\AndroidPlayer\Tools\sdktools.jar'
+        foreach ($path in @($editorPath, $iosExtension, $macExtension, $androidExtension)) {
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $path) | Out-Null
+            New-Item -ItemType File -Force -Path $path | Out-Null
+        }
+
+        $partialIosAccepted = Test-UnityCiModuleGroupPresent -EditorPath $editorPath -Group 'ios'
+        $partialMacAccepted = Test-UnityCiModuleGroupPresent -EditorPath $editorPath -Group 'mac-mono'
+        $partialAndroidExtensionOnlyAccepted = Test-UnityCiModuleGroupPresent -EditorPath $editorPath -Group 'android'
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $androidLegacyPlayerTools) | Out-Null
+        New-Item -ItemType File -Force -Path $androidLegacyPlayerTools | Out-Null
+        $legacyAndroidMarkerAccepted = Test-UnityCiModuleGroupPresent -EditorPath $editorPath -Group 'android'
+        Remove-Item -LiteralPath $androidLegacyPlayerTools -Force
+        Remove-Item -LiteralPath $androidExtension -Force
+        foreach ($path in @($iosToolchain, $macIl2CppPlayer, $androidPlayerTools)) {
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $path) | Out-Null
+            New-Item -ItemType File -Force -Path $path | Out-Null
+        }
+        $il2CppOnlyMacAccepted = Test-UnityCiModuleGroupPresent -EditorPath $editorPath -Group 'mac-mono'
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $macPlayer) | Out-Null
+        New-Item -ItemType File -Force -Path $macPlayer | Out-Null
+        $partialAndroidToolsOnlyAccepted = Test-UnityCiModuleGroupPresent -EditorPath $editorPath -Group 'android'
+        New-Item -ItemType File -Force -Path $androidExtension | Out-Null
+        $completeIosAccepted = Test-UnityCiModuleGroupPresent -EditorPath $editorPath -Group 'ios'
+        $completeMacAccepted = Test-UnityCiModuleGroupPresent -EditorPath $editorPath -Group 'mac-mono'
+        $completeAndroidAccepted = Test-UnityCiModuleGroupPresent -EditorPath $editorPath -Group 'android'
+        if (
+            $partialIosAccepted -or
+            $partialMacAccepted -or
+            $il2CppOnlyMacAccepted -or
+            $partialAndroidExtensionOnlyAccepted -or
+            $legacyAndroidMarkerAccepted -or
+            $partialAndroidToolsOnlyAccepted -or
+            -not $completeIosAccepted -or
+            -not $completeMacAccepted -or
+            -not $completeAndroidAccepted
+        ) {
+            Write-Host "::error file=scripts/unity/ensure-editor.ps1::iOS, macOS Mono, and Android module checks must reject partial installs and stale Android markers, and accept only the extension plus its toolchain/player payload. PartialIos=$partialIosAccepted PartialMac=$partialMacAccepted Il2CppOnlyMac=$il2CppOnlyMacAccepted PartialAndroidExtensionOnly=$partialAndroidExtensionOnlyAccepted LegacyAndroidMarker=$legacyAndroidMarkerAccepted PartialAndroidToolsOnly=$partialAndroidToolsOnlyAccepted CompleteIos=$completeIosAccepted CompleteMac=$completeMacAccepted CompleteAndroid=$completeAndroidAccepted."
+            $failed = $true
+        } elseif ($VerboseOutput) {
+            Write-Info 'Checked iOS, macOS Mono, and Android module verification rejects partial installs.'
+        }
+    } finally {
+        Remove-Item -LiteralPath $modulePresenceRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
     $alternateInstallFunctionAst = Get-FunctionAstByName -Ast $ensureEditorAst -Name 'Install-UnityEditorWithCiModulesInAlternateRoot'
     $alternateInstallContent = if ($alternateInstallFunctionAst) { $alternateInstallFunctionAst.Extent.Text } else { '' }
     $requiredPayloadRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("unity-required-payload-" + [guid]::NewGuid().ToString('N'))
@@ -3073,21 +3506,29 @@ if ($sparseRegistryExitCode -ne 0) {
     Write-Info "Checked Windows runner bootstrap sparse uninstall registry entries."
 }
 
-# Two properties, and they pull against each other. `cancel-in-progress: false` is mandatory --
-# cancelling a licensed job can skip license return and lock release. But that alone makes every new
-# run queue behind its predecessor, and a superseded predecessor holds the group for as long as its
-# legs sit in the runner queue, where they cannot reach the head guard that would end them. On PR
-# #351 the head carried no Unity check at all for two hours while every other check was green.
-# Scoping the group to the head is what keeps the second property from costing the first.
-$preservesLicensedPrRuns = (
-    $workflowContent.Contains('group: unity-tests-${{ github.event.pull_request.number || github.ref }}-${{ github.event.pull_request.head.sha || github.sha }}') -and
-    $workflowContent.Contains('cancel-in-progress: false')
+# One stable group per PR/ref lets GitHub cancel both running and queued legs from an older
+# revision. The licensed jobs' `always()` cleanup path is responsible for returning the license
+# and releasing the organization lock when cancellation arrives after acquisition.
+$cancelsSupersededLicensedRuns = (
+    $workflowContent.Contains('group: unity-tests-${{ github.event.pull_request.number || github.ref }}') -and
+    $workflowContent.Contains('cancel-in-progress: true')
 )
-if (-not $preservesLicensedPrRuns) {
-    Write-Host "::error file=.github/workflows/unity-tests.yml::Unity Tests must not cancel an in-progress licensed run (cancellation can skip license return and lock release), and its concurrency group must be scoped to the head SHA so a superseded run cannot block the current head from being validated at all."
+if (-not $cancelsSupersededLicensedRuns) {
+    Write-Host "::error file=.github/workflows/unity-tests.yml::Unity Tests must group by pull request/ref and cancel in-progress runs so superseded licensed legs cannot starve the self-hosted runners."
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info "Checked Unity Tests preserves in-progress licensed runs and scopes concurrency per head."
+    Write-Info "Checked Unity Tests cancels superseded runs within a stable pull request/ref group."
+}
+
+$cancelsSupersededBenchmarkRuns = (
+    $benchmarksWorkflowContent.Contains('group: unity-benchmarks-${{ github.ref }}') -and
+    $benchmarksWorkflowContent.Contains('cancel-in-progress: true')
+)
+if (-not $cancelsSupersededBenchmarkRuns) {
+    Write-Host "::error file=.github/workflows/unity-benchmarks.yml::Unity Benchmarks must group by ref and cancel in-progress runs so repeated dispatches cannot starve the self-hosted runners."
+    $failed = $true
+} elseif ($VerboseOutput) {
+    Write-Info "Checked Unity Benchmarks cancels superseded runs within a stable ref group."
 }
 
 $currentPrHeadGuardUses = "Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@$currentPrHeadGuardCommit"
@@ -3331,11 +3772,10 @@ foreach ($licensedJobId in $licensedJobIds) {
 }
 
 # The per-leg guards above fire only after a leg has been dispatched, which means
-# waiting in line for the single self-hosted Unity seat. The concurrency group is
-# scoped per head so that queue can no longer block the successor run outright,
-# but a superseded iteration that dispatches its legs anyway still burns runner
-# slots to fail version-job guards. The hosted matrix-config job must resolve
-# supersession once and skip the licensed tiers outright.
+# waiting in line for the single self-hosted Unity seat. Workflow concurrency now
+# cancels a superseded iteration, but the hosted matrix-config guard remains a
+# defense in depth for runs superseded around dispatch and for historical runs
+# created before cancellation was enabled.
 $matrixConfigJob = if ($jobTexts.ContainsKey('matrix-config')) { [string]$jobTexts['matrix-config'] } else { '' }
 $supersededStep = [regex]::Match(
     $matrixConfigJob,
