@@ -35,6 +35,7 @@ if ($parseErrors -and $parseErrors.Count -gt 0) {
 
 foreach ($name in @(
         'ConvertTo-SingleLineDiagnostic',
+        'Assert-NoUnityCompilerWarnings',
         'Test-UnityPackageManagerTransientFailure',
         'Test-UnityConfigurePackageManagerRetryableFailure',
         'Write-UnityPackageManagerTransientFailureWarnings',
@@ -61,6 +62,7 @@ $script:passed = 0
 $script:failed = 0
 $script:notices = New-Object System.Collections.Generic.List[string]
 $script:CatastrophicPatterns = @(Get-CatastrophicPatterns)
+$RepoRoot = Split-Path -Parent $scriptRoot
 
 function Assert-That {
     param([string]$Description, [bool]$Condition)
