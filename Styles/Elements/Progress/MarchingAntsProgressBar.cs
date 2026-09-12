@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 {
     using System.Collections.Generic;
     using System.ComponentModel;
+    using System.Diagnostics.CodeAnalysis;
     using UnityEngine;
     using UnityEngine.UIElements;
 
@@ -222,13 +223,23 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private float _currentDashOffset;
         private IVisualElementScheduledItem _animationUpdateItem;
-#pragma warning disable WPROTO028 // UI-only geometry cache; this element is never a WallstopProto contract.
+
+        [SuppressMessage(
+            "WallstopProto",
+            "WPROTO028",
+            Justification = "UI-only geometry cache; this element is never a WallstopProto contract."
+        )]
         private readonly List<Vector2> _pathPoints = new();
 #if UNITY_2022_1_OR_NEWER
         private bool _pathDirty = true;
 #endif
+
+        [SuppressMessage(
+            "WallstopProto",
+            "WPROTO028",
+            Justification = "UI-only geometry cache; this element is never a WallstopProto contract."
+        )]
         private Rect _lastKnownRect = Rect.zero;
-#pragma warning restore WPROTO028
 
 #if !UNITY_6000_0_OR_NEWER
         public new class UxmlFactory : UxmlFactory<MarchingAntsProgressBar, UxmlTraits> { }
