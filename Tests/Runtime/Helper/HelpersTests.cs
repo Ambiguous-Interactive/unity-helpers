@@ -689,13 +689,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             try
             {
                 requestedContextCoroutine = host.StartFunctionAsCoroutine(
-                    requestedContext,
                     () =>
                     {
                         ++requestedContextInvocations;
                         throw new InvalidOperationException("Attributed job failure.");
                     },
-                    0.01f
+                    0.01f,
+                    useJitter: false,
+                    waitBefore: false,
+                    context: requestedContext
                 );
                 defaultContextCoroutine = host.StartFunctionAsCoroutine(
                     () =>

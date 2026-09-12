@@ -4113,37 +4113,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
         }
 
-        internal Texture2D GeneratePreviewTexture(
-            Color32[] sourcePixels,
-            int sourceWidth,
-            int sourceHeight,
-            SpriteEntryData sprite
-        )
-        {
-            return GenerateSinglePreviewTexture(sourcePixels, sourceWidth, sourceHeight, sprite);
-        }
-
-        internal bool ExtractSpriteImmediately(
-            SpriteSheetEntry sheet,
-            SpriteEntryData sprite,
-            string outputPath,
-            int index
-        )
-        {
-            return ExtractSprite(sheet, sprite, outputPath, index);
-        }
-
-        internal string ExtractSpriteWithoutImport(
-            SpriteSheetEntry sheet,
-            SpriteEntryData sprite,
-            string outputPath,
-            int index,
-            List<PendingImportSettings> pendingImports
-        )
-        {
-            return ExtractSpriteDeferred(sheet, sprite, outputPath, index, pendingImports);
-        }
-
         private void BindSerializedState()
         {
             ReleaseSerializedState();

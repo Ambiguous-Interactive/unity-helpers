@@ -627,36 +627,34 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             bool waitBefore = false
         )
         {
-            return StartFunctionAsCoroutine<Object>(
+            return StartFunctionAsCoroutine(
                 monoBehaviour,
-                null,
                 action,
                 updateRate,
                 useJitter,
-                waitBefore
+                waitBefore,
+                null
             );
         }
 
         /// <summary>
         /// Repeatedly invokes an action and reports its first failure against the object that owns it.
         /// </summary>
-        /// <typeparam name="TContext">The Unity object type used for error-report attribution.</typeparam>
         /// <param name="monoBehaviour">The component that hosts the coroutine.</param>
-        /// <param name="context">The object that owns the work for error reporting, or the coroutine host when null.</param>
         /// <param name="action">The action to invoke.</param>
         /// <param name="updateRate">Interval in seconds; nonpositive or nonfinite values invoke once per frame.</param>
         /// <param name="useJitter">If true, applies a single randomized initial delay up to <paramref name="updateRate"/>.</param>
         /// <param name="waitBefore">If true, waits one interval before the first invocation.</param>
+        /// <param name="context">The object that owns the work for error reporting, or the coroutine host when null.</param>
         /// <returns>The started coroutine.</returns>
-        public static Coroutine StartFunctionAsCoroutine<TContext>(
+        public static Coroutine StartFunctionAsCoroutine(
             this MonoBehaviour monoBehaviour,
-            TContext context,
             Action action,
             float updateRate,
-            bool useJitter = false,
-            bool waitBefore = false
+            bool useJitter,
+            bool waitBefore,
+            Object context
         )
-            where TContext : Object
         {
             if (action == null)
             {

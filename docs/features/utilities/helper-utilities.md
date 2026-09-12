@@ -264,10 +264,11 @@ using WallstopStudios.UnityHelpers.Core.Helper;
 // Spawn every 5 seconds after a randomized initial delay
 Helpers.StartFunctionAsCoroutine(
     gameManager,
-    waveController,
     SpawnEnemy,
     updateRate: 5f,
-    useJitter: true
+    useJitter: true,
+    waitBefore: false,
+    context: waveController
 );
 
 void SpawnEnemy()
