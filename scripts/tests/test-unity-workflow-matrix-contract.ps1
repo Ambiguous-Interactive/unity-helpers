@@ -2074,7 +2074,11 @@ $matrixConfigAssemblyDiscoveryIsCentralized = (
     $workflowContent.Contains('core-assembly-profiles: ${{ steps.assemblies.outputs.core_profiles }}') -and
     $workflowContent.Contains('test-modes: ${{ steps.resolve.outputs.test-modes }}') -and
     $workflowContent.Contains('unity-versions: ${{ steps.resolve.outputs.unity-versions }}') -and
-    $unityTestsMatrixJob.Contains('unity-version: ${{ fromJSON(needs.matrix-config.outputs.unity-versions) }}') -and
+    # The version axis is static text restating .github/unity-versions.json (the
+    # version-grouped matrix contract above proves the canonical match), because
+    # the enrollment audit can only prove the per-leg gate and return pins on a
+    # static axis.
+    $matrixVersionsMatchCanonicalSource -and
     $unityTestsMatrixJob.Contains('UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.editmode-integration-assemblies }}') -and
     $unityTestsMatrixJob.Contains('UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.playmode-integration-assemblies }}') -and
     $unityTestsMatrixJob.Contains('UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.standalone-integration-assemblies }}') -and
