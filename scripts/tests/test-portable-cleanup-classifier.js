@@ -301,7 +301,7 @@ for (const deprecatedPolicyFile of [
   );
 }
 
-// Discovered, not named. Listing `unity-tests.yml`, `unity-benchmarks.yml` and `release.yml` here
+// Discovered, not named. Listing workflow files here
 // stated where the requirement currently lives rather than what it is, and the quiet failure that
 // invites is a FOURTH workflow that returns a Unity license and is checked by nothing (#445). The
 // requirement is that every workflow returning a license passes through the central cleanup gate.
@@ -356,75 +356,13 @@ for (const entry of licenseReturningWorkflows) {
     }
   }
 }
-const releaseWorkflow = licenseReturningWorkflows.find((entry) => entry.name === "release.yml");
-assert.ok(releaseWorkflow, "release.yml must preserve its native export cleanup lifecycle");
-const releaseSteps = yaml.parse(releaseWorkflow.body).jobs.unitypackage.steps;
-const uploadGuards = releaseSteps.filter(
-  (step) => step.name === "Confirm Unity cleanup before package upload"
-);
-assert.equal(
-  uploadGuards.length,
-  1,
-  "release export must have exactly one cleanup guard before upload"
-);
-const uploadGuard = uploadGuards[0];
-const terminalGate = releaseSteps.at(-1);
-assert.equal(uploadGuard.id, "cleanup_before_upload");
-assert.equal(uploadGuard.uses, centralGateUse);
-assert.equal(uploadGuard.if, "always()");
-assert.equal(terminalGate.name, "Require confirmed Unity cleanup");
-assert.equal(terminalGate.uses, centralGateUse);
-assert.equal(terminalGate.if, "always()");
-const cleanupInputs = {
-  acquired: "${{ steps.unity_lock.outputs.acquired }}",
-  "classification-complete": "${{ steps.cleanup_classification.outputs.classification-complete }}",
-  "cleanup-status": "${{ steps.cleanup_classification.outputs.resource-cleanup-status }}",
-  "cleanup-health": "${{ steps.cleanup_classification.outputs.resource-health }}",
-  "cleanup-reason": "${{ steps.cleanup_classification.outputs.resource-reason }}",
-  "release-outcome": "${{ steps.release_unity_lock.outcome }}",
-  "cleanup-result": "${{ steps.release_unity_lock.outputs.cleanup-result }}",
-  released: "${{ steps.release_unity_lock.outputs.released }}",
-  "release-health": "${{ steps.release_unity_lock.outputs.resource-health }}",
-  "release-reason": "${{ steps.release_unity_lock.outputs.resource-reason }}",
-  "reservation-state": "${{ steps.release_unity_lock.outputs.reservation-state }}",
-  "reservation-id": "${{ steps.release_unity_lock.outputs.reservation-id }}",
-  "incident-id": "${{ steps.release_unity_lock.outputs.incident-id }}"
-};
-assert.deepEqual(
-  uploadGuard.with,
-  cleanupInputs,
-  "upload guard must consume central cleanup evidence"
-);
-assert.deepEqual(
-  terminalGate.with,
-  cleanupInputs,
-  "terminal gate must consume central cleanup evidence"
-);
-const packageUploadIndex = releaseSteps.findIndex(
-  (step) => step.name === "Upload .unitypackage artifact"
-);
-assert.ok(
-  releaseSteps.indexOf(uploadGuard) < packageUploadIndex &&
-    packageUploadIndex < releaseSteps.length - 1,
-  "release cleanup must be verified before package upload and at the end of the job"
-);
-assert.equal(
-  releaseSteps[packageUploadIndex].if,
-  undefined,
-  "package upload must require prior success"
-);
-assert.equal(
-  uploadGuard["continue-on-error"],
-  undefined,
-  "unsafe cleanup must block package upload"
-);
-const cleanupGates = licenseReturns + uploadGuards.length;
+const cleanupGates = licenseReturns;
 assert.ok(centralReturns > 0, "no Windows caller uses the central return executor");
 assert.equal(centralReturns, licenseReturns, "every return must use the pinned central executor");
 assert.equal(
   occurrences(workflow, `uses: ${centralGateUse}`),
   cleanupGates,
-  "every lifecycle needs a terminal gate; only release export has a second guard before upload"
+  "every lifecycle needs a terminal gate"
 );
 assert.equal(
   occurrences(workflow, "id: release_unity_lock"),

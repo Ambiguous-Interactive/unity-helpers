@@ -350,7 +350,7 @@ runTest("the workflow scanner still finds the Unity jobs, steps and uploads", ()
     "scanner: every upload step declares a path, so one that parsed to none is a scanner fault"
   );
   assert.ok(
-    unityUploads().length >= 13,
+    unityUploads().length >= 12,
     `scanner: expected the Unity uploads to be found, saw ${unityUploads().length}`
   );
 });

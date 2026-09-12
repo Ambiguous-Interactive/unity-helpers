@@ -297,7 +297,6 @@ runTest("the workflow scanner still finds the paths this repository uploads", ()
   for (const expected of [
     ".artifacts",
     ".artifacts/unity",
-    ".artifacts/unity/unitypackage-project",
     ".artifacts/unity/unitypackage-smoke-project"
   ]) {
     assert.ok(
