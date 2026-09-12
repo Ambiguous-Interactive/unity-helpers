@@ -283,6 +283,11 @@ const CHECKS = [
     run: "npm run test:unity-package-export"
   },
   {
+    id: "create-unitypackage",
+    name: "Portable Unity package archive",
+    run: "npm run test:create-unitypackage"
+  },
+  {
     id: "unity-test-filter",
     name: "Unity test filter arguments and results",
     run: "npm run test:unity-test-filter"

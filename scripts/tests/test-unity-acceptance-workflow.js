@@ -316,7 +316,7 @@ assert.equal(
   "Every declared diagnostic action must be exercised"
 );
 assert.ok(
-  diagnosticSubjects >= 17,
+  diagnosticSubjects >= 15,
   "The sweep must include all existing local diagnostic/redaction actions"
 );
 console.log(`${diagnosticSubjects} local action checkout dependencies checked.`);

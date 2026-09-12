@@ -98,9 +98,7 @@ claude-zai /status    # Auth token: ANTHROPIC_AUTH_TOKEN; base URL: the Z.ai end
 claude-openrouter /status
 ```
 
-Each isolated `CLAUDE_CONFIG_DIR` prompts once to trust the project's `.mcp.json` servers, and the
-tracked `.claude/settings.json` hooks (including the cspell post-edit hook) still apply because
-project settings load from the repository regardless of the config directory.
+Each isolated `CLAUDE_CONFIG_DIR` prompts once to trust the project's `.mcp.json` servers.
 
 References: [Z.ai devpack](https://docs.z.ai/devpack/overview),
 [Z.ai Codex integration](https://docs.z.ai/devpack/tool/codex),

@@ -103,7 +103,7 @@ Run formatters/linters **immediately after each file change**, not batched at ta
 - **Non-C#** (`.md`, `.json`, `.yaml`, `.yml`): `node scripts/run-prettier.js --write -- <file>` (repo-local launcher; run `npm install` first on the host that runs hooks)
 - **Markdown**: `npm run lint:docs` + `npm run lint:markdown`
 - **YAML**: `npm run lint:yaml` (then `actionlint` for workflows)
-- **Spelling**: `npm run lint:spelling` (add valid terms to `cspell.json`). A Claude Code PostToolUse hook (`scripts/hooks/cspell-post-edit.js`, registered in the tracked [`.claude/settings.json`](../.claude/settings.json) which ships with the repo) auto-runs cspell after every Edit/Write/MultiEdit/NotebookEdit, so typos surface immediately; manual invocation before completion remains the expectation (the hook is a safety net, not a substitute -- it does not fire in CI or when editing outside Claude Code)
+- **Spelling**: `npm run lint:spelling` (add valid terms to `cspell.json`). Run it manually before completion; `npm run agent:preflight` and CI provide the final safety net
 - **Tests**: `pwsh -NoProfile -File scripts/lint-tests.ps1 -FixNullChecks -Paths <changed test files>`, then `pwsh -NoProfile -File scripts/lint-tests.ps1 -Paths <changed test files>`. Passing more than one path only works because every `-Paths` script declares BOTH a `ValueFromRemainingArguments` sibling and `[CmdletBinding(PositionalBinding = $false)]` -- `pwsh -File` binds the first token and offers the rest to the other named parameters positionally, so the sibling alone only works when every neighbor happens to be a `[switch]`. Measured: `ensure-editor.ps1 -RequiredEditorPayloadRelativePath a b` put `b` in `-InstallRoot`. `PWS005` enforces both halves
 - **Skill files and [context](./context.md)**: `pwsh -NoProfile -File scripts/lint-skill-sizes.ps1` (500-line limit)
 - **Commit prep**: stage files, then run `npm run agent:preflight:fix` (includes changed spell-checkable file checks) before any commit attempt
@@ -177,7 +177,7 @@ See [formatting](./skills/formatting.md) and [validate-before-commit](./skills/v
 - Devcontainer Codex lifecycle changes must keep `.devcontainer/install-codex.sh`, `post-create.sh`, `post-start.sh` and `scripts/tests/test-post-create.sh` in sync (package, command, retry behavior, lifecycle wiring)
 - Codex login is browser-first (no device-auth fallback); keep it aligned with `scripts/codex-login.sh`, `devcontainer.json` port `1455`, and `scripts/tests/test-post-create.sh`. Use `npm run codex:yolo` for yolo flows in scripts or non-TTY contexts -- raw `codex --yolo` is interactive-only
 - Alternate model backends are process-scoped launchers, never native-config rewrites: `codex-zai`, `codex-openrouter`, `claude-zai`, `claude-openrouter` (see [ai-model-backends](../docs/guides/ai-model-backends.md)); `npm run test:ai-backends` holds their contracts
-- Release/package changes must keep the `.unitypackage` export smoke gate intact. `Samples~` is renamed to `Samples` by `scripts/unity/export-unitypackage.sh`, so sample assemblies must compile as a release payload, not only as ignored UPM samples.
+- Release/package changes must keep the `.unitypackage` export smoke gate intact. `Samples~` is renamed to `Samples` by `scripts/unity/stage-unitypackage.js`, so sample assemblies must compile as a release payload, not only as ignored UPM samples.
 - Unity licensing logs can contain serial/email fragments even when GitHub secrets are masked. Docker Unity activation/return output must be redacted before it reaches CI logs, and release paths must keep serial return behavior covered by contract tests.
 - If a script derives `REPO_ROOT` / `$repoRoot` from its own location, every `git ls-files` / `git diff --relative` / similar repo-relative git call must also be anchored there (`git -C "$REPO_ROOT" ...` or `cd "$REPO_ROOT"` first). Never combine repo-root-derived filesystem paths with caller-cwd-derived git output.
 - When adding formatter support for a new language, add explicit `[language]` entry in `devcontainer.json`
@@ -329,7 +329,8 @@ Lint-error-code prefixes (`^[A-Z]{2,}\d{3}$` tokens like `UNH001`, `PWS002`) mus
 - Write exhaustive tests for every change (see [create-test](./skills/create-test.md))
 - Use high-performance search tools: `rg` not `grep`, `fd` not `find`, `bat --paging=never` not `cat` (see [search-codebase](./skills/search-codebase.md))
 - For CI/CD bash scripts, use POSIX-compliant tools (see [validate-before-commit](./skills/validate-before-commit.md#portable-shell-scripting-in-workflows-critical))
-- **Do not commit**: `Library/`, `obj/`, secrets, tokens. **Do commit**: `.meta` files for all assets
+- **Never commit** `Library/`, `obj/`, secrets, tokens, or root `progress/`; never force-add ignored
+  progress. Put durable evidence in issues or commit bodies. **Do commit** asset `.meta` files.
 - **Verify `.asmdef` references** when adding new namespaces
 - Commits: short, imperative summaries (e.g., "Fix JSON serialization for FastVector"); group related changes
 - **User-facing copy is STE-simple.** PRs, titles, commits, comments, ship summaries -- anything a
@@ -341,12 +342,11 @@ Lint-error-code prefixes (`^[A-Z]{2,}\d{3}$` tokens like `UNH001`, `PWS002`) mus
 - PRs: **short and plain.** A title of 50 characters or fewer naming the effect the user sees,
   then one `**Why:**` sentence, two to five one-line `**What:**` bullets, and `Fixes #123`.
   Nothing else -- no root causes, no measurements, no validation reports. Those go in the commit
-  body, the progress log, or the linked issue. Include before/after screenshots for UI changes.
-  See [ship-changes](./skills/ship-changes.md#step-9b-open-the-pull-request-yourself)
+  body or the linked issue. Include before/after screenshots for UI changes.
 - **File follow-ups as GitHub issues, never as local-only notes.** A session remainder -- latent
   bug, stale comment, design decision, scoped sweep -- becomes a tracked issue (verified file:line
   evidence, fix shape, acceptance criteria, provenance link) BEFORE the work is declared done.
-  Local notes let it evaporate; issues survive and stay searchable. Search first (`search_issues`)
+  Search first (`search_issues`)
   for duplicates, pick the type (Bug/Feature/Task), and cross-link the issue where it was raised.
   The progress notes and work plan then carry the issue NUMBER, not the finding. Begin an
   agent-written issue body with the required LLM disclosure.

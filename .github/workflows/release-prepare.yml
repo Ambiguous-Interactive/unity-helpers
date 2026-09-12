@@ -208,10 +208,6 @@ jobs:
             -Version "${VERSION}" \
             -OutputPath "${notes_file}"
 
-          auth_header="$(printf 'x-access-token:%s' "${GH_PUSH_TOKEN}" | base64 | tr -d '\n')"
-          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth_header}" \
-            push origin "HEAD:refs/heads/${BRANCH}"
-
           pr_body_file="${RUNNER_TEMP}/release-pr-body.md"
           {
             echo "Automated release preparation for ${VERSION}."
@@ -222,16 +218,23 @@ jobs:
             echo "- [ ] \`CHANGELOG.md\` has a reviewed \`## [${VERSION}]\` section."
             echo "- [ ] Squash-merge with the default \`release: ${VERSION}\` title."
             echo
-            echo "## Release Notes"
-            echo
-            cat "${notes_file}"
+            echo "Review the complete release notes in the changed \`CHANGELOG.md\`."
             echo
             echo "## After Merge"
             echo
             echo "Run the Release Publish workflow on \`${DEFAULT_BRANCH}\` with version \`${VERSION}\`."
             echo "Leave \`source_ref\` as \`${DEFAULT_BRANCH}\` for the normal path."
-            echo "Release Publish validates, packs npm, exports the \`.unitypackage\`, creates the release tag if needed, publishes npm, and publishes the GitHub Release assets."
+            echo "Release Publish validates, packs npm, creates the \`.unitypackage\`, creates the release tag if needed, publishes npm, and publishes the GitHub Release assets."
           } > "${pr_body_file}"
+          pr_body_length="$(wc -m < "${pr_body_file}")"
+          if [ "${pr_body_length}" -gt 65536 ]; then
+            echo "::error::Release PR body has ${pr_body_length} characters; GitHub allows at most 65536."
+            exit 1
+          fi
+
+          auth_header="$(printf 'x-access-token:%s' "${GH_PUSH_TOKEN}" | base64 | tr -d '\n')"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth_header}" \
+            push origin "HEAD:refs/heads/${BRANCH}"
 
           GH_TOKEN="${GH_PUSH_TOKEN}" gh pr create \
             --repo "${GITHUB_REPOSITORY}" \

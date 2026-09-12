@@ -390,6 +390,31 @@ if ($trackedIgnoredPaths.Count -gt 0) {
   Write-Info '  No tracked file is gitignored.'
 }
 
+# ---- Check 5: Agent progress artifacts never enter history ----
+# This is an explicit repository policy, independent of whether the matching ignore rule is later
+# narrowed or removed. Progress notes are disposable local state; durable evidence belongs in the
+# canonical issue or commit body.
+Write-Info 'Check 5: Verifying no agent progress artifact is tracked...'
+$trackedProgress = @(& git ls-files --cached -- 'progress/**' 'progress.meta')
+if ($LASTEXITCODE -ne 0) {
+  throw "git ls-files failed with exit code $LASTEXITCODE"
+}
+$trackedProgressPaths = @($trackedProgress | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+if (0 -lt $trackedProgressPaths.Count) {
+  $hasErrors = $true
+  $errorCount += $trackedProgressPaths.Count
+  Write-Host ''
+  Write-Host "ERROR: $($trackedProgressPaths.Count) agent progress artifact(s) are tracked:" -ForegroundColor Red
+  foreach ($path in $trackedProgressPaths) {
+    Write-Host "  $path" -ForegroundColor Yellow
+  }
+  Write-Host ''
+  Write-Host 'Fix: git rm --cached <path> to keep the local note while removing it from history.' -ForegroundColor Cyan
+  Write-Host ''
+} else {
+  Write-Info '  No agent progress artifact is tracked.'
+}
+
 # ---- Summary ----
 if ($hasErrors) {
   Write-Host ""

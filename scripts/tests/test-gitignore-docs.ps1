@@ -426,6 +426,24 @@ Write-TestResult "GlobalGitignoreDoesNotFailCheckFour" ($result6d.ExitCode -eq 0
 Remove-Item -Path $globalIgnore -Force -ErrorAction SilentlyContinue
 Remove-TestRepo $repo6d
 
+# ==== Test Group 7: Agent progress artifacts are never tracked ====
+# This policy must survive an accidental removal or narrowing of the repository's ignore rule.
+Write-Host "`nTest group: Agent progress artifact policy" -ForegroundColor Magenta
+$repo7 = New-TestRepo -DocsFiles @('index.md')
+Push-Location $repo7
+try {
+  New-Item -ItemType Directory -Path 'progress' -Force | Out-Null
+  'local scratch' | Set-Content -Path 'progress/session.md' -Encoding UTF8
+  & git add 'progress/session.md' 2>&1 | Out-Null
+  & git commit -q -m 'Track agent scratch' 2>&1 | Out-Null
+} finally {
+  Pop-Location
+}
+$result7 = Invoke-Linter -RepoDir $repo7
+Write-TestResult "TrackedProgressArtifact_FailsWithoutIgnoreRule" ($result7.ExitCode -eq 1) "Expected exit code 1, got $($result7.ExitCode)"
+Write-TestResult "TrackedProgressArtifact_NamesThePath" ($result7.Output -match 'progress/session\.md') "Expected the message to name progress/session.md"
+Remove-TestRepo $repo7
+
 # ---- Summary ----
 
 Write-Host ""

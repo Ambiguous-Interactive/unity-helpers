@@ -2350,7 +2350,6 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
 
   $timeoutBudgetFailures = @()
   foreach ($caller in @(
-      @{ Name = 'release'; Job = $releaseJob; ExportStep = 'Export Unity package'; HasArtifactUpload = $true },
       @{ Name = 'unitypackage-smoke'; Job = $smokeJob; ExportStep = 'Export Unity package smoke artifact'; HasArtifactUpload = $false }
     )) {
     $jobTimeoutMatch = [regex]::Match($caller.Job, '(?m)^    timeout-minutes:\s*(?<minutes>\d+)\s*$')
@@ -2395,12 +2394,11 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
     $unityFailureMessageIndex -ge 0 -and
     $teeFailureMessageIndex -lt $unityFailureMessageIndex
   )
-  $releaseUploadsExportDiagnostics = (
-    $workflowContent.Contains('Dump Unity export log tail on failure or cancellation') -and
-    $workflowContent.Contains('results-dir: .artifacts/unity/unitypackage-project/unitypackage-output') -and
-    $workflowContent.Contains('Upload .unitypackage export diagnostics') -and
-    $workflowContent.Contains('unitypackage-export-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}') -and
-    $workflowContent.Contains('.artifacts/unity/unitypackage-project/unitypackage-output/*.log')
+  $releaseCreatesPortableUnityPackage = (
+    $releaseJob.Contains('runs-on: ubuntu-latest') -and
+    $releaseJob.Contains('run: node scripts/unity/create-unitypackage.js') -and
+    $releaseJob.Contains('path: .artifacts/release/*.unitypackage*') -and
+    -not ($releaseJob -match 'self-hosted|UNITY_SERIAL|ensure-unity-editor|build-lock|run-ci-tests\.ps1')
   )
   $containerCleanupIndex = $dockerRunnerContent.IndexOf('cleanup_unity_container()')
   $clientSettlementIndex = if ($containerCleanupIndex -ge 0) { $dockerRunnerContent.IndexOf('terminate_docker_run_client', $containerCleanupIndex) } else { -1 }
@@ -2459,9 +2457,9 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
   )
 
   Write-TestResult `
-    -TestName 'release Unity export step and job timeouts preserve cleanup budget' `
+    -TestName 'Unity package smoke timeouts preserve cleanup budget' `
     -Passed $timeoutBudgetIsCoherent `
-    -Message "Expected both exporter callers to cover bounded activation, Unity, TERM/KILL, return, and container teardown plus ${minimumExportWrapperMinutes}m step overhead; each job must preserve setup, cleanup, implicit-post, and ${minimumUnallocatedSlackMinutes}m unallocated slack. $($timeoutBudgetFailures -join '; ')"
+    -Message "Expected the Unity-backed smoke compile/export to cover bounded activation, Unity, TERM/KILL, return, and container teardown plus ${minimumExportWrapperMinutes}m step overhead. $($timeoutBudgetFailures -join '; ')"
 
   Write-TestResult `
     -TestName 'unitypackage exporter persists Unity log and preserves exit code' `
@@ -2469,9 +2467,9 @@ function Run-ReleasePublishWorkflowBudgetContractTests {
     -Message 'Expected export-unitypackage.sh to tee Unity stdout to unitypackage-output/unity.log, preserve the original Unity command exit code, and fail when tee cannot persist the log.'
 
   Write-TestResult `
-    -TestName 'release unitypackage job uploads export diagnostics on failure' `
-    -Passed $releaseUploadsExportDiagnostics `
-    -Message 'Expected release.yml to dump and upload the persisted Unity package export log on failure or cancellation.'
+    -TestName 'release unitypackage creation is portable and license-free' `
+    -Passed $releaseCreatesPortableUnityPackage `
+    -Message 'Expected release.yml to create and upload the Unity package on a hosted runner without Unity, license secrets, or the organization build lock.'
 
   Write-TestResult `
     -TestName 'Docker Unity runner redacts and returns serial licenses' `
@@ -2508,6 +2506,8 @@ function Run-ReleasePrepareWorkflowContractTests {
     -not ($workflowContent -match 'grep -Eq .*\bstatus')
   )
   $notesIndex = $workflowContent.IndexOf('scripts/release-tools/write-release-notes.ps1')
+  $prBodyIndex = $workflowContent.IndexOf('pr_body_file="${RUNNER_TEMP}/release-pr-body.md"')
+  $prBodyLimitIndex = $workflowContent.IndexOf('pr_body_length="$(wc -m < "${pr_body_file}")"')
   $branchPushIndex = $workflowContent.IndexOf('push origin "HEAD:refs/heads/${BRANCH}"')
   $generatesNotesBeforePushingBranch = (
     $notesIndex -ge 0 -and
@@ -2523,6 +2523,18 @@ function Run-ReleasePrepareWorkflowContractTests {
     $workflowContent.Contains('Run the Release Publish workflow on \`${DEFAULT_BRANCH}\` with version \`${VERSION}\`.') -and
     $workflowContent.Contains('creates the release tag if needed') -and
     -not $workflowContent.Contains('The Release Tag workflow pushes tag')
+  )
+  $prBodyDoesNotEmbedReleaseNotes = (
+    $workflowContent.Contains('Review the complete release notes in the changed \`CHANGELOG.md\`.') -and
+    -not $workflowContent.Contains('cat "${notes_file}"')
+  )
+  $validatesPrBodyBeforePushingBranch = (
+    $prBodyIndex -ge 0 -and
+    $prBodyLimitIndex -ge 0 -and
+    $branchPushIndex -ge 0 -and
+    $prBodyIndex -lt $prBodyLimitIndex -and
+    $prBodyLimitIndex -lt $branchPushIndex -and
+    $workflowContent.Contains('if [ "${pr_body_length}" -gt 65536 ]; then')
   )
 
   Write-TestResult `
@@ -2549,6 +2561,16 @@ function Run-ReleasePrepareWorkflowContractTests {
     -TestName 'release prepare points operators at the manual Release Publish button' `
     -Passed $prBodyUsesManualPublishWorkflow `
     -Message 'Expected release PR body to tell operators to run Release Publish after merge, without referencing the retired Release Tag workflow.'
+
+  Write-TestResult `
+    -TestName 'release prepare keeps the PR body independent of release-note size' `
+    -Passed $prBodyDoesNotEmbedReleaseNotes `
+    -Message 'Expected release-prepare.yml to validate release notes without copying the full changelog section into GitHub''s size-limited PR body.'
+
+  Write-TestResult `
+    -TestName 'release prepare validates the PR body before pushing its branch' `
+    -Passed $validatesPrBodyBeforePushingBranch `
+    -Message 'Expected release-prepare.yml to enforce GitHub''s PR body limit before creating a remote release branch.'
 }
 
 function Run-ReleaseTagWorkflowRetirementContractTests {

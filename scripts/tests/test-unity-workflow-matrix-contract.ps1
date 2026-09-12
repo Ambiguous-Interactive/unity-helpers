@@ -952,10 +952,10 @@ if ($unityVersions.Count -lt 1) {
 }
 
 if ([string]$unityVersionsConfig.release -ne '6000.6.0f1') {
-    Write-Host "::error file=.github/unity-versions.json::Release and unitypackage smoke coverage must target the latest supported editor, 6000.6.0f1, rather than a legacy compatibility editor."
+    Write-Host "::error file=.github/unity-versions.json::Unitypackage smoke coverage must target the latest supported editor, 6000.6.0f1, rather than a legacy compatibility editor."
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info 'Checked release and unitypackage smoke target Unity 6000.6.0f1.'
+    Write-Info 'Checked unitypackage smoke targets Unity 6000.6.0f1.'
 }
 
 # Every Unity version CI actually tests has to be selectable when someone files a bug against it,
@@ -1837,10 +1837,42 @@ $defaultModeContracts = @(
     @{ Label = 'PlayMode'; Key = 'playmode'; Timeout = 40; AssemblyOutput = 'playmode-integration-assemblies' },
     @{ Label = 'Standalone'; Key = 'standalone'; Timeout = 60; AssemblyOutput = 'standalone-integration-assemblies' }
 )
+$declaredVersions = [regex]::Matches(
+    $unityTestsMatrixJob,
+    '(?m)^        unity-version:\s*$\r?\n((?:^          - \S.*\r?\n)+)'
+)
+$matrixVersionsAreStaticText = $declaredVersions.Count -eq 1
+$matrixVersionsMatchCanonicalSource = $false
+$matrixSelectionPreservesDispatchFiltering = $false
+if ($matrixVersionsAreStaticText) {
+    $declared = @($declaredVersions[0].Groups[1].Value -split '\r?\n' |
+        ForEach-Object { $_.TrimStart(' ', '-') } |
+        Where-Object { $_ })
+    $canonical = @((Get-Content -LiteralPath $unityVersionsPath -Raw | ConvertFrom-Json).all)
+    $matrixVersionsMatchCanonicalSource = @($declared | Sort-Object) -join "`n" -eq @($canonical | Sort-Object) -join "`n"
+
+    $expectedExclusions = foreach ($matrixVersion in $canonical) {
+        foreach ($selectedVersion in $canonical) {
+            if ($matrixVersion -ne $selectedVersion) {
+                "unity-version: $matrixVersion`nselected-version: $selectedVersion"
+            }
+        }
+    }
+    $actualExclusions = @([regex]::Matches(
+        $unityTestsMatrixJob,
+        '(?m)^          - unity-version:\s*(\S+)\s*$\r?\n^            selected-version:\s*(\S+)\s*$'
+    ) | ForEach-Object { "unity-version: $($_.Groups[1].Value)`nselected-version: $($_.Groups[2].Value)" })
+    $matrixSelectionPreservesDispatchFiltering = (
+        $unityTestsMatrixJob.Contains('selected-version: ${{ fromJSON(needs.matrix-config.outputs.unity-versions) }}') -and
+        @($actualExclusions | Sort-Object) -join "`n---`n" -eq @($expectedExclusions | Sort-Object) -join "`n---`n"
+    )
+}
 $defaultMatrixIsVersionGrouped = (
     -not $jobTexts.ContainsKey('unity-tests-standalone') -and
     [regex]::Matches($unityTestsMatrixJob, '(?m)^      matrix:\s*$').Count -eq 1 -and
-    $unityTestsMatrixJob.Contains('unity-version: ${{ fromJSON(needs.matrix-config.outputs.unity-versions) }}') -and
+    $matrixVersionsAreStaticText -and
+    $matrixVersionsMatchCanonicalSource -and
+    $matrixSelectionPreservesDispatchFiltering -and
     [regex]::Matches($unityTestsMatrixJob, '(?m)^        test-mode:\s*$').Count -eq 0 -and
     -not $unityTestsMatrixJob.Contains('matrix.test-mode') -and
     $unityTestsMatrixJob.Contains('needs.matrix-config.outputs.test-modes') -and
@@ -1849,10 +1881,10 @@ $defaultMatrixIsVersionGrouped = (
     -not $workflowContent.Contains('matrix-include-standalone')
 )
 if (-not $defaultMatrixIsVersionGrouped) {
-    Write-Host '::error file=.github/workflows/unity-tests.yml::The default Unity matrix must consume the canonical selected-version output as its only axis. Modes must be sequential steps within each version job, never a second matrix axis that multiplies the licensed runner queue.'
+    Write-Host '::error file=.github/workflows/unity-tests.yml::The default Unity matrix must list the versions from .github/unity-versions.json as static text while its selected-version axis and complete mismatch exclusions preserve targeted dispatches (the enrollment audit can only prove per-leg gate and return pins on a static unity-version axis). Modes must be sequential steps within each version job, never a second mode axis that multiplies the licensed runner queue.'
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info 'Checked the default Unity matrix creates exactly one job per supported version.'
+    Write-Info 'Checked the default Unity matrix creates exactly one job per supported version and preserves targeted dispatch filtering.'
 }
 
 $groupedDefaultModesAreComplete = $true
@@ -2060,7 +2092,8 @@ $matrixConfigAssemblyDiscoveryIsCentralized = (
     $workflowContent.Contains('core-assembly-profiles: ${{ steps.assemblies.outputs.core_profiles }}') -and
     $workflowContent.Contains('test-modes: ${{ steps.resolve.outputs.test-modes }}') -and
     $workflowContent.Contains('unity-versions: ${{ steps.resolve.outputs.unity-versions }}') -and
-    $unityTestsMatrixJob.Contains('unity-version: ${{ fromJSON(needs.matrix-config.outputs.unity-versions) }}') -and
+    $matrixVersionsAreStaticText -and
+    $matrixVersionsMatchCanonicalSource -and
     $unityTestsMatrixJob.Contains('UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.editmode-integration-assemblies }}') -and
     $unityTestsMatrixJob.Contains('UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.playmode-integration-assemblies }}') -and
     $unityTestsMatrixJob.Contains('UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.standalone-integration-assemblies }}') -and
@@ -4124,11 +4157,7 @@ $unityLockCleanupIsGated = (
     (Test-UnityLockCleanupIsGated `
             -Jobs $benchmarksJobTexts `
             -WorkflowFile '.github/workflows/unity-benchmarks.yml' `
-            -LicensedWorkStepNames @{ benchmarks = 'Run Unity Test Runner' }) -and
-    (Test-UnityLockCleanupIsGated `
-            -Jobs $releaseJobTexts `
-            -WorkflowFile '.github/workflows/release.yml' `
-            -LicensedWorkStepNames @{ unitypackage = 'Export Unity package' })
+            -LicensedWorkStepNames @{ benchmarks = 'Run Unity Test Runner' })
 )
 if (-not $unityLockCleanupIsGated) {
     $failed = $true
@@ -4219,14 +4248,14 @@ foreach ($workflowJobSet in $licensedWorkflowJobSets) {
     }
 }
 if (
-    $licensedLifecycleCount -ne 5 -or
-    $centralLifecycleCount -ne 5 -or
+    $licensedLifecycleCount -ne 4 -or
+    $centralLifecycleCount -ne 4 -or
     $centralLifecycleFailures.Count -gt 0
 ) {
-    Write-Host "::error file=scripts/tests/test-unity-workflow-matrix-contract.ps1::All five licensed jobs must preserve central return -> digest classifier -> release -> gate with classifier-owned evidence deletion. Total=$licensedLifecycleCount Central=$centralLifecycleCount Failures=$($centralLifecycleFailures -join ', ')."
+    Write-Host "::error file=scripts/tests/test-unity-workflow-matrix-contract.ps1::All four licensed jobs must preserve central return -> digest classifier -> release -> gate with classifier-owned evidence deletion. Total=$licensedLifecycleCount Central=$centralLifecycleCount Failures=$($centralLifecycleFailures -join ', ')."
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info 'Checked all five central Windows cleanup lifecycles.'
+    Write-Info 'Checked all four central Windows cleanup lifecycles.'
 }
 
 $preActivationReturnGuardIndex = $runCiTestsContent.IndexOf('if ($hasLicenseCreds) {', [StringComparison]::Ordinal)
@@ -4282,8 +4311,7 @@ function Test-NativeExportFleet {
 }
 
 foreach ($exportContract in @(
-        @{ Job = [string]$jobTexts['unitypackage-smoke']; Preflight = [string]$jobTexts['runner-preflight']; Name = 'smoke' },
-        @{ Job = [string]$releaseJobTexts['unitypackage']; Preflight = [string]$releaseJobTexts['runner-preflight']; Name = 'release' }
+        @{ Job = [string]$jobTexts['unitypackage-smoke']; Preflight = [string]$jobTexts['runner-preflight']; Name = 'smoke' }
     )) {
     if (-not (Test-NativeExportFleet -Job $exportContract.Job -Preflight $exportContract.Preflight)) {
         Write-Host "::error::The $($exportContract.Name) export must stage the release payload before native activation on the preflighted Windows fleet and finish with an unconditional central cleanup gate."
@@ -4320,11 +4348,6 @@ foreach ($exportContract in @(
 
 $sharedDiagnosticEvidenceFailures = @()
 foreach ($sharedDiagnosticJob in @(
-        @{
-            File = '.github/workflows/release.yml'
-            Text = [string]$releaseJobTexts['unitypackage']
-            Upload = 'Upload .unitypackage export diagnostics'
-        },
         @{
             File = '.github/workflows/unity-tests.yml'
             Text = [string]$jobTexts['unitypackage-smoke']
@@ -4409,8 +4432,7 @@ if (-not $classifierParityDerivesPin) {
 
 $unityLockUsesAppCredentials = (
     (Test-UnityLockAppConfiguration -Content $workflowContent -WorkflowFile '.github/workflows/unity-tests.yml') -and
-    (Test-UnityLockAppConfiguration -Content ($benchmarksWorkflowLines -join "`n") -WorkflowFile '.github/workflows/unity-benchmarks.yml') -and
-    (Test-UnityLockAppConfiguration -Content ($releaseWorkflowLines -join "`n") -WorkflowFile '.github/workflows/release.yml')
+    (Test-UnityLockAppConfiguration -Content ($benchmarksWorkflowLines -join "`n") -WorkflowFile '.github/workflows/unity-benchmarks.yml')
 )
 if (-not $unityLockUsesAppCredentials) {
     $failed = $true
@@ -4511,6 +4533,15 @@ $requiredQueuedUnityContracts = @(
         Message = 'Queued Unity jobs require successful runner and credential preflight.'
     }
 )
+
+foreach ($contract in $requiredQueuedUnityContracts) {
+    if ($unityTestsMatrixJob -notmatch $contract.Pattern) {
+        Write-Host "::error file=.github/workflows/unity-tests.yml::unity-tests $($contract.Message)"
+        $failed = $true
+    } elseif ($VerboseOutput) {
+        Write-Info "Checked unity-tests contract '$($contract.Name)'."
+    }
+}
 
 if (-not $jobTexts.ContainsKey('unity-tests-single-threaded')) {
     Write-Host "::error file=.github/workflows/unity-tests.yml::Missing unity-tests-single-threaded job."

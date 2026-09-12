@@ -310,13 +310,13 @@ jobs:
           if-no-files-found: error
           overwrite: true
 
-  runner-preflight:
-    name: Self-hosted export runner preflight
-    needs: release-ready
+  unitypackage:
+    name: Create .unitypackage
+    needs:
+      - release-ready
+      - validate-package
     runs-on: ubuntu-latest
-    timeout-minutes: 3
-    outputs:
-      unity-version: ${{ steps.version.outputs.version }}
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -325,271 +325,22 @@ jobs:
           ref: ${{ needs.release-ready.outputs.source-sha }}
           persist-credentials: false
 
-      - name: Resolve release editor version
-        id: version
-        shell: pwsh
-        env:
-          RELEASE_UNITY_VERSION: ${{ vars.RELEASE_UNITY_VERSION }}
-        run: |
-          $version = $env:RELEASE_UNITY_VERSION
-          if ([string]::IsNullOrWhiteSpace($version)) {
-            $version = (Get-Content .github/unity-versions.json -Raw | ConvertFrom-Json).release
-          }
-          if ($version -notmatch '^\d+\.\d+\.\d+f\d+$') { throw 'Invalid release Unity version.' }
-          # The unitypackage editor gate and central return pin this version
-          # literally (enrollment contract); fail closed on drift.
-          if ($version -ne '6000.6.0f1') {
-            throw "Release Unity version '$version' drifted from the pinned unitypackage editor version '6000.6.0f1'; update the unitypackage ensure/return pin in the same change."
-          }
-          "version=$version" >> $env:GITHUB_OUTPUT
-
-      - name: Require an online Unity export runner
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/check-unity-runner-availability@d79e1cc2acc892b619db2ca46f78291ca427016b # v1.14.2
-        with:
-          reader-app-id: ${{ secrets.BUILD_LOCK_READER_APP_ID }}
-          reader-app-private-key: ${{ secrets.BUILD_LOCK_READER_APP_PRIVATE_KEY }}
-          required-label-sets: '[["self-hosted","Windows","RAM-64GB"]]'
-
-  unitypackage:
-    name: Export .unitypackage
-    needs:
-      - release-ready
-      - validate-package
-      - runner-preflight
-    runs-on: [self-hosted, Windows, RAM-64GB]
-    timeout-minutes: 360
-    steps:
-      - name: Require manually installed Unity editor
-        id: ensure_unity_editor
-        timeout-minutes: 10
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/ensure-unity-editor@d79e1cc2acc892b619db2ca46f78291ca427016b # v1.14.2
-        with:
-          # Enrollment contract (Workflow contract item 3): the editor gate and
-          # the central license return must carry a literal reviewed Unity
-          # version. Keep this pin identical to `release` in
-          # .github/unity-versions.json (the runner-preflight job resolves the
-          # same value and the export below consumes it).
-          unity-version: "6000.6.0f1"
-          install-root: ${{ runner.tool_cache }}\u6-v3
-          provisioning-profile: EditorOnly
-          diagnostics-path: unity-editor-check.json
-          ci-managed-only: true
-          require-healthy-existing: true
-
-      - name: Enable Git long paths
-        shell: powershell
-        env:
-          GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
-        run: git config --global core.longpaths true
-
-      - name: Checkout
-        id: checkout
-        env:
-          GIT_CONFIG_GLOBAL: ${{ runner.temp }}/uh-gitconfig
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          fetch-depth: 1 # Export inputs come from this source tree, without history or tags.
-          ref: ${{ needs.release-ready.outputs.source-sha }}
-          persist-credentials: false
-
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: "22.18.0"
 
-      - name: Stage release package payload
-        shell: pwsh
-        env:
-          UNITY_VERSION: ${{ needs.runner-preflight.outputs.unity-version }}
-        run: |
-          node scripts/unity/stage-unitypackage.js --project-dir ".artifacts/unity/unitypackage-project"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      - name: Validate Unity license secrets
-        uses: ./.github/actions/validate-unity-license
-        env:
-          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-          BUILD_LOCK_APP_ID: ${{ secrets.BUILD_LOCK_APP_ID }}
-          BUILD_LOCK_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_APP_PRIVATE_KEY }}
-
-      - name: Acquire organization Unity lock
-        id: unity_lock
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/acquire-build-lock@d79e1cc2acc892b619db2ca46f78291ca427016b # v1.14.2
-        with:
-          lock-name: wallstop-organization-builds
-          holder-id-suffix: release-${{ needs.release-ready.outputs.package-version }}
-          runner-id: ${{ runner.name }}
-          timeout-minutes: "160"
-        env:
-          BUILD_LOCK_APP_ID: ${{ secrets.BUILD_LOCK_APP_ID }}
-          BUILD_LOCK_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_APP_PRIVATE_KEY }}
-
-      - name: Export Unity package
-        id: export_unitypackage
-        if: ${{ !cancelled() && steps.unity_lock.outputs.acquired == 'true' }}
-        timeout-minutes: 155
-        shell: pwsh
-        env:
-          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-          UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
-          UNITY_VERSION: ${{ needs.runner-preflight.outputs.unity-version }}
-          UH_CENTRAL_LICENSE_RETURN: "true"
-        run: |
-          $package = Get-Content package.json -Raw | ConvertFrom-Json
-          ./scripts/unity/run-ci-tests.ps1 `
-            -UnityVersion $env:UNITY_VERSION `
-            -TestMode 'export' `
-            -ProjectPath '.artifacts/unity/unitypackage-project' `
-            -ArtifactsPath '.artifacts/unity/unitypackage-project/unitypackage-output' `
-            -ExportPackagePath ".artifacts/unitypackage/$($package.name)-$($package.version).unitypackage"
-
-      - name: Return Unity license
-        id: return_unity_license
-        if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
-        timeout-minutes: 5
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/return-unity-license@d79e1cc2acc892b619db2ca46f78291ca427016b # v1.14.2
-        with:
-          # Must match the ensure-unity-editor pin above exactly (see the
-          # enrollment contract's central-return version rule).
-          unity-version: "6000.6.0f1"
-          tool-cache: ${{ runner.tool_cache }}
-          unity-email: ${{ secrets.UNITY_EMAIL }}
-          unity-password: ${{ secrets.UNITY_PASSWORD }}
-          evidence-suffix: release
-
-      - name: Classify Unity cleanup evidence
-        id: cleanup_classification
-        if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/classify-unity-cleanup-evidence@d79e1cc2acc892b619db2ca46f78291ca427016b # v1.14.2
-        with:
-          return-log-path: ${{ steps.return_unity_license.outputs.return-log-path }}
-          return-command-completed: ${{ steps.return_unity_license.outputs.return-command-completed }}
-          return-exit-code: ${{ steps.return_unity_license.outputs.return-exit-code }}
-          evidence-capture-complete: ${{ steps.return_unity_license.outputs.evidence-capture-complete }}
-          return-log-digest: ${{ steps.return_unity_license.outputs.return-log-digest }}
-
-      - name: Release organization Unity lock
-        id: release_unity_lock
-        if: always()
-        timeout-minutes: 5
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/release-build-lock@d79e1cc2acc892b619db2ca46f78291ca427016b # v1.14.2
-        with:
-          lock-name: wallstop-organization-builds
-          holder-id-suffix: release-${{ needs.release-ready.outputs.package-version }}
-          runner-id: ${{ runner.name }}
-          resource-cleanup-status: ${{ steps.cleanup_classification.outputs.resource-cleanup-status }}
-          resource-health: ${{ steps.cleanup_classification.outputs.resource-health }}
-          resource-reason: ${{ steps.cleanup_classification.outputs.resource-reason }}
-        env:
-          BUILD_LOCK_APP_ID: ${{ secrets.BUILD_LOCK_APP_ID }}
-          BUILD_LOCK_APP_PRIVATE_KEY: ${{ secrets.BUILD_LOCK_APP_PRIVATE_KEY }}
-
-      - name: Confirm Unity cleanup before package upload
-        id: cleanup_before_upload
-        if: always()
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-confirmed-unity-cleanup@d79e1cc2acc892b619db2ca46f78291ca427016b # v1.14.2
-        with:
-          acquired: ${{ steps.unity_lock.outputs.acquired }}
-          classification-complete: ${{ steps.cleanup_classification.outputs.classification-complete }}
-          cleanup-status: ${{ steps.cleanup_classification.outputs.resource-cleanup-status }}
-          cleanup-health: ${{ steps.cleanup_classification.outputs.resource-health }}
-          cleanup-reason: ${{ steps.cleanup_classification.outputs.resource-reason }}
-          release-outcome: ${{ steps.release_unity_lock.outcome }}
-          cleanup-result: ${{ steps.release_unity_lock.outputs.cleanup-result }}
-          released: ${{ steps.release_unity_lock.outputs.released }}
-          release-health: ${{ steps.release_unity_lock.outputs.resource-health }}
-          release-reason: ${{ steps.release_unity_lock.outputs.resource-reason }}
-          reservation-state: ${{ steps.release_unity_lock.outputs.reservation-state }}
-          reservation-id: ${{ steps.release_unity_lock.outputs.reservation-id }}
-          incident-id: ${{ steps.release_unity_lock.outputs.incident-id }}
-
-      - name: Dump Unity export log tail on failure or cancellation
-        if: ${{ steps.checkout.outcome == 'success' && (failure() || cancelled()) }}
-        timeout-minutes: 2
-        uses: ./.github/actions/dump-unity-log-tail
-        with:
-          results-dir: .artifacts/unity/unitypackage-project/unitypackage-output
-          label: Unity package export
-
-      # Upload only scrubbed package and compiler diagnostics.
-      - name: Redact credentials from Unity artifacts
-        id: redact_unity_artifacts
-        if: ${{ steps.checkout.outcome == 'success' && always() }}
-        timeout-minutes: 2
-        uses: ./.github/actions/redact-unity-artifacts
-        with:
-          paths: |
-            .artifacts/unity/unitypackage-project/Assets/Editor
-            .artifacts/unity/unitypackage-project/Packages
-            .artifacts/unity/unitypackage-project/ProjectSettings
-            .artifacts/unity/unitypackage-project/unitypackage-output
-
-      - name: Upload .unitypackage export diagnostics
-        if: >-
-          ${{ (failure() || cancelled())
-          && steps.redact_unity_artifacts.outcome == 'success' }}
-        timeout-minutes: 5
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: unitypackage-export-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            .artifacts/unity/unitypackage-project/Assets/Editor/UnityHelpersPackageExporter.cs
-            .artifacts/unity/unitypackage-project/Packages/manifest.json
-            .artifacts/unity/unitypackage-project/ProjectSettings/
-            .artifacts/unity/unitypackage-project/unitypackage-output/*.log
-          if-no-files-found: warn
-          retention-days: 14
-          overwrite: true
+      - name: Create Unity package
+        run: node scripts/unity/create-unitypackage.js
 
       - name: Upload .unitypackage artifact
         timeout-minutes: 5
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: release-unitypackage
-          path: .artifacts/unitypackage/
+          path: .artifacts/release/*.unitypackage*
           if-no-files-found: error
           overwrite: true
-
-      - name: Require confirmed Unity cleanup
-        if: always()
-        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-confirmed-unity-cleanup@d79e1cc2acc892b619db2ca46f78291ca427016b # v1.14.2
-        with:
-          acquired: ${{ steps.unity_lock.outputs.acquired }}
-          classification-complete: ${{ steps.cleanup_classification.outputs.classification-complete }}
-          cleanup-status: ${{ steps.cleanup_classification.outputs.resource-cleanup-status }}
-          cleanup-health: ${{ steps.cleanup_classification.outputs.resource-health }}
-          cleanup-reason: ${{ steps.cleanup_classification.outputs.resource-reason }}
-          release-outcome: ${{ steps.release_unity_lock.outcome }}
-          cleanup-result: ${{ steps.release_unity_lock.outputs.cleanup-result }}
-          released: ${{ steps.release_unity_lock.outputs.released }}
-          release-health: ${{ steps.release_unity_lock.outputs.resource-health }}
-          release-reason: ${{ steps.release_unity_lock.outputs.resource-reason }}
-          reservation-state: ${{ steps.release_unity_lock.outputs.reservation-state }}
-          reservation-id: ${{ steps.release_unity_lock.outputs.reservation-id }}
-          incident-id: ${{ steps.release_unity_lock.outputs.incident-id }}
-
-  # Enrollment contract (Workflow contract item 10): a stable, always-reporting
-  # aggregate covering the licensed export job and its runner preflight, so a
-  # skipped or cancelled export can never disappear silently from the
-  # required-checks summary.
-  unitypackage-aggregate:
-    name: Require Unity package export result
-    if: ${{ always() }}
-    needs:
-      - runner-preflight
-      - unitypackage
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    steps:
-      - name: Enforce Unity package export and preflight results
-        shell: bash
-        run: |
-          test "${{ needs.unitypackage.result }}" = success
-          test "${{ needs.runner-preflight.result }}" = success
 
   prepare-tag:
     name: Prepare release tag
