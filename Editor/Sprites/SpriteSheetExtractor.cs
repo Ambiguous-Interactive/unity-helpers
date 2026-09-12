@@ -1277,6 +1277,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
         }
 
+        internal static void ApplyPixelBuffer(
+            Texture2D texture,
+            int width,
+            int height,
+            Color32[] pixels
+        )
+        {
+            texture.SetPixels32(0, 0, width, height, pixels, 0);
+            texture.Apply();
+        }
+
         [MenuItem("Tools/Wallstop Studios/Unity Helpers/" + Name)]
         private static void ShowWindow() => GetWindow<SpriteSheetExtractor>(Name);
 
@@ -4100,6 +4111,37 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 Utils.EditorUi.ClearProgress();
             }
+        }
+
+        internal Texture2D GeneratePreviewTexture(
+            Color32[] sourcePixels,
+            int sourceWidth,
+            int sourceHeight,
+            SpriteEntryData sprite
+        )
+        {
+            return GenerateSinglePreviewTexture(sourcePixels, sourceWidth, sourceHeight, sprite);
+        }
+
+        internal bool ExtractSpriteImmediately(
+            SpriteSheetEntry sheet,
+            SpriteEntryData sprite,
+            string outputPath,
+            int index
+        )
+        {
+            return ExtractSprite(sheet, sprite, outputPath, index);
+        }
+
+        internal string ExtractSpriteWithoutImport(
+            SpriteSheetEntry sheet,
+            SpriteEntryData sprite,
+            string outputPath,
+            int index,
+            List<PendingImportSettings> pendingImports
+        )
+        {
+            return ExtractSpriteDeferred(sheet, sprite, outputPath, index, pendingImports);
         }
 
         private void BindSerializedState()
@@ -7075,8 +7117,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             int pixelCount = targetWidth * targetHeight;
-            // SetPixels32 requires exact-length arrays; WallstopFastArrayPool supplies them without oversized buckets.
-            using PooledArray<Color32> pooledDestination = WallstopFastArrayPool<Color32>.Get(
+            using PooledArray<Color32> pooledDestination = SystemArrayPool<Color32>.Get(
                 pixelCount,
                 out Color32[] destPixels
             );
@@ -7108,8 +7149,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     filterMode = FilterMode.Point,
                     wrapMode = TextureWrapMode.Clamp,
                 };
-                preview.SetPixels32(destPixels);
-                preview.Apply();
+                ApplyPixelBuffer(preview, targetWidth, targetHeight, destPixels);
                 return preview;
             }
             catch
@@ -7568,30 +7608,33 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 Color32[] pixels = sheet._texture.GetPixels32();
                 int srcWidth = sheet._texture.width;
                 int pixelCount = width * height;
-                // SetPixels32 requires exact-length arrays, so oversized SystemArrayPool buffers cannot be used directly.
-                Color32[] destPixels = new Color32[pixelCount];
-
-                Parallel.For(
-                    0,
-                    height,
-                    destY =>
-                    {
-                        int srcY = y + destY;
-                        int destRowStart = destY * width;
-                        int srcRowStart = srcY * srcWidth + x;
-                        for (int destX = 0; destX < width; ++destX)
-                        {
-                            destPixels[destRowStart + destX] = pixels[srcRowStart + destX];
-                        }
-                    }
-                );
-
                 Texture2D extracted = null;
                 try
                 {
-                    extracted = new Texture2D(width, height, TextureFormat.RGBA32, false);
-                    extracted.SetPixels32(destPixels);
-                    extracted.Apply();
+                    {
+                        using PooledArray<Color32> destinationLease = SystemArrayPool<Color32>.Get(
+                            pixelCount,
+                            out Color32[] destPixels
+                        );
+
+                        Parallel.For(
+                            0,
+                            height,
+                            destY =>
+                            {
+                                int srcY = y + destY;
+                                int destRowStart = destY * width;
+                                int srcRowStart = srcY * srcWidth + x;
+                                for (int destX = 0; destX < width; ++destX)
+                                {
+                                    destPixels[destRowStart + destX] = pixels[srcRowStart + destX];
+                                }
+                            }
+                        );
+
+                        extracted = new Texture2D(width, height, TextureFormat.RGBA32, false);
+                        ApplyPixelBuffer(extracted, width, height, destPixels);
+                    }
 
                     byte[] pngBytes = extracted.EncodeToPNG();
                     File.WriteAllBytes(fullOutputPath, pngBytes);
@@ -7705,30 +7748,33 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 Color32[] pixels = sheet._texture.GetPixels32();
                 int srcWidth = sheet._texture.width;
                 int pixelCount = width * height;
-                // SetPixels32 requires exact-length arrays, so oversized SystemArrayPool buffers cannot be used directly.
-                Color32[] destPixels = new Color32[pixelCount];
-
-                Parallel.For(
-                    0,
-                    height,
-                    destY =>
-                    {
-                        int srcY = y + destY;
-                        int destRowStart = destY * width;
-                        int srcRowStart = srcY * srcWidth + x;
-                        for (int destX = 0; destX < width; ++destX)
-                        {
-                            destPixels[destRowStart + destX] = pixels[srcRowStart + destX];
-                        }
-                    }
-                );
-
                 Texture2D extracted = null;
                 try
                 {
-                    extracted = new Texture2D(width, height, TextureFormat.RGBA32, false);
-                    extracted.SetPixels32(destPixels);
-                    extracted.Apply();
+                    {
+                        using PooledArray<Color32> destinationLease = SystemArrayPool<Color32>.Get(
+                            pixelCount,
+                            out Color32[] destPixels
+                        );
+
+                        Parallel.For(
+                            0,
+                            height,
+                            destY =>
+                            {
+                                int srcY = y + destY;
+                                int destRowStart = destY * width;
+                                int srcRowStart = srcY * srcWidth + x;
+                                for (int destX = 0; destX < width; ++destX)
+                                {
+                                    destPixels[destRowStart + destX] = pixels[srcRowStart + destX];
+                                }
+                            }
+                        );
+
+                        extracted = new Texture2D(width, height, TextureFormat.RGBA32, false);
+                        ApplyPixelBuffer(extracted, width, height, destPixels);
+                    }
 
                     byte[] pngBytes = extracted.EncodeToPNG();
                     File.WriteAllBytes(fullOutputPath, pngBytes);

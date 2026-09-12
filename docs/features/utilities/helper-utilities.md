@@ -264,6 +264,7 @@ using WallstopStudios.UnityHelpers.Core.Helper;
 // Spawn every 5 seconds after a randomized initial delay
 Helpers.StartFunctionAsCoroutine(
     gameManager,
+    waveController,
     SpawnEnemy,
     updateRate: 5f,
     useJitter: true
@@ -274,6 +275,10 @@ void SpawnEnemy()
     Instantiate(enemyPrefab, spawnPoint.position, Quaternion.identity);
 }
 ```
+
+Pass `context` when the object that owns the work is not the `MonoBehaviour` that hosts the
+coroutine. The first callback failure is filed against that object in the Console. A null context
+uses the coroutine host.
 
 **Use for:**
 

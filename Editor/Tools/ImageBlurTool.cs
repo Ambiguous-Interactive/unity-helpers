@@ -84,7 +84,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 int width = original.width;
                 int height = original.height;
 
-                // SetPixels accepts oversized buffers, unlike SetPixels32, so this destination can be pooled.
+                // SetPixels accepts an oversized destination buffer.
                 using PooledArray<Color> pooledBlurred = SystemArrayPool<Color>.Get(
                     pixels.Length,
                     out Color[] blurredPixels

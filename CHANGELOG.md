@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add `ColorContrast.Composite`, which produces the opaque visible color for a translucent foreground before a contrast measurement. See [Readable Text on Any Background](./docs/features/utilities/math-and-extensions.md#readable-text-on-any-background) ([#777](https://github.com/Ambiguous-Interactive/unity-helpers/issues/777)).
+- Add an optional report context to `StartFunctionAsCoroutine`, so a failure hosted on a shared runner is filed against the object that owns the work ([#778](https://github.com/Ambiguous-Interactive/unity-helpers/issues/778)).
+
+### Improved
+
+- Improve Sprite Cropper and Sprite Sheet Extractor memory reuse for dynamically sized pixel output ([#754](https://github.com/Ambiguous-Interactive/unity-helpers/issues/754)).
+
 ## [3.6.0] - 2026-09-12
 
 ### Added

@@ -34,6 +34,36 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private const float LuminanceOffset = 0.05f;
 
         /// <summary>
+        /// Composites a translucent <paramref name="tone"/> over an opaque <paramref name="background"/>.
+        /// </summary>
+        /// <param name="tone">The foreground color.</param>
+        /// <param name="background">The opaque background color.</param>
+        /// <returns>The visible color with an alpha of 1.</returns>
+        public static Color Composite(Color tone, Color background)
+        {
+            float alpha = tone.a;
+            if (!(0f < alpha))
+            {
+                background.a = 1f;
+                return background;
+            }
+
+            if (1f <= alpha)
+            {
+                tone.a = 1f;
+                return tone;
+            }
+
+            float backgroundShare = 1f - alpha;
+            return new Color(
+                (tone.r * alpha) + (background.r * backgroundShare),
+                (tone.g * alpha) + (background.g * backgroundShare),
+                (tone.b * alpha) + (background.b * backgroundShare),
+                1f
+            );
+        }
+
+        /// <summary>
         /// Computes a color's WCAG relative luminance, the linear-light quantity contrast is defined on.
         /// </summary>
         /// <param name="color">The color. Alpha is ignored, because contrast is defined between two composited colors.</param>
@@ -53,12 +83,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <summary>
         /// Computes the WCAG contrast ratio between two colors.
         /// </summary>
-        /// <param name="first">One color.</param>
-        /// <param name="second">The other color. Order does not matter.</param>
+        /// <param name="first">One opaque color.</param>
+        /// <param name="second">The other opaque color. Order does not matter.</param>
         /// <returns>
         /// A ratio in <c>[1, 21]</c>. 1 is two identical colors and 21 is black against white.
         /// Compare against <see cref="MinimumReadableRatio"/> or <see cref="MinimumLargeTextRatio"/>.
         /// </returns>
+        /// <remarks>Composite translucent colors over their backgrounds before measuring them.</remarks>
         public static float ContrastRatio(Color first, Color second)
         {
             float firstLuminance = RelativeLuminance(first);

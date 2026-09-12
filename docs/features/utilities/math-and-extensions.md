@@ -789,10 +789,14 @@ type exists to prevent.
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Helper;
 
-Color label = ColorContrast.ReadableTextColor(buttonColor);   // black or white, whichever wins
-float ratio = ColorContrast.ContrastRatio(buttonColor, label);
+Color visibleButton = ColorContrast.Composite(buttonColor, panelColor);
+Color label = ColorContrast.ReadableTextColor(visibleButton); // black or white, whichever wins
+float ratio = ColorContrast.ContrastRatio(visibleButton, label);
 bool readable = ratio >= ColorContrast.MinimumReadableRatio;  // 4.5:1, WCAG AA body text
 ```
+
+`ContrastRatio` measures opaque colors. Use `Composite` first when a color is translucent. It
+applies the foreground alpha over an opaque background and returns the visible opaque color.
 
 The tempting shortcut, thresholding the familiar `0.299r + 0.587g + 0.114b` luma, measures perceived
 brightness, and brightness is not contrast. Contrast is a ratio between two colors' _relative

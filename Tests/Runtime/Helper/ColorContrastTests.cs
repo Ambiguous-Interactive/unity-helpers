@@ -14,6 +14,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         private const float Tolerance = 1e-4f;
 
         [Test]
+        public void CompositeReturnsTheVisibleOpaqueColorAndBoundsHostileAlpha()
+        {
+            Color background = new(0.2f, 0.4f, 0.4f, 0.1f);
+            Color[] tones =
+            {
+                new(0.8f, 0.2f, 0.3f, 0f),
+                new(0.8f, 0.2f, 0.3f, 1f),
+                new(0.8f, 0.2f, 0.3f, 0.25f),
+                new(0.8f, 0.2f, 0.3f, float.NaN),
+                new(0.8f, 0.2f, 0.3f, float.NegativeInfinity),
+                new(0.8f, 0.2f, 0.3f, -1f),
+                new(0.8f, 0.2f, 0.3f, float.PositiveInfinity),
+                new(0.8f, 0.2f, 0.3f, 2f),
+            };
+            Color[] expected =
+            {
+                new(0.2f, 0.4f, 0.4f, 1f),
+                new(0.8f, 0.2f, 0.3f, 1f),
+                new(0.35f, 0.35f, 0.375f, 1f),
+                new(0.2f, 0.4f, 0.4f, 1f),
+                new(0.2f, 0.4f, 0.4f, 1f),
+                new(0.2f, 0.4f, 0.4f, 1f),
+                new(0.8f, 0.2f, 0.3f, 1f),
+                new(0.8f, 0.2f, 0.3f, 1f),
+            };
+
+            for (int i = 0; i < tones.Length; ++i)
+            {
+                Color result = ColorContrast.Composite(tones[i], background);
+                Assert.That(result.r, Is.EqualTo(expected[i].r).Within(Tolerance));
+                Assert.That(result.g, Is.EqualTo(expected[i].g).Within(Tolerance));
+                Assert.That(result.b, Is.EqualTo(expected[i].b).Within(Tolerance));
+                Assert.AreEqual(1f, result.a);
+            }
+        }
+
+        [Test]
         public void RelativeLuminanceMatchesTheWcagAnchors()
         {
             Assert.That(
@@ -73,11 +110,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                         Color text = ColorContrast.ReadableTextColor(background);
                         Color other = text == Color.black ? Color.white : Color.black;
 
-                        Assert.GreaterOrEqual(
-                            ColorContrast.ContrastRatio(background, text),
-                            ColorContrast.ContrastRatio(background, other),
-                            $"{background} got the less readable of black and white."
-                        );
+                        float selectedRatio = ColorContrast.ContrastRatio(background, text);
+                        float otherRatio = ColorContrast.ContrastRatio(background, other);
+                        if (selectedRatio < otherRatio)
+                        {
+                            Assert.Fail(
+                                $"{background} got ratio {selectedRatio} instead of {otherRatio}."
+                            );
+                        }
                     }
                 }
             }

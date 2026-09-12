@@ -78,13 +78,20 @@ size is not sufficient reason to use one.
 **"Precise" means the API rejects a longer array, and that is worth measuring:**
 
 ```text
-Texture2D.SetPixels32(oversized)      -> ArgumentException: size of data to be written is
-                                         outside the target buffer bounds
-RectTransform.GetWorldCorners(len 8)  -> accepted; it needs four OR MORE
+Texture2D.SetPixels32(oversized)             -> ArgumentException: size of data to be written is
+                                                outside the target buffer bounds
+Texture2D.SetPixels32(block, oversized)      -> accepted; consumes the requested block prefix
+RectTransform.GetWorldCorners(len 8)         -> accepted; it needs four OR MORE
 ```
 
-So `SpriteSheetExtractor` is the one justified exact-size rent in the package, and `GetWorldCorners`
-— which looks like it needs exactly four — does not.
+The whole-texture `SetPixels32` overload requires an exact-length array, but its block overload
+accepts a longer array and consumes only the `width * height` prefix. `SpriteSheetExtractor` and
+`SpriteCropper` therefore use the block overload with `SystemArrayPool<Color32>` rather than
+creating permanent exact-size buckets. The active editor test
+`SpriteSheetExtractorPixelBufferTests.PooledPixelBuffersPreservePreviewAndExtractionOutput` guards
+the oversized-buffer behavior and verifies byte-identical immediate and deferred extraction on the
+supported editor matrix, including the 2021.3 floor. `GetWorldCorners` likewise accepts more than
+four elements and does not justify an exact-size rent.
 
 A texture read has no such lever: `Texture2D` declares `GetPixels32()` and its mip-level overload
 and nothing else — there is no array-filling overload to rent into (measured on 6000.4.6f1; the

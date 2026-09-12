@@ -679,30 +679,71 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             // An uncaught callback exception previously stopped recurring work permanently.
             CoroutineHost host = CreateHost();
-            ExpectError(LogType.Error, "A repeating job threw");
-
-            int invocations = 0;
-            Coroutine coroutine = host.StartFunctionAsCoroutine(
-                () =>
-                {
-                    ++invocations;
-                    throw new InvalidOperationException("Periodic job failure.");
-                },
-                0.01f
-            );
-
-            float timeout = Time.time + 2f;
-            while (invocations < 3 && Time.time < timeout)
+            GameObject requestedContext = Track(new GameObject("Helpers_JobOwner"));
+            RecordingLogHandler recorder = new(Debug.unityLogger.logHandler);
+            Debug.unityLogger.logHandler = recorder;
+            int requestedContextInvocations = 0;
+            int defaultContextInvocations = 0;
+            Coroutine requestedContextCoroutine = null;
+            Coroutine defaultContextCoroutine = null;
+            try
             {
-                yield return null;
+                requestedContextCoroutine = host.StartFunctionAsCoroutine(
+                    requestedContext,
+                    () =>
+                    {
+                        ++requestedContextInvocations;
+                        throw new InvalidOperationException("Attributed job failure.");
+                    },
+                    0.01f
+                );
+                defaultContextCoroutine = host.StartFunctionAsCoroutine(
+                    () =>
+                    {
+                        ++defaultContextInvocations;
+                        throw new InvalidOperationException("Default job failure.");
+                    },
+                    0.01f
+                );
+
+                float timeout = Time.time + 2f;
+                while (
+                    (requestedContextInvocations < 3 || defaultContextInvocations < 3)
+                    && Time.time < timeout
+                )
+                {
+                    yield return null;
+                }
+
+                Assert.GreaterOrEqual(
+                    requestedContextInvocations,
+                    3,
+                    $"The attributed job stopped after {requestedContextInvocations} invocations."
+                );
+                Assert.GreaterOrEqual(
+                    defaultContextInvocations,
+                    3,
+                    $"The default-context job stopped after {defaultContextInvocations} invocations."
+                );
+            }
+            finally
+            {
+                if (requestedContextCoroutine != null)
+                {
+                    host.StopCoroutine(requestedContextCoroutine);
+                }
+
+                if (defaultContextCoroutine != null)
+                {
+                    host.StopCoroutine(defaultContextCoroutine);
+                }
+
+                Debug.unityLogger.logHandler = recorder.Inner;
             }
 
-            host.StopCoroutine(coroutine);
-            Assert.GreaterOrEqual(
-                invocations,
-                3,
-                $"A throwing repeating job must keep running, got {invocations} invocations."
-            );
+            Assert.AreEqual(2, recorder.ErrorContexts.Count);
+            Assert.AreSame(requestedContext, recorder.ErrorContexts[0]);
+            Assert.AreSame(host, recorder.ErrorContexts[1]);
         }
 
         [UnityTest]
@@ -1196,6 +1237,39 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             GameObject go = Track(new GameObject("Helpers_CoroutineHost", typeof(CoroutineHost)));
             return go.GetComponent<CoroutineHost>();
+        }
+
+        private sealed class RecordingLogHandler : ILogHandler
+        {
+            internal ILogHandler Inner { get; }
+
+            internal List<Object> ErrorContexts { get; } = new();
+
+            internal RecordingLogHandler(ILogHandler inner)
+            {
+                Inner = inner;
+            }
+
+            public void LogException(Exception exception, Object context)
+            {
+                Inner.LogException(exception, context);
+            }
+
+            public void LogFormat(
+                LogType logType,
+                Object context,
+                string format,
+                params object[] args
+            )
+            {
+                if (logType == LogType.Error)
+                {
+                    ErrorContexts.Add(context);
+                    return;
+                }
+
+                Inner.LogFormat(logType, context, format, args);
+            }
         }
     }
 

@@ -129,6 +129,8 @@ Assets/Sprites/Characters/
 > _Before and after: transparent padding removed while preserving sprite content and pivot_
 
 Cropping first also makes [Sprite Atlas Generator](#sprite-atlas-generator) pack tighter.
+Crop output reuses dynamically sized pixel buffers, so repeated work does not retain one permanent
+pool bucket for every texture size.
 
 ---
 
@@ -645,6 +647,8 @@ Transparency-based grid detection requires a threshold in `[0, 1)`.
   **Save Config** writes a `<texture>.spritesheet.json` beside the sheet so a re-extraction is
   reproducible. A `Config Stale` badge appears when the texture has changed since.
 - **Preserve Import Settings** (on by default) copies the source's importer settings to each output.
+- Preview and extracted output reuse dynamically sized pixel buffers instead of retaining one
+  permanent pool bucket for every sprite size.
 - The **Danger Zone: Reference Replacement** section points existing assets at the extracted
   sprites. Like the one in Sprite Cropper, it requires ticking
   "I understand the risks and want to proceed." and it is not undoable.
