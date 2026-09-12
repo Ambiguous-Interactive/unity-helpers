@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.0] - 2026-09-12
+
 ### Added
 
 - Add `WallMath.Median`, `Percentile`, `Mean` and `StandardDeviation` over `IReadOnlyList<float>`, `<double>`, `<int>` and `<long>`, sorting pooled copies so the caller's list is never reordered. See [Descriptive Statistics](./docs/features/utilities/helper-utilities.md#descriptive-statistics-wallmath) ([#742](https://github.com/Ambiguous-Interactive/unity-helpers/issues/742)).
