@@ -33,7 +33,9 @@ namespace Samples.UnityHelpers.SpatialStructures
                 points.Add(new Vector2(x, y));
             }
 
+#pragma warning disable WPROTO028 // Transient query bounds are never serialized by WallstopProto.
             Bounds bounds = new Bounds(Vector3.zero, new Vector3(areaSize.x, areaSize.y, 0.1f));
+#pragma warning restore WPROTO028
 
             // QuadTree: radius query
             QuadTree2D<Vector2> quad = new QuadTree2D<Vector2>(points, p => p, bounds);

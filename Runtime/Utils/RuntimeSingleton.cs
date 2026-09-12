@@ -1,6 +1,12 @@
 // MIT License - Copyright (c) 2024 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
+#pragma warning disable UAC0009 // Preserve diagnostics in development players.
+#if DEVELOPMENT_BUILD
+#define WALLSTOP_DEVELOPMENT_BUILD
+#endif
+#pragma warning restore UAC0009
+
 namespace WallstopStudios.UnityHelpers.Utils
 {
     using System;
@@ -73,7 +79,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private bool _isPendingDestruction;
 
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || WALLSTOP_DEVELOPMENT_BUILD
         private static bool _creationRefusedWarningLogged;
 #endif
 
@@ -285,14 +291,14 @@ namespace WallstopStudios.UnityHelpers.Utils
             _instance = null;
             // A cache reset must also clear remembered misses.
             _creationRefusedFrame = -1;
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || WALLSTOP_DEVELOPMENT_BUILD
             _creationRefusedWarningLogged = false;
 #endif
         }
 
         private static void WarnCreationRefused(Type type)
         {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || WALLSTOP_DEVELOPMENT_BUILD
             if (_creationRefusedWarningLogged)
             {
                 return;

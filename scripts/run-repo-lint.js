@@ -375,6 +375,11 @@ const CHECKS = [
     run: "pwsh -NoProfile -File scripts/tests/test-unity-environment-warnings.ps1 -VerboseOutput"
   },
   {
+    id: "unity-compiler-warnings",
+    name: "Unity compiler warnings",
+    run: "pwsh -NoProfile -File scripts/tests/test-unity-compiler-warnings.ps1 -VerboseOutput"
+  },
+  {
     id: "catastrophic-pattern-sync",
     name: "Catastrophic pattern sync",
     run: "pwsh -NoProfile -File scripts/tests/test-catastrophic-pattern-sync.ps1 -VerboseOutput"

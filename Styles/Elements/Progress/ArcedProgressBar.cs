@@ -151,7 +151,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
             }
         }
 
+#pragma warning disable WPROTO028 // UI-only Unity value; this element is never a WallstopProto contract.
         private Color _trackColor = Color.gray;
+#pragma warning restore WPROTO028
 
 #if UNITY_6000_0_OR_NEWER
         [UxmlAttribute("track-color-attr")]
@@ -325,8 +327,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
             }
 
             Painter2D painter = mgc.painter2D;
+#pragma warning disable WPROTO028 // Transient paint geometry is never serialized by WallstopProto.
             Rect rect = contentRect;
             Vector2 center = rect.center;
+#pragma warning restore WPROTO028
 
             painter.lineWidth = _thickness;
             painter.lineCap = _roundedCaps ? LineCap.Round : LineCap.Butt;

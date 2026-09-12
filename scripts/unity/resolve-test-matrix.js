@@ -40,12 +40,7 @@ function resolveTestMatrix(
   }
   return {
     "unity-versions": selectedVersions,
-    "test-modes": selectedModes,
-    // The workflow matrix has only a version axis. Mode selection gates steps
-    // inside each version job, so only unselected versions need exclusions.
-    "matrix-exclude": versions
-      .filter((entry) => !selectedVersions.includes(entry))
-      .map((entry) => ({ "unity-version": entry }))
+    "test-modes": selectedModes
   };
 }
 

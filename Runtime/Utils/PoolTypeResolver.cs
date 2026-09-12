@@ -757,8 +757,13 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
             }
 
-            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            foreach (Assembly assembly in assemblies)
+#if UNITY_6000_6_OR_NEWER
+            IReadOnlyList<Assembly> loadedAssemblies =
+                UnityEngine.Assemblies.CurrentAssemblies.GetLoadedAssemblies();
+#else
+            IReadOnlyList<Assembly> loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
+#endif
+            foreach (Assembly assembly in loadedAssemblies)
             {
                 try
                 {

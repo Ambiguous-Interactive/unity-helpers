@@ -20,7 +20,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
             if (matchColliderToSprite == null)
             {
                 this.LogError(
-                    $"Target was of type {target?.GetType()}, expected {nameof(MatchColliderToSprite)}."
+                    $"Target was of type {(target != null ? target.GetType() : null)}, expected {nameof(MatchColliderToSprite)}."
                 );
                 return;
             }
@@ -87,9 +87,13 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                 nameof(MatchColliderToSprite.polygonCollider)
             );
             PolygonCollider2D collider = colliderProperty.objectReferenceValue as PolygonCollider2D;
-            if (collider == null && target is MatchColliderToSprite matcher)
+            if (
+                collider == null
+                && target is MatchColliderToSprite matcher
+                && matcher.TryGetComponent(out PolygonCollider2D resolvedCollider)
+            )
             {
-                matcher.TryGetComponent(out collider);
+                collider = resolvedCollider;
             }
             return collider;
         }

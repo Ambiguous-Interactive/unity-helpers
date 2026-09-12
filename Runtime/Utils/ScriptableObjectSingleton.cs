@@ -1,6 +1,12 @@
 // MIT License - Copyright (c) 2025 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
+#pragma warning disable UAC0009 // Preserve diagnostics in development players.
+#if DEVELOPMENT_BUILD
+#define WALLSTOP_DEVELOPMENT_BUILD
+#endif
+#pragma warning restore UAC0009
+
 namespace WallstopStudios.UnityHelpers.Utils
 {
     using System;
@@ -517,7 +523,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private static void WarnMetadataFolderEmpty(Type type, string folder)
         {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || WALLSTOP_DEVELOPMENT_BUILD
             if (string.IsNullOrWhiteSpace(folder))
             {
                 return;
@@ -551,7 +557,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private static void WarnNoInstancesFound(Type type)
         {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || WALLSTOP_DEVELOPMENT_BUILD
 #if UNITY_EDITOR
             // Suppress warning during early initialization - asset may not be created yet
             if (!ScriptableObjectSingletonInitState.InitialEnsureCompleted)
@@ -579,7 +585,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private static void LogMetadataWarning(string message, ref bool flag)
         {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || WALLSTOP_DEVELOPMENT_BUILD
             if (!flag)
             {
                 flag = true;

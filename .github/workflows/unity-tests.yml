@@ -72,7 +72,6 @@ jobs:
       unity-versions: ${{ steps.resolve.outputs.unity-versions }}
       release-unity-version: ${{ steps.release_version.outputs.version }}
       test-modes: ${{ steps.resolve.outputs.test-modes }}
-      matrix-exclude: ${{ steps.resolve.outputs.matrix-exclude }}
       editmode-integration-assemblies: ${{ steps.assemblies.outputs.editmode_integrations }}
       playmode-integration-assemblies: ${{ steps.assemblies.outputs.playmode_integrations }}
       standalone-integration-assemblies: ${{ steps.assemblies.outputs.standalone_integrations }}
@@ -308,12 +307,7 @@ jobs:
       # trade-off accepted here is politeness -- a sibling repo's Unity job can now
       # queue behind more of ours at once.
       matrix:
-        unity-version:
-          - 2021.3.45f1
-          - 2022.3.45f1
-          - 6000.5.2f1
-          - 6000.6.0f1
-        exclude: ${{ fromJSON(needs.matrix-config.outputs.matrix-exclude) }}
+        unity-version: ${{ fromJSON(needs.matrix-config.outputs.unity-versions) }}
     steps:
       - name: Require current PR head before setup
         timeout-minutes: 2

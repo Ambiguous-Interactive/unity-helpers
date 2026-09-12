@@ -11,10 +11,12 @@ namespace Samples.UnityHelpers.Serialization.Json
     [Serializable]
     public struct SampleSave
     {
+#pragma warning disable WPROTO028 // This sample demonstrates JSON, not WallstopProto serialization.
         public Vector3 position;
         public Quaternion rotation;
         public Color color;
         public Rect screenRect;
+#pragma warning restore WPROTO028
     }
 
     /// <summary>

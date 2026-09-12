@@ -124,10 +124,10 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
         $project = Join-Path $temporary "configuration-$level"
         $null = Initialize-EphemeralProject -Root $temporary -Version '2021.3.45f1' -Mode editmode -Path $project -ManagedStrippingLevel $level
         $generated = Get-Content -LiteralPath (Join-Path $project 'Assets/Editor/UhCiTestConfigurator.cs') -Raw
-        if (-not $generated.Contains("PlayerSettings.SetManagedStrippingLevel(BuildTargetGroup.Standalone, ManagedStrippingLevel.$level);")) {
+        if (-not $generated.Contains("PlayerSettings.SetManagedStrippingLevel(target, ManagedStrippingLevel.$level);")) {
             throw 'Ephemeral project dropped the selected stripping level.'
         }
-        if (-not $generated.Contains('stripping={PlayerSettings.GetManagedStrippingLevel(BuildTargetGroup.Standalone)}')) {
+        if (-not $generated.Contains('stripping={PlayerSettings.GetManagedStrippingLevel(target)}')) {
             throw 'Configurator must report the effective stripping level.'
         }
         $checks++

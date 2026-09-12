@@ -1,22 +1,6 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
-#if UNITY_2021 || UNITY_2022 || UNITY_2023
-#define UNH_NEEDS_DOES_NOT_RETURN_ATTRIBUTE_POLYFILL
-#endif
-
-// Polyfill DoesNotReturn on older Unity profiles so Throw helpers retain analyzer annotations.
-
-#if !NET5_0_OR_GREATER && UNH_NEEDS_DOES_NOT_RETURN_ATTRIBUTE_POLYFILL
-namespace System.Diagnostics.CodeAnalysis
-{
-    using System;
-
-    [AttributeUsage(AttributeTargets.Method, Inherited = false)]
-    internal sealed class DoesNotReturnAttribute : Attribute { }
-}
-#endif
-
 namespace WallstopStudios.UnityHelpers.Core.Serialization
 {
     using System;

@@ -26,14 +26,18 @@ namespace Samples.UnityHelpers.UGUI.EnhancedImage
             GameObject imageGo = new GameObject("EnhancedImage");
             imageGo.transform.SetParent(canvasGo.transform, false);
             EnhancedImage image = imageGo.AddComponent<EnhancedImage>();
+#pragma warning disable WPROTO028 // Transient UI geometry is never serialized by WallstopProto.
             image.rectTransform.sizeDelta = new Vector2(200f, 200f);
+#pragma warning restore WPROTO028
 
             if (materialTemplate != null)
             {
                 image.material = Object.Instantiate(materialTemplate);
             }
 
+#pragma warning disable WPROTO028 // Transient UI tint is never serialized by WallstopProto.
             image.HdrColor = new Color(1.6f, 1.2f, 0.8f, 1f);
+#pragma warning restore WPROTO028
         }
     }
 }

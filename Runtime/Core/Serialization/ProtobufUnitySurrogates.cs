@@ -773,7 +773,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             catch (Exception error)
             {
                 RegistrationFailures.Add(typeof(TReal).Name);
-#if !ENABLE_IL2CPP
+#if ENABLE_IL2CPP
+                _ = error;
+#else
                 // AOT always uses WallstopProto; expected protobuf-net refusals must not log startup errors.
                 Debug.LogError(
                     $"[UnityHelpers] protobuf-net already bound {typeof(TReal).Name}, so its "

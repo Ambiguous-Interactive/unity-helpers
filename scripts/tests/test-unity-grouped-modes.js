@@ -20,13 +20,7 @@ for (const requestedVersion of ["", ...versions]) {
     const selectedModes = TEST_MODES.includes(requestedMode) ? [requestedMode] : TEST_MODES;
     assert.deepEqual(result["unity-versions"], selectedVersions);
     assert.deepEqual(result["test-modes"], selectedModes);
-    // Modes are steps inside each version job, not a second matrix axis.
-    assert.deepEqual(
-      result["matrix-exclude"],
-      versions
-        .filter((version) => !selectedVersions.includes(version))
-        .map((version) => ({ "unity-version": version }))
-    );
+    assert.deepEqual(Object.keys(result).sort(), ["test-modes", "unity-versions"]);
     cases++;
   }
 }
@@ -66,7 +60,7 @@ for (const acceptance of ["sentinel", "intmap", "serialization", "all"]) {
 const matrix = resolveTestMatrix(versions);
 matrix["unity-versions"].pop();
 assert.deepEqual(resolveTestMatrix(versions)["unity-versions"], versions);
-assert.equal(resolveTestMatrix(versions)["unity-versions"].length, 4);
+assert.equal(resolveTestMatrix(versions)["unity-versions"].length, versions.length);
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "unity-grouped-modes-"));
 try {

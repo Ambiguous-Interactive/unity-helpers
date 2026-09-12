@@ -57,9 +57,15 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             try
             {
+#if UNITY_6000_6_OR_NEWER
+                return UnityEngine
+                    .Assemblies.CurrentAssemblies.GetLoadedAssemblies()
+                    .Where(assembly => assembly != null && !assembly.IsDynamic);
+#else
                 return AppDomain
                     .CurrentDomain.GetAssemblies()
                     .Where(assembly => assembly != null && !assembly.IsDynamic);
+#endif
             }
             catch
             {

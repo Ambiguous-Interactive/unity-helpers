@@ -444,7 +444,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
 
             // Visit assemblies with orphan-only manifests so unused numbers remain retired.
-            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+#if UNITY_6000_6_OR_NEWER
+            IReadOnlyList<Assembly> loadedAssemblies =
+                UnityEngine.Assemblies.CurrentAssemblies.GetLoadedAssemblies();
+#else
+            IReadOnlyList<Assembly> loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
+#endif
+            foreach (Assembly assembly in loadedAssemblies)
             {
                 if (assembly.IsDynamic || byAssembly.ContainsKey(assembly))
                 {

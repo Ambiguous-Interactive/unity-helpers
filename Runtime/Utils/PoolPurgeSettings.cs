@@ -1,6 +1,12 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
+#pragma warning disable UAC0009 // Preserve diagnostics in development players.
+#if DEVELOPMENT_BUILD
+#define WALLSTOP_DEVELOPMENT_BUILD
+#endif
+#pragma warning restore UAC0009
+
 namespace WallstopStudios.UnityHelpers.Utils
 {
     using System;
@@ -1781,7 +1787,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 catch (Exception e)
                 {
                     // One pool failure must not prevent cleanup of the others.
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || WALLSTOP_DEVELOPMENT_BUILD
                     Debug.LogWarning($"[PoolPurgeSettings] Failed to purge pool: {e}");
 #endif
                     _ = e;
@@ -1838,7 +1844,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 catch (Exception e)
                 {
                     // One pool failure must not prevent cleanup of the others.
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || WALLSTOP_DEVELOPMENT_BUILD
                     Debug.LogWarning($"[PoolPurgeSettings] Failed to force-purge pool: {e}");
 #endif
                     _ = e;
@@ -2075,7 +2081,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 catch (Exception e)
                 {
                     // One pool failure must not prevent cleanup of the others.
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || WALLSTOP_DEVELOPMENT_BUILD
                     Debug.LogWarning($"[PoolPurgeSettings] Failed to purge pool for budget: {e}");
 #endif
                     _ = e;

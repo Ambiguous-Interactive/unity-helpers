@@ -52,9 +52,12 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 TryGetComponent(out polygonCollider);
             }
-            if (spriteRenderer == null)
+            if (
+                spriteRenderer == null
+                && TryGetComponent(out SpriteRenderer resolvedSpriteRenderer)
+            )
             {
-                TryGetComponent(out spriteRenderer);
+                spriteRenderer = resolvedSpriteRenderer;
             }
             if (spriteRenderer == null && image == null)
             {

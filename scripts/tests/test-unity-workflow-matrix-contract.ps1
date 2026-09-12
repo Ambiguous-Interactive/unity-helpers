@@ -1258,6 +1258,10 @@ $runCiTestsClearsStaleCompilationCache = (
     $runCiTestsContent.Contains('[System.StringComparison]::OrdinalIgnoreCase') -and
     $runCiTestsContent.Contains('.unity-helpers-repo-root.txt') -and
     $runCiTestsContent.Contains('.unity-helpers-source-inventory.txt') -and
+    $runCiTestsContent.Contains('unity-compilation-inventory-v2') -and
+    $runCiTestsContent.Contains('Runtime/Analyzers/WallstopStudios.UnityHelpers.Analyzers.dll') -and
+    $runCiTestsContent.Contains('Runtime/Analyzers/WallstopStudios.UnityHelpers.Proto.Generator.dll') -and
+    $runCiTestsContent.Contains('Get-FileHash -LiteralPath $fullPath -Algorithm SHA256') -and
     $runCiTestsContent.Contains('Clear-StaleUnityCompilationCache -Project $ProjectPath -RepoRoot $RepoRoot') -and
     $runCiTestsContent.Contains('Write-UnityCompilationSourceInventoryMarker -Project $ProjectPath -RepoRoot $RepoRoot') -and
     $runCiTestsContent.Contains("'Bee'") -and
@@ -1836,23 +1840,16 @@ $defaultModeContracts = @(
 $defaultMatrixIsVersionGrouped = (
     -not $jobTexts.ContainsKey('unity-tests-standalone') -and
     [regex]::Matches($unityTestsMatrixJob, '(?m)^      matrix:\s*$').Count -eq 1 -and
-    [regex]::Matches($unityTestsMatrixJob, '(?m)^        unity-version:\s*$').Count -eq 1 -and
-    [regex]::Matches($unityTestsMatrixJob, '(?m)^          - \d+\.\d+\.\d+f\d+\s*$').Count -eq 4 -and
+    $unityTestsMatrixJob.Contains('unity-version: ${{ fromJSON(needs.matrix-config.outputs.unity-versions) }}') -and
     [regex]::Matches($unityTestsMatrixJob, '(?m)^        test-mode:\s*$').Count -eq 0 -and
     -not $unityTestsMatrixJob.Contains('matrix.test-mode') -and
-    $unityTestsMatrixJob.Contains('exclude: ${{ fromJSON(needs.matrix-config.outputs.matrix-exclude) }}') -and
     $unityTestsMatrixJob.Contains('needs.matrix-config.outputs.test-modes') -and
+    -not $workflowContent.Contains('matrix-exclude') -and
     -not $workflowContent.Contains('matrix-exclude-standalone') -and
     -not $workflowContent.Contains('matrix-include-standalone')
 )
-foreach ($version in @('2021.3.45f1', '2022.3.45f1', '6000.5.2f1', '6000.6.0f1')) {
-    $defaultMatrixIsVersionGrouped = (
-        $defaultMatrixIsVersionGrouped -and
-        [regex]::Matches($unityTestsMatrixJob, "(?m)^          - $([regex]::Escape($version))\s*$").Count -eq 1
-    )
-}
 if (-not $defaultMatrixIsVersionGrouped) {
-    Write-Host '::error file=.github/workflows/unity-tests.yml::The default Unity matrix must contain exactly one axis with the four supported Unity versions. Modes must be sequential steps within each version job, never a second matrix axis that multiplies the licensed runner queue.'
+    Write-Host '::error file=.github/workflows/unity-tests.yml::The default Unity matrix must consume the canonical selected-version output as its only axis. Modes must be sequential steps within each version job, never a second matrix axis that multiplies the licensed runner queue.'
     $failed = $true
 } elseif ($VerboseOutput) {
     Write-Info 'Checked the default Unity matrix creates exactly one job per supported version.'
@@ -2062,8 +2059,8 @@ $matrixConfigAssemblyDiscoveryIsCentralized = (
     $workflowContent.Contains('integration-assembly-profiles: ${{ steps.assemblies.outputs.integration_profiles }}') -and
     $workflowContent.Contains('core-assembly-profiles: ${{ steps.assemblies.outputs.core_profiles }}') -and
     $workflowContent.Contains('test-modes: ${{ steps.resolve.outputs.test-modes }}') -and
-    $workflowContent.Contains('matrix-exclude: ${{ steps.resolve.outputs.matrix-exclude }}') -and
-    $unityTestsMatrixJob.Contains('exclude: ${{ fromJSON(needs.matrix-config.outputs.matrix-exclude) }}') -and
+    $workflowContent.Contains('unity-versions: ${{ steps.resolve.outputs.unity-versions }}') -and
+    $unityTestsMatrixJob.Contains('unity-version: ${{ fromJSON(needs.matrix-config.outputs.unity-versions) }}') -and
     $unityTestsMatrixJob.Contains('UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.editmode-integration-assemblies }}') -and
     $unityTestsMatrixJob.Contains('UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.playmode-integration-assemblies }}') -and
     $unityTestsMatrixJob.Contains('UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.standalone-integration-assemblies }}') -and

@@ -24,6 +24,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         private ValidationGraphConnections _graphConnections;
         private readonly List<VisualElement> _graphNodes = new List<VisualElement>();
 
+        private static void SetGraphNodePosition(VisualElement element, Vector2 position)
+        {
+#if UNITY_6000_0_OR_NEWER
+            element.style.translate = new Translate(position.x, position.y, 0);
+#else
+            element.transform.position = position;
+#endif
+        }
+
         private VisualElement BuilderNode(string title, int index)
         {
             if (index == 0)
@@ -44,7 +53,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 if (!_graphMode || !handle.HasMouseCapture())
                     return;
                 _graphPositions[index] += evt.mouseDelta;
-                node.transform.position = _graphPositions[index];
+                SetGraphNodePosition(node, _graphPositions[index]);
                 _graphConnections.MarkDirtyRepaint();
                 evt.StopPropagation();
             });
@@ -82,7 +91,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     node.userData = row;
                     Label handle = AddLabel(node, "CHECK " + (index + 1), "sentinel-node-title");
                     node.Add(row);
-                    node.transform.position = condition.graphPosition;
+                    SetGraphNodePosition(node, condition.graphPosition);
                     handle.RegisterCallback<MouseDownEvent>(evt =>
                     {
                         if (evt.button != 0)
@@ -95,7 +104,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                         if (!handle.HasMouseCapture())
                             return;
                         condition.graphPosition += evt.mouseDelta;
-                        node.transform.position = condition.graphPosition;
+                        SetGraphNodePosition(node, condition.graphPosition);
                         _graphConnections.MarkDirtyRepaint();
                         evt.StopPropagation();
                     });
@@ -112,8 +121,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             _graphNodes.Add(_reportNode);
             _builderSurface.EnableInClassList("sentinel-graph", graph);
             _graphConnections.EnableInClassList("dx-hidden", !graph);
-            _targetNode.transform.position = graph ? _graphPositions[0] : Vector2.zero;
-            _reportNode.transform.position = graph ? _graphPositions[2] : Vector2.zero;
+            SetGraphNodePosition(_targetNode, graph ? _graphPositions[0] : Vector2.zero);
+            SetGraphNodePosition(_reportNode, graph ? _graphPositions[2] : Vector2.zero);
             _graphConnections.MarkDirtyRepaint();
         }
 

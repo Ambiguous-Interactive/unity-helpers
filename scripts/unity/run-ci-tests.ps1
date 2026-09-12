@@ -284,6 +284,61 @@ function Write-CiWarning {
     Write-Host "::warning::$Message"
 }
 
+function Assert-NoUnityCompilerWarnings {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][string]$LogPath,
+        [Parameter(Mandatory = $true)][string]$Label,
+        [Parameter(Mandatory = $true)][string]$PackageRoot,
+        [int]$MaximumReported = 25
+    )
+
+    if (-not (Test-Path -LiteralPath $LogPath -PathType Leaf)) {
+        throw "$Label compiler-warning gate could not read '$LogPath'."
+    }
+
+    # A Unity project can contain third-party dependencies and this repository's own test
+    # assemblies. Neither is shipped to package consumers. Gate the package's production source,
+    # opt-in samples, and the small generated CI harness instead of claiming ownership of every
+    # warning emitted anywhere in the host project.
+    $packageRoot = [System.IO.Path]::GetFullPath($PackageRoot).TrimEnd('/', '\')
+    $escapedPackageRoot = [regex]::Escape($packageRoot) -replace '(?:\\/|/)','[\\/]'
+    $diagnosticSuffix = '\.cs\(\d+(?:,\d+){0,3}\):\s*warning\s+[A-Z][A-Z0-9]*\d{3,4}\s*:'
+    $ownedSourcePattern = '(?i)(?:' +
+        $escapedPackageRoot + '[\\/](?:Runtime|Editor|Styles|Samples~?)[\\/]|' +
+        'Packages[\\/]com\.wallstop-studios\.unity-helpers[\\/](?:Runtime|Editor|Styles|Samples~?)[\\/]|' +
+        'Library[\\/]PackageCache[\\/]com\.wallstop-studios\.unity-helpers(?:@[^\\/]+)?[\\/](?:Runtime|Editor|Styles|Samples~?)[\\/]|' +
+        'Assets[\\/]WallstopStudios[\\/]UnityHelpers[\\/](?:Runtime|Editor|Styles|Samples)[\\/]|' +
+        '^(?:Runtime|Editor|Styles|Samples~?)[\\/])[^\r\n]*?' + $diagnosticSuffix
+    $harnessPattern = '(?i)Assets[\\/]Editor[\\/](?:UhCi[^\\/]*|UnityHelpersPackageExporter)' + $diagnosticSuffix
+    $generatedSourcePattern = '(?i)Library[\\/]Bee[\\/][^\r\n]*WallstopStudios\.UnityHelpers(?![A-Za-z0-9_])[^\r\n]*?' + $diagnosticSuffix
+    $sourceLessDiagnosticPrefix = '(?i)^\s*(?:[^\r\n]*?\bCSC\s*:\s*)?warning\s+[A-Z][A-Z0-9]*\d{3,4}\s*:'
+    $packageAttributedSourceLessPattern = $sourceLessDiagnosticPrefix + '[^\r\n]*(?:WallstopStudios\.UnityHelpers(?![A-Za-z0-9_])|com\.wallstop-studios\.unity-helpers(?![A-Za-z0-9_-]))'
+    $logLines = @(Get-Content -LiteralPath $LogPath -ErrorAction Stop)
+    $warnings = @(
+        $logLines |
+            Where-Object {
+                $_ -notmatch '(?i)[\\/]Tests[\\/]' -and
+                ($_ -match $ownedSourcePattern -or $_ -match $harnessPattern -or $_ -match $generatedSourcePattern -or $_ -match $packageAttributedSourceLessPattern)
+            } |
+            ForEach-Object { ("$_").Trim() } |
+            Sort-Object -Unique
+    )
+
+    Write-Host "[compiler-warnings] Scanned $($logLines.Count) $Label log line(s); found $($warnings.Count) unique package, sample, or CI-harness compiler warning(s)."
+    if ($warnings.Count -lt 1) {
+        return
+    }
+
+    foreach ($warning in @($warnings | Select-Object -First $MaximumReported)) {
+        Write-CiError "$Label emitted a compiler warning: $(ConvertTo-UnitySafeLogText -Text $warning)"
+    }
+    if ($MaximumReported -lt $warnings.Count) {
+        Write-CiError "$Label emitted $($warnings.Count - $MaximumReported) additional unique compiler warning(s); inspect $LogPath."
+    }
+    throw "$Label emitted $($warnings.Count) unique package, sample, or CI-harness compiler warning(s). Unity CI requires zero client-visible warnings on every supported editor."
+}
+
 # SINGLE SOURCE OF TRUTH for the catastrophic-pattern list that both
 # Write-UnityCatastrophicErrorAnnotations (new ::error:: annotation surface)
 # AND Write-UnityResultFailureDiagnostics (older line-numbered selected-line
@@ -649,7 +704,7 @@ function Get-UnityCompilationSourceInventory {
         [System.IO.Path]::AltDirectorySeparatorChar
     )
     $sourceExtensions = @('.cs', '.asmdef', '.asmref', '.rsp')
-    $relativePaths = @(
+    $inventoryEntries = @(
         # These are the source-bearing roots imported by the local UPM package and
         # its testable assemblies. Samples~/ and Generator~/ are not imported into
         # the ephemeral project and must not invalidate its warm compilation cache.
@@ -672,9 +727,25 @@ function Get-UnityCompilationSourceInventory {
                 $relativePath.Replace([System.IO.Path]::DirectorySeparatorChar, '/')
             }
         }
+
+        # Analyzer binaries and their Unity importer settings affect diagnostics without changing
+        # a C# source path. Include both so a restored Library cannot silently reuse compilation
+        # performed under a different warning policy.
+        foreach ($relativePath in @(
+                'Runtime/Analyzers/WallstopStudios.UnityHelpers.Analyzers.dll',
+                'Runtime/Analyzers/WallstopStudios.UnityHelpers.Analyzers.dll.meta',
+                'Runtime/Analyzers/WallstopStudios.UnityHelpers.Proto.Generator.dll',
+                'Runtime/Analyzers/WallstopStudios.UnityHelpers.Proto.Generator.dll.meta'
+            )) {
+            $fullPath = Join-Path $normalizedRoot $relativePath
+            if (Test-Path -LiteralPath $fullPath -PathType Leaf) {
+                $contentHash = (Get-FileHash -LiteralPath $fullPath -Algorithm SHA256).Hash
+                "$relativePath`t$contentHash"
+            }
+        }
     )
 
-    return (@($relativePaths | Sort-Object -CaseSensitive) -join "`n")
+    return ((@('unity-compilation-inventory-v2') + @($inventoryEntries | Sort-Object -CaseSensitive)) -join "`n")
 }
 
 function Write-UnityCompilationSourceInventoryMarker {
@@ -750,7 +821,7 @@ function Clear-StaleUnityCompilationCache {
         $reasons += if ($null -eq $previousSourceInventory) {
             'source-inventory marker is missing or unreadable'
         } else {
-            'the package source path set changed'
+            'the package source path or analyzer inventory changed'
         }
     }
 
@@ -1541,24 +1612,25 @@ public static class UhCiTestConfigurator
 
         // The scripting backend is parameterized: the runner passes the IL2CPP or
         // the Mono backend for the Mono perf leg via -Backend.
-        PlayerSettings.SetScriptingBackend(BuildTargetGroup.Standalone, ScriptingImplementation.$Backend);
+        NamedBuildTarget target = NamedBuildTarget.Standalone;
+        PlayerSettings.SetScriptingBackend(target, ScriptingImplementation.$Backend);
         // Use the non-deprecated ApiCompatibilityLevel.NET_Standard (targets .NET
         // Standard 2.1). The deprecated 2.0 form and the non-existent 2.1 enum
         // member are intentionally NOT used.
-        PlayerSettings.SetApiCompatibilityLevel(BuildTargetGroup.Standalone, ApiCompatibilityLevel.NET_Standard);
-        PlayerSettings.SetManagedStrippingLevel(BuildTargetGroup.Standalone, ManagedStrippingLevel.$StrippingLevel);
+        PlayerSettings.SetApiCompatibilityLevel(target, ApiCompatibilityLevel.NET_Standard);
+        PlayerSettings.SetManagedStrippingLevel(target, ManagedStrippingLevel.$StrippingLevel);
         // Pin the IL2CPP C++ compiler configuration explicitly ($CompilerConfiguration).
         // An ephemeral CI project has no committed default, so the pin removes the
         // variable instead of trusting any implicit default. The standalone leg passes
         // Debug because Release ICEs MSVC on the generated test C++ -- see the
         // -Il2CppCompilerConfiguration parameter docs for the run and the exact file.
         // Harmless under Mono.
-        PlayerSettings.SetIl2CppCompilerConfiguration(BuildTargetGroup.Standalone, Il2CppCompilerConfiguration.$CompilerConfiguration);
+        PlayerSettings.SetIl2CppCompilerConfiguration(target, Il2CppCompilerConfiguration.$CompilerConfiguration);
 
         // Print the EFFECTIVE Unity config so the artifact log PROVES Mono/IL2CPP
         // + .NET Standard 2.1 + Release for this run.
-        PlayerSettings.GetScriptingDefineSymbols(NamedBuildTarget.Standalone, out string[] effectiveDefines);
-        Debug.Log(`$"UH perf config: backend={PlayerSettings.GetScriptingBackend(BuildTargetGroup.Standalone)}, api={PlayerSettings.GetApiCompatibilityLevel(BuildTargetGroup.Standalone)}, codeOpt={UnityEditor.Compilation.CompilationPipeline.codeOptimization}, il2cppConfig={PlayerSettings.GetIl2CppCompilerConfiguration(BuildTargetGroup.Standalone)}, stripping={PlayerSettings.GetManagedStrippingLevel(BuildTargetGroup.Standalone)}, defines=[{string.Join(`";`", effectiveDefines ?? new string[0])}]");
+        PlayerSettings.GetScriptingDefineSymbols(target, out string[] effectiveDefines);
+        Debug.Log(`$"UH perf config: backend={PlayerSettings.GetScriptingBackend(target)}, api={PlayerSettings.GetApiCompatibilityLevel(target)}, codeOpt={UnityEditor.Compilation.CompilationPipeline.codeOptimization}, il2cppConfig={PlayerSettings.GetIl2CppCompilerConfiguration(target)}, stripping={PlayerSettings.GetManagedStrippingLevel(target)}, defines=[{string.Join(`";`", effectiveDefines ?? new string[0])}]");
 
         // Persist the PlayerSettings mutations (scripting backend/api/stripping AND
         // any injected scripting defines) to ProjectSettings.asset so the SEPARATE
@@ -1709,8 +1781,9 @@ $developmentOption
             }
             playerOptions.locationPathName = outPath;
         }
-        Debug.Log("UH player build config: backend=" + UnityEditor.PlayerSettings.GetScriptingBackend(UnityEditor.BuildTargetGroup.Standalone)
-            + ", stripping=" + UnityEditor.PlayerSettings.GetManagedStrippingLevel(UnityEditor.BuildTargetGroup.Standalone)
+        UnityEditor.Build.NamedBuildTarget target = UnityEditor.Build.NamedBuildTarget.Standalone;
+        Debug.Log("UH player build config: backend=" + UnityEditor.PlayerSettings.GetScriptingBackend(target)
+            + ", stripping=" + UnityEditor.PlayerSettings.GetManagedStrippingLevel(target)
             + ", development=" + ((playerOptions.options & UnityEditor.BuildOptions.Development) != 0));
         return playerOptions;
     }
@@ -3624,6 +3697,7 @@ function Invoke-UnityConfigurePass {
             -StallSeconds (Get-EditorTestStallSeconds)
     }
 
+    $firstAttemptLogPath = $null
     $configureStartedUtc = [DateTime]::UtcNow
     try {
         $configureExit = & $invokeConfigure $Label
@@ -3643,9 +3717,10 @@ function Invoke-UnityConfigurePass {
     ) {
         Write-CiWarning "Unity Package Manager canceled package resolution before the configure marker existed; clearing UPM state and retrying once."
         Write-UnityPackageManagerTransientFailureWarnings -LogPath $LogPath
-        $firstAttemptLogPath = Join-Path (Split-Path -Parent $LogPath) ("{0}.first-attempt.log" -f [System.IO.Path]::GetFileNameWithoutExtension($LogPath))
+        $preservedLogPath = Join-Path (Split-Path -Parent $LogPath) ("{0}.first-attempt.log" -f [System.IO.Path]::GetFileNameWithoutExtension($LogPath))
         try {
-            Copy-Item -LiteralPath $LogPath -Destination $firstAttemptLogPath -Force -ErrorAction Stop
+            Copy-Item -LiteralPath $LogPath -Destination $preservedLogPath -Force -ErrorAction Stop
+            $firstAttemptLogPath = $preservedLogPath
             Write-CiNotice "Saved first failed Unity configure log before retry: $firstAttemptLogPath"
         } catch {
             Write-CiWarning "Could not preserve first failed Unity configure log before retry: $($_.Exception.Message)"
@@ -3676,6 +3751,10 @@ function Invoke-UnityConfigurePass {
         Write-UnityBenignExitWarning -Label $Label -ExitCode $configureExit -LogPath $LogPath
     }
     Write-AnalyzerSetupDiagnostics -Project $ProjectPath -LogPath $LogPath -Label $Label
+    if (-not [string]::IsNullOrWhiteSpace($firstAttemptLogPath)) {
+        Assert-NoUnityCompilerWarnings -LogPath $firstAttemptLogPath -Label "$Label (first attempt)" -PackageRoot $RepoRoot
+    }
+    Assert-NoUnityCompilerWarnings -LogPath $LogPath -Label $Label -PackageRoot $RepoRoot
 }
 
 function Assert-UnityRunMode {
@@ -3729,6 +3808,7 @@ function Invoke-UnityPackageExport {
         [Parameter(Mandatory = $true)][string]$Project,
         [Parameter(Mandatory = $true)][string]$OutputPath,
         [Parameter(Mandatory = $true)][string]$LogPath,
+        [Parameter(Mandatory = $true)][string]$PackageRoot,
         [string[]]$ExtraArguments = @()
     )
 
@@ -3750,6 +3830,7 @@ function Invoke-UnityPackageExport {
         (Get-Item -LiteralPath $OutputPath).Length -le 0) {
         throw "Unity package export did not produce a fresh non-empty file: $OutputPath. See $LogPath."
     }
+    Assert-NoUnityCompilerWarnings -LogPath $LogPath -Label 'Unity package export' -PackageRoot $PackageRoot
     $hash = (Get-FileHash -LiteralPath $OutputPath -Algorithm SHA256).Hash.ToLowerInvariant()
     Set-Content -LiteralPath $hashPath -Value "$hash  $([IO.Path]::GetFileName($OutputPath))" -Encoding ascii
     Write-Host "Unity package exported: $OutputPath (SHA256 $hash)"
@@ -4042,7 +4123,8 @@ try {
 
     if ($TestMode -eq 'export') {
         Invoke-UnityPackageExport -EditorPath $UnityEditorPath -Project $ProjectPath `
-            -OutputPath $ExportPackagePath -LogPath $logPath -ExtraArguments $acceleratorArgs
+            -OutputPath $ExportPackagePath -LogPath $logPath -PackageRoot $RepoRoot `
+            -ExtraArguments $acceleratorArgs
         return
     }
 
@@ -4179,6 +4261,10 @@ try {
         if ($buildResult.TimedOut -or $buildResult.ExitCode -ne 0) {
             Write-UnityBenignExitWarning -Label "Build standalone IL2CPP test player (Unity $UnityVersion)" -ExitCode $buildResult.ExitCode -TimedOut:$buildResult.TimedOut -LogPath $logPath
         }
+        Assert-NoUnityCompilerWarnings `
+            -LogPath $logPath `
+            -Label "Unity $UnityVersion standalone build" `
+            -PackageRoot $RepoRoot
 
         # MISSED-CASE GUARD: even when the exe exists, scan the build log for the
         # signatures of a NON-redirected AutoRun build (PlayerWithTests /
@@ -4275,6 +4361,10 @@ try {
             -Project $ProjectPath
         Write-AnalyzerSetupDiagnostics -Project $ProjectPath -LogPath $logPath -Label "$UnityVersion $TestMode test compile"
         Test-NUnitResults -Path $resultsPath -Label "Unity $UnityVersion $TestMode" -LogPath $logPath -Project $ProjectPath -UnityExitCode $runExit -RequirePassedTests:$requireFilteredPass
+        Assert-NoUnityCompilerWarnings `
+            -LogPath $logPath `
+            -Label "Unity $UnityVersion $TestMode" `
+            -PackageRoot $RepoRoot
     }
     # Commit the inventory only after the selected mode produced valid passing
     # NUnit output. If import/compilation fails, the old or missing marker remains

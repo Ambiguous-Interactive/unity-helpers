@@ -195,7 +195,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// </param>
         [HideInCallstack]
         [System.Diagnostics.Conditional(CompilationSymbols.EnableUberLogging)]
+#pragma warning disable UAC0009 // Development builds are part of the public logging contract.
         [System.Diagnostics.Conditional(CompilationSymbols.DevelopmentBuild)]
+#pragma warning restore UAC0009
         [System.Diagnostics.Conditional(CompilationSymbols.Debug)]
         [System.Diagnostics.Conditional(CompilationSymbols.UnityEditor)]
         [System.Diagnostics.Conditional(CompilationSymbols.DebugLogging)]
@@ -225,7 +227,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// </param>
         [HideInCallstack]
         [System.Diagnostics.Conditional(CompilationSymbols.EnableUberLogging)]
+#pragma warning disable UAC0009 // Development builds are part of the public logging contract.
         [System.Diagnostics.Conditional(CompilationSymbols.DevelopmentBuild)]
+#pragma warning restore UAC0009
         [System.Diagnostics.Conditional(CompilationSymbols.Debug)]
         [System.Diagnostics.Conditional(CompilationSymbols.UnityEditor)]
         [System.Diagnostics.Conditional(CompilationSymbols.DebugLogging)]
@@ -255,7 +259,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// </param>
         [HideInCallstack]
         [System.Diagnostics.Conditional(CompilationSymbols.EnableUberLogging)]
+#pragma warning disable UAC0009 // Development builds are part of the public logging contract.
         [System.Diagnostics.Conditional(CompilationSymbols.DevelopmentBuild)]
+#pragma warning restore UAC0009
         [System.Diagnostics.Conditional(CompilationSymbols.Debug)]
         [System.Diagnostics.Conditional(CompilationSymbols.UnityEditor)]
         [System.Diagnostics.Conditional(CompilationSymbols.WarnLogging)]
@@ -285,7 +291,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// </param>
         [HideInCallstack]
         [System.Diagnostics.Conditional(CompilationSymbols.EnableUberLogging)]
+#pragma warning disable UAC0009 // Development builds are part of the public logging contract.
         [System.Diagnostics.Conditional(CompilationSymbols.DevelopmentBuild)]
+#pragma warning restore UAC0009
         [System.Diagnostics.Conditional(CompilationSymbols.Debug)]
         [System.Diagnostics.Conditional(CompilationSymbols.UnityEditor)]
         [System.Diagnostics.Conditional(CompilationSymbols.ErrorLogging)]
