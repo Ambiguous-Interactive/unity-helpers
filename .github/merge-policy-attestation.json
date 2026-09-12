@@ -6,9 +6,7 @@
       "rulesetId": 22983578,
       "rulesetName": "Required CI - Success (default branch)",
       "enforcement": "active",
-      "requiredContexts": [
-        "Unity CI Success"
-      ],
+      "requiredContexts": ["Unity CI Success"],
       "bypassActors": []
     }
   ]
