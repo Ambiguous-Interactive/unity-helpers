@@ -329,7 +329,8 @@ Lint-error-code prefixes (`^[A-Z]{2,}\d{3}$` tokens like `UNH001`, `PWS002`) mus
 - Write exhaustive tests for every change (see [create-test](./skills/create-test.md))
 - Use high-performance search tools: `rg` not `grep`, `fd` not `find`, `bat --paging=never` not `cat` (see [search-codebase](./skills/search-codebase.md))
 - For CI/CD bash scripts, use POSIX-compliant tools (see [validate-before-commit](./skills/validate-before-commit.md#portable-shell-scripting-in-workflows-critical))
-- **Do not commit**: `Library/`, `obj/`, secrets, tokens. **Do commit**: `.meta` files for all assets
+- **Never commit** `Library/`, `obj/`, secrets, tokens, or root `progress/`; never force-add ignored
+  progress. Put durable evidence in issues or commit bodies. **Do commit** asset `.meta` files.
 - **Verify `.asmdef` references** when adding new namespaces
 - Commits: short, imperative summaries (e.g., "Fix JSON serialization for FastVector"); group related changes
 - **User-facing copy is STE-simple.** PRs, titles, commits, comments, ship summaries -- anything a
@@ -341,12 +342,11 @@ Lint-error-code prefixes (`^[A-Z]{2,}\d{3}$` tokens like `UNH001`, `PWS002`) mus
 - PRs: **short and plain.** A title of 50 characters or fewer naming the effect the user sees,
   then one `**Why:**` sentence, two to five one-line `**What:**` bullets, and `Fixes #123`.
   Nothing else -- no root causes, no measurements, no validation reports. Those go in the commit
-  body, the progress log, or the linked issue. Include before/after screenshots for UI changes.
-  See [ship-changes](./skills/ship-changes.md#step-9b-open-the-pull-request-yourself)
+  body or the linked issue. Include before/after screenshots for UI changes.
 - **File follow-ups as GitHub issues, never as local-only notes.** A session remainder -- latent
   bug, stale comment, design decision, scoped sweep -- becomes a tracked issue (verified file:line
   evidence, fix shape, acceptance criteria, provenance link) BEFORE the work is declared done.
-  Local notes let it evaporate; issues survive and stay searchable. Search first (`search_issues`)
+  Search first (`search_issues`)
   for duplicates, pick the type (Bug/Feature/Task), and cross-link the issue where it was raised.
   The progress notes and work plan then carry the issue NUMBER, not the finding. Begin an
   agent-written issue body with the required LLM disclosure.

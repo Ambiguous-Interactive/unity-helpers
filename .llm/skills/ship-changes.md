@@ -245,8 +245,8 @@ and **what**, in that order, then stop.
 
 **Never put these in a pull request:** root causes, measurements, run IDs,
 session numbers, CI results, a list of what you validated, byte traces, the
-diff, or the file list. They go in the commit body, the progress log, or the
-linked issue.
+diff, or the file list. They go in the commit body or the linked issue. Local
+progress notes stay ignored and must never be staged.
 
 Count the title before you send it. Nine of the twelve titles before this rule
 existed were over 60 characters, so count rather than judge:
