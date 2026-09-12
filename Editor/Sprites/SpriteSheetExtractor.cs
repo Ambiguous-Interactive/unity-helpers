@@ -10,7 +10,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using System.Text;
     using System.Text.Json;
     using System.Text.RegularExpressions;
-    using System.Threading.Tasks;
     using CustomEditors;
     using UnityEditor;
     using UnityEngine;
@@ -1274,6 +1273,24 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         return yCompare != 0 ? yCompare : a.x.CompareTo(b.x);
                     }
                 );
+            }
+        }
+
+        internal static void CopyPixelRows(
+            Color32[] source,
+            int sourceWidth,
+            int sourceX,
+            int sourceY,
+            int width,
+            int height,
+            Color32[] destination
+        )
+        {
+            for (int destinationY = 0; destinationY < height; ++destinationY)
+            {
+                int sourceIndex = (sourceY + destinationY) * sourceWidth + sourceX;
+                int destinationIndex = destinationY * width;
+                Array.Copy(source, sourceIndex, destination, destinationIndex, width);
             }
         }
 
@@ -7586,20 +7603,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             out Color32[] destPixels
                         );
 
-                        Parallel.For(
-                            0,
-                            height,
-                            destY =>
-                            {
-                                int srcY = y + destY;
-                                int destRowStart = destY * width;
-                                int srcRowStart = srcY * srcWidth + x;
-                                for (int destX = 0; destX < width; ++destX)
-                                {
-                                    destPixels[destRowStart + destX] = pixels[srcRowStart + destX];
-                                }
-                            }
-                        );
+                        CopyPixelRows(pixels, srcWidth, x, y, width, height, destPixels);
 
                         extracted = new Texture2D(width, height, TextureFormat.RGBA32, false);
                         ApplyPixelBuffer(extracted, width, height, destPixels);
@@ -7726,20 +7730,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             out Color32[] destPixels
                         );
 
-                        Parallel.For(
-                            0,
-                            height,
-                            destY =>
-                            {
-                                int srcY = y + destY;
-                                int destRowStart = destY * width;
-                                int srcRowStart = srcY * srcWidth + x;
-                                for (int destX = 0; destX < width; ++destX)
-                                {
-                                    destPixels[destRowStart + destX] = pixels[srcRowStart + destX];
-                                }
-                            }
-                        );
+                        CopyPixelRows(pixels, srcWidth, x, y, width, height, destPixels);
 
                         extracted = new Texture2D(width, height, TextureFormat.RGBA32, false);
                         ApplyPixelBuffer(extracted, width, height, destPixels);

@@ -943,50 +943,43 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 int srcY0 = Mathf.Max(visibleMinY, 0);
                 int srcX1 = Mathf.Min(visibleMaxX, width - 1);
                 int srcY1 = Mathf.Min(visibleMaxY, height - 1);
+                int copyStartDestX = Mathf.Max(0, srcX0 - visibleMinX);
+                int copyEndDestX = Mathf.Min(cropWidth - 1, srcX1 - visibleMinX);
+                int leftClear = copyStartDestX;
+                int rightClear = cropWidth - 1 - copyEndDestX;
+                int copyCount = copyEndDestX - copyStartDestX + 1;
 
-                Parallel.For(
-                    0,
-                    cropHeight,
-                    y =>
+                for (int y = 0; y < cropHeight; ++y)
+                {
+                    int destinationRow = y * cropWidth;
+                    int sourceY = visibleMinY + y;
+                    if (sourceY < 0 || height <= sourceY || sourceY < srcY0 || srcY1 < sourceY)
                     {
-                        int destRow = y * cropWidth;
-                        int srcY = visibleMinY + y;
-                        if (srcY < 0 || height <= srcY || srcY < srcY0 || srcY1 < srcY)
-                        {
-                            Array.Clear(croppedPixels, destRow, cropWidth);
-                            return;
-                        }
-
-                        int copyStartDestX = Mathf.Max(0, srcX0 - visibleMinX);
-                        int copyEndDestX = Mathf.Min(cropWidth - 1, srcX1 - visibleMinX);
-
-                        int leftClear = copyStartDestX;
-                        int rightClear = cropWidth - 1 - copyEndDestX;
-
-                        if (0 < leftClear)
-                        {
-                            Array.Clear(croppedPixels, destRow, leftClear);
-                        }
-
-                        if (copyStartDestX <= copyEndDestX)
-                        {
-                            int numToCopy = copyEndDestX - copyStartDestX + 1;
-                            int srcStartX = srcX0;
-                            int srcIndex = srcY * width + srcStartX;
-                            int destIndex = destRow + copyStartDestX;
-                            Array.Copy(pixels, srcIndex, croppedPixels, destIndex, numToCopy);
-                        }
-
-                        if (0 < rightClear)
-                        {
-                            Array.Clear(
-                                croppedPixels,
-                                destRow + (cropWidth - rightClear),
-                                rightClear
-                            );
-                        }
+                        Array.Clear(croppedPixels, destinationRow, cropWidth);
+                        continue;
                     }
-                );
+
+                    if (0 < leftClear)
+                    {
+                        Array.Clear(croppedPixels, destinationRow, leftClear);
+                    }
+
+                    if (0 < copyCount)
+                    {
+                        int sourceIndex = sourceY * width + srcX0;
+                        int destinationIndex = destinationRow + copyStartDestX;
+                        Array.Copy(pixels, sourceIndex, croppedPixels, destinationIndex, copyCount);
+                    }
+
+                    if (0 < rightClear)
+                    {
+                        Array.Clear(
+                            croppedPixels,
+                            destinationRow + (cropWidth - rightClear),
+                            rightClear
+                        );
+                    }
+                }
 
                 cropped.SetPixels32(0, 0, cropWidth, cropHeight, croppedPixels, 0);
                 cropped.Apply();

@@ -88,9 +88,13 @@ The whole-texture `SetPixels32` overload requires an exact-length array, but its
 accepts a longer array and consumes only the `width * height` prefix. `SpriteSheetExtractor` and
 `SpriteCropper` therefore use the block overload with `SystemArrayPool<Color32>` rather than
 creating permanent exact-size buckets. The active editor test
-`SpriteSheetExtractorPixelBufferTests.ApplyPixelBufferCopiesOnlyTheRequestedPooledPrefix` guards
+`SpriteSheetExtractorPixelBufferTests.PixelBufferOperationsCopyOnlyLogicalPrefixes` guards
 the oversized-buffer behavior on the supported editor matrix, including the 2021.3 floor.
 `GetWorldCorners` likewise accepts more than four elements and does not justify an exact-size rent.
+
+`Parallel.For` is not a zero-allocation substitute for a loop. Retain it only when a multi-size
+benchmark shows a stable crossover with meaningful absolute savings, and keep its body free of
+lexical captures. Row copies use sequential `Array.Copy` unless measurements prove otherwise.
 
 A texture read has no such lever: `Texture2D` declares `GetPixels32()` and its mip-level overload
 and nothing else — there is no array-filling overload to rent into (measured on 6000.4.6f1; the
