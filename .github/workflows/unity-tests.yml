@@ -306,8 +306,16 @@ jobs:
       # one job at a time, and the organization lock guards the Unity seat. The
       # trade-off accepted here is politeness -- a sibling repo's Unity job can now
       # queue behind more of ours at once.
+      # The enrollment audit proves the editor gate and central return pin the
+      # same version per leg only when the version axis is static text, so the
+      # axis restates .github/unity-versions.json. The matrix contract below
+      # fails when this list drifts from that file.
       matrix:
-        unity-version: ${{ fromJSON(needs.matrix-config.outputs.unity-versions) }}
+        unity-version:
+          - 2021.3.45f1
+          - 2022.3.45f1
+          - 6000.5.2f1
+          - 6000.6.0f1
     steps:
       - name: Require current PR head before setup
         timeout-minutes: 2

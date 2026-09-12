@@ -24,9 +24,13 @@ on:
 permissions:
   contents: read
 
+# The release workflow acquires the organization lock. The enrollment
+# contract requires superseding cancellation so a repeated dispatch for the
+# same version cannot queue behind the run it replaces; the acquire action's
+# signal cleanup and the always() release path make the superseded run safe.
 concurrency:
   group: release-${{ inputs.version }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   verify-tag:

@@ -1837,10 +1837,24 @@ $defaultModeContracts = @(
     @{ Label = 'PlayMode'; Key = 'playmode'; Timeout = 40; AssemblyOutput = 'playmode-integration-assemblies' },
     @{ Label = 'Standalone'; Key = 'standalone'; Timeout = 60; AssemblyOutput = 'standalone-integration-assemblies' }
 )
+$declaredVersions = [regex]::Matches(
+    $unityTestsMatrixJob,
+    '(?m)^        unity-version:\s*$\r?\n((?:^          - \S.*\r?\n)+)'
+)
+$matrixVersionsAreStaticText = $declaredVersions.Count -eq 1
+$matrixVersionsMatchCanonicalSource = $false
+if ($matrixVersionsAreStaticText) {
+    $declared = @($declaredVersions[0].Groups[1].Value -split '\r?\n' |
+        ForEach-Object { $_.TrimStart(' ', '-') } |
+        Where-Object { $_ })
+    $canonical = @((Get-Content -LiteralPath $unityVersionsPath -Raw | ConvertFrom-Json).all)
+    $matrixVersionsMatchCanonicalSource = @($declared | Sort-Object) -join "`n" -eq @($canonical | Sort-Object) -join "`n"
+}
 $defaultMatrixIsVersionGrouped = (
     -not $jobTexts.ContainsKey('unity-tests-standalone') -and
     [regex]::Matches($unityTestsMatrixJob, '(?m)^      matrix:\s*$').Count -eq 1 -and
-    $unityTestsMatrixJob.Contains('unity-version: ${{ fromJSON(needs.matrix-config.outputs.unity-versions) }}') -and
+    $matrixVersionsAreStaticText -and
+    $matrixVersionsMatchCanonicalSource -and
     [regex]::Matches($unityTestsMatrixJob, '(?m)^        test-mode:\s*$').Count -eq 0 -and
     -not $unityTestsMatrixJob.Contains('matrix.test-mode') -and
     $unityTestsMatrixJob.Contains('needs.matrix-config.outputs.test-modes') -and
@@ -1849,10 +1863,10 @@ $defaultMatrixIsVersionGrouped = (
     -not $workflowContent.Contains('matrix-include-standalone')
 )
 if (-not $defaultMatrixIsVersionGrouped) {
-    Write-Host '::error file=.github/workflows/unity-tests.yml::The default Unity matrix must consume the canonical selected-version output as its only axis. Modes must be sequential steps within each version job, never a second matrix axis that multiplies the licensed runner queue.'
+    Write-Host '::error file=.github/workflows/unity-tests.yml::The default Unity matrix must list the versions from .github/unity-versions.json as static text (the enrollment audit can only prove per-leg gate and return pins on a static axis). Modes must be sequential steps within each version job, never a second matrix axis that multiplies the licensed runner queue.'
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info 'Checked the default Unity matrix creates exactly one job per supported version.'
+    Write-Info 'Checked the default Unity matrix creates exactly one job per supported version from the canonical source.'
 }
 
 $groupedDefaultModesAreComplete = $true
