@@ -4,7 +4,6 @@
 namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 {
     using System.ComponentModel;
-    using System.Diagnostics.CodeAnalysis;
     using Core.Helper;
     using UnityEngine;
     using UnityEngine.UIElements;
@@ -152,11 +151,6 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
             }
         }
 
-        [SuppressMessage(
-            "WallstopProto",
-            "WPROTO028",
-            Justification = "UI-only Unity value; this element is never a WallstopProto contract."
-        )]
         private Color _trackColor = Color.gray;
 
 #if UNITY_6000_0_OR_NEWER
