@@ -303,7 +303,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                         catch (Exception ex)
                         {
                             Debug.LogError(
-                                $"ScriptableObjectSingletonCreator: Failed to create singleton for type {derivedType.FullName} at {targetAssetPath}. {ex.Message}"
+                                $"ScriptableObjectSingletonCreator: Failed to create singleton for type {derivedType.FullName} at {targetAssetPath}. {ex}"
                             );
                             // Creation may associate the instance with an asset before throwing; cleanup must allow asset destruction.
                             SafeDestroyInstance(instance, targetAssetPath);
@@ -1217,7 +1217,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             {
                 // If destroy still fails, log but don't rethrow - we've done our best
                 LogVerbose(
-                    $"ScriptableObjectSingletonCreator: Failed to destroy instance after failed asset creation: {ex.Message}"
+                    $"ScriptableObjectSingletonCreator: Failed to destroy instance after failed asset creation: {ex}"
                 );
             }
         }
@@ -1265,7 +1265,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             catch (Exception ex)
             {
                 LogVerbose(
-                    $"ScriptableObjectSingletonCreator: Failed to clean up partially created asset files at {absolutePath}: {ex.Message}"
+                    $"ScriptableObjectSingletonCreator: Failed to clean up partially created asset files at {absolutePath}: {ex}"
                 );
             }
 
@@ -1294,7 +1294,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 catch (Exception ex)
                 {
                     Debug.LogWarning(
-                        $"ScriptableObjectSingletonCreator: AssetDatabase.DeleteAsset threw while cleaning stale singleton artifacts at '{assetsRelativePath}': {ex.Message}"
+                        $"ScriptableObjectSingletonCreator: AssetDatabase.DeleteAsset threw while cleaning stale singleton artifacts at '{assetsRelativePath}': {ex}"
                     );
                 }
 
@@ -1317,7 +1317,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 catch (Exception ex)
                 {
                     Debug.LogWarning(
-                        $"ScriptableObjectSingletonCreator: Failed deleting stale asset file '{absoluteAssetPathInner}': {ex.Message}"
+                        $"ScriptableObjectSingletonCreator: Failed deleting stale asset file '{absoluteAssetPathInner}': {ex}"
                     );
                 }
 
@@ -1335,7 +1335,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 catch (Exception ex)
                 {
                     Debug.LogWarning(
-                        $"ScriptableObjectSingletonCreator: Failed deleting stale meta file '{absoluteMetaPathInner}': {ex.Message}"
+                        $"ScriptableObjectSingletonCreator: Failed deleting stale meta file '{absoluteMetaPathInner}': {ex}"
                     );
                 }
 
@@ -1352,7 +1352,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     catch (Exception ex)
                     {
                         LogVerbose(
-                            $"ScriptableObjectSingletonCreator: ImportAsset after stale-artifact removal at '{assetsRelativePath}' reported: {ex.Message}"
+                            $"ScriptableObjectSingletonCreator: ImportAsset after stale-artifact removal at '{assetsRelativePath}' reported: {ex}"
                         );
                     }
                 }
@@ -1696,7 +1696,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             catch (Exception ex)
             {
                 Debug.LogWarning(
-                    $"ScriptableObjectSingletonCreator: Asset import worker detector threw {ex.GetType().Name}: {ex.Message}. {(assumeWorkerOnFailure ? "Assuming import worker context." : "Assuming main editor process.")}"
+                    $"ScriptableObjectSingletonCreator: Asset import worker detector threw: {ex}. {(assumeWorkerOnFailure ? "Assuming import worker context." : "Assuming main editor process.")}"
                 );
                 return assumeWorkerOnFailure;
             }
@@ -1746,7 +1746,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             catch (Exception ex)
             {
                 LogVerbose(
-                    $"ScriptableObjectSingletonCreator: Unable to enumerate environment variables for worker detection: {ex.Message}"
+                    $"ScriptableObjectSingletonCreator: Unable to enumerate environment variables for worker detection: {ex}"
                 );
             }
 

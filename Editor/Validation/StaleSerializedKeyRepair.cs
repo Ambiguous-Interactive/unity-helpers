@@ -147,7 +147,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             {
                 // Report restoration only after its outcome is known.
                 Debug.LogError(
-                    $"[Unity Helpers] Rewriting {assetPath} threw: {exception.Message}. "
+                    $"[Unity Helpers] Rewriting {assetPath} threw: {exception}. "
                         + "Nothing was repaired."
                 );
                 return Restore(assetPath, filePath, original)
@@ -242,7 +242,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             catch (Exception exception)
             {
                 Debug.LogError(
-                    $"[Unity Helpers] Could not undo the rewrite of {assetPath}: {exception.Message}. "
+                    $"[Unity Helpers] Could not undo the rewrite of {assetPath}: {exception}. "
                         + $"The file at {filePath} holds the rewritten bytes, not the original. "
                         + "Restore it from source control before saving the project."
                 );

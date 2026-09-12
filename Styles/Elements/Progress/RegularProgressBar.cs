@@ -7,7 +7,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
     using UnityEngine;
     using UnityEngine.UIElements;
 
-    public sealed class RegularProgressBar : VisualElement
+#if UNITY_6000_0_OR_NEWER
+    [UxmlElement]
+#endif
+    public sealed partial class RegularProgressBar : VisualElement
     {
         public const string USSClassName = "regular-progress-bar";
         public const string USSTrackClassName = USSClassName + "__track";
@@ -34,6 +37,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private float _progress = 0.5f;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("progress")]
+#endif
         public float Progress
         {
             get => _progress;
@@ -49,6 +56,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private Color _trackColor = new(0.3f, 0.3f, 0.3f, 1f);
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("track-color-attr")]
+#endif
         public Color TrackColor
         {
             get => _trackColor;
@@ -63,6 +74,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private Color _progressColor = new(0.2f, 0.7f, 0.2f, 1f);
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("progress-color-attr")]
+#endif
         public Color ProgressColor
         {
             get => _progressColor;
@@ -77,6 +92,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private OrientationType _orientation = OrientationType.Horizontal;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("orientation")]
+#endif
         public OrientationType Orientation
         {
             get => _orientation;
@@ -90,6 +109,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private FillDirection _fillDirection = FillDirection.Forward;
 
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("direction")]
+#endif
         public FillDirection Direction
         {
             get => _fillDirection;
@@ -102,6 +124,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private float _borderRadius = 3f;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("border-radius")]
+#endif
         public float BorderRadius
         {
             get => _borderRadius;
@@ -117,6 +143,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
         }
 
         private float _thickness = 15f;
+
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("thickness")]
+#endif
         public float Thickness
         {
             get => _thickness;
@@ -131,6 +161,7 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
             }
         }
 
+#if !UNITY_6000_0_OR_NEWER
         public new class UxmlFactory : UxmlFactory<RegularProgressBar, UxmlTraits> { }
 
         public new class UxmlTraits : VisualElement.UxmlTraits
@@ -194,6 +225,7 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
                 bar.Direction = _fillAttribute.GetValueFromBag(bag, cc);
             }
         }
+#endif
 
         public RegularProgressBar()
         {

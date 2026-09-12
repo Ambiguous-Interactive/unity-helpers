@@ -70,10 +70,11 @@
 
     764 of the 807 files under `Tests/Editor/`, plus the four trees they bind:
 
-      * `Runtime/**` and `Editor/**`, with TypeCheck's and EditorCheck's exclusions, because every
-        editmode asmdef references `WallstopStudios.UnityHelpers` and all but three reference
-        `WallstopStudios.UnityHelpers.Editor`. TypeCheck and EditorCheck remain the gates that JUDGE
-        those two trees; a divergence here is a bug in one of the three.
+      * `Runtime/**`, `Styles/**` and `Editor/**`, with TypeCheck's and EditorCheck's exclusions,
+        because every editmode asmdef references `WallstopStudios.UnityHelpers`, all but three
+        reference `WallstopStudios.UnityHelpers.Editor`, and the progress-control fixtures reference
+        `WallstopStudios.UnityHelpers.Styles`. TypeCheck and EditorCheck remain the gates that JUDGE
+        the runtime and editor trees; this project also judges the styles it consumes.
       * `Tests/Core/**` INCLUDING `Tests/Core/Editor/**`. `TestCheck` excludes that last directory
         because it has no `UnityEditor` to compile it with, so those four fixtures were in the same
         hole this project closes; here they are in scope, which is why they appear in the governed
@@ -346,6 +347,8 @@
       Include="$(RepoRoot)/Runtime/**/*.cs"
       Exclude="$(RepoRoot)/Runtime/Integrations/**/*.cs;$(RepoRoot)/Runtime/Analyzers/**/*.cs;$(RepoRoot)/Runtime/Core/Extension/Partials/UI.cs;$(RepoRoot)/Runtime/Utils/MatchColliderToSprite.cs;$(RepoRoot)/Runtime/Visuals/UGUI/EnhancedImage.cs"
     />
+    <!-- The UI Toolkit styles referenced by the progress-control editmode fixtures. -->
+    <Compile Include="$(RepoRoot)/Styles/**/*.cs" />
     <!-- The editor sources, with EditorCheck's seven exclusions, restated one per line so the
          cascade block further down can name the file each fixture is waiting on. EditorCheck
          remains the gate that JUDGES this tree; its header carries the full reasoning. -->

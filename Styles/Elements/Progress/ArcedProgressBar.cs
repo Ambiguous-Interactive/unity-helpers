@@ -8,7 +8,10 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
     using UnityEngine;
     using UnityEngine.UIElements;
 
-    public sealed class ArcedProgressBar : VisualElement
+#if UNITY_6000_0_OR_NEWER
+    [UxmlElement]
+#endif
+    public sealed partial class ArcedProgressBar : VisualElement
     {
         public enum FillDirection
         {
@@ -23,6 +26,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private float _progress = 0.5f;
 
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("progress")]
+#endif
         public float Progress
         {
             get => _progress;
@@ -39,6 +45,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private float _radius = 50f;
 
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("radius")]
+#endif
         public float Radius
         {
             get => _radius;
@@ -56,6 +65,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private float _thickness = 10f;
 
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("thickness")]
+#endif
         public float Thickness
         {
             get => _thickness;
@@ -73,6 +85,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private float _startAngleDegrees = -90f;
 
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("start-angle")]
+#endif
         public float StartAngleDegrees
         {
             get => _startAngleDegrees;
@@ -89,6 +104,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private float _endAngleDegrees = 90f;
 
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("end-angle")]
+#endif
         public float EndAngleDegrees
         {
             get => _endAngleDegrees;
@@ -105,6 +123,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private FillDirection _fillDirection = FillDirection.Forward;
 
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("fill-direction")]
+#endif
         public FillDirection Direction
         {
             get => _fillDirection;
@@ -117,6 +138,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private bool _roundedCaps = true;
 
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("rounded-caps")]
+#endif
         public bool RoundedCaps
         {
             get => _roundedCaps;
@@ -129,6 +153,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private Color _trackColor = Color.gray;
 
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("track-color-attr")]
+#endif
         public Color TrackColor
         {
             get => _trackColor;
@@ -141,6 +168,9 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
 
         private Color _progressColor = Color.cyan;
 
+#if UNITY_6000_0_OR_NEWER
+        [UxmlAttribute("progress-color-attr")]
+#endif
         public Color ProgressColor
         {
             get => _progressColor;
@@ -151,6 +181,7 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
             }
         }
 
+#if !UNITY_6000_0_OR_NEWER
         public new class UxmlFactory : UxmlFactory<ArcedProgressBar, UxmlTraits> { }
 
         public new class UxmlTraits : VisualElement.UxmlTraits
@@ -228,6 +259,7 @@ namespace WallstopStudios.UnityHelpers.Styles.Elements.Progress
                 bar.ProgressColor = _progressColorAttribute.GetValueFromBag(bag, cc);
             }
         }
+#endif
 
         public ArcedProgressBar()
         {

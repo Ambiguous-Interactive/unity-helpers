@@ -251,7 +251,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                     builder ??= new StringBuilder();
                     builder.Append(registration.type.FullName);
                     builder.Append(" cache inspection failed: ");
-                    builder.Append(ex.Message);
+                    builder.Append(ex);
                     builder.AppendLine();
                 }
 
@@ -266,7 +266,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                     builder ??= new StringBuilder();
                     builder.Append(registration.type.FullName);
                     builder.Append(" live-instance inspection failed: ");
-                    builder.Append(ex.Message);
+                    builder.Append(ex);
                     builder.AppendLine();
                 }
 

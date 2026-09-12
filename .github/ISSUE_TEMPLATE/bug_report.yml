@@ -66,6 +66,7 @@ body:
       label: Unity Version
       description: Which version of Unity are you using?
       options:
+        - "Unity 6.6 (6000.6)"
         - "Unity 6.5 (6000.5)"
         - "Unity 6.4 (6000.4)"
         - "Unity 6.3 (6000.3)"

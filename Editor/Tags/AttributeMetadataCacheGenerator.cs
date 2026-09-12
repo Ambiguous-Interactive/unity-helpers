@@ -526,7 +526,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
                 catch (Exception ex)
                 {
                     Debug.LogWarning(
-                        $"AttributeMetadataCacheGenerator: Failed to create cache asset: {ex.Message}"
+                        $"AttributeMetadataCacheGenerator: Failed to create cache asset: {ex}"
                     );
                     if (cache != null)
                     {

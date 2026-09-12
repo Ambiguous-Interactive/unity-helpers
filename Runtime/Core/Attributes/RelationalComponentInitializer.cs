@@ -57,7 +57,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 {
                     report.Errors++;
                     Debug.LogError(
-                        $"RelationalComponents.Initialize: Error pre-warming type '{type.FullName}': {e.Message}\n{e}"
+                        $"RelationalComponents.Initialize: Error pre-warming type '{type.FullName}': {e}"
                     );
                 }
             }
@@ -136,7 +136,7 @@ namespace WallstopStudios.UnityHelpers.Core.Attributes
                 {
                     report.Errors++;
                     Debug.LogError(
-                        $"RelationalComponents.Initialize: Error warming field '{componentType.FullName}.{fieldMeta.FieldName}': {e.Message}\n{e}"
+                        $"RelationalComponents.Initialize: Error warming field '{componentType.FullName}.{fieldMeta.FieldName}': {e}"
                     );
                 }
             }

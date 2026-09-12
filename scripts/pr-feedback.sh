@@ -104,7 +104,13 @@ ROOT_COMMENTS_ONLY = os.environ["PR_FEEDBACK_ROOT_COMMENTS_ONLY"] == "true"
 SELF_TEST = os.environ["PR_FEEDBACK_SELF_TEST"] == "true"
 ROOT_API = "https://api.github.com"
 API = ROOT_API + "/repos/" + SLUG
+TRUSTED_AUTHORS = {
+    "wallstop",
+}
 TRUSTED_AUTOMATION = {
+    "cursor[bot]",
+    "copilot-pull-request-reviewer[bot]",
+    "copilot-swe-agent[bot]",
     "dependabot[bot]",
     "github-actions[bot]",
 }
@@ -212,6 +218,8 @@ def classify(item, viewer_login):
     login = actor(item).get("login") or ""
     if viewer_login and login.casefold() == viewer_login.casefold():
         return "authenticated account"
+    if login.casefold() in TRUSTED_AUTHORS:
+        return "repository-trusted author"
     if is_trusted_automation(item):
         return "trusted deterministic automation"
     return "OUTSIDE OR UNKNOWN -- USER INPUT REQUIRED"
@@ -284,11 +292,18 @@ def run_self_tests():
     outside_item = {"user": {"login": "contributor", "type": "User"}}
     unknown_item = {"user": None}
     trusted_bot = {"user": {"login": "github-actions[bot]", "type": "Bot"}}
+    cursor_bugbot = {"user": {"login": "cursor[bot]", "type": "Bot"}}
+    copilot_reviewer = {"user": {"login": "copilot-pull-request-reviewer[bot]", "type": "Bot"}}
+    copilot_agent = {"user": {"login": "copilot-swe-agent[bot]", "type": "Bot"}}
     third_party_bot = {"user": {"login": "third-party[bot]", "type": "Bot"}}
     expect(classify(self_item, "wallstop") == "authenticated account", "self identity")
+    expect(classify(self_item, "another-login") == "repository-trusted author", "trusted author")
     expect(classify(outside_item, "wallstop").startswith("OUTSIDE"), "outside identity")
     expect(classify(unknown_item, "wallstop").startswith("OUTSIDE"), "unknown identity")
     expect(classify(trusted_bot, "wallstop") == "trusted deterministic automation", "trusted bot")
+    expect(classify(cursor_bugbot, "wallstop") == "trusted deterministic automation", "Cursor Bugbot")
+    expect(classify(copilot_reviewer, "wallstop") == "trusted deterministic automation", "Copilot reviewer")
+    expect(classify(copilot_agent, "wallstop") == "trusted deterministic automation", "Copilot agent")
     expect(classify(third_party_bot, "wallstop").startswith("OUTSIDE"), "third-party bot")
     expect(
         len(select_threads([{"id": 1}, {"id": 2, "in_reply_to_id": 1}], True)) == 1,

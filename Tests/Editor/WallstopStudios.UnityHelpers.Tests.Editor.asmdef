@@ -7,6 +7,7 @@
     "Unity.2D.Sprite.Editor",
     "WallstopStudios.UnityHelpers",
     "WallstopStudios.UnityHelpers.Editor",
+    "WallstopStudios.UnityHelpers.Styles",
     "WallstopStudios.UnityHelpers.Tests.Core",
     "WallstopStudios.UnityHelpers.Tests.Runtime"
   ],

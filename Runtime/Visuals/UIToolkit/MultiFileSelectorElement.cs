@@ -557,7 +557,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             }
             catch (Exception e)
             {
-                Debug.LogError($"Error accessing path {_currentDirectory}: {e.Message}");
+                Debug.LogError($"Error accessing path {_currentDirectory}: {e}");
             }
 
             _listView.RefreshItems();
@@ -766,7 +766,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             }
             catch (Exception e)
             {
-                Debug.LogError($"Failed to open in Explorer/Finder: {e.Message}");
+                Debug.LogError($"Failed to open in Explorer/Finder: {e}");
             }
         }
 #endif

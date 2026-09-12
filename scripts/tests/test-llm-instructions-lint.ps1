@@ -233,6 +233,9 @@ try {
   Write-TestResult "Context.PausesForOutsideHumans" `
     ($contextRaw -match '(?is)Pause for outside humans.*?authenticated login.*?issue-specific user direction') `
     "context.md must pause for issue-specific input on outside-human work"
+  Write-TestResult "Context.TrustsOwnerAndReviewBots" `
+    ($contextRaw -match '(?is)Always act on input authored by `wallstop`.*?`cursor\[bot\]`.*?`copilot-pull-request-reviewer\[bot\]`.*?`copilot-swe-agent\[bot\]`') `
+    "context.md must permit action on wallstop, Cursor Bugbot, and GitHub Copilot input"
 
   $shipChangesRaw = Get-Content -LiteralPath $shipChangesSkill -Raw
   Write-TestResult "ShipChanges.LinksGitHubOperations" `
@@ -253,8 +256,11 @@ try {
       ($githubOperationsRaw -match '(?is)author_association.*?still another person') `
       "GitHub operations must not use author_association as identity"
     Write-TestResult "GitHubOperationsSkill.ExemptsDeterministicBots" `
-      ($githubOperationsRaw -match '(?is)Only deterministic automation explicitly trusted.*?unknown third-party bot as\s+outside') `
+      ($githubOperationsRaw -match '(?is)Other\s+deterministic automation explicitly trusted.*?unknown third-party bot as\s+outside') `
       "GitHub operations must exempt only trusted deterministic automation"
+    Write-TestResult "GitHubOperationsSkill.TrustsOwnerAndReviewBots" `
+      ($githubOperationsRaw -match '(?is)Always handle input authored by `wallstop`.*?`cursor\[bot\]`.*?`copilot-pull-request-reviewer\[bot\]`.*?`copilot-swe-agent\[bot\]`') `
+      "GitHub operations must permit action on wallstop, Cursor Bugbot, and GitHub Copilot input"
   }
 
   $prFeedbackRaw = Get-Content -LiteralPath $prFeedbackFile -Raw
@@ -273,7 +279,7 @@ try {
     "pr-feedback must foreground outside or unknown authors"
   $prFeedbackSelfTestOutput = & bash $prFeedbackFile --self-test 2>&1
   Write-TestResult "PrFeedback.OfflineBehaviorFixtures" `
-    (($LASTEXITCODE -eq 0) -and ($prFeedbackSelfTestOutput -match 'self-tests passed: 18')) `
+    (($LASTEXITCODE -eq 0) -and ($prFeedbackSelfTestOutput -match 'self-tests passed: 22')) `
     "pr-feedback offline fixtures must cover pagination, identities, provenance, failures, and sanitization: $prFeedbackSelfTestOutput"
 
   # ===========================================================================

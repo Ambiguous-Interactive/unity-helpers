@@ -4015,6 +4015,10 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         public void Advance(int count)
         {
             ThrowIfDisposed();
+            if (count < 0 || _buffer.Length - _written < count)
+            {
+                throw new ArgumentOutOfRangeException(nameof(count));
+            }
             _written += count;
         }
 
@@ -4068,9 +4072,17 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
 
         private void EnsureCapacity(int sizeHint)
         {
-            if (sizeHint <= 0)
+            if (sizeHint < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(sizeHint));
+            }
+            if (sizeHint == 0)
             {
                 sizeHint = 1;
+            }
+            if (int.MaxValue - _written < sizeHint)
+            {
+                throw new ArgumentOutOfRangeException(nameof(sizeHint));
             }
             int required = _written + sizeHint;
             if (required <= _buffer.Length)
@@ -4081,7 +4093,13 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             int newSize = _buffer.Length;
             while (newSize < required)
             {
-                newSize = newSize < 1024 ? newSize * 2 : newSize + (newSize >> 1);
+                int growth = newSize < 1024 ? newSize : newSize >> 1;
+                if (int.MaxValue - newSize < growth)
+                {
+                    newSize = required;
+                    break;
+                }
+                newSize += growth;
             }
 
             byte[] newBuf = ArrayPool<byte>.Shared.Rent(newSize);

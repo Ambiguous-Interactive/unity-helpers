@@ -842,7 +842,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                     catch (ArgumentException e)
                     {
                         Debug.LogWarning(
-                            $"SerializableTypeCatalog ignore pattern '{trimmed}' is invalid: {e.Message}"
+                            $"SerializableTypeCatalog ignore pattern '{trimmed}' is invalid: {e}"
                         );
                     }
                 }
