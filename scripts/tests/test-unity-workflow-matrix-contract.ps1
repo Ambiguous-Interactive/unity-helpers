@@ -2508,32 +2508,48 @@ if (-not $installRootResolverAst) {
 } else {
     Invoke-Expression "function script:Resolve-RunnerMaintenanceInstallRoot $($installRootResolverAst.Body.Extent.Text)"
     $resolverOldToolCache = $env:RUNNER_TOOL_CACHE
+    $resolverOldToolsDirectory = $env:RUNNER_TOOLSDIRECTORY
+    $resolverOldAgentToolsDirectory = $env:AGENT_TOOLSDIRECTORY
     $resolverOldFallbackToolCache = $env:UH_RUNNER_TOOL_CACHE
     $resolverOldOverride = $env:UNITY_EDITOR_INSTALL_ROOT
+    $runnerEnvironmentRoot = ''
     try {
         Remove-Item Env:\RUNNER_TOOL_CACHE -ErrorAction SilentlyContinue
+        Remove-Item Env:\RUNNER_TOOLSDIRECTORY -ErrorAction SilentlyContinue
+        Remove-Item Env:\AGENT_TOOLSDIRECTORY -ErrorAction SilentlyContinue
         Remove-Item Env:\UH_RUNNER_TOOL_CACHE -ErrorAction SilentlyContinue
         Remove-Item Env:\UNITY_EDITOR_INSTALL_ROOT -ErrorAction SilentlyContinue
         $checkoutRoot = Resolve-RunnerMaintenanceInstallRoot -InstallRoot '' -RepoRoot 'E:\actions-runner\_work\unity-helpers\unity-helpers'
+        $runnerEnvironmentRoot = Join-Path ([System.IO.Path]::GetTempPath()) "unity-runner-environment-$PID-$(Get-Random)"
+        $runnerEnvironmentCheckout = Join-Path $runnerEnvironmentRoot '_work/unity-helpers/unity-helpers'
+        $runnerEnvironmentToolCache = Join-Path $runnerEnvironmentRoot '_tool'
+        New-Item -ItemType Directory -Force -Path $runnerEnvironmentCheckout | Out-Null
+        Set-Content -LiteralPath (Join-Path $runnerEnvironmentRoot '.env') -Value "RUNNER_TOOL_CACHE=$runnerEnvironmentToolCache"
+        $runnerEnvironmentResolvedRoot = Resolve-RunnerMaintenanceInstallRoot -InstallRoot '' -RepoRoot $runnerEnvironmentCheckout
+        $runnerEnvironmentExpectedRoot = Join-Path $runnerEnvironmentToolCache 'u6-v3'
         $sameDriveRoot = Resolve-RunnerMaintenanceInstallRoot -InstallRoot '' -RepoRoot 'F:\src\unity-helpers'
         $env:UNITY_EDITOR_INSTALL_ROOT = 'G:\operator\editors'
         $overrideRoot = Resolve-RunnerMaintenanceInstallRoot -InstallRoot '' -RepoRoot 'F:\src\unity-helpers'
         $explicitRoot = Resolve-RunnerMaintenanceInstallRoot -InstallRoot 'H:\explicit\editors' -RepoRoot 'F:\src\unity-helpers'
         if (
-            $checkoutRoot -ne 'E:\actions-runner\_tool\u6-v3' -or
+            $checkoutRoot -ne 'E:\actions-runner\_work\_tool\u6-v3' -or
+            $runnerEnvironmentResolvedRoot -ne $runnerEnvironmentExpectedRoot -or
             $sameDriveRoot -ne 'F:\Unity\Editors' -or
             $overrideRoot -ne 'G:\operator\editors' -or
             $explicitRoot -ne 'H:\explicit\editors'
         ) {
-            Write-Host "::error file=scripts/unity/maintain-windows-runner.ps1::Install-root resolution must prefer explicit/operator roots, reuse the runner tool cache for _work checkouts, and otherwise stay on the checkout drive. Checkout=$checkoutRoot SameDrive=$sameDriveRoot Override=$overrideRoot Explicit=$explicitRoot"
+            Write-Host "::error file=scripts/unity/maintain-windows-runner.ps1::Install-root resolution must prefer explicit/operator roots, honor the runner's service .env tool-cache override, use the Actions default for _work checkouts, and otherwise stay on the checkout drive. Checkout=$checkoutRoot RunnerEnvironment=$runnerEnvironmentResolvedRoot SameDrive=$sameDriveRoot Override=$overrideRoot Explicit=$explicitRoot"
             $failed = $true
         } elseif ($VerboseOutput) {
             Write-Info 'Checked runner maintenance keeps Unity on the Actions runner drive with deterministic override precedence.'
         }
     } finally {
         if ($resolverOldToolCache) { $env:RUNNER_TOOL_CACHE = $resolverOldToolCache } else { Remove-Item Env:\RUNNER_TOOL_CACHE -ErrorAction SilentlyContinue }
+        if ($resolverOldToolsDirectory) { $env:RUNNER_TOOLSDIRECTORY = $resolverOldToolsDirectory } else { Remove-Item Env:\RUNNER_TOOLSDIRECTORY -ErrorAction SilentlyContinue }
+        if ($resolverOldAgentToolsDirectory) { $env:AGENT_TOOLSDIRECTORY = $resolverOldAgentToolsDirectory } else { Remove-Item Env:\AGENT_TOOLSDIRECTORY -ErrorAction SilentlyContinue }
         if ($resolverOldFallbackToolCache) { $env:UH_RUNNER_TOOL_CACHE = $resolverOldFallbackToolCache } else { Remove-Item Env:\UH_RUNNER_TOOL_CACHE -ErrorAction SilentlyContinue }
         if ($resolverOldOverride) { $env:UNITY_EDITOR_INSTALL_ROOT = $resolverOldOverride } else { Remove-Item Env:\UNITY_EDITOR_INSTALL_ROOT -ErrorAction SilentlyContinue }
+        if ($runnerEnvironmentRoot) { Remove-Item -LiteralPath $runnerEnvironmentRoot -Recurse -Force -ErrorAction SilentlyContinue }
     }
 }
 
@@ -2880,7 +2896,8 @@ if ($ensureEditorWatchdogImported) {
         $macIl2CppPlayer = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\MacStandaloneSupport\Variations\macosx64_player_development_il2cpp\UnityPlayer.app\Contents\MacOS\UnityPlayer'
         $macPlayer = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\MacStandaloneSupport\Variations\macosx64_player_development_mono\UnityPlayer.app\Contents\MacOS\UnityPlayer'
         $androidExtension = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\AndroidPlayer\UnityEditor.Android.Extensions.dll'
-        $androidPlayerTools = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\AndroidPlayer\Tools\Source.properties'
+        $androidLegacyPlayerTools = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\AndroidPlayer\Tools\Source.properties'
+        $androidPlayerTools = Join-Path $modulePresenceRoot 'Editor\Data\PlaybackEngines\AndroidPlayer\Tools\sdktools.jar'
         foreach ($path in @($editorPath, $iosExtension, $macExtension, $androidExtension)) {
             New-Item -ItemType Directory -Force -Path (Split-Path -Parent $path) | Out-Null
             New-Item -ItemType File -Force -Path $path | Out-Null
@@ -2889,6 +2906,10 @@ if ($ensureEditorWatchdogImported) {
         $partialIosAccepted = Test-UnityCiModuleGroupPresent -EditorPath $editorPath -Group 'ios'
         $partialMacAccepted = Test-UnityCiModuleGroupPresent -EditorPath $editorPath -Group 'mac-mono'
         $partialAndroidExtensionOnlyAccepted = Test-UnityCiModuleGroupPresent -EditorPath $editorPath -Group 'android'
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $androidLegacyPlayerTools) | Out-Null
+        New-Item -ItemType File -Force -Path $androidLegacyPlayerTools | Out-Null
+        $legacyAndroidMarkerAccepted = Test-UnityCiModuleGroupPresent -EditorPath $editorPath -Group 'android'
+        Remove-Item -LiteralPath $androidLegacyPlayerTools -Force
         Remove-Item -LiteralPath $androidExtension -Force
         foreach ($path in @($iosToolchain, $macIl2CppPlayer, $androidPlayerTools)) {
             New-Item -ItemType Directory -Force -Path (Split-Path -Parent $path) | Out-Null
@@ -2907,12 +2928,13 @@ if ($ensureEditorWatchdogImported) {
             $partialMacAccepted -or
             $il2CppOnlyMacAccepted -or
             $partialAndroidExtensionOnlyAccepted -or
+            $legacyAndroidMarkerAccepted -or
             $partialAndroidToolsOnlyAccepted -or
             -not $completeIosAccepted -or
             -not $completeMacAccepted -or
             -not $completeAndroidAccepted
         ) {
-            Write-Host "::error file=scripts/unity/ensure-editor.ps1::iOS, macOS Mono, and Android module checks must reject partial installs and accept only the extension plus its toolchain/player payload. PartialIos=$partialIosAccepted PartialMac=$partialMacAccepted Il2CppOnlyMac=$il2CppOnlyMacAccepted PartialAndroidExtensionOnly=$partialAndroidExtensionOnlyAccepted PartialAndroidToolsOnly=$partialAndroidToolsOnlyAccepted CompleteIos=$completeIosAccepted CompleteMac=$completeMacAccepted CompleteAndroid=$completeAndroidAccepted."
+            Write-Host "::error file=scripts/unity/ensure-editor.ps1::iOS, macOS Mono, and Android module checks must reject partial installs and stale Android markers, and accept only the extension plus its toolchain/player payload. PartialIos=$partialIosAccepted PartialMac=$partialMacAccepted Il2CppOnlyMac=$il2CppOnlyMacAccepted PartialAndroidExtensionOnly=$partialAndroidExtensionOnlyAccepted LegacyAndroidMarker=$legacyAndroidMarkerAccepted PartialAndroidToolsOnly=$partialAndroidToolsOnlyAccepted CompleteIos=$completeIosAccepted CompleteMac=$completeMacAccepted CompleteAndroid=$completeAndroidAccepted."
             $failed = $true
         } elseif ($VerboseOutput) {
             Write-Info 'Checked iOS, macOS Mono, and Android module verification rejects partial installs.'

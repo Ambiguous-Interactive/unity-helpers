@@ -95,22 +95,49 @@ function Resolve-RunnerMaintenanceInstallRoot {
 
     # The tool cache is on the runner's storage volume and is also the root
     # consumed by every licensed Unity workflow in this repository.
-    $runnerToolCache = if (-not [string]::IsNullOrWhiteSpace($env:RUNNER_TOOL_CACHE)) {
-        $env:RUNNER_TOOL_CACHE
-    } elseif (-not [string]::IsNullOrWhiteSpace($env:UH_RUNNER_TOOL_CACHE)) {
-        $env:UH_RUNNER_TOOL_CACHE
-    } else {
-        ''
+    $runnerToolCache = ''
+    foreach ($variableName in @('RUNNER_TOOL_CACHE', 'RUNNER_TOOLSDIRECTORY', 'AGENT_TOOLSDIRECTORY', 'UH_RUNNER_TOOL_CACHE')) {
+        $candidate = [Environment]::GetEnvironmentVariable($variableName)
+        if (-not [string]::IsNullOrWhiteSpace($candidate)) {
+            $runnerToolCache = $candidate
+            break
+        }
     }
     if ($runnerToolCache) {
-        return ($runnerToolCache.TrimEnd('\', '/') + '\u6-v3')
+        $separator = if ($runnerToolCache -match '^[A-Za-z]:' -or $runnerToolCache.Contains('\')) { '\' } else { [IO.Path]::DirectorySeparatorChar }
+        return ($runnerToolCache.TrimEnd('\', '/') + $separator + 'u6-v3')
     }
 
-    # Interactive shells do not inherit RUNNER_TOOL_CACHE. An Actions checkout
-    # still reveals <runner>\_work, so derive <runner>\_tool from it.
-    $normalizedRepoRoot = $RepoRoot.Replace('/', '\').TrimEnd('\')
-    if ($normalizedRepoRoot -match '^(?<runner>[A-Za-z]:\\.*)\\_work(?:\\|$)') {
-        return ($Matches['runner'].TrimEnd('\') + '\_tool\u6-v3')
+    # Interactive shells do not inherit the service's environment. Load only
+    # the runner tool-cache keys from its .env file, using the same precedence
+    # as actions/runner. Without an override, actions/runner defaults to
+    # <work folder>\_tool.
+    $normalizedRepoRoot = $RepoRoot.TrimEnd('\', '/')
+    if ($normalizedRepoRoot -match '^(?<runner>.*)(?<separator>[\\/])_work(?:[\\/]|$)') {
+        $runnerRoot = $Matches['runner'].TrimEnd('\', '/')
+        $separator = $Matches['separator']
+        $runnerEnvironmentPath = $runnerRoot + $separator + '.env'
+        if (Test-Path -LiteralPath $runnerEnvironmentPath -PathType Leaf) {
+            $runnerEnvironment = @{}
+            foreach ($line in @(Get-Content -LiteralPath $runnerEnvironmentPath -ErrorAction Stop)) {
+                $equalsIndex = $line.IndexOf('=')
+                if (0 -lt $equalsIndex) {
+                    $name = $line.Substring(0, $equalsIndex)
+                    if ($name -in @('RUNNER_TOOL_CACHE', 'RUNNER_TOOLSDIRECTORY', 'AGENT_TOOLSDIRECTORY')) {
+                        $runnerEnvironment[$name] = $line.Substring($equalsIndex + 1)
+                    }
+                }
+            }
+            foreach ($variableName in @('RUNNER_TOOL_CACHE', 'RUNNER_TOOLSDIRECTORY', 'AGENT_TOOLSDIRECTORY')) {
+                $candidate = [string]$runnerEnvironment[$variableName]
+                if (-not [string]::IsNullOrWhiteSpace($candidate)) {
+                    $cacheSeparator = if ($candidate -match '^[A-Za-z]:' -or $candidate.Contains('\')) { '\' } else { [IO.Path]::DirectorySeparatorChar }
+                    return ($candidate.TrimEnd('\', '/') + $cacheSeparator + 'u6-v3')
+                }
+            }
+        }
+
+        return ($runnerRoot + $separator + '_work' + $separator + '_tool' + $separator + 'u6-v3')
     }
 
     # A manually cloned checkout still keeps editor payloads on its own drive.

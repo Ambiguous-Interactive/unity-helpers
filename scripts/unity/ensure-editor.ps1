@@ -2881,7 +2881,7 @@ function Test-UnityCiModuleGroupPresent {
             'android' {
                 $androidRoot = Join-Path $dataRoot 'PlaybackEngines\AndroidPlayer'
                 $hasEditorExtension = Test-Path -LiteralPath (Join-Path $androidRoot 'UnityEditor.Android.Extensions.dll') -PathType Leaf
-                $hasPlayerTools = Test-Path -LiteralPath (Join-Path $androidRoot 'Tools\Source.properties') -PathType Leaf
+                $hasPlayerTools = Test-Path -LiteralPath (Join-Path $androidRoot 'Tools\sdktools.jar') -PathType Leaf
                 return $hasEditorExtension -and $hasPlayerTools
             }
             'android-sdk-ndk-tools' {
