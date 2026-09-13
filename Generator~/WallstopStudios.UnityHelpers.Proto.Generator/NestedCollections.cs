@@ -315,8 +315,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// </remarks>
         internal int DepthRefusals { get; private set; }
 
-        private readonly Dictionary<string, IGeneratedMessage> _byType =
-            new Dictionary<string, IGeneratedMessage>();
+        private readonly Dictionary<string, IGeneratedMessage> _byType = new Dictionary<
+            string,
+            IGeneratedMessage
+        >(System.StringComparer.Ordinal);
 
         private readonly List<IGeneratedMessage> _ordered = new List<IGeneratedMessage>();
 

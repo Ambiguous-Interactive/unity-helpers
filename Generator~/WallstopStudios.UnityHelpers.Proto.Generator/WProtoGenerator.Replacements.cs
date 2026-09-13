@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Proto.Generator
 {
+    using System;
     using System.Collections.Generic;
     using System.Text;
     using Microsoft.CodeAnalysis;
@@ -52,8 +53,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 )
                 {
                     if (
-                        field.AttributeClass?.ToDisplayString()
-                            != AttributeNamespace + ".WProtoDispatchFieldAttribute"
+                        !string.Equals(
+                            field.AttributeClass?.ToDisplayString(),
+                            AttributeNamespace + ".WProtoDispatchFieldAttribute",
+                            StringComparison.Ordinal
+                        )
                         || field.ConstructorArguments.Length != 4
                         || !SymbolEqualityComparer.Default.Equals(
                             field.ConstructorArguments[0].Value as INamedTypeSymbol,
@@ -81,8 +85,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                     foreach (AttributeData attribute in reference.GetAttributes())
                     {
                         if (
-                            attribute.AttributeClass?.ToDisplayString()
-                                == AttributeNamespace + ".WProtoReplacementAttribute"
+                            string.Equals(
+                                attribute.AttributeClass?.ToDisplayString(),
+                                AttributeNamespace + ".WProtoReplacementAttribute",
+                                StringComparison.Ordinal
+                            )
                             && attribute.ConstructorArguments.Length == 1
                             && SymbolEqualityComparer.Default.Equals(
                                 attribute.ConstructorArguments[0].Value as INamedTypeSymbol,
@@ -131,12 +138,19 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                             AttributeData attribute in contract.ContainingAssembly.GetAttributes()
                         )
                         {
+                            string attributeName = attribute.AttributeClass?.ToDisplayString();
                             if (
                                 (
-                                    attribute.AttributeClass?.ToDisplayString()
-                                        == SubtypeTagManifest.RetiredAttribute
-                                    || attribute.AttributeClass?.ToDisplayString()
-                                        == SubtypeTagManifest.TagAttribute
+                                    string.Equals(
+                                        attributeName,
+                                        SubtypeTagManifest.RetiredAttribute,
+                                        StringComparison.Ordinal
+                                    )
+                                    || string.Equals(
+                                        attributeName,
+                                        SubtypeTagManifest.TagAttribute,
+                                        StringComparison.Ordinal
+                                    )
                                 )
                                 && attribute.ConstructorArguments.Length == 3
                                 && SymbolEqualityComparer.Default.Equals(

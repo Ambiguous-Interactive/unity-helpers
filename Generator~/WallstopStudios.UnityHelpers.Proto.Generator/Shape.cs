@@ -34,9 +34,21 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         internal bool Packable =>
             !NeverPacked
             && (
-                WireType == Proto + ".WProtoWireType.Varint"
-                || WireType == Proto + ".WProtoWireType.Fixed32"
-                || WireType == Proto + ".WProtoWireType.Fixed64"
+                string.Equals(
+                    WireType,
+                    Proto + ".WProtoWireType.Varint",
+                    System.StringComparison.Ordinal
+                )
+                || string.Equals(
+                    WireType,
+                    Proto + ".WProtoWireType.Fixed32",
+                    System.StringComparison.Ordinal
+                )
+                || string.Equals(
+                    WireType,
+                    Proto + ".WProtoWireType.Fixed64",
+                    System.StringComparison.Ordinal
+                )
             );
 
         /// <summary>The wire type constant a field of this shape carries in its key.</summary>
@@ -601,7 +613,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             foreach (KeyValuePair<string, TypedConstant> argument in contract.NamedArguments)
             {
-                if (argument.Key == name && argument.Value.Value is bool flag)
+                if (
+                    string.Equals(argument.Key, name, System.StringComparison.Ordinal)
+                    && argument.Value.Value is bool flag
+                )
                 {
                     return flag;
                 }
@@ -621,8 +636,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             {
                 if (
                     attribute.AttributeClass != null
-                    && attribute.AttributeClass.ToDisplayString()
-                        == "WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoContractAttribute"
+                    && string.Equals(
+                        attribute.AttributeClass.ToDisplayString(),
+                        "WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto.WProtoContractAttribute",
+                        System.StringComparison.Ordinal
+                    )
                 )
                 {
                     return attribute;

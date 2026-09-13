@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Proto.Generator
 {
+    using System;
     using System.Collections.Generic;
     using Microsoft.CodeAnalysis;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
@@ -329,7 +330,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             foreach (AttributeData attribute in subType.GetAttributes())
             {
-                if (attribute.AttributeClass?.ToDisplayString() == SubtypeAttribute)
+                if (
+                    string.Equals(
+                        attribute.AttributeClass?.ToDisplayString(),
+                        SubtypeAttribute,
+                        StringComparison.Ordinal
+                    )
+                )
                 {
                     return true;
                 }
@@ -508,7 +515,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             foreach (AttributeData attribute in symbol.GetAttributes())
             {
-                if (attribute.AttributeClass?.ToDisplayString() == NotSerializedAttribute)
+                if (
+                    string.Equals(
+                        attribute.AttributeClass?.ToDisplayString(),
+                        NotSerializedAttribute,
+                        StringComparison.Ordinal
+                    )
+                )
                 {
                     return true;
                 }
@@ -535,7 +548,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             foreach (AttributeData attribute in baseType.GetAttributes())
             {
                 if (
-                    attribute.AttributeClass?.ToDisplayString() != IncludeAttribute
+                    !string.Equals(
+                        attribute.AttributeClass?.ToDisplayString(),
+                        IncludeAttribute,
+                        StringComparison.Ordinal
+                    )
                     || attribute.ConstructorArguments.Length < 2
                 )
                 {
@@ -561,7 +578,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             foreach (AttributeData attribute in symbol.GetAttributes())
             {
-                if (attribute.AttributeClass?.ToDisplayString() == ContractAttribute)
+                if (
+                    string.Equals(
+                        attribute.AttributeClass?.ToDisplayString(),
+                        ContractAttribute,
+                        StringComparison.Ordinal
+                    )
+                )
                 {
                     return true;
                 }
@@ -610,7 +633,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
             if (
                 attribute.AttributeClass == null
-                || attribute.AttributeClass.ToDisplayString() != SubtypeAttribute
+                || !string.Equals(
+                    attribute.AttributeClass.ToDisplayString(),
+                    SubtypeAttribute,
+                    StringComparison.Ordinal
+                )
                 || attribute.ConstructorArguments.Length < 1
                 || 2 < attribute.ConstructorArguments.Length
             )
@@ -734,7 +761,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             if (
                 !tagless
                 && manifest.TryRetired(baseType, tag, out string retiredBy)
-                && retiredBy != subType.ToDisplayString()
+                && !string.Equals(retiredBy, subType.ToDisplayString(), StringComparison.Ordinal)
             )
             {
                 problem = RetiredProblem(tag, baseType, retiredBy);

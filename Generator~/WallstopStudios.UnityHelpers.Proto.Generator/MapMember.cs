@@ -49,7 +49,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         /// can be constructed and filled, so the member's current entries are copied into a
         /// <c>Dictionary&lt;K,V&gt;</c> and the decoded ones merged on top.
         /// </remarks>
-        private bool SeedsByCopy => _accumulatorQualified != _mapQualified;
+        private bool SeedsByCopy =>
+            !string.Equals(_accumulatorQualified, _mapQualified, System.StringComparison.Ordinal);
 
         private string PairLocal => "pair" + Tag;
 
@@ -169,8 +170,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 {
                     if (
                         !candidate.IsGenericType
-                        || candidate.ConstructedFrom.ToDisplayString()
-                            != "System.Collections.Generic.IDictionary<TKey, TValue>"
+                        || !string.Equals(
+                            candidate.ConstructedFrom.ToDisplayString(),
+                            "System.Collections.Generic.IDictionary<TKey, TValue>",
+                            System.StringComparison.Ordinal
+                        )
                     )
                     {
                         continue;
@@ -362,8 +366,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             return
                 isKey
                 && (
-                    shape.WireType == Proto + ".WProtoWireType.Fixed32"
-                    || shape.WireType == Proto + ".WProtoWireType.Fixed64"
+                    string.Equals(
+                        shape.WireType,
+                        Proto + ".WProtoWireType.Fixed32",
+                        System.StringComparison.Ordinal
+                    )
+                    || string.Equals(
+                        shape.WireType,
+                        Proto + ".WProtoWireType.Fixed64",
+                        System.StringComparison.Ordinal
+                    )
                 )
                 ? "true"
                 : Shape.Fill(shape.PresenceTest, access);

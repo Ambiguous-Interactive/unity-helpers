@@ -89,7 +89,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             {
                 if (
                     attribute.AttributeClass == null
-                    || attribute.AttributeClass.ToDisplayString() != ReservedAttribute
+                    || !string.Equals(
+                        attribute.AttributeClass.ToDisplayString(),
+                        ReservedAttribute,
+                        StringComparison.Ordinal
+                    )
                 )
                 {
                     continue;

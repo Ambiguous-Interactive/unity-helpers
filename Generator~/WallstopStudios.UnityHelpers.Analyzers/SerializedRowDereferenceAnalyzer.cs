@@ -418,7 +418,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 if (
                     node is InvocationExpressionSyntax invocation
                     && invocation.Expression is MemberAccessExpressionSyntax access
-                    && access.Name.Identifier.ValueText == CompactionMethodName
+                    && string.Equals(
+                        access.Name.Identifier.ValueText,
+                        CompactionMethodName,
+                        System.StringComparison.Ordinal
+                    )
                     && NamesField(model, access.Expression, field)
                 )
                 {

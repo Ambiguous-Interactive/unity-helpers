@@ -46,6 +46,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         /// </remarks>
         private static readonly ImmutableHashSet<string> BclFactoryTakingTypes =
             ImmutableHashSet.Create(
+                System.StringComparer.Ordinal,
                 "System.Collections.Concurrent.ConcurrentDictionary`2",
                 "System.Runtime.CompilerServices.ConditionalWeakTable`2"
             );
@@ -54,7 +55,12 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         /// Members of <see cref="BclFactoryTakingTypes"/> that take a value factory.
         /// </summary>
         private static readonly ImmutableHashSet<string> BclFactoryTakingMethods =
-            ImmutableHashSet.Create("GetOrAdd", "AddOrUpdate", "GetValue");
+            ImmutableHashSet.Create(
+                System.StringComparer.Ordinal,
+                "GetOrAdd",
+                "AddOrUpdate",
+                "GetValue"
+            );
 
         /// <summary>
         /// This package's own extension types, where EVERY delegate-typed parameter counts and no
@@ -74,6 +80,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         /// </remarks>
         private static readonly ImmutableHashSet<string> PackageFactoryTakingTypes =
             ImmutableHashSet.Create(
+                System.StringComparer.Ordinal,
                 "WallstopStudios.UnityHelpers.Core.Extension.DictionaryExtensions"
             );
 

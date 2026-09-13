@@ -60,20 +60,26 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         /// deliberately absent; see the remarks on the type.
         /// </summary>
         private static readonly ImmutableHashSet<string> AssertionNamespaces =
-            ImmutableHashSet.Create("NUnit.Framework");
+            ImmutableHashSet.Create(System.StringComparer.Ordinal, "NUnit.Framework");
 
         /// <summary>
         /// Assertions whose first argument is the value under test; every later parameter is the
         /// failure message.
         /// </summary>
         private static readonly ImmutableHashSet<string> NullTestingAssertions =
-            ImmutableHashSet.Create("IsNull", "IsNotNull", "Null", "NotNull");
+            ImmutableHashSet.Create(
+                System.StringComparer.Ordinal,
+                "IsNull",
+                "IsNotNull",
+                "Null",
+                "NotNull"
+            );
 
         /// <summary>
         /// Assertions that reach the same comparison through a null literal in either operand.
         /// </summary>
         private static readonly ImmutableHashSet<string> EqualityAssertions =
-            ImmutableHashSet.Create("AreEqual", "AreNotEqual");
+            ImmutableHashSet.Create(System.StringComparer.Ordinal, "AreEqual", "AreNotEqual");
 
         /// <inheritdoc />
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>

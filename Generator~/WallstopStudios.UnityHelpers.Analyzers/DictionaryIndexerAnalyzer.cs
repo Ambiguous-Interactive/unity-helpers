@@ -153,10 +153,17 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             )
             {
                 return key.SpecialType == SpecialType.System_String
-                    && containing.MetadataName == "GroupCollection"
+                    && string.Equals(
+                        containing.MetadataName,
+                        "GroupCollection",
+                        System.StringComparison.Ordinal
+                    )
                     && containing.ContainingNamespace != null
-                    && containing.ContainingNamespace.ToDisplayString()
-                        == "System.Text.RegularExpressions";
+                    && string.Equals(
+                        containing.ContainingNamespace.ToDisplayString(),
+                        "System.Text.RegularExpressions",
+                        System.StringComparison.Ordinal
+                    );
             }
 
             internal void OnPropertyReference(OperationAnalysisContext context)

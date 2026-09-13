@@ -87,10 +87,10 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             if (
                 isEditorWindow
                 && (
-                    name == "OnGUI"
-                    || name == "Update"
-                    || name == "OnBecameVisible"
-                    || name == "OnBecameInvisible"
+                    string.Equals(name, "OnGUI", System.StringComparison.Ordinal)
+                    || string.Equals(name, "Update", System.StringComparison.Ordinal)
+                    || string.Equals(name, "OnBecameVisible", System.StringComparison.Ordinal)
+                    || string.Equals(name, "OnBecameInvisible", System.StringComparison.Ordinal)
                 )
             )
             {
@@ -98,12 +98,12 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             }
             if (!isMonoBehaviour)
             {
-                return name == "Awake"
-                    || name == "OnEnable"
-                    || name == "OnDisable"
-                    || name == "OnDestroy"
-                    || name == "OnValidate"
-                    || name == "Reset";
+                return string.Equals(name, "Awake", System.StringComparison.Ordinal)
+                    || string.Equals(name, "OnEnable", System.StringComparison.Ordinal)
+                    || string.Equals(name, "OnDisable", System.StringComparison.Ordinal)
+                    || string.Equals(name, "OnDestroy", System.StringComparison.Ordinal)
+                    || string.Equals(name, "OnValidate", System.StringComparison.Ordinal)
+                    || string.Equals(name, "Reset", System.StringComparison.Ordinal);
             }
             return GetSignature(name).Parameters != null;
         }
@@ -166,12 +166,15 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             {
                 IParameterSymbol parameter = method.Parameters[index];
                 string expectedName = signature.Parameters[index];
-                ITypeSymbol expected =
-                    expectedName == "System.Single[]"
-                        ? compilation.CreateArrayTypeSymbol(
-                            compilation.GetSpecialType(SpecialType.System_Single)
-                        )
-                        : compilation.GetTypeByMetadataName(expectedName);
+                ITypeSymbol expected = string.Equals(
+                    expectedName,
+                    "System.Single[]",
+                    System.StringComparison.Ordinal
+                )
+                    ? compilation.CreateArrayTypeSymbol(
+                        compilation.GetSpecialType(SpecialType.System_Single)
+                    )
+                    : compilation.GetTypeByMetadataName(expectedName);
                 if (
                     parameter.RefKind != RefKind.None
                     || !SymbolEqualityComparer.Default.Equals(parameter.Type, expected)

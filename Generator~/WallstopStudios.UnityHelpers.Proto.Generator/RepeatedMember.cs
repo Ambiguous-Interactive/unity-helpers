@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Proto.Generator
 {
+    using System;
     using Microsoft.CodeAnalysis;
 
     /// <summary>
@@ -380,7 +381,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             {
                 if (
                     candidate.IsGenericType
-                    && candidate.ConstructedFrom.ToDisplayString() == CollectionInterface
+                    && string.Equals(
+                        candidate.ConstructedFrom.ToDisplayString(),
+                        CollectionInterface,
+                        StringComparison.Ordinal
+                    )
                 )
                 {
                     if (element != null)

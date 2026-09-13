@@ -92,6 +92,12 @@ the source into the analyzer project instead of adding a runtime assembly depend
 [WProtoGeneratedNames](../../Runtime/Core/Serialization/WallstopProto/WProtoGeneratedNames.cs),
 which keeps the generated formatter declarations and subtype discovery in agreement.
 
+For Roslyn syntax, compare tokens and nodes through `SyntaxKind` (`token.IsKind(...)`) instead of
+their text. Prefer `SymbolEqualityComparer.Default` when both sides are symbols. When analyzer or
+generator logic must compare metadata names, attribute argument keys, or display strings, state
+`StringComparison.Ordinal` explicitly so the intended compiler-identity comparison is visible.
+Use `StringComparer.Ordinal` for collections keyed by the same names.
+
 ---
 
 ## Editor Test Patterns

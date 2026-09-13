@@ -311,7 +311,14 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 existenceForm = null;
 
                 IMethodSymbol target = invocation.TargetMethod;
-                if (target == null || target.Name != GetComponentMethodName)
+                if (
+                    target == null
+                    || !string.Equals(
+                        target.Name,
+                        GetComponentMethodName,
+                        System.StringComparison.Ordinal
+                    )
+                )
                 {
                     return false;
                 }

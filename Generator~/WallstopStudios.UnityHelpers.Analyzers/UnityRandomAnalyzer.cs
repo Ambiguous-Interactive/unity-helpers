@@ -208,7 +208,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             {
                 if (
                     SymbolEqualityComparer.Default.Equals(type, unityRandom)
-                    || EngineWrapperTypeName == FullName(type)
+                    || string.Equals(
+                        EngineWrapperTypeName,
+                        FullName(type),
+                        System.StringComparison.Ordinal
+                    )
                 )
                 {
                     return true;

@@ -81,7 +81,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             {
                 if (
                     attribute.AttributeClass == null
-                    || attribute.AttributeClass.ToDisplayString() != SurrogateAttribute
+                    || !string.Equals(
+                        attribute.AttributeClass.ToDisplayString(),
+                        SurrogateAttribute,
+                        StringComparison.Ordinal
+                    )
                     || attribute.ConstructorArguments.Length < 2
                     || !(attribute.ConstructorArguments[0].Value is INamedTypeSymbol real)
                     || !(attribute.ConstructorArguments[1].Value is INamedTypeSymbol surrogate)
@@ -204,7 +208,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             {
                 if (
                     attribute.AttributeClass == null
-                    || attribute.AttributeClass.ToDisplayString() != SurrogateAttribute
+                    || !string.Equals(
+                        attribute.AttributeClass.ToDisplayString(),
+                        SurrogateAttribute,
+                        StringComparison.Ordinal
+                    )
                     || attribute.ConstructorArguments.Length < 2
                 )
                 {
@@ -247,7 +255,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             foreach (AttributeData attribute in type.GetAttributes())
             {
-                if (attribute.AttributeClass?.ToDisplayString() == ContractAttribute)
+                if (
+                    string.Equals(
+                        attribute.AttributeClass?.ToDisplayString(),
+                        ContractAttribute,
+                        StringComparison.Ordinal
+                    )
+                )
                 {
                     return true;
                 }

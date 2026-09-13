@@ -55,6 +55,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         /// </para>
         /// </remarks>
         private static readonly ImmutableHashSet<string> TeardownHooks = ImmutableHashSet.Create(
+            System.StringComparer.Ordinal,
             "OnDestroy",
             "OnDisable",
             "OnApplicationQuit",
@@ -117,7 +118,8 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         /// </remarks>
         private static bool HasTeardownArity(string name, MethodDeclarationSyntax method)
         {
-            return name != DisposeHook || method.ParameterList.Parameters.Count == 0;
+            return !string.Equals(name, DisposeHook, System.StringComparison.Ordinal)
+                || method.ParameterList.Parameters.Count == 0;
         }
 
         /// <summary>
@@ -144,7 +146,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             // A differently named base call does not chain this lifecycle method.
             bool isSameHook =
                 memberAccess.Expression is BaseExpressionSyntax
-                && memberAccess.Name.Identifier.ValueText == name;
+                && string.Equals(
+                    memberAccess.Name.Identifier.ValueText,
+                    name,
+                    System.StringComparison.Ordinal
+                );
             return isSameHook ? invocation : null;
         }
 

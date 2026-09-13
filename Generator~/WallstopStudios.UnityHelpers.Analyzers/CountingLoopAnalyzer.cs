@@ -189,7 +189,18 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             sequenceType = null;
             if (
                 !(bound is IPropertyReferenceOperation property)
-                || (property.Property.Name != "Length" && property.Property.Name != "Count")
+                || (
+                    !string.Equals(
+                        property.Property.Name,
+                        "Length",
+                        System.StringComparison.Ordinal
+                    )
+                    && !string.Equals(
+                        property.Property.Name,
+                        "Count",
+                        System.StringComparison.Ordinal
+                    )
+                )
             )
             {
                 return false;

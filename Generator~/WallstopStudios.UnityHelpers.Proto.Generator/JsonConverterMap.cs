@@ -209,7 +209,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             {
                 if (
                     current.Arity != 1
-                    || current.ConstructedFrom?.ToDisplayString() != ConverterBase + "<T>"
+                    || !string.Equals(
+                        current.ConstructedFrom?.ToDisplayString(),
+                        ConverterBase + "<T>",
+                        StringComparison.Ordinal
+                    )
                 )
                 {
                     continue;
@@ -230,7 +234,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             {
                 if (
                     attribute.AttributeClass == null
-                    || attribute.AttributeClass.ToDisplayString() != ConverterAttribute
+                    || !string.Equals(
+                        attribute.AttributeClass.ToDisplayString(),
+                        ConverterAttribute,
+                        StringComparison.Ordinal
+                    )
                     || attribute.ConstructorArguments.Length < 2
                 )
                 {
@@ -269,7 +277,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             HashSet<string> announced
         )
         {
-            HashSet<string> found = new HashSet<string>();
+            HashSet<string> found = new HashSet<string>(StringComparer.Ordinal);
             List<string> registrations = new List<string>();
 
             if (_pairs.Count == 0)

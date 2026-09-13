@@ -149,7 +149,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             {
                 if (
                     attribute.AttributeClass == null
-                    || attribute.AttributeClass.ToDisplayString() != RetiredAttribute
+                    || !string.Equals(
+                        attribute.AttributeClass.ToDisplayString(),
+                        RetiredAttribute,
+                        StringComparison.Ordinal
+                    )
                     || attribute.ConstructorArguments.Length < 3
                 )
                 {
@@ -205,7 +209,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             {
                 if (
                     attribute.AttributeClass == null
-                    || attribute.AttributeClass.ToDisplayString() != TagAttribute
+                    || !string.Equals(
+                        attribute.AttributeClass.ToDisplayString(),
+                        TagAttribute,
+                        StringComparison.Ordinal
+                    )
                     || attribute.ConstructorArguments.Length < 3
                 )
                 {
@@ -252,7 +260,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 }
                 else if (
                     tagOwners.TryGetValue(TagKeyOf(baseType, tag), out string taken)
-                    && taken != subTypeName
+                    && !string.Equals(taken, subTypeName, StringComparison.Ordinal)
                 )
                 {
                     problem =
@@ -267,7 +275,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 }
                 else if (
                     retiredOwners.TryGetValue(TagKeyOf(baseType, tag), out string retiredBy)
-                    && retiredBy != subTypeName
+                    && !string.Equals(retiredBy, subTypeName, StringComparison.Ordinal)
                 )
                 {
                     problem =
@@ -309,7 +317,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             if (
                 attribute.AttributeClass == null
-                || attribute.AttributeClass.ToDisplayString() != attributeName
+                || !string.Equals(
+                    attribute.AttributeClass.ToDisplayString(),
+                    attributeName,
+                    StringComparison.Ordinal
+                )
                 || attribute.ConstructorArguments.Length < 3
             )
             {

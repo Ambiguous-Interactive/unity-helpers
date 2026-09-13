@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
     using System.Runtime.Serialization;
     using System.Text;
     using Microsoft.CodeAnalysis;
+    using Microsoft.CodeAnalysis.CSharp;
     using Microsoft.CodeAnalysis.CSharp.Syntax;
     using Microsoft.CodeAnalysis.Text;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
@@ -137,7 +138,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             HashSet<string> announced
         )
         {
-            HashSet<string> found = new HashSet<string>();
+            HashSet<string> found = new HashSet<string>(StringComparer.Ordinal);
             HashSet<ITypeSymbol> visited = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
             HashSet<ITypeSymbol> visitedWithDependencies = new HashSet<ITypeSymbol>(
                 SymbolEqualityComparer.Default
@@ -416,7 +417,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             HashSet<string> announced
         )
         {
-            HashSet<string> found = new HashSet<string>();
+            HashSet<string> found = new HashSet<string>(StringComparer.Ordinal);
             List<string> registrations = new List<string>();
 
             foreach (ClosureScan.TypeUse use in typeUses)
@@ -1522,7 +1523,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             foreach (AttributeData attribute in baseType.GetAttributes())
             {
                 if (
-                    attribute.AttributeClass?.ToDisplayString() != IncludeAttribute
+                    !string.Equals(
+                        attribute.AttributeClass?.ToDisplayString(),
+                        IncludeAttribute,
+                        StringComparison.Ordinal
+                    )
                     || attribute.ConstructorArguments.Length < 2
                 )
                 {
@@ -2911,7 +2916,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             HashSet<string> announced
         )
         {
-            HashSet<string> found = new HashSet<string>();
+            HashSet<string> found = new HashSet<string>(StringComparer.Ordinal);
 
             foreach (ClosureScan.TypeUse use in typeUses)
             {
@@ -3001,7 +3006,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             {
                 if (
                     attribute.AttributeClass == null
-                    || attribute.AttributeClass.ToDisplayString() != IncludeAttribute
+                    || !string.Equals(
+                        attribute.AttributeClass.ToDisplayString(),
+                        IncludeAttribute,
+                        StringComparison.Ordinal
+                    )
                     || attribute.ConstructorArguments.Length < 2
                 )
                 {
@@ -3041,7 +3050,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 }
                 else if (
                     subtypes.Manifest.TryRetired(contract, tag, out string retiredBy)
-                    && retiredBy != subType.ToDisplayString()
+                    && !string.Equals(
+                        retiredBy,
+                        subType.ToDisplayString(),
+                        StringComparison.Ordinal
+                    )
                 )
                 {
                     // Both include declaration forms share the same retirement constraints.
@@ -3483,7 +3496,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             foreach (KeyValuePair<string, TypedConstant> argument in attribute.NamedArguments)
             {
-                if (argument.Key == "Name" && argument.Value.Value is string declared)
+                if (
+                    string.Equals(argument.Key, "Name", StringComparison.Ordinal)
+                    && argument.Value.Value is string declared
+                )
                 {
                     return string.IsNullOrEmpty(declared) ? null : declared;
                 }
@@ -3508,7 +3524,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             foreach (KeyValuePair<string, TypedConstant> argument in attribute.NamedArguments)
             {
-                if (argument.Key != "DataFormat" || argument.Value.Value == null)
+                if (
+                    !string.Equals(argument.Key, "DataFormat", StringComparison.Ordinal)
+                    || argument.Value.Value == null
+                )
                 {
                     continue;
                 }
@@ -3537,7 +3556,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             foreach (KeyValuePair<string, TypedConstant> argument in attribute.NamedArguments)
             {
-                if (argument.Key == name && argument.Value.Value is bool flag)
+                if (
+                    string.Equals(argument.Key, name, StringComparison.Ordinal)
+                    && argument.Value.Value is bool flag
+                )
                 {
                     return flag;
                 }
@@ -3603,7 +3625,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
                     foreach (Microsoft.CodeAnalysis.SyntaxToken modifier in declaration.Modifiers)
                     {
-                        if (modifier.ValueText == "partial")
+                        if (modifier.IsKind(SyntaxKind.PartialKeyword))
                         {
                             partial = true;
                             break;
@@ -3668,7 +3690,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             {
                 if (
                     attribute.AttributeClass != null
-                    && attribute.AttributeClass.ToDisplayString() == fullName
+                    && string.Equals(
+                        attribute.AttributeClass.ToDisplayString(),
+                        fullName,
+                        StringComparison.Ordinal
+                    )
                 )
                 {
                     return attribute;
@@ -4119,7 +4145,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             DeclaredRootMap.Validate(context.Compilation, context.ReportDiagnostic);
 
             // All scans share diagnostics so one unnameable closure reports only once.
-            HashSet<string> announced = new HashSet<string>();
+            HashSet<string> announced = new HashSet<string>(StringComparer.Ordinal);
 
             List<string> registrations = new List<string>();
             List<string> replacements;

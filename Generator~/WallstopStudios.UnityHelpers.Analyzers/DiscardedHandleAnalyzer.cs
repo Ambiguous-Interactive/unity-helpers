@@ -97,7 +97,14 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 return;
             }
 
-            if (effectHandle == null || target.Name != ApplyEffectMethodName)
+            if (
+                effectHandle == null
+                || !string.Equals(
+                    target.Name,
+                    ApplyEffectMethodName,
+                    System.StringComparison.Ordinal
+                )
+            )
             {
                 return;
             }

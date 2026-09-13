@@ -187,9 +187,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             foreach (INamedTypeSymbol candidate in formatter.AllInterfaces)
             {
                 if (
-                    candidate.Name != FormatterInterface
+                    !string.Equals(candidate.Name, FormatterInterface, StringComparison.Ordinal)
                     || candidate.Arity != 1
-                    || candidate.ContainingNamespace?.ToDisplayString() != FormatterNamespace
+                    || !string.Equals(
+                        candidate.ContainingNamespace?.ToDisplayString(),
+                        FormatterNamespace,
+                        StringComparison.Ordinal
+                    )
                 )
                 {
                     continue;
@@ -208,7 +212,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
         {
             foreach (AttributeData attribute in type.GetAttributes())
             {
-                if (attribute.AttributeClass?.ToDisplayString() == ContractAttribute)
+                if (
+                    string.Equals(
+                        attribute.AttributeClass?.ToDisplayString(),
+                        ContractAttribute,
+                        StringComparison.Ordinal
+                    )
+                )
                 {
                     return true;
                 }
@@ -223,7 +233,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             {
                 if (
                     attribute.AttributeClass == null
-                    || attribute.AttributeClass.ToDisplayString() != MarshalAttribute
+                    || !string.Equals(
+                        attribute.AttributeClass.ToDisplayString(),
+                        MarshalAttribute,
+                        StringComparison.Ordinal
+                    )
                     || attribute.ConstructorArguments.Length < 2
                 )
                 {
@@ -273,7 +287,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             HashSet<string> announced
         )
         {
-            HashSet<string> found = new HashSet<string>();
+            HashSet<string> found = new HashSet<string>(StringComparer.Ordinal);
             List<string> registrations = new List<string>();
 
             foreach (KeyValuePair<INamedTypeSymbol, INamedTypeSymbol> pair in _pairs)

@@ -95,7 +95,10 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 return false;
             }
 
-            if (method.Name != DisposeName && !ImplementsDisposeExplicitly(method))
+            if (
+                !string.Equals(method.Name, DisposeName, System.StringComparison.Ordinal)
+                && !ImplementsDisposeExplicitly(method)
+            )
             {
                 return false;
             }
@@ -127,7 +130,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         {
             foreach (IMethodSymbol explicitly in method.ExplicitInterfaceImplementations)
             {
-                if (explicitly.Name == DisposeName)
+                if (string.Equals(explicitly.Name, DisposeName, System.StringComparison.Ordinal))
                 {
                     return true;
                 }

@@ -65,8 +65,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         private static bool IsSerializedStringComparer(ITypeSymbol type)
         {
             return type != null
-                && type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
-                    == "global::" + ComparerMetadataName;
+                && string.Equals(
+                    type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                    "global::" + ComparerMetadataName,
+                    System.StringComparison.Ordinal
+                );
         }
 
         private static bool IsStringEqualityComparer(ITypeSymbol type)
@@ -76,8 +79,16 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 return false;
             }
 
-            return named.ConstructedFrom.MetadataName == EqualityComparerMetadataName
-                && named.ContainingNamespace.ToDisplayString() == CollectionsNamespace
+            return string.Equals(
+                    named.ConstructedFrom.MetadataName,
+                    EqualityComparerMetadataName,
+                    System.StringComparison.Ordinal
+                )
+                && string.Equals(
+                    named.ContainingNamespace.ToDisplayString(),
+                    CollectionsNamespace,
+                    System.StringComparison.Ordinal
+                )
                 && named.TypeArguments.Length == 1
                 && named.TypeArguments[0].SpecialType == SpecialType.System_String;
         }
@@ -92,15 +103,35 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             INamedTypeSymbol definition = type.OriginalDefinition;
             string namespaceName = definition.ContainingNamespace.ToDisplayString();
             return (
-                    namespaceName == CollectionsNamespace
+                    string.Equals(
+                        namespaceName,
+                        CollectionsNamespace,
+                        System.StringComparison.Ordinal
+                    )
                     && (
-                        definition.MetadataName == "Dictionary`2"
-                        || definition.MetadataName == "HashSet`1"
+                        string.Equals(
+                            definition.MetadataName,
+                            "Dictionary`2",
+                            System.StringComparison.Ordinal
+                        )
+                        || string.Equals(
+                            definition.MetadataName,
+                            "HashSet`1",
+                            System.StringComparison.Ordinal
+                        )
                     )
                 )
                 || (
-                    namespaceName == ConcurrentCollectionsNamespace
-                    && definition.MetadataName == "ConcurrentDictionary`2"
+                    string.Equals(
+                        namespaceName,
+                        ConcurrentCollectionsNamespace,
+                        System.StringComparison.Ordinal
+                    )
+                    && string.Equals(
+                        definition.MetadataName,
+                        "ConcurrentDictionary`2",
+                        System.StringComparison.Ordinal
+                    )
                 );
         }
 
@@ -187,7 +218,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             }
 
             return field.Field != null
-                && field.Field.Name == CompareModeFieldName
+                && string.Equals(
+                    field.Field.Name,
+                    CompareModeFieldName,
+                    System.StringComparison.Ordinal
+                )
                 && IsSerializedStringComparer(field.Field.ContainingType)
                 && TryGetTrackedComparer(field.Instance, out receiver);
         }
@@ -267,7 +302,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             return invocation != null
                 && invocation.Instance != null
                 && invocation.TargetMethod != null
-                && invocation.TargetMethod.Name == FreezeMethodName
+                && string.Equals(
+                    invocation.TargetMethod.Name,
+                    FreezeMethodName,
+                    System.StringComparison.Ordinal
+                )
                 && invocation.TargetMethod.Parameters.Length == 0
                 && IsSerializedStringComparer(invocation.TargetMethod.ContainingType);
         }
@@ -466,7 +505,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers
 
                 if (
                     field.Field == null
-                    || field.Field.Name != CompareModeFieldName
+                    || !string.Equals(
+                        field.Field.Name,
+                        CompareModeFieldName,
+                        System.StringComparison.Ordinal
+                    )
                     || !IsSerializedStringComparer(field.Field.ContainingType)
                     || !TryGetTrackedComparer(field.Instance, out ISymbol symbol)
                 )
@@ -627,7 +670,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers
 
                 if (
                     field.Field == null
-                    || field.Field.Name != CompareModeFieldName
+                    || !string.Equals(
+                        field.Field.Name,
+                        CompareModeFieldName,
+                        System.StringComparison.Ordinal
+                    )
                     || !IsSerializedStringComparer(field.Field.ContainingType)
                     || !TryGetTrackedComparer(field.Instance, out ISymbol symbol)
                 )

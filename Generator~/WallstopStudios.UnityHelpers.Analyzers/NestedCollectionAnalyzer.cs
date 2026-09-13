@@ -112,12 +112,12 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             foreach (AttributeData attribute in field.GetAttributes())
             {
                 string name = attribute.AttributeClass?.ToDisplayString();
-                if (name == NonSerializedAttribute)
+                if (string.Equals(name, NonSerializedAttribute, System.StringComparison.Ordinal))
                 {
                     return false;
                 }
 
-                if (name == SerializeFieldAttribute)
+                if (string.Equals(name, SerializeFieldAttribute, System.StringComparison.Ordinal))
                 {
                     hasSerializeField = true;
                 }
@@ -245,7 +245,11 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 type is INamedTypeSymbol named
                 && named.IsGenericType
                 && named.TypeArguments.Length == 1
-                && FullMetadataName(named) == ListMetadataName
+                && string.Equals(
+                    FullMetadataName(named),
+                    ListMetadataName,
+                    System.StringComparison.Ordinal
+                )
             )
             {
                 return named.TypeArguments[0];
@@ -291,7 +295,13 @@ namespace WallstopStudios.UnityHelpers.Analyzers
 
             foreach (AttributeData attribute in type.GetAttributes())
             {
-                if (attribute.AttributeClass?.ToDisplayString() == SerializableAttribute)
+                if (
+                    string.Equals(
+                        attribute.AttributeClass?.ToDisplayString(),
+                        SerializableAttribute,
+                        System.StringComparison.Ordinal
+                    )
+                )
                 {
                     return true;
                 }
@@ -304,7 +314,13 @@ namespace WallstopStudios.UnityHelpers.Analyzers
         {
             for (INamedTypeSymbol current = type; current != null; current = current.BaseType)
             {
-                if (current.ToDisplayString() == UnityObject)
+                if (
+                    string.Equals(
+                        current.ToDisplayString(),
+                        UnityObject,
+                        System.StringComparison.Ordinal
+                    )
+                )
                 {
                     return true;
                 }
@@ -321,9 +337,9 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 return false;
             }
 
-            return ns == "System"
+            return string.Equals(ns, "System", System.StringComparison.Ordinal)
                 || ns.StartsWith("System.", System.StringComparison.Ordinal)
-                || ns == "Microsoft"
+                || string.Equals(ns, "Microsoft", System.StringComparison.Ordinal)
                 || ns.StartsWith("Microsoft.", System.StringComparison.Ordinal);
         }
 
