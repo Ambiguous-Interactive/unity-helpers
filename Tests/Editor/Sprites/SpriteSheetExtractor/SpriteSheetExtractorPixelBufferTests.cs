@@ -60,6 +60,107 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 sentinel,
             };
             CollectionAssert.AreEqual(expectedRegion, destination);
+
+            if (
+                SpriteSheetExtractor.ShouldCopyPixelsInParallel(256, 256)
+                || SpriteSheetExtractor.ShouldCopyPixelsInParallel(4096, 16)
+                || !SpriteSheetExtractor.ShouldCopyPixelsInParallel(2048, 512)
+                || SpriteSheetExtractor.ShouldCopyPixelsInParallel(2048, 511)
+                || SpriteSheetExtractor.ShouldCopyPixelsInParallel(2047, 512)
+                || !SpriteSheetExtractor.ShouldCopyPixelsInParallel(1024, 1024)
+                || !SpriteSheetExtractor.ShouldCopyPixelsInParallel(4096, 4096)
+                || SpriteCropper.ShouldCopyPixelsInParallel(256, 256)
+                || SpriteCropper.ShouldCopyPixelsInParallel(4096, 16)
+                || !SpriteCropper.ShouldCopyPixelsInParallel(2048, 512)
+                || SpriteCropper.ShouldCopyPixelsInParallel(2048, 511)
+                || SpriteCropper.ShouldCopyPixelsInParallel(2047, 512)
+                || !SpriteCropper.ShouldCopyPixelsInParallel(1024, 1024)
+                || !SpriteCropper.ShouldCopyPixelsInParallel(4096, 4096)
+            )
+            {
+                Assert.Fail("Size-aware pixel-copy parallelism selected an unexpected path.");
+            }
+
+            const int largeWidth = 1024;
+            const int largeHeight = 1024;
+            Color32[] largeSource = new Color32[largeWidth * largeHeight];
+            Color32[] largeDestination = new Color32[largeSource.Length];
+            for (int index = 0; index < largeSource.Length; ++index)
+            {
+                largeSource[index] = new Color32(
+                    (byte)index,
+                    (byte)(index >> 8),
+                    (byte)(index >> 16),
+                    255
+                );
+            }
+
+            SpriteSheetExtractor.CopyPixelRows(
+                largeSource,
+                largeWidth,
+                0,
+                0,
+                largeWidth,
+                largeHeight,
+                largeDestination
+            );
+
+            for (int index = 0; index < largeDestination.Length; ++index)
+            {
+                if (!largeDestination[index].Equals(largeSource[index]))
+                {
+                    Assert.Fail($"Parallel pixel copy corrupted index {index}.");
+                }
+            }
+
+            const int cropSourceSize = 1022;
+            Color32[] cropSource = new Color32[cropSourceSize * cropSourceSize];
+            for (int index = 0; index < cropSource.Length; ++index)
+            {
+                cropSource[index] = new Color32(
+                    (byte)(index + 1),
+                    (byte)((index >> 8) + 1),
+                    (byte)((index >> 16) + 1),
+                    255
+                );
+            }
+
+            Color32[] cropDestination = new Color32[largeWidth * largeHeight];
+            Color32 cropSentinel = new(201, 202, 203, 255);
+            System.Array.Fill(cropDestination, cropSentinel);
+
+            SpriteCropper.CopyCropPixels(
+                cropSource,
+                cropSourceSize,
+                cropSourceSize,
+                -1,
+                -1,
+                cropSourceSize,
+                cropSourceSize,
+                largeWidth,
+                largeHeight,
+                cropDestination
+            );
+
+            for (int row = 0; row < largeHeight; ++row)
+            {
+                for (int column = 0; column < largeWidth; ++column)
+                {
+                    bool padding =
+                        0 == row
+                        || largeHeight - 1 == row
+                        || 0 == column
+                        || largeWidth - 1 == column;
+                    Color32 actual = cropDestination[row * largeWidth + column];
+                    Color32 expectedCrop = padding
+                        ? default
+                        : cropSource[(row - 1) * cropSourceSize + column - 1];
+                    if (!actual.Equals(expectedCrop))
+                    {
+                        Assert.Fail($"Parallel padded crop corrupted ({column}, {row}).");
+                    }
+                }
+            }
         }
     }
 #endif

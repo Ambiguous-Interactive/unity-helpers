@@ -94,7 +94,11 @@ the oversized-buffer behavior on the supported editor matrix, including the 2021
 
 `Parallel.For` is not a zero-allocation substitute for a loop. Retain it only when a multi-size
 benchmark shows a stable crossover with meaningful absolute savings, and keep its body free of
-lexical captures. Row copies use sequential `Array.Copy` unless measurements prove otherwise.
+lexical captures. For rectangular row copies, gate the parallel path on both pixel count and row
+count: a pixel-only threshold misclassifies very wide, short images. The sprite tools use parallel
+copies from 1,048,576 pixels and 512 rows. Their exact row-copy kernels won at 1024², 2048², and
+4096² in a .NET 9 Release benchmark on a 24-logical-CPU host; smaller work and 4096×16 remain
+sequential. Treat that threshold as platform-specific evidence and remeasure before generalizing it.
 
 A texture read has no such lever: `Texture2D` declares `GetPixels32()` and its mip-level overload
 and nothing else — there is no array-filling overload to rent into (measured on 6000.4.6f1; the

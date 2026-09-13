@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Improved
 
-- Improve Sprite Cropper and Sprite Sheet Extractor memory reuse for dynamically sized pixel output ([#754](https://github.com/Ambiguous-Interactive/unity-helpers/issues/754)).
+- Improve Sprite Cropper and Sprite Sheet Extractor memory reuse for dynamically sized pixel output, with measured size-aware parallel row copies for large images ([#754](https://github.com/Ambiguous-Interactive/unity-helpers/issues/754)).
 
 ## [3.6.0] - 2026-09-12
 

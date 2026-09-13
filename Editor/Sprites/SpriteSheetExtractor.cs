@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using System.Text;
     using System.Text.Json;
     using System.Text.RegularExpressions;
+    using System.Threading.Tasks;
     using CustomEditors;
     using UnityEditor;
     using UnityEngine;
@@ -93,6 +94,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// Default splitter position as ratio of window height (0.4 = 40% settings, 60% preview).
         /// </summary>
         private const float DefaultSplitterRatio = 0.4f;
+
+        private const long ParallelPixelCopyThreshold = 1_048_576L;
+
+        private const int ParallelRowCopyThreshold = 512;
 
         internal static bool SuppressUserPrompts { get; set; }
 
@@ -521,6 +526,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
             catch { }
+        }
+
+        internal static bool ShouldCopyPixelsInParallel(int width, int height)
+        {
+            return ParallelPixelCopyThreshold <= (long)width * height
+                && ParallelRowCopyThreshold <= height;
         }
 
         /// <summary>
@@ -1286,6 +1297,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             Color32[] destination
         )
         {
+            if (ShouldCopyPixelsInParallel(width, height))
+            {
+                PixelRowCopyJob job = new(
+                    source,
+                    sourceWidth,
+                    sourceX,
+                    sourceY,
+                    width,
+                    destination
+                );
+                Parallel.For(0, height, job.Execute);
+                return;
+            }
+
             for (int destinationY = 0; destinationY < height; ++destinationY)
             {
                 int sourceIndex = (sourceY + destinationY) * sourceWidth + sourceX;
@@ -8138,6 +8163,45 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             None = 0,
             Sprite = 1,
             Sheet = 2,
+        }
+
+        private sealed class PixelRowCopyJob
+        {
+            private readonly Color32[] _source;
+
+            private readonly int _sourceWidth;
+
+            private readonly int _sourceX;
+
+            private readonly int _sourceY;
+
+            private readonly int _width;
+
+            private readonly Color32[] _destination;
+
+            internal PixelRowCopyJob(
+                Color32[] source,
+                int sourceWidth,
+                int sourceX,
+                int sourceY,
+                int width,
+                Color32[] destination
+            )
+            {
+                _source = source;
+                _sourceWidth = sourceWidth;
+                _sourceX = sourceX;
+                _sourceY = sourceY;
+                _width = width;
+                _destination = destination;
+            }
+
+            internal void Execute(int destinationY)
+            {
+                int sourceIndex = (_sourceY + destinationY) * _sourceWidth + _sourceX;
+                int destinationIndex = destinationY * _width;
+                Array.Copy(_source, sourceIndex, _destination, destinationIndex, _width);
+            }
         }
     }
 #endif
