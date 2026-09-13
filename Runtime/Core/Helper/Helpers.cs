@@ -633,6 +633,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 updateRate,
                 useJitter,
                 waitBefore,
+                null,
                 null
             );
         }
@@ -656,6 +657,42 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             Object context
         )
         {
+            return StartFunctionAsCoroutine(
+                monoBehaviour,
+                action,
+                updateRate,
+                useJitter,
+                waitBefore,
+                context,
+                null
+            );
+        }
+
+        /// <summary>
+        /// Repeatedly invokes an action and sends each failure to a caller-defined handler.
+        /// </summary>
+        /// <param name="monoBehaviour">The component that hosts the coroutine.</param>
+        /// <param name="action">The action to invoke.</param>
+        /// <param name="updateRate">Interval in seconds; nonpositive or nonfinite values invoke once per frame.</param>
+        /// <param name="useJitter">If true, applies a single randomized initial delay up to <paramref name="updateRate"/>.</param>
+        /// <param name="waitBefore">If true, waits one interval before the first invocation.</param>
+        /// <param name="context">The object that owns the work, or the coroutine host when null.</param>
+        /// <param name="exceptionHandler">Receives the zero-based invocation index, context, and exception for each failure.</param>
+        /// <returns>The started coroutine.</returns>
+        /// <remarks>
+        /// The job continues when either the action or handler throws. A handler failure is reported
+        /// once through Unity, while later action failures still reach the handler.
+        /// </remarks>
+        public static Coroutine StartFunctionAsCoroutine(
+            this MonoBehaviour monoBehaviour,
+            Action action,
+            float updateRate,
+            bool useJitter,
+            bool waitBefore,
+            Object context,
+            Action<ulong, Object, Exception> exceptionHandler
+        )
+        {
             if (action == null)
             {
                 throw new ArgumentNullException(nameof(action));
@@ -667,7 +704,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     action,
                     updateRate,
                     useJitter,
-                    waitBefore
+                    waitBefore,
+                    exceptionHandler
                 )
             );
         }
@@ -1174,7 +1212,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             Action action,
             float updateRate,
             bool useJitter,
-            bool waitBefore
+            bool waitBefore,
+            Action<ulong, Object, Exception> exceptionHandler
         )
         {
             float interval = ResolveInvocationDelay(updateRate);
@@ -1191,6 +1230,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             bool reportedFailure = false;
+            ulong iteration = 0;
             while (true)
             {
                 try
@@ -1199,12 +1239,28 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
                 catch (Exception e)
                 {
-                    if (!reportedFailure)
+                    if (exceptionHandler != null)
+                    {
+                        try
+                        {
+                            exceptionHandler(iteration, context, e);
+                        }
+                        catch (Exception handlerException)
+                        {
+                            if (!reportedFailure)
+                            {
+                                ReportRepeatingJobHandlerFailure(e, handlerException, context);
+                                reportedFailure = true;
+                            }
+                        }
+                    }
+                    else if (!reportedFailure)
                     {
                         ReportRepeatingJobFailure(e, context);
                         reportedFailure = true;
                     }
                 }
+                iteration = unchecked(iteration + 1);
 
                 if (interval <= 0f)
                 {
@@ -1222,6 +1278,20 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             Debug.LogError(
                 "A repeating job threw; it will keep running, and further failures of this job "
                     + $"will not be reported. {e}",
+                context
+            );
+        }
+
+        private static void ReportRepeatingJobHandlerFailure(
+            Exception actionException,
+            Exception handlerException,
+            Object context
+        )
+        {
+            Debug.LogError(
+                "A repeating job and its exception handler threw; the job will keep running, and "
+                    + $"further handler failures will not be reported. Action: {actionException} "
+                    + $"Handler: {handlerException}",
                 context
             );
         }

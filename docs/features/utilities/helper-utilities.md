@@ -281,6 +281,23 @@ Pass `context` when the object that owns the work is not the `MonoBehaviour` tha
 coroutine. The first callback failure is filed against that object in the Console. A null context
 uses the coroutine host.
 
+Pass an `exceptionHandler` to program against failures instead of logging them. It receives every
+failed invocation's zero-based index, resolved context, and exception. The coroutine continues when
+the action or handler throws; a handler failure is logged once.
+
+```csharp
+Helpers.StartFunctionAsCoroutine(
+    CoroutineHandler.Instance,
+    SaveGame,
+    updateRate: 30f,
+    useJitter: false,
+    waitBefore: false,
+    context: saveController,
+    exceptionHandler: (iteration, owner, exception) =>
+        Debug.LogError($"Save invocation {iteration} failed: {exception}", owner)
+);
+```
+
 **Use for:**
 
 - Enemy spawning with variability
