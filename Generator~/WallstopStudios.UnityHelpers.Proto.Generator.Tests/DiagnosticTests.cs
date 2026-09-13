@@ -1831,6 +1831,32 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         }
 
         [Test]
+        public void AttributedMethodsKeepPartialDerivedTypesOnTheFullDiagnosticPath()
+        {
+            ImmutableArray<Diagnostic> diagnostics = Run(
+                @"public class Plain { }
+                  public partial class Leaf : Plain { }
+                  public partial class Leaf
+                  {
+                      [WProtoBeforeSerialization] private void Prepare() { }
+                      [WProtoAfterDeserialization] private void Rebuild() { }
+                  }"
+            );
+
+            CollectionAssert.AreEqual(
+                new[] { "WPROTO005", "WPROTO005" },
+                diagnostics.Select(diagnostic => diagnostic.Id).OrderBy(id => id).ToArray()
+            );
+            CollectionAssert.AreEquivalent(
+                new[] { "Prepare", "Rebuild" },
+                diagnostics
+                    .Select(diagnostic => diagnostic.GetMessage())
+                    .Select(message => message.Contains("Prepare") ? "Prepare" : "Rebuild")
+                    .ToArray()
+            );
+        }
+
+        [Test]
         public void OnlyAHookNoReaderAgreesOnWarns()
         {
             string[] clean =

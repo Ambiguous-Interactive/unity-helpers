@@ -46,16 +46,18 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
 
         internal void Line(string text)
         {
-            // Avoid Split allocations for the common single-line case.
-            if (text.IndexOf('\n') < 0)
+            int lineStart = 0;
+            while (true)
             {
-                AppendLine(text);
-                return;
-            }
+                int lineEnd = text.IndexOf('\n', lineStart);
+                if (lineEnd < 0)
+                {
+                    AppendLine(text, lineStart, text.Length - lineStart);
+                    return;
+                }
 
-            foreach (string part in text.Split('\n'))
-            {
-                AppendLine(part);
+                AppendLine(text, lineStart, lineEnd - lineStart);
+                lineStart = lineEnd + 1;
             }
         }
 
@@ -113,16 +115,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             _builder.Append('\n');
         }
 
-        private void AppendLine(string part)
+        private void AppendLine(string text, int startIndex, int length)
         {
-            if (part.Length == 0)
+            if (length == 0)
             {
                 _builder.Append('\n');
                 return;
             }
 
             Indentation();
-            _builder.Append(part);
+            _builder.Append(text, startIndex, length);
             _builder.Append('\n');
         }
 
