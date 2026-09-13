@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version to publish, as strict X.Y.Z semver."
+        description: "Optional strict X.Y.Z version; defaults to the selected source's package.json."
         type: string
-        required: true
+        required: false
       source_ref:
         description: "Branch, tag, or commit to build release assets from."
         type: string
@@ -25,7 +25,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-${{ inputs.version }}
+  group: release-publish
   cancel-in-progress: false
 
 jobs:
@@ -54,11 +54,7 @@ jobs:
           set -euo pipefail
           tag="${INPUT_VERSION}"
           source_ref="${INPUT_SOURCE_REF}"
-          if [ -z "${tag}" ]; then
-            echo "::error::Release version is required."
-            exit 1
-          fi
-          if [[ "${tag}" == *$'\n'* || "${tag}" == *$'\r'* ]]; then
+          if [ -n "${tag}" ] && [[ "${tag}" == *$'\n'* || "${tag}" == *$'\r'* ]]; then
             echo "::error::Release version must be a single line."
             exit 1
           fi
@@ -98,6 +94,11 @@ jobs:
           tag="${INPUT_VERSION}"
           source_ref="${INPUT_SOURCE_REF}"
           allow_tag_recovery="${INPUT_ALLOW_TAG_RECOVERY}"
+          version_defaulted=false
+          if [ -z "${tag}" ]; then
+            tag="$(jq -r '.version // empty' package.json)"
+            version_defaulted=true
+          fi
 
           # Tag + package metadata contract, extracted for unit testing (#360). Writes the
           # package-name/package-version/tag step outputs and exits non-zero with a
@@ -106,6 +107,10 @@ jobs:
             -Tag "${tag}" \
             -SourceRef "${source_ref}" \
             -PackageJsonPath package.json
+
+          if [ "${version_defaulted}" = "true" ]; then
+            echo "::notice::Release version defaulted to package.json version ${tag}."
+          fi
 
           source_sha="$(git rev-parse HEAD)"
           package_name="$(jq -r '.name // empty' package.json)"

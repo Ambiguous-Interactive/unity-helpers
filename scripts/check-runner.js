@@ -28,15 +28,19 @@ const path = require("node:path");
 const repoRoot = path.resolve(__dirname, "..");
 
 /**
- * Concurrency a runner uses when `--jobs` is not supplied. The checks are independent processes
- * that only read the tree, so this is bounded by cores rather than by anything about a registry.
+ * Concurrency a runner uses when `--jobs` is not supplied. GitHub Actions gets one worker per
+ * available core. An interactive checkout is capped at four because editor services and agent
+ * tools already own many processes; eight simultaneous npm/PowerShell trees exhausted process
+ * resources in a measured devcontainer run even though the checks do not share files.
  *
+ * @param {NodeJS.ProcessEnv} [environment] Process environment.
  * @returns {number} Default worker count.
  */
-function defaultJobs() {
+function defaultJobs(environment = process.env) {
   const cores =
     typeof os.availableParallelism === "function" ? os.availableParallelism() : os.cpus().length;
-  return Math.max(1, cores);
+  const maximum = environment.GITHUB_ACTIONS === "true" ? cores : Math.min(4, cores);
+  return Math.max(1, maximum);
 }
 
 /**

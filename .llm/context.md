@@ -102,7 +102,7 @@ Run formatters/linters **immediately after each file change**, not batched at ta
 - **C#**: `dotnet tool run csharpier format .` (or `npm run format:csharp`). `npm run agent:preflight:fix` formats changed C# files and `npm run agent:preflight` / `validate:local` fail on unformatted C#, so a later edit that undoes the formatting is caught locally rather than by CI
 - **Non-C#** (`.md`, `.json`, `.yaml`, `.yml`): `node scripts/run-prettier.js --write -- <file>` (repo-local launcher; run `npm install` first on the host that runs hooks)
 - **Markdown**: `npm run lint:docs` + `npm run lint:markdown`
-- **YAML**: `npm run lint:yaml` (then `actionlint` for workflows)
+- **YAML**: `pwsh -NoProfile -File scripts/lint-yaml.ps1 -Paths <changed files>` (then `actionlint <changed workflows>`)
 - **Spelling**: `npm run lint:spelling` (add valid terms to `cspell.json`). Run it manually before completion; `npm run agent:preflight` and CI provide the final safety net
 - **Tests**: `pwsh -NoProfile -File scripts/lint-tests.ps1 -FixNullChecks -Paths <changed test files>`, then `pwsh -NoProfile -File scripts/lint-tests.ps1 -Paths <changed test files>`. Passing more than one path only works because every `-Paths` script declares BOTH a `ValueFromRemainingArguments` sibling and `[CmdletBinding(PositionalBinding = $false)]` -- `pwsh -File` binds the first token and offers the rest to the other named parameters positionally, so the sibling alone only works when every neighbor happens to be a `[switch]`. Measured: `ensure-editor.ps1 -RequiredEditorPayloadRelativePath a b` put `b` in `-InstallRoot`. `PWS005` enforces both halves
 - **Skill files and [context](./context.md)**: `pwsh -NoProfile -File scripts/lint-skill-sizes.ps1` (500-line limit)
@@ -360,11 +360,9 @@ Lint-error-code prefixes (`^[A-Z]{2,}\d{3}$` tokens like `UNH001`, `PWS002`) mus
   a line-scoped comment as a policy; once authorized, fix the line, sweep the class, and decide
   whether a rule should carry it
 
-### Re-running local aggregates costs your session -- CI runs them anyway
+### Keep local validation bounded
 
-The opposite number of the rule above. Session 218 re-ran `lint:repo`, `validate:tests` and
-`typecheck:unity` after nearly every change and forced ~5-minute Unity clean rebuilds to sweep what
-a `rg` had already answered. CI runs those exact gates on the push.
+CI runs the repository aggregates. Repeating them after each edit wastes the session.
 
 - **The edit loop is `npm run agent:preflight` (2.9 s) plus the targeted check for what you touched.**
   Run the aggregate ONCE, before the push, not after each commit. **It inspects only CHANGED files,
@@ -373,14 +371,15 @@ a `rg` had already answered. CI runs those exact gates on the push.
   caught. And an aggregate run BEFORE your last edit is not an aggregate run: session 247 moved a
   test after `lint:repo` and reddened `xml-doc-summaries`, which no changed-file check covers.
 - **Prefer the cheap instrument that answers the question** -- a `rg` for the shape, one `--only <id>`, one `dotnet test --filter` -- and say which you used.
+- **Never start a second repository aggregate, whole-tree linter, or build while one is live.**
+  Runner-managed workers inside one command are expected. First poll or stop any live external
+  validation/build process, including children left by an interrupted tool call.
+- **Agents do not run `validate:local` by default.** Use preflight and targeted checks unless the
+  user requests it or targeted evidence cannot validate a change to the aggregate runner itself.
 - **A Unity clean rebuild is a last resort**, not a routine sweep. `AssetDatabase.Refresh` alone is
   usually enough; `RequestScriptCompilationOptions.CleanBuildCache` recompiles everything.
 - **When you skip a gate, name what is unverified.** "Runtime is analyzer-swept; Editor is
   grep-checked only" is useful; "all clean" when one of the three was a grep is not.
-- Costs, measured 2026-08-23: `agent:preflight` 2.9 s, `validate:prepush` 1.3 s,
-  `validate:tests:fast` ~150 s, `lint:repo` ~300 s, `typecheck:unity` minutes, a clean Unity rebuild
-  ~5 min; the three that dominate the contract suite are on
-  [#540](https://github.com/Ambiguous-Interactive/unity-helpers/issues/540).
 
 ### Pushing costs a full CI matrix -- batch before you push
 

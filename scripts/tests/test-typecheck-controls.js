@@ -10,7 +10,7 @@
 // have to match the repository -- the anchors, the property every check project must declare --
 // are asserted against the tracked files rather than remembered.
 //
-// The full run compiles four projects twice each and takes minutes. Nothing here spawns a build.
+// The full run compiles five projects twice each and takes minutes. Nothing here spawns a build.
 
 "use strict";
 
@@ -26,7 +26,9 @@ const {
   analyzerControl,
   classify,
   compilerControl,
-  diagnosticsIn
+  defaultJobs,
+  diagnosticsIn,
+  parseArguments
 } = require(path.join(repoRoot, "scripts", "typecheck-controls.js"));
 
 let passed = 0;
@@ -123,6 +125,54 @@ runTest("diagnosticsIn reads every family the check projects can emit, and nothi
     [],
     "ordinary build chatter must not read as a diagnostic"
   );
+});
+
+runTest("the bounded worker count is configurable and rejects invalid values", () => {
+  assert.ok(1 <= defaultJobs() && defaultJobs() <= 2);
+  assert.equal(parseArguments(["node", "script", "--jobs=1"]).jobs, 1);
+  for (const invalid of ["0", "-1", "1.5", "many", ""]) {
+    assert.throws(
+      () => parseArguments(["node", "script", `--jobs=${invalid}`]),
+      /--jobs must be a positive integer/,
+      invalid
+    );
+  }
+  assert.equal(
+    parseArguments(["node", "script", "--jobs=1000000"]).jobs,
+    1000000,
+    "the scheduler, rather than the parser, bounds valid requests by project-group count"
+  );
+});
+
+runTest("project groups overlap without racing runtime and integrations", () => {
+  const scriptPath = path.join(repoRoot, "scripts", "typecheck-controls.js");
+  const nodeBody = `
+const { runProjectGroups } = require(${JSON.stringify(scriptPath)});
+let active = 0;
+let maximum = 0;
+const events = [];
+async function run(project) {
+  active++;
+  maximum = Math.max(maximum, active);
+  events.push("start:" + project);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  events.push("end:" + project);
+  active--;
+  return project;
+}
+runProjectGroups([["runtime", "integrations"], ["editor"], ["tests"]], 2, run)
+  .then((results) => console.log(JSON.stringify({ events, maximum, results })));
+`;
+  const result = spawnSync(process.execPath, ["-e", nodeBody], { encoding: "utf8" });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr);
+  const measured = JSON.parse(result.stdout);
+  assert.equal(measured.maximum, 2, "two independent project groups must actually overlap");
+  assert.ok(
+    measured.events.indexOf("end:runtime") < measured.events.indexOf("start:integrations"),
+    "the integration project must not overlap the runtime project it references"
+  );
+  assert.deepEqual(measured.results, [["runtime", "integrations"], ["editor"], ["tests"]]);
 });
 
 runTest("every control body carries its anchor, so an empty source tree cannot pass", () => {

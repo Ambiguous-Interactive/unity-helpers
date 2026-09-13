@@ -28,14 +28,24 @@
     ./lint-yaml.ps1 -Paths .github/workflows/ci.yml
     Lint a specific file.
 #>
+[CmdletBinding(PositionalBinding = $false)]
 param(
     [switch]$StagedOnly,
     [switch]$VerboseOutput,
+    [string[]]$Paths,
     [Parameter(ValueFromRemainingArguments = $true)]
-    [string[]]$Paths
+    [string[]]$AdditionalPaths
 )
 
 $ErrorActionPreference = 'Stop'
+$repoRoot = (Resolve-Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path
+$effectivePaths = @()
+if ($Paths -and $Paths.Count -gt 0) {
+    $effectivePaths += $Paths
+}
+if ($AdditionalPaths -and $AdditionalPaths.Count -gt 0) {
+    $effectivePaths += $AdditionalPaths
+}
 
 # Check for yamllint availability
 $yamllint = Get-Command yamllint -ErrorAction SilentlyContinue
@@ -73,7 +83,7 @@ if ($StagedOnly) {
     if (Test-Path $helpersPath) {
         . $helpersPath
         $yamlGlobs = @('*.yml', '*.yaml')
-        $filesToLint = Get-StagedPathsForGlobs -DefaultPaths $Paths -Globs $yamlGlobs
+        $filesToLint = Get-StagedPathsForGlobs -DefaultPaths $effectivePaths -Globs $yamlGlobs
         $filesToLint = Get-ExistingPaths -Candidates $filesToLint
     } else {
         # Fallback: get staged files manually
@@ -82,11 +92,20 @@ if ($StagedOnly) {
             $filesToLint = $stagedFiles | Where-Object { $_ -match '\.(ya?ml)$' } | Where-Object { Test-Path $_ }
         }
     }
-} elseif ($Paths -and $Paths.Count -gt 0) {
-    $filesToLint = $Paths | Where-Object { Test-Path $_ }
+} elseif ($effectivePaths.Count -gt 0) {
+    $filesToLint = $effectivePaths | Where-Object { Test-Path $_ }
 } else {
-    # Lint all YAML files (let yamllint handle discovery via config)
-    $filesToLint = @('.')
+    # Pass the repository's actual YAML corpus. Giving yamllint '.' makes its Python walker enter
+    # large ignored build and tool caches before its ignore rules can prune files; this checkout
+    # measured about two minutes to discover 41 YAML files that git lists in milliseconds.
+    $gitOutput = & git -C $repoRoot ls-files -z --cached --others --exclude-standard -- '*.yml' '*.yaml'
+    $gitExitCode = $LASTEXITCODE
+    if ($gitExitCode -ne 0) {
+        Write-Error "Unable to enumerate repository YAML files. git exited with $gitExitCode."
+        exit $gitExitCode
+    }
+    $relativeFiles = @($gitOutput -split "`0" | Where-Object { $_ -ne '' })
+    $filesToLint = @($relativeFiles | ForEach-Object { Join-Path -Path $repoRoot -ChildPath $_ })
 }
 
 if ($filesToLint.Count -eq 0) {
@@ -97,8 +116,8 @@ if ($filesToLint.Count -eq 0) {
 }
 
 if ($VerboseOutput) {
-    Write-Host "Linting YAML files with yamllint..."
-    if ($filesToLint -ne @('.')) {
+    Write-Host "Linting $($filesToLint.Count) YAML file(s) with yamllint..."
+    if ($effectivePaths.Count -gt 0 -or $StagedOnly) {
         foreach ($file in $filesToLint) {
             Write-Host "  - $file"
         }

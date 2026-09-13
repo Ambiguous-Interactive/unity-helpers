@@ -729,7 +729,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             PatternStats stats;
             try
             {
-                Regex regex = new(trimmed, RegexOptions.Compiled | RegexOptions.CultureInvariant);
+                Regex regex = new(trimmed, RegexOptions.CultureInvariant);
                 int count = CountTypesMatchingRegex(regex);
                 stats = new PatternStats(trimmed, true, count, null);
             }
@@ -744,41 +744,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             }
 
             return stats;
-        }
-
-        internal static void WarmPatternStats(IEnumerable<string> patterns)
-        {
-            if (patterns == null)
-            {
-                return;
-            }
-
-            using (
-                PooledResource<HashSet<string>> uniqueLease = SetBuffers<string>
-                    .GetHashSetPool(StringComparer.Ordinal)
-                    .Get(out HashSet<string> unique)
-            )
-            {
-                foreach (string pattern in patterns)
-                {
-                    if (string.IsNullOrWhiteSpace(pattern))
-                    {
-                        continue;
-                    }
-
-                    unique.Add(pattern.Trim());
-                }
-
-                if (unique.Count == 0)
-                {
-                    return;
-                }
-
-                foreach (string pattern in unique)
-                {
-                    GetPatternStats(pattern);
-                }
-            }
         }
 
         internal static bool ShouldSkipType(Type type)

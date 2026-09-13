@@ -191,6 +191,14 @@ function Run-PowerShellScriptEndOfOptionsTests {
     Write-TestResult -TestName "lint-yaml.ps1 uses '--' before file paths" `
       -Passed $yamlHasSeparator `
       -Message "Missing '--' separator in yamllint argument construction"
+
+    $yamlUsesBoundedGitCorpus = (
+      $yamlContent.Contains("git -C `$repoRoot ls-files -z --cached --others --exclude-standard -- '*.yml' '*.yaml'") -and
+      -not $yamlContent.Contains("`$filesToLint = @('.')")
+    )
+    Write-TestResult -TestName 'lint-yaml.ps1 excludes ignored workspace trees from discovery' `
+      -Passed $yamlUsesBoundedGitCorpus `
+      -Message "Expected lint-yaml.ps1 to pass git's tracked and unignored YAML corpus to yamllint."
   } else {
     Write-Host "  [SKIP] lint-yaml.ps1 not found at: $yamlScript" -ForegroundColor Yellow
   }

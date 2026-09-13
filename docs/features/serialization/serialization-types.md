@@ -688,6 +688,10 @@ wider rescan; the results are identical. Set it to 0 or less to remove the bound
 Changing the property resizes the live shared `Cache<string, SerializableTypeDescriptor[]>`;
 shrinking evicts least-recently-used results immediately.
 
+Ignore-pattern match counts are computed only when the Unity Helpers settings window displays
+them. Normal editor startup and domain reloads apply the patterns without scanning every loaded
+type for counts that are not visible.
+
 ---
 
 ### Type Operations

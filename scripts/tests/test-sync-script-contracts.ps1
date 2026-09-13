@@ -2047,13 +2047,20 @@ function Run-ReleasePublishTagPreparationContractTests {
   $repoRoot = Get-RepoRoot
   $workflowPath = Join-Path $repoRoot '.github/workflows/release.yml'
   $workflowContent = Get-Content -Path $workflowPath -Raw
+  $versionInputMatch = [regex]::Match(
+    $workflowContent,
+    '(?ms)^      version:\r?\n(?<body>.*?)(?=^      source_ref:)'
+  )
+  $versionInputBlock = if ($versionInputMatch.Success) { $versionInputMatch.Groups['body'].Value } else { '' }
 
   $hasManualReleaseInputs = (
     $workflowContent.Contains('workflow_dispatch:') -and
-    $workflowContent.Contains('version:') -and
+    $versionInputMatch.Success -and
     $workflowContent.Contains('source_ref:') -and
     $workflowContent.Contains('allow_tag_recovery:') -and
-    $workflowContent.Contains('Release version to publish, as strict X.Y.Z semver.') -and
+    $versionInputBlock.Contains("Optional strict X.Y.Z version; defaults to the selected source's package.json.") -and
+    $versionInputBlock.Contains('required: false') -and
+    $versionInputBlock.Contains('type: string') -and
     $workflowContent.Contains('Retarget an existing tag only if npm and GitHub Release are both still unpublished.')
   )
 
@@ -2075,10 +2082,19 @@ function Run-ReleasePublishTagPreparationContractTests {
   $versionOutputIsInjectionSafe = (
     $workflowContent.Contains('INPUT_VERSION: ${{ inputs.version }}') -and
     $workflowContent.Contains('tag="${INPUT_VERSION}"') -and
-    $workflowContent.Contains('Release version is required.') -and
     $workflowContent.Contains('Release version must be a single line.') -and
+    $workflowContent.Contains('if [ -n "${tag}" ] && [[ "${tag}" == *$''\n''* || "${tag}" == *$''\r''* ]]; then') -and
     $verifyTagScriptContent.Contains('"tag=$Tag"') -and
     (Test-AppearsBefore -Haystack $verifyTagScriptContent -First 'Release version must be a single line.' -Second '"tag=$Tag"')
+  )
+
+  $emptyVersionUsesSelectedManifest = (
+    $workflowContent.Contains('tag="$(jq -r ''.version // empty'' package.json)"') -and
+    $workflowContent.Contains('Release version defaulted to package.json version ${tag}.') -and
+    (Test-AppearsBefore -Haystack $workflowContent -First 'tag="$(jq -r ''.version // empty'' package.json)"' -Second '-Tag "${tag}"') -and
+    (Test-AppearsBefore -Haystack $workflowContent -First '-Tag "${tag}"' -Second 'Release version defaulted to package.json version ${tag}.') -and
+    $workflowContent.Contains('group: release-publish') -and
+    $workflowContent.Contains('cancel-in-progress: false')
   )
 
   $downstreamJobsCheckoutVerifiedSha = (
@@ -2224,7 +2240,7 @@ function Run-ReleasePublishTagPreparationContractTests {
   )
 
   Write-TestResult `
-    -TestName 'release publish exposes manual version/source/tag recovery inputs' `
+    -TestName 'release publish exposes optional version and manual source/tag recovery inputs' `
     -Passed $hasManualReleaseInputs `
     -Message 'Expected release.yml workflow_dispatch inputs for version, source_ref, and allow_tag_recovery.'
 
@@ -2239,9 +2255,14 @@ function Run-ReleasePublishTagPreparationContractTests {
     -Message 'Expected release.yml to reject multiline source_ref values before writing source-ref to GITHUB_OUTPUT.'
 
   Write-TestResult `
-    -TestName 'release publish rejects multiline versions before writing outputs' `
+    -TestName 'release publish rejects multiline explicit versions before writing outputs' `
     -Passed $versionOutputIsInjectionSafe `
-    -Message 'Expected release.yml to reject empty or multiline version values before writing tag to GITHUB_OUTPUT.'
+    -Message 'Expected release.yml to reject multiline explicit versions before writing tag to GITHUB_OUTPUT.'
+
+  Write-TestResult `
+    -TestName 'release publish derives an omitted version from the selected manifest' `
+    -Passed $emptyVersionUsesSelectedManifest `
+    -Message 'Expected release.yml to derive an omitted tag from package.json before the existing strict verification.'
 
   Write-TestResult `
     -TestName 'release publish checks existing tag targets before publish' `

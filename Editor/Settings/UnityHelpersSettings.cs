@@ -4166,7 +4166,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         {
             IReadOnlyList<string> patterns = GetSerializableTypeIgnorePatterns();
             SerializableTypeCatalog.ConfigureTypeNameIgnorePatterns(patterns);
-            SerializableTypeCatalog.WarmPatternStats(patterns);
 
             ApplyPoolPurgingSettingsToRuntime();
         }

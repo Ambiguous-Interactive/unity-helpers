@@ -109,7 +109,7 @@ Preferred commit prep order:
 
 1. Edit markdown -> `node scripts/run-prettier.js --write -- <file>` -> `npm run lint:markdown`
 2. Edit C# -> `dotnet tool run csharpier format .`
-3. Edit YAML -> `node scripts/run-prettier.js --write -- <file>` -> `npm run lint:yaml`
+3. Edit YAML -> `node scripts/run-prettier.js --write -- <file>` -> `pwsh -NoProfile -File scripts/lint-yaml.ps1 -Paths <file>`
 4. Edit test file -> `pwsh -NoProfile -File scripts/lint-tests.ps1` -> `dotnet tool run csharpier format .`
 
 For detailed workflow patterns and more examples, see [formatting](./formatting.md).
@@ -244,7 +244,7 @@ npm run lint:spelling    # 🚨 validate:local/CI spell-check CHANGELOG + JSON
 ```bash
 # After EVERY .yml/.yaml file modification:
 node scripts/run-prettier.js --write -- <file>
-npm run lint:yaml
+pwsh -NoProfile -File scripts/lint-yaml.ps1 -Paths <changed files>
 
 # For workflow files (.github/workflows/*.yml), also run:
 actionlint
@@ -328,7 +328,12 @@ pwsh -NoProfile -File scripts/lint-llm-instructions.ps1 -Fix
 
 The `npm run validate:local` command runs these checks:
 
-> **Run this list once, before the push -- not after every commit.** CI runs the same gates. The
+> **Agents do not run this aggregate by default.** CI runs the same gates. Use it only when the user
+> explicitly requests a full local aggregate, or when the aggregate runner itself changed and
+> targeted integration evidence cannot answer the question. Do not start it while another external
+> repository aggregate, whole-tree linter, build, or interrupted child is alive. Concurrency managed
+> by a single runner invocation is expected.
+> The
 > edit loop is `npm run agent:preflight` (2.9 s) plus the one targeted check for what you touched
 > (`node scripts/run-contract-tests.js --only <id>`, `node scripts/run-repo-lint.js --only <id>`,
 > `dotnet test --filter`). Reach for the cheapest instrument that answers the question -- a `rg` for

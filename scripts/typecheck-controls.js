@@ -30,11 +30,16 @@
 
     The controls reach the compilation through the `WallstopCheckControl` property, which every
     check project declares and nothing else sets. An ordinary build adds no file.
+
+    Controls remain sequential within one project because they share its obj directory. Independent
+    projects run in two lanes; runtime and integrations share a lane because integrations references
+    the runtime check project. On the same warm tree this reduced 11 controls from 222.288 seconds
+    to 150.248 seconds while preserving their exact diagnostic sets (#636).
 */
 
 "use strict";
 
-const { spawnSync } = require("node:child_process");
+const { spawn } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
@@ -212,9 +217,16 @@ const CONTROLS = Object.freeze([
 
 const DIAGNOSTIC_PATTERN = /\b(CS\d{4}|WPROTO\d{3}|WUH\d{3})\b/g;
 
+function defaultJobs() {
+  const cores =
+    typeof os.availableParallelism === "function" ? os.availableParallelism() : os.cpus().length;
+  return Math.min(2, Math.max(1, cores));
+}
+
 function parseArguments(argv) {
   const requested = [];
   let verbose = false;
+  let jobs = defaultJobs();
   for (const argument of argv.slice(2)) {
     if (argument === "--verbose") {
       verbose = true;
@@ -224,9 +236,18 @@ function parseArguments(argv) {
       requested.push(...argument.slice("--only=".length).split(","));
       continue;
     }
-    throw new Error(`Unknown option ${argument}. Use --only=<id>[,<id>] or --verbose.`);
+    if (argument.startsWith("--jobs=")) {
+      jobs = Number(argument.slice("--jobs=".length));
+      if (!Number.isInteger(jobs) || jobs < 1) {
+        throw new Error(`--jobs must be a positive integer, got ${argument}.`);
+      }
+      continue;
+    }
+    throw new Error(
+      `Unknown option ${argument}. Use --only=<id>[,<id>], --jobs=<count>, or --verbose.`
+    );
   }
-  return { requested: requested.filter((entry) => entry.length > 0), verbose };
+  return { requested: requested.filter((entry) => entry.length > 0), verbose, jobs };
 }
 
 function build(project, controlPath, property = "WallstopCheckControl") {
@@ -245,9 +266,28 @@ function build(project, controlPath, property = "WallstopCheckControl") {
   if (controlPath !== null) {
     args.push(`-p:${property}=${controlPath}`);
   }
-  const result = spawnSync("dotnet", args, { cwd: repoRoot, encoding: "utf8" });
-  const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
-  return { exitCode: result.status ?? 1, output };
+  return new Promise((resolve) => {
+    const child = spawn("dotnet", args, {
+      cwd: repoRoot,
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    const chunks = [];
+    child.stdout.on("data", (chunk) => chunks.push(chunk));
+    child.stderr.on("data", (chunk) => chunks.push(chunk));
+    let settled = false;
+    const finish = (exitCode) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      resolve({ exitCode: exitCode ?? 1, output: Buffer.concat(chunks).toString("utf8") });
+    };
+    child.on("error", (error) => {
+      chunks.push(Buffer.from(`${error.message}\n`, "utf8"));
+      finish(1);
+    });
+    child.on("close", finish);
+  });
 }
 
 function diagnosticsIn(output) {
@@ -286,8 +326,51 @@ function classify(project, control, attempt) {
   return null;
 }
 
-function main() {
-  const { requested, verbose } = parseArguments(process.argv);
+async function runProject(project, controlRoot, verbose, buildControl = build) {
+  const failures = [];
+  const messages = [];
+  for (const control of CONTROLS) {
+    if (control.projectIds && !control.projectIds.includes(project.id)) {
+      continue;
+    }
+    const controlPath = path.join(controlRoot, `${project.id}-${control.fileName}`);
+    fs.writeFileSync(controlPath, control.render(project.anchor), "utf8");
+    const attempt = await buildControl(project.project, controlPath, control.property);
+    if (verbose) {
+      messages.push(attempt.output);
+    }
+    const failure = classify(project, control, attempt);
+    if (failure !== null) {
+      failures.push(failure);
+      continue;
+    }
+    messages.push(
+      `  [PASS] ${project.id}: the ${control.id} control over ${project.tree} reported ` +
+        `${control.expected.join(", ")} and nothing else\n`
+    );
+  }
+  return { failures, messages };
+}
+
+async function runProjectGroups(groups, jobs, run) {
+  const results = new Array(groups.length);
+  let next = 0;
+  const worker = async () => {
+    for (let cursor = next++; cursor < groups.length; cursor = next++) {
+      const group = groups[cursor];
+      const groupResults = [];
+      for (const project of group) {
+        groupResults.push(await run(project));
+      }
+      results[cursor] = groupResults;
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(jobs, groups.length) }, worker));
+  return results;
+}
+
+async function main() {
+  const { requested, verbose, jobs } = parseArguments(process.argv);
   const projects =
     requested.length === 0
       ? [...CHECK_PROJECTS]
@@ -312,27 +395,23 @@ function main() {
 
   const controlRoot = fs.mkdtempSync(path.join(os.tmpdir(), "unity-helpers-check-controls-"));
   const failures = [];
+  let workerCount = 1;
   try {
-    for (const project of projects) {
-      for (const control of CONTROLS) {
-        if (control.projectIds && !control.projectIds.includes(project.id)) {
-          continue;
-        }
-        const controlPath = path.join(controlRoot, `${project.id}-${control.fileName}`);
-        fs.writeFileSync(controlPath, control.render(project.anchor), "utf8");
-        const attempt = build(project.project, controlPath, control.property);
-        if (verbose) {
-          console.log(attempt.output);
-        }
-        const failure = classify(project, control, attempt);
-        if (failure !== null) {
-          failures.push(failure);
-          continue;
-        }
-        console.log(
-          `  [PASS] ${project.id}: the ${control.id} control over ${project.tree} reported ` +
-            `${control.expected.join(", ")} and nothing else`
-        );
+    const byId = new Map(projects.map((project) => [project.id, project]));
+    const groups = [
+      [byId.get("runtime"), byId.get("integrations")].filter(Boolean),
+      [byId.get("editor")].filter(Boolean),
+      [byId.get("tests")].filter(Boolean),
+      [byId.get("editor-tests")].filter(Boolean)
+    ].filter((group) => group.length !== 0);
+    workerCount = Math.min(jobs, groups.length);
+    const groupedResults = await runProjectGroups(groups, jobs, (project) =>
+      runProject(project, controlRoot, verbose)
+    );
+    for (const groupResults of groupedResults) {
+      for (const result of groupResults) {
+        failures.push(...result.failures);
+        process.stdout.write(result.messages.join(""));
       }
     }
   } finally {
@@ -353,18 +432,22 @@ function main() {
   }
   console.log(
     `[typecheck-controls] OK: ${projects.length} check project(s), ${CONTROLS.length} control(s) ` +
-      `available by scope, every expected diagnostic reported and nothing else.`
+      `available by scope, every expected diagnostic reported and nothing else across ` +
+      `${workerCount} worker(s).`
   );
   return 0;
 }
 
 if (require.main === module) {
-  try {
-    process.exitCode = main();
-  } catch (error) {
-    console.error(`[typecheck-controls] ${error.message}`);
-    process.exitCode = 2;
-  }
+  main().then(
+    (exitCode) => {
+      process.exitCode = exitCode;
+    },
+    (error) => {
+      console.error(`[typecheck-controls] ${error.message}`);
+      process.exitCode = 2;
+    }
+  );
 }
 
 module.exports = {
@@ -373,5 +456,8 @@ module.exports = {
   analyzerControl,
   classify,
   compilerControl,
-  diagnosticsIn
+  defaultJobs,
+  diagnosticsIn,
+  parseArguments,
+  runProjectGroups
 };

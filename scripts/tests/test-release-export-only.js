@@ -39,36 +39,46 @@ try {
   const environment = Object.fromEntries(
     Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_"))
   );
-  for (const exportOnly of ["true", "false"]) {
-    fs.rmSync(apiMarker, { force: true });
-    const output = path.join(temporary, `outputs-${exportOnly}`);
-    const result = spawnSync("bash", [scriptPath], {
-      cwd: root,
-      encoding: "utf8",
-      timeout: 30000,
-      env: {
-        ...environment,
-        PATH: `${temporary}${path.delimiter}${process.env.PATH}`,
-        GITHUB_OUTPUT: output,
-        RUNNER_TEMP: temporary,
-        GITHUB_REPOSITORY: "fixture/repository",
-        GH_TOKEN: "",
-        API_MARKER: apiMarker,
-        INPUT_VERSION: version,
-        INPUT_SOURCE_REF: "candidate-branch",
-        INPUT_ALLOW_TAG_RECOVERY: "false",
-        INPUT_EXPORT_ONLY: exportOnly
+  for (const inputVersion of [version, ""]) {
+    for (const exportOnly of ["true", "false"]) {
+      fs.rmSync(apiMarker, { force: true });
+      const output = path.join(
+        temporary,
+        `outputs-${inputVersion.length === 0 ? "derived" : "explicit"}-${exportOnly}`
+      );
+      const result = spawnSync("bash", [scriptPath], {
+        cwd: root,
+        encoding: "utf8",
+        timeout: 30000,
+        env: {
+          ...environment,
+          PATH: `${temporary}${path.delimiter}${process.env.PATH}`,
+          GITHUB_OUTPUT: output,
+          RUNNER_TEMP: temporary,
+          GITHUB_REPOSITORY: "fixture/repository",
+          GH_TOKEN: "",
+          API_MARKER: apiMarker,
+          INPUT_VERSION: inputVersion,
+          INPUT_SOURCE_REF: "candidate-branch",
+          INPUT_ALLOW_TAG_RECOVERY: "false",
+          INPUT_EXPORT_ONLY: exportOnly
+        }
+      });
+      assert.equal(result.error, undefined);
+      assert.equal(result.status, exportOnly === "true" ? 0 : 77, result.stderr + result.stdout);
+      assert.equal(fs.existsSync(apiMarker), exportOnly !== "true");
+      const outputs = fs.readFileSync(output, "utf8");
+      assert.ok(outputs.includes(`package-version=${version}`));
+      assert.ok(outputs.includes(`tag=${version}`));
+      assert.equal(
+        result.stdout.includes("Release version defaulted to package.json"),
+        inputVersion.length === 0
+      );
+      if (exportOnly === "true") {
+        assert.match(outputs, /^source-sha=[a-f0-9]{40}$/m);
+        assert.match(outputs, /^source-ref=candidate-branch$/m);
+        assert.match(outputs, /^tag-action=none$/m);
       }
-    });
-    assert.equal(result.error, undefined);
-    assert.equal(result.status, exportOnly === "true" ? 0 : 77, result.stderr + result.stdout);
-    assert.equal(fs.existsSync(apiMarker), exportOnly !== "true");
-    const outputs = fs.readFileSync(output, "utf8");
-    assert.ok(outputs.includes(`package-version=${version}`));
-    if (exportOnly === "true") {
-      assert.match(outputs, /^source-sha=[a-f0-9]{40}$/m);
-      assert.match(outputs, /^source-ref=candidate-branch$/m);
-      assert.match(outputs, /^tag-action=none$/m);
     }
   }
 } finally {
