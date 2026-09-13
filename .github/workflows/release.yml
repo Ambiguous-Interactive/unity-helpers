@@ -221,33 +221,9 @@ jobs:
           # package-name, package-version, and tag step outputs are written by
           # scripts/ci/verify-release-tag.ps1 after the tag contract passes.
 
-  release-ready:
-    name: Confirm release publish inputs
-    needs: verify-tag
-    runs-on: ubuntu-latest
-    timeout-minutes: 1
-    outputs:
-      package-name: ${{ needs.verify-tag.outputs.package-name }}
-      package-version: ${{ needs.verify-tag.outputs.package-version }}
-      source-ref: ${{ needs.verify-tag.outputs.source-ref }}
-      source-sha: ${{ needs.verify-tag.outputs.source-sha }}
-      tag: ${{ needs.verify-tag.outputs.tag }}
-      tag-action: ${{ needs.verify-tag.outputs.tag-action }}
-    steps:
-      - name: Confirm release inputs
-        env:
-          PACKAGE_NAME: ${{ needs.verify-tag.outputs.package-name }}
-          PACKAGE_VERSION: ${{ needs.verify-tag.outputs.package-version }}
-          SOURCE_REF: ${{ needs.verify-tag.outputs.source-ref }}
-          SOURCE_SHA: ${{ needs.verify-tag.outputs.source-sha }}
-          TAG: ${{ needs.verify-tag.outputs.tag }}
-        run: |
-          set -euo pipefail
-          echo "Release ${TAG} will validate ${PACKAGE_NAME}@${PACKAGE_VERSION} from ${SOURCE_REF} (${SOURCE_SHA})."
-
   validate-package:
     name: Validate and pack npm package
-    needs: release-ready
+    needs: verify-tag
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -255,7 +231,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
-          ref: ${{ needs.release-ready.outputs.source-sha }}
+          ref: ${{ needs.verify-tag.outputs.source-sha }}
           persist-credentials: false
 
       - name: Setup Node.js
@@ -297,7 +273,7 @@ jobs:
           mv "${pack_dir}/${package_file}" ".artifacts/release/${package_file}"
           (cd .artifacts/release && sha256sum "${package_file}" > "${package_file}.sha256")
           pwsh -NoProfile -File scripts/release-tools/write-release-notes.ps1 \
-            -Version "${{ needs.release-ready.outputs.package-version }}" \
+            -Version "${{ needs.verify-tag.outputs.package-version }}" \
             -Footer \
             -OutputPath .artifacts/release/release-notes.md
           echo "package-file=${package_file}" >> "${GITHUB_OUTPUT}"
@@ -313,7 +289,7 @@ jobs:
   unitypackage:
     name: Create .unitypackage
     needs:
-      - release-ready
+      - verify-tag
       - validate-package
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -322,7 +298,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 1
-          ref: ${{ needs.release-ready.outputs.source-sha }}
+          ref: ${{ needs.verify-tag.outputs.source-sha }}
           persist-credentials: false
 
       - name: Setup Node.js
@@ -345,10 +321,10 @@ jobs:
   prepare-tag:
     name: Prepare release tag
     needs:
-      - release-ready
+      - verify-tag
       - validate-package
       - unitypackage
-    if: ${{ !inputs.export_only && needs.release-ready.outputs.tag-action != 'none' }}
+    if: ${{ !inputs.export_only && needs.verify-tag.outputs.tag-action != 'none' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -363,9 +339,9 @@ jobs:
         env:
           GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PACKAGE_NAME: ${{ needs.release-ready.outputs.package-name }}
-          PACKAGE_VERSION: ${{ needs.release-ready.outputs.package-version }}
-          TAG: ${{ needs.release-ready.outputs.tag }}
+          PACKAGE_NAME: ${{ needs.verify-tag.outputs.package-name }}
+          PACKAGE_VERSION: ${{ needs.verify-tag.outputs.package-version }}
+          TAG: ${{ needs.verify-tag.outputs.tag }}
         run: |
           set -euo pipefail
           npm_published="false"
@@ -413,9 +389,9 @@ jobs:
         env:
           GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SOURCE_SHA: ${{ needs.release-ready.outputs.source-sha }}
-          TAG: ${{ needs.release-ready.outputs.tag }}
-          TAG_ACTION: ${{ needs.release-ready.outputs.tag-action }}
+          SOURCE_SHA: ${{ needs.verify-tag.outputs.source-sha }}
+          TAG: ${{ needs.verify-tag.outputs.tag }}
+          TAG_ACTION: ${{ needs.verify-tag.outputs.tag-action }}
         run: |
           set -euo pipefail
 
@@ -469,7 +445,7 @@ jobs:
   publish:
     name: Publish npm and GitHub Release
     needs:
-      - release-ready
+      - verify-tag
       - validate-package
       - unitypackage
       - prepare-tag
@@ -477,10 +453,10 @@ jobs:
       ${{
         always() &&
         !inputs.export_only &&
-        needs.release-ready.result == 'success' &&
+        needs.verify-tag.result == 'success' &&
         needs.validate-package.result == 'success' &&
         needs.unitypackage.result == 'success' &&
-        (needs.release-ready.outputs.tag-action == 'none' || needs.prepare-tag.result == 'success')
+        (needs.verify-tag.outputs.tag-action == 'none' || needs.prepare-tag.result == 'success')
       }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -509,8 +485,8 @@ jobs:
       - name: Verify downloaded artifacts
         id: artifacts
         env:
-          EXPECTED_PACKAGE_NAME: ${{ needs.release-ready.outputs.package-name }}
-          EXPECTED_PACKAGE_VERSION: ${{ needs.release-ready.outputs.package-version }}
+          EXPECTED_PACKAGE_NAME: ${{ needs.verify-tag.outputs.package-name }}
+          EXPECTED_PACKAGE_VERSION: ${{ needs.verify-tag.outputs.package-version }}
         run: |
           set -euo pipefail
           mapfile -t packages < <(find .artifacts/release -maxdepth 1 -type f -name '*.tgz' | sort)
@@ -549,8 +525,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
-          SOURCE_SHA: ${{ needs.release-ready.outputs.source-sha }}
-          TAG: ${{ needs.release-ready.outputs.tag }}
+          SOURCE_SHA: ${{ needs.verify-tag.outputs.source-sha }}
+          TAG: ${{ needs.verify-tag.outputs.tag }}
         run: |
           set -euo pipefail
           tag_ref_file="${RUNNER_TEMP}/publish-tag-ref.json"
@@ -585,8 +561,8 @@ jobs:
       - name: Publish npm package
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          PACKAGE_NAME: ${{ needs.release-ready.outputs.package-name }}
-          PACKAGE_VERSION: ${{ needs.release-ready.outputs.package-version }}
+          PACKAGE_NAME: ${{ needs.verify-tag.outputs.package-name }}
+          PACKAGE_VERSION: ${{ needs.verify-tag.outputs.package-version }}
           PACKAGE_FILE: ${{ steps.artifacts.outputs.package-file }}
         run: |
           set -euo pipefail
@@ -618,7 +594,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
-          TAG: ${{ needs.release-ready.outputs.tag }}
+          TAG: ${{ needs.verify-tag.outputs.tag }}
           PACKAGE_FILE: ${{ steps.artifacts.outputs.package-file }}
           UNITYPACKAGE_FILE: ${{ steps.artifacts.outputs.unitypackage-file }}
         run: |
@@ -656,7 +632,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
-          TAG: ${{ needs.release-ready.outputs.tag }}
+          TAG: ${{ needs.verify-tag.outputs.tag }}
           PACKAGE_FILE: ${{ steps.artifacts.outputs.package-file }}
           UNITYPACKAGE_FILE: ${{ steps.artifacts.outputs.unitypackage-file }}
         run: |

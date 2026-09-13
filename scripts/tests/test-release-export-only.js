@@ -10,8 +10,18 @@ const vm = require("node:vm");
 
 const root = path.resolve(__dirname, "..", "..");
 const workflow = fs.readFileSync(path.join(root, ".github/workflows/release.yml"), "utf8");
+assert.doesNotMatch(
+  workflow,
+  /^  release-ready:/m,
+  "Release publishing must consume verified outputs directly instead of starting a relay job"
+);
+assert.match(
+  workflow,
+  /  validate-package:\n[\s\S]*?    needs: verify-tag\n/,
+  "Package validation must depend directly on release input verification"
+);
 const verification = workflow.match(
-  /      - name: Verify tag matches package metadata\n[\s\S]*?        run: \|\n([\s\S]*?)(?=\n  release-ready:)/
+  /      - name: Verify tag matches package metadata\n[\s\S]*?        run: \|\n([\s\S]*?)(?=\n  validate-package:)/
 );
 assert.ok(verification, "Release metadata verification must have a runnable body");
 const script = verification[1].replace(/^          /gm, "");
@@ -77,7 +87,7 @@ for (const jobName of ["prepare-tag", "publish"]) {
       const expression = condition[1]
         .replace(/inputs\.export_only/g, String(exportOnly))
         .replace(/always\(\)/g, "true")
-        .replace(/needs\.release-ready\.outputs\.tag-action/g, JSON.stringify(tagAction))
+        .replace(/needs\.verify-tag\.outputs\.tag-action/g, JSON.stringify(tagAction))
         .replace(/needs\.[a-z-]+\.result/g, '"success"');
       const allowed = vm.runInNewContext(expression, Object.create(null), { timeout: 100 });
       assert.equal(
