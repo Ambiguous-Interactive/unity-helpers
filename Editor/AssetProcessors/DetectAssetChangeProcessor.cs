@@ -1073,10 +1073,8 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 MethodInfo[] methods = type.GetMethods(flags);
                 foreach (MethodInfo method in methods)
                 {
-                    object[] attributes = method.GetCustomAttributes(
-                        typeof(DetectAssetChangedAttribute),
-                        true
-                    );
+                    DetectAssetChangedAttribute[] attributes =
+                        method.GetAllAttributesSafe<DetectAssetChangedAttribute>();
                     if (attributes.Length == 0)
                     {
                         continue;
@@ -1094,13 +1092,8 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                         continue;
                     }
 
-                    foreach (object attributeObject in attributes)
+                    foreach (DetectAssetChangedAttribute attribute in attributes)
                     {
-                        if (attributeObject is not DetectAssetChangedAttribute attribute)
-                        {
-                            continue;
-                        }
-
                         if (
                             parameterMode == SubscriptionParameterMode.CreatedAndDeleted
                             && !ResolutionSupportsAssetType(createdElementType, attribute.AssetType)
@@ -1197,10 +1190,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             {
                 clone.EnableSceneObjectSearch();
             }
-            foreach (string knownAssetPath in source.KnownAssetPaths)
-            {
-                clone.KnownAssetPaths.Add(knownAssetPath);
-            }
+            clone.KnownAssetPaths.UnionWith(source.KnownAssetPaths);
             foreach (MethodSubscription subscription in source.Subscriptions)
             {
                 clone.Subscriptions.Add(subscription == null ? null : subscription.Clone());
@@ -1238,6 +1228,16 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
         private static string[] CopyPaths(IReadOnlyList<string> source)
         {
             string[] copy = new string[source.Count];
+            if (source is string[] sourceArray)
+            {
+                Array.Copy(sourceArray, copy, sourceArray.Length);
+                return copy;
+            }
+            if (source is ICollection<string> sourceCollection)
+            {
+                sourceCollection.CopyTo(copy, 0);
+                return copy;
+            }
             for (int index = 0; index < source.Count; ++index)
             {
                 copy[index] = source[index];
