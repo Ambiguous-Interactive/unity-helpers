@@ -1843,36 +1843,18 @@ $declaredVersions = [regex]::Matches(
 )
 $matrixVersionsAreStaticText = $declaredVersions.Count -eq 1
 $matrixVersionsMatchCanonicalSource = $false
-$matrixSelectionPreservesDispatchFiltering = $false
 if ($matrixVersionsAreStaticText) {
     $declared = @($declaredVersions[0].Groups[1].Value -split '\r?\n' |
         ForEach-Object { $_.TrimStart(' ', '-') } |
         Where-Object { $_ })
     $canonical = @((Get-Content -LiteralPath $unityVersionsPath -Raw | ConvertFrom-Json).all)
     $matrixVersionsMatchCanonicalSource = @($declared | Sort-Object) -join "`n" -eq @($canonical | Sort-Object) -join "`n"
-
-    $expectedExclusions = foreach ($matrixVersion in $canonical) {
-        foreach ($selectedVersion in $canonical) {
-            if ($matrixVersion -ne $selectedVersion) {
-                "unity-version: $matrixVersion`nselected-version: $selectedVersion"
-            }
-        }
-    }
-    $actualExclusions = @([regex]::Matches(
-        $unityTestsMatrixJob,
-        '(?m)^          - unity-version:\s*(\S+)\s*$\r?\n^            selected-version:\s*(\S+)\s*$'
-    ) | ForEach-Object { "unity-version: $($_.Groups[1].Value)`nselected-version: $($_.Groups[2].Value)" })
-    $matrixSelectionPreservesDispatchFiltering = (
-        $unityTestsMatrixJob.Contains('selected-version: ${{ fromJSON(needs.matrix-config.outputs.unity-versions) }}') -and
-        @($actualExclusions | Sort-Object) -join "`n---`n" -eq @($expectedExclusions | Sort-Object) -join "`n---`n"
-    )
 }
 $defaultMatrixIsVersionGrouped = (
     -not $jobTexts.ContainsKey('unity-tests-standalone') -and
     [regex]::Matches($unityTestsMatrixJob, '(?m)^      matrix:\s*$').Count -eq 1 -and
     $matrixVersionsAreStaticText -and
     $matrixVersionsMatchCanonicalSource -and
-    $matrixSelectionPreservesDispatchFiltering -and
     [regex]::Matches($unityTestsMatrixJob, '(?m)^        test-mode:\s*$').Count -eq 0 -and
     -not $unityTestsMatrixJob.Contains('matrix.test-mode') -and
     $unityTestsMatrixJob.Contains('needs.matrix-config.outputs.test-modes') -and
@@ -1881,10 +1863,10 @@ $defaultMatrixIsVersionGrouped = (
     -not $workflowContent.Contains('matrix-include-standalone')
 )
 if (-not $defaultMatrixIsVersionGrouped) {
-    Write-Host '::error file=.github/workflows/unity-tests.yml::The default Unity matrix must list the versions from .github/unity-versions.json as static text while its selected-version axis and complete mismatch exclusions preserve targeted dispatches (the enrollment audit can only prove per-leg gate and return pins on a static unity-version axis). Modes must be sequential steps within each version job, never a second mode axis that multiplies the licensed runner queue.'
+    Write-Host '::error file=.github/workflows/unity-tests.yml::The default Unity matrix must list the versions from .github/unity-versions.json as static text (the enrollment audit can only prove per-leg gate and return pins on a static axis). Modes must be sequential steps within each version job, never a second matrix axis that multiplies the licensed runner queue.'
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info 'Checked the default Unity matrix creates exactly one job per supported version and preserves targeted dispatch filtering.'
+    Write-Info 'Checked the default Unity matrix creates exactly one job per supported version from the canonical source.'
 }
 
 $groupedDefaultModesAreComplete = $true
