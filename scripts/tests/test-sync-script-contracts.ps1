@@ -1984,8 +1984,8 @@ function Run-ReleaseWorkflowGitHubCliContractTests {
   $publishHasRepo = $workflowContent -match "(?ms)- name: Publish GitHub Release.*?env:.*?${repoEnvPattern}.*?run:"
   $verifyHasRepo = $workflowContent -match "(?ms)- name: Verify GitHub Release assets.*?env:.*?${repoEnvPattern}.*?run:"
   $verifyDownloadedArtifactsChecksIdentity = (
-    $workflowContent.Contains('EXPECTED_PACKAGE_NAME: ${{ needs.release-ready.outputs.package-name }}') -and
-    $workflowContent.Contains('EXPECTED_PACKAGE_VERSION: ${{ needs.release-ready.outputs.package-version }}') -and
+    $workflowContent.Contains('EXPECTED_PACKAGE_NAME: ${{ needs.verify-tag.outputs.package-name }}') -and
+    $workflowContent.Contains('EXPECTED_PACKAGE_VERSION: ${{ needs.verify-tag.outputs.package-version }}') -and
     $workflowContent.Contains('notes_file=".artifacts/release/release-notes.md"') -and
     $workflowContent.Contains('tar -xOf "${package_file}" package/package.json') -and
     $workflowContent.Contains('Npm tarball identity mismatch.')
@@ -2003,7 +2003,7 @@ function Run-ReleaseWorkflowGitHubCliContractTests {
   $publishRechecksTagTargetBeforePublish = (
     $publishJobBlock.Success -and
     $publishJobBlock.Value.Contains('Verify release tag target before publish') -and
-    $publishJobBlock.Value.Contains('SOURCE_SHA: ${{ needs.release-ready.outputs.source-sha }}') -and
+    $publishJobBlock.Value.Contains('SOURCE_SHA: ${{ needs.verify-tag.outputs.source-sha }}') -and
     $publishJobBlock.Value.Contains('gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}"') -and
     $publishJobBlock.Value.Contains('git/tags/${tag_object_sha}') -and
     $publishJobBlock.Value.Contains('Tag ${TAG} points at ${tag_target}, not selected source ${SOURCE_SHA}.') -and
@@ -2082,10 +2082,10 @@ function Run-ReleasePublishTagPreparationContractTests {
   )
 
   $downstreamJobsCheckoutVerifiedSha = (
-    ([regex]::Matches($workflowContent, [regex]::Escape('ref: ${{ needs.release-ready.outputs.source-sha }}')).Count -ge 2) -and
+    ([regex]::Matches($workflowContent, [regex]::Escape('ref: ${{ needs.verify-tag.outputs.source-sha }}')).Count -ge 2) -and
     $workflowContent.Contains('source-ref: ${{ steps.verify.outputs.source-ref }}') -and
-    $workflowContent.Contains('source-sha: ${{ needs.verify-tag.outputs.source-sha }}') -and
-    $workflowContent.Contains('tag-action: ${{ needs.verify-tag.outputs.tag-action }}')
+    $workflowContent.Contains('source-sha: ${{ steps.verify.outputs.source-sha }}') -and
+    $workflowContent.Contains('tag-action: ${{ steps.verify.outputs.tag-action }}')
   )
 
   $tagPreparationChecksExistingTagTarget = (
@@ -2128,7 +2128,7 @@ function Run-ReleasePublishTagPreparationContractTests {
 
   $verifyTagBlock = [regex]::Match(
     $workflowContent,
-    '(?ms)^\s*verify-tag:\s*.*?^\s*release-ready:'
+    '(?ms)^\s*verify-tag:\s*.*?^\s*validate-package:'
   )
   $prepareTagBlock = [regex]::Match(
     $workflowContent,
@@ -2149,10 +2149,10 @@ function Run-ReleasePublishTagPreparationContractTests {
     $prepareTagBlock.Success -and
     $prepareTagBlock.Value.Contains('name: Prepare release tag') -and
     $prepareTagBlock.Value.Contains('needs:') -and
-    $prepareTagBlock.Value.Contains('      - release-ready') -and
+    $prepareTagBlock.Value.Contains('      - verify-tag') -and
     $prepareTagBlock.Value.Contains('      - validate-package') -and
     $prepareTagBlock.Value.Contains('      - unitypackage') -and
-    $prepareTagBlock.Value.Contains('if: ${{ !inputs.export_only && needs.release-ready.outputs.tag-action != ''none'' }}')
+    $prepareTagBlock.Value.Contains('if: ${{ !inputs.export_only && needs.verify-tag.outputs.tag-action != ''none'' }}')
   )
 
   # DERIVE the setup-node pin from the workflow instead of restating it. A restated SHA is not a
@@ -2213,7 +2213,7 @@ function Run-ReleasePublishTagPreparationContractTests {
   $publishWaitsForPreparedTag = (
     $publishBlock.Success -and
     $publishBlock.Value.Contains('      - prepare-tag') -and
-    $publishBlock.Value.Contains("needs.release-ready.outputs.tag-action == 'none' || needs.prepare-tag.result == 'success'")
+    $publishBlock.Value.Contains("needs.verify-tag.outputs.tag-action == 'none' || needs.prepare-tag.result == 'success'")
   )
 
   $hasWritePermissionOnlyWhereNeeded = (

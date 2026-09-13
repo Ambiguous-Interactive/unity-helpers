@@ -4326,6 +4326,19 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             /// </remarks>
             internal List<EnumDeclarationSyntax> Enums { get; } = new List<EnumDeclarationSyntax>();
 
+            private static bool HasAttributedMethod(TypeDeclarationSyntax declaration)
+            {
+                foreach (MemberDeclarationSyntax member in declaration.Members)
+                {
+                    if (member is MethodDeclarationSyntax method && 0 < method.AttributeLists.Count)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
             public void OnVisitSyntaxNode(SyntaxNode node)
             {
                 if (node is EnumDeclarationSyntax enumeration)
@@ -4345,11 +4358,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
                 {
                     Types.Add(declaration);
                 }
-                else if (
-                    node is TypeDeclarationSyntax bare
-                    && bare.Members.OfType<MethodDeclarationSyntax>()
-                        .Any(m => 0 < m.AttributeLists.Count)
-                )
+                else if (node is TypeDeclarationSyntax bare && HasAttributedMethod(bare))
                 {
                     Types.Add(bare);
                 }

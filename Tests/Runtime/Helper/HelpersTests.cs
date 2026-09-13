@@ -684,8 +684,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Debug.unityLogger.logHandler = recorder;
             int requestedContextInvocations = 0;
             int defaultContextInvocations = 0;
+            int handledInvocations = 0;
+            int throwingHandlerInvocations = 0;
+            List<ulong> handledIterations = new();
+            List<Object> handledContexts = new();
+            List<Exception> handledExceptions = new();
             Coroutine requestedContextCoroutine = null;
             Coroutine defaultContextCoroutine = null;
+            Coroutine handledCoroutine = null;
+            Coroutine throwingHandlerCoroutine = null;
             try
             {
                 requestedContextCoroutine = host.StartFunctionAsCoroutine(
@@ -707,10 +714,44 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     },
                     0.01f
                 );
+                handledCoroutine = host.StartFunctionAsCoroutine(
+                    () =>
+                    {
+                        ++handledInvocations;
+                        throw new InvalidOperationException("Handled job failure.");
+                    },
+                    0.01f,
+                    useJitter: false,
+                    waitBefore: false,
+                    context: requestedContext,
+                    exceptionHandler: (iteration, context, exception) =>
+                    {
+                        handledIterations.Add(iteration);
+                        handledContexts.Add(context);
+                        handledExceptions.Add(exception);
+                    }
+                );
+                throwingHandlerCoroutine = host.StartFunctionAsCoroutine(
+                    () => throw new InvalidOperationException("Throwing-handler job failure."),
+                    0.01f,
+                    useJitter: false,
+                    waitBefore: false,
+                    context: requestedContext,
+                    exceptionHandler: (_, _, _) =>
+                    {
+                        ++throwingHandlerInvocations;
+                        throw new InvalidOperationException("Handler failure.");
+                    }
+                );
 
                 float timeout = Time.time + 2f;
                 while (
-                    (requestedContextInvocations < 3 || defaultContextInvocations < 3)
+                    (
+                        requestedContextInvocations < 3
+                        || defaultContextInvocations < 3
+                        || handledInvocations < 3
+                        || throwingHandlerInvocations < 3
+                    )
                     && Time.time < timeout
                 )
                 {
@@ -727,6 +768,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     3,
                     $"The default-context job stopped after {defaultContextInvocations} invocations."
                 );
+                Assert.GreaterOrEqual(
+                    handledInvocations,
+                    3,
+                    $"The handled job stopped after {handledInvocations} invocations."
+                );
+                Assert.GreaterOrEqual(
+                    throwingHandlerInvocations,
+                    3,
+                    $"The job with a throwing handler stopped after {throwingHandlerInvocations} handler invocations."
+                );
             }
             finally
             {
@@ -740,12 +791,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     host.StopCoroutine(defaultContextCoroutine);
                 }
 
+                if (handledCoroutine != null)
+                {
+                    host.StopCoroutine(handledCoroutine);
+                }
+
+                if (throwingHandlerCoroutine != null)
+                {
+                    host.StopCoroutine(throwingHandlerCoroutine);
+                }
+
                 Debug.unityLogger.logHandler = recorder.Inner;
             }
 
-            Assert.AreEqual(2, recorder.ErrorContexts.Count);
+            Assert.AreEqual(3, recorder.ErrorContexts.Count);
             Assert.AreSame(requestedContext, recorder.ErrorContexts[0]);
             Assert.AreSame(host, recorder.ErrorContexts[1]);
+            Assert.AreSame(requestedContext, recorder.ErrorContexts[2]);
+            Assert.GreaterOrEqual(handledIterations.Count, 3);
+            CollectionAssert.AreEqual(new ulong[] { 0, 1, 2 }, handledIterations.GetRange(0, 3));
+            Assert.AreSame(requestedContext, handledContexts[0]);
+            Assert.AreSame(requestedContext, handledContexts[1]);
+            Assert.AreSame(requestedContext, handledContexts[2]);
+            Assert.IsInstanceOf<InvalidOperationException>(handledExceptions[0]);
+            Assert.IsInstanceOf<InvalidOperationException>(handledExceptions[1]);
+            Assert.IsInstanceOf<InvalidOperationException>(handledExceptions[2]);
         }
 
         [UnityTest]
