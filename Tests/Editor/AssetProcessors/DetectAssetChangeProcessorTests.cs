@@ -28,6 +28,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         private const string AssignableHandlerAssetPath = TestRoot + "/AssignableHandler.asset";
 
         private DetectAssetChangeProcessor.AssetWatcherSettings _settings;
+        private DetectAssetChangeProcessor.AssetWatcherSettings _fixtureSettings;
         private float _originalLoopWindowSeconds;
         private AssetChangeDetectionEnabledScope _watcherScope;
 
@@ -48,6 +49,13 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 handler state.
             */
             AssetPostprocessorDeferral.FlushForTesting();
+            DetectAssetChangeProcessor.ResetForTesting();
+            DetectAssetChangeProcessor.EnabledOverride = true;
+            DetectAssetChangeProcessor.IncludeTestAssets = true;
+            DetectAssetChangeProcessor.TestAssetFolderAllowlist = FixtureAllowlist;
+            DetectAssetChangeProcessor.EnsureInitializedForTesting();
+            _fixtureSettings = DetectAssetChangeProcessor.GetSettingsForTesting();
+            DetectAssetChangeProcessor.ResetForTesting(_settings);
         }
 
         [SetUp]
@@ -72,7 +80,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 mid-test.
             */
             AssetPostprocessorTestHandlers.FlushAndClearAll();
-            DetectAssetChangeProcessor.ResetForTesting();
+            DetectAssetChangeProcessor.ResetForTesting(_fixtureSettings);
             // Force the watcher on because CI runs this fixture in batch mode.
             _watcherScope = AssetChangeDetectionUtility.EnabledScope(true);
             DetectAssetChangeProcessor.IncludeTestAssets = true;
@@ -87,9 +95,9 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         public override void TearDown()
         {
             DetectAssetChangeProcessor.TestAssetFolderAllowlist = null;
-            DetectAssetChangeProcessor.ResetForTesting(_settings);
             _watcherScope?.Dispose();
             _watcherScope = null;
+            DetectAssetChangeProcessor.ResetForTesting(_settings);
 
             UnityHelpersSettings settings = UnityHelpersSettings.instance;
             if (
@@ -371,7 +379,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             // Clear state after asset creation since Unity's OnPostprocessAllAssets may have fired
             ClearTestState();
 
-            ResetProcessorWithCleanState();
+            ResetProcessorWithFixtureState();
             TestReentrantHandler.Configure(PayloadPath);
 
             DetectAssetChangeProcessor.ProcessChangesForTesting(
@@ -395,7 +403,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             // Clear state after asset creation since Unity's OnPostprocessAllAssets may have fired
             ClearTestState();
 
-            ResetProcessorWithCleanState();
+            ResetProcessorWithFixtureState();
 
             double fakeTime = 0;
             DetectAssetChangeProcessor.TimeProvider = () => fakeTime;
@@ -425,7 +433,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         {
             CreatePayloadAssetAt(PayloadPath);
             ClearTestState();
-            ResetProcessorWithCleanState();
+            ResetProcessorWithFixtureState();
 
             double fakeTime = 0;
             DetectAssetChangeProcessor.TimeProvider = () => fakeTime;
@@ -449,6 +457,23 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             DetectAssetChangeProcessor.AssetWatcherSettings protectedSettings =
                 DetectAssetChangeProcessor.GetSettingsForTesting();
             Assert.IsTrue(protectedSettings.LoopProtectionActive);
+            Assert.IsTrue(
+                protectedSettings.WatchersByAssetType.TryGetValue(
+                    typeof(TestDetectableAsset),
+                    out DetectAssetChangeProcessor.AssetWatcher snapshotWatcher
+                )
+            );
+            int activeSubscriptionCount = snapshotWatcher.Subscriptions.Count;
+            snapshotWatcher.Subscriptions.Clear();
+            Assert.IsTrue(
+                DetectAssetChangeProcessor
+                    .GetSettingsForTesting()
+                    .WatchersByAssetType.TryGetValue(
+                        typeof(TestDetectableAsset),
+                        out DetectAssetChangeProcessor.AssetWatcher activeWatcher
+                    )
+            );
+            Assert.AreEqual(activeSubscriptionCount, activeWatcher.Subscriptions.Count);
             int invocationCountAfterLoopProtection = TestLoopingHandler.InvocationCount;
 
             DetectAssetChangeProcessor.ProcessChangesForTesting(
@@ -476,6 +501,42 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
             Assert.Greater(TestLoopingHandler.InvocationCount, invocationCountAfterLoopProtection);
             LogAssert.NoUnexpectedReceived();
+        }
+
+        [Test]
+        public void ResetForTestingToleratesNullCollectionsAndEntries()
+        {
+            DetectAssetChangeProcessor.AssetWatcherSettings settings = new()
+            {
+                WatchersByAssetType = null,
+                PendingAssetChanges = null,
+            };
+
+            Assert.DoesNotThrow(() => DetectAssetChangeProcessor.ResetForTesting(settings));
+
+            DetectAssetChangeProcessor.AssetWatcherSettings emptySnapshot =
+                DetectAssetChangeProcessor.GetSettingsForTesting();
+            Assert.AreEqual(0, emptySnapshot.WatchersByAssetType.Count);
+            Assert.AreEqual(0, emptySnapshot.PendingAssetChanges.Count);
+
+            settings.WatchersByAssetType = new();
+            settings.WatchersByAssetType.Add(typeof(TestDetectableAsset), null);
+            settings.PendingAssetChanges = new();
+            settings.PendingAssetChanges.Enqueue(null);
+
+            Assert.DoesNotThrow(() => DetectAssetChangeProcessor.ResetForTesting(settings));
+
+            DetectAssetChangeProcessor.AssetWatcherSettings nullEntrySnapshot =
+                DetectAssetChangeProcessor.GetSettingsForTesting();
+            Assert.IsTrue(
+                nullEntrySnapshot.WatchersByAssetType.TryGetValue(
+                    typeof(TestDetectableAsset),
+                    out DetectAssetChangeProcessor.AssetWatcher watcher
+                )
+            );
+            Assert.IsTrue(watcher == null);
+            Assert.AreEqual(1, nullEntrySnapshot.PendingAssetChanges.Count);
+            Assert.IsTrue(nullEntrySnapshot.PendingAssetChanges.Peek() == null);
         }
 
         [Test]
@@ -836,7 +897,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             CreatePayloadAssetAt(PayloadPath);
             CreateAlternatePayloadAssetAt(AlternatePayloadPath);
             ClearTestState();
-            ResetProcessorWithCleanState();
+            ResetProcessorWithFixtureState();
 
             DetectAssetChangeProcessor.ProcessChangesForTesting(
                 new[] { PayloadPath, AlternatePayloadPath },
@@ -980,6 +1041,15 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             {
                 settings.DetectAssetChangeLoopWindowSeconds = _originalLoopWindowSeconds;
             }
+        }
+
+        private void ResetProcessorWithFixtureState()
+        {
+            DetectAssetChangeProcessor.ResetForTesting(_fixtureSettings);
+            EnsureTestFolder();
+            DetectAssetChangeProcessor.EnabledOverride = true;
+            DetectAssetChangeProcessor.IncludeTestAssets = true;
+            DetectAssetChangeProcessor.TestAssetFolderAllowlist = FixtureAllowlist;
         }
     }
 }

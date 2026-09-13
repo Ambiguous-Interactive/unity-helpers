@@ -7,7 +7,6 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
     using System.Collections.Generic;
     using System.Globalization;
     using System.IO;
-    using System.Linq;
     using System.Reflection;
     using UnityEditor;
     using UnityEngine;
@@ -147,8 +146,8 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                     _testAssetFolderAllowlist == null
                         ? null
                         : new List<string>(_testAssetFolderAllowlist),
-                WatchersByAssetType = new Dictionary<Type, AssetWatcher>(WatchersByAssetType),
-                PendingAssetChanges = new Queue<PendingAssetChangeSet>(PendingAssetChanges),
+                WatchersByAssetType = CloneWatchers(WatchersByAssetType),
+                PendingAssetChanges = ClonePendingChanges(PendingAssetChanges),
                 ProcessingAssetChanges = _processingAssetChanges,
                 LoopProtectionActive = _loopProtectionActive,
                 ConsecutiveChangeBatches = _consecutiveChangeBatches,
@@ -169,20 +168,20 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                     ? null
                     : new List<string>(settings.TestAssetFolderAllowlist);
             WatchersByAssetType.Clear();
-            foreach (
-                var kvp in settings?.WatchersByAssetType
-                    ?? Enumerable.Empty<KeyValuePair<Type, AssetWatcher>>()
-            )
+            if (settings?.WatchersByAssetType != null)
             {
-                WatchersByAssetType.Add(kvp.Key, kvp.Value);
+                foreach (KeyValuePair<Type, AssetWatcher> pair in settings.WatchersByAssetType)
+                {
+                    WatchersByAssetType.Add(pair.Key, CloneWatcher(pair.Value));
+                }
             }
             PendingAssetChanges.Clear();
-            foreach (
-                var pendingChange in settings?.PendingAssetChanges
-                    ?? Enumerable.Empty<PendingAssetChangeSet>()
-            )
+            if (settings?.PendingAssetChanges != null)
             {
-                PendingAssetChanges.Enqueue(pendingChange);
+                foreach (PendingAssetChangeSet pendingChange in settings.PendingAssetChanges)
+                {
+                    PendingAssetChanges.Enqueue(ClonePendingChange(pendingChange));
+                }
             }
             _processingAssetChanges = settings?.ProcessingAssetChanges ?? false;
             _loopProtectionActive = settings?.LoopProtectionActive ?? false;
@@ -1045,9 +1044,18 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
         {
             WatchersByAssetType.Clear();
 
-            Type[] loadedTypes =
-                ReflectionHelpers.GetAllLoadedTypes()?.Where(t => t != null).ToArray()
-                ?? Array.Empty<Type>();
+            List<Type> loadedTypes = new();
+            IEnumerable<Type> discoveredTypes = ReflectionHelpers.GetAllLoadedTypes();
+            if (discoveredTypes != null)
+            {
+                foreach (Type discoveredType in discoveredTypes)
+                {
+                    if (discoveredType != null)
+                    {
+                        loadedTypes.Add(discoveredType);
+                    }
+                }
+            }
             foreach (Type type in loadedTypes)
             {
                 // Static classes are abstract sealed and can still declare handlers.
@@ -1065,10 +1073,10 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 MethodInfo[] methods = type.GetMethods(flags);
                 foreach (MethodInfo method in methods)
                 {
-                    DetectAssetChangedAttribute[] attributes = method
-                        .GetCustomAttributes(typeof(DetectAssetChangedAttribute), true)
-                        .OfType<DetectAssetChangedAttribute>()
-                        .ToArray();
+                    object[] attributes = method.GetCustomAttributes(
+                        typeof(DetectAssetChangedAttribute),
+                        true
+                    );
                     if (attributes.Length == 0)
                     {
                         continue;
@@ -1086,8 +1094,13 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                         continue;
                     }
 
-                    foreach (DetectAssetChangedAttribute attribute in attributes)
+                    foreach (object attributeObject in attributes)
                     {
+                        if (attributeObject is not DetectAssetChangedAttribute attribute)
+                        {
+                            continue;
+                        }
+
                         if (
                             parameterMode == SubscriptionParameterMode.CreatedAndDeleted
                             && !ResolutionSupportsAssetType(createdElementType, attribute.AssetType)
@@ -1138,9 +1151,15 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                             watcher.EnableSceneObjectSearch();
                         }
 
-                        bool alreadyExists = watcher.Subscriptions.Any(existing =>
-                            existing._declaringType == type && existing._method == method
-                        );
+                        bool alreadyExists = false;
+                        foreach (MethodSubscription existing in watcher.Subscriptions)
+                        {
+                            if (existing._declaringType == type && existing._method == method)
+                            {
+                                alreadyExists = true;
+                                break;
+                            }
+                        }
                         if (!alreadyExists)
                         {
                             watcher.Subscriptions.Add(subscription);
@@ -1148,6 +1167,82 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                     }
                 }
             }
+        }
+
+        private static Dictionary<Type, AssetWatcher> CloneWatchers(
+            IReadOnlyDictionary<Type, AssetWatcher> source
+        )
+        {
+            Dictionary<Type, AssetWatcher> clones = new(source.Count);
+            foreach (KeyValuePair<Type, AssetWatcher> pair in source)
+            {
+                clones.Add(pair.Key, CloneWatcher(pair.Value));
+            }
+            return clones;
+        }
+
+        private static AssetWatcher CloneWatcher(AssetWatcher source)
+        {
+            if (source == null)
+            {
+                return null;
+            }
+
+            AssetWatcher clone = new(source.AssetType, source.IncludeAssignableTypes);
+            if (source.SearchPrefabs)
+            {
+                clone.EnablePrefabSearch();
+            }
+            if (source.SearchSceneObjects)
+            {
+                clone.EnableSceneObjectSearch();
+            }
+            foreach (string knownAssetPath in source.KnownAssetPaths)
+            {
+                clone.KnownAssetPaths.Add(knownAssetPath);
+            }
+            foreach (MethodSubscription subscription in source.Subscriptions)
+            {
+                clone.Subscriptions.Add(subscription == null ? null : subscription.Clone());
+            }
+            return clone;
+        }
+
+        private static Queue<PendingAssetChangeSet> ClonePendingChanges(
+            IEnumerable<PendingAssetChangeSet> source
+        )
+        {
+            Queue<PendingAssetChangeSet> clones = new();
+            foreach (PendingAssetChangeSet pendingChange in source)
+            {
+                clones.Enqueue(ClonePendingChange(pendingChange));
+            }
+            return clones;
+        }
+
+        private static PendingAssetChangeSet ClonePendingChange(PendingAssetChangeSet source)
+        {
+            if (source == null)
+            {
+                return null;
+            }
+
+            return new PendingAssetChangeSet(
+                CopyPaths(source.Imported),
+                CopyPaths(source.Deleted),
+                CopyPaths(source.Moved),
+                CopyPaths(source.MovedFrom)
+            );
+        }
+
+        private static string[] CopyPaths(IReadOnlyList<string> source)
+        {
+            string[] copy = new string[source.Count];
+            for (int index = 0; index < source.Count; ++index)
+            {
+                copy[index] = source[index];
+            }
+            return copy;
         }
 
         private static void PopulateKnownAssetPaths(
@@ -1541,6 +1636,20 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             internal Type _createdParameterElementType;
             internal bool _searchPrefabs;
             internal bool _searchSceneObjects;
+
+            internal MethodSubscription Clone()
+            {
+                return new MethodSubscription
+                {
+                    _declaringType = _declaringType,
+                    _method = _method,
+                    _flags = _flags,
+                    _parameterMode = _parameterMode,
+                    _createdParameterElementType = _createdParameterElementType,
+                    _searchPrefabs = _searchPrefabs,
+                    _searchSceneObjects = _searchSceneObjects,
+                };
+            }
         }
 
         internal sealed class AssetWatcherSettings

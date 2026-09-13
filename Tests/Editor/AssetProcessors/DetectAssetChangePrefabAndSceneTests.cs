@@ -53,26 +53,8 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         protected override string DefaultPayloadAssetPath => TestRoot + "/Payload.asset";
 
         private readonly List<GameObject> _instantiatedSceneObjects = new();
-
-        /// <summary>
-        /// Resets the processor to a clean state while preserving this fixture's
-        /// <see cref="PrefabSceneFixtureAllowlist"/>. Every in-test call site that resets the
-        /// processor MUST go through this helper — calling
-        /// <see cref="DetectAssetChangeProcessor.ResetForTesting()"/> directly drops
-        /// the allowlist, which silently opens the structural defense against
-        /// cross-fixture pollution for the remainder of that test.
-        /// </summary>
-        private static void ResetProcessorWithPrefabSceneFixtureAllowlist()
-        {
-            DetectAssetChangeProcessor.ResetForTesting();
-            /*
-                Reset clears the enablement override; force it back on because CI runs these watcher tests in
-                batch mode.
-            */
-            DetectAssetChangeProcessor.EnabledOverride = true;
-            DetectAssetChangeProcessor.IncludeTestAssets = true;
-            DetectAssetChangeProcessor.TestAssetFolderAllowlist = PrefabSceneFixtureAllowlist;
-        }
+        private DetectAssetChangeProcessor.AssetWatcherSettings _fixtureSettings;
+        private DetectAssetChangeProcessor.AssetWatcherSettings _settings;
 
         /// <summary>
         /// Counts how many times the specified handler instances were invoked.
@@ -142,22 +124,37 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         public override void CommonOneTimeSetUp()
         {
             base.CommonOneTimeSetUp();
+            _settings = DetectAssetChangeProcessor.GetSettingsForTesting();
             SharedPrefabTestFixtures.AcquireFixtures();
             CleanupTestFolders();
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
             // Flush cleanup mutations before the first test can observe a late drain.
             AssetPostprocessorDeferral.FlushForTesting();
+            DetectAssetChangeProcessor.ResetForTesting();
+            DetectAssetChangeProcessor.EnabledOverride = true;
+            DetectAssetChangeProcessor.IncludeTestAssets = true;
+            DetectAssetChangeProcessor.TestAssetFolderAllowlist = PrefabSceneFixtureAllowlist;
+            DetectAssetChangeProcessor.EnsureInitializedForTesting();
+            _fixtureSettings = DetectAssetChangeProcessor.GetSettingsForTesting();
+            DetectAssetChangeProcessor.ResetForTesting(_settings);
         }
 
         [OneTimeTearDown]
         public override void OneTimeTearDown()
         {
-            base.OneTimeTearDown();
-            CleanupTestFolders();
-            SharedPrefabTestFixtures.ReleaseFixtures();
-            CleanupDeferredAssetsAndFolders();
-            // Cleanup queues drains that must finish before the next fixture can observe handler state.
-            AssetPostprocessorDeferral.FlushForTesting();
+            try
+            {
+                base.OneTimeTearDown();
+                CleanupTestFolders();
+                SharedPrefabTestFixtures.ReleaseFixtures();
+                CleanupDeferredAssetsAndFolders();
+                // Cleanup queues drains that must finish before the next fixture can observe handler state.
+                AssetPostprocessorDeferral.FlushForTesting();
+            }
+            finally
+            {
+                DetectAssetChangeProcessor.ResetForTesting(_settings);
+            }
         }
 
         [SetUp]
@@ -186,9 +183,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         [TearDown]
         public override void TearDown()
         {
-            DetectAssetChangeProcessor.IncludeTestAssets = false;
-            DetectAssetChangeProcessor.TestAssetFolderAllowlist = null;
-            DetectAssetChangeProcessor.EnabledOverride = null;
+            DetectAssetChangeProcessor.ResetForTesting(_settings);
 
             foreach (GameObject go in _instantiatedSceneObjects)
             {
@@ -997,6 +992,26 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 sceneHandler.HasComponent<TestSceneAssetChangeHandler>(),
                 "SceneHandler fixture missing TestSceneAssetChangeHandler component"
             );
+        }
+
+        /// <summary>
+        /// Resets the processor to a clean state while preserving this fixture's
+        /// <see cref="PrefabSceneFixtureAllowlist"/>. Every in-test call site that resets the
+        /// processor MUST go through this helper — calling
+        /// <see cref="DetectAssetChangeProcessor.ResetForTesting()"/> directly drops
+        /// the allowlist, which silently opens the structural defense against
+        /// cross-fixture pollution for the remainder of that test.
+        /// </summary>
+        private void ResetProcessorWithPrefabSceneFixtureAllowlist()
+        {
+            DetectAssetChangeProcessor.ResetForTesting(_fixtureSettings);
+            /*
+                Reset clears the enablement override; force it back on because CI runs these watcher tests in
+                batch mode.
+            */
+            DetectAssetChangeProcessor.EnabledOverride = true;
+            DetectAssetChangeProcessor.IncludeTestAssets = true;
+            DetectAssetChangeProcessor.TestAssetFolderAllowlist = PrefabSceneFixtureAllowlist;
         }
 
         private GameObject InstantiateInScene(GameObject prefab)
