@@ -148,9 +148,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 3
             );
 
-            AssertPointEquals(Vector2.up, points[0]);
+            float diagonal = Mathf.Sqrt(0.5f);
+            AssertPointEquals(new Vector2(-diagonal, diagonal), points[0]);
             AssertPointEquals(Vector2.left, points[1]);
-            AssertPointEquals(Vector2.down, points[2]);
+            AssertPointEquals(new Vector2(-diagonal, -diagonal), points[2]);
         }
 
         [Test]
