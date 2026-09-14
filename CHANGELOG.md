@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `Line2D.TryGetIntersectionPoint(Circle, out Vector2)`, which returns the first circle-boundary
+  hit along a segment. See
+  [Math and Extensions](./docs/features/utilities/math-and-extensions.md#line2d-2d-line-segment-operations)
+  ([#742](https://github.com/Ambiguous-Interactive/unity-helpers/issues/742)).
 - Add `ShapeHelper` circular curves, upper-semicircle fractions, and angle-centered circular
   fractions with reusable output buffers and fail-soft validation. See
   [Helper Utilities](./docs/features/utilities/helper-utilities.md#circular-curves-and-arcs)
@@ -22,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Improved
 
+- Avoid parallel scheduling for Image Blur passes with fewer than 256 pixels or only one
+  partition, reducing small-texture overhead while retaining parallel execution for larger work
+  ([#782](https://github.com/Ambiguous-Interactive/unity-helpers/issues/782)).
 - Resolve already-loadable `SerializableType` names before constructing the full descriptor catalog,
   and avoid parallel sprite-crop scans below a conservative measured crossover
   ([#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781),

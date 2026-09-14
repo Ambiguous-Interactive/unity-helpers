@@ -137,13 +137,20 @@ if (wall.TryGetIntersectionPoint(ray, out Vector2 hitPoint))
 
 **Circle intersection (bullets hitting circular enemies):**
 
+`Intersects` answers whether any part of the segment is inside or on the circle. Use
+`TryGetIntersectionPoint` when you need the first point on the circumference, ordered from
+`bulletStart` toward `bulletEnd`. A path wholly inside the circle intersects its area but does not
+cross its circumference.
+`TryGetIntersectionPoint` rejects negative radii, while `Intersects` retains its existing
+radius-squared behavior.
+
 ```csharp
 var bulletPath = new Line2D(bulletStart, bulletEnd);
 var enemy = new Circle(enemyPosition, enemyRadius);
 
-if (bulletPath.Intersects(enemy))
+if (bulletPath.TryGetIntersectionPoint(enemy, out Vector2 hitPoint))
 {
-    // Bullet hit the enemy
+    impactEffect.transform.position = hitPoint;
     enemy.TakeDamage(bulletDamage);
 }
 ```

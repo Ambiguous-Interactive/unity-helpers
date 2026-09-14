@@ -190,6 +190,141 @@ namespace WallstopStudios.UnityHelpers.Tests.Math
             Assert.AreEqual(50f, intersection.y, Epsilon);
         }
 
+        [TestCase(-10f, 0f, 10f, 0f, 0f, 0f, 5f, -5f, 0f)]
+        [TestCase(10f, 0f, -10f, 0f, 0f, 0f, 5f, 5f, 0f)]
+        [TestCase(0f, -10f, 0f, 10f, 0f, 0f, 5f, 0f, -5f)]
+        [TestCase(-10f, 5f, 10f, 5f, 0f, 0f, 5f, 0f, 5f)]
+        [TestCase(0f, 0f, 10f, 0f, 0f, 0f, 5f, 5f, 0f)]
+        [TestCase(-5f, 0f, -10f, 0f, 0f, 0f, 5f, -5f, 0f)]
+        [TestCase(0f, 0f, 20f, 20f, 10f, 10f, 5f, 6.464466f, 6.464466f)]
+        [TestCase(20f, 20f, 0f, 0f, 10f, 10f, 5f, 13.535534f, 13.535534f)]
+        [TestCase(100_000_000f, 0f, 0f, 0f, 0f, 0f, 1f, 1f, 0f)]
+        [TestCase(100_000_000f, 0f, 1f, 0f, 0f, 0f, 1f, 1f, 0f)]
+        [TestCase(10_000_000_000_000_000f, 0f, 0f, 0f, 0f, 0f, 1f, 1f, 0f)]
+        [TestCase(float.MaxValue, 0f, 0f, 0f, 0f, 0f, 1f, 1f, 0f)]
+        [TestCase(0f, 0f, 10_000_000_000_000_000f, 0f, 0f, 0f, 1f, 1f, 0f)]
+        [TestCase(-1f, 0f, 1f, 0f, 0f, 0f, 0f, 0f, 0f)]
+        public void TryGetIntersectionPointWithCircleReturnsFirstBoundaryPoint(
+            float fromX,
+            float fromY,
+            float toX,
+            float toY,
+            float centerX,
+            float centerY,
+            float radius,
+            float expectedX,
+            float expectedY
+        )
+        {
+            Line2D line = new(new Vector2(fromX, fromY), new Vector2(toX, toY));
+            Circle circle = new(new Vector2(centerX, centerY), radius);
+
+            bool result = line.TryGetIntersectionPoint(circle, out Vector2 intersection);
+
+            Assert.IsTrue(result);
+            Assert.AreEqual(expectedX, intersection.x, Epsilon);
+            Assert.AreEqual(expectedY, intersection.y, Epsilon);
+        }
+
+        [TestCase(6f, 0f, 10f, 0f, 0f, 0f, 5f)]
+        [TestCase(-1f, 0f, 1f, 0f, 0f, 0f, 5f)]
+        [TestCase(0f, 0f, 0f, 0f, 0f, 0f, 5f)]
+        [TestCase(5f, 5f, 5f, 5f, 0f, 0f, 5f)]
+        [TestCase(11f, 11f, 12f, 12f, 10f, 10f, 5f)]
+        [TestCase(-1f, 1f, 1f, 1f, 0f, 0f, 0f)]
+        [TestCase(0.0000005f, 0f, 0.0000005f, 0f, 0f, 0f, 0f)]
+        [TestCase(-1f, 0.0000005f, 1f, 0.0000005f, 0f, 0f, 0f)]
+        [TestCase(0f, 0f, 0.000000000000001f, 0f, 0.000000000000002f, 0f, 0f)]
+        [TestCase(-1f, 0.0000001f, 1f, 0.0000001f, 0f, 0f, 0.000000001f)]
+        [TestCase(-10f, 0f, 10f, 0f, 0f, 0f, -5f)]
+        public void TryGetIntersectionPointWithCircleReturnsFalseWithoutBoundaryContact(
+            float fromX,
+            float fromY,
+            float toX,
+            float toY,
+            float centerX,
+            float centerY,
+            float radius
+        )
+        {
+            Line2D line = new(new Vector2(fromX, fromY), new Vector2(toX, toY));
+            Circle circle = new(new Vector2(centerX, centerY), radius);
+
+            bool result = line.TryGetIntersectionPoint(circle, out Vector2 intersection);
+
+            Assert.IsFalse(result);
+            Assert.AreEqual(Vector2.zero, intersection);
+        }
+
+        [Test]
+        public void TryGetIntersectionPointWithCircleAcceptsZeroLengthPointOnBoundary()
+        {
+            Line2D line = new(new Vector2(3f, 4f), new Vector2(3f, 4f));
+
+            bool result = line.TryGetIntersectionPoint(
+                new Circle(Vector2.zero, 5f),
+                out Vector2 intersection
+            );
+
+            Assert.IsTrue(result);
+            Assert.AreEqual(line.from, intersection);
+        }
+
+        [Test]
+        public void TryGetIntersectionPointWithPointCircleAcceptsMatchingPoint()
+        {
+            Circle point = new(new Vector2(2f, 3f), 0f);
+
+            Assert.IsTrue(
+                new Line2D(point.center, point.center).TryGetIntersectionPoint(
+                    point,
+                    out Vector2 intersection
+                )
+            );
+            Assert.AreEqual(point.center, intersection);
+        }
+
+        [TestCase(float.NaN)]
+        [TestCase(float.PositiveInfinity)]
+        [TestCase(float.NegativeInfinity)]
+        public void TryGetIntersectionPointWithCircleRejectsEachNonFiniteField(float value)
+        {
+            Line2D[] invalidLines =
+            {
+                new(new Vector2(value, 0f), Vector2.one),
+                new(new Vector2(0f, value), Vector2.one),
+                new(Vector2.zero, new Vector2(value, 1f)),
+                new(Vector2.zero, new Vector2(1f, value)),
+            };
+            foreach (Line2D invalidLine in invalidLines)
+            {
+                Assert.IsFalse(
+                    invalidLine.TryGetIntersectionPoint(
+                        new Circle(Vector2.zero, 1f),
+                        out Vector2 lineHit
+                    )
+                );
+                Assert.AreEqual(Vector2.zero, lineHit);
+            }
+
+            Circle[] invalidCircles =
+            {
+                new(new Vector2(value, 0f), 1f),
+                new(new Vector2(0f, value), 1f),
+                new(Vector2.zero, value),
+            };
+            foreach (Circle invalidCircle in invalidCircles)
+            {
+                Assert.IsFalse(
+                    new Line2D(Vector2.zero, Vector2.one).TryGetIntersectionPoint(
+                        invalidCircle,
+                        out Vector2 circleHit
+                    )
+                );
+                Assert.AreEqual(Vector2.zero, circleHit);
+            }
+        }
+
         [Test]
         public void DistanceToPointReturnsZeroForPointOnLine()
         {

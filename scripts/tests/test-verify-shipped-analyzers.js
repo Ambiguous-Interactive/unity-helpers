@@ -13,13 +13,17 @@
 // message its OWN guard emits. Asserting only a non-zero exit would let a case pass by tripping a
 // different guard than the one it is named for, which is how an unfalsifiable gate looks from the
 // outside.
+// cspell:ignore msbuild
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { spawnSync } = require("node:child_process");
 
 const { ANALYZERS, verify } = require("../verify-shipped-analyzers.js");
+
+const REPO_ROOT = path.resolve(__dirname, "../..");
 
 let passed = 0;
 
@@ -85,6 +89,65 @@ withCase((fixture) => {
   const { code, output } = run(fixture);
   check("an unmodified tree passes", code === 0, `exit ${code}: ${output}`);
 });
+
+console.log("Section: analyzer build configuration");
+
+function runMsBuild(project, args) {
+  return spawnSync("dotnet", ["msbuild", path.join(REPO_ROOT, project), "-nologo", ...args], {
+    cwd: REPO_ROOT,
+    encoding: "utf8"
+  });
+}
+
+for (const { project, assembly } of ANALYZERS) {
+  const debug = runMsBuild(project, ["-getProperty:CopyAnalyzerPayload", "-p:Configuration=Debug"]);
+  check(
+    `${project} does not copy a Debug payload by default`,
+    debug.status === 0 && debug.stdout.trim() === "false",
+    `exit ${debug.status}: ${debug.stdout || debug.stderr}`
+  );
+
+  const release = runMsBuild(project, [
+    "-getProperty:CopyAnalyzerPayload",
+    "-p:Configuration=Release"
+  ]);
+  check(
+    `${project} copies a Release payload by default`,
+    release.status === 0 && release.stdout.trim() === "true",
+    `exit ${release.status}: ${release.stdout || release.stderr}`
+  );
+
+  const disabled = runMsBuild(project, [
+    "-getProperty:CopyAnalyzerPayload",
+    "-p:Configuration=Release",
+    "-p:CopyAnalyzerPayload=false"
+  ]);
+  check(
+    `${project} honors an explicitly disabled copy`,
+    disabled.status === 0 && disabled.stdout.trim() === "false",
+    `exit ${disabled.status}: ${disabled.stdout || disabled.stderr}`
+  );
+
+  const rejectedOutputDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "rejected-analyzer-copy-"));
+  try {
+    const rejected = runMsBuild(project, [
+      "-t:CopyAnalyzerToPackage",
+      "-p:Configuration=Debug",
+      "-p:CopyAnalyzerPayload=true",
+      `-p:AnalyzerPayloadOutputDir=${rejectedOutputDirectory}`
+    ]);
+    const rejectionOutput = `${rejected.stdout || ""}\n${rejected.stderr || ""}`;
+    check(
+      `${project} rejects an explicit Debug payload copy before writing`,
+      rejected.status !== 0 &&
+        rejectionOutput.includes("Analyzer payloads can only be copied from a Release build") &&
+        !fs.existsSync(path.join(rejectedOutputDirectory, assembly)),
+      `exit ${rejected.status}: ${rejectionOutput}`
+    );
+  } finally {
+    fs.rmSync(rejectedOutputDirectory, { recursive: true, force: true });
+  }
+}
 
 console.log("Section: red halves");
 

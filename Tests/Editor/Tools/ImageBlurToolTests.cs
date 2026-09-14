@@ -55,6 +55,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             Assert.That(sum, Is.InRange(0.999f, 1.001f));
         }
 
+        [TestCase(8, 8, 8, false)]
+        [TestCase(16, 16, 16, true)]
+        [TestCase(1, 4_096, 1, false)]
+        [TestCase(1, 4_096, 4_096, true)]
+        [TestCase(int.MaxValue, int.MaxValue, int.MaxValue, true)]
+        public void BlurParallelismRequiresEnoughPixelsAndPartitions(
+            int width,
+            int height,
+            int partitionCount,
+            bool expected
+        )
+        {
+            Assert.That(
+                ImageBlurTool.ShouldBlurInParallel(width, height, partitionCount),
+                Is.EqualTo(expected)
+            );
+        }
+
         [Test]
         public void BlurredTextureMatchesInputDimensions()
         {
@@ -131,6 +149,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             }
         }
 
+        [Test]
+        public void SequentialAndParallelBlurProduceEquivalentPixels()
+        {
+            Color[] pixels = new Color[256];
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                float alpha = i % 5 == 0 ? 0f : (i % 11) / 10f;
+                pixels[i] = new Color((i % 3) / 2f, (i % 7) / 6f, (i % 13) / 12f, alpha);
+            }
+
+            Color[] sequential = Blur(16, 16, pixels, 3, false);
+            Color[] parallel = Blur(16, 16, pixels, 3, true);
+
+            Assert.That(parallel.Length, Is.EqualTo(sequential.Length));
+            for (int i = 0; i < parallel.Length; i++)
+            {
+                Assert.That(parallel[i], Is.EqualTo(sequential[i]), $"pixel {i}");
+            }
+        }
+
         [TestCase(1)]
         [TestCase(3)]
         public void BlurOfUniformImageIsUniform(int radius)
@@ -156,6 +194,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             source.SetPixels(pixels);
             source.Apply();
             Texture2D blurred = Track(ImageBlurTool.BlurredForTests(source, radius));
+            return blurred.GetPixels();
+        }
+
+        private Color[] Blur(int width, int height, Color[] pixels, int radius, bool runInParallel)
+        {
+            Texture2D source = Track(new Texture2D(width, height, TextureFormat.RGBAFloat, false));
+            source.SetPixels(pixels);
+            source.Apply();
+            Texture2D blurred = Track(ImageBlurTool.BlurredForTests(source, radius, runInParallel));
             return blurred.GetPixels();
         }
     }

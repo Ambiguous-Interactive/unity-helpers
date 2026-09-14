@@ -74,8 +74,9 @@ radius appends `_1`, `_2` and so on rather than overwriting.
 
 The tool temporarily enables `Read/Write` and uses uncompressed import data while processing each
 source. It restores both settings after that texture succeeds or fails, and shows one completion
-summary for the whole batch. The new blurred files are permanent project changes and are not covered
-by Unity's undo history.
+summary for the whole batch. Small images and one-row or one-column passes avoid worker scheduling;
+larger images retain parallel processing. The new blurred files are permanent project changes and
+are not covered by Unity's undo history.
 
 > **Visual Demo**
 >

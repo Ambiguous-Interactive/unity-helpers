@@ -20,6 +20,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
     {
         internal const string TemporaryTextureName = "ImageBlurTool Temporary Blur";
 
+        private const long ParallelBlurPixelThreshold = 256L;
+
         internal SerializedObject SerializedStateForTesting => _serializedObject;
 
         public List<Object> imageSources = new();
@@ -64,7 +66,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
         internal static Texture2D BlurredForTests(Texture2D original, int radius)
         {
-            return CreateBlurredTexture(original, radius);
+            return CreateBlurredTexture(original, radius, null);
+        }
+
+        internal static Texture2D BlurredForTests(
+            Texture2D original,
+            int radius,
+            bool runInParallel
+        )
+        {
+            return CreateBlurredTexture(original, radius, runInParallel);
         }
 
         internal static float[] KernelForTests(int radius)
@@ -72,7 +83,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             return GenerateGaussianKernel(radius);
         }
 
-        private static Texture2D CreateBlurredTexture(Texture2D original, int radius)
+        internal static bool ShouldBlurInParallel(int width, int height, int partitionCount)
+        {
+            return ParallelBlurPixelThreshold <= (long)width * height && 1 < partitionCount;
+        }
+
+        private static Texture2D CreateBlurredTexture(
+            Texture2D original,
+            int radius,
+            bool? parallelOverride
+        )
         {
             Texture2D blurred = new(original.width, original.height, original.format, false)
             {
@@ -110,65 +130,25 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 );
 
                 float[] kernel = GenerateGaussianKernel(radius);
-
-                Parallel.For(
-                    0,
-                    height,
-                    y =>
-                    {
-                        int yOffset = y * width;
-                        for (int x = 0; x < width; x++)
-                        {
-                            Color weightedSum = Color.clear;
-                            Color straightSum = Color.clear;
-                            float weightTotal = 0f;
-
-                            for (int k = -radius; k <= radius; k++)
-                            {
-                                int currentX = x + k;
-                                if (0 <= currentX && currentX < width)
-                                {
-                                    float weight = kernel[k + radius];
-                                    weightedSum += premultiplied[yOffset + currentX] * weight;
-                                    straightSum += pixels[yOffset + currentX] * weight;
-                                    weightTotal += weight;
-                                }
-                            }
-                            tempPixels[yOffset + x] = weightedSum / weightTotal;
-                            tempStraight[yOffset + x] = straightSum / weightTotal;
-                        }
-                    }
-                );
-
-                Parallel.For(
-                    0,
+                BlurJob job = new(
                     width,
-                    x =>
-                    {
-                        for (int y = 0; y < height; y++)
-                        {
-                            Color weightedSum = Color.clear;
-                            Color straightSum = Color.clear;
-                            float weightTotal = 0f;
-
-                            for (int k = -radius; k <= radius; k++)
-                            {
-                                int currentY = y + k;
-                                if (0 <= currentY && currentY < height)
-                                {
-                                    float weight = kernel[k + radius];
-                                    weightedSum += tempPixels[(currentY * width) + x] * weight;
-                                    straightSum += tempStraight[(currentY * width) + x] * weight;
-                                    weightTotal += weight;
-                                }
-                            }
-                            blurredPixels[(y * width) + x] = TextureResampling.Unpremultiply(
-                                weightedSum / weightTotal,
-                                straightSum / weightTotal
-                            );
-                        }
-                    }
+                    height,
+                    radius,
+                    kernel,
+                    pixels,
+                    premultiplied,
+                    tempPixels,
+                    tempStraight,
+                    blurredPixels
                 );
+                bool horizontalParallel = parallelOverride.HasValue
+                    ? parallelOverride.Value
+                    : ShouldBlurInParallel(width, height, height);
+                bool verticalParallel = parallelOverride.HasValue
+                    ? parallelOverride.Value
+                    : ShouldBlurInParallel(width, height, width);
+                job.ExecuteHorizontalPass(horizontalParallel);
+                job.ExecuteVerticalPass(verticalParallel);
 
                 blurred.SetPixels(blurredPixels);
                 blurred.Apply();
@@ -310,7 +290,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     return false;
                 }
 
-                blurredTexture = CreateBlurredTexture(currentTexture, radius);
+                blurredTexture = CreateBlurredTexture(currentTexture, radius, null);
                 if (blurredTexture == null)
                 {
                     this.LogError($"Failed to create blurred texture for: {originalTexture.name}.");
@@ -603,6 +583,121 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 toProcess = combined.ToArray();
             }
             ApplyBlurToTextures(toProcess, _blurRadius, EditorUi.Info);
+        }
+
+        private sealed class BlurJob
+        {
+            private readonly int _width;
+            private readonly int _height;
+            private readonly int _radius;
+            private readonly float[] _kernel;
+            private readonly Color[] _pixels;
+            private readonly Color[] _premultiplied;
+            private readonly Color[] _tempPixels;
+            private readonly Color[] _tempStraight;
+            private readonly Color[] _blurredPixels;
+
+            internal BlurJob(
+                int width,
+                int height,
+                int radius,
+                float[] kernel,
+                Color[] pixels,
+                Color[] premultiplied,
+                Color[] tempPixels,
+                Color[] tempStraight,
+                Color[] blurredPixels
+            )
+            {
+                _width = width;
+                _height = height;
+                _radius = radius;
+                _kernel = kernel;
+                _pixels = pixels;
+                _premultiplied = premultiplied;
+                _tempPixels = tempPixels;
+                _tempStraight = tempStraight;
+                _blurredPixels = blurredPixels;
+            }
+
+            internal void ExecuteHorizontalPass(bool runInParallel)
+            {
+                if (runInParallel)
+                {
+                    Parallel.For(0, _height, ExecuteHorizontalPartition);
+                    return;
+                }
+
+                for (int y = 0; y < _height; y++)
+                {
+                    ExecuteHorizontalPartition(y);
+                }
+            }
+
+            internal void ExecuteVerticalPass(bool runInParallel)
+            {
+                if (runInParallel)
+                {
+                    Parallel.For(0, _width, ExecuteVerticalPartition);
+                    return;
+                }
+
+                for (int x = 0; x < _width; x++)
+                {
+                    ExecuteVerticalPartition(x);
+                }
+            }
+
+            private void ExecuteHorizontalPartition(int y)
+            {
+                int yOffset = y * _width;
+                for (int x = 0; x < _width; x++)
+                {
+                    Color weightedSum = Color.clear;
+                    Color straightSum = Color.clear;
+                    float weightTotal = 0f;
+
+                    for (int k = -_radius; k <= _radius; k++)
+                    {
+                        int currentX = x + k;
+                        if (0 <= currentX && currentX < _width)
+                        {
+                            float weight = _kernel[k + _radius];
+                            weightedSum += _premultiplied[yOffset + currentX] * weight;
+                            straightSum += _pixels[yOffset + currentX] * weight;
+                            weightTotal += weight;
+                        }
+                    }
+                    _tempPixels[yOffset + x] = weightedSum / weightTotal;
+                    _tempStraight[yOffset + x] = straightSum / weightTotal;
+                }
+            }
+
+            private void ExecuteVerticalPartition(int x)
+            {
+                for (int y = 0; y < _height; y++)
+                {
+                    Color weightedSum = Color.clear;
+                    Color straightSum = Color.clear;
+                    float weightTotal = 0f;
+
+                    for (int k = -_radius; k <= _radius; k++)
+                    {
+                        int currentY = y + k;
+                        if (0 <= currentY && currentY < _height)
+                        {
+                            float weight = _kernel[k + _radius];
+                            weightedSum += _tempPixels[(currentY * _width) + x] * weight;
+                            straightSum += _tempStraight[(currentY * _width) + x] * weight;
+                            weightTotal += weight;
+                        }
+                    }
+                    _blurredPixels[(y * _width) + x] = TextureResampling.Unpremultiply(
+                        weightedSum / weightTotal,
+                        straightSum / weightTotal
+                    );
+                }
+            }
         }
     }
 }

@@ -29,6 +29,9 @@ namespace WallstopStudios.UnityHelpers.Core.Math
     [WProtoContract]
     public readonly partial struct Line2D : IEquatable<Line2D>
     {
+        private const double DoubleMachineEpsilon = 2.2204460492503131e-16d;
+        private const double DoubleRoundingToleranceFactor = 64d * DoubleMachineEpsilon;
+
         /// <summary>
         /// Equality operator.
         /// </summary>
@@ -155,6 +158,108 @@ namespace WallstopStudios.UnityHelpers.Core.Math
 
             intersection = default;
             return false;
+        }
+
+        /// <summary>
+        /// Attempts to find the first point where this segment meets a circle's circumference.
+        /// </summary>
+        /// <param name="circle">The circle whose non-negative-radius boundary is tested.</param>
+        /// <param name="intersection">The first boundary point from <see cref="from"/> toward <see cref="to"/>, or zero when none exists.</param>
+        /// <returns><c>true</c> when the segment touches or crosses the circumference; otherwise, <c>false</c>.</returns>
+        /// <remarks>
+        /// A segment that starts inside the circle returns its exit point. A segment wholly inside
+        /// the circle has no boundary intersection and returns <c>false</c>.
+        /// </remarks>
+        public bool TryGetIntersectionPoint(Circle circle, out Vector2 intersection)
+        {
+            if (
+                !float.IsFinite(from.x)
+                || !float.IsFinite(from.y)
+                || !float.IsFinite(to.x)
+                || !float.IsFinite(to.y)
+                || !float.IsFinite(circle.center.x)
+                || !float.IsFinite(circle.center.y)
+                || !float.IsFinite(circle.radius)
+                || circle.radius < 0f
+            )
+            {
+                intersection = default;
+                return false;
+            }
+
+            double directionX = (double)to.x - from.x;
+            double directionY = (double)to.y - from.y;
+            double offsetX = (double)from.x - circle.center.x;
+            double offsetY = (double)from.y - circle.center.y;
+            double directionLengthSquared = directionX * directionX + directionY * directionY;
+            double offsetLengthSquared = offsetX * offsetX + offsetY * offsetY;
+            double radiusSquared = (double)circle.radius * circle.radius;
+
+            if (directionLengthSquared == 0d)
+            {
+                double pointScale = Math.Max(offsetLengthSquared, radiusSquared);
+                double pointTolerance = DoubleRoundingToleranceFactor * pointScale;
+                if (Math.Abs(offsetLengthSquared - radiusSquared) <= pointTolerance)
+                {
+                    intersection = from;
+                    return true;
+                }
+
+                intersection = default;
+                return false;
+            }
+
+            double directionLength = Math.Sqrt(directionLengthSquared);
+            double cross = offsetX * directionY - offsetY * directionX;
+            double perpendicularDistanceSquared = cross * cross / directionLengthSquared;
+            double halfChordSquared = radiusSquared - perpendicularDistanceSquared;
+            double boundaryScale = Math.Max(perpendicularDistanceSquared, radiusSquared);
+            double roundingTolerance = DoubleRoundingToleranceFactor * boundaryScale;
+            if (halfChordSquared < -roundingTolerance)
+            {
+                intersection = default;
+                return false;
+            }
+
+            double unitDirectionX = directionX / directionLength;
+            double unitDirectionY = directionY / directionLength;
+            double halfChord = Math.Sqrt(Math.Max(0d, halfChordSquared));
+            double endOffsetX = (double)to.x - circle.center.x;
+            double endOffsetY = (double)to.y - circle.center.y;
+            double startLongitudinal = offsetX * unitDirectionX + offsetY * unitDirectionY;
+            double endLongitudinal = endOffsetX * unitDirectionX + endOffsetY * unitDirectionY;
+            double startTolerance =
+                DoubleRoundingToleranceFactor * Math.Max(halfChord, Math.Abs(startLongitudinal));
+            double endTolerance =
+                DoubleRoundingToleranceFactor * Math.Max(halfChord, Math.Abs(endLongitudinal));
+            double longitudinal;
+            if (
+                startLongitudinal - startTolerance <= -halfChord
+                && -halfChord <= endLongitudinal + endTolerance
+            )
+            {
+                longitudinal = -halfChord;
+            }
+            else if (
+                startLongitudinal - startTolerance <= halfChord
+                && halfChord <= endLongitudinal + endTolerance
+            )
+            {
+                longitudinal = halfChord;
+            }
+            else
+            {
+                intersection = default;
+                return false;
+            }
+
+            double perpendicularX = unitDirectionY * cross / directionLength;
+            double perpendicularY = -unitDirectionX * cross / directionLength;
+            intersection = new Vector2(
+                (float)(circle.center.x + perpendicularX + unitDirectionX * longitudinal),
+                (float)(circle.center.y + perpendicularY + unitDirectionY * longitudinal)
+            );
+            return true;
         }
 
         /// <summary>

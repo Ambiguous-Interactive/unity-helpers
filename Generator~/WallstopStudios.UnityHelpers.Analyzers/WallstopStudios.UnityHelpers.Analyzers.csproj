@@ -28,7 +28,10 @@
     <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <DebugType>none</DebugType>
-    <CopyAnalyzerPayload Condition="'$(CopyAnalyzerPayload)' == ''">true</CopyAnalyzerPayload>
+    <CopyAnalyzerPayload
+      Condition="'$(CopyAnalyzerPayload)' == '' and '$(Configuration)' == 'Release'"
+      >true</CopyAnalyzerPayload>
+    <CopyAnalyzerPayload Condition="'$(CopyAnalyzerPayload)' == ''">false</CopyAnalyzerPayload>
     <AnalyzerPayloadOutputDir Condition="'$(AnalyzerPayloadOutputDir)' == ''"
       >$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../../Runtime/Analyzers'))</AnalyzerPayloadOutputDir>
     <!-- RS2008 wants an AnalyzerReleases ledger, which is for analyzer packages published on NuGet
@@ -46,6 +49,14 @@
       PrivateAssets="all"
     />
   </ItemGroup>
+
+  <Target
+    Name="RejectNonReleaseAnalyzerPayload"
+    BeforeTargets="CopyAnalyzerToPackage"
+    Condition="'$(CopyAnalyzerPayload)' == 'true' and '$(Configuration)' != 'Release'"
+  >
+    <Error Text="Analyzer payloads can only be copied from a Release build; current configuration is '$(Configuration)'. Run dotnet build -c Release." />
+  </Target>
 
   <Target
     Name="CopyAnalyzerToPackage"
