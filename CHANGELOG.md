@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `RandomSeeds.Mix64` and ordered numeric or UTF-8 domain seed derivation for reproducible,
+  schedule-independent gameplay streams. See
+  [Keyed Seed Derivation](./docs/features/utilities/random-generators.md#keyed-seed-derivation)
+  ([#791](https://github.com/Ambiguous-Interactive/unity-helpers/issues/791)).
 - Add `PointerEventData.TryGetWorldPoint` and `TryGetLocalPoint`, which prefer raycast hits and
   convert clamped screen positions across overlay, camera, and world-space canvases. See
   [Pointer Coordinates](./docs/features/utilities/math-and-extensions.md#pointer-coordinates)

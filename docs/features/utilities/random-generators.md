@@ -184,6 +184,32 @@ for (int i = 0; i < 10; i++)
 PcgRandom different = new PcgRandom(seed: 67890);
 ```
 
+### Keyed seed derivation
+
+Use `RandomSeeds.Derive` when each gameplay decision or parallel job needs its own reproducible
+stream. Changing one decision then leaves unrelated streams unchanged, and scheduling jobs in a
+different order does not move their results.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.Random;
+
+const ulong worldSeed = 12345UL;
+ulong roomIndex = 7UL;
+ulong attemptIndex = 2UL;
+ulong roomSeed = RandomSeeds.Derive(worldSeed, roomIndex, attemptIndex);
+IRandom roomRandom = new SplitMix64(roomSeed);
+
+ulong lootSeed = RandomSeeds.Derive(worldSeed, "loot");
+```
+
+Numeric keys are folded in order, so `(room, attempt)` differs from `(attempt, room)`. Domain text
+is hashed as UTF-8 and remains stable across processes; a null domain is the empty domain.
+`RandomSeeds.Mix64` exposes the SplitMix64 finalizer for callers that already have their own
+key-composition scheme; the finalizer is a bijection over 64-bit values. These helpers are
+deterministic mixers, not cryptographic hashes.
+
 ### Seeded streams that moved
 
 Reproducibility is a promise about a _given version_. Two corrections in this release change what

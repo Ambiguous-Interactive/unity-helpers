@@ -165,15 +165,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static ulong Mix64(ulong value)
+        private static ulong MixSeed(ulong value)
         {
             unchecked
             {
-                value += GoldenGamma;
-                value = (value ^ (value >> 30)) * 0xBF58476D1CE4E5B9UL;
-                value = (value ^ (value >> 27)) * 0x94D049BB133111EBUL;
-                value ^= value >> 31;
-                return value;
+                return RandomSeeds.Mix64(value + GoldenGamma);
             }
         }
 
@@ -220,10 +216,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         private void InitializeFromGuid(Guid guid)
         {
             (ulong seed0, ulong seed1) = RandomUtilities.GuidToUInt64Pair(guid);
-            ulong mixed0 = Mix64(seed0);
-            ulong mixed1 = Mix64(seed0 + GoldenGamma);
-            ulong mixed2 = Mix64(seed1);
-            ulong mixed3 = Mix64(seed1 + GoldenGamma);
+            ulong mixed0 = MixSeed(seed0);
+            ulong mixed1 = MixSeed(seed0 + GoldenGamma);
+            ulong mixed2 = MixSeed(seed1);
+            ulong mixed3 = MixSeed(seed1 + GoldenGamma);
             SetState(mixed0, mixed1, mixed2, mixed3);
         }
 
@@ -231,10 +227,10 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         {
             unchecked
             {
-                ulong baseSeed = Mix64(seed);
-                ulong bSeed = Mix64(seed + GoldenGamma);
-                ulong cSeed = Mix64(seed + (GoldenGamma * 2));
-                ulong dSeed = Mix64(seed + (GoldenGamma * 3));
+                ulong baseSeed = MixSeed(seed);
+                ulong bSeed = MixSeed(seed + GoldenGamma);
+                ulong cSeed = MixSeed(seed + (GoldenGamma * 2));
+                ulong dSeed = MixSeed(seed + (GoldenGamma * 3));
                 SetState(baseSeed, bSeed, cSeed, dSeed);
             }
         }

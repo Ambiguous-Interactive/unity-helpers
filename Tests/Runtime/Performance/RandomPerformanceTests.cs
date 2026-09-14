@@ -73,12 +73,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             unchecked
             {
                 ulong value = DeterministicSeedBase + ((ulong)index * DeterministicSeedIncrement);
-                value ^= value >> 30;
-                value *= 0xBF58476D1CE4E5B9UL;
-                value ^= value >> 27;
-                value *= 0x94D049BB133111EBUL;
-                value ^= value >> 31;
-                return value;
+                return RandomSeeds.Mix64(value);
             }
         }
 
