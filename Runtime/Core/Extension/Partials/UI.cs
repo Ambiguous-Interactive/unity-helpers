@@ -75,9 +75,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             out Vector3 worldPoint
         )
         {
-            worldPoint = default;
             if (pointerEventData == null || rectangle == null)
             {
+                worldPoint = default;
                 return false;
             }
 
@@ -98,6 +98,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             Vector2 screenPoint = ClampToScreen(pointerEventData.position);
             if (!TryResolveEventCamera(pointerEventData, rectangle, out Camera eventCamera))
             {
+                worldPoint = default;
                 return false;
             }
 
@@ -110,6 +111,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 ) || !IsFinite(resolved)
             )
             {
+                worldPoint = default;
                 return false;
             }
 
@@ -136,9 +138,9 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             out Vector2 localPoint
         )
         {
-            localPoint = default;
             if (!pointerEventData.TryGetWorldPoint(rectangle, out Vector3 worldPoint))
             {
+                localPoint = default;
                 return false;
             }
 
@@ -146,6 +148,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             Vector2 resolved = new(local.x, local.y);
             if (!IsFinite(resolved))
             {
+                localPoint = default;
                 return false;
             }
 
@@ -159,33 +162,43 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             out Camera eventCamera
         )
         {
-            eventCamera = null;
             Canvas canvas = rectangle.GetComponentInParent<Canvas>();
             Canvas rootCanvas = canvas != null ? canvas.rootCanvas : null;
             if (rootCanvas != null && rootCanvas.renderMode == RenderMode.ScreenSpaceOverlay)
             {
+                eventCamera = null;
                 return true;
             }
 
-            eventCamera = pointerEventData.enterEventCamera;
-            if (eventCamera != null)
+            Camera enterEventCamera = pointerEventData.enterEventCamera;
+            if (enterEventCamera != null)
             {
+                eventCamera = enterEventCamera;
                 return true;
             }
 
-            eventCamera = pointerEventData.pressEventCamera;
-            if (eventCamera != null)
+            Camera pressEventCamera = pointerEventData.pressEventCamera;
+            if (pressEventCamera != null)
             {
+                eventCamera = pressEventCamera;
                 return true;
             }
 
             if (rootCanvas == null)
             {
+                eventCamera = null;
                 return true;
             }
 
-            eventCamera = rootCanvas.worldCamera;
-            return eventCamera != null;
+            Camera worldCamera = rootCanvas.worldCamera;
+            if (worldCamera == null)
+            {
+                eventCamera = null;
+                return false;
+            }
+
+            eventCamera = worldCamera;
+            return true;
         }
 
         private static Vector2 ClampToScreen(Vector2 point)

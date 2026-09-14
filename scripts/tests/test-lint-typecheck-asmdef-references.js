@@ -564,6 +564,7 @@ runTest("this repository's own typecheck projects are parsed, not silently skipp
       "WallstopStudios.UnityHelpers.Tests.Editor.Settings",
       "WallstopStudios.UnityHelpers.Tests.Editor.Sprites.Animation",
       "WallstopStudios.UnityHelpers.Tests.Editor.Sprites.Cropper",
+      "WallstopStudios.UnityHelpers.Tests.Editor.Sprites.PivotAdjuster",
       "WallstopStudios.UnityHelpers.Tests.Editor.Sprites.SpriteSheetExtractor",
       "WallstopStudios.UnityHelpers.Tests.Editor.Sprites.TextureSettings",
       "WallstopStudios.UnityHelpers.Tests.Editor.Sprites.TextureTools",
