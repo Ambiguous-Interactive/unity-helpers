@@ -7,13 +7,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     using System.Collections.Generic;
     using System.Linq;
     using System.Reflection;
+    using System.Runtime.InteropServices;
     using NUnit.Framework;
     using UnityEngine;
+    using UnityEngine.TestTools.Constraints;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Random;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Tests.TestDoubles;
     using WallstopStudios.UnityHelpers.Utils;
+    using Is = NUnit.Framework.Is;
+    using UnityIs = UnityEngine.TestTools.Constraints.Is;
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
@@ -437,6 +441,462 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             SystemRandom rng = new(17);
             IReadOnlyList<float> weights = new[] { -float.MaxValue, 0f, float.Epsilon, -1f };
             Assert.AreEqual(2, rng.NextWeightedIndex(weights));
+        }
+
+        [Test]
+        public void TryNextWeightedIndexSupportsExtremeDoubleWeights()
+        {
+            EdgeCaseRandom random = new(doubleSequence: new[] { 0.75d }, maxDoubleCalls: 1);
+            double[] weights = { double.MaxValue, double.MaxValue };
+
+            bool selected = random.TryNextWeightedIndex(weights, out int index);
+
+            Assert.IsTrue(selected);
+            Assert.AreEqual(1, index);
+            Assert.Throws<InvalidOperationException>(() => random.NextDouble());
+        }
+
+        [Test]
+        public void TryNextWeightedIndexByRaceConsumesOneDrawPerSlot()
+        {
+            EdgeCaseRandom random = new(
+                doubleSequence: new[] { 0.5d, 0.5d, 0.5d, 0.99d },
+                maxDoubleCalls: 4
+            );
+            double[] weights = { 1d, 2d, 4d, 0d };
+
+            bool selected = random.TryNextWeightedIndexByRace(weights, out int index);
+
+            Assert.IsTrue(selected);
+            Assert.AreEqual(2, index);
+            Assert.Throws<InvalidOperationException>(() => random.NextDouble());
+        }
+
+        [Test]
+        public void TryNextWeightedIndexByRaceSupportsFloatWeightsAndLowerIndexTies()
+        {
+            EdgeCaseRandom random = new(doubleSequence: new[] { 0d, 0d, 0.75d }, maxDoubleCalls: 3);
+            float[] weights = { 1f, 4f, 0f };
+
+            bool selected = random.TryNextWeightedIndexByRace(
+                (ReadOnlySpan<float>)weights,
+                out int index
+            );
+
+            Assert.IsTrue(selected);
+            Assert.AreEqual(0, index);
+            Assert.Throws<InvalidOperationException>(() => random.NextDouble());
+        }
+
+        [Test]
+        public void TryNextWeightedRaceHandlesExtremeAndInactiveWeights()
+        {
+            EdgeCaseRandom random = new(
+                doubleSequence: new[] { 0.5d, 0.5d, 0.5d },
+                maxDoubleCalls: 3
+            );
+            double[] weights = { 0d, double.Epsilon, double.MaxValue };
+
+            Assert.IsTrue(random.TryNextWeightedIndexByRace(weights, out int index));
+            Assert.AreEqual(2, index);
+            Assert.Throws<InvalidOperationException>(() => random.NextDouble());
+
+            EdgeCaseRandom single = new(doubleFallback: 0.5d, maxDoubleCalls: 3);
+            Assert.IsTrue(single.TryNextWeightedIndexByRace(new[] { 0d, 7d, -1d }, out index));
+            Assert.AreEqual(1, index);
+        }
+
+        [Test]
+        public void WeightedSpanMethodsHaveSeededGoldenSequences()
+        {
+            int[] expectedFloatRace = { 2, 0, 2, 2, 1, 2, 0, 1 };
+            int[] expectedDoubleRace = { 2, 0, 2, 2, 1, 2, 0, 1 };
+            int[] expectedCumulative = { 2, 2, 1, 1, 2, 2, 1, 2 };
+            int[] expectedSubset = { 2, 1 };
+            float[] floatWeights = { 1f, 3f, 7f };
+            double[] doubleWeights = { 1d, 3d, 7d };
+            PcgRandom floatRace = new(792);
+            PcgRandom doubleRace = new(792);
+            PcgRandom cumulative = new(792);
+            PcgRandom subset = new(792);
+
+            for (int draw = 0; draw < expectedFloatRace.Length; draw++)
+            {
+                Assert.IsTrue(
+                    floatRace.TryNextWeightedIndexByRace(
+                        (ReadOnlySpan<float>)floatWeights,
+                        out int index
+                    )
+                );
+                Assert.AreEqual(expectedFloatRace[draw], index);
+                Assert.IsTrue(doubleRace.TryNextWeightedIndexByRace(doubleWeights, out index));
+                Assert.AreEqual(expectedDoubleRace[draw], index);
+                Assert.IsTrue(cumulative.TryNextWeightedIndex(doubleWeights, out index));
+                Assert.AreEqual(expectedCumulative[draw], index);
+            }
+
+            int[] destination = new int[2];
+            Assert.IsTrue(subset.TryNextWeightedSubsetByRace(doubleWeights, destination.AsSpan()));
+            CollectionAssert.AreEqual(expectedSubset, destination);
+        }
+
+        [Test]
+        public void TryNextWeightedMethodsRejectInvalidWeightsBeforeDrawing()
+        {
+            EdgeCaseRandom random = new(maxDoubleCalls: 0);
+            int index = 99;
+
+            Assert.IsFalse(random.TryNextWeightedIndex(ReadOnlySpan<double>.Empty, out index));
+            Assert.AreEqual(0, index);
+            Assert.IsFalse(random.TryNextWeightedIndex(new[] { 0d, -1d }, out index));
+            Assert.AreEqual(0, index);
+            Assert.IsFalse(random.TryNextWeightedIndex(new[] { 1d, double.NaN }, out index));
+            Assert.AreEqual(0, index);
+            Assert.IsFalse(
+                random.TryNextWeightedIndexByRace(new[] { 1d, double.PositiveInfinity }, out index)
+            );
+            Assert.AreEqual(0, index);
+            Assert.IsFalse(
+                random.TryNextWeightedIndexByRace(
+                    (ReadOnlySpan<float>)new[] { 1f, float.NegativeInfinity },
+                    out index
+                )
+            );
+            Assert.AreEqual(0, index);
+        }
+
+        [Test]
+        public void TryNextWeightedIndexByRaceMatchesWeightedFrequencies()
+        {
+            const int DrawCount = 4000;
+            SystemRandom random = new(792);
+            double[] weights = { 1d, 3d };
+            int firstCount = 0;
+            bool everySelectionSucceeded = true;
+            bool everyIndexWasInRange = true;
+            for (int draw = 0; draw < DrawCount; draw++)
+            {
+                if (!random.TryNextWeightedIndexByRace(weights, out int index))
+                {
+                    everySelectionSucceeded = false;
+                    continue;
+                }
+
+                everyIndexWasInRange &= 0 <= index && index <= 1;
+                if (index == 0)
+                {
+                    firstCount++;
+                }
+            }
+
+            double expectedFirst = DrawCount * 0.25d;
+            double expectedSecond = DrawCount - expectedFirst;
+            double firstDifference = firstCount - expectedFirst;
+            double secondDifference = DrawCount - firstCount - expectedSecond;
+            double chiSquared =
+                firstDifference * firstDifference / expectedFirst
+                + secondDifference * secondDifference / expectedSecond;
+            Assert.IsTrue(everySelectionSucceeded);
+            Assert.IsTrue(everyIndexWasInRange);
+            Assert.Less(chiSquared, 10d);
+        }
+
+        [Test]
+        public void TryNextWeightedIndexByRaceMovesFewerPicksWhenOneWeightChanges()
+        {
+            const int DrawCount = 1000;
+            double[] original = { 1d, 1d, 1d, 1d, 1d, 1d, 1d, 1d };
+            double[] changed = { 1d, 1d, 1d, 4d, 1d, 1d, 1d, 1d };
+            SystemRandom cumulativeOriginal = new(792);
+            SystemRandom cumulativeChanged = new(792);
+            SystemRandom raceOriginal = new(792);
+            SystemRandom raceChanged = new(792);
+            int cumulativeChanges = 0;
+            int raceChanges = 0;
+            bool everySelectionSucceeded = true;
+
+            for (int draw = 0; draw < DrawCount; draw++)
+            {
+                everySelectionSucceeded &= cumulativeOriginal.TryNextWeightedIndex(
+                    original,
+                    out int oldIndex
+                );
+                everySelectionSucceeded &= cumulativeChanged.TryNextWeightedIndex(
+                    changed,
+                    out int newIndex
+                );
+                if (oldIndex != newIndex)
+                {
+                    cumulativeChanges++;
+                }
+
+                everySelectionSucceeded &= raceOriginal.TryNextWeightedIndexByRace(
+                    original,
+                    out oldIndex
+                );
+                everySelectionSucceeded &= raceChanged.TryNextWeightedIndexByRace(
+                    changed,
+                    out newIndex
+                );
+                if (oldIndex != newIndex)
+                {
+                    raceChanges++;
+                }
+            }
+
+            Assert.IsTrue(everySelectionSucceeded);
+            Assert.Less(raceChanges, cumulativeChanges);
+        }
+
+        [Test]
+        public void TryNextWeightedSubsetByRaceReturnsSmallestUniqueClocks()
+        {
+            double[] uniforms = { 0.5d, 0.5d, 0.5d, 0.99d };
+            double[] weights = { 1d, 2d, 4d, 0d };
+            int[] expected = { 2, 1 };
+            int[] convenience = new int[2];
+            int[] callerOwned = new int[2];
+            double[] scratch = new double[2];
+            EdgeCaseRandom convenienceRandom = new(
+                doubleSequence: uniforms,
+                maxDoubleCalls: uniforms.Length
+            );
+            EdgeCaseRandom callerOwnedRandom = new(
+                doubleSequence: uniforms,
+                maxDoubleCalls: uniforms.Length
+            );
+
+            Assert.IsTrue(
+                convenienceRandom.TryNextWeightedSubsetByRace(weights, convenience.AsSpan())
+            );
+            Assert.IsTrue(
+                callerOwnedRandom.TryNextWeightedSubsetByRace(
+                    weights,
+                    callerOwned.AsSpan(),
+                    scratch.AsSpan()
+                )
+            );
+
+            CollectionAssert.AreEqual(expected, convenience);
+            CollectionAssert.AreEqual(expected, callerOwned);
+            Assert.Throws<InvalidOperationException>(() => convenienceRandom.NextDouble());
+            Assert.Throws<InvalidOperationException>(() => callerOwnedRandom.NextDouble());
+        }
+
+        [Test]
+        public void TryNextWeightedSubsetByRaceSortsFullHeapByClockThenIndex()
+        {
+            EdgeCaseRandom ties = new(doubleFallback: 0.5d, maxDoubleCalls: 3);
+            int[] all = new int[3];
+            Assert.IsTrue(
+                ties.TryNextWeightedSubsetByRace(
+                    new[] { 1d, 1d, 1d },
+                    all.AsSpan(),
+                    new double[3].AsSpan()
+                )
+            );
+            CollectionAssert.AreEqual(new[] { 0, 1, 2 }, all);
+
+            EdgeCaseRandom rejected = new(doubleFallback: 0.5d, maxDoubleCalls: 3);
+            int[] best = new int[2];
+            Assert.IsTrue(
+                rejected.TryNextWeightedSubsetByRace(
+                    new[] { 100d, 100d, double.Epsilon },
+                    best.AsSpan(),
+                    new double[2].AsSpan()
+                )
+            );
+            CollectionAssert.AreEqual(new[] { 0, 1 }, best);
+
+            double[] uniforms = { 0.9d, 0.1d, 0.8d, 0.2d, 0.7d, 0.3d };
+            double[] weights = { 1d, 8d, 2d, 16d, 3d, 7d };
+            List<(double score, int index)> oracle = new(weights.Length);
+            for (int index = 0; index < weights.Length; index++)
+            {
+                double exponential = -Math.Log(1d - uniforms[index]);
+                oracle.Add((Math.Log(exponential) - Math.Log(weights[index]), index));
+            }
+
+            int[] expected = oracle
+                .OrderBy(entry => entry.score)
+                .ThenBy(entry => entry.index)
+                .Take(3)
+                .Select(entry => entry.index)
+                .ToArray();
+            int[] selected = new int[3];
+            EdgeCaseRandom multiLevel = new(
+                doubleSequence: uniforms,
+                maxDoubleCalls: uniforms.Length
+            );
+            Assert.IsTrue(
+                multiLevel.TryNextWeightedSubsetByRace(
+                    weights,
+                    selected.AsSpan(),
+                    new double[3].AsSpan()
+                )
+            );
+            CollectionAssert.AreEqual(expected, selected);
+
+            EdgeCaseRandom cutoffTie = new(doubleFallback: 0.5d, maxDoubleCalls: 5);
+            int[] tied = new int[3];
+            Assert.IsTrue(
+                cutoffTie.TryNextWeightedSubsetByRace(
+                    new[] { 1d, 1d, 1d, 1d, 1d },
+                    tied.AsSpan(),
+                    new double[3].AsSpan()
+                )
+            );
+            CollectionAssert.AreEqual(new[] { 0, 1, 2 }, tied);
+        }
+
+        [Test]
+        public void TryNextWeightedSubsetByRaceSupportsPooledWinnerScratch()
+        {
+            const int WinnerCount = 1025;
+            double[] weights = new double[WinnerCount];
+            int[] winners = new int[WinnerCount];
+            Array.Fill(weights, 1d);
+            EdgeCaseRandom random = new(doubleFallback: 0.5d, maxDoubleCalls: WinnerCount);
+
+            Assert.IsTrue(random.TryNextWeightedSubsetByRace(weights, winners.AsSpan()));
+            bool ordered = true;
+            for (int index = 0; index < winners.Length; index++)
+            {
+                ordered &= winners[index] == index;
+            }
+            Assert.IsTrue(ordered);
+        }
+
+        [Test]
+        public void TryNextWeightedSubsetByRaceAllocatesNothingWithReusableScratch()
+        {
+            double[] weights = { 1d, 2d, 3d, 4d };
+            int[] winners = new int[2];
+            double[] scratch = new double[2];
+            SystemRandom random = new(792);
+
+            Assert.IsTrue(
+                random.TryNextWeightedSubsetByRace(weights, winners.AsSpan(), scratch.AsSpan())
+            );
+            Assert.IsTrue(random.TryNextWeightedSubsetByRace(weights, winners.AsSpan()));
+            AllocationProbe.IgnoreWhenUnmeasurable();
+            Assert.That(
+                () =>
+                {
+                    for (int iteration = 0; iteration < AllocationProbe.Iterations; iteration++)
+                    {
+                        if (
+                            !random.TryNextWeightedSubsetByRace(
+                                weights,
+                                winners.AsSpan(),
+                                scratch.AsSpan()
+                            ) || !random.TryNextWeightedSubsetByRace(weights, winners.AsSpan())
+                        )
+                        {
+                            throw new InvalidOperationException("weighted selection failed");
+                        }
+                    }
+                },
+                UnityIs.Not.AllocatingGCMemory()
+            );
+        }
+
+        [Test]
+        public void TryNextWeightedSubsetByRacePreservesDestinationOnValidationFailure()
+        {
+            EdgeCaseRandom random = new(maxDoubleCalls: 0);
+            int[] destination = { 7, 8 };
+
+            Assert.IsFalse(
+                random.TryNextWeightedSubsetByRace(
+                    new[] { 1d, 2d },
+                    destination.AsSpan(),
+                    new double[1].AsSpan()
+                )
+            );
+            CollectionAssert.AreEqual(new[] { 7, 8 }, destination);
+
+            Assert.IsFalse(
+                random.TryNextWeightedSubsetByRace(
+                    new[] { 1d, 0d },
+                    destination.AsSpan(),
+                    new double[2].AsSpan()
+                )
+            );
+            CollectionAssert.AreEqual(new[] { 7, 8 }, destination);
+
+            double[] overlappingWeights = { 1d, 2d, 3d };
+            int[] oneWinner = { 9 };
+            Assert.IsFalse(
+                random.TryNextWeightedSubsetByRace(
+                    overlappingWeights,
+                    oneWinner.AsSpan(),
+                    overlappingWeights.AsSpan()
+                )
+            );
+            CollectionAssert.AreEqual(new[] { 9 }, oneWinner);
+
+            byte[] sharedWeightDestination = new byte[24];
+            Span<double> sharedWeights = MemoryMarshal.Cast<byte, double>(sharedWeightDestination);
+            sharedWeights.Fill(1d);
+            Span<int> sharedDestination = MemoryMarshal.Cast<byte, int>(
+                sharedWeightDestination.AsSpan(8, sizeof(int))
+            );
+            sharedDestination[0] = 9;
+            Assert.IsFalse(
+                random.TryNextWeightedSubsetByRace(
+                    sharedWeights,
+                    sharedDestination,
+                    new double[1].AsSpan()
+                )
+            );
+            Assert.AreEqual(9, sharedDestination[0]);
+            Assert.IsFalse(random.TryNextWeightedSubsetByRace(sharedWeights, sharedDestination));
+            Assert.AreEqual(9, sharedDestination[0]);
+
+            byte[] sharedScoreDestination = new byte[8];
+            Span<double> sharedScores = MemoryMarshal.Cast<byte, double>(sharedScoreDestination);
+            Span<int> scoreBackedDestination = MemoryMarshal.Cast<byte, int>(
+                sharedScoreDestination.AsSpan(0, sizeof(int))
+            );
+            scoreBackedDestination[0] = 9;
+            Assert.IsFalse(
+                random.TryNextWeightedSubsetByRace(
+                    new[] { 1d, 2d },
+                    scoreBackedDestination,
+                    sharedScores
+                )
+            );
+            Assert.AreEqual(9, scoreBackedDestination[0]);
+            Assert.IsFalse(
+                random.TryNextWeightedSubsetByRace(
+                    overlappingWeights,
+                    oneWinner.AsSpan(),
+                    overlappingWeights.AsSpan(1, 1)
+                )
+            );
+            CollectionAssert.AreEqual(new[] { 9 }, oneWinner);
+        }
+
+        [Test]
+        public void TryNextWeightedSubsetByRaceDoesNoWorkForEmptyDestination()
+        {
+            EdgeCaseRandom random = new(maxDoubleCalls: 0);
+
+            Assert.IsTrue(
+                random.TryNextWeightedSubsetByRace(
+                    ReadOnlySpan<double>.Empty,
+                    Span<int>.Empty,
+                    Span<double>.Empty
+                )
+            );
+            Assert.IsFalse(
+                ((IRandom)null).TryNextWeightedSubsetByRace(
+                    ReadOnlySpan<double>.Empty,
+                    Span<int>.Empty,
+                    Span<double>.Empty
+                )
+            );
         }
 
         [TestCase(float.NaN)]

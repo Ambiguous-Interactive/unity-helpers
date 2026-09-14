@@ -54,13 +54,93 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private static string[] CachedLayerNames = Array.Empty<string>();
         private static bool LayerCacheInitialized;
 
+        /// <summary>Gets the first value following a named process argument.</summary>
+        /// <param name="name">The exact, case-sensitive argument name.</param>
+        /// <returns>The following value, or <see langword="null" /> when none exists.</returns>
+        /// <remarks>Returns <see langword="null" /> instead of throwing when arguments are unavailable.</remarks>
+        public static string GetCommandLineArgument(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+            {
+                return null;
+            }
+
+            try
+            {
 #if UNITY_EDITOR || UNITY_INCLUDE_TESTS
+                return GetCommandLineArgument(CommandLineArgumentProvider(), name);
+#else
+                return GetCommandLineArgument(Environment.GetCommandLineArgs(), name);
+#endif
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>Gets the first value following a named argument.</summary>
+        /// <param name="arguments">The arguments to search.</param>
+        /// <param name="name">The exact, case-sensitive argument name.</param>
+        /// <returns>The following value, or <see langword="null" /> when none exists.</returns>
+        public static string GetCommandLineArgument(IReadOnlyList<string> arguments, string name)
+        {
+            if (arguments == null || string.IsNullOrEmpty(name))
+            {
+                return null;
+            }
+
+            for (int index = 0; index + 1 < arguments.Count; index++)
+            {
+                if (string.Equals(arguments[index], name, StringComparison.Ordinal))
+                {
+                    return arguments[index + 1];
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>Gets every value following a repeated named argument.</summary>
+        /// <param name="arguments">The arguments to search.</param>
+        /// <param name="name">The exact, case-sensitive argument name.</param>
+        /// <returns>The values in argument order, or an empty list when none exist.</returns>
+        public static List<string> GetCommandLineArguments(
+            IReadOnlyList<string> arguments,
+            string name
+        )
+        {
+            List<string> values = new();
+            if (arguments == null || string.IsNullOrEmpty(name))
+            {
+                return values;
+            }
+
+            for (int index = 0; index + 1 < arguments.Count; index++)
+            {
+                if (string.Equals(arguments[index], name, StringComparison.Ordinal))
+                {
+                    values.Add(arguments[index + 1]);
+                }
+            }
+
+            return values;
+        }
+
+#if UNITY_EDITOR || UNITY_INCLUDE_TESTS
+        internal static Func<string[]> CommandLineArgumentProvider
+        {
+            get => _commandLineArgumentProvider ?? Environment.GetCommandLineArgs;
+            set => _commandLineArgumentProvider = value;
+        }
+
         internal static Func<string[]> LayerNameProvider
         {
             get => _layerNameProvider ?? DefaultLayerNameProvider;
             set => _layerNameProvider = value;
         }
 
+        private static Func<string[]> _commandLineArgumentProvider;
         private static Func<string[]> _layerNameProvider;
 
 #if UNITY_EDITOR
@@ -69,6 +149,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 #else
         private static readonly Func<string[]> DefaultLayerNameProvider = () => Array.Empty<string>();
 #endif
+
+        internal static void ResetCommandLineArgumentProvider()
+        {
+            _commandLineArgumentProvider = null;
+        }
 
         internal static void ResetLayerNameProvider()
         {

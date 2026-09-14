@@ -303,11 +303,11 @@ after that failure can start at an earlier stream position. `Next()` and `NextLo
 signed maximum; the earlier correction to those methods intentionally changed the rare draw that
 previously returned that maximum. These generators are not cryptographic random sources.
 
-Arithmetic verification is separate from statistical quality testing. Run the executable
-`scripts/random-quality/verify-bounded-sampling.py` proof with a C++17
-compiler and Python's `z3-solver` installed:
+Arithmetic verification is separate from statistical quality testing. Install the pinned proof
+dependency and run the executable contract with a C++17 compiler exposed as `c++` on `PATH`:
 
 ```bash
+python3 -m pip install -r requirements-random-quality.txt
 python3 scripts/random-quality/verify-bounded-sampling.py
 ```
 
@@ -370,10 +370,42 @@ The float and double siblings also answer the low bound when either bound is `Na
 `NextFloat` and `NextDouble` overloads reject `NaN` bounds with `ArgumentException` before drawing.
 Their existing support for infinite two-bound ranges and bounded-sampling fallbacks is unchanged.
 
+#### Weighted span selection
+
 Weighted selection rejects `NaN` and infinite weights before drawing. Array and tuple overloads also
 reject negative weights and totals that overflow `float`; the `IReadOnlyList<float>` overload
 continues treating finite negative weights as zero and sums in `double`. `NextBool(probability)`
 requires a probability in `[0, 1]`, including rejection of `NaN`.
+
+For large or highly skewed tables, `TryNextWeightedIndex(ReadOnlySpan<double>, out int)` normalizes
+before summing so finite weights near `double.MaxValue` remain usable. The `ByRace` index overloads
+consume one random draw per slot and give each slot an independent exponential clock. Changing one
+weight therefore leaves every other slot's clock stable, which is useful for seeded procedural
+content. The subset overload returns the earliest clocks without replacement:
+
+```csharp
+ReadOnlySpan<double> weights = stackalloc double[] { 1d, 3d, 8d };
+Span<int> selected = stackalloc int[2];
+Span<double> scratch = stackalloc double[2];
+if (random.TryNextWeightedSubsetByRace(weights, selected, scratch))
+{
+    // selected contains two unique indices, ordered by their clocks.
+}
+```
+
+All `Try` weighted methods reject a null generator and any non-finite weight before drawing. A
+selection requiring a winner also rejects empty or wholly non-positive input; a zero-winner subset
+succeeds without inspecting weights or drawing. Non-positive slots still consume a race draw after
+validation so adding weight to an existing slot does not shift the other slots' seeded clocks. The
+weights and destination spans must not overlap for either subset overload, including differently
+typed views over shared bytes. The explicit scratch overload is allocation-free and additionally
+requires its scratch span not to overlap either input. The convenience subset overload uses bounded
+stack scratch for up to 1,024 winners and a pooled buffer above that.
+
+Exact clock ties resolve to the lower index. The race uses `Math.Log`, whose last bits can differ by
+runtime, so an extremely close non-exact tie can resolve differently across Mono, IL2CPP, and
+WebGL. Record selected indices rather than relying on cross-runtime replay when weights and draws
+can produce near-ties.
 
 `NextNoiseMap` requires positive finite scale, persistence, lacunarity and octave offset range,
 and a finite base offset. Sphere surface sampling returns its center for nonfinite radius,

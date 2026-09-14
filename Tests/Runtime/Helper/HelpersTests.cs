@@ -77,6 +77,54 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [Test]
+        public void CommandLineArgumentsUseExactNamesAndPreserveRepeatedValues()
+        {
+            string[] arguments =
+            {
+                "program",
+                "-scene",
+                "First",
+                "-Scene",
+                "WrongCase",
+                "-scene",
+                "Second",
+                "-raw",
+                "-literal-value",
+                "-dangling",
+            };
+
+            Assert.AreEqual("First", Helpers.GetCommandLineArgument(arguments, "-scene"));
+            CollectionAssert.AreEqual(
+                new[] { "First", "Second" },
+                Helpers.GetCommandLineArguments(arguments, "-scene")
+            );
+            Assert.IsTrue(Helpers.GetCommandLineArgument(arguments, "-missing") == null);
+            Assert.AreEqual("-literal-value", Helpers.GetCommandLineArgument(arguments, "-raw"));
+            Assert.IsTrue(Helpers.GetCommandLineArgument(arguments, string.Empty) == null);
+            Assert.IsEmpty(Helpers.GetCommandLineArguments(null, "-scene"));
+        }
+
+        [Test]
+        public void CurrentCommandLineArgumentLookupFailsSoftWhenNameIsAbsent()
+        {
+            Assert.IsTrue(
+                Helpers.GetCommandLineArgument("-wallstop-missing-session-279-argument") == null
+            );
+            Assert.IsTrue(Helpers.GetCommandLineArgument(string.Empty) == null);
+
+            try
+            {
+                Helpers.CommandLineArgumentProvider = () =>
+                    throw new InvalidOperationException("arguments unavailable");
+                Assert.IsTrue(Helpers.GetCommandLineArgument("-scene") == null);
+            }
+            finally
+            {
+                Helpers.ResetCommandLineArgumentProvider();
+            }
+        }
+
+        [Test]
         public void IsRunningInContinuousIntegrationRespectsEnvironmentVariables()
         {
             Dictionary<string, string> originalValues = new Dictionary<string, string>();

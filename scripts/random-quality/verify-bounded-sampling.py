@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Exhaustive reduced-width sampling and executable arithmetic proofs for issue #638.
 
-Requires a C++17 compiler and z3-solver. Production arithmetic is interpreted from
-AbstractRandom.cs; unsupported source syntax fails instead of proving a stale model.
+Requires a C++17 compiler and z3-solver. Production MulHi64 arithmetic is interpreted from
+AbstractRandom.cs; unsupported source syntax fails instead of proving a stale multiplication model.
 """
 
 # cspell:words cout endl unsat BitVec BitVecVal ULE
@@ -240,8 +240,9 @@ def main():
             subprocess.run(
                 ["c++", "-std=c++17", "-O3", str(source), "-o", str(executable)],
                 check=True,
+                timeout=60,
             )
-            subprocess.run([str(executable)], check=True)
+            subprocess.run([str(executable)], check=True, timeout=60)
 
 
 if __name__ == "__main__":

@@ -95,14 +95,29 @@ jobs:
         with:
           dotnet-version: "9.0.306"
 
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: unity-helpers/requirements-random-quality.txt
+
       - name: Install dependencies
         working-directory: unity-helpers
         run: |
+          set -euo pipefail
           if [ -f package-lock.json ]; then
             npm ci
           else
             npm i --no-audit --no-fund
           fi
+
+      - name: Run bounded-random arithmetic proof
+        working-directory: unity-helpers
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check -r requirements-random-quality.txt
+          timeout 2m python3 scripts/random-quality/verify-bounded-sampling.py
 
       # The pre-commit integration suite drives scripts/format-staged-csharp.ps1, which shells out to
       # CSharpier. Without the restore it would exercise a missing tool rather than the binding.

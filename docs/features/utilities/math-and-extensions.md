@@ -576,6 +576,7 @@ Edge Cases Gallery
 - Camera `OrthographicBounds`
 - Bounds aggregation from collections
 - Pointer coordinates across overlay, camera, and world-space canvases
+- RectTransform-to-collider synchronization and density-aware drag thresholds
 - Sprites referenced by an `AnimationClip`, with or without their curve bindings (editor-only)
 
 Example:
@@ -606,6 +607,23 @@ public void OnDrag(PointerEventData eventData)
 
 Both methods return `false` for a missing event or rectangle, a non-finite raycast hit, or a screen
 conversion that cannot reach the rectangle's plane. Their output is the default vector on failure.
+
+### UI Bounds and Drag Thresholds
+
+`RectTransform.TrySyncBoxCollider2D` copies the rectangle's local size and pivot-derived center to a
+`BoxCollider2D` on the same GameObject. It changes only the collider's `size` and `offset`, and
+returns `false` when either Unity object is missing or destroyed or belongs to a different object.
+
+`UnityExtensions.CalculatePixelDragThreshold` scales a baseline threshold above the reference DPI
+without reducing it on low-density or unreported displays. Use the wrapper to apply the current
+display's value:
+
+```csharp
+eventSystem.TryApplyPixelDragThresholdForCurrentDpi(baseThreshold: 10);
+```
+
+Fractional results round to the nearest integer using midpoint-to-even. Invalid DPI and reference
+values preserve the non-negative baseline, and an overflowing result is clamped to `int.MaxValue`.
 
 <a id="sprites-from-an-animationclip"></a>
 
@@ -1346,6 +1364,10 @@ int dropIndex = rng.NextWeightedIndex(loot.Select(x => x.weight));
 Weights must be finite. Array and tuple selection reject negatives and nonfinite `float` totals;
 list selection retains its finite-negative-as-zero behavior and sums in `double`. All forms reject
 `NaN` and infinity before consuming a random draw. `NextBool(probability)` accepts only `[0, 1]`.
+
+For overflow-safe double spans, seeded exponential-race selection, unique weighted subsets,
+allocation-free caller scratch, validation rules, and cross-runtime near-tie behavior, see the
+[weighted span APIs](./random-generators.md#weighted-span-selection).
 
 ### Vector and Quaternion Generation
 

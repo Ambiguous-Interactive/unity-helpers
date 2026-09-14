@@ -2943,6 +2943,140 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         }
 
         [Test]
+        public void SyncBoxColliderCopiesRectSizeAndPivotOffset()
+        {
+            RectTransform rectangle = CreateRectangle();
+            rectangle.pivot = new Vector2(0.25f, 0.75f);
+            BoxCollider2D collider = rectangle.gameObject.AddComponent<BoxCollider2D>();
+
+            Assert.IsTrue(rectangle.TrySyncBoxCollider2D(collider));
+            Assert.AreEqual(rectangle.rect.size, collider.size);
+            Assert.AreEqual(rectangle.rect.center, collider.offset);
+
+            RectTransform parent = Track(new GameObject("Parent", typeof(RectTransform)))
+                .GetComponent<RectTransform>();
+            parent.sizeDelta = new Vector2(400f, 300f);
+            RectTransform stretched = CreateRectangle(parent);
+            stretched.anchorMin = Vector2.zero;
+            stretched.anchorMax = Vector2.one;
+            stretched.sizeDelta = new Vector2(-40f, -60f);
+            stretched.pivot = new Vector2(0.25f, 0.75f);
+            BoxCollider2D stretchedCollider = stretched.gameObject.AddComponent<BoxCollider2D>();
+
+            Assert.IsTrue(stretched.TrySyncBoxCollider2D(stretchedCollider));
+            Assert.AreNotEqual(stretched.sizeDelta, stretchedCollider.size);
+            Assert.AreEqual(stretched.rect.size, stretchedCollider.size);
+            Assert.AreEqual(stretched.rect.center, stretchedCollider.offset);
+        }
+
+        [Test]
+        public void SyncBoxColliderFailsSoftForInvalidUnityObjects()
+        {
+            RectTransform rectangle = null;
+            BoxCollider2D collider = null;
+
+            Assert.IsFalse(rectangle.TrySyncBoxCollider2D(collider));
+
+            RectTransform validRectangle = CreateRectangle();
+            BoxCollider2D validCollider = validRectangle.gameObject.AddComponent<BoxCollider2D>();
+            Assert.IsFalse(rectangle.TrySyncBoxCollider2D(validCollider));
+            Assert.IsFalse(validRectangle.TrySyncBoxCollider2D(collider));
+
+            GameObject other = Track(new GameObject("Other", typeof(BoxCollider2D)));
+            BoxCollider2D otherCollider = other.GetComponent<BoxCollider2D>();
+            otherCollider.size = new Vector2(7f, 8f);
+            otherCollider.offset = new Vector2(9f, 10f);
+            Assert.IsFalse(validRectangle.TrySyncBoxCollider2D(otherCollider));
+            Assert.AreEqual(new Vector2(7f, 8f), otherCollider.size);
+            Assert.AreEqual(new Vector2(9f, 10f), otherCollider.offset);
+
+            UnityEngine.Object.DestroyImmediate(validCollider); // UNH-SUPPRESS UNH001: the subject is destroyed-object fail-soft behavior.
+            Assert.IsFalse(validRectangle.TrySyncBoxCollider2D(validCollider));
+
+            GameObject destroyedRectangleOwner = new("Destroyed", typeof(RectTransform)); // UNH-SUPPRESS UNH002: deliberately destroyed below to exercise Unity fake-null behavior.
+            RectTransform destroyedRectangle =
+                destroyedRectangleOwner.GetComponent<RectTransform>();
+            UnityEngine.Object.DestroyImmediate(destroyedRectangleOwner); // UNH-SUPPRESS UNH001: the subject is destroyed-object fail-soft behavior.
+            Assert.IsFalse(destroyedRectangle.TrySyncBoxCollider2D(otherCollider));
+            Assert.AreEqual(new Vector2(7f, 8f), otherCollider.size);
+            Assert.AreEqual(new Vector2(9f, 10f), otherCollider.offset);
+        }
+
+        [TestCase(float.NaN)]
+        [TestCase(float.PositiveInfinity)]
+        public void SyncBoxColliderRejectsNonfiniteBoundsWithoutMutation(float invalidSize)
+        {
+            RectTransform rectangle = CreateRectangle();
+            BoxCollider2D collider = rectangle.gameObject.AddComponent<BoxCollider2D>();
+            collider.size = new Vector2(7f, 8f);
+            collider.offset = new Vector2(9f, 10f);
+            rectangle.sizeDelta = new Vector2(invalidSize, 100f);
+
+            Assert.IsFalse(rectangle.TrySyncBoxCollider2D(collider));
+            Assert.AreEqual(new Vector2(7f, 8f), collider.size);
+            Assert.AreEqual(new Vector2(9f, 10f), collider.offset);
+
+            rectangle.sizeDelta = new Vector2(200f, 100f);
+            rectangle.pivot = new Vector2(float.NaN, 0.5f);
+            Assert.IsFalse(rectangle.TrySyncBoxCollider2D(collider));
+            Assert.AreEqual(new Vector2(7f, 8f), collider.size);
+            Assert.AreEqual(new Vector2(9f, 10f), collider.offset);
+        }
+
+        [TestCase(10, 160f, 160f, 10)]
+        [TestCase(10, 320f, 160f, 20)]
+        [TestCase(10, 80f, 160f, 10)]
+        [TestCase(-10, 320f, 160f, 0)]
+        [TestCase(10, 320f, 0f, 10)]
+        [TestCase(10, float.NaN, 160f, 10)]
+        [TestCase(10, float.PositiveInfinity, 160f, 10)]
+        [TestCase(10, float.NegativeInfinity, 160f, 10)]
+        [TestCase(10, -1f, 160f, 10)]
+        [TestCase(10, 0.1f, 160f, 10)]
+        [TestCase(10, 320f, float.NaN, 10)]
+        [TestCase(10, 320f, float.PositiveInfinity, 10)]
+        [TestCase(10, 320f, -160f, 10)]
+        [TestCase(3, 200f, 160f, 4)]
+        [TestCase(10, 200f, 160f, 12)]
+        [TestCase(1073741800, 320f, 160f, 2147483600)]
+        [TestCase(int.MaxValue, 320f, 160f, int.MaxValue)]
+        public void PixelDragThresholdScalingIsDefensive(
+            int baseThreshold,
+            float dpi,
+            float referenceDpi,
+            int expected
+        )
+        {
+            Assert.AreEqual(
+                expected,
+                UnityExtensions.CalculatePixelDragThreshold(baseThreshold, dpi, referenceDpi)
+            );
+        }
+
+        [Test]
+        public void ApplyPixelDragThresholdHandlesLiveNullAndDestroyedEventSystems()
+        {
+            EventSystem eventSystem = null;
+
+            Assert.IsFalse(eventSystem.TryApplyPixelDragThresholdForCurrentDpi(10));
+
+            try
+            {
+                UnityExtensions.ScreenDpiProvider = () => 320f;
+                EventSystem liveEventSystem = CreateEventSystem();
+                Assert.IsTrue(liveEventSystem.TryApplyPixelDragThresholdForCurrentDpi(10));
+                Assert.AreEqual(20, liveEventSystem.pixelDragThreshold);
+
+                UnityEngine.Object.DestroyImmediate(liveEventSystem); // UNH-SUPPRESS UNH001: the subject is destroyed-object fail-soft behavior.
+                Assert.IsFalse(liveEventSystem.TryApplyPixelDragThresholdForCurrentDpi(10));
+            }
+            finally
+            {
+                UnityExtensions.ResetScreenDpiProvider();
+            }
+        }
+
+        [Test]
         public void PointerCurrentRaycastTakesPriority()
         {
             EventSystem eventSystem = CreateEventSystem();

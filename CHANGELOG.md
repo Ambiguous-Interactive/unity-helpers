@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add stable exponential-race weighted index and no-replacement subset selection over spans, with
+  allocation-free caller scratch and overflow-safe cumulative double selection. See
+  [Random Generators](./docs/features/utilities/random-generators.md) ([#792](https://github.com/Ambiguous-Interactive/unity-helpers/issues/792), [#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781)).
+- Add reusable named command-line parsing, RectTransform-to-BoxCollider2D synchronization, and
+  DPI-aware EventSystem drag thresholds. See [Helper Utilities](./docs/features/utilities/helper-utilities.md) and [Math and Extensions](./docs/features/utilities/math-and-extensions.md) ([#742](https://github.com/Ambiguous-Interactive/unity-helpers/issues/742)).
 - Add `RandomSeeds.Mix64` and ordered numeric or UTF-8 domain seed derivation for reproducible,
   schedule-independent gameplay streams. See
   [Keyed Seed Derivation](./docs/features/utilities/random-generators.md#keyed-seed-derivation)

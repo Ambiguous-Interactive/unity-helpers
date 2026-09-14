@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     using System.Collections.Generic;
     using NUnit.Framework;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Validation.Continuous;
     using WallstopStudios.UnityHelpers.Editor.Validation.Continuous.Rules;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -409,17 +410,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
             CollectionAssert.AreEqual(
                 new[] { "Assets/A", "Assets/B" },
-                ValidationBatch.ValuesOf(commandLine, ValidationBatch.FolderArgument)
+                Helpers.GetCommandLineArguments(commandLine, ValidationBatch.FolderArgument)
             );
             Assert.AreEqual(
                 "out.json",
-                ValidationBatch.ValueOf(commandLine, ValidationBatch.OutputArgument)
+                Helpers.GetCommandLineArgument(commandLine, ValidationBatch.OutputArgument)
             );
             Assert.IsTrue(
-                ValidationBatch.ValueOf(commandLine, ValidationBatch.SuppressionsArgument) == null,
+                Helpers.GetCommandLineArgument(commandLine, ValidationBatch.SuppressionsArgument)
+                    == null,
                 "a flag with no value after it must not read past the end of the array"
             );
-            Assert.IsTrue(ValidationBatch.ValueOf(null, ValidationBatch.OutputArgument) == null);
+            Assert.IsTrue(
+                Helpers.GetCommandLineArgument(null, ValidationBatch.OutputArgument) == null
+            );
         }
 
         /// <summary>

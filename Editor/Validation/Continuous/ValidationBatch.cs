@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     using System.IO;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>
     /// Runs every <see cref="IValidationRule"/> in the project from the command line and reports
@@ -75,11 +76,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// </remarks>
         public static Result Run(string[] commandLine)
         {
-            List<string> folders = ValuesOf(commandLine, FolderArgument);
-            string outputPath = ValueOf(commandLine, OutputArgument);
-            string suppressionsPath = ValueOf(commandLine, SuppressionsArgument);
+            List<string> folders = Helpers.GetCommandLineArguments(commandLine, FolderArgument);
+            string outputPath = Helpers.GetCommandLineArgument(commandLine, OutputArgument);
+            string suppressionsPath = Helpers.GetCommandLineArgument(
+                commandLine,
+                SuppressionsArgument
+            );
             ValidationSeverity threshold = ParseSeverity(
-                ValueOf(commandLine, FailOnArgument),
+                Helpers.GetCommandLineArgument(commandLine, FailOnArgument),
                 ValidationSeverity.Error
             );
 
@@ -340,39 +344,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
 
             return fallback;
-        }
-
-        /// <summary>Reads the value following a named argument, or <c>null</c>.</summary>
-        /// <param name="commandLine">The process arguments.</param>
-        /// <param name="name">The argument to look for.</param>
-        /// <returns>The first value given for it.</returns>
-        internal static string ValueOf(string[] commandLine, string name)
-        {
-            List<string> values = ValuesOf(commandLine, name);
-            return values.Count == 0 ? null : values[0];
-        }
-
-        /// <summary>Reads every value given for a named argument, in order.</summary>
-        /// <param name="commandLine">The process arguments.</param>
-        /// <param name="name">The argument to look for.</param>
-        /// <returns>The values; empty when the argument was not given.</returns>
-        internal static List<string> ValuesOf(string[] commandLine, string name)
-        {
-            List<string> values = new List<string>();
-            if (commandLine == null)
-            {
-                return values;
-            }
-
-            for (int index = 0; index + 1 < commandLine.Length; index++)
-            {
-                if (string.Equals(commandLine[index], name, StringComparison.Ordinal))
-                {
-                    values.Add(commandLine[index + 1]);
-                }
-            }
-
-            return values;
         }
 
         private static bool IsTestAssembly(

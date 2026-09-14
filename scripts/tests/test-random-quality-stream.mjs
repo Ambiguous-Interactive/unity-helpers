@@ -16,6 +16,33 @@ const project = path.join(
   "WallstopStudios.UnityHelpers.RandomQuality.csproj"
 );
 const seed = "00010203-0405-0607-0809-0a0b0c0d0e0f";
+const localGates = fs.readFileSync(
+  path.join(repoRoot, ".github/workflows/local-gates.yml"),
+  "utf8"
+);
+const proofRequirements = fs.readFileSync(
+  path.join(repoRoot, "requirements-random-quality.txt"),
+  "utf8"
+);
+const pinnedProofRequirements = proofRequirements
+  .split(/\r?\n/)
+  .map((line) => line.trim())
+  .filter((line) => line.length > 0 && !line.startsWith("#"));
+assert.match(
+  localGates,
+  /python3 -m pip install --disable-pip-version-check -r requirements-random-quality\.txt/,
+  "Local Gates must install the pinned bounded-random proof dependency"
+);
+assert.match(
+  localGates,
+  /timeout 2m python3 scripts\/random-quality\/verify-bounded-sampling\.py/,
+  "Local Gates must own and bound the executable bounded-random proof"
+);
+assert.deepEqual(
+  pinnedProofRequirements,
+  ["z3-solver==4.13.4.0"],
+  "The bounded-random proof must keep its validated Z3 version pinned"
+);
 const runtimeAssembly = JSON.parse(
   fs.readFileSync(path.join(repoRoot, "Runtime/WallstopStudios.UnityHelpers.asmdef"), "utf8")
 );

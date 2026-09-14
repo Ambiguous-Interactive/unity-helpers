@@ -1515,6 +1515,21 @@ if (Helpers.IsRunningInBatchMode)
 }
 ```
 
+Read a named value from the current process, or use the deterministic overload when parsing a
+stored command line. Names are matched exactly and a trailing flag has no value:
+
+```csharp
+string scene = Helpers.GetCommandLineArgument("-scene");
+List<string> scenes = Helpers.GetCommandLineArguments(
+    new[] { "game", "-scene", "Town", "-scene", "Dungeon" },
+    "-scene"
+);
+```
+
+`GetCommandLineArguments` preserves repeated values in order. Both helpers fail soft for null input
+or an empty name, and the current-process overload returns `null` instead of throwing when process
+arguments are unavailable.
+
 **Supported CI systems (checked via environment variables):**
 
 | CI System           | Environment Variable     |
