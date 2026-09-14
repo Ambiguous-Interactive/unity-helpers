@@ -587,10 +587,12 @@ Bounds view = Camera.main.OrthographicBounds();
 
 ### Pointer Coordinates
 
-`TryGetWorldPoint` and `TryGetLocalPoint` resolve a `PointerEventData` position against a
-`RectTransform`. A valid current raycast wins, followed by the press raycast. Otherwise, the
-screen position is clamped to the visible display and converted with the event camera or the
-target canvas camera. Screen Space - Overlay canvases use Unity's required camera-free conversion.
+`TryGetWorldPoint` and `TryGetLocalPoint` resolve a `PointerEventData` position for a
+`RectTransform`. A valid current raycast wins, followed by the press raycast; the world helper
+returns that hit and the local helper transforms it into the target rectangle's coordinates.
+Otherwise, the screen position is clamped to the visible display and projected onto the rectangle
+with the event camera or target canvas camera. Screen Space - Overlay canvases use Unity's required
+camera-free conversion.
 
 ```csharp
 public void OnDrag(PointerEventData eventData)
@@ -602,8 +604,8 @@ public void OnDrag(PointerEventData eventData)
 }
 ```
 
-Both methods return `false` for a missing event or rectangle and for a conversion that cannot
-reach the rectangle's plane. Their output is the default vector on failure.
+Both methods return `false` for a missing event or rectangle, a non-finite raycast hit, or a screen
+conversion that cannot reach the rectangle's plane. Their output is the default vector on failure.
 
 <a id="sprites-from-an-animationclip"></a>
 

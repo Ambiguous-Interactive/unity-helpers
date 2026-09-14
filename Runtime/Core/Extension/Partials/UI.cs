@@ -56,11 +56,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             rt.offsetMin = new Vector2(rt.offsetMin.x, bottom);
         }
 
-        /// <summary>Tries to resolve the pointer on a rectangle's world-space plane.</summary>
+        /// <summary>Tries to resolve a raycast hit or pointer position in world space.</summary>
         /// <param name="pointerEventData">The pointer event to resolve.</param>
         /// <param name="rectangle">The target rectangle.</param>
         /// <param name="worldPoint">The resolved world point, or the default vector on failure.</param>
-        /// <returns><see langword="true" /> when the pointer reaches the rectangle's plane.</returns>
+        /// <returns>
+        /// <see langword="true" /> when a valid raycast hit exists or the pointer reaches the
+        /// rectangle's plane.
+        /// </returns>
         /// <example>
         /// <code>
         /// if (eventData.TryGetWorldPoint(panel, out Vector3 point))
@@ -119,11 +122,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             return true;
         }
 
-        /// <summary>Tries to resolve the pointer in a rectangle's local coordinate space.</summary>
+        /// <summary>Tries to resolve a raycast hit or pointer position in a rectangle's local space.</summary>
         /// <param name="pointerEventData">The pointer event to resolve.</param>
         /// <param name="rectangle">The target rectangle.</param>
         /// <param name="localPoint">The resolved local point, or the default vector on failure.</param>
-        /// <returns><see langword="true" /> when the pointer reaches the rectangle's plane.</returns>
+        /// <returns>
+        /// <see langword="true" /> when a valid raycast hit exists or the pointer reaches the
+        /// rectangle's plane.
+        /// </returns>
         /// <example>
         /// <code>
         /// if (eventData.TryGetLocalPoint(panel, out Vector2 point))
