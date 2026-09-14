@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     using System.Linq;
     using NUnit.Framework;
     using UnityEngine;
+    using UnityEngine.EventSystems;
     using UnityEngine.TestTools;
     using UnityEngine.UI;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
@@ -2929,6 +2930,171 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             Assert.IsEmpty(clip.GetSpritesFromClip(string.Empty).ToList());
         }
 
+        [Test]
+        public void PointerCoordinatesFailSoftForNullInputs()
+        {
+            PointerEventData pointerEventData = null;
+            RectTransform rectangle = null;
+
+            Assert.IsFalse(pointerEventData.TryGetWorldPoint(rectangle, out Vector3 worldPoint));
+            Assert.AreEqual(Vector3.zero, worldPoint);
+            Assert.IsFalse(pointerEventData.TryGetLocalPoint(rectangle, out Vector2 localPoint));
+            Assert.AreEqual(Vector2.zero, localPoint);
+        }
+
+        [Test]
+        public void PointerCurrentRaycastTakesPriority()
+        {
+            EventSystem eventSystem = CreateEventSystem();
+            RectTransform rectangle = CreateRectangle();
+            Camera camera = Track(new GameObject("RaycastCamera")).AddComponent<Camera>();
+            PhysicsRaycaster raycaster = camera.gameObject.AddComponent<PhysicsRaycaster>();
+            Vector3 expected = new(14f, -9f, 3f);
+            PointerEventData pointerEventData = new(eventSystem)
+            {
+                position = new Vector2(float.PositiveInfinity, float.NegativeInfinity),
+                pointerCurrentRaycast = new RaycastResult
+                {
+                    gameObject = rectangle.gameObject,
+                    module = raycaster,
+                    worldPosition = expected,
+                },
+            };
+
+            Assert.IsTrue(pointerEventData.TryGetWorldPoint(rectangle, out Vector3 worldPoint));
+            Assert.AreEqual(expected, worldPoint);
+            Assert.IsTrue(pointerEventData.TryGetLocalPoint(rectangle, out Vector2 localPoint));
+            Assert.AreEqual((Vector2)rectangle.InverseTransformPoint(expected), localPoint);
+        }
+
+        [Test]
+        public void PointerPressRaycastIsFallbackForInvalidCurrentRaycast()
+        {
+            EventSystem eventSystem = CreateEventSystem();
+            RectTransform rectangle = CreateRectangle();
+            Camera camera = Track(new GameObject("PressCamera")).AddComponent<Camera>();
+            PhysicsRaycaster raycaster = camera.gameObject.AddComponent<PhysicsRaycaster>();
+            Vector3 expected = new(-4f, 7f, 2f);
+            PointerEventData pointerEventData = new(eventSystem)
+            {
+                pointerPressRaycast = new RaycastResult
+                {
+                    gameObject = rectangle.gameObject,
+                    module = raycaster,
+                    worldPosition = expected,
+                },
+            };
+
+            Assert.IsTrue(pointerEventData.TryGetWorldPoint(rectangle, out Vector3 worldPoint));
+            Assert.AreEqual(expected, worldPoint);
+        }
+
+        [Test]
+        public void PointerNonFiniteRaycastFallsBackToClampedScreenPoint()
+        {
+            EventSystem eventSystem = CreateEventSystem();
+            RectTransform rectangle = CreateRectangle();
+            Camera camera = Track(new GameObject("FallbackCamera")).AddComponent<Camera>();
+            camera.transform.position = new Vector3(0f, 0f, -10f);
+            PhysicsRaycaster raycaster = camera.gameObject.AddComponent<PhysicsRaycaster>();
+            PointerEventData pointerEventData = new(eventSystem)
+            {
+                position = new Vector2(-100f, Screen.height + 100f),
+                pointerCurrentRaycast = new RaycastResult
+                {
+                    gameObject = rectangle.gameObject,
+                    module = raycaster,
+                    worldPosition = new Vector3(float.NaN, 0f, 0f),
+                },
+            };
+
+            Assert.IsTrue(
+                RectTransformUtility.ScreenPointToWorldPointInRectangle(
+                    rectangle,
+                    new Vector2(0f, Screen.height),
+                    camera,
+                    out Vector3 expected
+                )
+            );
+            Assert.IsTrue(pointerEventData.TryGetWorldPoint(rectangle, out Vector3 worldPoint));
+            Assert.AreEqual(expected, worldPoint);
+        }
+
+        [TestCase(
+            RenderMode.ScreenSpaceCamera,
+            TestName = "Pointer.ScreenSpaceCamera.UsesWorldCamera"
+        )]
+        [TestCase(RenderMode.WorldSpace, TestName = "Pointer.WorldSpace.UsesWorldCamera")]
+        public void PointerCanvasWorldCameraConvertsScreenPoint(RenderMode renderMode)
+        {
+            EventSystem eventSystem = CreateEventSystem();
+            Camera camera = Track(new GameObject("CanvasCamera")).AddComponent<Camera>();
+            camera.transform.position = new Vector3(0f, 0f, -10f);
+            camera.orthographic = true;
+            GameObject canvasObject = Track(new GameObject("Canvas", typeof(RectTransform)));
+            Canvas canvas = canvasObject.AddComponent<Canvas>();
+            canvas.worldCamera = camera;
+            canvas.renderMode = renderMode;
+            RectTransform rectangle = CreateRectangle(canvasObject.transform);
+            Vector2 screenPoint = new(Screen.width * 0.5f, Screen.height * 0.5f);
+            PointerEventData pointerEventData = new(eventSystem) { position = screenPoint };
+
+            Assert.IsTrue(
+                RectTransformUtility.ScreenPointToWorldPointInRectangle(
+                    rectangle,
+                    screenPoint,
+                    camera,
+                    out Vector3 expected
+                )
+            );
+            Assert.IsTrue(pointerEventData.TryGetWorldPoint(rectangle, out Vector3 worldPoint));
+            Assert.AreEqual(expected, worldPoint);
+        }
+
+        [Test]
+        public void PointerOverlayCanvasUsesCameraFreeConversion()
+        {
+            EventSystem eventSystem = CreateEventSystem();
+            GameObject canvasObject = Track(new GameObject("OverlayCanvas", typeof(RectTransform)));
+            Canvas canvas = canvasObject.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            RectTransform rectangle = CreateRectangle(canvasObject.transform);
+            Vector2 screenPoint = new(Screen.width * 0.25f, Screen.height * 0.75f);
+            PointerEventData pointerEventData = new(eventSystem) { position = screenPoint };
+
+            Assert.IsTrue(
+                RectTransformUtility.ScreenPointToWorldPointInRectangle(
+                    rectangle,
+                    screenPoint,
+                    null,
+                    out Vector3 expected
+                )
+            );
+            Assert.IsTrue(pointerEventData.TryGetWorldPoint(rectangle, out Vector3 worldPoint));
+            Assert.AreEqual(expected, worldPoint);
+        }
+
+        [Test]
+        public void PointerWorldCanvasWithoutCameraFailsSoft()
+        {
+            EventSystem eventSystem = CreateEventSystem();
+            GameObject canvasObject = Track(
+                new GameObject("CameraLessCanvas", typeof(RectTransform))
+            );
+            Canvas canvas = canvasObject.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            RectTransform rectangle = CreateRectangle(canvasObject.transform);
+            PointerEventData pointerEventData = new(eventSystem)
+            {
+                position = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f),
+            };
+
+            Assert.IsFalse(pointerEventData.TryGetWorldPoint(rectangle, out Vector3 worldPoint));
+            Assert.AreEqual(Vector3.zero, worldPoint);
+            Assert.IsFalse(pointerEventData.TryGetLocalPoint(rectangle, out Vector2 localPoint));
+            Assert.AreEqual(Vector2.zero, localPoint);
+        }
+
         /// <summary>
         /// Builds a clip whose four curves differ in exactly one binding field each, so a filter
         /// that ignores one of the three is visible as a wrong answer rather than a missing one.
@@ -2978,6 +3144,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 "the editor did not store every object-reference curve this fixture set"
             );
             return clip;
+        }
+
+        private EventSystem CreateEventSystem()
+        {
+            return Track(new GameObject("EventSystem")).AddComponent<EventSystem>();
+        }
+
+        private RectTransform CreateRectangle(Transform parent = null)
+        {
+            RectTransform rectangle = Track(new GameObject("Rectangle", typeof(RectTransform)))
+                .GetComponent<RectTransform>();
+            rectangle.SetParent(parent, worldPositionStays: false);
+            rectangle.sizeDelta = new Vector2(200f, 100f);
+            return rectangle;
         }
 #endif
     }

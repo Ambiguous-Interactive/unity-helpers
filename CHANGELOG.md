@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `PointerEventData.TryGetWorldPoint` and `TryGetLocalPoint`, which prefer raycast hits and
+  convert clamped screen positions across overlay, camera, and world-space canvases. See
+  [Pointer Coordinates](./docs/features/utilities/math-and-extensions.md#pointer-coordinates)
+  ([#742](https://github.com/Ambiguous-Interactive/unity-helpers/issues/742)).
 - Add `Line2D.TryGetIntersectionPoint(Circle, out Vector2)`, which returns the first circle-boundary
   hit along a segment. See
   [Math and Extensions](./docs/features/utilities/math-and-extensions.md#line2d-2d-line-segment-operations)
@@ -26,6 +30,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Improved
 
+- Avoid Sprite Pivot parallel scheduling below 65,536 pixels and for one-row sprites, while
+  retaining measured parallel speedups for larger work
+  ([#648](https://github.com/Ambiguous-Interactive/unity-helpers/issues/648),
+  [#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781),
+  [#782](https://github.com/Ambiguous-Interactive/unity-helpers/issues/782)).
 - Avoid parallel scheduling for Image Blur passes with fewer than 256 pixels or only one
   partition, reducing small-texture overhead while retaining parallel execution for larger work
   ([#782](https://github.com/Ambiguous-Interactive/unity-helpers/issues/782)).

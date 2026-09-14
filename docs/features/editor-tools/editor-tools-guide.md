@@ -249,6 +249,8 @@ an alpha-weighted center of mass per sprite and writes it as a custom pivot.
    **Adjust Pivots in Directory**.
 
 Import settings only; each changed importer is recorded as an `Adjust Sprite Pivot` undo step.
+Center-of-mass scans run directly below 65,536 pixels and for one-row sprites. Larger scans use
+parallel row partitions, so small sprite batches avoid worker startup without slowing large art.
 
 **Before you run it:**
 

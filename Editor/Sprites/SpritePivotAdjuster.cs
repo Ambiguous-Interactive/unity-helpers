@@ -43,6 +43,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     /// </remarks>
     public class SpritePivotAdjuster : EditorWindow
     {
+        private const int CenterOfMassParallelPixelThreshold = 65_536;
         private const float PivotEpsilon = 1e-3f;
 
         internal static bool SuppressUserPrompts { get; set; }
@@ -101,6 +102,89 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             GetWindow<SpritePivotAdjuster>("Sprite Pivot Adjuster");
         }
 
+        internal static bool ShouldCalculateCenterOfMassInParallel(int width, int height)
+        {
+            return 1 < height && CenterOfMassParallelPixelThreshold <= (long)width * height;
+        }
+
+        internal static Vector2 CalculateCenterOfMass(
+            Color32[] pixels,
+            int width,
+            int height,
+            byte alphaThreshold,
+            bool parallel
+        )
+        {
+            if (!HasExpectedPixelCount(pixels, width, height))
+            {
+                return new Vector2(0.5f, 0.5f);
+            }
+
+            CenterOfMassAccumulator totals;
+            if (parallel)
+            {
+                Color32CenterOfMassJob job = new(pixels, width, alphaThreshold);
+                job.RunParallel(height);
+                totals = job.Totals;
+            }
+            else
+            {
+                totals = default;
+                for (int y = 0; y < height; ++y)
+                {
+                    int rowOffset = y * width;
+                    for (int x = 0; x < width; ++x)
+                    {
+                        if (alphaThreshold < pixels[rowOffset + x].a)
+                        {
+                            totals.Add(x, y);
+                        }
+                    }
+                }
+            }
+
+            return ToPivot(totals, width, height);
+        }
+
+        internal static Vector2 CalculateCenterOfMass(
+            Color[] pixels,
+            int width,
+            int height,
+            float alphaCutoff,
+            bool parallel
+        )
+        {
+            if (!HasExpectedPixelCount(pixels, width, height))
+            {
+                return new Vector2(0.5f, 0.5f);
+            }
+
+            CenterOfMassAccumulator totals;
+            if (parallel)
+            {
+                ColorCenterOfMassJob job = new(pixels, width, alphaCutoff);
+                job.RunParallel(height);
+                totals = job.Totals;
+            }
+            else
+            {
+                totals = default;
+                for (int y = 0; y < height; ++y)
+                {
+                    int rowOffset = y * width;
+                    for (int x = 0; x < width; ++x)
+                    {
+                        if (alphaCutoff < pixels[rowOffset + x].a)
+                        {
+                            totals.Add(x, y);
+                        }
+                    }
+                }
+            }
+
+            return ToPivot(totals, width, height);
+        }
+
         private static bool ShowCancelableProgress(string title, string info, float progress)
         {
             return Utils.EditorUi.CancelableProgress(title, info, progress);
@@ -125,80 +209,35 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int width = Mathf.FloorToInt(spriteRect.width);
             int height = Mathf.FloorToInt(spriteRect.height);
 
-            long totalX = 0;
-            long totalY = 0;
-            long pixelCount = 0;
-
-            // Fast path: sprite covers entire texture, use GetPixels32 for lower allocation and faster access
+            bool parallel = ShouldCalculateCenterOfMassInParallel(width, height);
             if (startX == 0 && startY == 0 && width == texture.width && height == texture.height)
             {
                 Color32[] pixels32 = texture.GetPixels32();
                 byte alphaThreshold = ColorQuantization.ToThresholdByte(alphaCutoff);
-
-                Parallel.For(
-                    0,
-                    height,
-                    () => (sumX: 0L, sumY: 0L, count: 0L),
-                    (y, _, local) =>
-                    {
-                        int rowOffset = y * width;
-                        for (int x = 0; x < width; ++x)
-                        {
-                            if (alphaThreshold < pixels32[rowOffset + x].a)
-                            {
-                                local.sumX += x;
-                                local.sumY += y;
-                                local.count++;
-                            }
-                        }
-                        return local;
-                    },
-                    local =>
-                    {
-                        Interlocked.Add(ref totalX, local.sumX);
-                        Interlocked.Add(ref totalY, local.sumY);
-                        Interlocked.Add(ref pixelCount, local.count);
-                    }
-                );
-            }
-            else
-            {
-                Color[] pixels = texture.GetPixels(startX, startY, width, height);
-
-                Parallel.For(
-                    0,
-                    height,
-                    () => (sumX: 0L, sumY: 0L, count: 0L),
-                    (y, _, local) =>
-                    {
-                        int rowOffset = y * width;
-                        for (int x = 0; x < width; ++x)
-                        {
-                            if (alphaCutoff < pixels[rowOffset + x].a)
-                            {
-                                local.sumX += x;
-                                local.sumY += y;
-                                local.count++;
-                            }
-                        }
-                        return local;
-                    },
-                    local =>
-                    {
-                        Interlocked.Add(ref totalX, local.sumX);
-                        Interlocked.Add(ref totalY, local.sumY);
-                        Interlocked.Add(ref pixelCount, local.count);
-                    }
-                );
+                return CalculateCenterOfMass(pixels32, width, height, alphaThreshold, parallel);
             }
 
-            if (pixelCount == 0L)
+            Color[] pixels = texture.GetPixels(startX, startY, width, height);
+            return CalculateCenterOfMass(pixels, width, height, alphaCutoff, parallel);
+        }
+
+        private static bool HasExpectedPixelCount<T>(T[] pixels, int width, int height)
+        {
+            return pixels != null
+                && 0 < width
+                && 0 < height
+                && (long)width * height == pixels.LongLength;
+        }
+
+        private static Vector2 ToPivot(CenterOfMassAccumulator totals, int width, int height)
+        {
+            if (totals.Count == 0L)
             {
                 return new Vector2(0.5f, 0.5f);
             }
 
-            double averageX = (double)totalX / pixelCount;
-            double averageY = (double)totalY / pixelCount;
+            double averageX = (double)totals.SumX / totals.Count;
+            double averageY = (double)totals.SumY / totals.Count;
 
             double pivotX = averageX / width;
             double pivotY = averageY / height;
@@ -604,6 +643,122 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     "No sprites found to process in the selected directories.",
                     EditorStyles.label
                 );
+            }
+        }
+
+        private struct CenterOfMassAccumulator
+        {
+            public long SumX;
+            public long SumY;
+            public long Count;
+
+            public void Add(int x, int y)
+            {
+                SumX += x;
+                SumY += y;
+                Count++;
+            }
+        }
+
+        private sealed class Color32CenterOfMassJob
+        {
+            public CenterOfMassAccumulator Totals;
+
+            private readonly Color32[] _pixels;
+            private readonly int _width;
+            private readonly byte _alphaThreshold;
+
+            public Color32CenterOfMassJob(Color32[] pixels, int width, byte alphaThreshold)
+            {
+                _pixels = pixels;
+                _width = width;
+                _alphaThreshold = alphaThreshold;
+            }
+
+            public void RunParallel(int height)
+            {
+                Parallel.For(0, height, CreateAccumulator, ScanRow, MergeAccumulator);
+            }
+
+            private CenterOfMassAccumulator CreateAccumulator()
+            {
+                return default;
+            }
+
+            private CenterOfMassAccumulator ScanRow(
+                int y,
+                ParallelLoopState _,
+                CenterOfMassAccumulator local
+            )
+            {
+                int rowOffset = y * _width;
+                for (int x = 0; x < _width; ++x)
+                {
+                    if (_alphaThreshold < _pixels[rowOffset + x].a)
+                    {
+                        local.Add(x, y);
+                    }
+                }
+
+                return local;
+            }
+
+            private void MergeAccumulator(CenterOfMassAccumulator local)
+            {
+                Interlocked.Add(ref Totals.SumX, local.SumX);
+                Interlocked.Add(ref Totals.SumY, local.SumY);
+                Interlocked.Add(ref Totals.Count, local.Count);
+            }
+        }
+
+        private sealed class ColorCenterOfMassJob
+        {
+            public CenterOfMassAccumulator Totals;
+
+            private readonly Color[] _pixels;
+            private readonly int _width;
+            private readonly float _alphaCutoff;
+
+            public ColorCenterOfMassJob(Color[] pixels, int width, float alphaCutoff)
+            {
+                _pixels = pixels;
+                _width = width;
+                _alphaCutoff = alphaCutoff;
+            }
+
+            public void RunParallel(int height)
+            {
+                Parallel.For(0, height, CreateAccumulator, ScanRow, MergeAccumulator);
+            }
+
+            private CenterOfMassAccumulator CreateAccumulator()
+            {
+                return default;
+            }
+
+            private CenterOfMassAccumulator ScanRow(
+                int y,
+                ParallelLoopState _,
+                CenterOfMassAccumulator local
+            )
+            {
+                int rowOffset = y * _width;
+                for (int x = 0; x < _width; ++x)
+                {
+                    if (_alphaCutoff < _pixels[rowOffset + x].a)
+                    {
+                        local.Add(x, y);
+                    }
+                }
+
+                return local;
+            }
+
+            private void MergeAccumulator(CenterOfMassAccumulator local)
+            {
+                Interlocked.Add(ref Totals.SumX, local.SumX);
+                Interlocked.Add(ref Totals.SumY, local.SumY);
+                Interlocked.Add(ref Totals.Count, local.Count);
             }
         }
     }

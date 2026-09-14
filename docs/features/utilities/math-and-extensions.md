@@ -575,6 +575,7 @@ Edge Cases Gallery
 - Rect/Bounds conversions, RectTransform world bounds
 - Camera `OrthographicBounds`
 - Bounds aggregation from collections
+- Pointer coordinates across overlay, camera, and world-space canvases
 - Sprites referenced by an `AnimationClip`, with or without their curve bindings (editor-only)
 
 Example:
@@ -583,6 +584,26 @@ Example:
 Rect r = rectTransform.GetWorldRect();
 Bounds view = Camera.main.OrthographicBounds();
 ```
+
+### Pointer Coordinates
+
+`TryGetWorldPoint` and `TryGetLocalPoint` resolve a `PointerEventData` position against a
+`RectTransform`. A valid current raycast wins, followed by the press raycast. Otherwise, the
+screen position is clamped to the visible display and converted with the event camera or the
+target canvas camera. Screen Space - Overlay canvases use Unity's required camera-free conversion.
+
+```csharp
+public void OnDrag(PointerEventData eventData)
+{
+    if (eventData.TryGetLocalPoint(panel, out Vector2 localPoint))
+    {
+        handle.anchoredPosition = localPoint;
+    }
+}
+```
+
+Both methods return `false` for a missing event or rectangle and for a conversion that cannot
+reach the rectangle's plane. Their output is the default vector on failure.
 
 <a id="sprites-from-an-animationclip"></a>
 
