@@ -398,11 +398,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             out bool hasFileId
         )
         {
-            hasFileId = false;
             if (string.IsNullOrEmpty(value))
             {
                 fileId = 0;
                 guid = null;
+                hasFileId = false;
                 return false;
             }
 
@@ -411,11 +411,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             {
                 fileId = 0;
                 guid = null;
+                hasFileId = false;
                 return false;
             }
 
             long readFileId = 0;
             string readGuid = null;
+            bool readHasFileId = false;
             string body = trimmed.Substring(1, trimmed.Length - 2);
             foreach (string part in body.Split(','))
             {
@@ -439,7 +441,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                     )
                     {
                         readFileId = parsedFileId;
-                        hasFileId = true;
+                        readHasFileId = true;
                     }
                 }
                 else if (string.Equals(key, "guid", StringComparison.Ordinal))
@@ -450,6 +452,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
             fileId = readFileId;
             guid = readGuid;
+            hasFileId = readHasFileId;
             return true;
         }
 
