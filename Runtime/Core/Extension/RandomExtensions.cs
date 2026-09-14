@@ -25,6 +25,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
     /// </remarks>
     public static class RandomExtensions
     {
+        /// <summary>The largest supported uniform sample count for <see cref="NextIntSkewed"/>.</summary>
+        public const int MaxSkewedIterations = 1024;
+
+        private const int SkewedTargetWeight = 2;
+
         /// <summary>
         /// Draws a value in <c>[low, high)</c>, returning <paramref name="low"/> instead of throwing
         /// when the range is empty.
@@ -174,6 +179,60 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             return random.NextDouble(low, high);
+        }
+
+        /// <summary>Draws an integer biased toward a target within the requested bounds.</summary>
+        /// <param name="random">Generator to draw from. A null generator yields <paramref name="min"/>.</param>
+        /// <param name="min">Inclusive lower bound.</param>
+        /// <param name="max">Inclusive upper clamp.</param>
+        /// <param name="target">The value that contributes the weight of two uniform draws.</param>
+        /// <param name="iterations">
+        /// The number of uniform draws to average with the target, from zero through
+        /// <see cref="MaxSkewedIterations"/>.
+        /// </param>
+        /// <returns>
+        /// The truncated weighted mean in <c>[min, max]</c>. Invalid or float-indistinguishable
+        /// bounds, an iteration count outside the supported range, or a target that is not a
+        /// number yield <paramref name="min"/>.
+        /// </returns>
+        public static int NextIntSkewed(
+            this IRandom random,
+            int min,
+            int max,
+            float target,
+            int iterations = 3
+        )
+        {
+            if (
+                random == null
+                || max <= min
+                || iterations < 0
+                || MaxSkewedIterations < iterations
+                || float.IsNaN(target)
+            )
+            {
+                return min;
+            }
+
+            if (!((float)min < (float)max))
+            {
+                return min;
+            }
+
+            if (iterations == 0)
+            {
+                return ClampSkewedInteger(target, min, max);
+            }
+
+            float sum = 0f;
+            for (int index = 0; index < iterations; index++)
+            {
+                sum += random.NextFloat(min, max);
+            }
+
+            sum += target * SkewedTargetWeight;
+            float result = sum / (iterations + (float)SkewedTargetWeight);
+            return ClampSkewedInteger(result, min, max);
         }
 
         /// <summary>
@@ -1404,6 +1463,21 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             // The deferred iterator outlives this pool lease; give it an owned copy.
             return NextSubsetIterator(random, materializedList.ToArray(), count);
+        }
+
+        private static int ClampSkewedInteger(float value, int min, int max)
+        {
+            if (float.IsNaN(value) || value <= min)
+            {
+                return min;
+            }
+
+            if (max <= value)
+            {
+                return max;
+            }
+
+            return (int)value;
         }
 
         private static T NextOfExceptCore<T>(IRandom random, IReadOnlyList<T> source, T exception1)

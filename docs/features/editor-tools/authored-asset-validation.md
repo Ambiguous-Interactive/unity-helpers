@@ -85,6 +85,12 @@ The one question text cannot answer is animation: a keyframe's guid can resolve 
 object does not, because a sprite sheet re-imported as `Single` still has a `.meta` describing every
 slice the importer no longer produces. That check uses `AnimationUtility`.
 
+`AuthoredAssetYaml.TryResolveObjectReference` reads both external and same-file references. Unity
+omits `guid` when one document points to another document in the same scene, prefab or asset. Pass
+the owning asset GUID and the method supplies it for a nonzero `fileID`; an empty reference keeps a
+null GUID. Invalid inline mappings and local references without an owning GUID return `false` with
+empty outputs.
+
 ## Script bindings
 
 A `MonoBehaviour` or `ScriptableObject` reaches a scene, a prefab or an asset through exactly one

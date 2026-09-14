@@ -425,6 +425,10 @@ the previous snapshot and `HasRun` state; an unvisited asset is never presented 
 incremental targets remain queued for the next triggering event. The store is not serialized, so a
 domain reload returns it to the explicitly unchecked state.
 
+When results are next read, the central store releases a destroyed target wrapper while keeping the
+finding's rule, severity, identity and message. Live targets and findings that never named an object
+remain unchanged.
+
 ## Scene coverage
 
 Shipped text-based rules can inspect committed scene and prefab data without opening them. Authored

@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Random;
     using WallstopStudios.UnityHelpers.Tests.Core;
+    using WallstopStudios.UnityHelpers.Tests.TestDoubles;
     using WallstopStudios.UnityHelpers.Utils;
 
     [TestFixture]
@@ -190,6 +191,110 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 Assert.GreaterOrEqual(precise, 2d);
                 Assert.Less(precise, 5d);
             }
+        }
+
+        /// <remarks>
+        /// The reference calculation is frozen from DoxReloaded's
+        /// <c>Assets/Scripts/Generators/TargetMoveSampler.cs</c> at commit
+        /// <c>91f0a620b50131f83ef1f635268dc3b044a9ec58</c>. Keeping the sampled values separate
+        /// from the normalized generator sequence makes changes to either the draw transformation
+        /// or the weighted-mean arithmetic visible here.
+        /// </remarks>
+        [Test]
+        public void NextIntSkewedMatchesTheFirstPartySampler()
+        {
+            float[] positiveSamples = { 10f, 15f, 19f };
+            float[] negativeSamples = { -17.5f, -15f, -12.5f };
+            float[] oneSample = { 25f };
+            EdgeCaseRandom positive = new(
+                floatSequence: new[] { 0f, 0.5f, 0.9f },
+                maxFloatCalls: 3
+            );
+            EdgeCaseRandom negative = new(
+                floatSequence: new[] { 0.25f, 0.5f, 0.75f },
+                maxFloatCalls: 3
+            );
+            EdgeCaseRandom oneDraw = new(floatFallback: 0.25f, maxFloatCalls: 1);
+
+            Assert.AreEqual(
+                FirstPartySkewedReference(positiveSamples, 10, 20, 18f),
+                positive.NextIntSkewed(10, 20, 18f)
+            );
+            Assert.AreEqual(
+                FirstPartySkewedReference(negativeSamples, -20, -10, -12f),
+                negative.NextIntSkewed(-20, -10, -12f)
+            );
+            Assert.AreEqual(
+                FirstPartySkewedReference(oneSample, 0, 100, 50f),
+                oneDraw.NextIntSkewed(0, 100, 50f, 1)
+            );
+        }
+
+        [TestCase(-100f, 10)]
+        [TestCase(100f, 20)]
+        public void NextIntSkewedClampsAfterApplyingTargetWeight(float target, int expected)
+        {
+            EdgeCaseRandom random = new(floatFallback: 0.5f, maxFloatCalls: 3);
+
+            Assert.AreEqual(expected, random.NextIntSkewed(10, 20, target));
+        }
+
+        [Test]
+        public void NextIntSkewedHandlesDegenerateInputsWithoutDrawing()
+        {
+            EdgeCaseRandom random = new(maxFloatCalls: 0);
+            IRandom absent = null;
+
+            Assert.AreEqual(10, absent.NextIntSkewed(10, 20, 15f));
+            Assert.AreEqual(10, random.NextIntSkewed(10, 10, 15f));
+            Assert.AreEqual(20, random.NextIntSkewed(20, 10, 15f));
+            Assert.AreEqual(10, random.NextIntSkewed(10, 20, float.NaN));
+            Assert.AreEqual(15, random.NextIntSkewed(10, 20, 15f, 0));
+            Assert.AreEqual(10, random.NextIntSkewed(10, 20, 15f, -1));
+            Assert.AreEqual(
+                10,
+                random.NextIntSkewed(10, 20, 15f, RandomExtensions.MaxSkewedIterations + 1)
+            );
+        }
+
+        [Test]
+        public void NextIntSkewedHandlesIntegerAndFloatBoundariesWithoutDrawingOutOfRange()
+        {
+            EdgeCaseRandom collapsed = new(maxFloatCalls: 0);
+            EdgeCaseRandom upper = new(floatFallback: 0.5f, maxFloatCalls: 1);
+            EdgeCaseRandom lower = new(floatFallback: 0.5f, maxFloatCalls: 1);
+            EdgeCaseRandom invalidSample = new(floatFallback: float.NaN, maxFloatCalls: 1);
+
+            Assert.AreEqual(
+                16_777_216,
+                collapsed.NextIntSkewed(16_777_216, 16_777_217, 16_777_217f, 1)
+            );
+            Assert.AreEqual(
+                int.MaxValue,
+                upper.NextIntSkewed(int.MinValue, int.MaxValue, float.PositiveInfinity, 1)
+            );
+            Assert.AreEqual(
+                int.MinValue,
+                lower.NextIntSkewed(int.MinValue, int.MaxValue, float.NegativeInfinity, 1)
+            );
+            Assert.AreEqual(
+                int.MinValue,
+                invalidSample.NextIntSkewed(int.MinValue, int.MaxValue, 0f, 1)
+            );
+        }
+
+        [Test]
+        public void NextIntSkewedAcceptsTheMaximumSupportedIterationCount()
+        {
+            EdgeCaseRandom random = new(
+                floatFallback: 0.5f,
+                maxFloatCalls: RandomExtensions.MaxSkewedIterations
+            );
+
+            Assert.AreEqual(
+                15,
+                random.NextIntSkewed(10, 20, 15f, RandomExtensions.MaxSkewedIterations)
+            );
         }
 
         /// <summary>
@@ -731,6 +836,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             Bounds flat = new(new Vector3(1f, 2f, 3f), new Vector3(4f, 0f, 4f));
             Assert.AreEqual(flat.center, rng.NextVector3InBounds(flat));
+        }
+
+        private static int FirstPartySkewedReference(
+            IReadOnlyList<float> samples,
+            int min,
+            int max,
+            float target
+        )
+        {
+            float sum = 0f;
+            for (int index = 0; index < samples.Count; index++)
+            {
+                sum += samples[index];
+            }
+
+            sum += target * 2f;
+            return (int)Math.Clamp(sum / (samples.Count + 2f), min, max);
         }
     }
 }

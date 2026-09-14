@@ -111,6 +111,7 @@ tree.GetApproximateNearestNeighbors(position, count: 5, resultsBuffer);
 - `WDoomRandom` - index-into-array generator, period 1024; deterministic replays, not statistical randomness
 - `NativePcgRandom` - Burst/Jobs compatible
 - All implement `IRandom` with extensive API: `NextFloat()`, `NextVector2()`, `NextGaussian()`, `NextWeightedIndex()`, `Shuffle()`, `NextGuid()`
+- `NextIntSkewed()` draws a bounded integer toward a preferred target with a bounded sample count
 - `PerlinNoise` - Coherent noise generation
 
 All generators are seedable for deterministic replay systems. Use `RandomGeneratorMetadata` to inspect generator properties.

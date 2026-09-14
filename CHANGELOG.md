@@ -11,11 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `NextIntSkewed`, which averages uniform draws with a preferred target and clamps the result to the requested bounds. See [Random Generators](./docs/features/utilities/random-generators.md#ranges-a-designer-authored) ([#742](https://github.com/Ambiguous-Interactive/unity-helpers/issues/742)).
+- Add `AuthoredAssetYaml.TryResolveObjectReference`, which resolves both external and same-file Unity references without loading the asset. See [Authored Asset Validation](./docs/features/editor-tools/authored-asset-validation.md#why-text-and-why-loading-is-the-wrong-instrument) ([#779](https://github.com/Ambiguous-Interactive/unity-helpers/issues/779)).
 - Add `ColorContrast.Composite`, which produces the opaque visible color for a translucent foreground before a contrast measurement. See [Readable Text on Any Background](./docs/features/utilities/math-and-extensions.md#readable-text-on-any-background) ([#777](https://github.com/Ambiguous-Interactive/unity-helpers/issues/777)).
 - Add optional report context and exception handler overloads to `StartFunctionAsCoroutine`, so hosted jobs can attribute or program against every failure ([#778](https://github.com/Ambiguous-Interactive/unity-helpers/issues/778)).
 
 ### Improved
 
+- Release destroyed Unity object targets from Sentinel's central result store on the next results read without discarding diagnostic details ([#669](https://github.com/Ambiguous-Interactive/unity-helpers/issues/669)).
 - Defer SerializableType ignore-pattern match counts until the settings window displays them, avoiding a scan of every loaded type on each domain reload ([#786](https://github.com/Ambiguous-Interactive/unity-helpers/issues/786)).
 - Improve Sprite Cropper and Sprite Sheet Extractor memory reuse for dynamically sized pixel output, with measured size-aware parallel row copies for large images ([#754](https://github.com/Ambiguous-Interactive/unity-helpers/issues/754)).
 - Remove avoidable allocations from asset watcher discovery and WallstopProto source generation while preserving handler and diagnostic ordering ([#764](https://github.com/Ambiguous-Interactive/unity-helpers/issues/764), [#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781)).

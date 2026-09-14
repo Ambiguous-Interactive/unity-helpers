@@ -50,6 +50,26 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// </summary>
         public static IReadOnlyList<string> RecordedAssetGuids => AssetOrder;
 
+        internal static int DestroyedTargetCount
+        {
+            get
+            {
+                int count = 0;
+                foreach (List<ValidationFinding> findings in ByAsset.Values)
+                {
+                    foreach (ValidationFinding finding in findings)
+                    {
+                        if (finding.HasDestroyedTarget)
+                        {
+                            count++;
+                        }
+                    }
+                }
+
+                return count;
+            }
+        }
+
         private static Dictionary<string, List<ValidationFinding>> ByAsset = new Dictionary<
             string,
             List<ValidationFinding>
@@ -79,6 +99,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// <remarks>
         /// The allocation-free half of <see cref="Snapshot"/>, for a caller that refreshes on every
         /// keystroke and would otherwise copy every finding in the project into a new list each time.
+        /// A destroyed Unity target is released while the finding's diagnostic data is retained.
         /// </remarks>
         public static void CopyInto(List<ValidationFinding> destination)
         {
@@ -92,7 +113,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             {
                 if (ByAsset.TryGetValue(assetOrderElement, out List<ValidationFinding> findings))
                 {
-                    destination.AddRange(findings);
+                    for (int index = 0; index < findings.Count; index++)
+                    {
+                        ValidationFinding finding = findings[index].WithoutDestroyedTarget();
+                        findings[index] = finding;
+                        destination.Add(finding);
+                    }
                 }
             }
         }

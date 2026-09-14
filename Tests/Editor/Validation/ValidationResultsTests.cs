@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     using NUnit.Framework;
     using WallstopStudios.UnityHelpers.Editor.Validation.Continuous;
     using WallstopStudios.UnityHelpers.Tests.Core;
+    using WallstopStudios.UnityHelpers.Tests.Editor.Validation.TestTypes;
     using Object = UnityEngine.Object;
 
     /// <summary>
@@ -706,6 +707,75 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             ValidationResults.CopyInto(destination);
 
             Assert.AreEqual(ValidationResults.Snapshot(), destination);
+        }
+
+        [Test]
+        public void CopyIntoReleasesDestroyedTargetsWithoutDiscardingFindings()
+        {
+            AuthoredRequirementTestAsset destroyedTarget =
+                UnityEngine.ScriptableObject.CreateInstance<AuthoredRequirementTestAsset>();
+            AuthoredRequirementTestAsset liveTarget = Track(
+                UnityEngine.ScriptableObject.CreateInstance<AuthoredRequirementTestAsset>()
+            );
+            ValidationFinding destroyedFinding = new ValidationFinding(
+                "destroyed-rule",
+                ValidationSeverity.Error,
+                destroyedTarget,
+                FirstGuid,
+                "Assets/first.asset",
+                "destroyed-slot",
+                "destroyed message",
+                "source fingerprint",
+                ValidationSeverity.Warning
+            );
+            ValidationResults.Replace(
+                FirstGuid,
+                new[]
+                {
+                    destroyedFinding,
+                    new ValidationFinding(
+                        "live",
+                        ValidationSeverity.Warning,
+                        liveTarget,
+                        FirstGuid,
+                        "Assets/first.asset",
+                        "live",
+                        "live"
+                    ),
+                    Finding(FirstGuid, "targetless"),
+                }
+            );
+            Object.DestroyImmediate(destroyedTarget); // UNH-SUPPRESS: Intentional stale-target regression.
+            Assert.IsTrue(destroyedFinding.HasDestroyedTarget);
+            Assert.AreEqual(1, ValidationResults.DestroyedTargetCount);
+            List<ValidationFinding> destination = new List<ValidationFinding>
+            {
+                Finding(SecondGuid, "stale"),
+            };
+
+            ValidationResults.CopyInto(destination);
+
+            Assert.AreEqual(0, ValidationResults.DestroyedTargetCount);
+            Assert.AreEqual(3, destination.Count);
+            ValidationFinding released = destination[0];
+            Assert.AreEqual("destroyed-rule", released.RuleId);
+            Assert.AreEqual(ValidationSeverity.Error, released.Severity);
+            Assert.AreEqual(ValidationSeverity.Warning, released.OriginalSeverity);
+            Assert.AreEqual(FirstGuid, released.AssetGuid);
+            Assert.AreEqual("Assets/first.asset", released.AssetPath);
+            Assert.AreEqual("destroyed-slot", released.Discriminator);
+            Assert.AreEqual("destroyed message", released.Message);
+            Assert.AreEqual("source fingerprint", released.SourceFingerprint);
+            Assert.AreEqual(destroyedFinding.Id, released.Id);
+            Assert.IsFalse(released.HasDestroyedTarget);
+            Assert.IsFalse(released.TryGetTarget(out Object releasedTarget));
+            Assert.IsTrue(releasedTarget == null);
+            Assert.IsFalse(destination[1].HasDestroyedTarget);
+            Assert.IsTrue(destination[1].TryGetTarget(out Object retainedTarget));
+            Assert.AreSame(liveTarget, retainedTarget);
+            Assert.IsFalse(destination[2].HasDestroyedTarget);
+            Assert.IsFalse(destination[2].TryGetTarget(out Object targetless));
+            Assert.IsTrue(targetless == null);
         }
 
         /// <summary>

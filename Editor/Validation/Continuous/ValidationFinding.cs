@@ -64,6 +64,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         internal string SourceFingerprint { get; }
         internal ValidationSeverity OriginalSeverity { get; }
+        internal bool HasDestroyedTarget => WasHandedIn(_target) && IsGone(_target);
 
         private readonly Object _target;
         private readonly string _id;
@@ -124,6 +125,30 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             Discriminator = discriminator;
             Message = message;
             _id = ruleId + "|" + assetGuid + "|" + discriminator;
+        }
+
+        private ValidationFinding(ValidationFinding source)
+        {
+            SourceFingerprint = source.SourceFingerprint;
+            OriginalSeverity = source.OriginalSeverity;
+            RuleId = source.RuleId;
+            Severity = source.Severity;
+            _target = null;
+            AssetGuid = source.AssetGuid;
+            AssetPath = source.AssetPath;
+            Discriminator = source.Discriminator;
+            Message = source.Message;
+            _id = source._id;
+        }
+
+        private static bool WasHandedIn(Object target)
+        {
+            return !ReferenceEquals(target, null);
+        }
+
+        private static bool IsGone(Object target)
+        {
+            return target == null;
         }
 
         /// <summary>
@@ -188,6 +213,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             return string.IsNullOrEmpty(Discriminator)
                 ? $"[{Severity}] {RuleId}: {where} -- {Message}"
                 : $"[{Severity}] {RuleId}: {where} ({Discriminator}) -- {Message}";
+        }
+
+        internal ValidationFinding WithoutDestroyedTarget()
+        {
+            if (!HasDestroyedTarget)
+            {
+                return this;
+            }
+
+            return new ValidationFinding(this);
         }
     }
 #endif

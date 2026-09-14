@@ -329,6 +329,17 @@ Every ranged draw has one, and they all answer the low bound:
 | `NextFloat(min, max)`             | `NextFloatInRange(low, high)`  |
 | `NextDouble(min, max)`            | `NextDoubleInRange(low, high)` |
 
+`NextIntSkewed(min, max, target, iterations)` draws an integer toward a preferred value. It
+averages the requested number of uniform draws with two copies of `target`, truncates the mean, and
+clamps the result to `[min, max]`. The default is three uniform draws. Zero iterations returns the
+clamped target without drawing. The public `MaxSkewedIterations` limit is 1,024 draws. A null
+generator, empty, inverted or float-indistinguishable bounds, an iteration count outside the
+supported range, or a `NaN` target returns `min` without drawing.
+
+```csharp
+int moves = random.NextIntSkewed(minMoves, maxMoves, targetMoves);
+```
+
 The float and double siblings also answer the low bound when either bound is `NaN`. The strict
 `NextFloat` and `NextDouble` overloads reject `NaN` bounds with `ArgumentException` before drawing.
 Their existing support for infinite two-bound ranges and bounded-sampling fallbacks is unchanged.

@@ -199,56 +199,45 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// <returns><c>false</c> when the value is not an inline mapping.</returns>
         public static bool TryParseObjectReference(string value, out long fileId, out string guid)
         {
-            if (string.IsNullOrEmpty(value))
+            return TryParseObjectReference(value, out fileId, out guid, out bool _);
+        }
+
+        /// <summary>Resolves an inline object reference, including references within one asset.</summary>
+        /// <param name="value">The inline value to parse.</param>
+        /// <param name="owningAssetGuid">The GUID of the file that contains the reference.</param>
+        /// <param name="fileId">Receives the referenced local file id.</param>
+        /// <param name="guid">Receives the referenced asset GUID.</param>
+        /// <returns><c>false</c> when the value is invalid or a local reference has no owning GUID.</returns>
+        public static bool TryResolveObjectReference(
+            string value,
+            string owningAssetGuid,
+            out long fileId,
+            out string guid
+        )
+        {
+            if (
+                !TryParseObjectReference(value, out fileId, out guid, out bool hasFileId)
+                || !hasFileId
+            )
             {
                 fileId = 0;
                 guid = null;
                 return false;
             }
 
-            string trimmed = value.Trim();
-            if (trimmed.Length < 2 || trimmed[0] != '{' || trimmed[trimmed.Length - 1] != '}')
+            if (fileId == 0 || !string.IsNullOrEmpty(guid))
+            {
+                return true;
+            }
+
+            if (string.IsNullOrEmpty(owningAssetGuid))
             {
                 fileId = 0;
                 guid = null;
                 return false;
             }
 
-            long readFileId = 0;
-            string readGuid = null;
-            string body = trimmed.Substring(1, trimmed.Length - 2);
-            foreach (string part in body.Split(','))
-            {
-                int separator = part.IndexOf(':');
-                if (separator < 0)
-                {
-                    continue;
-                }
-
-                string key = part.Substring(0, separator).Trim();
-                string entry = part.Substring(separator + 1).Trim();
-                if (string.Equals(key, "fileID", StringComparison.Ordinal))
-                {
-                    if (
-                        long.TryParse(
-                            entry,
-                            NumberStyles.Integer,
-                            CultureInfo.InvariantCulture,
-                            out long parsedFileId
-                        )
-                    )
-                    {
-                        readFileId = parsedFileId;
-                    }
-                }
-                else if (string.Equals(key, "guid", StringComparison.Ordinal))
-                {
-                    readGuid = entry;
-                }
-            }
-
-            fileId = readFileId;
-            guid = readGuid;
+            guid = owningAssetGuid;
             return true;
         }
 
@@ -400,6 +389,68 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             }
 
             return index;
+        }
+
+        private static bool TryParseObjectReference(
+            string value,
+            out long fileId,
+            out string guid,
+            out bool hasFileId
+        )
+        {
+            hasFileId = false;
+            if (string.IsNullOrEmpty(value))
+            {
+                fileId = 0;
+                guid = null;
+                return false;
+            }
+
+            string trimmed = value.Trim();
+            if (trimmed.Length < 2 || trimmed[0] != '{' || trimmed[trimmed.Length - 1] != '}')
+            {
+                fileId = 0;
+                guid = null;
+                return false;
+            }
+
+            long readFileId = 0;
+            string readGuid = null;
+            string body = trimmed.Substring(1, trimmed.Length - 2);
+            foreach (string part in body.Split(','))
+            {
+                int separator = part.IndexOf(':');
+                if (separator < 0)
+                {
+                    continue;
+                }
+
+                string key = part.Substring(0, separator).Trim();
+                string entry = part.Substring(separator + 1).Trim();
+                if (string.Equals(key, "fileID", StringComparison.Ordinal))
+                {
+                    if (
+                        long.TryParse(
+                            entry,
+                            NumberStyles.Integer,
+                            CultureInfo.InvariantCulture,
+                            out long parsedFileId
+                        )
+                    )
+                    {
+                        readFileId = parsedFileId;
+                        hasFileId = true;
+                    }
+                }
+                else if (string.Equals(key, "guid", StringComparison.Ordinal))
+                {
+                    readGuid = entry;
+                }
+            }
+
+            fileId = readFileId;
+            guid = readGuid;
+            return true;
         }
 
         private static bool IsZeroGuid(string guid)

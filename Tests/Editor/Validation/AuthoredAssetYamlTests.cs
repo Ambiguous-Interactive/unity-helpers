@@ -167,6 +167,50 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assert.AreEqual(expectedGuid, guid);
         }
 
+        [TestCase("{fileID: 4200000}", "owner", 4200000L, "owner")]
+        [TestCase("{fileID: 0}", "owner", 0L, null)]
+        [TestCase("{fileID: 11500000, guid: external, type: 3}", "owner", 11500000L, "external")]
+        public void AReferenceWithoutAGuidResolvesWithinItsOwningAsset(
+            string value,
+            string owningAssetGuid,
+            long expectedFileId,
+            string expectedGuid
+        )
+        {
+            Assert.IsTrue(
+                AuthoredAssetYaml.TryResolveObjectReference(
+                    value,
+                    owningAssetGuid,
+                    out long fileId,
+                    out string guid
+                )
+            );
+            Assert.AreEqual(expectedFileId, fileId);
+            Assert.AreEqual(expectedGuid, guid);
+        }
+
+        [TestCase("not a reference", "owner")]
+        [TestCase("{fileID: 42}", null)]
+        [TestCase("{}", "owner")]
+        [TestCase("{foo: bar}", "owner")]
+        [TestCase("{fileID: nope}", "owner")]
+        public void AnInvalidReferenceCannotResolveToItsOwningAsset(
+            string value,
+            string owningAssetGuid
+        )
+        {
+            Assert.IsFalse(
+                AuthoredAssetYaml.TryResolveObjectReference(
+                    value,
+                    owningAssetGuid,
+                    out long fileId,
+                    out string guid
+                )
+            );
+            Assert.AreEqual(0L, fileId);
+            Assert.AreEqual(null, guid);
+        }
+
         [TestCase("")]
         [TestCase(null)]
         [TestCase("7")]
