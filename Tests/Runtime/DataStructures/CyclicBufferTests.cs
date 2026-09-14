@@ -153,36 +153,69 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void NormalAndWrappingBehavior()
         {
-            LinkedList<int> expected = new();
             for (int i = 0; i < NumTries; ++i)
             {
                 int capacity = PRNG.Instance.Next(100, 1_000);
                 CyclicBuffer<int> buffer = new(capacity);
+                int[] expected = new int[capacity];
+                int expectedCount = 0;
+                int expectedStart = 0;
                 CollectionAssert.AreEquivalent(Array.Empty<int>(), buffer);
-                expected.Clear();
                 for (int j = 0; j < capacity * CapacityMultiplier; ++j)
                 {
                     int newValue = PRNG.Instance.Next();
-                    expected.AddLast(newValue);
-                    while (capacity < expected.Count)
+                    if (expectedCount < capacity)
                     {
-                        expected.RemoveFirst();
+                        int insertionIndex = expectedStart + expectedCount;
+                        if (capacity <= insertionIndex)
+                        {
+                            insertionIndex -= capacity;
+                        }
+
+                        expected[insertionIndex] = newValue;
+                        ++expectedCount;
                     }
-                    buffer.Add(newValue);
-                    Assert.AreEqual(expected.Count, buffer.Count);
-                    if (!expected.SequenceEqual(buffer))
+                    else
                     {
+                        expected[expectedStart] = newValue;
+                        expectedStart = (expectedStart + 1) % capacity;
+                    }
+
+                    buffer.Add(newValue);
+                    bool matches = expectedCount == buffer.Count;
+                    int expectedIndex = expectedStart;
+                    for (int index = 0; matches && index < expectedCount; ++index)
+                    {
+                        matches = expected[expectedIndex] == buffer[index];
+                        ++expectedIndex;
+                        if (capacity <= expectedIndex)
+                        {
+                            expectedIndex = 0;
+                        }
+                    }
+
+                    if (!matches)
+                    {
+                        IEnumerable<int> expectedSequence = Enumerable
+                            .Range(0, expectedCount)
+                            .Select(index => expected[(expectedStart + index) % capacity]);
                         Assert.Fail(
                             $"Failure at iteration {i}, j={j}, capacity={buffer.Capacity}, "
                                 + $"capacityMultiplier={CapacityMultiplier}\n"
-                                + $"Expected: [{string.Join(",", expected)}], Actual: [{string.Join(",", buffer)}]"
+                                + $"Expected: [{string.Join(",", expectedSequence)}], Actual: [{string.Join(",", buffer)}]"
                         );
                     }
                 }
 
-                foreach (int item in expected)
+                int membershipIndex = expectedStart;
+                for (int index = 0; index < expectedCount; ++index)
                 {
-                    Assert.IsTrue(buffer.Contains(item));
+                    Assert.IsTrue(buffer.Contains(expected[membershipIndex]));
+                    ++membershipIndex;
+                    if (capacity <= membershipIndex)
+                    {
+                        membershipIndex = 0;
+                    }
                 }
 
                 for (int j = 0; j < NumTries; ++j)

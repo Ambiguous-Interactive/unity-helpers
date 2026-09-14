@@ -424,12 +424,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         public void DoubleMaxRange()
         {
             IRandom random = NewRandom();
+            int invalidIndex = -1;
+            double invalidValue = 0;
             for (int i = 0; i < SampleCount; ++i)
             {
                 double value = random.NextDouble(double.MinValue, double.MaxValue);
-                Assert.IsFalse(double.IsNaN(value));
-                Assert.IsFalse(double.IsInfinity(value));
+                if (invalidIndex < 0 && (double.IsNaN(value) || double.IsInfinity(value)))
+                {
+                    invalidIndex = i;
+                    invalidValue = value;
+                }
             }
+
+            Assert.AreEqual(
+                -1,
+                invalidIndex,
+                $"Sample {invalidIndex} was not finite: {invalidValue}."
+            );
         }
 
         [Test]

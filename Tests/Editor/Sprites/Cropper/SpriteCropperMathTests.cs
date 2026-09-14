@@ -42,6 +42,57 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             return pixels;
         }
 
+        [TestCase(1_024, 1_024, false)]
+        [TestCase(2_048, 2_048, false)]
+        [TestCase(4_096, 2_047, false)]
+        [TestCase(32_768, 256, false)]
+        [TestCase(4_096, 2_048, true)]
+        [TestCase(8_192, 1_024, true)]
+        [TestCase(16_384, 512, true)]
+        public void ScanParallelizationRequiresEnoughPixelsAndRows(
+            int width,
+            int height,
+            bool expected
+        )
+        {
+            Assert.AreEqual(expected, SpriteCropper.ShouldScanPixelsInParallel(width, height));
+        }
+
+        [Test]
+        public void ParallelAndSequentialScansProduceIdenticalBounds()
+        {
+            const int Width = 8;
+            const int Height = 6;
+            Color32[] thresholdEdges = new Color32[Width * Height];
+            thresholdEdges[1 * Width + 1] = new Color32(255, 255, 255, 129);
+            thresholdEdges[4 * Width + 6] = new Color32(255, 255, 255, 129);
+            thresholdEdges[3 * Width + 3] = new Color32(255, 255, 255, 128);
+            Color32[][] scenarios =
+            {
+                new Color32[Width * Height],
+                OpaqueRect(Width, Height, 0, 0, Width, Height),
+                thresholdEdges,
+            };
+
+            foreach (Color32[] pixels in scenarios)
+            {
+                SpriteCropper.VisibleBounds sequential =
+                    SpriteCropper.FindVisibleBoundsSequentially(pixels, Width, Height, 128);
+                SpriteCropper.VisibleBounds parallel = SpriteCropper.FindVisibleBoundsInParallel(
+                    pixels,
+                    Width,
+                    Height,
+                    128
+                );
+
+                Assert.AreEqual(sequential.HasVisible, parallel.HasVisible);
+                Assert.AreEqual(sequential.MinX, parallel.MinX);
+                Assert.AreEqual(sequential.MinY, parallel.MinY);
+                Assert.AreEqual(sequential.MaxX, parallel.MaxX);
+                Assert.AreEqual(sequential.MaxY, parallel.MaxY);
+            }
+        }
+
         [TestCase(1, 1, 0, 0, 1, 1, 1, 1)]
         [TestCase(2, 2, 0, 0, 2, 2, 2, 2)]
         [TestCase(100, 100, 25, 25, 50, 50, 50, 50)]

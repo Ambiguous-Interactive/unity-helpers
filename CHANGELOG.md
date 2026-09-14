@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `ShapeHelper` circular curves, upper-semicircle fractions, and angle-centered circular
+  fractions with reusable output buffers and fail-soft validation. See
+  [Helper Utilities](./docs/features/utilities/helper-utilities.md#circular-curves-and-arcs)
+  ([#742](https://github.com/Ambiguous-Interactive/unity-helpers/issues/742)).
 - Add `NextIntSkewed`, which averages uniform draws with a preferred target and clamps the result to the requested bounds. See [Random Generators](./docs/features/utilities/random-generators.md#ranges-a-designer-authored) ([#742](https://github.com/Ambiguous-Interactive/unity-helpers/issues/742)).
 - Add `AuthoredAssetYaml.TryResolveObjectReference`, which resolves both external and same-file Unity references without loading the asset. See [Authored Asset Validation](./docs/features/editor-tools/authored-asset-validation.md#why-text-and-why-loading-is-the-wrong-instrument) ([#779](https://github.com/Ambiguous-Interactive/unity-helpers/issues/779)).
 - Add `ColorContrast.Composite`, which produces the opaque visible color for a translucent foreground before a contrast measurement. See [Readable Text on Any Background](./docs/features/utilities/math-and-extensions.md#readable-text-on-any-background) ([#777](https://github.com/Ambiguous-Interactive/unity-helpers/issues/777)).
@@ -18,6 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Improved
 
+- Resolve already-loadable `SerializableType` names before constructing the full descriptor catalog,
+  and avoid parallel sprite-crop scans below a conservative measured crossover
+  ([#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781),
+  [#782](https://github.com/Ambiguous-Interactive/unity-helpers/issues/782)).
+- Reduce the slowest EditMode, PlayMode, and standalone test paths without reducing case, sample, or
+  parameter counts or covered production behavior
+  ([#783](https://github.com/Ambiguous-Interactive/unity-helpers/issues/783)).
 - Format Sentinel JUnit reports sequentially, removing worker scheduling and two temporary
   arrays while preserving report order ([#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781), [#782](https://github.com/Ambiguous-Interactive/unity-helpers/issues/782)).
 - Release destroyed Unity object targets from Sentinel's central result store on the next results read without discarding diagnostic details ([#669](https://github.com/Ambiguous-Interactive/unity-helpers/issues/669)).

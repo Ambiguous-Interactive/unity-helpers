@@ -421,6 +421,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         }
 
         internal static int CachedFilterResultCountForTesting => FilterCache.Count;
+        internal static bool IsDescriptorCacheInitializedForTesting =>
+            Volatile.Read(ref _descriptorByName) != null;
 
         private static readonly object SyncRoot = new();
         private static SerializableTypeDescriptor[] _descriptors;
@@ -470,10 +472,12 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 return null;
             }
 
-            EnsureCache();
-
+            Dictionary<string, SerializableTypeDescriptor> descriptorsByName = Volatile.Read(
+                ref _descriptorByName
+            );
             if (
-                _descriptorByName.TryGetValue(
+                descriptorsByName != null
+                && descriptorsByName.TryGetValue(
                     assemblyQualifiedName,
                     out SerializableTypeDescriptor descriptor
                 )
@@ -486,6 +490,17 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             if (direct != null)
             {
                 return direct;
+            }
+
+            EnsureCache();
+            if (
+                _descriptorByName.TryGetValue(
+                    assemblyQualifiedName,
+                    out SerializableTypeDescriptor cachedDescriptor
+                )
+            )
+            {
+                return cachedDescriptor.Type;
             }
 
             string fullName = ExtractFullName(assemblyQualifiedName);
@@ -698,8 +713,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 _configuredIgnoreRegexes = sanitized == null ? null : CompilePatterns(sanitized);
 
                 PatternStatsCache.Clear();
+                Volatile.Write(ref _descriptorByName, null);
                 _descriptors = null;
-                _descriptorByName = null;
                 _assemblyQualifiedNames = null;
                 _displayNames = null;
                 _tooltips = null;
@@ -978,14 +993,14 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
         private static void EnsureCache()
         {
-            if (_descriptors != null)
+            if (Volatile.Read(ref _descriptorByName) != null)
             {
                 return;
             }
 
             lock (SyncRoot)
             {
-                if (_descriptors != null)
+                if (_descriptorByName != null)
                 {
                     return;
                 }
@@ -1129,16 +1144,16 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                     _descriptors = descriptors.ToArray();
                 }
 
-                _descriptorByName = new Dictionary<string, SerializableTypeDescriptor>(
+                Dictionary<string, SerializableTypeDescriptor> descriptorByName = new(
                     _descriptors.Length,
                     StringComparer.Ordinal
                 );
 
                 foreach (SerializableTypeDescriptor descriptor in _descriptors)
                 {
-                    if (!_descriptorByName.ContainsKey(descriptor.AssemblyQualifiedName))
+                    if (!descriptorByName.ContainsKey(descriptor.AssemblyQualifiedName))
                     {
-                        _descriptorByName.Add(descriptor.AssemblyQualifiedName, descriptor);
+                        descriptorByName.Add(descriptor.AssemblyQualifiedName, descriptor);
                     }
                 }
 
@@ -1153,6 +1168,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 }
 
                 FilterCache.Set(string.Empty, _descriptors);
+                Volatile.Write(ref _descriptorByName, descriptorByName);
             }
         }
 

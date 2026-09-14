@@ -199,6 +199,40 @@ Vector3 explosionPoint = Helpers.GetRandomPointInSphere(center, radius);
 
 ---
 
+### Circular Curves and Arcs
+
+`ShapeHelper` generates evenly spaced `Vector2` points from angles expressed in degrees. Curve
+generation includes both requested endpoints; a one-point curve samples the angular midpoint.
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using System.Collections.Generic;
+using UnityEngine;
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+List<Vector2> points = new(16);
+ShapeHelper.GenerateCircularCurvePoints(
+    center: Vector2.zero,
+    radius: 4f,
+    startAngle: 30f,
+    endAngle: 150f,
+    pointCount: 16,
+    buffer: points
+);
+```
+
+`GenerateTopCircularFraction` takes a fraction of the upper `180°` semicircle and centers it on
+`90°`. `GenerateCircularFraction` takes a fraction of a full `360°` circle and centers it on a
+caller-supplied angle. A full-circle fraction includes geometrically identical first and last
+points, which is useful for an open polyline; omit the last point when feeding a renderer that
+already closes its loop.
+
+Supplying a buffer clears and reuses that list. Invalid counts, radii, fractions, centers, or angles
+fail softly by returning an empty destination instead of throwing.
+
+---
+
 ### Smooth Rotation Helpers
 
 **Get rotation speed for smooth turning:**

@@ -358,6 +358,38 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
+        public void ResolvingKnownTypeDoesNotBuildDescriptorCatalog()
+        {
+            IReadOnlyList<string> original = SerializableTypeCatalog.GetActiveIgnorePatterns();
+            bool wasConfigured = !ReferenceEquals(
+                original,
+                SerializableTypeCatalog.GetDefaultIgnorePatterns()
+            );
+            string[] backup = original.ToArray();
+
+            try
+            {
+                SerializableTypeCatalog.ConfigureTypeNameIgnorePatterns(
+                    new[] { "^TypeThatCannotExistForDescriptorCacheTest$" }
+                );
+                Assert.IsFalse(SerializableTypeCatalog.IsDescriptorCacheInitializedForTesting);
+
+                Type resolved = SerializableTypeCatalog.Resolve(
+                    typeof(SerializableType).AssemblyQualifiedName
+                );
+
+                Assert.AreSame(typeof(SerializableType), resolved);
+                Assert.IsFalse(SerializableTypeCatalog.IsDescriptorCacheInitializedForTesting);
+            }
+            finally
+            {
+                SerializableTypeCatalog.ConfigureTypeNameIgnorePatterns(
+                    wasConfigured ? backup : null
+                );
+            }
+        }
+
+        [Test]
         public void CatalogExcludesCompilerGeneratedAndAnonymousTypes()
         {
             string[] names = SerializableTypeCatalog.GetAssemblyQualifiedNames();

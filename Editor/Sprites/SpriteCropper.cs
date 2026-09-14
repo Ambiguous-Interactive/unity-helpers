@@ -61,6 +61,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private const int ParallelRowCopyThreshold = 512;
 
+        private const long ParallelPixelScanThreshold = 8_388_608L;
+
+        private const int ParallelScanRowThreshold = 512;
+
         private static readonly string[] ImageFileExtensions =
         {
             ".png",
@@ -131,6 +135,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         {
             return ParallelPixelCopyThreshold <= (long)width * height
                 && ParallelRowCopyThreshold <= height;
+        }
+
+        internal static bool ShouldScanPixelsInParallel(int width, int height)
+        {
+            return ParallelPixelScanThreshold <= (long)width * height
+                && ParallelScanRowThreshold <= height;
         }
 
         internal static void CopyCropPixels(
@@ -217,48 +227,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             bool onlyNecessary
         )
         {
-            int minX = width;
-            int minY = height;
-            int maxX = 0;
-            int maxY = 0;
-            bool hasVisible = false;
-            object lockObject = new();
             byte alphaByteThreshold = ColorQuantization.ToThresholdByte(alphaThreshold);
-            Parallel.For(
-                0,
-                width * height,
-                () => (minX: width, minY: height, maxX: 0, maxY: 0, hasVisible: false),
-                (index, _, localState) =>
-                {
-                    int x = index % width;
-                    int y = index / width;
-
-                    byte a = pixels[index].a;
-                    if (alphaByteThreshold < a)
-                    {
-                        localState.hasVisible = true;
-                        localState.minX = Mathf.Min(localState.minX, x);
-                        localState.minY = Mathf.Min(localState.minY, y);
-                        localState.maxX = Mathf.Max(localState.maxX, x);
-                        localState.maxY = Mathf.Max(localState.maxY, y);
-                    }
-                    return localState;
-                },
-                finalLocalState =>
-                {
-                    if (finalLocalState.hasVisible)
-                    {
-                        lock (lockObject)
-                        {
-                            hasVisible = true;
-                            minX = Mathf.Min(minX, finalLocalState.minX);
-                            minY = Mathf.Min(minY, finalLocalState.minY);
-                            maxX = Mathf.Max(maxX, finalLocalState.maxX);
-                            maxY = Mathf.Max(maxY, finalLocalState.maxY);
-                        }
-                    }
-                }
-            );
+            VisibleBounds bounds = ShouldScanPixelsInParallel(width, height)
+                ? FindVisibleBoundsInParallel(pixels, width, height, alphaByteThreshold)
+                : FindVisibleBoundsSequentially(pixels, width, height, alphaByteThreshold);
+            int minX = bounds.MinX;
+            int minY = bounds.MinY;
+            int maxX = bounds.MaxX;
+            int maxY = bounds.MaxY;
+            bool hasVisible = bounds.HasVisible;
 
             int visibleMinX = minX;
             int visibleMinY = minY;
@@ -307,6 +284,51 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 cropHeight,
                 newPivotNorm
             );
+        }
+
+        internal static VisibleBounds FindVisibleBoundsInParallel(
+            Color32[] pixels,
+            int width,
+            int height,
+            byte alphaByteThreshold
+        )
+        {
+            VisibleBoundsScanJob job = new(pixels, width, height, alphaByteThreshold);
+            Parallel.For(0, height, job.CreateLocalBounds, job.ScanRow, job.MergeLocalBounds);
+            return job.Bounds;
+        }
+
+        internal static VisibleBounds FindVisibleBoundsSequentially(
+            Color32[] pixels,
+            int width,
+            int height,
+            byte alphaByteThreshold
+        )
+        {
+            int minX = width;
+            int minY = height;
+            int maxX = 0;
+            int maxY = 0;
+            bool hasVisible = false;
+            for (int y = 0; y < height; ++y)
+            {
+                int rowStart = y * width;
+                for (int x = 0; x < width; ++x)
+                {
+                    if (pixels[rowStart + x].a <= alphaByteThreshold)
+                    {
+                        continue;
+                    }
+
+                    hasVisible = true;
+                    minX = Mathf.Min(minX, x);
+                    minY = Mathf.Min(minY, y);
+                    maxX = Mathf.Max(maxX, x);
+                    maxY = Mathf.Max(maxY, y);
+                }
+            }
+
+            return new VisibleBounds(hasVisible, minX, minY, maxX, maxY);
         }
 
         [MenuItem("Tools/Wallstop Studios/Unity Helpers/" + Name)]
@@ -1183,6 +1205,95 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             FatalError,
         }
 
+        private sealed class VisibleBoundsScanJob
+        {
+            internal VisibleBounds Bounds => new(_hasVisible, _minX, _minY, _maxX, _maxY);
+
+            private readonly Color32[] _pixels;
+            private readonly int _width;
+            private readonly int _height;
+            private readonly byte _alphaByteThreshold;
+            private readonly object _lockObject = new();
+            private bool _hasVisible;
+            private int _minX;
+            private int _minY;
+            private int _maxX;
+            private int _maxY;
+
+            internal VisibleBoundsScanJob(
+                Color32[] pixels,
+                int width,
+                int height,
+                byte alphaByteThreshold
+            )
+            {
+                _pixels = pixels;
+                _width = width;
+                _height = height;
+                _alphaByteThreshold = alphaByteThreshold;
+                _minX = width;
+                _minY = height;
+            }
+
+            internal VisibleBounds CreateLocalBounds()
+            {
+                return new VisibleBounds(false, _width, _height, 0, 0);
+            }
+
+            internal VisibleBounds ScanRow(
+                int y,
+                ParallelLoopState loopState,
+                VisibleBounds localBounds
+            )
+            {
+                int minX = _width;
+                int maxX = 0;
+                bool hasVisible = false;
+                int rowStart = y * _width;
+                for (int x = 0; x < _width; ++x)
+                {
+                    if (_pixels[rowStart + x].a <= _alphaByteThreshold)
+                    {
+                        continue;
+                    }
+
+                    hasVisible = true;
+                    minX = Mathf.Min(minX, x);
+                    maxX = Mathf.Max(maxX, x);
+                }
+
+                if (!hasVisible)
+                {
+                    return localBounds;
+                }
+
+                return new VisibleBounds(
+                    true,
+                    Mathf.Min(localBounds.MinX, minX),
+                    Mathf.Min(localBounds.MinY, y),
+                    Mathf.Max(localBounds.MaxX, maxX),
+                    Mathf.Max(localBounds.MaxY, y)
+                );
+            }
+
+            internal void MergeLocalBounds(VisibleBounds localBounds)
+            {
+                if (!localBounds.HasVisible)
+                {
+                    return;
+                }
+
+                lock (_lockObject)
+                {
+                    _hasVisible = true;
+                    _minX = Mathf.Min(_minX, localBounds.MinX);
+                    _minY = Mathf.Min(_minY, localBounds.MinY);
+                    _maxX = Mathf.Max(_maxX, localBounds.MaxX);
+                    _maxY = Mathf.Max(_maxY, localBounds.MaxY);
+                }
+            }
+        }
+
         private sealed class CropRowCopyJob
         {
             private readonly Color32[] _pixels;
@@ -1288,6 +1399,24 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 CropWidth = cropWidth;
                 CropHeight = cropHeight;
                 NewPivot = newPivot;
+            }
+        }
+
+        internal readonly struct VisibleBounds
+        {
+            internal readonly bool HasVisible;
+            internal readonly int MinX;
+            internal readonly int MinY;
+            internal readonly int MaxX;
+            internal readonly int MaxY;
+
+            internal VisibleBounds(bool hasVisible, int minX, int minY, int maxX, int maxY)
+            {
+                HasVisible = hasVisible;
+                MinX = minX;
+                MinY = minY;
+                MaxX = maxX;
+                MaxY = maxY;
             }
         }
     }
