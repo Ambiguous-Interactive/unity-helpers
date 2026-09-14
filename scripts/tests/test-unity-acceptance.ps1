@@ -112,7 +112,7 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
         }
         $checks++
     }
-    foreach ($function in @('New-ConfiguratorSource', 'Initialize-EphemeralProject')) {
+    foreach ($function in @('New-ConfiguratorSource', 'Set-EphemeralProjectContent', 'Initialize-EphemeralProject')) {
         $definition = $runner.Find({ param($node)
             $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $function
         }, $true)
@@ -132,6 +132,52 @@ if ($env:ACCEPTANCE_CONTROL_START_ACTIVE -eq 'true') { $env:ACCEPTANCE_CONTROL_A
         }
         $checks++
     }
+    $idempotentProject = Join-Path $temporary 'idempotent-project'
+    $null = Initialize-EphemeralProject -Root $temporary -Version '2021.3.45f1' -Mode editmode -Path $idempotentProject
+    $seedPaths = @(
+        (Join-Path $idempotentProject 'Packages/manifest.json'),
+        (Join-Path $idempotentProject 'ProjectSettings/ProjectVersion.txt'),
+        (Join-Path $idempotentProject 'ProjectSettings/EditorSettings.asset'),
+        (Join-Path $idempotentProject 'Assets/Editor/UhCiTestConfigurator.cs')
+    )
+    $sentinelWriteTime = [DateTime]::SpecifyKind([DateTime]'2001-01-01T00:00:00', [DateTimeKind]::Utc)
+    foreach ($seedPath in $seedPaths) {
+        [IO.File]::SetLastWriteTimeUtc($seedPath, $sentinelWriteTime)
+    }
+    $null = Initialize-EphemeralProject -Root $temporary -Version '2021.3.45f1' -Mode editmode -Path $idempotentProject
+    if (@($seedPaths | Where-Object { [IO.File]::GetLastWriteTimeUtc($_) -ne $sentinelWriteTime }).Count -ne 0) {
+        throw 'Unchanged ephemeral project seeds must preserve their write times.'
+    }
+    Set-Content -LiteralPath $seedPaths[0] -Value '{"stale":true}'
+    [IO.File]::SetLastWriteTimeUtc($seedPaths[0], $sentinelWriteTime)
+    $null = Initialize-EphemeralProject -Root $temporary -Version '2021.3.45f1' -Mode editmode -Path $idempotentProject
+    if ((Get-Content -LiteralPath $seedPaths[0] -Raw).Trim() -ne '{}' -or
+        [IO.File]::GetLastWriteTimeUtc($seedPaths[0]) -eq $sentinelWriteTime -or
+        @($seedPaths[1..3] | Where-Object { [IO.File]::GetLastWriteTimeUtc($_) -ne $sentinelWriteTime }).Count -ne 0) {
+        throw 'Ephemeral project seeds must rewrite only changed content.'
+    }
+    $configurator = Get-Content -LiteralPath $seedPaths[3] -Raw
+    $caseChangedConfigurator = $configurator.Replace('using ', 'Using ')
+    if ($caseChangedConfigurator -ceq $configurator) { throw 'Case-only seed control did not change.' }
+    Set-Content -LiteralPath $seedPaths[3] -Value $caseChangedConfigurator
+    [IO.File]::SetLastWriteTimeUtc($seedPaths[3], $sentinelWriteTime)
+    $null = Initialize-EphemeralProject -Root $temporary -Version '2021.3.45f1' -Mode editmode -Path $idempotentProject
+    if ((Get-Content -LiteralPath $seedPaths[3] -Raw).TrimEnd() -cne $configurator.TrimEnd() -or
+        [IO.File]::GetLastWriteTimeUtc($seedPaths[3]) -eq $sentinelWriteTime) {
+        throw 'Ephemeral project seeds must repair case-only content drift.'
+    }
+    foreach ($seedPath in $seedPaths) {
+        [IO.File]::SetLastWriteTimeUtc($seedPath, $sentinelWriteTime)
+    }
+    [IO.File]::WriteAllBytes($seedPaths[0], [byte[]]::new(0))
+    [IO.File]::SetLastWriteTimeUtc($seedPaths[0], $sentinelWriteTime)
+    $null = Initialize-EphemeralProject -Root $temporary -Version '2021.3.45f1' -Mode editmode -Path $idempotentProject
+    if ((Get-Content -LiteralPath $seedPaths[0] -Raw).Trim() -ne '{}' -or
+        [IO.File]::GetLastWriteTimeUtc($seedPaths[0]) -eq $sentinelWriteTime -or
+        @($seedPaths[1..3] | Where-Object { [IO.File]::GetLastWriteTimeUtc($_) -ne $sentinelWriteTime }).Count -ne 0) {
+        throw 'Ephemeral project seeds must rewrite only a truncated zero-byte seed.'
+    }
+    $checks++
     foreach ($selection in @('sentinel', 'intmap', 'serialization', 'all')) {
         Remove-Item -LiteralPath $env:ACCEPTANCE_CONTROL_LOG -ErrorAction SilentlyContinue
         & $subject -Acceptance $selection -UnityVersion '2021.3.45f1' -ArtifactsPath $temporary -TemporaryRoot $temporary -Repository (Join-Path $PSScriptRoot '../..')

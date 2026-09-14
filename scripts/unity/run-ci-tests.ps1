@@ -1986,6 +1986,22 @@ function Write-AnalyzerSetupDiagnostics {
         "project. Placement is asserted by scripts/tests/test-analyzer-placement.js ($Label).")
 }
 
+function Set-EphemeralProjectContent {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Content
+    )
+
+    $needsWrite = -not (Test-Path -LiteralPath $Path -PathType Leaf)
+    if (-not $needsWrite) {
+        $existing = [IO.File]::ReadAllText($Path)
+        $needsWrite = ($existing.TrimEnd("`r", "`n") -cne $Content.TrimEnd("`r", "`n"))
+    }
+    if ($needsWrite) {
+        $Content | Set-Content -LiteralPath $Path -Encoding UTF8
+    }
+}
+
 function Initialize-EphemeralProject {
     param(
         [Parameter(Mandatory = $true)][string]$Root,
@@ -2019,10 +2035,12 @@ function Initialize-EphemeralProject {
     New-Item -ItemType Directory -Force -Path (Join-Path $project 'ProjectSettings') | Out-Null
     New-Item -ItemType Directory -Force -Path (Join-Path $project 'Assets\Editor') | Out-Null
 
-    New-ManifestJson -Root $Root -IncludeComparisons:$IncludeComparisons -IncludeIntegrations:$IncludeIntegrations -RepoRoot $RepoRoot |
-        Set-Content -LiteralPath (Join-Path $project 'Packages\manifest.json') -Encoding UTF8
-    "m_EditorVersion: $Version`n" |
-        Set-Content -LiteralPath (Join-Path $project 'ProjectSettings\ProjectVersion.txt') -Encoding UTF8
+    Set-EphemeralProjectContent `
+        -Path (Join-Path $project 'Packages\manifest.json') `
+        -Content (New-ManifestJson -Root $Root -IncludeComparisons:$IncludeComparisons -IncludeIntegrations:$IncludeIntegrations -RepoRoot $RepoRoot)
+    Set-EphemeralProjectContent `
+        -Path (Join-Path $project 'ProjectSettings\ProjectVersion.txt') `
+        -Content "m_EditorVersion: $Version`n"
     # Force 2D Default Behavior Mode (kept in sync with create-test-project.sh Step 3b).
     # unity-helpers is a 2D sprite-tooling package whose dev environment and entire
     # validated test suite run in 2D mode. Without this seed the ephemeral project defaults
@@ -2031,16 +2049,19 @@ function Initialize-EphemeralProject {
     # texture/sprite tests that pass locally fail in CI. A partial EditorSettings.asset seeds
     # the mode (Unity fills the rest); UhCiTestConfigurator's later SaveAssets preserves it.
     # ProjectBehaviorModeTests guards against silent regression.
-    @'
+    $editorSettings = @'
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
 --- !u!159 &1
 EditorSettings:
   m_DefaultBehaviorMode: 1
-'@ |
-        Set-Content -LiteralPath (Join-Path $project 'ProjectSettings\EditorSettings.asset') -Encoding UTF8
-    New-ConfiguratorSource -Backend $Backend -CompilerConfiguration $Il2CppCompilerConfiguration -StrippingLevel $ManagedStrippingLevel |
-        Set-Content -LiteralPath (Join-Path $project 'Assets\Editor\UhCiTestConfigurator.cs') -Encoding UTF8
+'@
+    Set-EphemeralProjectContent `
+        -Path (Join-Path $project 'ProjectSettings\EditorSettings.asset') `
+        -Content $editorSettings
+    Set-EphemeralProjectContent `
+        -Path (Join-Path $project 'Assets\Editor\UhCiTestConfigurator.cs') `
+        -Content (New-ConfiguratorSource -Backend $Backend -CompilerConfiguration $Il2CppCompilerConfiguration -StrippingLevel $ManagedStrippingLevel)
 
     # STANDALONE ONLY: generate the split-build helpers that sever the test
     # player's PlayerConnection/TCP result streaming (the 10060 hang on multi-NIC
@@ -2062,17 +2083,7 @@ EditorSettings:
             if ($dir -and -not (Test-Path -LiteralPath $dir -PathType Container)) {
                 New-Item -ItemType Directory -Force -Path $dir | Out-Null
             }
-            $needsWrite = -not (Test-Path -LiteralPath $file.Path -PathType Leaf)
-            if (-not $needsWrite) {
-                # Compare EOL-trailing-tolerantly: Set-Content appends a trailing
-                # newline that the here-string content lacks, so a naive `-ne` would
-                # rewrite on every run and needlessly bust Unity's import cache.
-                $existing = Get-Content -LiteralPath $file.Path -Raw
-                $needsWrite = ($existing.TrimEnd("`r", "`n") -ne $file.Content.TrimEnd("`r", "`n"))
-            }
-            if ($needsWrite) {
-                Set-Content -LiteralPath $file.Path -Value $file.Content -Encoding UTF8
-            }
+            Set-EphemeralProjectContent -Path $file.Path -Content $file.Content
         }
         Write-Host "::group::unity-helpers standalone split-build helpers"
         Write-Host "Generated the standalone build modifier + player TestRunCallback under $project (file-based results; no PlayerConnection)."
