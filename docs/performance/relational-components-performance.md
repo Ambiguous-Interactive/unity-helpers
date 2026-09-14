@@ -8,7 +8,7 @@ Numbers below are grouped by operating system. A section reading `pending` means
 
 <!-- RELATIONAL_COMPONENTS_WINDOWS_START -->
 
-Last updated 2026-05-08 04:09 UTC on Windows 11 (10.0.26200) 64bit.
+Last updated 2026-09-14 05:38 UTC on Windows 11 (10.0.26200).
 
 Numbers capture repeated `Assign*Components` calls for one second per scenario.
 Higher operations per second are better.
@@ -26,18 +26,18 @@ Higher operations per second are better.
     </tr>
   </thead>
   <tbody>
-    <tr><td align="left">Parent - Single</td><td align="right">727,869</td><td align="right">5,749,952</td><td align="right">0.13x</td><td align="right">730,000</td></tr>
-    <tr><td align="left">Parent - Array</td><td align="right">445,375</td><td align="right">3,343,147</td><td align="right">0.13x</td><td align="right">450,000</td></tr>
-    <tr><td align="left">Parent - List</td><td align="right">491,299</td><td align="right">4,194,708</td><td align="right">0.12x</td><td align="right">500,000</td></tr>
-    <tr><td align="left">Parent - HashSet</td><td align="right">479,674</td><td align="right">2,949,101</td><td align="right">0.16x</td><td align="right">480,000</td></tr>
-    <tr><td align="left">Child - Single</td><td align="right">496,367</td><td align="right">3,564,321</td><td align="right">0.14x</td><td align="right">500,000</td></tr>
-    <tr><td align="left">Child - Array</td><td align="right">187,832</td><td align="right">2,392,107</td><td align="right">0.08x</td><td align="right">190,000</td></tr>
-    <tr><td align="left">Child - List</td><td align="right">193,706</td><td align="right">2,594,739</td><td align="right">0.07x</td><td align="right">200,000</td></tr>
-    <tr><td align="left">Child - HashSet</td><td align="right">194,977</td><td align="right">1,728,196</td><td align="right">0.11x</td><td align="right">200,000</td></tr>
-    <tr><td align="left">Sibling - Single</td><td align="right">3,797,711</td><td align="right">14,448,211</td><td align="right">0.26x</td><td align="right">3,800,000</td></tr>
-    <tr><td align="left">Sibling - Array</td><td align="right">687,153</td><td align="right">2,578,904</td><td align="right">0.27x</td><td align="right">690,000</td></tr>
-    <tr><td align="left">Sibling - List</td><td align="right">838,603</td><td align="right">3,380,690</td><td align="right">0.25x</td><td align="right">840,000</td></tr>
-    <tr><td align="left">Sibling - HashSet</td><td align="right">826,435</td><td align="right">1,872,130</td><td align="right">0.44x</td><td align="right">830,000</td></tr>
+    <tr><td align="left">Parent - Single</td><td align="right">1,239,795</td><td align="right">10,018,690</td><td align="right">0.12x</td><td align="right">1,240,000</td></tr>
+    <tr><td align="left">Parent - Array</td><td align="right">746,056</td><td align="right">4,764,392</td><td align="right">0.16x</td><td align="right">750,000</td></tr>
+    <tr><td align="left">Parent - List</td><td align="right">802,040</td><td align="right">7,396,326</td><td align="right">0.11x</td><td align="right">810,000</td></tr>
+    <tr><td align="left">Parent - HashSet</td><td align="right">777,660</td><td align="right">3,955,524</td><td align="right">0.20x</td><td align="right">780,000</td></tr>
+    <tr><td align="left">Child - Single</td><td align="right">665,079</td><td align="right">5,341,149</td><td align="right">0.12x</td><td align="right">670,000</td></tr>
+    <tr><td align="left">Child - Array</td><td align="right">293,349</td><td align="right">3,229,543</td><td align="right">0.09x</td><td align="right">300,000</td></tr>
+    <tr><td align="left">Child - List</td><td align="right">285,215</td><td align="right">3,783,105</td><td align="right">0.08x</td><td align="right">290,000</td></tr>
+    <tr><td align="left">Child - HashSet</td><td align="right">300,276</td><td align="right">2,001,901</td><td align="right">0.15x</td><td align="right">310,000</td></tr>
+    <tr><td align="left">Sibling - Single</td><td align="right">4,636,847</td><td align="right">28,450,407</td><td align="right">0.16x</td><td align="right">4,640,000</td></tr>
+    <tr><td align="left">Sibling - Array</td><td align="right">1,242,712</td><td align="right">3,361,155</td><td align="right">0.37x</td><td align="right">1,250,000</td></tr>
+    <tr><td align="left">Sibling - List</td><td align="right">1,339,612</td><td align="right">4,176,273</td><td align="right">0.32x</td><td align="right">1,340,000</td></tr>
+    <tr><td align="left">Sibling - HashSet</td><td align="right">1,260,522</td><td align="right">2,255,225</td><td align="right">0.56x</td><td align="right">1,270,000</td></tr>
   </tbody>
 </table>
 

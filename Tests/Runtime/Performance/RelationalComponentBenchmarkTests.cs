@@ -194,7 +194,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             {
                 string.Format(
                     CultureInfo.InvariantCulture,
-                    "_Last updated {0:yyyy-MM-dd HH:mm} UTC on {1}_",
+                    "Last updated {0:yyyy-MM-dd HH:mm} UTC on {1}.",
                     DateTime.UtcNow,
                     SystemInfo.operatingSystem
                 ),
