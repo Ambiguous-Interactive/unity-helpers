@@ -246,8 +246,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     ? ValidationWorkspaceReport.ToJUnit(
                         _lastCompletedRun,
                         _suppressions,
-                        settings.ActiveProfile.failOn,
-                        settings.workerThreads
+                        settings.ActiveProfile.failOn
                     )
                     : ValidationReport.ToJson(_lastCompletedRun, _suppressions);
                 File.WriteAllText(path, report);

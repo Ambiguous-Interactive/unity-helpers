@@ -326,15 +326,15 @@ workspace height below the toolbar. The window has four tabs:
   Switching to another fix hides that field and preserves its value. **Dry Run** evaluates the draft without replacing the
   current results; **Save Rule** persists it and starts a project scan when the scheduler is free.
 - **Settings** selects Default, Release or CI Gate and configures each category's On change, On save
-  or Manual trigger. It also controls the frame budget, report worker count, build gate and failure
-  threshold, report exports and suppression restoration.
+  or Manual trigger. It also controls the frame budget, build gate and failure threshold, report
+  exports and suppression restoration.
 
 Profiles and authored rules live in `ProjectSettings/UnityHelpersValidation.asset`. Rule enablement
 and severity preferences are shared across profiles; each profile owns its trigger matrix and build
 gate. Changing a rule's enablement or severity immediately updates Issues, the toolbar, Scene overlay
 and Inspector status. Suppression stays applied, and removing an override restores the rule's original
-severity without changing the stored scan. The frame budget bounds scheduler slices between assets. Unity API validation stays on the
-main thread; report worker threads parallelize only pure JUnit formatting.
+severity without changing the stored scan. The frame budget bounds scheduler slices between assets.
+Unity API validation and report export stay on the main thread.
 
 The eight navigation categories are Prefabs, Scenes, ScriptableObjects, Materials, Scripts,
 Addressables, Settings and Build Profiles. Materials includes texture imports. Category membership

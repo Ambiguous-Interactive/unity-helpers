@@ -87,9 +87,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         internal int frameBudget = 8;
 
         [SerializeField]
-        internal int workerThreads = 4;
-
-        [SerializeField]
         internal List<Profile> profiles = new List<Profile>
         {
             new Profile { name = "Default", triggers = new[] { 0, 0, 0, 0, 0, 0, 2, 2 } },
@@ -170,7 +167,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             projectRules ??= new List<RuleDefinition>();
             projectRules.RemoveAll(rule => rule == null);
             frameBudget = Math.Max(1, Math.Min(100, frameBudget));
-            workerThreads = Math.Max(1, Math.Min(32, workerThreads));
         }
 
         internal int TriggerFor(string path)

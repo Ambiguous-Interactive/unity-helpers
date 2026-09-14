@@ -603,21 +603,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 )
             );
             _settingsContent.Add(budget);
-            IntegerField workers = new IntegerField("Report worker threads")
-            {
-                value = settings.workerThreads,
-                isDelayed = true,
-            };
-            workers.RegisterValueChangedCallback(changed =>
-                settings.Change(
-                    "Set validation workers",
-                    () => settings.workerThreads = changed.newValue
-                )
-            );
-            _settingsContent.Add(workers);
             AddLabel(
                 _settingsContent,
-                "Unity object validation runs on the editor thread; report workers prepare independent JUnit entries.",
+                "Unity object validation and report export run on the editor thread.",
                 "sentinel-detail-message"
             );
             AddLabel(_settingsContent, "CONTINUOUS INTEGRATION", "sentinel-section-title");

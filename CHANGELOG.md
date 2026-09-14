@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Improved
 
+- Format Sentinel JUnit reports sequentially, removing worker scheduling and two temporary
+  arrays while preserving report order ([#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781), [#782](https://github.com/Ambiguous-Interactive/unity-helpers/issues/782)).
 - Release destroyed Unity object targets from Sentinel's central result store on the next results read without discarding diagnostic details ([#669](https://github.com/Ambiguous-Interactive/unity-helpers/issues/669)).
 - Defer SerializableType ignore-pattern match counts until the settings window displays them, avoiding a scan of every loaded type on each domain reload ([#786](https://github.com/Ambiguous-Interactive/unity-helpers/issues/786)).
 - Improve Sprite Cropper and Sprite Sheet Extractor memory reuse for dynamically sized pixel output, with measured size-aware parallel row copies for large images ([#754](https://github.com/Ambiguous-Interactive/unity-helpers/issues/754)).

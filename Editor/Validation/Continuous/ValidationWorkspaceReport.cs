@@ -8,7 +8,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     using System.Globalization;
     using System.IO;
     using System.Text;
-    using System.Threading.Tasks;
     using System.Xml;
 
     internal static class ValidationWorkspaceReport
@@ -16,64 +15,61 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         internal static string ToJUnit(
             ValidationRun run,
             ValidationSuppressions suppressions,
-            ValidationSeverity threshold,
-            int workers
+            ValidationSeverity threshold
         )
         {
             if (run == null)
                 throw new ArgumentNullException(nameof(run));
             ValidationSuppressions effective = suppressions ?? ValidationSuppressions.Empty;
             string[] cases = new string[run.Findings.Count];
-            bool[] failed = new bool[cases.Length];
-            bool[] skipped = new bool[cases.Length];
-            Parallel.For(
-                0,
-                cases.Length,
-                new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, Math.Min(32, workers)) },
-                index =>
-                {
-                    ValidationFinding finding = run.Findings[index];
-                    skipped[index] = effective.IsSuppressed(in finding);
-                    failed[index] = !skipped[index] && threshold <= finding.Severity;
-                    StringBuilder text = new StringBuilder();
-                    using (
-                        XmlWriter writer = XmlWriter.Create(
-                            text,
-                            new XmlWriterSettings
-                            {
-                                OmitXmlDeclaration = true,
-                                ConformanceLevel = ConformanceLevel.Fragment,
-                            }
-                        )
-                    )
-                    {
-                        writer.WriteStartElement("testcase");
-                        writer.WriteAttributeString("classname", finding.RuleId);
-                        writer.WriteAttributeString(
-                            "name",
-                            finding.AssetPath + "|" + finding.Discriminator
-                        );
-                        if (skipped[index] || failed[index])
-                        {
-                            writer.WriteStartElement(skipped[index] ? "skipped" : "failure");
-                            writer.WriteAttributeString("message", finding.Message);
-                            writer.WriteEndElement();
-                        }
-                        else
-                            writer.WriteElementString("system-out", finding.Message);
-                        writer.WriteEndElement();
-                    }
-                    cases[index] = text.ToString();
-                }
-            );
             int failures = 0;
             int suppressed = 0;
-            foreach (bool value in failed)
-                if (value)
-                    failures++;
-            foreach (bool value in skipped)
-                if (value)
+            for (int index = 0; index < cases.Length; index++)
+            {
+                ValidationFinding finding = run.Findings[index];
+                bool skipped = effective.IsSuppressed(in finding);
+                bool failed = !skipped && threshold <= finding.Severity;
+                if (skipped)
+                {
                     suppressed++;
+                }
+                else if (failed)
+                {
+                    failures++;
+                }
+
+                StringBuilder text = new StringBuilder();
+                using (
+                    XmlWriter writer = XmlWriter.Create(
+                        text,
+                        new XmlWriterSettings
+                        {
+                            OmitXmlDeclaration = true,
+                            ConformanceLevel = ConformanceLevel.Fragment,
+                        }
+                    )
+                )
+                {
+                    writer.WriteStartElement("testcase");
+                    writer.WriteAttributeString("classname", finding.RuleId);
+                    writer.WriteAttributeString(
+                        "name",
+                        finding.AssetPath + "|" + finding.Discriminator
+                    );
+                    if (skipped || failed)
+                    {
+                        writer.WriteStartElement(skipped ? "skipped" : "failure");
+                        writer.WriteAttributeString("message", finding.Message);
+                        writer.WriteEndElement();
+                    }
+                    else
+                    {
+                        writer.WriteElementString("system-out", finding.Message);
+                    }
+                    writer.WriteEndElement();
+                }
+                cases[index] = text.ToString();
+            }
             bool incomplete = !run.IsComplete || run.IsCancelled || run.TotalCount == 0;
             int errors = run.Failures.Count + (incomplete ? 1 : 0);
             StringBuilder report = new StringBuilder();

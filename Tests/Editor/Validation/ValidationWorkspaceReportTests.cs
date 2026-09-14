@@ -27,10 +27,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
         }
 
-        private static ValidationRun Run(ValidationFinding finding)
+        private static ValidationRun Run(params ValidationFinding[] findings)
         {
+            ReportRule[] rules = new ReportRule[findings.Length];
+            for (int index = 0; index < findings.Length; index++)
+            {
+                rules[index] = new ReportRule(findings[index]);
+            }
             ValidationRun run = new ValidationRun(
-                new[] { new ReportRule(finding) },
+                rules,
                 new[]
                 {
                     new ValidationTarget("guid", "Assets/Test.asset", typeof(ScriptableObject)),
@@ -59,9 +64,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
         }
 
-        [TestCase(1)]
-        [TestCase(4)]
-        public void JUnitEscapesDataAndKeepsSuppressedFindings(int workers)
+        [Test]
+        public void JUnitEscapesDataAndKeepsSuppressedFindings()
         {
             ValidationFinding finding = Finding(ValidationSeverity.Error);
             ValidationRun run = Run(finding);
@@ -70,8 +74,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 ValidationWorkspaceReport.ToJUnit(
                     run,
                     ValidationSuppressions.Empty,
-                    ValidationSeverity.Error,
-                    workers
+                    ValidationSeverity.Error
                 )
             );
             Assert.AreEqual("1", document.DocumentElement.GetAttribute("failures"));
@@ -83,8 +86,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 ValidationWorkspaceReport.ToJUnit(
                     run,
                     ValidationSuppressions.Parse(finding.Id),
-                    ValidationSeverity.Error,
-                    workers
+                    ValidationSeverity.Error
                 )
             );
             Assert.AreEqual("0", document.DocumentElement.GetAttribute("failures"));
@@ -98,11 +100,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             ValidationRun run = Run(Finding(ValidationSeverity.Warning));
             XmlDocument document = new XmlDocument();
             document.LoadXml(
-                ValidationWorkspaceReport.ToJUnit(run, null, ValidationSeverity.Error, 2)
+                ValidationWorkspaceReport.ToJUnit(run, null, ValidationSeverity.Error)
             );
             Assert.AreEqual("0", document.DocumentElement.GetAttribute("failures"));
             document.LoadXml(
-                ValidationWorkspaceReport.ToJUnit(run, null, ValidationSeverity.Warning, 2)
+                ValidationWorkspaceReport.ToJUnit(run, null, ValidationSeverity.Warning)
             );
             Assert.AreEqual("1", document.DocumentElement.GetAttribute("failures"));
         }
@@ -113,10 +115,47 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             ValidationRun run = new ValidationRun(new IValidationRule[0], new ValidationTarget[0]);
             XmlDocument document = new XmlDocument();
             document.LoadXml(
-                ValidationWorkspaceReport.ToJUnit(run, null, ValidationSeverity.Error, 1)
+                ValidationWorkspaceReport.ToJUnit(run, null, ValidationSeverity.Error)
             );
             Assert.AreEqual("1", document.DocumentElement.GetAttribute("errors"));
             Assert.IsTrue(document.SelectSingleNode("//error") != null);
+        }
+
+        [Test]
+        public void JUnitPreservesFindingOrder()
+        {
+            ValidationFinding first = new ValidationFinding(
+                "first",
+                ValidationSeverity.Info,
+                null,
+                "guid",
+                "Assets/First.asset",
+                "one",
+                "First message"
+            );
+            ValidationFinding second = new ValidationFinding(
+                "second",
+                ValidationSeverity.Warning,
+                null,
+                "guid",
+                "Assets/Second.asset",
+                "two",
+                "Second message"
+            );
+            XmlDocument document = new XmlDocument();
+
+            document.LoadXml(
+                ValidationWorkspaceReport.ToJUnit(
+                    Run(first, second),
+                    null,
+                    ValidationSeverity.Error
+                )
+            );
+
+            XmlNodeList cases = document.SelectNodes("//testcase");
+            Assert.AreEqual(2, cases.Count);
+            Assert.AreEqual("first", cases[0].Attributes["classname"].Value);
+            Assert.AreEqual("second", cases[1].Attributes["classname"].Value);
         }
 
         private sealed class ReportRule : IValidationRule

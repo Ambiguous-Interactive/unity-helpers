@@ -274,8 +274,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 Field<IntegerField>(settingsView, "Frame budget (ms)").value = 0;
                 Assert.AreEqual(1, settings.frameBudget);
                 Field<IntegerField>(settingsView, "Frame budget (ms)").value = 17;
-                Field<IntegerField>(settingsView, "Report worker threads").value = 999;
-                Assert.AreEqual(32, settings.workerThreads);
                 Button trigger = settingsView
                     .Query<Button>()
                     .ToList()
@@ -290,7 +288,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 string saved = File.ReadAllText(settingsPath);
                 StringAssert.Contains("selectedProfile: Probe B", saved);
                 StringAssert.Contains("frameBudget: 17", saved);
-                StringAssert.Contains("workerThreads: 32", saved);
                 StringAssert.Contains("Retained probe rule", saved);
                 Assert.AreSame(blocker, ValidationScheduler.Active);
                 Assert.AreEqual(0, blocker.ProcessedCount);
