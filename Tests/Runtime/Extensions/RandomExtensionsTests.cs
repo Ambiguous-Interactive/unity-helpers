@@ -21,6 +21,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     {
         private static readonly SystemRandom DeterministicRandom = new(1234);
 
+        private static int FirstPartySkewedReference(
+            IReadOnlyList<float> samples,
+            int min,
+            int max,
+            float target
+        )
+        {
+            float sum = 0f;
+            for (int index = 0; index < samples.Count; index++)
+            {
+                sum += samples[index];
+            }
+
+            sum += target * 2f;
+            return (int)Math.Clamp(sum / (samples.Count + 2f), min, max);
+        }
+
         /// <summary>
         /// Every ranged draw on <see cref="IRandom"/> has a sibling that answers the low bound
         /// where the strict one raises.
@@ -836,23 +853,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             Bounds flat = new(new Vector3(1f, 2f, 3f), new Vector3(4f, 0f, 4f));
             Assert.AreEqual(flat.center, rng.NextVector3InBounds(flat));
-        }
-
-        private static int FirstPartySkewedReference(
-            IReadOnlyList<float> samples,
-            int min,
-            int max,
-            float target
-        )
-        {
-            float sum = 0f;
-            for (int index = 0; index < samples.Count; index++)
-            {
-                sum += samples[index];
-            }
-
-            sum += target * 2f;
-            return (int)Math.Clamp(sum / (samples.Count + 2f), min, max);
         }
     }
 }
