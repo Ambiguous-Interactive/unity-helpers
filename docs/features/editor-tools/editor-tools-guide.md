@@ -131,7 +131,8 @@ Assets/Sprites/Characters/
 
 Cropping first also makes [Sprite Atlas Generator](#sprite-atlas-generator) pack tighter.
 Crop output reuses dynamically sized pixel buffers, so repeated work does not retain one permanent
-pool bucket for every texture size.
+pool bucket for every texture size. Folder and file-extension filtering scans directly without
+building temporary iterator chains during large asset searches.
 
 ---
 
@@ -251,6 +252,7 @@ an alpha-weighted center of mass per sprite and writes it as a custom pivot.
 Import settings only; each changed importer is recorded as an `Adjust Sprite Pivot` undo step.
 Center-of-mass scans run directly below 65,536 pixels and for one-row sprites. Larger scans use
 parallel row partitions, so small sprite batches avoid worker startup without slowing large art.
+Folder and file-extension filtering also scans directly without per-file predicate allocations.
 
 **Before you run it:**
 

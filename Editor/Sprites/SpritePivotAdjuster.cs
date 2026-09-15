@@ -7,7 +7,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using System;
     using System.Collections.Generic;
     using System.IO;
-    using System.Linq;
     using System.Text;
     using System.Text.RegularExpressions;
     using System.Threading;
@@ -258,8 +257,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             using PooledResource<HashSet<string>> seenRes = SetBuffers<string>
                 .GetHashSetPool(StringComparer.OrdinalIgnoreCase)
                 .Get(out HashSet<string> seen);
-            foreach (Object maybeDirectory in _directoryPaths.Where(d => d != null))
+            foreach (Object maybeDirectory in _directoryPaths)
             {
+                if (maybeDirectory == null)
+                {
+                    continue;
+                }
+
                 string assetPath = AssetDatabase.GetAssetPath(maybeDirectory);
                 if (!AssetDatabase.IsValidFolder(assetPath))
                 {
@@ -276,12 +280,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         continue;
                     }
 
-                    if (
-                        !Array.Exists(
-                            ImageFileExtensions,
-                            ext => file.EndsWith(ext, StringComparison.OrdinalIgnoreCase)
-                        )
-                    )
+                    if (!SpriteFileExtensions.HasAny(file, ImageFileExtensions))
                     {
                         continue;
                     }

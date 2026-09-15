@@ -59,6 +59,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         }
 
         [Test]
+        public void ExtensionMatchingHandlesCaseAndInvalidInputs()
+        {
+            string[] extensions = { ".png", ".jpeg" };
+
+            Assert.IsTrue(SpriteFileExtensions.HasAny("Assets/Sprite.PNG", extensions));
+            Assert.IsTrue(SpriteFileExtensions.HasAny("Assets/Sprite.jpeg", extensions));
+            Assert.IsFalse(SpriteFileExtensions.HasAny("Assets/Sprite.png.meta", extensions));
+            Assert.IsFalse(SpriteFileExtensions.HasAny("Assets/Sprite", extensions));
+            Assert.IsFalse(SpriteFileExtensions.HasAny(null, extensions));
+            Assert.IsFalse(SpriteFileExtensions.HasAny("Assets/Sprite.png", null));
+            Assert.IsFalse(SpriteFileExtensions.HasAny("Assets/Sprite.png", new[] { "", null }));
+        }
+
+        [Test]
         public void ParallelAndSequentialScansProduceIdenticalBounds()
         {
             const int Width = 8;

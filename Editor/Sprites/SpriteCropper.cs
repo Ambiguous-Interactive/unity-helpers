@@ -7,7 +7,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using System;
     using System.Collections.Generic;
     using System.IO;
-    using System.Linq;
     using System.Text.RegularExpressions;
     using System.Threading.Tasks;
     using UnityEditor;
@@ -428,8 +427,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            foreach (Object maybeDirectory in _inputDirectories.Where(d => d != null))
+            foreach (Object maybeDirectory in _inputDirectories)
             {
+                if (maybeDirectory == null)
+                {
+                    continue;
+                }
+
                 string assetPath = AssetDatabase.GetAssetPath(maybeDirectory);
                 if (!AssetDatabase.IsValidFolder(assetPath))
                 {
@@ -437,18 +441,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     continue;
                 }
 
-                IEnumerable<string> files = Directory
-                    .GetFiles(assetPath, "*.*", SearchOption.AllDirectories)
-                    .Where(file =>
-                        Array.Exists(
-                            ImageFileExtensions,
-                            extension =>
-                                file.EndsWith(extension, StringComparison.OrdinalIgnoreCase)
-                        )
-                    );
-
+                string[] files = Directory.GetFiles(assetPath, "*.*", SearchOption.AllDirectories);
                 foreach (string file in files)
                 {
+                    if (!SpriteFileExtensions.HasAny(file, ImageFileExtensions))
+                    {
+                        continue;
+                    }
+
                     if (file.Contains(CroppedPrefix, StringComparison.OrdinalIgnoreCase))
                     {
                         continue;
@@ -589,7 +589,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         }
                     }
 
-                    if (!canceled && needReprocessing.Any())
+                    if (!canceled && 0 < needReprocessing.Count)
                     {
                         newImporters.Clear();
                         using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: true))
@@ -855,26 +855,31 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     return;
                 }
 
-                foreach (Object maybeDirectory in _inputDirectories.Where(d => d != null))
+                foreach (Object maybeDirectory in _inputDirectories)
                 {
+                    if (maybeDirectory == null)
+                    {
+                        continue;
+                    }
+
                     string dirPath = AssetDatabase.GetAssetPath(maybeDirectory);
                     if (!AssetDatabase.IsValidFolder(dirPath))
                     {
                         continue;
                     }
 
-                    IEnumerable<string> files = Directory
-                        .GetFiles(dirPath, "*.*", SearchOption.AllDirectories)
-                        .Where(file =>
-                            Array.Exists(
-                                ImageFileExtensions,
-                                extension =>
-                                    file.EndsWith(extension, StringComparison.OrdinalIgnoreCase)
-                            )
-                        );
-
+                    string[] files = Directory.GetFiles(
+                        dirPath,
+                        "*.*",
+                        SearchOption.AllDirectories
+                    );
                     foreach (string file in files)
                     {
+                        if (!SpriteFileExtensions.HasAny(file, ImageFileExtensions))
+                        {
+                            continue;
+                        }
+
                         if (file.Contains(CroppedPrefix, StringComparison.OrdinalIgnoreCase))
                         {
                             continue;
@@ -928,11 +933,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             {
                                 continue;
                             }
-                            if (
-                                !candidateExts.Any(ext =>
-                                    path.EndsWith(ext, StringComparison.OrdinalIgnoreCase)
-                                )
-                            )
+                            if (!SpriteFileExtensions.HasAny(path, candidateExts))
                             {
                                 continue;
                             }

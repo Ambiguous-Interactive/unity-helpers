@@ -1053,6 +1053,72 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         /// <summary>
+        /// Tries to compute the exact two-sided sign-test probability for paired differences.
+        /// </summary>
+        /// <param name="positiveDifferences">The number of non-tied differences above zero.</param>
+        /// <param name="negativeDifferences">The number of non-tied differences below zero.</param>
+        /// <param name="twoSidedPValue">The probability of an outcome at least as imbalanced, or zero on failure.</param>
+        /// <returns>True when the probability was computed.</returns>
+        /// <remarks>
+        /// Ties are excluded. Under the null hypothesis, either sign has probability one half.
+        /// The returned value doubles the smaller exact binomial tail and clamps it to one.
+        /// </remarks>
+        public static bool TryExactSignTest(
+            int positiveDifferences,
+            int negativeDifferences,
+            out double twoSidedPValue
+        )
+        {
+            long differenceCount = (long)positiveDifferences + negativeDifferences;
+            if (
+                positiveDifferences < 0
+                || negativeDifferences < 0
+                || differenceCount <= 0
+                || int.MaxValue < differenceCount
+            )
+            {
+                twoSidedPValue = 0.0;
+                return false;
+            }
+
+            int smallerCount = Math.Min(positiveDifferences, negativeDifferences);
+            int trials = (int)differenceCount;
+            if (Math.Abs((long)positiveDifferences - negativeDifferences) <= 1L)
+            {
+                twoSidedPValue = 1.0;
+                return true;
+            }
+
+            if (smallerCount == 0)
+            {
+                twoSidedPValue = Math.Pow(0.5, trials - 1);
+                return true;
+            }
+
+            if (
+                !TryRegularizedIncompleteBeta(
+                    trials - smallerCount,
+                    smallerCount + 1.0,
+                    0.5,
+                    out double smallerTail
+                )
+            )
+            {
+                twoSidedPValue = 0.0;
+                return false;
+            }
+
+            double computedPValue = Math.Min(1.0, 2.0 * smallerTail);
+            bool succeeded =
+                !double.IsNaN(computedPValue)
+                && !double.IsInfinity(computedPValue)
+                && 0.0 <= computedPValue
+                && computedPValue <= 1.0;
+            twoSidedPValue = succeeded ? computedPValue : 0.0;
+            return succeeded;
+        }
+
+        /// <summary>
         /// Tries to compute an exact two-sided Clopper-Pearson interval for a binomial proportion.
         /// </summary>
         /// <param name="successes">The observed successful trials.</param>

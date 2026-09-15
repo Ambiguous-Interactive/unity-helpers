@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `WallMath.TryExactSignTest` for exact two-sided paired-result comparisons that exclude ties
+  and fail soft on invalid counts. See
+  [Descriptive Statistics](./docs/features/utilities/helper-utilities.md#descriptive-statistics-wallmath)
+  ([#742](https://github.com/Ambiguous-Interactive/unity-helpers/issues/742)).
 - Add `WallMath.TryClopperPearsonInterval` for exact equal-tailed binomial confidence bounds with
   fail-soft validation. See
   [Descriptive Statistics](./docs/features/utilities/helper-utilities.md#descriptive-statistics-wallmath)
@@ -49,7 +53,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ([#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781),
   [#782](https://github.com/Ambiguous-Interactive/unity-helpers/issues/782)).
 - Avoid Sprite Pivot parallel scheduling below 65,536 pixels and for one-row sprites, while
-  retaining measured parallel speedups for larger work
+  retaining measured parallel speedups for larger work, and reduce overhead when Pivot Adjuster
+  and Sprite Cropper search large asset folders
   ([#648](https://github.com/Ambiguous-Interactive/unity-helpers/issues/648),
   [#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781),
   [#782](https://github.com/Ambiguous-Interactive/unity-helpers/issues/782)).

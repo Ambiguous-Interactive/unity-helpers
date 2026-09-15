@@ -338,6 +338,104 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [Test]
+        public void ExactSignTestMatchesExhaustiveBinomialReference()
+        {
+            for (int positiveDifferences = 0; positiveDifferences <= 32; ++positiveDifferences)
+            {
+                for (
+                    int negativeDifferences = 0;
+                    negativeDifferences <= 32 - positiveDifferences;
+                    ++negativeDifferences
+                )
+                {
+                    int trials = positiveDifferences + negativeDifferences;
+                    if (trials == 0)
+                    {
+                        continue;
+                    }
+
+                    int smallerCount = Math.Min(positiveDifferences, negativeDifferences);
+                    double expected = Math.Min(
+                        1.0,
+                        2.0 * BinomialProbabilityAtMost(smallerCount, trials, 0.5)
+                    );
+
+                    Assert.IsTrue(
+                        WallMath.TryExactSignTest(
+                            positiveDifferences,
+                            negativeDifferences,
+                            out double pValue
+                        )
+                    );
+                    Assert.AreEqual(
+                        expected,
+                        pValue,
+                        1e-12,
+                        $"Unexpected p-value for {positiveDifferences} positive and {negativeDifferences} negative differences."
+                    );
+                }
+            }
+        }
+
+        [Test]
+        public void ExactSignTestRejectsInvalidCountsAndClearsOutput()
+        {
+            (int positiveDifferences, int negativeDifferences)[] invalidInputs =
+            {
+                (-1, 1),
+                (1, -1),
+                (0, 0),
+                (int.MaxValue, 1),
+            };
+
+            foreach (
+                (int positiveDifferences, int negativeDifferences) invalidInput in invalidInputs
+            )
+            {
+                Assert.IsFalse(
+                    WallMath.TryExactSignTest(
+                        invalidInput.positiveDifferences,
+                        invalidInput.negativeDifferences,
+                        out double pValue
+                    )
+                );
+                Assert.AreEqual(0.0, pValue);
+            }
+        }
+
+        [Test]
+        public void ExactSignTestHandlesLargeAndSymmetricCounts()
+        {
+            Assert.IsTrue(WallMath.TryExactSignTest(500_000, 500_000, out double balanced));
+            Assert.AreEqual(1.0, balanced);
+
+            Assert.IsTrue(
+                WallMath.TryExactSignTest(
+                    1_073_741_823,
+                    1_073_741_824,
+                    out double maximumOddBalanced
+                )
+            );
+            Assert.AreEqual(1.0, maximumOddBalanced);
+
+            Assert.IsTrue(WallMath.TryExactSignTest(0, 1_000, out double extremeTail));
+            Assert.AreEqual(Math.Pow(0.5, 999), extremeTail);
+
+            Assert.IsTrue(WallMath.TryExactSignTest(0, 10_000, out double underflowedTail));
+            Assert.AreEqual(0.0, underflowedTail);
+
+            Assert.IsTrue(WallMath.TryExactSignTest(8, 2, out double forward));
+            Assert.IsTrue(WallMath.TryExactSignTest(2, 8, out double reflected));
+            Assert.AreEqual(0.109375, forward, 1e-12);
+            Assert.AreEqual(forward, reflected);
+
+            Assert.IsTrue(WallMath.TryExactSignTest(499_999, 500_001, out double nearBalanced));
+            /* For 2m trials split m - 1 to m + 1, the doubled tail is one minus
+             * the central binomial probability C(2m, m) / 2^(2m). */
+            Assert.AreEqual(0.9992021156392126, nearBalanced, 5e-10);
+        }
+
+        [Test]
         [TestCaseSource(nameof(MedianFloatCases))]
         public void MedianFloatMatchesExpected(float[] values, float expected)
         {
