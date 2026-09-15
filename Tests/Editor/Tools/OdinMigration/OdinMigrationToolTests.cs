@@ -98,6 +98,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         }
 
         [Test]
+        public void AnalyzerRewritesAttributesAfterPreprocessorDirectives()
+        {
+            const string Source =
+                "class Target\n"
+                + "{\n"
+                + "#region Fields\n"
+                + "    [global::Sirenix.OdinInspector.ReadOnly] int first;\n"
+                + "#endregion\n"
+                + "#if UNITY_EDITOR\n"
+                + "    [global::Sirenix.OdinInspector.EnumToggleButtons] int second;\n"
+                + "#endif\n"
+                + "}\n";
+
+            OdinMigrationAnalysis analysis = OdinMigrationSourceAnalyzer.Analyze(Source);
+
+            Assert.AreEqual(2, analysis.ReplacementCount);
+            StringAssert.Contains("Core.Attributes.WReadOnly] int first", analysis.UpgradedSource);
+            StringAssert.Contains(
+                "Core.Attributes.WEnumToggleButtons] int second",
+                analysis.UpgradedSource
+            );
+        }
+
+        [Test]
         public void AnalyzerClassifiesStateAndUnsupportedShapesWithoutRewritingThem()
         {
             const string Source =

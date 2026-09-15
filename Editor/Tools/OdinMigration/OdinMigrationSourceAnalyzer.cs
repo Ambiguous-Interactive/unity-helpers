@@ -495,12 +495,33 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                         || (1 < index && masked[index - 1] == '$' && masked[index - 2] == '@');
                     MaskQuoted(masked, ref index, '"', verbatim);
                 }
+                else if (character == '#' && IsPreprocessorDirectiveStart(masked, index))
+                {
+                    MaskLineComment(masked, ref index);
+                }
                 else
                 {
                     index++;
                 }
             }
             return new string(masked);
+        }
+
+        private static bool IsPreprocessorDirectiveStart(char[] characters, int index)
+        {
+            for (int position = index - 1; 0 <= position; position--)
+            {
+                char character = characters[position];
+                if (character == '\r' || character == '\n')
+                {
+                    return true;
+                }
+                if (!char.IsWhiteSpace(character))
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         private static void MaskBlockComment(char[] characters, ref int index)
