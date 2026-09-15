@@ -1417,8 +1417,9 @@ of overflowing silently.
 `Mean` and `StandardDeviation` read an `IReadOnlyList` directly, so a `List<T>`, a `T[]` or a pooled
 buffer all work with no intermediate copy on your side. `TryClopperPearsonInterval` computes an
 exact confidence interval for a measured binomial success rate. `TryExactSignTest` compares paired
-measurements without a large-sample approximation. Sorting for median and percentile happens on
-a pooled internal copy, so your list is never reordered.
+measurements without a large-sample approximation. `TryFisherExactTest` compares two binary groups
+with fixed margins. Sorting for median and percentile happens on a pooled internal copy, so your
+list is never reordered.
 
 <!-- doc-sample: compiles -->
 
@@ -1486,6 +1487,27 @@ Exclude tied pairs before calling the method. Negative counts, no non-tied pairs
 count beyond `int.MaxValue` return `false` and clear the output. The calculation uses the exact
 binomial tail and remains bounded for large counts; extremely small probabilities can round to zero
 in `double`.
+
+For two independent binary groups, Fisher's exact test sums every fixed-margin table no more likely
+than the observed table:
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+bool compared = WallMath.TryFisherExactTest(
+    upperLeft: 1,
+    upperRight: 9,
+    lowerLeft: 11,
+    lowerRight: 3,
+    out double twoSidedPValue
+); // p is about 0.00276
+```
+
+Negative counts, an empty table, totals beyond `int.MaxValue`, or more than one million possible
+fixed-margin tables return `false` and clear the output. The table-count limit bounds work for data
+that needs a large-sample method instead.
 
 <!-- doc-sample: compiles -->
 

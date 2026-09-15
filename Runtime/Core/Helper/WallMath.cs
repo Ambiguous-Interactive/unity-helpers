@@ -1119,6 +1119,132 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         /// <summary>
+        /// Tries to compute the exact two-sided Fisher probability for a two-by-two table.
+        /// </summary>
+        /// <param name="upperLeft">The count in the upper-left cell.</param>
+        /// <param name="upperRight">The count in the upper-right cell.</param>
+        /// <param name="lowerLeft">The count in the lower-left cell.</param>
+        /// <param name="lowerRight">The count in the lower-right cell.</param>
+        /// <param name="twoSidedPValue">The fixed-margin probability, or zero on failure.</param>
+        /// <returns>True when the probability was computed.</returns>
+        /// <remarks>
+        /// The result sums every fixed-margin table no more likely than the observed table. Tables
+        /// with more than one million possible upper-left counts are refused to bound run time.
+        /// </remarks>
+        /// <example>
+        /// <code>
+        /// bool compared = WallMath.TryFisherExactTest(1, 9, 11, 3, out double pValue);
+        /// </code>
+        /// </example>
+        public static bool TryFisherExactTest(
+            int upperLeft,
+            int upperRight,
+            int lowerLeft,
+            int lowerRight,
+            out double twoSidedPValue
+        )
+        {
+            const int maximumTableCount = 1_000_000;
+            if (upperLeft < 0 || upperRight < 0 || lowerLeft < 0 || lowerRight < 0)
+            {
+                twoSidedPValue = 0.0;
+                return false;
+            }
+
+            long firstRowLong = (long)upperLeft + upperRight;
+            long secondRowLong = (long)lowerLeft + lowerRight;
+            long firstColumnLong = (long)upperLeft + lowerLeft;
+            long totalLong = firstRowLong + secondRowLong;
+            if (totalLong <= 0 || int.MaxValue < totalLong)
+            {
+                twoSidedPValue = 0.0;
+                return false;
+            }
+
+            int firstRow = (int)firstRowLong;
+            int secondRow = (int)secondRowLong;
+            int firstColumn = (int)firstColumnLong;
+            int total = (int)totalLong;
+            int minimumUpperLeft = Math.Max(0, firstColumn - secondRow);
+            int maximumUpperLeft = Math.Min(firstRow, firstColumn);
+            long tableCount = (long)maximumUpperLeft - minimumUpperLeft + 1L;
+            if (maximumTableCount < tableCount)
+            {
+                twoSidedPValue = 0.0;
+                return false;
+            }
+
+            int mode = (int)(((long)firstRow + 1L) * (firstColumn + 1L) / (total + 2L));
+            mode = Math.Max(minimumUpperLeft, Math.Min(maximumUpperLeft, mode));
+            double observedRelativeLogProbability = FisherRelativeLogProbability(
+                upperLeft,
+                mode,
+                firstRow,
+                secondRow,
+                firstColumn
+            );
+            double totalWeight = 0.0;
+            double totalCompensation = 0.0;
+            double includedWeight = 0.0;
+            double includedCompensation = 0.0;
+            const double comparisonTolerance = 1e-10;
+
+            AddFisherWeight(
+                0.0,
+                observedRelativeLogProbability,
+                comparisonTolerance,
+                ref totalWeight,
+                ref totalCompensation,
+                ref includedWeight,
+                ref includedCompensation
+            );
+
+            double currentRelativeLogProbability = 0.0;
+            for (int candidate = mode; minimumUpperLeft < candidate; --candidate)
+            {
+                double numerator = (double)candidate * (secondRow - firstColumn + candidate);
+                double denominator =
+                    (double)(firstRow - candidate + 1) * (firstColumn - candidate + 1);
+                currentRelativeLogProbability += Math.Log(numerator / denominator);
+                AddFisherWeight(
+                    currentRelativeLogProbability,
+                    observedRelativeLogProbability,
+                    comparisonTolerance,
+                    ref totalWeight,
+                    ref totalCompensation,
+                    ref includedWeight,
+                    ref includedCompensation
+                );
+            }
+
+            currentRelativeLogProbability = 0.0;
+            for (int candidate = mode; candidate < maximumUpperLeft; ++candidate)
+            {
+                double numerator = (double)(firstRow - candidate) * (firstColumn - candidate);
+                double denominator =
+                    (double)(candidate + 1) * (secondRow - firstColumn + candidate + 1);
+                currentRelativeLogProbability += Math.Log(numerator / denominator);
+                AddFisherWeight(
+                    currentRelativeLogProbability,
+                    observedRelativeLogProbability,
+                    comparisonTolerance,
+                    ref totalWeight,
+                    ref totalCompensation,
+                    ref includedWeight,
+                    ref includedCompensation
+                );
+            }
+
+            double computedPValue = includedWeight / totalWeight;
+            bool succeeded =
+                !double.IsNaN(computedPValue)
+                && !double.IsInfinity(computedPValue)
+                && 0.0 <= computedPValue;
+            twoSidedPValue = succeeded ? Math.Min(1.0, computedPValue) : 0.0;
+            return succeeded;
+        }
+
+        /// <summary>
         /// Tries to compute an exact two-sided Clopper-Pearson interval for a binomial proportion.
         /// </summary>
         /// <param name="successes">The observed successful trials.</param>
@@ -1786,6 +1912,65 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 + (shifted + 0.5) * Math.Log(offset)
                 - offset
                 + Math.Log(series);
+        }
+
+        private static void AddFisherWeight(
+            double relativeLogProbability,
+            double observedRelativeLogProbability,
+            double comparisonTolerance,
+            ref double totalWeight,
+            ref double totalCompensation,
+            ref double includedWeight,
+            ref double includedCompensation
+        )
+        {
+            double weight = Math.Exp(relativeLogProbability);
+            AddCompensated(weight, ref totalWeight, ref totalCompensation);
+            if (relativeLogProbability <= observedRelativeLogProbability + comparisonTolerance)
+            {
+                AddCompensated(weight, ref includedWeight, ref includedCompensation);
+            }
+        }
+
+        private static void AddCompensated(double value, ref double sum, ref double compensation)
+        {
+            double adjusted = value - compensation;
+            double updated = sum + adjusted;
+            compensation = (updated - sum) - adjusted;
+            sum = updated;
+        }
+
+        private static double FisherRelativeLogProbability(
+            int candidate,
+            int mode,
+            int firstRow,
+            int secondRow,
+            int firstColumn
+        )
+        {
+            double relativeLogProbability = 0.0;
+            if (candidate < mode)
+            {
+                for (int current = mode; candidate < current; --current)
+                {
+                    double numerator = (double)current * (secondRow - firstColumn + current);
+                    double denominator =
+                        (double)(firstRow - current + 1) * (firstColumn - current + 1);
+                    relativeLogProbability += Math.Log(numerator / denominator);
+                }
+            }
+            else
+            {
+                for (int current = mode; current < candidate; ++current)
+                {
+                    double numerator = (double)(firstRow - current) * (firstColumn - current);
+                    double denominator =
+                        (double)(current + 1) * (secondRow - firstColumn + current + 1);
+                    relativeLogProbability += Math.Log(numerator / denominator);
+                }
+            }
+
+            return relativeLogProbability;
         }
 
         private static void ValidateSampleSize(int count, bool sample)
