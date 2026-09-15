@@ -750,7 +750,9 @@ one someone has to remember to drag in. This drives the atlas from a rule instea
 label, or both — and rescans on demand.
 
 Project changes rebuild the serialized editor state and drop removed configurations from the
-foldout cache while preserving surviving scan results. Closing the window releases its cached state.
+foldout cache while preserving surviving scan results. Refreshes sort configurations in place, and
+source-sprite checks reuse temporary storage, so large atlas lists do not build query pipelines.
+Closing the window releases its cached state.
 
 1. Click **Create New Config in 'Assets/Data'**. That makes a `ScriptableSpriteAtlas` asset (you can
    also use `Assets > Create > Wallstop Studios > Unity Helpers > Scriptable Sprite Atlas Config`).
