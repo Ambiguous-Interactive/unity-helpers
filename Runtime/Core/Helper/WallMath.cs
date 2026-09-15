@@ -1053,6 +1053,109 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         /// <summary>
+        /// Tries to compute an exact two-sided Clopper-Pearson interval for a binomial proportion.
+        /// </summary>
+        /// <param name="successes">The observed successful trials.</param>
+        /// <param name="trials">The total observed trials.</param>
+        /// <param name="confidenceLevel">The confidence level, exclusively between zero and one.</param>
+        /// <param name="lowerBound">The inclusive lower probability bound, or zero on failure.</param>
+        /// <param name="upperBound">The inclusive upper probability bound, or zero on failure.</param>
+        /// <returns>True when both bounds were computed.</returns>
+        /// <remarks>
+        /// The interval inverts equal-tailed binomial tests. It does not use a normal approximation,
+        /// so it remains suitable for small samples and boundary outcomes.
+        /// </remarks>
+        /// <example>
+        /// <code>
+        /// bool measured = WallMath.TryClopperPearsonInterval(
+        ///     successes: 7,
+        ///     trials: 10,
+        ///     confidenceLevel: 0.95,
+        ///     out double lower,
+        ///     out double upper
+        /// );
+        /// </code>
+        /// </example>
+        public static bool TryClopperPearsonInterval(
+            int successes,
+            int trials,
+            double confidenceLevel,
+            out double lowerBound,
+            out double upperBound
+        )
+        {
+            if (
+                trials <= 0
+                || successes < 0
+                || trials < successes
+                || confidenceLevel <= 0.0
+                || 1.0 <= confidenceLevel
+                || double.IsNaN(confidenceLevel)
+                || double.IsInfinity(confidenceLevel)
+            )
+            {
+                lowerBound = 0.0;
+                upperBound = 0.0;
+                return false;
+            }
+
+            double tailProbability = (1.0 - confidenceLevel) / 2.0;
+            double computedLower;
+            if (successes == 0)
+            {
+                computedLower = 0.0;
+            }
+            else if (
+                !TryInverseRegularizedIncompleteBeta(
+                    successes,
+                    trials - successes + 1.0,
+                    tailProbability,
+                    out computedLower
+                )
+            )
+            {
+                lowerBound = 0.0;
+                upperBound = 0.0;
+                return false;
+            }
+
+            double computedUpper;
+            if (successes == trials)
+            {
+                computedUpper = 1.0;
+            }
+            else if (
+                !TryInverseRegularizedIncompleteBeta(
+                    trials - successes,
+                    successes + 1.0,
+                    tailProbability,
+                    out double complementaryUpper
+                )
+            )
+            {
+                lowerBound = 0.0;
+                upperBound = 0.0;
+                return false;
+            }
+            else
+            {
+                computedUpper = 1.0 - complementaryUpper;
+            }
+
+            bool succeeded =
+                !double.IsNaN(computedLower)
+                && !double.IsInfinity(computedLower)
+                && !double.IsNaN(computedUpper)
+                && !double.IsInfinity(computedUpper)
+                && 0.0 <= computedLower
+                && computedLower <= computedUpper
+                && computedUpper <= 1.0;
+            lowerBound = succeeded ? computedLower : 0.0;
+            upperBound = succeeded ? computedUpper : 0.0;
+            return succeeded;
+        }
+
+        /// <summary>
         /// Reports whether two values differ by no more than <paramref name="tolerance"/>, with no
         /// relative cushion of any kind. Unlike <see cref="Approximately(float, float, float)"/>,
         /// the tolerance is the whole of the permitted difference, so a caller passing zero gets an
@@ -1412,6 +1515,211 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             return count;
+        }
+
+        private static bool TryBetaContinuedFraction(
+            double firstShape,
+            double secondShape,
+            double value,
+            out double fraction
+        )
+        {
+            const double epsilon = 3e-14;
+            const double minimumMagnitude = 1e-300;
+            int maxIterations = Math.Max(
+                200,
+                (int)Math.Ceiling(2.0 * Math.Sqrt(firstShape + secondShape))
+            );
+
+            double shapeSum = firstShape + secondShape;
+            double firstShift = firstShape + 1.0;
+            double secondShift = firstShape - 1.0;
+            double multiplier = 1.0;
+            double denominator = 1.0 - shapeSum * value / firstShift;
+            if (Math.Abs(denominator) < minimumMagnitude)
+            {
+                denominator = minimumMagnitude;
+            }
+
+            denominator = 1.0 / denominator;
+            double result = denominator;
+            for (int iteration = 1; iteration <= maxIterations; ++iteration)
+            {
+                int doubledIteration = iteration * 2;
+                double numerator =
+                    iteration
+                    * (secondShape - iteration)
+                    * value
+                    / ((secondShift + doubledIteration) * (firstShape + doubledIteration));
+                denominator = 1.0 + numerator * denominator;
+                if (Math.Abs(denominator) < minimumMagnitude)
+                {
+                    denominator = minimumMagnitude;
+                }
+
+                multiplier = 1.0 + numerator / multiplier;
+                if (Math.Abs(multiplier) < minimumMagnitude)
+                {
+                    multiplier = minimumMagnitude;
+                }
+
+                denominator = 1.0 / denominator;
+                result *= denominator * multiplier;
+                numerator =
+                    -(firstShape + iteration)
+                    * (shapeSum + iteration)
+                    * value
+                    / ((firstShape + doubledIteration) * (firstShift + doubledIteration));
+                denominator = 1.0 + numerator * denominator;
+                if (Math.Abs(denominator) < minimumMagnitude)
+                {
+                    denominator = minimumMagnitude;
+                }
+
+                multiplier = 1.0 + numerator / multiplier;
+                if (Math.Abs(multiplier) < minimumMagnitude)
+                {
+                    multiplier = minimumMagnitude;
+                }
+
+                denominator = 1.0 / denominator;
+                double delta = denominator * multiplier;
+                result *= delta;
+                if (Math.Abs(delta - 1.0) <= epsilon)
+                {
+                    bool succeeded = !double.IsNaN(result) && !double.IsInfinity(result);
+                    fraction = succeeded ? result : 0.0;
+                    return succeeded;
+                }
+            }
+
+            fraction = 0.0;
+            return false;
+        }
+
+        private static bool TryInverseRegularizedIncompleteBeta(
+            double firstShape,
+            double secondShape,
+            double probability,
+            out double value
+        )
+        {
+            const int bisectionIterations = 128;
+            double lower = 0.0;
+            double upper = 1.0;
+            for (int iteration = 0; iteration < bisectionIterations; ++iteration)
+            {
+                double midpoint = lower + (upper - lower) / 2.0;
+                if (
+                    !TryRegularizedIncompleteBeta(
+                        firstShape,
+                        secondShape,
+                        midpoint,
+                        out double measuredProbability
+                    )
+                )
+                {
+                    value = 0.0;
+                    return false;
+                }
+
+                if (measuredProbability < probability)
+                {
+                    lower = midpoint;
+                }
+                else
+                {
+                    upper = midpoint;
+                }
+            }
+
+            value = lower + (upper - lower) / 2.0;
+            return true;
+        }
+
+        private static bool TryRegularizedIncompleteBeta(
+            double firstShape,
+            double secondShape,
+            double value,
+            out double probability
+        )
+        {
+            if (value <= 0.0)
+            {
+                probability = 0.0;
+                return true;
+            }
+
+            if (1.0 <= value)
+            {
+                probability = 1.0;
+                return true;
+            }
+
+            double logarithmicFront =
+                LogGamma(firstShape + secondShape)
+                - LogGamma(firstShape)
+                - LogGamma(secondShape)
+                + firstShape * Math.Log(value)
+                + secondShape * Math.Log(1.0 - value);
+            double front = Math.Exp(logarithmicFront);
+            bool useDirect = value < (firstShape + 1.0) / (firstShape + secondShape + 2.0);
+            double result;
+            if (useDirect)
+            {
+                if (!TryBetaContinuedFraction(firstShape, secondShape, value, out double fraction))
+                {
+                    probability = 0.0;
+                    return false;
+                }
+
+                result = front * fraction / firstShape;
+            }
+            else
+            {
+                if (
+                    !TryBetaContinuedFraction(
+                        secondShape,
+                        firstShape,
+                        1.0 - value,
+                        out double fraction
+                    )
+                )
+                {
+                    probability = 0.0;
+                    return false;
+                }
+
+                result = 1.0 - front * fraction / secondShape;
+            }
+
+            if (double.IsNaN(result) || double.IsInfinity(result))
+            {
+                probability = 0.0;
+                return false;
+            }
+
+            probability = Math.Max(0.0, Math.Min(1.0, result));
+            return true;
+        }
+
+        private static double LogGamma(double value)
+        {
+            double shifted = value - 1.0;
+            double series = 0.99999999999980993;
+            series += 676.5203681218851 / (shifted + 1.0);
+            series -= 1259.1392167224028 / (shifted + 2.0);
+            series += 771.32342877765313 / (shifted + 3.0);
+            series -= 176.61502916214059 / (shifted + 4.0);
+            series += 12.507343278686905 / (shifted + 5.0);
+            series -= 0.13857109526572012 / (shifted + 6.0);
+            series += 9.9843695780195716e-6 / (shifted + 7.0);
+            series += 1.5056327351493116e-7 / (shifted + 8.0);
+            double offset = shifted + 7.5;
+            return 0.91893853320467274
+                + (shifted + 0.5) * Math.Log(offset)
+                - offset
+                + Math.Log(series);
         }
 
         private static void ValidateSampleSize(int count, bool sample)

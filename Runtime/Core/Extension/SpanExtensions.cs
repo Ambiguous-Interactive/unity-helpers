@@ -447,9 +447,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             int matches = 0;
-            for (int i = 0; i < source.Length; ++i)
+            foreach (T element in source)
             {
-                T element = source[i];
                 if (!predicate(element, state))
                 {
                     continue;
@@ -520,9 +519,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
             int matched = 0;
             int unmatched = 0;
-            for (int i = 0; i < source.Length; ++i)
+            foreach (T element in source)
             {
-                T element = source[i];
                 if (predicate(element, state))
                 {
                     matching[matched] = element;

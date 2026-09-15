@@ -246,7 +246,8 @@ characterImage.Fps = 6f;  // Slow down animation
 
 ### How Compositing Works
 
-LayeredImage performs these steps each frame:
+`LayeredImage` performs these steps once for every animation frame during construction, then swaps
+the cached composited texture as the animation advances:
 
 1. **Allocates canvas**: Creates a texture large enough to hold all layers with their offsets
 2. **Alpha blending**: Layers are composited back-to-front with alpha blending
@@ -257,9 +258,9 @@ LayeredImage performs these steps each frame:
 
 **Performance optimization:**
 
-- Uses parallel processing for large sprites (2048+ pixels total)
+- Uses parallel row processing for sprites with at least 2,048 pixels and more than one row
 - Employs array pooling to minimize GC allocations
-- Caches composited frames when possible
+- Caches every composited frame for playback
 
 ### Pixel Cutoff Parameter
 
@@ -285,10 +286,11 @@ All layers must have the same number of frames. Mixing 4-frame and 8-frame anima
 
 **Performance Considerations:**
 
-- Compositing happens every frame for animated images
-- Large sprite resolutions (1024×1024+) will impact performance
+- Compositing happens during construction, not during each animation tick
+- Large sprite resolutions (1024×1024+) increase construction time and cached texture memory
 - Consider pre-rendering if targeting low-end devices
-- Parallel processing threshold is 2048 pixels (width × height)
+- Parallel processing starts at 2,048 pixels (`width × height`) when work spans multiple rows;
+  single-row sprites stay sequential to avoid scheduling overhead
 
 **Editor vs Runtime:**
 

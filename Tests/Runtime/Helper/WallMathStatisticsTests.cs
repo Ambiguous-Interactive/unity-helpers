@@ -135,6 +135,208 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             yield return new TestCaseData(1.0001f).SetName("InvalidPercentile.AboveRange");
         }
 
+        private static double BinomialProbabilityAtMost(int successes, int trials, double chance)
+        {
+            double failureChance = 1.0 - chance;
+            double probability = Math.Pow(failureChance, trials);
+            double total = probability;
+            for (int observed = 0; observed < successes; ++observed)
+            {
+                probability *= (trials - observed) * chance / ((observed + 1) * failureChance);
+                total += probability;
+            }
+
+            return total;
+        }
+
+        [Test]
+        public void ClopperPearsonRejectsInvalidInputs()
+        {
+            (int successes, int trials, double confidenceLevel)[] invalidInputs =
+            {
+                (-1, 10, 0.95),
+                (11, 10, 0.95),
+                (0, 0, 0.95),
+                (0, -1, 0.95),
+                (5, 10, 0.0),
+                (5, 10, 1.0),
+                (5, 10, double.NaN),
+                (5, 10, double.PositiveInfinity),
+            };
+
+            foreach (
+                (int successes, int trials, double confidenceLevel) invalidInput in invalidInputs
+            )
+            {
+                bool success = WallMath.TryClopperPearsonInterval(
+                    invalidInput.successes,
+                    invalidInput.trials,
+                    invalidInput.confidenceLevel,
+                    out double lowerBound,
+                    out double upperBound
+                );
+
+                Assert.IsFalse(success, $"Expected {invalidInput} to fail.");
+                Assert.AreEqual(0.0, lowerBound, $"Expected {invalidInput} to clear lower.");
+                Assert.AreEqual(0.0, upperBound, $"Expected {invalidInput} to clear upper.");
+            }
+        }
+
+        [Test]
+        public void ClopperPearsonUsesExactBoundaryFormulas()
+        {
+            const int trials = 10;
+            const double confidenceLevel = 0.95;
+            double tail = (1.0 - confidenceLevel) / 2.0;
+
+            Assert.IsTrue(
+                WallMath.TryClopperPearsonInterval(
+                    0,
+                    trials,
+                    confidenceLevel,
+                    out double zeroLower,
+                    out double zeroUpper
+                )
+            );
+            Assert.AreEqual(0.0, zeroLower);
+            Assert.AreEqual(1.0 - Math.Pow(tail, 1.0 / trials), zeroUpper, 1e-12);
+
+            Assert.IsTrue(
+                WallMath.TryClopperPearsonInterval(
+                    trials,
+                    trials,
+                    confidenceLevel,
+                    out double allLower,
+                    out double allUpper
+                )
+            );
+            Assert.AreEqual(Math.Pow(tail, 1.0 / trials), allLower, 1e-12);
+            Assert.AreEqual(1.0, allUpper);
+
+            double extremeConfidence = BitConverter.Int64BitsToDouble(
+                BitConverter.DoubleToInt64Bits(1.0) - 1
+            );
+            double extremeTail = (1.0 - extremeConfidence) / 2.0;
+            Assert.IsTrue(
+                WallMath.TryClopperPearsonInterval(
+                    0,
+                    trials,
+                    extremeConfidence,
+                    out double extremeLower,
+                    out double extremeUpper
+                )
+            );
+            Assert.AreEqual(0.0, extremeLower);
+            Assert.AreEqual(1.0 - Math.Pow(extremeTail, 1.0 / trials), extremeUpper, 1e-12);
+
+            Assert.IsTrue(
+                WallMath.TryClopperPearsonInterval(
+                    1,
+                    int.MaxValue,
+                    extremeConfidence,
+                    out double rareLower,
+                    out double rareUpper
+                )
+            );
+            double rareLowerApproximation = extremeTail / int.MaxValue;
+            Assert.That(rareLower / rareLowerApproximation, Is.InRange(0.999, 1.001));
+            Assert.That(rareUpper, Is.InRange(rareLower, 1.0));
+        }
+
+        [Test]
+        public void ClopperPearsonInteriorBoundsSatisfyDefiningTails()
+        {
+            const int successes = 3;
+            const int trials = 10;
+            const double confidenceLevel = 0.95;
+            double tail = (1.0 - confidenceLevel) / 2.0;
+
+            Assert.IsTrue(
+                WallMath.TryClopperPearsonInterval(
+                    successes,
+                    trials,
+                    confidenceLevel,
+                    out double lowerBound,
+                    out double upperBound
+                )
+            );
+
+            double lowerTail = 1.0 - BinomialProbabilityAtMost(successes - 1, trials, lowerBound);
+            double upperTail = BinomialProbabilityAtMost(successes, trials, upperBound);
+            Assert.AreEqual(tail, lowerTail, 1e-10);
+            Assert.AreEqual(tail, upperTail, 1e-10);
+            Assert.That(lowerBound, Is.LessThan((double)successes / trials));
+            Assert.That((double)successes / trials, Is.LessThan(upperBound));
+        }
+
+        [Test]
+        public void ClopperPearsonIsSymmetricAndWidensWithConfidence()
+        {
+            Assert.IsTrue(
+                WallMath.TryClopperPearsonInterval(
+                    7,
+                    20,
+                    0.9,
+                    out double lower90,
+                    out double upper90
+                )
+            );
+            Assert.IsTrue(
+                WallMath.TryClopperPearsonInterval(
+                    7,
+                    20,
+                    0.99,
+                    out double lower99,
+                    out double upper99
+                )
+            );
+            Assert.IsTrue(
+                WallMath.TryClopperPearsonInterval(
+                    13,
+                    20,
+                    0.9,
+                    out double reflectedLower,
+                    out double reflectedUpper
+                )
+            );
+
+            Assert.That(lower99, Is.LessThan(lower90));
+            Assert.That(upper90, Is.LessThan(upper99));
+            Assert.AreEqual(1.0 - upper90, reflectedLower, 1e-12);
+            Assert.AreEqual(1.0 - lower90, reflectedUpper, 1e-12);
+        }
+
+        [Test]
+        public void ClopperPearsonHandlesLargeCountsWithBoundedFiniteOutput()
+        {
+            Assert.IsTrue(
+                WallMath.TryClopperPearsonInterval(
+                    3000,
+                    10000,
+                    0.999,
+                    out double lowerBound,
+                    out double upperBound
+                )
+            );
+
+            Assert.That(lowerBound, Is.InRange(0.0, 0.3));
+            Assert.That(upperBound, Is.InRange(0.3, 1.0));
+            Assert.IsFalse(double.IsNaN(lowerBound));
+            Assert.IsFalse(double.IsNaN(upperBound));
+
+            Assert.IsTrue(
+                WallMath.TryClopperPearsonInterval(
+                    500_000,
+                    1_000_000,
+                    0.95,
+                    out double balancedLower,
+                    out double balancedUpper
+                )
+            );
+            Assert.That(balancedLower, Is.InRange(0.49, 0.5));
+            Assert.That(balancedUpper, Is.InRange(0.5, 0.51));
+        }
+
         [Test]
         [TestCaseSource(nameof(MedianFloatCases))]
         public void MedianFloatMatchesExpected(float[] values, float expected)

@@ -691,9 +691,9 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             float maxX = float.NegativeInfinity;
             float maxY = float.NegativeInfinity;
 
-            for (int i = 0; i < count; ++i)
+            foreach (int entryIndex in source)
             {
-                Vector2 position = entries[source[i]].position;
+                Vector2 position = entries[entryIndex].position;
                 if (position.x < minX)
                 {
                     minX = position.x;
@@ -723,9 +723,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
 
             int leftWrite = 0;
             int rightWrite = count - 1;
-            for (int i = 0; i < count; ++i)
+            foreach (int entryIndex in source)
             {
-                int entryIndex = source[i];
                 Vector2 position = entries[entryIndex].position;
                 float value = splitOnXAxis ? position.x : position.y;
                 if (value <= cutoff)

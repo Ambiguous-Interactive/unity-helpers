@@ -747,9 +747,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             float maxY = float.NegativeInfinity;
             float maxZ = float.NegativeInfinity;
 
-            for (int i = 0; i < count; ++i)
+            foreach (int entryIndex in source)
             {
-                int entryIndex = source[i];
                 float px = positionsX[entryIndex];
                 float py = positionsY[entryIndex];
                 float pz = positionsZ[entryIndex];
@@ -791,9 +790,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             int leftWrite = 0;
             int rightWrite = count - 1;
             float[] axisArray = GetAxisArray(axis);
-            for (int i = 0; i < count; ++i)
+            foreach (int entryIndex in source)
             {
-                int entryIndex = source[i];
                 float value = axisArray[entryIndex];
                 if (value <= cutoff)
                 {

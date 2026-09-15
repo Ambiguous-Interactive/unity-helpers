@@ -639,9 +639,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             float centerY = boundaryCenter.y;
 
             Entry[] entries = _entries;
-            for (int i = 0; i < count; ++i)
+            foreach (int entryIndex in source)
             {
-                int entryIndex = source[i];
                 Vector2 position = entries[entryIndex].position;
                 bool east = centerX < position.x;
                 bool north = centerY <= position.y;
@@ -673,9 +672,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return QuadTreeNode.CreateLeaf(boundary, startIndex, count);
             }
 
-            for (int i = 0; i < count; ++i)
+            foreach (int entryIndex in source)
             {
-                int entryIndex = source[i];
                 Vector2 position = entries[entryIndex].position;
                 bool east = centerX < position.x;
                 bool north = centerY <= position.y;

@@ -453,9 +453,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
             float centerZ = boundaryCenter.z;
 
             Entry[] entries = _entries;
-            for (int i = 0; i < count; ++i)
+            foreach (int entryIndex in source)
             {
-                int entryIndex = source[i];
                 Vector3 position = entries[entryIndex].position;
                 bool east = centerX <= position.x;
                 bool north = centerY <= position.y;
@@ -483,9 +482,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure
                 return OctTreeNode.CreateLeaf(boundary, startIndex, count, degenerateUnity);
             }
 
-            for (int i = 0; i < count; ++i)
+            foreach (int entryIndex in source)
             {
-                int entryIndex = source[i];
                 Vector3 position = entries[entryIndex].position;
                 bool east = centerX <= position.x;
                 bool north = centerY <= position.y;

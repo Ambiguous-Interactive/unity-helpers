@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `WallMath.TryClopperPearsonInterval` for exact equal-tailed binomial confidence bounds with
+  fail-soft validation. See
+  [Descriptive Statistics](./docs/features/utilities/helper-utilities.md#descriptive-statistics-wallmath)
+  ([#742](https://github.com/Ambiguous-Interactive/unity-helpers/issues/742)).
 - Add stable exponential-race weighted index and no-replacement subset selection over spans, with
   allocation-free caller scratch and overflow-safe cumulative double selection. See
   [Random Generators](./docs/features/utilities/random-generators.md) ([#792](https://github.com/Ambiguous-Interactive/unity-helpers/issues/792), [#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781)).
@@ -39,6 +43,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Improved
 
+- Improve `LayeredImage` construction by keeping measured parallel blending for multi-row sprites
+  while avoiding slower scheduling for single-row sprites; overflow-safe work sizing preserves the
+  parallel path for very large dimensions
+  ([#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781),
+  [#782](https://github.com/Ambiguous-Interactive/unity-helpers/issues/782)).
 - Avoid Sprite Pivot parallel scheduling below 65,536 pixels and for one-row sprites, while
   retaining measured parallel speedups for larger work
   ([#648](https://github.com/Ambiguous-Interactive/unity-helpers/issues/648),

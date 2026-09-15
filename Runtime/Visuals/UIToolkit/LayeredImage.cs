@@ -115,6 +115,42 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
             Fps = fps;
         }
 
+        internal static bool ShouldBlendInParallel(int spriteWidth, int spriteHeight)
+        {
+            return 1 < spriteHeight
+                && 0 < spriteWidth
+                && ParallelBlendThreshold <= (long)spriteWidth * spriteHeight;
+        }
+
+        internal static void ComposeSpriteOntoBufferForTests(
+            Color[] bufferPixels,
+            int bufferWidth,
+            int bufferHeight,
+            Color[] spritePixels,
+            int spriteWidth,
+            int spriteHeight,
+            float baseX,
+            float baseY,
+            float layerAlpha,
+            float pixelCutoff,
+            bool useParallel
+        )
+        {
+            ComposeSpriteOntoBuffer(
+                bufferPixels,
+                bufferWidth,
+                bufferHeight,
+                spritePixels,
+                spriteWidth,
+                spriteHeight,
+                baseX,
+                baseY,
+                layerAlpha,
+                pixelCutoff,
+                useParallel
+            );
+        }
+
         /// <remarks>
         /// The tolerance covers float drift only. A half-8-bit-step of slack used to be added on top,
         /// which discarded an extra alpha level at some cutoffs and none at others - so the same cutoff
@@ -172,6 +208,35 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                 return;
             }
 
+            ComposeSpriteOntoBuffer(
+                bufferPixels,
+                bufferWidth,
+                bufferHeight,
+                spritePixels,
+                spriteWidth,
+                spriteHeight,
+                baseX,
+                baseY,
+                layerAlpha,
+                pixelCutoff,
+                ShouldBlendInParallel(spriteWidth, spriteHeight)
+            );
+        }
+
+        private static void ComposeSpriteOntoBuffer(
+            Color[] bufferPixels,
+            int bufferWidth,
+            int bufferHeight,
+            Color[] spritePixels,
+            int spriteWidth,
+            int spriteHeight,
+            float baseX,
+            float baseY,
+            float layerAlpha,
+            float pixelCutoff,
+            bool useParallel
+        )
+        {
             BlendSpriteRowJob job = new(
                 bufferPixels,
                 bufferWidth,
@@ -184,7 +249,7 @@ namespace WallstopStudios.UnityHelpers.Visuals.UIToolkit
                 pixelCutoff
             );
 
-            if (ParallelBlendThreshold <= spriteWidth * spriteHeight)
+            if (useParallel)
             {
                 Parallel.For(0, spriteHeight, job.Execute);
                 return;

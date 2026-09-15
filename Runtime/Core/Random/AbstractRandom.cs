@@ -295,9 +295,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool SpanContains<T>(ReadOnlySpan<T> span, T value)
         {
-            for (int i = 0; i < span.Length; ++i)
+            foreach (T element in span)
             {
-                if (EqualityComparer<T>.Default.Equals(span[i], value))
+                if (EqualityComparer<T>.Default.Equals(element, value))
                 {
                     return true;
                 }

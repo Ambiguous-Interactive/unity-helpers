@@ -870,9 +870,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         public static uint StableHash32V1(ReadOnlySpan<byte> bytes, uint seed)
         {
             uint hash = seed;
-            for (int i = 0; i < bytes.Length; ++i)
+            foreach (byte value in bytes)
             {
-                hash ^= bytes[i];
+                hash ^= value;
                 hash *= Fnv32Prime;
             }
 

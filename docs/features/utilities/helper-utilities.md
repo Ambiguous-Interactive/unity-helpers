@@ -1415,8 +1415,9 @@ of overflowing silently.
 
 **One home for the numbers gameplay code keeps re-deriving:** `WallMath.Median`, `Percentile`,
 `Mean` and `StandardDeviation` read an `IReadOnlyList` directly, so a `List<T>`, a `T[]` or a pooled
-buffer all work with no intermediate copy on your side. Sorting for median and percentile happens
-on a pooled internal copy, so your list is never reordered.
+buffer all work with no intermediate copy on your side. `TryClopperPearsonInterval` computes an
+exact confidence interval for a measured binomial success rate. Sorting for median and percentile
+happens on a pooled internal copy, so your list is never reordered.
 
 <!-- doc-sample: compiles -->
 
@@ -1442,6 +1443,28 @@ Conventions, chosen once so callers do not have to guess:
   overflow. Integral data returns `double`, matching `Enumerable.Average`.
 - `StandardDeviation` is the population standard deviation by default; pass `sample: true` for
   Bessel's correction when the data is a sample of a larger population.
+
+For a binary outcome, use an exact Clopper-Pearson interval when the sample is small or the observed
+rate is close to zero or one:
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+bool measured = WallMath.TryClopperPearsonInterval(
+    successes: 17,
+    trials: 20,
+    confidenceLevel: 0.95,
+    out double lowerRate,
+    out double upperRate
+);
+```
+
+The interval is equal-tailed and includes both endpoints. Zero successes produces a lower bound of
+zero; success on every trial produces an upper bound of one. Invalid counts, a non-positive trial
+count, or a non-finite/confidence level outside the open interval `(0, 1)` return `false` and set both
+outputs to zero.
 
 <!-- doc-sample: compiles -->
 

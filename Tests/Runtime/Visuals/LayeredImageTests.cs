@@ -726,6 +726,89 @@ namespace WallstopStudios.UnityHelpers.Tests.Visuals
             );
         }
 
+        [Test]
+        public void ParallelBlendPolicyUsesMeasuredWorkAndRowBounds()
+        {
+            (int width, int height, bool expected)[] cases =
+            {
+                (0, 2048, false),
+                (2048, 0, false),
+                (2047, 1, false),
+                (2048, 1, false),
+                (4096, 1, false),
+                (1024, 2, true),
+                (64, 32, true),
+                (int.MaxValue, 2, true),
+            };
+
+            foreach ((int width, int height, bool expected) testCase in cases)
+            {
+                Assert.AreEqual(
+                    testCase.expected,
+                    LayeredImage.ShouldBlendInParallel(testCase.width, testCase.height),
+                    $"Unexpected parallel decision for {testCase.width}x{testCase.height}."
+                );
+            }
+        }
+
+        [Test]
+        public void SequentialAndParallelBlendPathsProduceIdenticalPixels()
+        {
+            const int bufferWidth = 72;
+            const int bufferHeight = 36;
+            const int spriteWidth = 64;
+            const int spriteHeight = 32;
+            Color[] spritePixels = new Color[spriteWidth * spriteHeight];
+            Color[] sequential = new Color[bufferWidth * bufferHeight];
+            Color[] parallel = new Color[bufferWidth * bufferHeight];
+            for (int index = 0; index < spritePixels.Length; ++index)
+            {
+                float alpha = index % 5 == 0 ? 0.005f : 0.25f + index % 3 * 0.25f;
+                spritePixels[index] = new Color(
+                    index % 7 / 6f,
+                    index % 11 / 10f,
+                    index % 13 / 12f,
+                    alpha
+                );
+            }
+
+            for (int index = 0; index < sequential.Length; ++index)
+            {
+                Color background = new Color(0.1f, 0.2f, 0.3f, index % 4 / 4f);
+                sequential[index] = background;
+                parallel[index] = background;
+            }
+
+            LayeredImage.ComposeSpriteOntoBufferForTests(
+                sequential,
+                bufferWidth,
+                bufferHeight,
+                spritePixels,
+                spriteWidth,
+                spriteHeight,
+                3.5f,
+                -1.25f,
+                0.75f,
+                0.01f,
+                useParallel: false
+            );
+            LayeredImage.ComposeSpriteOntoBufferForTests(
+                parallel,
+                bufferWidth,
+                bufferHeight,
+                spritePixels,
+                spriteWidth,
+                spriteHeight,
+                3.5f,
+                -1.25f,
+                0.75f,
+                0.01f,
+                useParallel: true
+            );
+
+            CollectionAssert.AreEqual(sequential, parallel);
+        }
+
         private IEnumerator AssertManualUpdateAtElapsedSinceLastFrame(
             float fps,
             double elapsedMilliseconds,
