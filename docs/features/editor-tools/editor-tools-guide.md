@@ -1571,6 +1571,9 @@ by reflection. Doing that on the first frame is a visible stall, and on IL2CPP s
 done at all. This walks your types at edit time and bakes the answers into an
 `AttributeMetadataCache` asset that ships with the build.
 
+The scan filters each discovered type once and avoids additional temporary query stages during
+reloads.
+
 You do not call the generator. It runs on load, and the `AttributeMetadataCache` asset's inspector
 has a **Purge & Refresh Cache** button for when you want to force it.
 

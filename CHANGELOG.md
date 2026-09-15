@@ -11,10 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add an Odin migration preview/apply tool for scripts under `Assets`, limited to proven-equivalent
-  inspector attributes. It preserves encoding, byte-order marks, newline style, and all untouched
-  text; retains backups; detects common concurrent edits; attempts rollback for failed batches
-  without overwriting newer bytes; and reports serialized-state blockers without rewriting them. See the
+- Add an Odin migration preview/apply tool that reports all globally qualified inspector
+  attributes and only updates proven-equivalent attributes on public fields or fields with exact
+  Unity serialization attributes. It preserves source formatting, retains backups, and blocks
+  unsafe or incomplete scans. See the
   [Odin Migration Guide](./docs/guides/odin-migration-guide.md)
   ([#794](https://github.com/Ambiguous-Interactive/unity-helpers/issues/794)).
 - Add `WallMath.TryFisherExactTest` for exact two-sided comparisons of two binary groups with
@@ -57,6 +57,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Improved
 
+- Improve editor reloads by removing additional query stages from attribute metadata discovery
+  ([#648](https://github.com/Ambiguous-Interactive/unity-helpers/issues/648),
+  [#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781)).
 - Improve Sprite Atlas Generator refresh and source-sprite processing by removing temporary query
   pipelines while preserving configuration and sprite order
   ([#648](https://github.com/Ambiguous-Interactive/unity-helpers/issues/648),

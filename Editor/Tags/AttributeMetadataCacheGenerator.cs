@@ -5,7 +5,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
 {
     using System;
     using System.Collections.Generic;
-    using System.Linq;
     using System.Reflection;
     using global::UnityEditor;
     using global::UnityEngine;
@@ -73,7 +72,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
                     }
                 }
 
-                string[] sortedAttributeNames = allAttributeNames.OrderBy(name => name).ToArray();
+                string[] sortedAttributeNames = new string[allAttributeNames.Count];
+                allAttributeNames.CopyTo(sortedAttributeNames);
+                Array.Sort(sortedAttributeNames, StringComparer.Ordinal);
 
                 List<RelationalTypeMetadata> relationalMetadataList = ScanRelationalAttributes();
 
@@ -211,10 +212,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
 
         private static List<Type> FindAttributeComponentTypes()
         {
-            List<Type> types = ReflectionHelpers
-                .GetTypesDerivedFrom<AttributesComponent>(includeAbstract: false)
-                .Where(AttributeMetadataFilters.ShouldSerialize)
-                .ToList();
+            List<Type> types = new();
+            foreach (
+                Type type in ReflectionHelpers.GetTypesDerivedFrom<AttributesComponent>(
+                    includeAbstract: false
+                )
+            )
+            {
+                if (AttributeMetadataFilters.ShouldSerialize(type))
+                {
+                    types.Add(type);
+                }
+            }
 
             if (0 < types.Count)
             {
@@ -233,18 +242,26 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
                     results.Add(t);
                 }
             }
-            return results.ToList();
+            types.AddRange(results);
+            return types;
         }
 
         private static List<RelationalTypeMetadata> ScanRelationalAttributes()
         {
             List<RelationalTypeMetadata> result = new();
 
-            List<Type> componentTypes = ReflectionHelpers
-                .GetTypesDerivedFrom<Component>(includeAbstract: false)
-                .Where(type => !type.IsGenericType)
-                .Where(AttributeMetadataFilters.ShouldSerialize)
-                .ToList();
+            List<Type> componentTypes = new();
+            foreach (
+                Type type in ReflectionHelpers.GetTypesDerivedFrom<Component>(
+                    includeAbstract: false
+                )
+            )
+            {
+                if (!type.IsGenericType && AttributeMetadataFilters.ShouldSerialize(type))
+                {
+                    componentTypes.Add(type);
+                }
+            }
 
             if (componentTypes.Count == 0)
             {
@@ -261,7 +278,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
                         results.Add(t);
                     }
                 }
-                componentTypes = results.ToList();
+                componentTypes.AddRange(results);
             }
 
             foreach (Type type in componentTypes)
@@ -374,14 +391,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Tags
                     continue;
                 }
 
-                AutoLoadSingletonAttribute attribute =
-                    System
-                        .Attribute.GetCustomAttributes(
-                            type,
-                            typeof(AutoLoadSingletonAttribute),
-                            inherit: false
-                        )
-                        .FirstOrDefault() as AutoLoadSingletonAttribute;
+                AutoLoadSingletonAttribute attribute = null;
+                object[] attributes = System.Attribute.GetCustomAttributes(
+                    type,
+                    typeof(AutoLoadSingletonAttribute),
+                    inherit: false
+                );
+                foreach (object candidate in attributes)
+                {
+                    attribute = candidate as AutoLoadSingletonAttribute;
+                    if (attribute != null)
+                    {
+                        break;
+                    }
+                }
                 if (attribute == null)
                 {
                     continue;

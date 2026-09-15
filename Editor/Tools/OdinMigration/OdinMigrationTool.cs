@@ -17,6 +17,95 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
 
         private static string ProjectRoot => Directory.GetParent(Application.dataPath).FullName;
 
+        internal static ScanResult BuildPlans(
+            IReadOnlyList<string> assetPaths,
+            IOdinMigrationScanContext context
+        )
+        {
+            ScanResult result = new ScanResult();
+            if (assetPaths == null || context == null)
+            {
+                result.Failures.Add("The migration scan did not receive valid inputs.");
+                return result;
+            }
+
+            for (int index = 0; index < assetPaths.Count; index++)
+            {
+                string assetPath = assetPaths[index];
+                if (context.ShouldCancel(assetPath, index, assetPaths.Count))
+                {
+                    result.Cancelled = true;
+                    break;
+                }
+                string fullPath;
+                byte[] original;
+                try
+                {
+                    fullPath = context.GetFullPath(assetPath);
+                    original = context.ReadAllBytes(fullPath);
+                }
+                catch (Exception exception)
+                {
+                    result.Failures.Add($"{assetPath}: {exception.Message}");
+                    continue;
+                }
+
+                if (
+                    !OdinMigrationEncodedSource.TryDecode(
+                        original,
+                        out OdinMigrationDecodedSource decoded,
+                        out string decodeFailure
+                    )
+                )
+                {
+                    result.Failures.Add($"{assetPath}: {decodeFailure}");
+                    continue;
+                }
+                if (OdinMigrationSourceAnalyzer.LooksGenerated(assetPath, decoded.Source))
+                {
+                    result.GeneratedFiles++;
+                    continue;
+                }
+
+                OdinMigrationAnalysis analysis = OdinMigrationSourceAnalyzer.Analyze(
+                    decoded.Source
+                );
+                result.Blockers += analysis.Blockers.Count;
+                result.ManualReviews += analysis.ManualReviews.Count;
+                result.AnalyzedFiles++;
+                if (
+                    0 < analysis.ReplacementCount
+                    || 0 < analysis.Blockers.Count
+                    || 0 < analysis.ManualReviews.Count
+                )
+                {
+                    result.Analyses.Add(new FileAnalysis(assetPath, analysis));
+                }
+                if (analysis.ReplacementCount == 0)
+                {
+                    continue;
+                }
+
+                byte[] upgraded = OdinMigrationEncodedSource.Encode(
+                    decoded,
+                    analysis.UpgradedSource
+                );
+                result.Plans.Add(
+                    new OdinMigrationFilePlan(assetPath, fullPath, original, upgraded, analysis)
+                );
+                result.Replacements += analysis.ReplacementCount;
+            }
+            return result;
+        }
+
+        internal static bool CanApply(ScanResult result)
+        {
+            return result != null
+                && 0 < result.Plans.Count
+                && !result.Cancelled
+                && result.Failures.Count == 0;
+        }
+
         [MenuItem(MenuRoot + "Preview Assets")]
         private static void PreviewAssets()
         {
@@ -59,7 +148,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             ScanResult result;
             try
             {
-                result = BuildPlans(assetPaths);
+                result = BuildPlans(assetPaths, new PhysicalOdinMigrationScanContext(ProjectRoot));
             }
             finally
             {
@@ -67,7 +156,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             }
             string report = BuildReport(result);
             Debug.Log(report);
-            if (!apply || result.Plans.Count == 0 || result.Cancelled)
+            if (!apply || !CanApply(result))
             {
                 EditorUtility.DisplayDialog("Odin Migration Preview", Summary(result), "OK");
                 return;
@@ -132,83 +221,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 $"Updated {result.Plans.Count} file(s).\nBackups: {backupRoot}",
                 "OK"
             );
-        }
-
-        private static ScanResult BuildPlans(List<string> assetPaths)
-        {
-            ScanResult result = new ScanResult();
-            for (int index = 0; index < assetPaths.Count; index++)
-            {
-                string assetPath = assetPaths[index];
-                if (
-                    EditorUtility.DisplayCancelableProgressBar(
-                        "Odin Migration",
-                        $"Analyzing {assetPath}",
-                        (float)index / assetPaths.Count
-                    )
-                )
-                {
-                    result.Cancelled = true;
-                    break;
-                }
-                string fullPath = Path.GetFullPath(Path.Combine(ProjectRoot, assetPath));
-                byte[] original;
-                try
-                {
-                    original = File.ReadAllBytes(fullPath);
-                }
-                catch (Exception exception)
-                {
-                    result.Failures.Add($"{assetPath}: {exception.Message}");
-                    continue;
-                }
-
-                if (
-                    !OdinMigrationEncodedSource.TryDecode(
-                        original,
-                        out OdinMigrationDecodedSource decoded,
-                        out string decodeFailure
-                    )
-                )
-                {
-                    result.Failures.Add($"{assetPath}: {decodeFailure}");
-                    continue;
-                }
-                if (OdinMigrationSourceAnalyzer.LooksGenerated(assetPath, decoded.Source))
-                {
-                    result.GeneratedFiles++;
-                    continue;
-                }
-
-                OdinMigrationAnalysis analysis = OdinMigrationSourceAnalyzer.Analyze(
-                    decoded.Source
-                );
-                result.Blockers += analysis.Blockers.Count;
-                result.ManualReviews += analysis.ManualReviews.Count;
-                result.AnalyzedFiles++;
-                if (
-                    0 < analysis.ReplacementCount
-                    || 0 < analysis.Blockers.Count
-                    || 0 < analysis.ManualReviews.Count
-                )
-                {
-                    result.Analyses.Add(new FileAnalysis(assetPath, analysis));
-                }
-                if (analysis.ReplacementCount == 0)
-                {
-                    continue;
-                }
-
-                byte[] upgraded = OdinMigrationEncodedSource.Encode(
-                    decoded,
-                    analysis.UpgradedSource
-                );
-                result.Plans.Add(
-                    new OdinMigrationFilePlan(assetPath, fullPath, original, upgraded, analysis)
-                );
-                result.Replacements += analysis.ReplacementCount;
-            }
-            return result;
         }
 
         private static string BuildReport(ScanResult result)
@@ -313,7 +325,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             return new List<string>(paths);
         }
 
-        private sealed class FileAnalysis
+        internal sealed class FileAnalysis
         {
             internal readonly string AssetPath;
             internal readonly OdinMigrationAnalysis Analysis;
@@ -325,7 +337,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             }
         }
 
-        private sealed class ScanResult
+        internal sealed class ScanResult
         {
             internal readonly List<FileAnalysis> Analyses = new List<FileAnalysis>();
             internal readonly List<string> Failures = new List<string>();
@@ -336,6 +348,44 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             internal int GeneratedFiles;
             internal int ManualReviews;
             internal int Replacements;
+        }
+
+        internal interface IOdinMigrationScanContext
+        {
+            string GetFullPath(string assetPath);
+
+            byte[] ReadAllBytes(string fullPath);
+
+            bool ShouldCancel(string assetPath, int index, int count);
+        }
+
+        private sealed class PhysicalOdinMigrationScanContext : IOdinMigrationScanContext
+        {
+            private readonly string projectRoot;
+
+            internal PhysicalOdinMigrationScanContext(string projectRoot)
+            {
+                this.projectRoot = projectRoot;
+            }
+
+            public string GetFullPath(string assetPath)
+            {
+                return Path.GetFullPath(Path.Combine(projectRoot, assetPath));
+            }
+
+            public byte[] ReadAllBytes(string fullPath)
+            {
+                return File.ReadAllBytes(fullPath);
+            }
+
+            public bool ShouldCancel(string assetPath, int index, int count)
+            {
+                return EditorUtility.DisplayCancelableProgressBar(
+                    "Odin Migration",
+                    $"Analyzing {assetPath}",
+                    (float)index / count
+                );
+            }
         }
     }
 }

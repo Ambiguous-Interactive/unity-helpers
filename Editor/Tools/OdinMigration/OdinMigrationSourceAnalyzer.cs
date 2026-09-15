@@ -47,6 +47,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             "SerializedBehaviour",
             "SerializedComponent",
             "SerializedStateMachineBehaviour",
+            "OdinSerializeAttribute",
             "OdinSerialize",
         };
 
@@ -111,6 +112,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     lineMap,
                     sourceContext,
                     hasDirectOdinUsing,
+                    blockers.Count == 0,
                     replacements,
                     manualReviews
                 );
@@ -258,11 +260,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             LineMap lineMap,
             SourceContext sourceContext,
             bool hasDirectOdinUsing,
+            bool automaticRewritesAllowed,
             List<Replacement> replacements,
             List<OdinMigrationFinding> manualReviews
         )
         {
-            bool fieldOrPropertyTarget = IsProvableFieldOrPropertyTarget(
+            bool serializedFieldTarget = IsProvableSerializedFieldTarget(
+                source,
                 masked,
                 bracketStart,
                 bracketEnd,
@@ -271,8 +275,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             int position = bracketStart + 1;
             SkipWhitespace(masked, ref position, bracketEnd);
             string explicitTarget = ReadAttributeTarget(masked, ref position, bracketEnd);
-            bool allowedAttributeTarget =
-                explicitTarget == null || explicitTarget == "field" || explicitTarget == "property";
+            bool allowedAttributeTarget = explicitTarget == null || explicitTarget == "field";
 
             while (position < bracketEnd)
             {
@@ -317,12 +320,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                         nameSpan,
                         argumentsStart,
                         argumentsEnd,
-                        fieldOrPropertyTarget,
+                        serializedFieldTarget,
                         allowedAttributeTarget,
                         explicitTarget,
                         lineMap,
                         attributeName,
                         automaticRewrite,
+                        automaticRewritesAllowed,
+                        writtenName.StartsWith(
+                            "global::Sirenix.OdinInspector.",
+                            StringComparison.Ordinal
+                        ),
                         replacements,
                         manualReviews
                     );
@@ -342,12 +350,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             TextSpan nameSpan,
             int argumentsStart,
             int argumentsEnd,
-            bool fieldOrPropertyTarget,
+            bool serializedFieldTarget,
             bool allowedAttributeTarget,
             string explicitTarget,
             LineMap lineMap,
             string attributeName,
             bool automaticRewrite,
+            bool automaticRewritesAllowed,
+            bool globallyQualified,
             List<Replacement> replacements,
             List<OdinMigrationFinding> manualReviews
         )
@@ -363,7 +373,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     manualReviews,
                     lineMap,
                     nameSpan.Start,
-                    $"{attributeName} could not be proven to resolve to the global Odin type and was left unchanged."
+                    globallyQualified
+                        ? $"{attributeName} has no proven Unity Helpers migration and was left unchanged."
+                        : $"{attributeName} could not be proven to resolve to the global Odin type and was left unchanged."
+                );
+                return;
+            }
+
+            if (!automaticRewritesAllowed)
+            {
+                AddFinding(
+                    manualReviews,
+                    lineMap,
+                    nameSpan.Start,
+                    $"{attributeName} was left unchanged because this file contains Odin-owned serialized state."
                 );
                 return;
             }
@@ -374,18 +397,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     manualReviews,
                     lineMap,
                     nameSpan.Start,
-                    $"The explicit '{explicitTarget}:' attribute target is not a field or property target and was left unchanged."
+                    $"The explicit '{explicitTarget}:' attribute target is not a field target and was left unchanged."
                 );
                 return;
             }
 
-            if (!fieldOrPropertyTarget)
+            if (!serializedFieldTarget)
             {
                 AddFinding(
                     manualReviews,
                     lineMap,
                     nameSpan.Start,
-                    $"{attributeName} is not on a provable field or property declaration and was left unchanged."
+                    $"{attributeName} is not on a public field or a field with an exact Unity serialization attribute and was left unchanged."
                 );
                 return;
             }
@@ -490,10 +513,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 }
                 else if (character == '"')
                 {
-                    bool verbatim =
-                        (0 < index && masked[index - 1] == '@')
-                        || (1 < index && masked[index - 1] == '$' && masked[index - 2] == '@');
-                    MaskQuoted(masked, ref index, '"', verbatim);
+                    int quoteCount = CountConsecutive(masked, index, '"');
+                    if (3 <= quoteCount)
+                    {
+                        MaskRawQuoted(masked, ref index, quoteCount);
+                    }
+                    else
+                    {
+                        bool verbatim =
+                            (0 < index && masked[index - 1] == '@')
+                            || (1 < index && masked[index - 1] == '$' && masked[index - 2] == '@');
+                        MaskQuoted(masked, ref index, '"', verbatim);
+                    }
                 }
                 else if (character == '#' && IsPreprocessorDirectiveStart(masked, index))
                 {
@@ -505,6 +536,43 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 }
             }
             return new string(masked);
+        }
+
+        private static int CountConsecutive(char[] characters, int start, char character)
+        {
+            int count = 0;
+            while (start + count < characters.Length && characters[start + count] == character)
+            {
+                count++;
+            }
+            return count;
+        }
+
+        private static void MaskCharacters(char[] characters, ref int index, int count)
+        {
+            for (int maskedCount = 0; maskedCount < count; maskedCount++)
+            {
+                characters[index++] = ' ';
+            }
+        }
+
+        private static void MaskRawQuoted(char[] characters, ref int index, int delimiterLength)
+        {
+            MaskCharacters(characters, ref index, delimiterLength);
+
+            while (index < characters.Length)
+            {
+                if (delimiterLength <= CountConsecutive(characters, index, '"'))
+                {
+                    MaskCharacters(characters, ref index, delimiterLength);
+                    return;
+                }
+                if (characters[index] != '\r' && characters[index] != '\n')
+                {
+                    characters[index] = ' ';
+                }
+                index++;
+            }
         }
 
         private static bool IsPreprocessorDirectiveStart(char[] characters, int index)
@@ -654,7 +722,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             {
                 int end = candidate + identifier.Length;
                 bool startsAtBoundary =
-                    candidate == 0 || !IsIdentifierCharacter(source[candidate - 1]);
+                    candidate == 0
+                    || (
+                        !IsIdentifierCharacter(source[candidate - 1])
+                        && source[candidate - 1] != '@'
+                    );
                 bool endsAtBoundary = end == source.Length || !IsIdentifierCharacter(source[end]);
                 if (startsAtBoundary && endsAtBoundary)
                 {
@@ -746,7 +818,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 bool recognized = ReportedOdinAttributes.Contains(resolvedAttributeName);
                 attributeName = resolvedAttributeName;
                 automaticRewrite = recognized;
-                return recognized;
+                return true;
             }
 
             const string QualifiedPrefix = "Sirenix.OdinInspector.";
@@ -776,7 +848,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             return char.IsLetterOrDigit(character) || character == '_';
         }
 
-        private static bool IsProvableFieldOrPropertyTarget(
+        private static bool IsProvableSerializedFieldTarget(
+            string originalSource,
             string source,
             int bracketStart,
             int bracketEnd,
@@ -824,12 +897,160 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 {
                     return false;
                 }
-                if (character == ';' || character == '=' || character == '{' || character == ',')
+                if (character == '{')
                 {
-                    return HeaderCanDeclareFieldOrProperty(source, declarationStart, position);
+                    return false;
+                }
+                if (character == '=' && position + 1 < source.Length && source[position + 1] == '>')
+                {
+                    return false;
+                }
+                if (character == ';' || character == '=' || character == ',')
+                {
+                    string header = source.Substring(declarationStart, position - declarationStart);
+                    if (
+                        !HeaderCanDeclareFieldOrProperty(source, declarationStart, position)
+                        || ContainsIdentifier(header, "const", out _)
+                        || ContainsIdentifier(header, "readonly", out _)
+                        || ContainsIdentifier(header, "static", out _)
+                    )
+                    {
+                        return false;
+                    }
+
+                    int attributeStart = FindAttributeSequenceStart(source, bracketStart);
+                    int attributeLength = declarationStart - attributeStart;
+                    string attributes = source.Substring(attributeStart, attributeLength);
+                    if (
+                        ContainsAttributeIdentifier(attributes, "NonSerialized")
+                        || ContainsAttributeIdentifier(attributes, "OdinSerialize")
+                    )
+                    {
+                        return false;
+                    }
+
+                    bool explicitlySerialized =
+                        originalSource.IndexOf('#', attributeStart, attributeLength) < 0
+                        && HasExactUnitySerializationAttribute(
+                            source,
+                            attributeStart,
+                            declarationStart
+                        );
+                    return explicitlySerialized || ContainsIdentifier(header, "public", out _);
                 }
             }
             return false;
+        }
+
+        private static bool HasExactUnitySerializationAttribute(string source, int start, int limit)
+        {
+            int position = start;
+            while (position < limit)
+            {
+                SkipWhitespace(source, ref position, limit);
+                if (limit <= position || source[position] != '[')
+                {
+                    return false;
+                }
+
+                int bracketEnd = FindMatching(source, position, limit, '[', ']');
+                if (bracketEnd < 0)
+                {
+                    return false;
+                }
+                position++;
+                SkipWhitespace(source, ref position, bracketEnd);
+                ReadAttributeTarget(source, ref position, bracketEnd);
+                while (position < bracketEnd)
+                {
+                    SkipWhitespace(source, ref position, bracketEnd);
+                    if (
+                        !TryReadQualifiedName(
+                            source,
+                            ref position,
+                            bracketEnd,
+                            out TextSpan nameSpan
+                        )
+                    )
+                    {
+                        break;
+                    }
+
+                    string writtenName = source.Substring(nameSpan.Start, nameSpan.Length);
+                    if (
+                        writtenName == "global::UnityEngine.SerializeField"
+                        || writtenName == "global::UnityEngine.SerializeFieldAttribute"
+                        || writtenName == "global::UnityEngine.SerializeReference"
+                        || writtenName == "global::UnityEngine.SerializeReferenceAttribute"
+                    )
+                    {
+                        return true;
+                    }
+
+                    SkipWhitespace(source, ref position, bracketEnd);
+                    if (position < bracketEnd && source[position] == '(')
+                    {
+                        int argumentsEnd = FindMatching(source, position, bracketEnd, '(', ')');
+                        if (argumentsEnd < 0)
+                        {
+                            return false;
+                        }
+                        position = argumentsEnd + 1;
+                    }
+                    SkipWhitespace(source, ref position, bracketEnd);
+                    if (bracketEnd <= position || source[position] != ',')
+                    {
+                        break;
+                    }
+                    position++;
+                }
+                position = bracketEnd + 1;
+            }
+            return false;
+        }
+
+        private static bool ContainsAttributeIdentifier(string source, string attributeName)
+        {
+            return ContainsIdentifier(source, attributeName, out _)
+                || ContainsIdentifier(source, attributeName + "Attribute", out _);
+        }
+
+        private static int FindAttributeSequenceStart(string source, int bracketStart)
+        {
+            int sequenceStart = bracketStart;
+            int position = bracketStart - 1;
+            while (0 <= position)
+            {
+                while (0 <= position && char.IsWhiteSpace(source[position]))
+                {
+                    position--;
+                }
+                if (position < 0 || source[position] != ']')
+                {
+                    break;
+                }
+
+                int depth = 1;
+                position--;
+                while (0 <= position && 0 < depth)
+                {
+                    if (source[position] == ']')
+                    {
+                        depth++;
+                    }
+                    else if (source[position] == '[')
+                    {
+                        depth--;
+                    }
+                    position--;
+                }
+                if (0 < depth)
+                {
+                    break;
+                }
+                sequenceStart = position + 1;
+            }
+            return sequenceStart;
         }
 
         private static bool HeaderCanDeclareFieldOrProperty(string source, int start, int end)

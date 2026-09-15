@@ -44,7 +44,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 "class Target\r\n"
                 + "{\r\n"
                 + "    [global::Sirenix.OdinInspector.ReadOnly, global::Sirenix.OdinInspector.EnumToggleButtons]\r\n"
-                + "    int value;\r\n"
+                + "    public int value;\r\n"
                 + "    [Sirenix.OdinInspector.ShowIf(nameof(enabled))] int shown;\r\n"
                 + "    [Sirenix.OdinInspector.HideIf(nameof(enabled))] int hidden;\r\n"
                 + "}\r\n";
@@ -87,13 +87,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             const string Source =
                 "class Target\n"
                 + "{\n"
-                + "    [global::Sirenix.OdinInspector.ReadOnly] int value;\n"
+                + "    [global::Sirenix.OdinInspector.ReadOnly] public int value;\n"
                 + "}\n";
 
             OdinMigrationAnalysis analysis = OdinMigrationSourceAnalyzer.Analyze(Source);
 
             Assert.AreEqual(1, analysis.ReplacementCount);
-            StringAssert.Contains("Core.Attributes.WReadOnly] int value", analysis.UpgradedSource);
+            StringAssert.Contains(
+                "Core.Attributes.WReadOnly] public int value",
+                analysis.UpgradedSource
+            );
             Assert.AreEqual(0, analysis.ManualReviews.Count);
         }
 
@@ -104,19 +107,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 "class Target\n"
                 + "{\n"
                 + "#region Fields\n"
-                + "    [global::Sirenix.OdinInspector.ReadOnly] int first;\n"
+                + "    [global::Sirenix.OdinInspector.ReadOnly] public int first;\n"
                 + "#endregion\n"
                 + "#if UNITY_EDITOR\n"
-                + "    [global::Sirenix.OdinInspector.EnumToggleButtons] int second;\n"
+                + "    [global::Sirenix.OdinInspector.EnumToggleButtons] public int second;\n"
                 + "#endif\n"
                 + "}\n";
 
             OdinMigrationAnalysis analysis = OdinMigrationSourceAnalyzer.Analyze(Source);
 
             Assert.AreEqual(2, analysis.ReplacementCount);
-            StringAssert.Contains("Core.Attributes.WReadOnly] int first", analysis.UpgradedSource);
             StringAssert.Contains(
-                "Core.Attributes.WEnumToggleButtons] int second",
+                "Core.Attributes.WReadOnly] public int first",
+                analysis.UpgradedSource
+            );
+            StringAssert.Contains(
+                "Core.Attributes.WEnumToggleButtons] public int second",
                 analysis.UpgradedSource
             );
         }
@@ -161,7 +167,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         }
 
         [Test]
-        public void AnalyzerRewritesOnlyProvenFieldAndPropertyTargetsAcrossAttributeLists()
+        public void AnalyzerRewritesOnlyProvenSerializedFieldsAcrossAttributeLists()
         {
             const string Source =
                 "[global::Sirenix.OdinInspector.ReadOnly] class DecoratedType {}\n"
@@ -170,12 +176,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 + "    [global::Sirenix.OdinInspector.ReadOnly] void Run() {}\n"
                 + "    [System.NonSerialized]\n"
                 + "    [field: global::Sirenix.OdinInspector.ReadOnly] int field;\n"
+                + "    [System.NonSerializedAttribute]\n"
+                + "    [global::Sirenix.OdinInspector.ReadOnly] public int attributedField;\n"
                 + "    [property: global::Sirenix.OdinInspector.EnumToggleButtons] int Property { get; set; }\n"
+                + "    [global::UnityEngine.SerializeFieldAttribute]\n"
+                + "    [global::Sirenix.OdinInspector.ReadOnly] int serialized;\n"
                 + "}\n";
 
             OdinMigrationAnalysis analysis = OdinMigrationSourceAnalyzer.Analyze(Source);
 
-            Assert.AreEqual(2, analysis.ReplacementCount);
+            Assert.AreEqual(1, analysis.ReplacementCount);
             StringAssert.Contains(
                 "[global::Sirenix.OdinInspector.ReadOnly] class DecoratedType",
                 analysis.UpgradedSource
@@ -185,12 +195,183 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 analysis.UpgradedSource
             );
             StringAssert.Contains("[System.NonSerialized]", analysis.UpgradedSource);
-            StringAssert.Contains("Core.Attributes.WReadOnly] int field", analysis.UpgradedSource);
             StringAssert.Contains(
-                "Core.Attributes.WEnumToggleButtons] int Property",
+                "[field: global::Sirenix.OdinInspector.ReadOnly] int field",
                 analysis.UpgradedSource
             );
-            Assert.AreEqual(2, analysis.ManualReviews.Count);
+            StringAssert.Contains(
+                "[global::Sirenix.OdinInspector.ReadOnly] public int attributedField",
+                analysis.UpgradedSource
+            );
+            StringAssert.Contains(
+                "[property: global::Sirenix.OdinInspector.EnumToggleButtons] int Property",
+                analysis.UpgradedSource
+            );
+            StringAssert.Contains(
+                "Core.Attributes.WReadOnly] int serialized",
+                analysis.UpgradedSource
+            );
+            Assert.AreEqual(5, analysis.ManualReviews.Count);
+        }
+
+        [Test]
+        public void AnalyzerDisablesAllRewritesWhenFileContainsOdinSerializedState()
+        {
+            const string Source =
+                "class Target : Sirenix.OdinInspector.Serialized"
+                + "MonoBehaviour\n"
+                + "{\n"
+                + "    [global::Sirenix.OdinInspector.ReadOnly] public int value;\n"
+                + "}\n";
+
+            OdinMigrationAnalysis analysis = OdinMigrationSourceAnalyzer.Analyze(Source);
+
+            Assert.AreEqual(0, analysis.ReplacementCount);
+            Assert.AreSame(Source, analysis.UpgradedSource);
+            Assert.AreEqual(1, analysis.Blockers.Count);
+            Assert.AreEqual(1, analysis.ManualReviews.Count);
+            StringAssert.Contains("Odin-owned serialized state", analysis.ManualReviews[0].Message);
+        }
+
+        [Test]
+        public void AnalyzerLeavesFieldsThatUnityWillNotSerializeForReview()
+        {
+            const string Source =
+                "class Target\n"
+                + "{\n"
+                + "    [global::Sirenix.OdinInspector.ReadOnly] static int shared;\n"
+                + "    [global::Sirenix.OdinInspector.ReadOnly] readonly int immutable;\n"
+                + "    [global::Sirenix.OdinInspector.ReadOnly] private int hidden;\n"
+                + "    [global::Sirenix.OdinInspector.ReadOnly] int @public;\n"
+                + "    [global::Sirenix.OdinInspector.ReadOnly] public int Expression => 1;\n"
+                + "    [global::Sirenix.OdinInspector.ReadOnly] public int visible;\n"
+                + "}\n";
+
+            OdinMigrationAnalysis analysis = OdinMigrationSourceAnalyzer.Analyze(Source);
+
+            Assert.AreEqual(1, analysis.ReplacementCount);
+            StringAssert.Contains(
+                "Core.Attributes.WReadOnly] public int visible",
+                analysis.UpgradedSource
+            );
+            Assert.AreEqual(5, analysis.ManualReviews.Count);
+            foreach (OdinMigrationFinding finding in analysis.ManualReviews)
+            {
+                StringAssert.Contains("public field", finding.Message);
+            }
+        }
+
+        [Test]
+        public void AnalyzerRequiresAnExactUnconditionalUnitySerializationAttribute()
+        {
+            const string Source =
+                "class Target\n"
+                + "{\n"
+                + "    [Marker(nameof(SerializeField))]\n"
+                + "    [global::Sirenix.OdinInspector.ReadOnly] int argumentOnly;\n"
+                + "    [SerializeField]\n"
+                + "    [global::Sirenix.OdinInspector.ReadOnly] int ambiguous;\n"
+                + "#if ENABLE_FIELD\n"
+                + "    [global::UnityEngine.SerializeField]\n"
+                + "#endif\n"
+                + "    [global::Sirenix.OdinInspector.ReadOnly] int conditional;\n"
+                + "}\n";
+
+            OdinMigrationAnalysis analysis = OdinMigrationSourceAnalyzer.Analyze(Source);
+
+            Assert.AreEqual(0, analysis.ReplacementCount);
+            Assert.AreSame(Source, analysis.UpgradedSource);
+            Assert.AreEqual(3, analysis.ManualReviews.Count);
+        }
+
+        [Test]
+        public void AnalyzerMasksRawAndInterpolatedRawStringContents()
+        {
+            const string Source =
+                "class Target\n"
+                + "{\n"
+                + "    string raw = \"\"\"\n"
+                + "[global::Sirenix.OdinInspector.ReadOnly] public int falseField;\n"
+                + "\"\"\";\n"
+                + "    string interpolated = $\"\"\"\n"
+                + "[global::Sirenix.OdinInspector.EnumToggleButtons] public int otherFalseField;\n"
+                + "\"\"\";\n"
+                + "    [global::Sirenix.OdinInspector.ReadOnly] public int actual;\n"
+                + "}\n";
+
+            OdinMigrationAnalysis analysis = OdinMigrationSourceAnalyzer.Analyze(Source);
+
+            Assert.AreEqual(1, analysis.ReplacementCount);
+            StringAssert.Contains("ReadOnly] public int falseField", analysis.UpgradedSource);
+            StringAssert.Contains(
+                "EnumToggleButtons] public int otherFalseField",
+                analysis.UpgradedSource
+            );
+            StringAssert.Contains(
+                "Core.Attributes.WReadOnly] public int actual",
+                analysis.UpgradedSource
+            );
+        }
+
+        [Test]
+        public void AnalyzerMasksWiderRawStringDelimiters()
+        {
+            const string Source =
+                "class Target\n"
+                + "{\n"
+                + "    string singleLine = \"\"\"\"\"\"; "
+                + "[global::Sirenix.OdinInspector.ReadOnly] public int falseSingleLine;\"\"\"\"\"\";\n"
+                + "    string widerDelimiter = \"\"\"\"\"\"\n"
+                + "[global::Sirenix.OdinInspector.ReadOnly] public int falseMultiLine;\n"
+                + "\"\"\"\"\"\";\n"
+                + "    [global::Sirenix.OdinInspector.ReadOnly] public int actual;\n"
+                + "}\n";
+
+            OdinMigrationAnalysis analysis = OdinMigrationSourceAnalyzer.Analyze(Source);
+
+            Assert.AreEqual(1, analysis.ReplacementCount);
+            StringAssert.Contains("ReadOnly] public int falseSingleLine", analysis.UpgradedSource);
+            StringAssert.Contains("ReadOnly] public int falseMultiLine", analysis.UpgradedSource);
+            StringAssert.Contains(
+                "Core.Attributes.WReadOnly] public int actual",
+                analysis.UpgradedSource
+            );
+        }
+
+        [Test]
+        public void AnalyzerBlocksExplicitOdinSerializeAttributeSuffix()
+        {
+            const string Source =
+                "class Target\n"
+                + "{\n"
+                + "    [global::Sirenix.OdinInspector.OdinSerializeAttribute] private int value;\n"
+                + "}\n";
+
+            OdinMigrationAnalysis analysis = OdinMigrationSourceAnalyzer.Analyze(Source);
+
+            Assert.AreEqual(0, analysis.ReplacementCount);
+            Assert.AreEqual(1, analysis.Blockers.Count);
+            Assert.AreSame(Source, analysis.UpgradedSource);
+        }
+
+        [Test]
+        public void AnalyzerReportsEveryGloballyQualifiedOdinInspectorAttribute()
+        {
+            const string Source =
+                "class Target\n"
+                + "{\n"
+                + "    [global::Sirenix.OdinInspector.Title(\"Stats\")] public int value;\n"
+                + "    [global::Sirenix.OdinInspector.InfoBox(\"Check this\")] public int other;\n"
+                + "    [global::Sirenix.OdinInspector.TableList] public object[] rows;\n"
+                + "}\n";
+
+            OdinMigrationAnalysis analysis = OdinMigrationSourceAnalyzer.Analyze(Source);
+
+            Assert.AreEqual(0, analysis.ReplacementCount);
+            Assert.AreEqual(3, analysis.ManualReviews.Count);
+            StringAssert.Contains("Title has no proven", analysis.ManualReviews[0].Message);
+            StringAssert.Contains("InfoBox has no proven", analysis.ManualReviews[1].Message);
+            StringAssert.Contains("TableList has no proven", analysis.ManualReviews[2].Message);
         }
 
         [Test]
@@ -261,7 +442,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 + "    class Target\n"
                 + "    {\n"
                 + "        [Sirenix.OdinInspector.ReadOnly] int shadowed;\n"
-                + "        [global::Sirenix.OdinInspector.EnumToggleButtons] int safe;\n"
+                + "        [global::Sirenix.OdinInspector.EnumToggleButtons] public int safe;\n"
                 + "    }\n"
                 + "}\n";
 
@@ -273,7 +454,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 analysis.UpgradedSource
             );
             StringAssert.Contains(
-                "Core.Attributes.WEnumToggleButtons] int safe",
+                "Core.Attributes.WEnumToggleButtons] public int safe",
                 analysis.UpgradedSource
             );
             Assert.AreEqual(1, analysis.ManualReviews.Count);
@@ -325,7 +506,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 + "{\n"
                 + "    string first = $@\"header\n[Sirenix.OdinInspector.ReadOnly]\ntail\";\n"
                 + "    string second = @$\"header\n[Sirenix.OdinInspector.EnumToggleButtons]\ntail\";\n"
-                + "    [global::Sirenix.OdinInspector.ReadOnly] int actual;\n"
+                + "    [global::Sirenix.OdinInspector.ReadOnly] public int actual;\n"
                 + "}\n";
 
             OdinMigrationAnalysis analysis = OdinMigrationSourceAnalyzer.Analyze(Source);
@@ -339,7 +520,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 "\n[Sirenix.OdinInspector.EnumToggleButtons]\ntail",
                 analysis.UpgradedSource
             );
-            StringAssert.Contains("Core.Attributes.WReadOnly] int actual", analysis.UpgradedSource);
+            StringAssert.Contains(
+                "Core.Attributes.WReadOnly] public int actual",
+                analysis.UpgradedSource
+            );
         }
 
         [Test]
@@ -348,7 +532,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             const string Source =
                 "class Target\r"
                 + "{\r"
-                + "    [global::Sirenix.OdinInspector.ReadOnly] int value;\r"
+                + "    [global::Sirenix.OdinInspector.ReadOnly] public int value;\r"
                 + "}\r";
 
             OdinMigrationAnalysis analysis = OdinMigrationSourceAnalyzer.Analyze(Source);
@@ -453,6 +637,100 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 )
             );
             StringAssert.Contains("invalid source encoding", failure);
+        }
+
+        [Test]
+        public void ScanCancellationStopsBeforeReadingTheCancelledFile()
+        {
+            string firstPath = "Assets/First.cs";
+            string secondPath = "Assets/Second.cs";
+            FakeScanContext context = new FakeScanContext { CancelAtIndex = 1 };
+            context.Files[firstPath] = Encoding.UTF8.GetBytes(
+                "class First { [global::Sirenix.OdinInspector.ReadOnly] public int value; }"
+            );
+            context.Files[secondPath] = Encoding.UTF8.GetBytes(
+                "class Second { [global::Sirenix.OdinInspector.ReadOnly] public int value; }"
+            );
+
+            OdinMigrationTool.ScanResult result = OdinMigrationTool.BuildPlans(
+                new[] { firstPath, secondPath },
+                context
+            );
+
+            Assert.IsTrue(result.Cancelled);
+            Assert.AreEqual(1, result.AnalyzedFiles);
+            Assert.AreEqual(1, result.Plans.Count);
+            Assert.AreEqual(1, result.Replacements);
+            CollectionAssert.AreEqual(new[] { firstPath }, context.Reads);
+        }
+
+        [Test]
+        public void ScanClassifiesGeneratedInvalidUnreadableAndPlainFiles()
+        {
+            string generatedPath = "Assets/Generated/First.cs";
+            string invalidPath = "Assets/Invalid.cs";
+            string missingPath = "Assets/Missing.cs";
+            string unresolvedPath = "Assets/Unresolved.cs";
+            string plainPath = "Assets/Plain.cs";
+            FakeScanContext context = new FakeScanContext();
+            context.Files[generatedPath] = Encoding.UTF8.GetBytes("class Generated {}");
+            context.Files[invalidPath] = new byte[] { 0xC3, 0x28 };
+            context.Files[plainPath] = Encoding.UTF8.GetBytes("class Plain {}");
+            context.FullPathFailures.Add(unresolvedPath);
+
+            OdinMigrationTool.ScanResult result = OdinMigrationTool.BuildPlans(
+                new[] { generatedPath, invalidPath, missingPath, unresolvedPath, plainPath },
+                context
+            );
+
+            Assert.IsFalse(result.Cancelled);
+            Assert.AreEqual(1, result.GeneratedFiles);
+            Assert.AreEqual(1, result.AnalyzedFiles);
+            Assert.AreEqual(3, result.Failures.Count);
+            Assert.AreEqual(0, result.Plans.Count);
+            CollectionAssert.AreEqual(
+                new[] { generatedPath, invalidPath, missingPath, plainPath },
+                context.Reads
+            );
+        }
+
+        [Test]
+        public void ScanRejectsMissingInputsWithoutThrowing()
+        {
+            OdinMigrationTool.ScanResult missingPaths = OdinMigrationTool.BuildPlans(
+                null,
+                new FakeScanContext()
+            );
+            OdinMigrationTool.ScanResult missingContext = OdinMigrationTool.BuildPlans(
+                Array.Empty<string>(),
+                null
+            );
+
+            Assert.AreEqual(1, missingPaths.Failures.Count);
+            Assert.AreEqual(1, missingContext.Failures.Count);
+        }
+
+        [Test]
+        public void ApplyEligibilityRequiresACompleteSuccessfulScanWithChanges()
+        {
+            FakeScanContext context = new FakeScanContext();
+            context.Files["Assets/Safe.cs"] = Encoding.UTF8.GetBytes(
+                "class Safe { [global::Sirenix.OdinInspector.ReadOnly] public int value; }"
+            );
+
+            OdinMigrationTool.ScanResult complete = OdinMigrationTool.BuildPlans(
+                new[] { "Assets/Safe.cs" },
+                context
+            );
+            Assert.IsTrue(OdinMigrationTool.CanApply(complete));
+
+            complete.Cancelled = true;
+            Assert.IsFalse(OdinMigrationTool.CanApply(complete));
+            complete.Cancelled = false;
+            complete.Failures.Add("unreadable source");
+            Assert.IsFalse(OdinMigrationTool.CanApply(complete));
+            Assert.IsFalse(OdinMigrationTool.CanApply(null));
+            Assert.IsFalse(OdinMigrationTool.CanApply(new OdinMigrationTool.ScanResult()));
         }
 
         [Test]
@@ -591,6 +869,38 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 {
                     Files[path] = new byte[] { 99 };
                 }
+            }
+        }
+
+        private sealed class FakeScanContext : OdinMigrationTool.IOdinMigrationScanContext
+        {
+            internal readonly Dictionary<string, byte[]> Files = new Dictionary<string, byte[]>();
+            internal readonly HashSet<string> FullPathFailures = new HashSet<string>();
+            internal readonly List<string> Reads = new List<string>();
+            internal int CancelAtIndex = -1;
+
+            public string GetFullPath(string assetPath)
+            {
+                if (FullPathFailures.Contains(assetPath))
+                {
+                    throw new IOException("Simulated path resolution failure.");
+                }
+                return assetPath;
+            }
+
+            public byte[] ReadAllBytes(string fullPath)
+            {
+                Reads.Add(fullPath);
+                if (Files.TryGetValue(fullPath, out byte[] bytes))
+                {
+                    return bytes;
+                }
+                throw new FileNotFoundException("Missing fake source.", fullPath);
+            }
+
+            public bool ShouldCancel(string assetPath, int index, int count)
+            {
+                return index == CancelAtIndex;
             }
         }
     }

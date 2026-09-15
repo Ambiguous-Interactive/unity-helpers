@@ -10,23 +10,32 @@ Use **Tools > Wallstop Studios > Odin Migration** to preview or apply conservati
 under `Assets`. The selected-script commands accept selected `.cs` files and selected folders; the
 Assets commands scan all scripts under `Assets`. Generated scripts are skipped.
 
-The tool rewrites only parameterless `ReadOnly` and `EnumToggleButtons` attributes on declarations
-that it can conservatively identify as fields or properties. Type, method, event, and ambiguous
-targets remain unchanged for review, including when several attribute lists precede a declaration.
+The tool rewrites only parameterless `ReadOnly` and `EnumToggleButtons` attributes on public fields,
+or non-public fields carrying the exact `global::UnityEngine.SerializeField` or
+`global::UnityEngine.SerializeReference` attribute (with or without the `Attribute` suffix). This
+textual check does not validate whether Unity supports the field's type. Properties, static fields,
+constants, read-only fields, and
+`NonSerialized` fields remain unchanged for review. Type, method, event, and ambiguous targets also
+remain unchanged, including when several attribute lists precede a declaration.
 
 Automatic rewrites require the exact global qualification
 `global::Sirenix.OdinInspector.Attribute`. Non-global qualified names, namespace aliases, attribute
 aliases, and unqualified attributes brought into scope by `using Sirenix.OdinInspector;` remain
 review items: textual analysis cannot prove that any of those names was not shadowed in a nearer
-scope. Explicit attribute targets are also checked; only no target, `field:`, or `property:` is
-eligible for an automatic edit.
+scope. Explicit attribute targets are also checked; only no target or `field:` is eligible for an
+automatic edit. Every globally qualified Odin inspector attribute appears in the
+report, including attributes for which Unity Helpers has no automatic migration.
 `ShowIf`, `HideIf`, `Button`, and `Required` also remain manual because their target lookup,
 multiplicity, and constructor semantics are not identical enough to infer from source text alone.
 Resolver strings such as `"enabled"` are never rewritten.
 
-It reports unsupported attribute options for manual review. It reports serialized Odin bases,
+The quick-reference table below lists conceptual replacements. It does not promise that the tool
+can rewrite every row safely. The report identifies unsupported attributes and options for manual
+review. It reports serialized Odin bases,
 `OdinSerialize`, and Odin-owned dictionary or set shapes as blockers and never rewrites them.
-Always run Preview first and inspect the Console report.
+Always run Preview first and inspect the Console report. Cancelling a scan stops before reading the
+next file. Cancellation or any scan failure disables Apply, so a partial scan cannot write source
+files.
 
 > [!CAUTION]
 > Replacing `SerializedMonoBehaviour`, `SerializedScriptableObject`, `[OdinSerialize]`, or an
