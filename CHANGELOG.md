@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add an Odin migration preview/apply tool for scripts under `Assets`, limited to proven-equivalent
+  inspector attributes. It preserves encoding, byte-order marks, newline style, and all untouched
+  text; retains backups; detects common concurrent edits; attempts rollback for failed batches
+  without overwriting newer bytes; and reports serialized-state blockers without rewriting them. See the
+  [Odin Migration Guide](./docs/guides/odin-migration-guide.md)
+  ([#794](https://github.com/Ambiguous-Interactive/unity-helpers/issues/794)).
+- Add `WallMath.TryFisherExactTest` for exact two-sided comparisons of two binary groups with
+  bounded work and fail-soft validation. See
+  [Descriptive Statistics](./docs/features/utilities/helper-utilities.md#descriptive-statistics-wallmath)
+  ([#742](https://github.com/Ambiguous-Interactive/unity-helpers/issues/742)).
 - Add `WallMath.TryExactSignTest` for exact two-sided paired-result comparisons that exclude ties
   and fail soft on invalid counts. See
   [Descriptive Statistics](./docs/features/utilities/helper-utilities.md#descriptive-statistics-wallmath)
@@ -47,6 +57,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Improved
 
+- Improve Sprite Atlas Generator refresh and source-sprite processing by removing temporary query
+  pipelines while preserving configuration and sprite order
+  ([#648](https://github.com/Ambiguous-Interactive/unity-helpers/issues/648),
+  [#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781)).
 - Improve `LayeredImage` construction by keeping measured parallel blending for multi-row sprites
   while avoiding slower scheduling for single-row sprites; overflow-safe work sizing preserves the
   parallel path for very large dimensions

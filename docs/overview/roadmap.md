@@ -8,7 +8,7 @@ This roadmap outlines planned enhancements to Unity Helpers. All "Currently ship
 
 **Next up:**
 
-- Odin Inspector migration tooling
+- Serialized-state migration support beyond the conservative Odin source migration tool
 - Investigate color themes (had a version of this for WGroup, had to scrap it due to complexity)
 - Tabbed/section navigation with persistent layout bookmarks
 - Visual instrumentation (progress bars, warning badges, inline state telemetry)
