@@ -1416,8 +1416,10 @@ of overflowing silently.
 **One home for the numbers gameplay code keeps re-deriving:** `WallMath.Median`, `Percentile`,
 `Mean` and `StandardDeviation` read an `IReadOnlyList` directly, so a `List<T>`, a `T[]` or a pooled
 buffer all work with no intermediate copy on your side. `TryClopperPearsonInterval` computes an
-exact confidence interval for a measured binomial success rate. Sorting for median and percentile
-happens on a pooled internal copy, so your list is never reordered.
+exact confidence interval for a measured binomial success rate. `TryExactSignTest` compares paired
+measurements without a large-sample approximation. `TryFisherExactTest` compares two binary groups
+with fixed margins. Sorting for median and percentile happens on a pooled internal copy, so your
+list is never reordered.
 
 <!-- doc-sample: compiles -->
 
@@ -1465,6 +1467,47 @@ The interval is equal-tailed and includes both endpoints. Zero successes produce
 zero; success on every trial produces an upper bound of one. Invalid counts, a non-positive trial
 count, or a non-finite/confidence level outside the open interval `(0, 1)` return `false` and set both
 outputs to zero.
+
+For paired measurements, count how many non-tied pairs improved and regressed. The exact sign test
+returns the probability of an outcome at least as imbalanced under an equal-chance null hypothesis:
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+bool compared = WallMath.TryExactSignTest(
+    positiveDifferences: 8,
+    negativeDifferences: 2,
+    out double twoSidedPValue
+); // p = 0.109375
+```
+
+Exclude tied pairs before calling the method. Negative counts, no non-tied pairs, or a combined
+count beyond `int.MaxValue` return `false` and clear the output. The calculation uses the exact
+binomial tail and remains bounded for large counts; extremely small probabilities can round to zero
+in `double`.
+
+For two independent binary groups, Fisher's exact test sums every fixed-margin table no more likely
+than the observed table:
+
+<!-- doc-sample: compiles -->
+
+```csharp
+using WallstopStudios.UnityHelpers.Core.Helper;
+
+bool compared = WallMath.TryFisherExactTest(
+    upperLeft: 1,
+    upperRight: 9,
+    lowerLeft: 11,
+    lowerRight: 3,
+    out double twoSidedPValue
+); // p is about 0.00276
+```
+
+Negative counts, an empty table, totals beyond `int.MaxValue`, or more than one million possible
+fixed-margin tables return `false` and clear the output. The table-count limit bounds work for data
+that needs a large-sample method instead.
 
 <!-- doc-sample: compiles -->
 

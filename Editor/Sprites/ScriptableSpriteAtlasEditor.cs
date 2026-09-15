@@ -7,7 +7,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using System;
     using System.Collections.Generic;
     using System.IO;
-    using System.Linq;
     using System.Text.RegularExpressions;
     using UnityEditor;
     using UnityEditor.U2D;
@@ -51,6 +50,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private static bool SuppressUserPrompts { get; set; }
 
+        private static readonly Comparison<AtlasConfigSortEntry> AtlasConfigNameComparison =
+            CompareAtlasConfigNames;
+
         private readonly Dictionary<ScriptableSpriteAtlas, SerializedObject> _serializedConfigs =
             new();
         private List<ScriptableSpriteAtlas> _atlasConfigs = new();
@@ -78,6 +80,98 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         public static void ShowWindow()
         {
             GetWindow<ScriptableSpriteAtlasEditor>("Sprite Atlas Generator");
+        }
+
+        internal static void SortAtlasConfigs(List<ScriptableSpriteAtlas> configs)
+        {
+            if (configs == null || configs.Count < 2)
+            {
+                return;
+            }
+
+            using PooledResource<List<AtlasConfigSortEntry>> lease =
+                Buffers<AtlasConfigSortEntry>.GetList(
+                    configs.Count,
+                    out List<AtlasConfigSortEntry> entries
+                );
+            for (int index = 0; index < configs.Count; ++index)
+            {
+                entries.Add(new AtlasConfigSortEntry(configs[index], index));
+            }
+
+            entries.Sort(AtlasConfigNameComparison);
+            for (int index = 0; index < entries.Count; ++index)
+            {
+                configs[index] = entries[index].Config;
+            }
+        }
+
+        internal static int CountValidSprites(IReadOnlyList<Sprite> sprites)
+        {
+            if (sprites == null)
+            {
+                return 0;
+            }
+
+            int count = 0;
+            for (int i = 0; i < sprites.Count; ++i)
+            {
+                if (sprites[i] != null)
+                {
+                    ++count;
+                }
+            }
+
+            return count;
+        }
+
+        internal static void AppendSpritesWithTextures(
+            IReadOnlyList<Sprite> sprites,
+            List<Sprite> destination
+        )
+        {
+            if (sprites == null || destination == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < sprites.Count; ++i)
+            {
+                Sprite sprite = sprites[i];
+                if (sprite != null && sprite.texture != null)
+                {
+                    destination.Add(sprite);
+                }
+            }
+        }
+
+        internal static Object[] ToObjectArray(IReadOnlyList<Sprite> sprites)
+        {
+            if (sprites == null || sprites.Count == 0)
+            {
+                return Array.Empty<Object>();
+            }
+
+            Object[] result = new Object[sprites.Count];
+            for (int i = 0; i < sprites.Count; ++i)
+            {
+                result[i] = sprites[i];
+            }
+
+            return result;
+        }
+
+        private static int CompareAtlasConfigNames(
+            AtlasConfigSortEntry left,
+            AtlasConfigSortEntry right
+        )
+        {
+            string leftName = left.Config != null ? left.Config.name : null;
+            string rightName = right.Config != null ? right.Config.name : null;
+            int nameComparison = Comparer<string>.Default.Compare(leftName, rightName);
+            return nameComparison != 0
+                ? nameComparison
+                : left.OriginalIndex.CompareTo(right.OriginalIndex);
         }
 
         private static void AppendNonEmptyStrings(
@@ -290,7 +384,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     _foldoutStates.TryAdd(config, true);
                 }
             }
-            _atlasConfigs = _atlasConfigs.OrderBy(c => c.name).ToList();
+            SortAtlasConfigs(_atlasConfigs);
             using (Buffers<ScriptableSpriteAtlas>.List.Get(out List<ScriptableSpriteAtlas> removed))
             {
                 foreach (ScriptableSpriteAtlas config in _foldoutStates.Keys)
@@ -368,9 +462,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            List<Sprite> spritesToProcess = config
-                .spritesToPack.Where(s => s != null && s.texture != null)
-                .ToList();
+            using PooledResource<List<Sprite>> spritesToProcessLease = Buffers<Sprite>.List.Get(
+                out List<Sprite> spritesToProcess
+            );
+            AppendSpritesWithTextures(config.spritesToPack, spritesToProcess);
             if (spritesToProcess.Count == 0)
             {
                 this.LogWarn(
@@ -859,7 +954,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     )
                     {
                         EditorGUILayout.LabelField(
-                            $"Current manually added sprites: {config.spritesToPack.Count(s => s != null)}"
+                            $"Current manually added sprites: {CountValidSprites(config.spritesToPack)}"
                         );
                         EditorGUILayout.LabelField(
                             "Sprites found by scan (not yet added/removed):"
@@ -929,7 +1024,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     EditorGUILayout.Space();
                     EditorGUILayout.LabelField("Source Sprite Utilities", EditorStyles.boldLabel);
 
-                    int validSpriteCount = config.spritesToPack.Count(s => s != null);
+                    int validSpriteCount = CountValidSprites(config.spritesToPack);
                     EditorGUI.BeginDisabledGroup(validSpriteCount == 0);
                     if (
                         GUILayout.Button(
@@ -1710,7 +1805,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             if (0 < config.spritesToPack.Count)
             {
-                Object[] spritesToAdd = config.spritesToPack.ToArray<Object>();
+                Object[] spritesToAdd = ToObjectArray(config.spritesToPack);
                 atlas.Add(spritesToAdd);
             }
             else
@@ -1810,6 +1905,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             public List<Sprite> spritesToAdd = new();
             public List<Sprite> spritesToRemove = new();
             public bool hasScanned;
+        }
+
+        private readonly struct AtlasConfigSortEntry
+        {
+            internal ScriptableSpriteAtlas Config { get; }
+
+            internal int OriginalIndex { get; }
+
+            internal AtlasConfigSortEntry(ScriptableSpriteAtlas config, int originalIndex)
+            {
+                Config = config;
+                OriginalIndex = originalIndex;
+            }
         }
     }
 #endif

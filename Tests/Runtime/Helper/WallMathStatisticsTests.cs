@@ -149,6 +149,52 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             return total;
         }
 
+        private static double Combination(int count, int selection)
+        {
+            selection = Math.Min(selection, count - selection);
+            double result = 1.0;
+            for (int i = 1; i <= selection; ++i)
+            {
+                result *= (double)(count - selection + i) / i;
+            }
+
+            return result;
+        }
+
+        private static double FisherExactReference(
+            int upperLeft,
+            int upperRight,
+            int lowerLeft,
+            int lowerRight
+        )
+        {
+            int firstRow = upperLeft + upperRight;
+            int secondRow = lowerLeft + lowerRight;
+            int firstColumn = upperLeft + lowerLeft;
+            int total = firstRow + secondRow;
+            int minimum = Math.Max(0, firstColumn - secondRow);
+            int maximum = Math.Min(firstRow, firstColumn);
+            double divisor = Combination(total, firstColumn);
+            double observed =
+                Combination(firstRow, upperLeft)
+                * Combination(secondRow, firstColumn - upperLeft)
+                / divisor;
+            double result = 0.0;
+            for (int candidate = minimum; candidate <= maximum; ++candidate)
+            {
+                double probability =
+                    Combination(firstRow, candidate)
+                    * Combination(secondRow, firstColumn - candidate)
+                    / divisor;
+                if (probability <= observed * (1.0 + 1e-12))
+                {
+                    result += probability;
+                }
+            }
+
+            return Math.Min(1.0, result);
+        }
+
         [Test]
         public void ClopperPearsonRejectsInvalidInputs()
         {
@@ -335,6 +381,244 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             );
             Assert.That(balancedLower, Is.InRange(0.49, 0.5));
             Assert.That(balancedUpper, Is.InRange(0.5, 0.51));
+        }
+
+        [Test]
+        public void ExactSignTestMatchesExhaustiveBinomialReference()
+        {
+            for (int positiveDifferences = 0; positiveDifferences <= 32; ++positiveDifferences)
+            {
+                for (
+                    int negativeDifferences = 0;
+                    negativeDifferences <= 32 - positiveDifferences;
+                    ++negativeDifferences
+                )
+                {
+                    int trials = positiveDifferences + negativeDifferences;
+                    if (trials == 0)
+                    {
+                        continue;
+                    }
+
+                    int smallerCount = Math.Min(positiveDifferences, negativeDifferences);
+                    double expected = Math.Min(
+                        1.0,
+                        2.0 * BinomialProbabilityAtMost(smallerCount, trials, 0.5)
+                    );
+
+                    Assert.IsTrue(
+                        WallMath.TryExactSignTest(
+                            positiveDifferences,
+                            negativeDifferences,
+                            out double pValue
+                        )
+                    );
+                    Assert.AreEqual(
+                        expected,
+                        pValue,
+                        1e-12,
+                        $"Unexpected p-value for {positiveDifferences} positive and {negativeDifferences} negative differences."
+                    );
+                }
+            }
+        }
+
+        [Test]
+        public void ExactSignTestRejectsInvalidCountsAndClearsOutput()
+        {
+            (int positiveDifferences, int negativeDifferences)[] invalidInputs =
+            {
+                (-1, 1),
+                (1, -1),
+                (0, 0),
+                (int.MaxValue, 1),
+            };
+
+            foreach (
+                (int positiveDifferences, int negativeDifferences) invalidInput in invalidInputs
+            )
+            {
+                Assert.IsFalse(
+                    WallMath.TryExactSignTest(
+                        invalidInput.positiveDifferences,
+                        invalidInput.negativeDifferences,
+                        out double pValue
+                    )
+                );
+                Assert.AreEqual(0.0, pValue);
+            }
+        }
+
+        [Test]
+        public void ExactSignTestHandlesLargeAndSymmetricCounts()
+        {
+            Assert.IsTrue(WallMath.TryExactSignTest(500_000, 500_000, out double balanced));
+            Assert.AreEqual(1.0, balanced);
+
+            Assert.IsTrue(
+                WallMath.TryExactSignTest(
+                    1_073_741_823,
+                    1_073_741_824,
+                    out double maximumOddBalanced
+                )
+            );
+            Assert.AreEqual(1.0, maximumOddBalanced);
+
+            Assert.IsTrue(WallMath.TryExactSignTest(0, 1_000, out double extremeTail));
+            Assert.AreEqual(Math.Pow(0.5, 999), extremeTail);
+
+            Assert.IsTrue(WallMath.TryExactSignTest(0, 10_000, out double underflowedTail));
+            Assert.AreEqual(0.0, underflowedTail);
+
+            Assert.IsTrue(WallMath.TryExactSignTest(8, 2, out double forward));
+            Assert.IsTrue(WallMath.TryExactSignTest(2, 8, out double reflected));
+            Assert.AreEqual(0.109375, forward, 1e-12);
+            Assert.AreEqual(forward, reflected);
+
+            Assert.IsTrue(WallMath.TryExactSignTest(499_999, 500_001, out double nearBalanced));
+            /* For 2m trials split m - 1 to m + 1, the doubled tail is one minus
+             * the central binomial probability C(2m, m) / 2^(2m). */
+            Assert.AreEqual(0.9992021156392126, nearBalanced, 5e-10);
+        }
+
+        [Test]
+        public void FisherExactMatchesKnownTables()
+        {
+            Assert.IsTrue(WallMath.TryFisherExactTest(1, 9, 11, 3, out double first));
+            Assert.AreEqual(0.0027594561852200836, first, 1e-14);
+
+            Assert.IsTrue(WallMath.TryFisherExactTest(8, 2, 1, 5, out double second));
+            Assert.AreEqual(0.03496503496503496, second, 1e-14);
+
+            Assert.IsTrue(WallMath.TryFisherExactTest(0, 5, 0, 7, out double degenerate));
+            Assert.AreEqual(1.0, degenerate);
+        }
+
+        [Test]
+        public void FisherExactIncludesTheObservedModeForBalancedLargeTables()
+        {
+            Assert.IsTrue(WallMath.TryFisherExactTest(50, 1000, 50, 1000, out double pValue));
+            Assert.AreEqual(1.0, pValue, 1e-14);
+
+            Assert.IsTrue(
+                WallMath.TryFisherExactTest(int.MaxValue, 0, 0, 0, out double narrowPValue)
+            );
+            Assert.AreEqual(1.0, narrowPValue);
+        }
+
+        [Test]
+        public void FisherExactMatchesExhaustiveSmallTableReference()
+        {
+            for (int upperLeft = 0; upperLeft <= 4; ++upperLeft)
+            {
+                for (int upperRight = 0; upperRight <= 4; ++upperRight)
+                {
+                    for (int lowerLeft = 0; lowerLeft <= 4; ++lowerLeft)
+                    {
+                        for (int lowerRight = 0; lowerRight <= 4; ++lowerRight)
+                        {
+                            if (upperLeft + upperRight + lowerLeft + lowerRight == 0)
+                            {
+                                continue;
+                            }
+
+                            double expected = FisherExactReference(
+                                upperLeft,
+                                upperRight,
+                                lowerLeft,
+                                lowerRight
+                            );
+                            Assert.IsTrue(
+                                WallMath.TryFisherExactTest(
+                                    upperLeft,
+                                    upperRight,
+                                    lowerLeft,
+                                    lowerRight,
+                                    out double actual
+                                )
+                            );
+                            Assert.AreEqual(
+                                expected,
+                                actual,
+                                1e-12,
+                                $"Unexpected table ({upperLeft}, {upperRight}, {lowerLeft}, {lowerRight})."
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        [Test]
+        public void FisherExactIsInvariantUnderTableReflections()
+        {
+            Assert.IsTrue(WallMath.TryFisherExactTest(3, 7, 8, 2, out double original));
+            (int upperLeft, int upperRight, int lowerLeft, int lowerRight)[] reflections =
+            {
+                (8, 2, 3, 7),
+                (7, 3, 2, 8),
+                (2, 8, 7, 3),
+                (3, 8, 7, 2),
+                (8, 3, 2, 7),
+                (7, 2, 3, 8),
+                (2, 7, 8, 3),
+            };
+            foreach (
+                (
+                    int upperLeft,
+                    int upperRight,
+                    int lowerLeft,
+                    int lowerRight
+                ) reflection in reflections
+            )
+            {
+                Assert.IsTrue(
+                    WallMath.TryFisherExactTest(
+                        reflection.upperLeft,
+                        reflection.upperRight,
+                        reflection.lowerLeft,
+                        reflection.lowerRight,
+                        out double reflected
+                    )
+                );
+                Assert.AreEqual(original, reflected, 1e-12);
+            }
+        }
+
+        [Test]
+        public void FisherExactRejectsInvalidOrUnboundedTablesAndClearsOutput()
+        {
+            (int upperLeft, int upperRight, int lowerLeft, int lowerRight)[] invalidInputs =
+            {
+                (-1, 0, 0, 0),
+                (0, -1, 0, 0),
+                (0, 0, -1, 0),
+                (0, 0, 0, -1),
+                (0, 0, 0, 0),
+                (int.MaxValue, 1, 0, 0),
+                (600_000, 600_000, 600_000, 600_000),
+            };
+
+            foreach (
+                (
+                    int upperLeft,
+                    int upperRight,
+                    int lowerLeft,
+                    int lowerRight
+                ) invalidInput in invalidInputs
+            )
+            {
+                Assert.IsFalse(
+                    WallMath.TryFisherExactTest(
+                        invalidInput.upperLeft,
+                        invalidInput.upperRight,
+                        invalidInput.lowerLeft,
+                        invalidInput.lowerRight,
+                        out double pValue
+                    )
+                );
+                Assert.AreEqual(0.0, pValue);
+            }
         }
 
         [Test]

@@ -4,22 +4,63 @@ A practical guide for migrating from Odin Inspector to Unity Helpers. Examples a
 
 ---
 
+## Safe Source Migration Tool
+
+Use **Tools > Wallstop Studios > Odin Migration** to preview or apply conservative source edits
+under `Assets`. The selected-script commands accept selected `.cs` files and selected folders; the
+Assets commands scan all scripts under `Assets`. Generated scripts are skipped.
+
+The tool rewrites only parameterless `ReadOnly` and `EnumToggleButtons` attributes on declarations
+that it can conservatively identify as fields or properties. Type, method, event, and ambiguous
+targets remain unchanged for review, including when several attribute lists precede a declaration.
+
+Automatic rewrites require the exact global qualification
+`global::Sirenix.OdinInspector.Attribute`. Non-global qualified names, namespace aliases, attribute
+aliases, and unqualified attributes brought into scope by `using Sirenix.OdinInspector;` remain
+review items: textual analysis cannot prove that any of those names was not shadowed in a nearer
+scope. Explicit attribute targets are also checked; only no target, `field:`, or `property:` is
+eligible for an automatic edit.
+`ShowIf`, `HideIf`, `Button`, and `Required` also remain manual because their target lookup,
+multiplicity, and constructor semantics are not identical enough to infer from source text alone.
+Resolver strings such as `"enabled"` are never rewritten.
+
+It reports unsupported attribute options for manual review. It reports serialized Odin bases,
+`OdinSerialize`, and Odin-owned dictionary or set shapes as blockers and never rewrites them.
+Always run Preview first and inspect the Console report.
+
+> [!CAUTION]
+> Replacing `SerializedMonoBehaviour`, `SerializedScriptableObject`, `[OdinSerialize]`, or an
+> Odin-serialized collection is a data migration, not a source rename. Existing scene, prefab, and
+> asset data can remain in Odin's serialization payload and disappear when the source type changes.
+> The automated tool deliberately leaves these constructs unchanged.
+
+Apply performs a best-effort check that every source file still matches its preview, writes through
+a staged durable-file replacement, and attempts to roll back completed writes if a later write
+fails. It refuses that rollback when the live bytes show a newer external edit. These checks reduce
+common editor races but cannot coordinate atomically with other processes. Timestamped byte-for-byte backups are retained under
+`Library/WallstopOdinMigrationBackups`.
+
+This is a **Tier C filesystem operation**: Unity Undo does not cover it. Commit or stash your work
+before Apply, keep the backup until the project has compiled and assets have been validated, and use
+version control for the authoritative rollback. The tool preserves each supported file's encoding,
+byte-order mark, and newline style, then refreshes the Asset Database once after a successful batch.
+
 ## Quick Reference Table
 
-| Odin Feature              | Unity Helpers Equivalent                              |
-| ------------------------- | ----------------------------------------------------- |
-| `[Button]`                | `[WButton]`                                           |
-| `[ReadOnly]`              | `[WReadOnly]`                                         |
-| `[ShowIf]` / `[HideIf]`   | `[WShowIf]`                                           |
-| `[EnumToggleButtons]`     | `[WEnumToggleButtons]`                                |
-| `[ValueDropdown]`         | `[WValueDropDown]`, `[IntDropDown]`, `[StringInList]` |
-| `[BoxGroup]`              | `[WGroup]`                                            |
-| `[FoldoutGroup]`          | `[WGroup(collapsible: true)]`                         |
-| `[InlineEditor]`          | `[WInLineEditor]`                                     |
-| `[Required]`              | `[WNotNull]`, `[ValidateAssignment]`                  |
-| `SerializedMonoBehaviour` | Standard `MonoBehaviour`                              |
-| `SerializedDictionary`    | `SerializableDictionary<K,V>`                         |
-| N/A (paid feature)        | `SerializableHashSet<T>`                              |
+| Odin Feature              | Unity Helpers Equivalent                               |
+| ------------------------- | ------------------------------------------------------ |
+| `[Button]`                | `[WButton]`                                            |
+| `[ReadOnly]`              | `[WReadOnly]`                                          |
+| `[ShowIf]` / `[HideIf]`   | `[WShowIf]`                                            |
+| `[EnumToggleButtons]`     | `[WEnumToggleButtons]`                                 |
+| `[ValueDropdown]`         | `[WValueDropDown]`, `[IntDropDown]`, `[StringInList]`  |
+| `[BoxGroup]`              | `[WGroup]`                                             |
+| `[FoldoutGroup]`          | `[WGroup(collapsible: true)]`                          |
+| `[InlineEditor]`          | `[WInLineEditor]`                                      |
+| `[Required]`              | `[WNotNull]`, `[ValidateAssignment]`                   |
+| `SerializedMonoBehaviour` | Staged data migration to standard `MonoBehaviour`      |
+| `SerializedDictionary`    | Staged data migration to `SerializableDictionary<K,V>` |
+| N/A (paid feature)        | `SerializableHashSet<T>`                               |
 
 ---
 
