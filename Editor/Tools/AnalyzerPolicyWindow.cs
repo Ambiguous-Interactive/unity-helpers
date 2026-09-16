@@ -15,7 +15,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
     internal sealed class AnalyzerPolicyWindow : EditorWindow
     {
-        internal const string RulesetAssetPath = "Assets/Default.ruleset";
+        private const string RulesetFileName = "Default.ruleset";
+        internal const string RulesetAssetPath = "Assets/" + RulesetFileName;
 
         private static readonly GUIContent EnableContent = new(
             "Enable All",
@@ -138,9 +139,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             return Policies;
         }
 
-        private static string GetRulesetPath()
+        internal static string GetRulesetPath()
         {
-            return Path.GetFullPath(RulesetAssetPath);
+            return Path.GetFullPath(Path.Combine(Application.dataPath, RulesetFileName));
         }
 
         private void OnEnable()

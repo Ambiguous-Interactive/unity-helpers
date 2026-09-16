@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
     using System.IO;
     using NUnit.Framework;
     using UnityEditor;
+    using UnityEngine;
     using WallstopStudios.UnityHelpers.Editor.Tools;
 
     [TestFixture]
@@ -40,6 +41,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             IReadOnlyList<AnalyzerPolicy> policies = AnalyzerPolicyWindow.GetPolicies();
             string path = GetRulesetPath();
 
+            Assert.AreEqual(
+                Path.GetFullPath(Path.Combine(Application.dataPath, "Default.ruleset")),
+                AnalyzerPolicyWindow.GetRulesetPath()
+            );
             Assert.AreEqual(18, policies.Count);
             for (int index = 0; index < policies.Count; ++index)
             {
