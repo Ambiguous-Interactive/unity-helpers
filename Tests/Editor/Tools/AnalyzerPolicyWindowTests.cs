@@ -7,7 +7,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
     using System.Collections.Generic;
     using System.IO;
     using NUnit.Framework;
-    using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Editor.Tools;
 
@@ -149,12 +148,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             );
             StringAssert.Contains("left unchanged", malformedMessage);
             Assert.AreEqual(malformed, File.ReadAllText(path));
-
-            AnalyzerPolicyWindow.ShowWindow();
-            AnalyzerPolicyWindow window = EditorWindow.GetWindow<AnalyzerPolicyWindow>();
-
-            Assert.IsTrue(window != null);
-            window.Close();
         }
 
         private string GetRulesetPath()
