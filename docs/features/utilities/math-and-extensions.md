@@ -528,6 +528,9 @@ bool inside = PointPolygonCheck.IsPointInsidePolygon(clickPos, vertices);
 
 - Polyline simplification (Douglas–Peucker)
   - `Simplify` (float epsilon) and `SimplifyPrecise` (double tolerance) reduce vertex count while preserving shape.
+  - When a destination list is supplied to `SimplifyPrecise`, the result uses that list even for
+    null, empty, one-point, or two-point inputs. Both methods also accept the input list as the
+    destination, replacing its contents with the simplified path.
 
 Example:
 

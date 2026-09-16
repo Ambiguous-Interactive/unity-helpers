@@ -27,8 +27,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </summary>
         /// <param name="points">Input polyline points.</param>
         /// <param name="tolerance">Maximum allowable deviation.</param>
-        /// <param name="buffer">Optional destination list (reused if provided).</param>
-        /// <returns>Output simplified points (in buffer if provided).</returns>
+        /// <param name="buffer">Optional destination list; the input list may also be used as the destination.</param>
+        /// <returns>Output simplified points in the supplied buffer, or the original short input when no buffer is supplied.</returns>
         /// <example>
         /// <code>
         /// // Keep tighter shape fidelity
@@ -43,7 +43,21 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             if (points == null || points.Count < 3)
             {
-                return points;
+                if (buffer == null)
+                {
+                    return points;
+                }
+
+                if (!ReferenceEquals(points, buffer))
+                {
+                    buffer.Clear();
+                    if (points != null)
+                    {
+                        buffer.AddRange(points);
+                    }
+                }
+
+                return buffer;
             }
 
             int firstPoint = 0;
@@ -56,9 +70,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             if (lastPoint <= firstPoint)
             {
+                Vector2 first = points[firstPoint];
                 buffer ??= new List<Vector2>(1);
                 buffer.Clear();
-                buffer.Add(points[firstPoint]);
+                buffer.Add(first);
                 return buffer;
             }
 
@@ -77,8 +92,20 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             );
 
             buffer ??= new List<Vector2>(pointIndexesToKeep.Count);
-            buffer.Clear();
             pointIndexesToKeep.Sort();
+            if (ReferenceEquals(points, buffer))
+            {
+                int destination = 0;
+                foreach (int pointIndex in pointIndexesToKeep)
+                {
+                    buffer[destination++] = points[pointIndex];
+                }
+
+                buffer.RemoveRange(destination, buffer.Count - destination);
+                return buffer;
+            }
+
+            buffer.Clear();
             foreach (int pointIndex in pointIndexesToKeep)
             {
                 buffer.Add(points[pointIndex]);
@@ -91,7 +118,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </summary>
         /// <param name="points">Input polyline points.</param>
         /// <param name="epsilon">Maximum allowable deviation.</param>
-        /// <param name="buffer">Optional destination list (reused if provided).</param>
+        /// <param name="buffer">Optional destination list; the input list may also be used as the destination.</param>
         /// <returns>Output simplified points (in buffer if provided).</returns>
         /// <example>
         /// <code>
@@ -107,6 +134,20 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         {
             int pointCount = points?.Count ?? 0;
             buffer ??= new List<Vector2>(pointCount);
+            if (ReferenceEquals(points, buffer))
+            {
+                if (pointCount < 3 || epsilon <= 0)
+                {
+                    return buffer;
+                }
+
+                using PooledResource<List<Vector2>> sourceLease = Buffers<Vector2>.List.Get(
+                    out List<Vector2> source
+                );
+                source.AddRange(points);
+                return Simplify(source, epsilon, buffer);
+            }
+
             buffer.Clear();
             if (0 < pointCount && buffer.Capacity < pointCount)
             {

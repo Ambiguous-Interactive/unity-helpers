@@ -274,6 +274,92 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [Test]
+        public void SimplifyPreciseUsesProvidedBufferForShortInputs()
+        {
+            List<Vector2>[] inputs =
+            {
+                null,
+                new(),
+                new() { Vector2.zero },
+                new() { Vector2.zero, Vector2.one },
+            };
+
+            foreach (List<Vector2> points in inputs)
+            {
+                List<Vector2> buffer = new() { Vector2.up };
+                List<Vector2> result = LineHelper.SimplifyPrecise(points, 0.5, buffer);
+
+                Assert.AreSame(buffer, result);
+                if (points == null)
+                {
+                    CollectionAssert.IsEmpty(result);
+                }
+                else
+                {
+                    CollectionAssert.AreEqual(points, result);
+                }
+            }
+        }
+
+        [Test]
+        public void SimplifyPrecisePreservesShortInputWhenItIsTheBuffer()
+        {
+            List<Vector2> points = new() { Vector2.zero, Vector2.one };
+
+            List<Vector2> result = LineHelper.SimplifyPrecise(points, 0.5, points);
+
+            Assert.AreSame(points, result);
+            CollectionAssert.AreEqual(new[] { Vector2.zero, Vector2.one }, result);
+        }
+
+        [Test]
+        public void SimplifyPreciseCompactsAliasedBuffer()
+        {
+            List<Vector2> points = new()
+            {
+                Vector2.zero,
+                Vector2.right,
+                Vector2.right * 2f,
+                Vector2.right * 3f,
+            };
+
+            List<Vector2> result = LineHelper.SimplifyPrecise(points, 0.1, points);
+
+            Assert.AreSame(points, result);
+            CollectionAssert.AreEqual(new[] { Vector2.zero, Vector2.right * 3f }, result);
+        }
+
+        [Test]
+        public void SimplifyPrecisePreservesOnePointInAliasedDuplicatePath()
+        {
+            List<Vector2> points = new() { Vector2.one, Vector2.one, Vector2.one };
+
+            List<Vector2> result = LineHelper.SimplifyPrecise(points, 0.1, points);
+
+            Assert.AreSame(points, result);
+            CollectionAssert.AreEqual(new[] { Vector2.one }, result);
+        }
+
+        [Test]
+        public void SimplifySupportsAliasedBuffer()
+        {
+            List<Vector2> points = new() { Vector2.zero, Vector2.right, Vector2.right * 2f };
+
+            List<Vector2> result = LineHelper.Simplify(points, 0.1f, points);
+
+            Assert.AreSame(points, result);
+            CollectionAssert.AreEqual(new[] { Vector2.zero, Vector2.right * 2f }, result);
+
+            points.Insert(1, Vector2.right);
+            result = LineHelper.Simplify(points, 0f, points);
+            Assert.AreSame(points, result);
+            CollectionAssert.AreEqual(
+                new[] { Vector2.zero, Vector2.right, Vector2.right * 2f },
+                result
+            );
+        }
+
+        [Test]
         public void SimplifyPreciseRemovesRedundantColinearPoints()
         {
             List<Vector2> points = new()
