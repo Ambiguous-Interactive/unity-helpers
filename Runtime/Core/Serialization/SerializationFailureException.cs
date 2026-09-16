@@ -307,12 +307,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             };
 
         internal static string DescribeNull(string parameterName) =>
-            parameterName == "data" || string.IsNullOrEmpty(parameterName)
+            string.Equals(parameterName, "data", StringComparison.Ordinal)
+            || string.IsNullOrEmpty(parameterName)
                 ? "null"
                 : "null " + parameterName;
 
         internal static string DescribeEmpty(string parameterName) =>
-            parameterName == "data" || string.IsNullOrEmpty(parameterName)
+            string.Equals(parameterName, "data", StringComparison.Ordinal)
+            || string.IsNullOrEmpty(parameterName)
                 ? "empty"
                 : "empty " + parameterName;
 

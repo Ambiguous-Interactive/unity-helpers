@@ -1,0 +1,90 @@
+name: Reference Upstream Drift
+
+on:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Check audited upstream sources
+        id: audit
+        continue-on-error: true
+        run: node scripts/check-reference-upstream-drift.js --report "${RUNNER_TEMP}/reference-upstream-drift.json"
+
+      - name: Open or update drift issue
+        if: steps.audit.outcome == 'failure'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        env:
+          REPORT_PATH: ${{ runner.temp }}/reference-upstream-drift.json
+        with:
+          script: |
+            const fs = require('node:fs');
+            const report = fs.existsSync(process.env.REPORT_PATH)
+              ? JSON.parse(fs.readFileSync(process.env.REPORT_PATH, 'utf8'))
+              : {
+                  checks: [{
+                    name: 'Audit infrastructure',
+                    status: 'unavailable',
+                    issue: 'n/a',
+                    localPath: 'scripts/reference-upstreams.json',
+                    expectedSha256: 'report file',
+                    actualSha256: null,
+                    error: 'The audit exited before it wrote a report.'
+                  }]
+                };
+            const title = 'Reference implementation drift detected';
+            const rows = report.checks
+              .filter((check) => check.status !== 'current')
+              .map((check) => {
+                const actual = check.actualSha256 || check.error || 'unknown';
+                return `| ${check.name} | ${check.status} | #${check.issue} | \`${check.localPath}\` | \`${check.expectedSha256}\` | \`${actual}\` |`;
+              });
+            const body = [
+              'The scheduled source audit found a changed or unavailable reference implementation.',
+              '',
+              '| Implementation | Status | Audit | Local adaptation | Expected | Current |',
+              '| --- | --- | --- | --- | --- | --- |',
+              ...rows,
+              '',
+              'Re-audit the local adaptation before updating `scripts/reference-upstreams.json`.'
+            ].join('\n');
+            const open = await github.paginate(github.rest.issues.listForRepo, {
+              ...context.repo,
+              state: 'open',
+              per_page: 100
+            });
+            const existing = open.find((issue) => !issue.pull_request && issue.title === title);
+            if (existing) {
+              await github.rest.issues.update({
+                ...context.repo,
+                issue_number: existing.number,
+                body
+              });
+              core.setOutput('issue-url', existing.html_url);
+            } else {
+              const created = await github.rest.issues.create({ ...context.repo, title, body });
+              core.setOutput('issue-url', created.data.html_url);
+            }
+
+      - name: Fail on unresolved drift
+        if: steps.audit.outcome == 'failure'
+        run: |
+          echo "::error::Reference implementation drift requires an audit."
+          exit 1

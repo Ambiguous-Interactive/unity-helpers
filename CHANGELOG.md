@@ -13,9 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add an Odin migration preview/apply tool that reports every globally qualified inspector
   attribute with safety guidance and only converts proven-equivalent `ReadOnly` and
-  `EnumToggleButtons` fields. It preserves formatting and backups, and blocks unsafe scans. See the
+  `EnumToggleButtons` fields. Button findings now identify the Unity-object, argument, and method
+  signature checks that need manual review. It preserves formatting and backups, and blocks unsafe scans. See the
   [Odin Migration Guide](./docs/guides/odin-migration-guide.md)
   ([#794](https://github.com/Ambiguous-Interactive/unity-helpers/issues/794)).
+- Add opt-in `WUH018` warnings for string `==` and `!=` comparisons whose ordinal comparison policy
+  is implicit. Null checks and explicit comparison APIs remain quiet. See
+  [Analyzers](./docs/performance/analyzers.md#wuh018-implicit-string-equality-opt-in)
+  ([#807](https://github.com/Ambiguous-Interactive/unity-helpers/issues/807)).
 - Add `WallMath.TryFisherExactTest` for exact two-sided comparisons of two binary groups with
   bounded work and fail-soft validation. See
   [Descriptive Statistics](./docs/features/utilities/helper-utilities.md#descriptive-statistics-wallmath)
@@ -55,6 +60,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add optional report context and exception handler overloads to `StartFunctionAsCoroutine`, so hosted jobs can attribute or program against every failure ([#778](https://github.com/Ambiguous-Interactive/unity-helpers/issues/778)).
 
 ### Improved
+
+- Avoid an iterator allocation when the Animation Viewer opens or restores its
+  multi-file selector ([#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781)).
 
 - Improve editor reloads by removing additional query stages from attribute metadata discovery
   ([#648](https://github.com/Ambiguous-Interactive/unity-helpers/issues/648),

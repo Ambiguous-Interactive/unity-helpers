@@ -25,7 +25,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// threshold and its merge strategy to how sequential the data turns out to be.
         /// </summary>
         /// <remarks>
-        /// Implementation reference: YamSort by Gary Gende, https://github.com/gendeg/YamSort (MIT License).
+        /// Implementation reference: YamSort by Gary Gende, https://github.com/gendeg/YamSort (MIT License),
+        /// audited at commit <c>aa849b59618ab0c0faf090f7c93f8b248ba1d94a</c>.
         /// This adaptation replaces the upstream <c>Span</c> and <c>IComparable</c> surface with
         /// <see cref="IList{T}"/> and an explicit comparer, and drops the upstream primitive-type comparison
         /// shortcuts so a caller-supplied comparer is always honoured. NaN ordering is whatever the supplied

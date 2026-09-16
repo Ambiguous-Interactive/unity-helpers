@@ -14,9 +14,9 @@ namespace WallstopStudios.UnityHelpers.Analyzers
     /// exception from inside a shipped player. A <c>WUH###</c> diagnostic reports an allocation or a
     /// footgun in code that is otherwise correct, so it is capped at a warning: a consumer taking a
     /// package upgrade must never find their build failing over one. Every member of this family is
-    /// suppressible, and every member but one is on by default (a consumer should get the safety
-    /// without discovering it). The exception is <see cref="DictionaryIndexerReadThrowsOnMiss"/>,
-    /// whose own remarks carry the reason it is opt-in.
+    /// suppressible, and most members are on by default (a consumer should get the safety without
+    /// discovering it). Dictionary indexer reads, counting loops, and string equality policy are
+    /// opt-in because their correct form depends on caller knowledge.
     /// </remarks>
     internal static class UnityHelpersDiagnostics
     {
@@ -476,6 +476,24 @@ namespace WallstopStudios.UnityHelpers.Analyzers
                 "Performance",
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: true
+            );
+
+        /// <summary>
+        /// A string equality operator whose comparison rules are implicit.
+        /// </summary>
+        /// <remarks>
+        /// This rule is opt-in because ordinal equality is correct for identifiers and paths while
+        /// culture-aware equality can be correct for user-facing text. The compiler cannot choose
+        /// that policy for the caller, but it can require the caller to state it (#807).
+        /// </remarks>
+        internal static readonly DiagnosticDescriptor StringEqualityHasImplicitComparison =
+            new DiagnosticDescriptor(
+                "WUH018",
+                "String equality has implicit comparison rules",
+                "'{0}' compares strings with implicit ordinal rules. Use 'string.Equals(left, right, StringComparison.Ordinal)' or another explicit StringComparison that matches this data. WUH018 is off by default; turn it on with '<Rule Id=\"WUH018\" Action=\"Warning\" />' in 'Assets/Default.ruleset'.",
+                "Correctness",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: false
             );
     }
 }

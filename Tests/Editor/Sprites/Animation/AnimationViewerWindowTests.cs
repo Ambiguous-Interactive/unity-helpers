@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
     using NUnit.Framework;
     using UnityEditor;
     using UnityEngine;
+    using UnityEngine.UIElements;
     using WallstopStudios.UnityHelpers.Editor.Sprites;
 
     [TestFixture]
@@ -15,7 +16,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
     public sealed class AnimationViewerWindowTests
     {
         [Test]
-        public void EditorLayerDataBuildsSpriteListFromClip()
+        public void CoreAnimationViewerBehaviorsRemainValid()
         {
             AnimationClip clip = new();
             Texture2D tex = new(2, 2);
@@ -37,6 +38,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             AnimationViewerWindow.EditorLayerData instance = new(clip);
             Assert.NotNull(instance);
             Assert.AreEqual(3, instance.Sprites.Count);
+
+            VisualElement root = new();
+            VisualElement existingContent = new();
+            VisualElement fileSelector = new();
+            root.Add(existingContent);
+            root.Add(fileSelector);
+
+            AnimationViewerWindow.PlaceFileSelectorFirst(root, fileSelector);
+
+            Assert.AreSame(fileSelector, root[0]);
         }
     }
 #endif

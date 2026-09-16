@@ -1119,7 +1119,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
                     declared.Add(new KeyValuePair<string, string>(names[i], raw));
                 }
 
-                if (declared[0].Value != "0")
+                if (!string.Equals(declared[0].Value, "0", StringComparison.Ordinal))
                 {
                     _diagnostics.Add(
                         $"enum {enumType.Name}: proto3 wants the first member at 0; it opens at {declared[0].Value}."

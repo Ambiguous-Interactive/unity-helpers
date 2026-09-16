@@ -8,7 +8,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using System;
     using System.Collections.Generic;
     using System.IO;
-    using System.Linq;
     using UnityEditor;
     using UnityEditor.UIElements;
     using UnityEngine;
@@ -305,24 +304,33 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 _fileSelector.OnFilesSelectedReadOnly += HandleFilesSelectedFromCustomBrowser;
                 _fileSelector.OnCancelled += HideMultiFileSelector;
                 root.Add(_fileSelector);
-                if (1 < root.childCount)
-                {
-                    _fileSelector.PlaceInFront(root.Children().FirstOrDefault());
-                }
+                PlaceFileSelectorFirst(root, _fileSelector);
             }
             else if (_fileSelector.parent == null)
             {
                 _fileSelector.ResetAndShow(GetLastAnimationDirectory());
                 root.Add(_fileSelector);
-                if (1 < root.childCount)
-                {
-                    _fileSelector.PlaceInFront(root.Children().FirstOrDefault());
-                }
+                PlaceFileSelectorFirst(root, _fileSelector);
             }
             else
             {
                 HideMultiFileSelector();
             }
+        }
+
+        internal static void PlaceFileSelectorFirst(VisualElement root, VisualElement fileSelector)
+        {
+            if (
+                root == null
+                || fileSelector == null
+                || fileSelector.parent != root
+                || root.childCount < 2
+            )
+            {
+                return;
+            }
+
+            fileSelector.PlaceInFront(root[0]);
         }
 
         private void HideMultiFileSelector()

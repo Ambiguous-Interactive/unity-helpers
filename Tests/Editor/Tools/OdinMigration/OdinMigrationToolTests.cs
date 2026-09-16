@@ -164,7 +164,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 + "    [OdinSerialize] Dictionary<string, int> values;\n"
                 + "    [ShowIf(\"left\", Value = 3)] int conditional;\n"
                 + "    [ValueDropdown(\"Choices\")] int choice;\n"
-                + "    [Button(ButtonSizes.Large)] void Run() {}\n"
+                + "    [global::Sirenix.OdinInspector.Button(ButtonSizes.Large)] void Run() {}\n"
                 + "}\n";
 
             OdinMigrationAnalysis analysis = OdinMigrationSourceAnalyzer.Analyze(Source);
@@ -172,6 +172,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             Assert.AreEqual(0, analysis.ReplacementCount);
             Assert.GreaterOrEqual(analysis.Blockers.Count, 3);
             Assert.GreaterOrEqual(analysis.ManualReviews.Count, 4);
+            bool foundButtonGuidance = false;
+            foreach (OdinMigrationFinding finding in analysis.ManualReviews)
+            {
+                if (finding.Message.Contains("WButton supports methods on Unity objects"))
+                {
+                    foundButtonGuidance = true;
+                    break;
+                }
+            }
+            Assert.IsTrue(foundButtonGuidance);
             Assert.AreSame(Source, analysis.UpgradedSource);
         }
 

@@ -29,6 +29,8 @@ report, including attributes for which Unity Helpers has no automatic migration.
 enough to infer from source text alone. Even `ShowIf(nameof(member))` and
 `HideIf(nameof(member))` stay unchanged: source text does not prove that the condition is Boolean,
 and `WShowIf` does not reproduce Odin's animated transition. The report explains this boundary.
+For `Button`, the report now calls out both checks that need a person: `WButton` targets methods on
+Unity objects, and its supported arguments and method signatures differ from Odin's.
 Resolver strings such as `"enabled"` are never rewritten.
 
 The quick-reference table below lists conceptual replacements. It does not promise that the tool

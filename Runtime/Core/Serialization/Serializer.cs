@@ -386,7 +386,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 );
                 foreach (MethodInfo mi in methods)
                 {
-                    if (mi.Name != "Deserialize")
+                    if (!string.Equals(mi.Name, "Deserialize", StringComparison.Ordinal))
                     {
                         continue;
                     }

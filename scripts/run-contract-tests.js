@@ -45,6 +45,11 @@ const CHECKS = [
     run: "npm run test:random-periods"
   },
   {
+    id: "reference-upstream-drift",
+    name: "Reference upstream drift audit",
+    run: "npm run test:reference-upstream-drift"
+  },
+  {
     id: "verify-shipped-analyzers",
     name: "Shipped analyzer freshness gate self-test",
     run: "npm run test:verify-shipped-analyzers"

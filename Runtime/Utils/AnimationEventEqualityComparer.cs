@@ -99,7 +99,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return false;
             }
 
-            if (lhs.functionName != rhs.functionName)
+            if (!string.Equals(lhs.functionName, rhs.functionName, StringComparison.Ordinal))
             {
                 return false;
             }
@@ -115,7 +115,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return false;
             }
 
-            if (lhs.stringParameter != rhs.stringParameter)
+            if (!string.Equals(lhs.stringParameter, rhs.stringParameter, StringComparison.Ordinal))
             {
                 return false;
             }

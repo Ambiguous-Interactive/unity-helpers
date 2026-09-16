@@ -380,6 +380,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 return;
             }
 
+            if (attributeName == "Button")
+            {
+                AddFinding(
+                    manualReviews,
+                    lineMap,
+                    nameSpan.Start,
+                    "Button remains manual: WButton supports methods on Unity objects, but Odin button arguments and supported method signatures are not equivalent."
+                );
+                return;
+            }
+
             if (!automaticRewritesAllowed)
             {
                 AddFinding(
