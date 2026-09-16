@@ -15,8 +15,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
     internal sealed class AnalyzerPolicyWindow : EditorWindow
     {
-        private const string RulesetFileName = "Default.ruleset";
         internal const string RulesetAssetPath = "Assets/" + RulesetFileName;
+        private const string RulesetFileName = "Default.ruleset";
 
         private static readonly GUIContent EnableContent = new(
             "Enable All",
@@ -144,6 +144,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             return Path.GetFullPath(Path.Combine(Application.dataPath, RulesetFileName));
         }
 
+        private static MessageType GetMessageType(AnalyzerPolicyState state)
+        {
+            switch (state)
+            {
+                case AnalyzerPolicyState.Enabled:
+                case AnalyzerPolicyState.Disabled:
+                    return MessageType.Info;
+                case AnalyzerPolicyState.Missing:
+                    return MessageType.Warning;
+                default:
+                    return MessageType.Error;
+            }
+        }
+
         private void OnEnable()
         {
             RefreshState();
@@ -195,20 +209,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             finally
             {
                 EditorGUILayout.EndScrollView();
-            }
-        }
-
-        private static MessageType GetMessageType(AnalyzerPolicyState state)
-        {
-            switch (state)
-            {
-                case AnalyzerPolicyState.Enabled:
-                case AnalyzerPolicyState.Disabled:
-                    return MessageType.Info;
-                case AnalyzerPolicyState.Missing:
-                    return MessageType.Warning;
-                default:
-                    return MessageType.Error;
             }
         }
 
