@@ -35,17 +35,24 @@ Resolver strings such as `"enabled"` are never rewritten.
 
 The quick-reference table below lists conceptual replacements. It does not promise that the tool
 can rewrite every row safely. The report identifies unsupported attributes and options for manual
-review. It reports serialized Odin bases,
-`OdinSerialize`, and Odin-owned dictionary or set shapes as blockers and never rewrites them.
+review. It reports serialized Odin bases (including `SerializedNetworkBehaviour` and
+`SerializedUnityObject`), `OdinSerialize`, and Odin-owned dictionary or set shapes as blockers and
+never rewrites them. A source file containing `SerializationData`,
+`UnitySerializationUtility`, `ISupportsPrefabSerialization`, or
+`ShowOdinSerializedPropertiesInInspector` (including its `Attribute` suffix) also blocks automatic
+rewrites. This includes direct calls, aliases, and `using static` imports of the utility. Escaped C#
+identifiers such as `@SerializationData` are recognized. These names can be shadowed by project types, so
+each finding means the file needs inspection; the text scanner does not prove that Odin owns its
+data.
 Always run Preview first and inspect the Console report. Cancelling a scan stops before reading the
 next file. Cancellation or any scan failure disables Apply, so a partial scan cannot write source
 files.
 
 > [!CAUTION]
-> Replacing `SerializedMonoBehaviour`, `SerializedScriptableObject`, `[OdinSerialize]`, or an
-> Odin-serialized collection is a data migration, not a source rename. Existing scene, prefab, and
-> asset data can remain in Odin's serialization payload and disappear when the source type changes.
-> The automated tool deliberately leaves these constructs unchanged.
+> Replacing an Odin serialized base, `[OdinSerialize]`, or a custom serialization path is a data
+> migration. Existing scene, prefab, and asset data can remain in Odin's serialization payload and
+> disappear when the source type changes. The automated tool deliberately leaves these constructs
+> unchanged.
 
 Apply performs a best-effort check that every source file still matches its preview, writes through
 a staged durable-file replacement, and attempts to roll back completed writes if a later write

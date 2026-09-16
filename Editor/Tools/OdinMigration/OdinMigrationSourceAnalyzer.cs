@@ -44,11 +44,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         {
             "Serialized" + "MonoBehaviour",
             "Serialized" + "ScriptableObject",
+            "SerializedNetworkBehaviour",
+            "SerializedUnityObject",
             "SerializedBehaviour",
             "SerializedComponent",
             "SerializedStateMachineBehaviour",
             "OdinSerializeAttribute",
             "OdinSerialize",
+        };
+
+        private static readonly string[] CustomSerializationTokens =
+        {
+            "SerializationData",
+            "UnitySerializationUtility",
+            "ISupportsPrefabSerialization",
+            "ShowOdinSerializedPropertiesInInspector",
+            "ShowOdinSerializedPropertiesInInspectorAttribute",
         };
 
         private static readonly string[] CollectionTokens =
@@ -74,6 +85,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             List<OdinMigrationFinding> manualReviews = new List<OdinMigrationFinding>();
 
             AddSerializedStateFindings(masked, blockers, lineMap);
+            AddCustomSerializationFindings(masked, blockers, lineMap);
             AddCollectionFindingsWhenOdinOwnsState(masked, blockers, lineMap);
             AddOdinDependencyFindings(masked, manualReviews, lineMap);
 
@@ -194,7 +206,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             bool odinOwnsState = false;
             foreach (string token in SerializedStateTokens)
             {
-                if (ContainsIdentifier(masked, token, out _))
+                if (TryFindIdentifier(masked, token, 0, out _, true))
                 {
                     odinOwnsState = true;
                     break;
@@ -209,7 +221,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             foreach (string token in CollectionTokens)
             {
                 int searchStart = 0;
-                while (TryFindIdentifier(masked, token, searchStart, out int position))
+                while (TryFindIdentifier(masked, token, searchStart, out int position, true))
                 {
                     int after = position + token.Length;
                     while (after < masked.Length && char.IsWhiteSpace(masked[after]))
@@ -239,13 +251,35 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             foreach (string token in SerializedStateTokens)
             {
                 int searchStart = 0;
-                while (TryFindIdentifier(masked, token, searchStart, out int position))
+                while (TryFindIdentifier(masked, token, searchStart, out int position, true))
                 {
                     AddFinding(
                         blockers,
                         lineMap,
                         position,
-                        $"{token} owns serialized state and requires a staged data migration."
+                        $"{token} may own Odin serialized state and requires a staged data migration review."
+                    );
+                    searchStart = position + token.Length;
+                }
+            }
+        }
+
+        private static void AddCustomSerializationFindings(
+            string masked,
+            List<OdinMigrationFinding> blockers,
+            LineMap lineMap
+        )
+        {
+            foreach (string token in CustomSerializationTokens)
+            {
+                int searchStart = 0;
+                while (TryFindIdentifier(masked, token, searchStart, out int position, true))
+                {
+                    AddFinding(
+                        blockers,
+                        lineMap,
+                        position,
+                        $"{token} may signal a custom Odin serialization setup; review stored data before migration."
                     );
                     searchStart = position + token.Length;
                 }
@@ -784,7 +818,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             string source,
             string identifier,
             int searchStart,
-            out int position
+            out int position,
+            bool includeEscapedIdentifiers = false
         )
         {
             int candidate = source.IndexOf(identifier, searchStart, StringComparison.Ordinal);
@@ -795,7 +830,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     candidate == 0
                     || (
                         !IsIdentifierCharacter(source[candidate - 1])
-                        && source[candidate - 1] != '@'
+                        && (includeEscapedIdentifiers || source[candidate - 1] != '@')
                     );
                 bool endsAtBoundary = end == source.Length || !IsIdentifierCharacter(source[end]);
                 if (startsAtBoundary && endsAtBoundary)

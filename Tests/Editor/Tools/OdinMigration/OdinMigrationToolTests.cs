@@ -279,6 +279,82 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             }
         }
 
+        [TestCase("class Target : SerializedNetworkBehaviour {}", "SerializedNetworkBehaviour")]
+        [TestCase("class Target : SerializedUnityObject {}", "SerializedUnityObject")]
+        [TestCase("class Target : @SerializedUnityObject {}", "SerializedUnityObject")]
+        [TestCase("class Target { SerializationData data; }", "SerializationData")]
+        [TestCase("class Target { @SerializationData data; }", "SerializationData")]
+        [TestCase(
+            "using Data = Sirenix.Serialization.SerializationData; class Target {}",
+            "SerializationData"
+        )]
+        [TestCase("class Target : ISupportsPrefabSerialization {}", "ISupportsPrefabSerialization")]
+        [TestCase(
+            "[ShowOdinSerializedPropertiesInInspector] class Target {}",
+            "ShowOdinSerializedPropertiesInInspector"
+        )]
+        [TestCase(
+            "[ShowOdinSerializedPropertiesInInspectorAttribute] class Target {}",
+            "ShowOdinSerializedPropertiesInInspectorAttribute"
+        )]
+        [TestCase(
+            "using USU = Sirenix.Serialization.UnitySerializationUtility; class Target { void Save() { USU.SerializeUnityObject(this, ref data, DataFormat.Binary); } }",
+            "UnitySerializationUtility"
+        )]
+        [TestCase(
+            "class Target { void Save() { UnitySerializationUtility.SerializeUnityObject(this, ref data); } }",
+            "UnitySerializationUtility"
+        )]
+        [TestCase(
+            "class Target { void Load() { UnitySerializationUtility.DeserializeUnityObject(this, ref data); } }",
+            "UnitySerializationUtility"
+        )]
+        [TestCase(
+            "using static Sirenix.Serialization.UnitySerializationUtility; class Target { void Save() { SerializeUnityObject(this, ref data); } }",
+            "UnitySerializationUtility"
+        )]
+        [TestCase(
+            "using static global::Sirenix.Serialization.UnitySerializationUtility; class Target { void Load() { DeserializeUnityObject(this, ref data); } }",
+            "UnitySerializationUtility"
+        )]
+        [TestCase(
+            "class Target { void Save() { @UnitySerializationUtility.@SerializeUnityObject(this, ref data); } }",
+            "UnitySerializationUtility"
+        )]
+        public void AnalyzerBlocksPotentialOdinSerializationPatterns(string pattern, string marker)
+        {
+            string source =
+                pattern
+                + "\nclass Other { [global::Sirenix.OdinInspector.ReadOnly] public int value; }\n";
+
+            OdinMigrationAnalysis analysis = OdinMigrationSourceAnalyzer.Analyze(source);
+
+            Assert.AreEqual(0, analysis.ReplacementCount);
+            Assert.AreSame(source, analysis.UpgradedSource);
+            Assert.AreEqual(1, analysis.Blockers.Count);
+            StringAssert.Contains(marker, analysis.Blockers[0].Message);
+            StringAssert.Contains("may", analysis.Blockers[0].Message);
+        }
+
+        [Test]
+        public void AnalyzerIgnoresSerializationPatternsInCommentsAndStrings()
+        {
+            const string Source =
+                "// SerializedNetworkBehaviour SerializationData ShowOdinSerializedPropertiesInInspectorAttribute\n"
+                + "class Target\n"
+                + "{\n"
+                + "    string guide = \"UnitySerializationUtility.SerializeUnityObject(this, ref data)\";\n"
+                + "    string alias = \"using USU = Sirenix.Serialization.UnitySerializationUtility;\";\n"
+                + "    /* SerializedUnityObject ISupportsPrefabSerialization */\n"
+                + "    [global::Sirenix.OdinInspector.ReadOnly] public int value;\n"
+                + "}\n";
+
+            OdinMigrationAnalysis analysis = OdinMigrationSourceAnalyzer.Analyze(Source);
+
+            Assert.AreEqual(0, analysis.Blockers.Count);
+            Assert.AreEqual(1, analysis.ReplacementCount);
+        }
+
         [Test]
         public void AnalyzerLeavesFieldsThatUnityWillNotSerializeForReview()
         {
