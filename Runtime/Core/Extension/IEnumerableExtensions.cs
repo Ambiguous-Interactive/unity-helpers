@@ -74,24 +74,20 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <para>Null handling: Comparer can be invoked with null elements depending on enumeration content.</para>
         /// <para>Thread safety: Not thread-safe. No Unity main thread requirement.</para>
         /// <para>Performance: O(n log n) where n is the number of elements (uses List.Sort).</para>
-        /// <para>Allocations: Allocates a result List. Uses pooled buffer for intermediate work.</para>
+        /// <para>Allocations: Allocates the returned List and a comparer wrapper. Sources that do not implement <see cref="ICollection{T}"/> use a pooled staging List to keep the returned List sized to its contents.</para>
         /// <para>Edge cases: Empty or single element collections return without sorting.</para>
         /// </remarks>
         /// <exception cref="ArgumentNullException">Thrown when comparer is null (propagated from FuncBasedComparer).</exception>
         public static List<T> OrderBy<T>(this IEnumerable<T> enumeration, Func<T, T, int> comparer)
         {
             FuncBasedComparer<T> typedComparer = new(comparer);
-            using PooledResource<List<T>> lease = Buffers<T>.List.Get(out List<T> buffer);
-
-            buffer.AddRange(enumeration);
-
-            if (buffer.Count <= 1)
+            List<T> result = CopyToOwnedList(enumeration);
+            if (1 < result.Count)
             {
-                return new List<T>(buffer);
+                result.Sort(typedComparer);
             }
 
-            buffer.Sort(typedComparer);
-            return new List<T>(buffer);
+            return result;
         }
 
         /// <summary>
@@ -104,23 +100,19 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <para>Null handling: Behavior with null elements depends on T's CompareTo implementation.</para>
         /// <para>Thread safety: Not thread-safe. No Unity main thread requirement.</para>
         /// <para>Performance: O(n log n) where n is the number of elements (uses List.Sort).</para>
-        /// <para>Allocations: Allocates a result List. Uses pooled buffer for intermediate work.</para>
+        /// <para>Allocations: Allocates the returned List. Sources that do not implement <see cref="ICollection{T}"/> use a pooled staging List to keep the returned List sized to its contents.</para>
         /// <para>Edge cases: Empty or single element collections return without sorting.</para>
         /// </remarks>
         public static List<T> Ordered<T>(this IEnumerable<T> enumerable)
             where T : IComparable
         {
-            using PooledResource<List<T>> lease = Buffers<T>.List.Get(out List<T> buffer);
-
-            buffer.AddRange(enumerable);
-
-            if (buffer.Count <= 1)
+            List<T> result = CopyToOwnedList(enumerable);
+            if (1 < result.Count)
             {
-                return new List<T>(buffer);
+                result.Sort();
             }
 
-            buffer.Sort();
-            return new List<T>(buffer);
+            return result;
         }
 
         /// <summary>
@@ -134,15 +126,14 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <para>Null handling: If enumerable is null, will throw when enumerated. If random is null, uses PRNG.Instance.</para>
         /// <para>Thread safety: Not thread-safe if random is shared. No Unity main thread requirement.</para>
         /// <para>Performance: O(n) where n is the number of elements (uses Fisher-Yates shuffle via IListExtensions.Shuffle).</para>
-        /// <para>Allocations: Allocates a result List. Uses pooled buffer for intermediate work.</para>
+        /// <para>Allocations: Allocates the returned List; sources that do not implement <see cref="ICollection{T}"/> and shuffling use pooled scratch storage.</para>
         /// <para>Edge cases: Empty or single element collections return unchanged. Shuffle quality depends on random implementation.</para>
         /// </remarks>
         public static List<T> Shuffled<T>(this IEnumerable<T> enumerable, IRandom random = null)
         {
-            using PooledResource<List<T>> lease = Buffers<T>.List.Get(out List<T> buffer);
-            buffer.AddRange(enumerable);
-            buffer.Shuffle(random);
-            return new List<T>(buffer);
+            List<T> result = CopyToOwnedList(enumerable);
+            result.Shuffle(random);
+            return result;
         }
 
         /// <summary>
@@ -343,6 +334,18 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             }
 
             return new PartitionPooledEnumerable<T>(items, size);
+        }
+
+        private static List<T> CopyToOwnedList<T>(IEnumerable<T> source)
+        {
+            if (source is ICollection<T> collection)
+            {
+                return new List<T>(collection);
+            }
+
+            using PooledResource<List<T>> lease = Buffers<T>.List.Get(out List<T> buffer);
+            buffer.AddRange(source);
+            return new List<T>(buffer);
         }
 
         private sealed class PartitionPooledEnumerable<T> : IEnumerable<PooledResource<List<T>>>

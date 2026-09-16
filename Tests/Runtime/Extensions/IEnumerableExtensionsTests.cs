@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     using NUnit.Framework;
     using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Core.Extension;
+    using WallstopStudios.UnityHelpers.Core.Random;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Utils;
 
@@ -42,6 +43,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         {
             yield return 0;
             yield return 1;
+        }
+
+        private static IEnumerable<int> SinglePassValues(Action onEnumerate)
+        {
+            onEnumerate();
+            yield return 5;
+            yield return 2;
+            yield return 3;
+            yield return 1;
+            yield return 4;
         }
 
         [Test]
@@ -118,6 +129,52 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             int[] values = Enumerable.Range(0, 10).ToArray();
             IReadOnlyCollection<int> shuffled = values.Shuffled().ToArray();
             CollectionAssert.AreEquivalent(values, shuffled);
+        }
+
+        [Test]
+        public void OrderingHelpersEnumerateTheSourceOnce()
+        {
+            int orderedEnumerations = 0;
+            List<int> ordered = SinglePassValues(() => ++orderedEnumerations).Ordered();
+            CollectionAssert.AreEqual(new[] { 1, 2, 3, 4, 5 }, ordered);
+            Assert.AreEqual(1, orderedEnumerations);
+
+            int comparerEnumerations = 0;
+            List<int> byComparer = SinglePassValues(() => ++comparerEnumerations)
+                .OrderBy((left, right) => right.CompareTo(left));
+            CollectionAssert.AreEqual(new[] { 5, 4, 3, 2, 1 }, byComparer);
+            Assert.AreEqual(1, comparerEnumerations);
+        }
+
+        [Test]
+        public void ShuffledPreservesSeededPermutationWithSingleEnumeration()
+        {
+            int[] values = { 5, 2, 3, 1, 4 };
+            WyRandom expectedRandom = new(781UL);
+            int[] expected = (int[])values.Clone();
+            expected.Shuffle(expectedRandom);
+
+            int enumerations = 0;
+            WyRandom actualRandom = new(781UL);
+            List<int> actual = SinglePassValues(() => ++enumerations).Shuffled(actualRandom);
+
+            CollectionAssert.AreEqual(expected, actual);
+            Assert.AreEqual(1, enumerations);
+            Assert.AreEqual(expectedRandom.NextUint(), actualRandom.NextUint());
+        }
+
+        [Test]
+        public void UnknownSizeSourcesReturnCompactLists()
+        {
+            List<int> ordered = SinglePassValues(() => { }).Ordered();
+            List<int> byComparer = SinglePassValues(() => { })
+                .OrderBy((left, right) => left.CompareTo(right));
+            List<int> shuffled = SinglePassValues(() => { }).Shuffled(new WyRandom(781UL));
+
+            Assert.AreEqual(5, ordered.Count);
+            Assert.AreEqual(ordered.Count, ordered.Capacity);
+            Assert.AreEqual(byComparer.Count, byComparer.Capacity);
+            Assert.AreEqual(shuffled.Count, shuffled.Capacity);
         }
 
         [Test]

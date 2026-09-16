@@ -64,6 +64,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Improved
 
+- Avoid a staging copy for `ICollection<T>` sources in `OrderBy`, `Ordered`, and `Shuffled`, while
+  keeping compact returned lists for other sources
+  ([#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781)).
 - Correct random reference documentation: identify `WyRandom`'s wyhash v1 stream, clarify
   `XoroShiroRandom`'s high-half output, and distinguish the SplitMix design from Vigna's 2015
   reference implementation without attributing an unsupported published PractRand result

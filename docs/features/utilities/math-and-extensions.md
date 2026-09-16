@@ -943,6 +943,11 @@ var shuffled = items.Shuffled();
 // Original list unchanged
 ```
 
+`OrderBy`, `Ordered`, and `Shuffled` build their returned `List<T>` directly when the source exposes
+an `ICollection<T>` count. Other sources use a pooled staging list so the returned list has capacity
+for its actual element count instead of retaining growth headroom. Each source is enumerated once,
+and `Shuffled` keeps the same random draw order.
+
 ### IList Operations
 
 **Remove O(1) by swapping with last element:**
