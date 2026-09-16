@@ -82,6 +82,32 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         }
 
         [Test]
+        public void AnalyzerExplainsWhyNameofConditionsRemainManual()
+        {
+            const string Source =
+                "class Target\n"
+                + "{\n"
+                + "    public bool enabled;\n"
+                + "    public object reference;\n"
+                + "    [global::Sirenix.OdinInspector.ShowIf(nameof(enabled))] public int booleanCondition;\n"
+                + "    [global::Sirenix.OdinInspector.HideIfAttribute(nameof(reference))] public int referenceCondition;\n"
+                + "    [global::WallstopStudios.UnityHelpers.Core.Attributes.WShowIf(nameof(enabled))]\n"
+                + "    [global::Sirenix.OdinInspector.ShowIf(nameof(enabled))] public int mixedAttributes;\n"
+                + "}\n";
+
+            OdinMigrationAnalysis analysis = OdinMigrationSourceAnalyzer.Analyze(Source);
+
+            Assert.AreEqual(0, analysis.ReplacementCount);
+            Assert.AreSame(Source, analysis.UpgradedSource);
+            Assert.AreEqual(3, analysis.ManualReviews.Count);
+            foreach (OdinMigrationFinding finding in analysis.ManualReviews)
+            {
+                StringAssert.Contains("value type", finding.Message);
+                StringAssert.Contains("Odin animation", finding.Message);
+            }
+        }
+
+        [Test]
         public void GlobalQualifierAtAttributeListStartIsNotATargetSpecifier()
         {
             const string Source =
@@ -222,6 +248,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 + "MonoBehaviour\n"
                 + "{\n"
                 + "    [global::Sirenix.OdinInspector.ReadOnly] public int value;\n"
+                + "    [global::Sirenix.OdinInspector.ShowIf(nameof(value))] public int conditional;\n"
                 + "}\n";
 
             OdinMigrationAnalysis analysis = OdinMigrationSourceAnalyzer.Analyze(Source);
@@ -229,8 +256,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             Assert.AreEqual(0, analysis.ReplacementCount);
             Assert.AreSame(Source, analysis.UpgradedSource);
             Assert.AreEqual(1, analysis.Blockers.Count);
-            Assert.AreEqual(1, analysis.ManualReviews.Count);
-            StringAssert.Contains("Odin-owned serialized state", analysis.ManualReviews[0].Message);
+            Assert.AreEqual(2, analysis.ManualReviews.Count);
+            foreach (OdinMigrationFinding finding in analysis.ManualReviews)
+            {
+                StringAssert.Contains("Odin-owned serialized state", finding.Message);
+            }
         }
 
         [Test]

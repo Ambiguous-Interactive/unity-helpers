@@ -25,8 +25,10 @@ review items: textual analysis cannot prove that any of those names was not shad
 scope. Explicit attribute targets are also checked; only no target or `field:` is eligible for an
 automatic edit. Every globally qualified Odin inspector attribute appears in the
 report, including attributes for which Unity Helpers has no automatic migration.
-`ShowIf`, `HideIf`, `Button`, and `Required` also remain manual because their target lookup,
-multiplicity, and constructor semantics are not identical enough to infer from source text alone.
+`Button`, `Required`, `ShowIf`, and `HideIf` remain manual because their semantics are not identical
+enough to infer from source text alone. Even `ShowIf(nameof(member))` and
+`HideIf(nameof(member))` stay unchanged: source text does not prove that the condition is Boolean,
+and `WShowIf` does not reproduce Odin's animated transition. The report explains this boundary.
 Resolver strings such as `"enabled"` are never rewritten.
 
 The quick-reference table below lists conceptual replacements. It does not promise that the tool

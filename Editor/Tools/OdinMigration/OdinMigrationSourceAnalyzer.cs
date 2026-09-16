@@ -445,17 +445,68 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             {
                 if (ReportedOdinAttributes.Contains(attributeName))
                 {
-                    AddFinding(
-                        manualReviews,
-                        lineMap,
-                        nameSpan.Start,
-                        $"{attributeName} has no proven equivalent for these arguments and was left unchanged."
-                    );
+                    string message =
+                        (attributeName == "ShowIf" || attributeName == "HideIf")
+                        && IsExactNameofArgument(source, argumentsStart, argumentsEnd)
+                            ? $"{attributeName} with a nameof condition remains manual because its value type and Odin animation cannot be proven equivalent."
+                            : $"{attributeName} has no proven equivalent for these arguments and was left unchanged.";
+                    AddFinding(manualReviews, lineMap, nameSpan.Start, message);
                 }
                 return;
             }
 
             replacements.Add(new Replacement(nameSpan.Start, nameSpan.Length, replacement));
+        }
+
+        private static bool IsExactNameofArgument(
+            string source,
+            int argumentsStart,
+            int argumentsEnd
+        )
+        {
+            if (argumentsStart < 0 || argumentsEnd <= argumentsStart)
+            {
+                return false;
+            }
+
+            int position = argumentsStart + 1;
+            SkipWhitespace(source, ref position, argumentsEnd);
+            if (
+                !TryReadIdentifier(source, ref position, argumentsEnd, out TextSpan keyword)
+                || source.Substring(keyword.Start, keyword.Length) != "nameof"
+            )
+            {
+                return false;
+            }
+
+            SkipWhitespace(source, ref position, argumentsEnd);
+            if (argumentsEnd <= position || source[position] != '(')
+            {
+                return false;
+            }
+            position++;
+            SkipWhitespace(source, ref position, argumentsEnd);
+            if (position < argumentsEnd && source[position] == '@')
+            {
+                position++;
+            }
+            if (!TryReadIdentifier(source, ref position, argumentsEnd, out _))
+            {
+                return false;
+            }
+            SkipWhitespace(source, ref position, argumentsEnd);
+            if (argumentsEnd <= position || source[position] != ')')
+            {
+                return false;
+            }
+            position++;
+            SkipWhitespace(source, ref position, argumentsEnd);
+            if (position != argumentsEnd)
+            {
+                return false;
+            }
+
+            return true;
         }
 
         private static bool ContainsIdentifier(string source, string identifier, out int position)
