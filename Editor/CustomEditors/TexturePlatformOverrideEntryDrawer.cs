@@ -98,7 +98,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
 
             for (int i = 0; i < choices.Length - 1; i++)
             {
-                if (choices[i] == name)
+                if (string.Equals(choices[i], name, System.StringComparison.Ordinal))
                 {
                     return i;
                 }
@@ -186,7 +186,13 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomEditors
                             }
 
                             string value = choices[capturedIndex];
-                            if (value == CustomOptionLabel)
+                            if (
+                                string.Equals(
+                                    value,
+                                    CustomOptionLabel,
+                                    System.StringComparison.Ordinal
+                                )
+                            )
                             {
                                 prop.stringValue = string.Empty;
                             }

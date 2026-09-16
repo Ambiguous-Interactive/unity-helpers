@@ -101,7 +101,7 @@ The following sorting algorithm implementations in `Runtime/Core/Extension/Sorti
 - Author: Gary Gende
 - Upstream: [GitHub repository](https://github.com/gendeg/YamSort)
 - License: MIT License
-- Notes: Adaptation in `Runtime/Core/Extension/Sorting/IListSortYam.cs` replaces the upstream `Span`/`IComparable` surface with `IList<T>` and an explicit comparer. Audited against upstream commit `aa849b59618ab0c0faf090f7c93f8b248ba1d94a`.
+- Notes: Adaptation in `Runtime/Core/Extension/Sorting/IListSortYam.cs` replaces the upstream `Span`/`IComparable` surface with `IList<T>` and an explicit comparer. Upstream drift detection is pinned to commit `aa849b59618ab0c0faf090f7c93f8b248ba1d94a`; this pin is not the family-wide parity audit tracked in issue #756.
 
 ## Random Number Generators
 
@@ -149,7 +149,7 @@ The following PRNG implementations in `Runtime/Core/Random/` are adapted from or
 - Upstream: [GitHub repository](https://github.com/wangyi-fudan/wyhash)
 - License: The Unlicense (Public Domain)
 - .NET Reference: [cocowalla/wyhash-dotnet](https://github.com/cocowalla/wyhash-dotnet) (MIT License)
-- Notes: Implementation references the cocowalla .NET port, audited at commit `3698f21da3a117cccfd323177138b15ae1a32dc7`.
+- Notes: Implementation references the cocowalla .NET port. Upstream drift detection is pinned to commit `3698f21da3a117cccfd323177138b15ae1a32dc7`; this pin is not the family-wide parity audit tracked in issue #757.
 
 ### Will Stafford Parsons Algorithms
 

@@ -27,7 +27,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             string fieldName
         )
         {
-            return findings.Single(finding => finding.FieldName == fieldName);
+            return findings.Single(finding =>
+                string.Equals(finding.FieldName, fieldName, System.StringComparison.Ordinal)
+            );
         }
 
         [Test]
@@ -86,7 +88,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             SerializedFieldValidator.TryValidate(typeof(DroppedSerializedFieldAsset), findings);
 
             List<DroppedSerializedField> nested = findings
-                .Where(finding => finding.FieldName == "nestedLookup")
+                .Where(finding =>
+                    string.Equals(
+                        finding.FieldName,
+                        "nestedLookup",
+                        System.StringComparison.Ordinal
+                    )
+                )
                 .ToList();
 
             Assert.AreEqual(3, nested.Count, "direct, List<T> and T[] should each be reached");

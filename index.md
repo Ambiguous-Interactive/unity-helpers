@@ -21,7 +21,7 @@ Welcome to the Unity Helpers documentation. This package provides production-rea
 
 - [Inspector Overview](./docs/features/inspector/inspector-overview.md) - Professional inspector tooling
 - [Visual Components](./docs/features/inspector/visual-components.md) - Enhanced UI components
-- [Editor Tools](./docs/features/editor-tools/editor-tools-guide.md) - 20+ automation tools
+- [Editor Tools](./docs/features/editor-tools/editor-tools-guide.md) - 30+ automation tools
 
 ### Core Systems
 

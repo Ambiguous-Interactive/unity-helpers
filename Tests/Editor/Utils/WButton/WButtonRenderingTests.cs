@@ -312,7 +312,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
 
             Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
             List<WButtonGroupKey> testGroupKeys = groupCounts
-                .Keys.Where(k => k._groupName == "TestGroup")
+                .Keys.Where(k =>
+                    string.Equals(k._groupName, "TestGroup", System.StringComparison.Ordinal)
+                )
                 .ToList();
 
             Assert.That(testGroupKeys, Has.Count.EqualTo(1), "Should have exactly one TestGroup");
@@ -373,10 +375,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
 
             Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
             WButtonGroupKey highPriorityKey = groupCounts.Keys.First(k =>
-                k._groupName == "HighPriority"
+                string.Equals(k._groupName, "HighPriority", System.StringComparison.Ordinal)
             );
             WButtonGroupKey lowPriorityKey = groupCounts.Keys.First(k =>
-                k._groupName == "LowPriority"
+                string.Equals(k._groupName, "LowPriority", System.StringComparison.Ordinal)
             );
 
             Assert.That(
@@ -766,7 +768,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetWithParameters)
             );
             WButtonMethodMetadata paramMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetWithParameters.ButtonWithParams)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetWithParameters.ButtonWithParams),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(
@@ -787,7 +793,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetWithDefaultParameters)
             );
             WButtonMethodMetadata paramMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetWithDefaultParameters.ButtonWithDefaults)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetWithDefaultParameters.ButtonWithDefaults),
+                    System.StringComparison.Ordinal
+                )
             );
 
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(asset);
@@ -815,7 +825,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetWithParameters)
             );
             WButtonMethodMetadata paramMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetWithParameters.ButtonWithParams)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetWithParameters.ButtonWithParams),
+                    System.StringComparison.Ordinal
+                )
             );
 
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(asset);
@@ -842,7 +856,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetMultipleParameters)
             );
             WButtonMethodMetadata paramMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetMultipleParameters.MultiParam)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetMultipleParameters.MultiParam),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(paramMethod.Parameters.Length, Is.EqualTo(3), "Should have 3 parameters");
@@ -874,7 +892,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetAsync)
             );
             WButtonMethodMetadata asyncMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetAsync.AsyncButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetAsync.AsyncButton),
+                    System.StringComparison.Ordinal
+                )
             );
 
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(asset);
@@ -894,7 +916,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetAsync)
             );
             WButtonMethodMetadata asyncMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetAsync.AsyncButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetAsync.AsyncButton),
+                    System.StringComparison.Ordinal
+                )
             );
 
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(asset);
@@ -924,7 +950,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetCancellable)
             );
             WButtonMethodMetadata cancellableMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetCancellable.CancellableButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetCancellable.CancellableButton),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(
@@ -945,7 +975,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetAsync)
             );
             WButtonMethodMetadata asyncMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetAsync.AsyncButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetAsync.AsyncButton),
+                    System.StringComparison.Ordinal
+                )
             );
 
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(asset);
@@ -1158,7 +1192,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetFloatParameter)
             );
             WButtonMethodMetadata floatMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetFloatParameter.FloatButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetFloatParameter.FloatButton),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(floatMethod.Parameters.Length, Is.EqualTo(1), "Should have one parameter");
@@ -1185,7 +1223,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetFloatParameter)
             );
             WButtonMethodMetadata defaultMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetFloatParameter.FloatWithDefault)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetFloatParameter.FloatWithDefault),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(
@@ -1216,7 +1258,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetVector2Parameter)
             );
             WButtonMethodMetadata vectorMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetVector2Parameter.Vector2Button)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetVector2Parameter.Vector2Button),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(vectorMethod.Parameters.Length, Is.EqualTo(1), "Should have one parameter");
@@ -1243,7 +1289,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetVector2Parameter)
             );
             WButtonMethodMetadata defaultMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetVector2Parameter.Vector2WithDefault)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetVector2Parameter.Vector2WithDefault),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(
@@ -1269,7 +1319,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetVector3Parameter)
             );
             WButtonMethodMetadata vectorMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetVector3Parameter.Vector3Button)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetVector3Parameter.Vector3Button),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(vectorMethod.Parameters.Length, Is.EqualTo(1), "Should have one parameter");
@@ -1296,7 +1350,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetVector3Parameter)
             );
             WButtonMethodMetadata defaultMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetVector3Parameter.Vector3WithDefault)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetVector3Parameter.Vector3WithDefault),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(
@@ -1322,7 +1380,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetColorParameter)
             );
             WButtonMethodMetadata colorMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetColorParameter.ColorButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetColorParameter.ColorButton),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(colorMethod.Parameters.Length, Is.EqualTo(1), "Should have one parameter");
@@ -1349,7 +1411,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetColorParameter)
             );
             WButtonMethodMetadata defaultMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetColorParameter.ColorWithDefault)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetColorParameter.ColorWithDefault),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(
@@ -1375,7 +1441,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetUnityObjectParameter)
             );
             WButtonMethodMetadata gameObjectMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetUnityObjectParameter.GameObjectButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetUnityObjectParameter.GameObjectButton),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(
@@ -1406,7 +1476,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetUnityObjectParameter)
             );
             WButtonMethodMetadata transformMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetUnityObjectParameter.TransformButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetUnityObjectParameter.TransformButton),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(
@@ -1437,7 +1511,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetEnumParameter)
             );
             WButtonMethodMetadata enumMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetEnumParameter.EnumButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetEnumParameter.EnumButton),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(enumMethod.Parameters.Length, Is.EqualTo(1), "Should have one parameter");
@@ -1464,7 +1542,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetEnumParameter)
             );
             WButtonMethodMetadata defaultMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetEnumParameter.EnumWithDefault)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetEnumParameter.EnumWithDefault),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(
@@ -1495,7 +1577,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetArrayParameter)
             );
             WButtonMethodMetadata arrayMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetArrayParameter.IntArrayButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetArrayParameter.IntArrayButton),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(arrayMethod.Parameters.Length, Is.EqualTo(1), "Should have one parameter");
@@ -1522,7 +1608,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetArrayParameter)
             );
             WButtonMethodMetadata arrayMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetArrayParameter.StringArrayButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetArrayParameter.StringArrayButton),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(arrayMethod.Parameters.Length, Is.EqualTo(1), "Should have one parameter");
@@ -1554,7 +1644,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetMixedUnityTypes)
             );
             WButtonMethodMetadata mixedMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetMixedUnityTypes.MixedUnityButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetMixedUnityTypes.MixedUnityButton),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(
@@ -1600,7 +1694,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetMixedUnityTypes)
             );
             WButtonMethodMetadata mixedMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetMixedUnityTypes.MixedUnityButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetMixedUnityTypes.MixedUnityButton),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(
@@ -1641,7 +1739,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetFloatParameter)
             );
             WButtonMethodMetadata floatMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetFloatParameter.FloatButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetFloatParameter.FloatButton),
+                    System.StringComparison.Ordinal
+                )
             );
 
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(asset);
@@ -1668,7 +1770,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetVector3Parameter)
             );
             WButtonMethodMetadata vectorMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetVector3Parameter.Vector3Button)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetVector3Parameter.Vector3Button),
+                    System.StringComparison.Ordinal
+                )
             );
 
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(asset);
@@ -1695,7 +1801,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetColorParameter)
             );
             WButtonMethodMetadata colorMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetColorParameter.ColorButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetColorParameter.ColorButton),
+                    System.StringComparison.Ordinal
+                )
             );
 
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(asset);
@@ -1722,7 +1832,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetEnumParameter)
             );
             WButtonMethodMetadata enumMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetEnumParameter.EnumButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetEnumParameter.EnumButton),
+                    System.StringComparison.Ordinal
+                )
             );
 
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(asset);
@@ -1749,7 +1863,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetUnityObjectParameter)
             );
             WButtonMethodMetadata gameObjectMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetUnityObjectParameter.GameObjectButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetUnityObjectParameter.GameObjectButton),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(
@@ -1775,7 +1893,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(RenderingTargetEnumParameter)
             );
             WButtonMethodMetadata enumMethod = metadata.First(m =>
-                m.Method.Name == nameof(RenderingTargetEnumParameter.EnumButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(RenderingTargetEnumParameter.EnumButton),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(

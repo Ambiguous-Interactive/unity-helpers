@@ -984,7 +984,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             string newSearch = EditorGUILayout.TextField(_searchFilter, GUILayout.MinWidth(100));
             GUILayout.EndHorizontal();
 
-            if (newSearch != _searchFilter)
+            if (!string.Equals(newSearch, _searchFilter, System.StringComparison.Ordinal))
             {
                 _searchFilter = newSearch;
                 UpdateTreeViewFilters();

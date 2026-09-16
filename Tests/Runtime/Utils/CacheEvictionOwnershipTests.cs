@@ -318,7 +318,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 .OnSet(
                     (_, value) =>
                     {
-                        if (value == "trigger")
+                        if (string.Equals(value, "trigger", System.StringComparison.Ordinal))
                         {
                             inner.Set("inner-replacement", "value");
                         }

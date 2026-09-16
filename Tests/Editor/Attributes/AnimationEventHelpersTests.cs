@@ -33,7 +33,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             Assert.IsTrue(
                 methods.Any(method =>
                     method.DeclaringType == typeof(AnimationEventSource)
-                    && method.Name == nameof(AnimationEventSource.SimpleEvent)
+                    && string.Equals(
+                        method.Name,
+                        nameof(AnimationEventSource.SimpleEvent),
+                        System.StringComparison.Ordinal
+                    )
                 ),
                 "Expected SimpleEvent to be registered for AnimationEventSource."
             );
@@ -64,14 +68,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
             Assert.IsTrue(
                 methods.Any(method =>
                     method.DeclaringType == typeof(AnimationEventDerivedAllowed)
-                    && method.Name == nameof(AnimationEventDerivedAllowed.DerivedOnly)
+                    && string.Equals(
+                        method.Name,
+                        nameof(AnimationEventDerivedAllowed.DerivedOnly),
+                        System.StringComparison.Ordinal
+                    )
                 ),
                 "Derived-only handler should be registered."
             );
             Assert.IsTrue(
                 methods.Any(method =>
                     method.DeclaringType == typeof(AnimationEventSource)
-                    && method.Name == nameof(AnimationEventSource.AllowDerived)
+                    && string.Equals(
+                        method.Name,
+                        nameof(AnimationEventSource.AllowDerived),
+                        System.StringComparison.Ordinal
+                    )
                 ),
                 "Base handler that allows derived types should be included."
             );

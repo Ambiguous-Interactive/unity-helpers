@@ -1111,7 +1111,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                 if (autoRefresh)
                 {
-                    bool regexChanged = _compiledRegex == null || _lastUsedRegex != spriteNameRegex;
+                    bool regexChanged =
+                        _compiledRegex == null
+                        || !string.Equals(
+                            _lastUsedRegex,
+                            spriteNameRegex,
+                            System.StringComparison.Ordinal
+                        );
                     int currentSourcesHash = ComputeSourcesHash();
                     bool sourcesChanged = currentSourcesHash != _lastSourcesHash;
 
@@ -1130,7 +1136,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                     if (
                         _compiledGroupRegex == null
-                        || _lastGroupRegex != customGroupRegex
+                        || !string.Equals(
+                            _lastGroupRegex,
+                            customGroupRegex,
+                            System.StringComparison.Ordinal
+                        )
                         || customGroupRegexIgnoreCase
                             != ((_compiledGroupRegex?.Options & RegexOptions.IgnoreCase) != 0)
                     )
@@ -2505,7 +2515,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private void UpdateRegex()
         {
-            if (_compiledRegex == null || _lastUsedRegex != spriteNameRegex)
+            if (
+                _compiledRegex == null
+                || !string.Equals(_lastUsedRegex, spriteNameRegex, System.StringComparison.Ordinal)
+            )
             {
                 try
                 {

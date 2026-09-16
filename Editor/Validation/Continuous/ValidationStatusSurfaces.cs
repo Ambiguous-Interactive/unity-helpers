@@ -57,7 +57,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                         : ValidationResults.HasRun
                             ? ValidationResults.CheckedAssetCount + " assets checked"
                         : "Open Sentinel to run validation";
-                    if (status.text != text)
+                    if (!string.Equals(status.text, text, System.StringComparison.Ordinal))
                         status.text = text;
                 })
                 .Every(250);
@@ -158,7 +158,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     if (target == inspected || gameObject != null && owner == gameObject)
                         matches.Add(finding);
                 }
-                else if (!string.IsNullOrEmpty(path) && finding.AssetPath == path)
+                else if (
+                    !string.IsNullOrEmpty(path)
+                    && string.Equals(finding.AssetPath, path, System.StringComparison.Ordinal)
+                )
                     matches.Add(finding);
             }
             if (matches.Count == 0)

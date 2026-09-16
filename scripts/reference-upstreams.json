@@ -6,7 +6,7 @@
       "issue": 756,
       "localPath": "Runtime/Core/Extension/Sorting/IListSortYam.cs",
       "upstreamUrl": "https://raw.githubusercontent.com/gendeg/YamSort/main/Sort/YamSort.cs",
-      "auditedCommit": "aa849b59618ab0c0faf090f7c93f8b248ba1d94a",
+      "referenceCommit": "aa849b59618ab0c0faf090f7c93f8b248ba1d94a",
       "sha256": "527cab2de56d3347570b71469108bf8da2077862e92b9ddb796ac5987a0582a7"
     },
     {
@@ -15,7 +15,7 @@
       "issue": 757,
       "localPath": "Runtime/Core/Random/WyRandom.cs",
       "upstreamUrl": "https://raw.githubusercontent.com/cocowalla/wyhash-dotnet/master/src/WyHash/WyRng.cs",
-      "auditedCommit": "3698f21da3a117cccfd323177138b15ae1a32dc7",
+      "referenceCommit": "3698f21da3a117cccfd323177138b15ae1a32dc7",
       "sha256": "efdfdf2863436cad0108ab6d9f146538b7f0143b58544c42ab31c801e9d62c93"
     }
   ]

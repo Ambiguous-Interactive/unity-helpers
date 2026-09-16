@@ -470,7 +470,10 @@ namespace WallstopStudios.UnityHelpers.Editor
             {
                 if (
                     !string.IsNullOrEmpty(assetPath)
-                    && (assetPath == "Assets" || AssetDatabase.IsValidFolder(assetPath))
+                    && (
+                        string.Equals(assetPath, "Assets", System.StringComparison.Ordinal)
+                        || AssetDatabase.IsValidFolder(assetPath)
+                    )
                 )
                 {
                     validPaths.Add(assetPath);
@@ -1234,7 +1237,10 @@ namespace WallstopStudios.UnityHelpers.Editor
                 string p = top[0].path;
                 if (
                     !string.IsNullOrWhiteSpace(p)
-                    && (p == "Assets" || AssetDatabase.IsValidFolder(p))
+                    && (
+                        string.Equals(p, "Assets", System.StringComparison.Ordinal)
+                        || AssetDatabase.IsValidFolder(p)
+                    )
                 )
                 {
                     _assetPaths.Add(p);

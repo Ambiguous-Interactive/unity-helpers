@@ -63,7 +63,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     typeof(RuntimeMarkerTarget)
                 );
             FieldInfo fi = fields.FirstOrDefault(f =>
-                f.Name == nameof(RuntimeMarkerTarget.markedField)
+                string.Equals(
+                    f.Name,
+                    nameof(RuntimeMarkerTarget.markedField),
+                    System.StringComparison.Ordinal
+                )
             );
             Assert.IsTrue(fi != null, "Expected MarkedField to be discovered.");
         }
@@ -76,7 +80,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     typeof(RuntimeMarkerTarget)
                 );
             MethodInfo mi = methods.FirstOrDefault(m =>
-                m.Name == nameof(RuntimeMarkerTarget.MarkedMethod)
+                string.Equals(
+                    m.Name,
+                    nameof(RuntimeMarkerTarget.MarkedMethod),
+                    System.StringComparison.Ordinal
+                )
             );
             Assert.IsTrue(mi != null, "Expected MarkedMethod to be discovered.");
         }
@@ -89,7 +97,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                     typeof(RuntimeMarkerTarget)
                 );
             PropertyInfo pi = props.FirstOrDefault(p =>
-                p.Name == nameof(RuntimeMarkerTarget.MarkedProperty)
+                string.Equals(
+                    p.Name,
+                    nameof(RuntimeMarkerTarget.MarkedProperty),
+                    System.StringComparison.Ordinal
+                )
             );
             Assert.IsTrue(pi != null, "Expected MarkedProperty to be discovered.");
         }

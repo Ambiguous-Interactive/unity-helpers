@@ -1881,10 +1881,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(methods != null);
             Assert.Greater(methods.Length, 0);
             Assert.IsTrue(
-                methods.Any(m => m.Name == nameof(TestAttributeClass.StaticMethodWithAttribute))
+                methods.Any(m =>
+                    string.Equals(
+                        m.Name,
+                        nameof(TestAttributeClass.StaticMethodWithAttribute),
+                        System.StringComparison.Ordinal
+                    )
+                )
             );
             Assert.IsTrue(
-                methods.Any(m => m.Name == nameof(TestAttributeClass.InstanceMethodWithAttribute))
+                methods.Any(m =>
+                    string.Equals(
+                        m.Name,
+                        nameof(TestAttributeClass.InstanceMethodWithAttribute),
+                        System.StringComparison.Ordinal
+                    )
+                )
             );
 
             PropertyInfo[] properties = testType
@@ -1894,7 +1906,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.Greater(properties.Length, 0);
             Assert.IsTrue(
                 properties.Any(p =>
-                    p.Name == nameof(TestAttributeClass.StaticPropertyWithAttribute)
+                    string.Equals(
+                        p.Name,
+                        nameof(TestAttributeClass.StaticPropertyWithAttribute),
+                        System.StringComparison.Ordinal
+                    )
                 )
             );
 
@@ -1904,7 +1920,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(fields != null);
             Assert.Greater(fields.Length, 0);
             Assert.IsTrue(
-                fields.Any(f => f.Name == nameof(TestAttributeClass.StaticFieldWithAttribute))
+                fields.Any(f =>
+                    string.Equals(
+                        f.Name,
+                        nameof(TestAttributeClass.StaticFieldWithAttribute),
+                        System.StringComparison.Ordinal
+                    )
+                )
             );
 
             Assert.AreEqual(

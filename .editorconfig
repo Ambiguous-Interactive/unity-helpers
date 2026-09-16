@@ -48,11 +48,6 @@ csharp_style_var_for_built_in_types = false:suggestion
 csharp_style_var_when_type_is_apparent = false:suggestion
 csharp_using_directive_placement = inside_namespace:silent
 
-# The Odin source migration tool makes comparison policy part of its parser contract (#807, #808).
-[Editor/Tools/OdinMigration/*.cs]
-dotnet_diagnostic.WUH018.severity = warning
-
-[*]
 dotnet_naming_rule.event_rule.import_to_resharper = True
 dotnet_naming_rule.event_rule.resharper_description = Events
 dotnet_naming_rule.event_rule.resharper_guid = 0c4c6401-2a1f-4db1-a21f-562f51542cf8

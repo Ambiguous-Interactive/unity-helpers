@@ -265,11 +265,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assert.AreEqual(2, document.findings.Count);
             Assert.IsTrue(
                 document.findings.Exists(record =>
-                    record.suppressed && record.message == "silenced"
+                    record.suppressed
+                    && string.Equals(record.message, "silenced", System.StringComparison.Ordinal)
                 )
             );
             Assert.IsTrue(
-                document.findings.Exists(record => !record.suppressed && record.message == "loud")
+                document.findings.Exists(record =>
+                    !record.suppressed
+                    && string.Equals(record.message, "loud", System.StringComparison.Ordinal)
+                )
             );
         }
 

@@ -112,10 +112,14 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
 
             List<WButtonGroupKey> debugToolsGroups = groupCounts
-                .Keys.Where(k => k._groupName == "Debug Tools")
+                .Keys.Where(k =>
+                    string.Equals(k._groupName, "Debug Tools", System.StringComparison.Ordinal)
+                )
                 .ToList();
             List<WButtonGroupKey> saveSystemGroups = groupCounts
-                .Keys.Where(k => k._groupName == "Save System")
+                .Keys.Where(k =>
+                    string.Equals(k._groupName, "Save System", System.StringComparison.Ordinal)
+                )
                 .ToList();
 
             Assert.That(
@@ -281,7 +285,9 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
 
             List<WButtonGroupKey> conflictGroups = groupCounts
-                .Keys.Where(k => k._groupName == "ConflictGroup")
+                .Keys.Where(k =>
+                    string.Equals(k._groupName, "ConflictGroup", System.StringComparison.Ordinal)
+                )
                 .ToList();
 
             Assert.That(
@@ -384,10 +390,14 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
 
             List<WButtonGroupKey> setupGroups = groupCounts
-                .Keys.Where(k => k._groupName == "Setup")
+                .Keys.Where(k =>
+                    string.Equals(k._groupName, "Setup", System.StringComparison.Ordinal)
+                )
                 .ToList();
             List<WButtonGroupKey> cleanupGroups = groupCounts
-                .Keys.Where(k => k._groupName == "Cleanup")
+                .Keys.Where(k =>
+                    string.Equals(k._groupName, "Cleanup", System.StringComparison.Ordinal)
+                )
                 .ToList();
 
             Assert.That(setupGroups, Has.Count.EqualTo(1), "Should have exactly one Setup group");
@@ -549,7 +559,9 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
 
             List<WButtonGroupKey> conflictGroups = groupCounts
-                .Keys.Where(k => k._groupName == "ConflictGroup")
+                .Keys.Where(k =>
+                    string.Equals(k._groupName, "ConflictGroup", System.StringComparison.Ordinal)
+                )
                 .ToList();
 
             Assert.That(

@@ -44,7 +44,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             Texture2D[] textures = Resources.FindObjectsOfTypeAll<Texture2D>();
             foreach (Texture2D texture in textures)
             {
-                if (texture != null && texture.name == ImageBlurTool.TemporaryTextureName)
+                if (
+                    texture != null
+                    && string.Equals(
+                        texture.name,
+                        ImageBlurTool.TemporaryTextureName,
+                        System.StringComparison.Ordinal
+                    )
+                )
                 {
                     count++;
                 }

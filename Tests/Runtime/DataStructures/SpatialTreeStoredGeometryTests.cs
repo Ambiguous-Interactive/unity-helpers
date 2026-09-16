@@ -38,7 +38,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int[] finiteCounts = { 0, 1, 12 };
             foreach (string variant in variants)
             {
-                int dimensions = IsThreeDimensional(variant) || variant == "R2" ? 3 : 2;
+                int dimensions =
+                    IsThreeDimensional(variant)
+                    || string.Equals(variant, "R2", System.StringComparison.Ordinal)
+                        ? 3
+                        : 2;
                 foreach (float invalidValue in invalidValues)
                 {
                     for (int axis = 0; axis < dimensions; ++axis)
@@ -65,7 +69,18 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                                             false
                                         );
                                     }
-                                    if (variant == "R2" || variant == "R3")
+                                    if (
+                                        string.Equals(
+                                            variant,
+                                            "R2",
+                                            System.StringComparison.Ordinal
+                                        )
+                                        || string.Equals(
+                                            variant,
+                                            "R3",
+                                            System.StringComparison.Ordinal
+                                        )
+                                    )
                                     {
                                         yield return new TestCaseData(
                                             variant,
@@ -113,9 +128,17 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                             for (int layout = 0; layout < 7; ++layout)
                             {
                                 int boundaryCount =
-                                    variant == "Quad"
-                                    || variant == "QuadEntries"
-                                    || variant == "Oct"
+                                    string.Equals(variant, "Quad", System.StringComparison.Ordinal)
+                                    || string.Equals(
+                                        variant,
+                                        "QuadEntries",
+                                        System.StringComparison.Ordinal
+                                    )
+                                    || string.Equals(
+                                        variant,
+                                        "Oct",
+                                        System.StringComparison.Ordinal
+                                    )
                                         ? 3
                                         : 1;
                                 for (
@@ -167,10 +190,10 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
         private static bool IsThreeDimensional(string variant)
         {
-            return variant == "Kd3Balanced"
-                || variant == "Kd3Unbalanced"
-                || variant == "Oct"
-                || variant == "R3";
+            return string.Equals(variant, "Kd3Balanced", System.StringComparison.Ordinal)
+                || string.Equals(variant, "Kd3Unbalanced", System.StringComparison.Ordinal)
+                || string.Equals(variant, "Oct", System.StringComparison.Ordinal)
+                || string.Equals(variant, "R3", System.StringComparison.Ordinal);
         }
 
         private static object CreateTree(
@@ -190,7 +213,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                         source,
                         index => positions[index],
                         bucketSize,
-                        variant == "Kd2Balanced"
+                        string.Equals(variant, "Kd2Balanced", System.StringComparison.Ordinal)
                     );
                     CollectionAssert.AreEqual(source, kd2.elements, "Source snapshot");
                     return kd2;
@@ -222,7 +245,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                         source,
                         index => positions[index],
                         bucketSize,
-                        variant == "Kd3Balanced"
+                        string.Equals(variant, "Kd3Balanced", System.StringComparison.Ordinal)
                     );
                     CollectionAssert.AreEqual(source, kd3.elements, "Source snapshot");
                     return kd3;
@@ -427,7 +450,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int[] source = new int[coordinates.Length];
             Vector3[] positions = new Vector3[source.Length];
             Bounds[] storedBounds = new Bounds[source.Length];
-            bool boxTree = variant == "R2" || variant == "R3";
+            bool boxTree =
+                string.Equals(variant, "R2", System.StringComparison.Ordinal)
+                || string.Equals(variant, "R3", System.StringComparison.Ordinal);
             for (int index = 0; index < source.Length; ++index)
             {
                 source[index] = index;
@@ -621,7 +646,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     }
                 );
                 int[] neighborCounts =
-                    variant == "Oct" || boxTree
+                    string.Equals(variant, "Oct", System.StringComparison.Ordinal) || boxTree
                         ? new[] { 1, 2, source.Length + 1 }
                         : new[] { source.Length + 1 };
                 foreach (int neighborCount in neighborCounts)

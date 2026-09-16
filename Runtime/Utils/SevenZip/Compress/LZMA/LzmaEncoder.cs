@@ -1758,7 +1758,7 @@ namespace SevenZip.Compression.LZMA
         {
             for (int m = 0; m < KMatchFinderIDs.Length; m++)
             {
-                if (s == KMatchFinderIDs[m])
+                if (string.Equals(s, KMatchFinderIDs[m], System.StringComparison.Ordinal))
                 {
                     return m;
                 }

@@ -117,7 +117,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assembly[] loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
             foreach (Assembly assembly in loadedAssemblies)
             {
-                if (assembly.GetName().Name == assemblyName)
+                if (
+                    string.Equals(
+                        assembly.GetName().Name,
+                        assemblyName,
+                        System.StringComparison.Ordinal
+                    )
+                )
                 {
                     return assembly;
                 }
@@ -135,7 +141,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                     continue;
                 }
 
-                if (defineConstraint.Trim() == UnityIncludeTestsDefine)
+                if (
+                    string.Equals(
+                        defineConstraint.Trim(),
+                        UnityIncludeTestsDefine,
+                        System.StringComparison.Ordinal
+                    )
+                )
                 {
                     continue;
                 }
@@ -974,7 +986,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                     referencedNames.Add(an.Name);
                 }
 
-                if (testAssemblyName == "WallstopStudios.UnityHelpers.Tests.Core")
+                if (
+                    string.Equals(
+                        testAssemblyName,
+                        "WallstopStudios.UnityHelpers.Tests.Core",
+                        System.StringComparison.Ordinal
+                    )
+                )
                 {
                     if (!referencedNames.Contains("WallstopStudios.UnityHelpers"))
                     {

@@ -57,10 +57,18 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             WButtonMethodMetadata intMax = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(WButtonArbitraryDrawOrderTarget.OrderIntMax)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(WButtonArbitraryDrawOrderTarget.OrderIntMax),
+                    System.StringComparison.Ordinal
+                )
             );
             WButtonMethodMetadata order1000 = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(WButtonArbitraryDrawOrderTarget.Order1000)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(WButtonArbitraryDrawOrderTarget.Order1000),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(intMax, Is.Not.Null);
@@ -78,10 +86,18 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             WButtonMethodMetadata intMin = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(WButtonArbitraryDrawOrderTarget.OrderIntMin)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(WButtonArbitraryDrawOrderTarget.OrderIntMin),
+                    System.StringComparison.Ordinal
+                )
             );
             WButtonMethodMetadata orderMinus1000 = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(WButtonArbitraryDrawOrderTarget.OrderMinus1000)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(WButtonArbitraryDrawOrderTarget.OrderMinus1000),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(intMin, Is.Not.Null);
@@ -99,13 +115,25 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             WButtonMethodMetadata topAction1 = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(WButtonDrawOrderTestTarget.TopAction1)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(WButtonDrawOrderTestTarget.TopAction1),
+                    System.StringComparison.Ordinal
+                )
             );
             WButtonMethodMetadata topDebug1 = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(WButtonDrawOrderTestTarget.TopDebug1)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(WButtonDrawOrderTestTarget.TopDebug1),
+                    System.StringComparison.Ordinal
+                )
             );
             WButtonMethodMetadata topUtility = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(WButtonDrawOrderTestTarget.TopUtility)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(WButtonDrawOrderTestTarget.TopUtility),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(topAction1, Is.Not.Null);
@@ -256,7 +284,9 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Assert.That(metadata, Has.All.Property("DrawOrder").EqualTo(0));
 
             List<WButtonMethodMetadata> orderTestGroup = metadata
-                .Where(m => m.GroupName == "Order Test")
+                .Where(m =>
+                    string.Equals(m.GroupName, "Order Test", System.StringComparison.Ordinal)
+                )
                 .ToList();
 
             Assert.That(orderTestGroup, Has.Count.EqualTo(4));
@@ -335,10 +365,18 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             WButtonMethodMetadata setupMethod = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(WButtonGroupDeclarationOrderTarget.Initialize)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(WButtonGroupDeclarationOrderTarget.Initialize),
+                    System.StringComparison.Ordinal
+                )
             );
             WButtonMethodMetadata debugMethod = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(WButtonGroupDeclarationOrderTarget.RollDice)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(WButtonGroupDeclarationOrderTarget.RollDice),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(setupMethod, Is.Not.Null, "Setup method should exist");
@@ -359,13 +397,25 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             WButtonMethodMetadata zebra = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(WButtonReverseAlphabeticalGroupsTarget.ZebraAction)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(WButtonReverseAlphabeticalGroupsTarget.ZebraAction),
+                    System.StringComparison.Ordinal
+                )
             );
             WButtonMethodMetadata yak = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(WButtonReverseAlphabeticalGroupsTarget.YakAction)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(WButtonReverseAlphabeticalGroupsTarget.YakAction),
+                    System.StringComparison.Ordinal
+                )
             );
             WButtonMethodMetadata xenon = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(WButtonReverseAlphabeticalGroupsTarget.XenonAction)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(WButtonReverseAlphabeticalGroupsTarget.XenonAction),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(zebra, Is.Not.Null);
@@ -392,13 +442,25 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             WButtonMethodMetadata alpha1 = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(WButtonInterleavedGroupsTarget.Alpha1)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(WButtonInterleavedGroupsTarget.Alpha1),
+                    System.StringComparison.Ordinal
+                )
             );
             WButtonMethodMetadata beta1 = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(WButtonInterleavedGroupsTarget.Beta1)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(WButtonInterleavedGroupsTarget.Beta1),
+                    System.StringComparison.Ordinal
+                )
             );
             WButtonMethodMetadata gamma1 = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(WButtonInterleavedGroupsTarget.Gamma1)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(WButtonInterleavedGroupsTarget.Gamma1),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(alpha1, Is.Not.Null);
@@ -425,7 +487,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             List<WButtonMethodMetadata> alphaMethods = metadata
-                .Where(m => m.GroupName == "Alpha")
+                .Where(m => string.Equals(m.GroupName, "Alpha", System.StringComparison.Ordinal))
                 .ToList();
 
             Assert.That(alphaMethods, Has.Count.EqualTo(3));
@@ -452,10 +514,18 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Assert.That(byDrawOrder.ValueFor(-2), Has.Count.EqualTo(2));
 
             WButtonMethodMetadata zeroFirst = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(WButtonMixedDrawOrderAndGroupsTarget.ZeroFirst)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(WButtonMixedDrawOrderAndGroupsTarget.ZeroFirst),
+                    System.StringComparison.Ordinal
+                )
             );
             WButtonMethodMetadata zeroSecond = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(WButtonMixedDrawOrderAndGroupsTarget.ZeroSecond)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(WButtonMixedDrawOrderAndGroupsTarget.ZeroSecond),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(zeroFirst, Is.Not.Null);

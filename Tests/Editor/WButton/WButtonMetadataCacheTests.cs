@@ -58,7 +58,11 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 typeof(SampleTarget)
             );
             WButtonMethodMetadata method = metadata.First(m =>
-                m.Method.Name == nameof(SampleTarget.MethodWithCancellation)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(SampleTarget.MethodWithCancellation),
+                    System.StringComparison.Ordinal
+                )
             );
             Assert.That(method.CancellationTokenParameterIndex, Is.EqualTo(0));
         }
@@ -70,7 +74,11 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 typeof(SampleTarget)
             );
             WButtonMethodMetadata method = metadata.First(m =>
-                m.Method.Name == nameof(SampleTarget.PriorityMethod)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(SampleTarget.PriorityMethod),
+                    System.StringComparison.Ordinal
+                )
             );
             Assert.That(method.ColorKey, Is.EqualTo("Critical"));
 #pragma warning disable CS0618
@@ -85,7 +93,11 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 typeof(SampleTarget)
             );
             WButtonMethodMetadata method = metadata.First(m =>
-                m.Method.Name == nameof(SampleTarget.NamedGroupMethod)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(SampleTarget.NamedGroupMethod),
+                    System.StringComparison.Ordinal
+                )
             );
             Assert.That(method.GroupName, Is.EqualTo("Utilities"));
         }
@@ -97,7 +109,11 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 typeof(SampleTarget)
             );
             WButtonMethodMetadata method = metadata.First(m =>
-                m.Method.Name == nameof(SampleTarget.TaskMethodAsync)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(SampleTarget.TaskMethodAsync),
+                    System.StringComparison.Ordinal
+                )
             );
             Assert.That(method.ExecutionKind, Is.EqualTo(WButtonExecutionKind.Task));
             Assert.AreEqual(typeof(int), method.AsyncResultType);
@@ -110,7 +126,11 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 typeof(SampleTarget)
             );
             WButtonMethodMetadata method = metadata.First(m =>
-                m.Method.Name == nameof(SampleTarget.EnumeratorMethod)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(SampleTarget.EnumeratorMethod),
+                    System.StringComparison.Ordinal
+                )
             );
             Assert.That(method.ExecutionKind, Is.EqualTo(WButtonExecutionKind.Enumerator));
         }
@@ -123,7 +143,11 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 typeof(SampleTarget)
             );
             WButtonMethodMetadata method = metadata.First(m =>
-                m.Method.Name == nameof(SampleTarget.MethodWithDefaults)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(SampleTarget.MethodWithDefaults),
+                    System.StringComparison.Ordinal
+                )
             );
 
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(asset);

@@ -30,7 +30,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             bool enterChildren = true;
             while (iterator.NextVisible(enterChildren))
             {
-                if (iterator.propertyPath == "m_Script")
+                if (
+                    string.Equals(
+                        iterator.propertyPath,
+                        "m_Script",
+                        System.StringComparison.Ordinal
+                    )
+                )
                 {
                     enterChildren = false;
                     continue;

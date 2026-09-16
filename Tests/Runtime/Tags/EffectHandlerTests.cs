@@ -759,11 +759,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             int armorTicks = 0;
             foreach ((string attribute, _, _) in attributes.notifications)
             {
-                if (attribute == nameof(TestAttributesComponent.health))
+                if (
+                    string.Equals(
+                        attribute,
+                        nameof(TestAttributesComponent.health),
+                        System.StringComparison.Ordinal
+                    )
+                )
                 {
                     healthTicks++;
                 }
-                else if (attribute == nameof(TestAttributesComponent.armor))
+                else if (
+                    string.Equals(
+                        attribute,
+                        nameof(TestAttributesComponent.armor),
+                        System.StringComparison.Ordinal
+                    )
+                )
                 {
                     armorTicks++;
                 }

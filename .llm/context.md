@@ -72,11 +72,9 @@ See [create-csharp-file](./skills/create-csharp-file.md) for detailed C# rules.
     that already works, so it is **capped at `DiagnosticSeverity.Warning` and suppressible**:
     taking a package upgrade must never fail a consumer's build. On by default, with three exceptions --
     `WUH010` (a dictionary read by indexer), `WUH013` (a counting loop that can use `foreach`),
-    and `WUH018` (string equality whose comparison policy is implicit)
-    remain opt-in for consumers because their correct shapes are ubiquitous. **The package opts
-    into WUH013 in its shared check-project ruleset**; all five source projects enforce it. The
-    Odin migration source opts into WUH018 through its scoped `.editorconfig` rule, so its parser
-    comparisons must state ordinal policy without changing the consumer default.
+    and `WUH018` (string equality whose comparison policy is implicit) remain opt-in for consumers
+    because their correct shapes are ubiquitous. **The package opts into WUH010, WUH013, and WUH018
+    in its shared check-project ruleset**; all five source projects enforce every package analyzer policy without changing consumer defaults.
     Retain indexed loops when the index is needed or enumeration changes behavior.
     Both DLLs are committed under `Runtime/Analyzers`, byte-compared in CI, and **an edit to
     either is not finished until you rebuild it**. See [analyzers](../docs/performance/analyzers.md)

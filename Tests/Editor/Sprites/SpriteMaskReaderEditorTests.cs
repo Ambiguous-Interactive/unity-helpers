@@ -132,7 +132,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                         ++opaque;
                     }
                 }
-                Assert.AreEqual(sprite.name == "First" ? 1 : 0, opaque);
+                Assert.AreEqual(
+                    string.Equals(sprite.name, "First", System.StringComparison.Ordinal) ? 1 : 0,
+                    opaque
+                );
             }
             Assert.AreEqual(2, count);
             Assert.IsFalse(importer.isReadable);

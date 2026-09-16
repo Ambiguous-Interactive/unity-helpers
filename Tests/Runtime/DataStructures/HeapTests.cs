@@ -1203,7 +1203,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int index = -1;
             for (int i = 0; i < heap.Count; i++)
             {
-                if (heap[i] == "date")
+                if (string.Equals(heap[i], "date", System.StringComparison.Ordinal))
                 {
                     index = i;
                     break;

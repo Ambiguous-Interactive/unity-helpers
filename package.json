@@ -168,7 +168,7 @@
     "pr:feedback": "bash scripts/pr-feedback.sh",
     "verify:shipped-analyzers": "node scripts/verify-shipped-analyzers.js",
     "verify:shipped-analyzers:fix": "node scripts/verify-shipped-analyzers.js --fix",
-    "audit:reference-upstreams": "node scripts/check-reference-upstream-drift.js",
+    "check:reference-upstream-drift": "node scripts/check-reference-upstream-drift.js",
     "lint:comparison-direction:fix": "node scripts/lint-comparison-direction.js --fix",
     "lint:nested-type-placement": "node scripts/lint-nested-type-placement.js --verbose",
     "lint:nested-type-placement:fix": "node scripts/lint-nested-type-placement.js --fix",

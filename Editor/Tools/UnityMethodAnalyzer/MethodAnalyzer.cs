@@ -83,8 +83,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 issue = null;
                 return false;
             }
-            bool lifecycle = code == "WUH015";
-            bool inheritance = code == "WUH016";
+            bool lifecycle = string.Equals(code, "WUH015", System.StringComparison.Ordinal);
+            bool inheritance = string.Equals(code, "WUH016", System.StringComparison.Ordinal);
             string signature = ExtractQuoted(text, 0, out int next);
             string baseSignature = inheritance ? ExtractQuoted(text, next, out _) : null;
             int parenthesis = signature.IndexOf('(');

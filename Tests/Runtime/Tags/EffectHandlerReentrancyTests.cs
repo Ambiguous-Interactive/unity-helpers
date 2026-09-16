@@ -1268,7 +1268,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             bool torn = false;
             tags.OnTagAdded += tag =>
             {
-                if (torn || tag != LifecycleTag)
+                if (torn || !string.Equals(tag, LifecycleTag, System.StringComparison.Ordinal))
                 {
                     return;
                 }
@@ -1329,7 +1329,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
 
             tags.OnTagAdded += tag =>
             {
-                if (tag == LifecycleTag)
+                if (string.Equals(tag, LifecycleTag, System.StringComparison.Ordinal))
                 {
                     throw new InvalidOperationException(FailureMessage);
                 }

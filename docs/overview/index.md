@@ -114,7 +114,7 @@ Alphabetical index of all Unity Helpers features with quick links to documentati
 
 ## E
 
-**Editor Tools** - 20+ tools for sprites, animations, validation
+**Editor Tools** - 30+ tools for sprites, animations, validation
 → [Editor Tools Guide](../features/editor-tools/editor-tools-guide.md) | [README](../readme.md#editor-tools)
 
 **EffectHandle** - Identifier for effect application instances

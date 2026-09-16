@@ -86,10 +86,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
                 }
 
                 ranged++;
-                string expected =
-                    strict.Name == nameof(IRandom.Next)
-                        ? "NextIntInRange"
-                        : strict.Name + "InRange";
+                string expected = string.Equals(
+                    strict.Name,
+                    nameof(IRandom.Next),
+                    System.StringComparison.Ordinal
+                )
+                    ? "NextIntInRange"
+                    : strict.Name + "InRange";
                 MethodInfo sibling = typeof(RandomExtensions).GetMethod(
                     expected,
                     new[] { typeof(IRandom), strict.ReturnType, strict.ReturnType }
@@ -944,7 +947,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             for (int i = 0; i < 1000; ++i)
             {
                 string choice = rng.NextWeighted(weighted);
-                if (choice == "low")
+                if (string.Equals(choice, "low", System.StringComparison.Ordinal))
                 {
                     lowCount++;
                 }

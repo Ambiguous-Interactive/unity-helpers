@@ -109,7 +109,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             {
                 string expectedTryName = "Try" + method.Name;
                 bool hasSibling = PublicMethods.Any(candidate =>
-                    candidate.Name == expectedTryName && HasMatchingTrySignature(method, candidate)
+                    string.Equals(candidate.Name, expectedTryName, System.StringComparison.Ordinal)
+                    && HasMatchingTrySignature(method, candidate)
                 );
                 if (!hasSibling)
                 {

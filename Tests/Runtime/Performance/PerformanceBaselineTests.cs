@@ -76,7 +76,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Performance
             string currentCategory = null;
             foreach (BaselineTestResult result in results)
             {
-                if (result.Category != currentCategory)
+                if (
+                    !string.Equals(
+                        result.Category,
+                        currentCategory,
+                        System.StringComparison.Ordinal
+                    )
+                )
                 {
                     if (currentCategory != null)
                     {

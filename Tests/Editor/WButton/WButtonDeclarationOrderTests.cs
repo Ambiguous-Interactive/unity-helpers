@@ -334,7 +334,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             List<WButtonMethodMetadata> groupA = metadata
-                .Where(m => m.GroupName == "Group A")
+                .Where(m => string.Equals(m.GroupName, "Group A", System.StringComparison.Ordinal))
                 .ToList();
             Assert.That(groupA, Has.Count.EqualTo(3));
             Assert.That(
@@ -354,7 +354,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             List<WButtonMethodMetadata> groupB = metadata
-                .Where(m => m.GroupName == "Group B")
+                .Where(m => string.Equals(m.GroupName, "Group B", System.StringComparison.Ordinal))
                 .ToList();
             Assert.That(groupB, Has.Count.EqualTo(3));
             Assert.That(
@@ -452,7 +452,9 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             List<WButtonMethodMetadata> orderTestGroup = metadata
-                .Where(m => m.GroupName == "Order Test")
+                .Where(m =>
+                    string.Equals(m.GroupName, "Order Test", System.StringComparison.Ordinal)
+                )
                 .ToList();
 
             Assert.That(orderTestGroup, Has.Count.EqualTo(4));
@@ -470,10 +472,10 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             WButtonMethodMetadata firstOrderTest = metadata.FirstOrDefault(m =>
-                m.GroupName == "Order Test"
+                string.Equals(m.GroupName, "Order Test", System.StringComparison.Ordinal)
             );
             WButtonMethodMetadata firstOtherGroup = metadata.FirstOrDefault(m =>
-                m.GroupName == "Other Group"
+                string.Equals(m.GroupName, "Other Group", System.StringComparison.Ordinal)
             );
 
             Assert.That(firstOrderTest, Is.Not.Null);
@@ -494,7 +496,7 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             );
 
             List<WButtonMethodMetadata> alphaGroup = metadata
-                .Where(m => m.GroupName == "Alpha")
+                .Where(m => string.Equals(m.GroupName, "Alpha", System.StringComparison.Ordinal))
                 .ToList();
 
             Assert.That(alphaGroup, Has.Count.EqualTo(3));
@@ -512,9 +514,15 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
                 typeof(WButtonInterleavedGroupsTarget)
             );
 
-            WButtonMethodMetadata alpha1 = metadata.First(m => m.GroupName == "Alpha");
-            WButtonMethodMetadata beta1 = metadata.First(m => m.GroupName == "Beta");
-            WButtonMethodMetadata gamma1 = metadata.First(m => m.GroupName == "Gamma");
+            WButtonMethodMetadata alpha1 = metadata.First(m =>
+                string.Equals(m.GroupName, "Alpha", System.StringComparison.Ordinal)
+            );
+            WButtonMethodMetadata beta1 = metadata.First(m =>
+                string.Equals(m.GroupName, "Beta", System.StringComparison.Ordinal)
+            );
+            WButtonMethodMetadata gamma1 = metadata.First(m =>
+                string.Equals(m.GroupName, "Gamma", System.StringComparison.Ordinal)
+            );
 
             Assert.That(
                 alpha1.DeclarationOrder,

@@ -67,7 +67,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             OdinMigrationChange lockedChange = default;
             foreach (OdinMigrationChange change in analysis.Changes)
             {
-                if (change.From == "global::Sirenix.OdinInspector.ReadOnly")
+                if (
+                    string.Equals(
+                        change.From,
+                        "global::Sirenix.OdinInspector.ReadOnly",
+                        System.StringComparison.Ordinal
+                    )
+                )
                 {
                     lockedChange = change;
                     break;
@@ -890,7 +896,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
 
             public void WriteBackup(string path, byte[] bytes)
             {
-                if (path == FailBackupPath)
+                if (string.Equals(path, FailBackupPath, System.StringComparison.Ordinal))
                 {
                     throw new IOException("Simulated backup failure.");
                 }
@@ -900,12 +906,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
             public void WriteTarget(string path, byte[] bytes)
             {
                 TargetWrites++;
-                if (path == FailTargetPath)
+                if (string.Equals(path, FailTargetPath, System.StringComparison.Ordinal))
                 {
                     throw new IOException("Simulated write failure.");
                 }
                 Files[path] = bytes;
-                if (path == MutateAfterTargetPath)
+                if (string.Equals(path, MutateAfterTargetPath, System.StringComparison.Ordinal))
                 {
                     Files[path] = new byte[] { 99 };
                 }

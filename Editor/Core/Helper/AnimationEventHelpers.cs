@@ -155,7 +155,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Core.Helper
 
                         for (int midx = entry.Value.Count - 1; 0 <= midx; midx--)
                         {
-                            if (entry.Value[midx].Name == methodName)
+                            if (
+                                string.Equals(
+                                    entry.Value[midx].Name,
+                                    methodName,
+                                    System.StringComparison.Ordinal
+                                )
+                            )
                             {
                                 entry.Value.RemoveAt(midx);
                             }

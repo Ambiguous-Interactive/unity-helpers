@@ -32,7 +32,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.TestTypes
             {
                 return false;
             }
-            return id == other.id;
+            return string.Equals(id, other.id, System.StringComparison.Ordinal);
         }
 
         public override bool Equals(object obj)

@@ -54,7 +54,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         {
             CreateGUI();
             ShowView(view);
-            if (view == "Builder")
+            if (string.Equals(view, "Builder", System.StringComparison.Ordinal))
                 SetBuilderMode(graph);
             if (0 < _visible.Count)
                 Select(0);
@@ -250,10 +250,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             bool suppressed = _suppressions.IsSuppressed(in finding);
             return _enabledSeverities.Contains(finding.Severity)
                 && (
-                    _axis == "Suppressed"
+                    string.Equals(_axis, "Suppressed", System.StringComparison.Ordinal)
                         ? suppressed
-                        : _axis == "All Issues"
-                            || ValidationWorkspaceSettings.CategoryFor(finding.AssetPath) == _axis
+                        : string.Equals(_axis, "All Issues", System.StringComparison.Ordinal)
+                            || string.Equals(
+                                ValidationWorkspaceSettings.CategoryFor(finding.AssetPath),
+                                _axis,
+                                System.StringComparison.Ordinal
+                            )
                 );
         }
 
@@ -265,18 +269,24 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 foreach (ValidationFinding finding in _known)
                 {
                     if (
-                        entry.Key == "All Issues"
+                        string.Equals(entry.Key, "All Issues", System.StringComparison.Ordinal)
                         || (
-                            entry.Key == "Suppressed"
+                            string.Equals(entry.Key, "Suppressed", System.StringComparison.Ordinal)
                                 ? _suppressions.IsSuppressed(in finding)
-                                : ValidationWorkspaceSettings.CategoryFor(finding.AssetPath)
-                                    == entry.Key
+                                : string.Equals(
+                                    ValidationWorkspaceSettings.CategoryFor(finding.AssetPath),
+                                    entry.Key,
+                                    System.StringComparison.Ordinal
+                                )
                         )
                     )
                         count++;
                 }
                 entry.Value.text = entry.Key + "  " + count;
-                entry.Value.EnableInClassList("dx-selected", _axis == entry.Key);
+                entry.Value.EnableInClassList(
+                    "dx-selected",
+                    string.Equals(_axis, entry.Key, System.StringComparison.Ordinal)
+                );
             }
             foreach (KeyValuePair<ValidationSeverity, Button> entry in _severityButtons)
             {

@@ -502,7 +502,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomDrawers
             while (iterator.NextVisible(enterChildren))
             {
                 float propHeight = EditorGUI.GetPropertyHeight(iterator, true);
-                if (iterator.propertyPath == "m_Script")
+                if (
+                    string.Equals(
+                        iterator.propertyPath,
+                        "m_Script",
+                        System.StringComparison.Ordinal
+                    )
+                )
                 {
                     propertyDebug.AppendLine(
                         $"  {iterator.propertyPath}: {propHeight}px [SKIPPED]"

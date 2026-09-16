@@ -528,7 +528,11 @@ namespace WallstopStudios.UnityHelpers.Tests.WGroup
 
             bool foundInOperations = layout.Operations.Any(op =>
                 op.Type == WGroupDrawOperationType.Property
-                && op.PropertyPath == nameof(WGroupLayoutTestTarget.ungroupedField)
+                && string.Equals(
+                    op.PropertyPath,
+                    nameof(WGroupLayoutTestTarget.ungroupedField),
+                    System.StringComparison.Ordinal
+                )
             );
             Assert.That(
                 foundInOperations,

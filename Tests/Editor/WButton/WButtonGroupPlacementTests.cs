@@ -305,7 +305,9 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
             List<WButtonGroupKey> conflictGroups = groupCounts
-                .Keys.Where(k => k._groupName == "ConflictGroup")
+                .Keys.Where(k =>
+                    string.Equals(k._groupName, "ConflictGroup", System.StringComparison.Ordinal)
+                )
                 .ToList();
 
             Assert.That(
@@ -392,7 +394,9 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
             List<WButtonGroupKey> conflictGroups = groupCounts
-                .Keys.Where(k => k._groupName == "ConflictGroup")
+                .Keys.Where(k =>
+                    string.Equals(k._groupName, "ConflictGroup", System.StringComparison.Ordinal)
+                )
                 .ToList();
 
             Assert.That(
@@ -430,13 +434,19 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
 
             List<WButtonGroupKey> topGroups = groupCounts
-                .Keys.Where(k => k._groupName == "TopGroup")
+                .Keys.Where(k =>
+                    string.Equals(k._groupName, "TopGroup", System.StringComparison.Ordinal)
+                )
                 .ToList();
             List<WButtonGroupKey> bottomGroups = groupCounts
-                .Keys.Where(k => k._groupName == "BottomGroup")
+                .Keys.Where(k =>
+                    string.Equals(k._groupName, "BottomGroup", System.StringComparison.Ordinal)
+                )
                 .ToList();
             List<WButtonGroupKey> defaultGroups = groupCounts
-                .Keys.Where(k => k._groupName == "DefaultGroup")
+                .Keys.Where(k =>
+                    string.Equals(k._groupName, "DefaultGroup", System.StringComparison.Ordinal)
+                )
                 .ToList();
 
             Assert.That(topGroups, Has.Count.EqualTo(1), "Should have TopGroup");
@@ -493,11 +503,17 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
 
-            WButtonGroupKey group0 = groupCounts.Keys.First(k => k._groupName == "Group0");
-            WButtonGroupKey group5 = groupCounts.Keys.First(k => k._groupName == "Group5");
-            WButtonGroupKey group10 = groupCounts.Keys.First(k => k._groupName == "Group10");
+            WButtonGroupKey group0 = groupCounts.Keys.First(k =>
+                string.Equals(k._groupName, "Group0", System.StringComparison.Ordinal)
+            );
+            WButtonGroupKey group5 = groupCounts.Keys.First(k =>
+                string.Equals(k._groupName, "Group5", System.StringComparison.Ordinal)
+            );
+            WButtonGroupKey group10 = groupCounts.Keys.First(k =>
+                string.Equals(k._groupName, "Group10", System.StringComparison.Ordinal)
+            );
             WButtonGroupKey groupNoPriority = groupCounts.Keys.First(k =>
-                k._groupName == "GroupNoPriority"
+                string.Equals(k._groupName, "GroupNoPriority", System.StringComparison.Ordinal)
             );
 
             Assert.That(group0._groupPriority, Is.EqualTo(0), "Group0 should have priority 0");
@@ -548,7 +564,9 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
             List<WButtonGroupKey> conflictGroups = groupCounts
-                .Keys.Where(k => k._groupName == "ConflictGroup")
+                .Keys.Where(k =>
+                    string.Equals(k._groupName, "ConflictGroup", System.StringComparison.Ordinal)
+                )
                 .ToList();
 
             Assert.That(conflictGroups, Has.Count.EqualTo(1), "Should have one ConflictGroup");
@@ -673,13 +691,13 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
 
             WButtonGroupKey highPriorityTop = groupCounts.Keys.First(k =>
-                k._groupName == "HighPriorityTop"
+                string.Equals(k._groupName, "HighPriorityTop", System.StringComparison.Ordinal)
             );
             WButtonGroupKey lowPriorityTop = groupCounts.Keys.First(k =>
-                k._groupName == "LowPriorityTop"
+                string.Equals(k._groupName, "LowPriorityTop", System.StringComparison.Ordinal)
             );
             WButtonGroupKey bottomGroup = groupCounts.Keys.First(k =>
-                k._groupName == "BottomGroup"
+                string.Equals(k._groupName, "BottomGroup", System.StringComparison.Ordinal)
             );
 
             Assert.That(

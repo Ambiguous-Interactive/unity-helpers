@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Turns WUH010 and WUH013 on for all five gate projects: WallstopStudios.UnityHelpers.TypeCheck (Runtime/),
+  Turns WUH010, WUH013 and WUH018 on for all five gate projects: WallstopStudios.UnityHelpers.TypeCheck (Runtime/),
   EditorCheck (Runtime/ + Editor/), TestCheck (Tests/Runtime/), EditorTestCheck (Tests/Editor/) and
   IntegrationCheck (Runtime/Integrations/). The fifth was added with the project itself (#687) and
   costs nothing: all three of its configurations compile clean with WUH010 on, so the DI tree
@@ -16,10 +16,8 @@
   map by key and dying with KeyNotFoundException instead of a readable assertion failure - and now
   read through Tests/Core/DictionaryAssertions.ValueFor, which fails naming the key.
 
-  WUH010 (a dictionary read through the key indexer, where TryGetValue reports the miss) is one of the
-  two members of the WUH### family that ship off by default, WUH013 being the other: a read of a key that is known present is
-  correct and ubiquitous, so on by default it would bury the correctness rules on a consumer's first build
-  after a package upgrade. The package still holds itself to it, and this file is how.
+  WUH010, WUH013 and WUH018 ship off by default because their shapes are valid and ubiquitous.
+  The package still holds itself to all three, and this file is how.
 
   WHY A RULESET AND NOT AN .editorconfig. `dotnet_diagnostic.WUH010.severity` is matched against the
   SOURCE FILE's path. All five projects compile files out of Runtime/, Editor/ and Tests/ - none
@@ -28,8 +26,8 @@
   own compilation of those same trees, which is the thing this must not change. A ruleset is
   attached to the PROJECT, and it covers nothing a consumer builds.
 
-  Generator~/Directory.Build.props makes warnings errors, so a WUH010 finding fails these builds.
-  That is the point: it is the package's own opt-in, made binding.
+  Generator~/Directory.Build.props makes warnings errors, so any enabled WUH finding fails these
+  builds. That is the point: the package's own opt-ins are binding.
 
   WUH013 is also enabled for all five projects after #671 completed the remaining loop migration.
   The closing census found 306 sites: Editor 187, Tests 95, Runtime 24 (22 in integrations).
@@ -37,10 +35,15 @@
   Ordinary array/List reads use foreach; in-place compaction and collection mutation retain their
   indexed traversal. The analyzer recognizes direct mutation, and indirect teardown mutation has
   a narrowly scoped, reasoned suppression. Consumer defaults remain unchanged.
+
+  WUH018 joined the shared policy in #808. Its closing sweep made 354 package-owned comparisons
+  explicit across Runtime, Editor and both test trees. The editor policy catalog is checked against
+  the shipped descriptors so a new analyzer cannot silently drift from the user-facing tool.
 -->
 <RuleSet Name="Unity Helpers production check projects" Description="Package-internal analyzer opt-ins for the Generator~ gates over Runtime/, Editor/ and Tests/." ToolsVersion="15.0">
   <Rules AnalyzerId="WallstopStudios.UnityHelpers.Analyzers" RuleNamespace="WallstopStudios.UnityHelpers.Analyzers">
     <Rule Id="WUH010" Action="Warning" />
     <Rule Id="WUH013" Action="Warning" />
+    <Rule Id="WUH018" Action="Warning" />
   </Rules>
 </RuleSet>

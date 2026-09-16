@@ -125,4 +125,42 @@ for (const analyzerDll of analyzerDlls) {
   );
 }
 
+const diagnosticsSource = fs.readFileSync(
+  path.join(
+    root,
+    "Generator~",
+    "WallstopStudios.UnityHelpers.Analyzers",
+    "UnityHelpersDiagnostics.cs"
+  ),
+  "utf8"
+);
+const policyWindowSource = fs.readFileSync(
+  path.join(root, "Editor", "Tools", "AnalyzerPolicyWindow.cs"),
+  "utf8"
+);
+const descriptorIds = [...diagnosticsSource.matchAll(/^\s+"(WUH\d{3})",\r?$/gm)].map(
+  (match) => match[1]
+);
+const catalogIds = [...policyWindowSource.matchAll(/new\(\s*"(WUH\d{3})",/g)].map(
+  (match) => match[1]
+);
+check(
+  "the analyzer-policy editor catalog matches every shipped WUH descriptor",
+  JSON.stringify(catalogIds) === JSON.stringify(descriptorIds),
+  `descriptors=${descriptorIds.join(",")} catalog=${catalogIds.join(",")}`
+);
+
+const checkRuleset = fs.readFileSync(
+  path.join(root, "Generator~", "CheckProjects.ruleset"),
+  "utf8"
+);
+const enabledOptInIds = [...checkRuleset.matchAll(/<Rule Id="(WUH\d{3})" Action="Warning" \/>/g)]
+  .map((match) => match[1])
+  .sort();
+check(
+  "all opt-in WUH policies are enabled for package-owned check projects",
+  JSON.stringify(enabledOptInIds) === JSON.stringify(["WUH010", "WUH013", "WUH018"]),
+  enabledOptInIds.join(",")
+);
+
 process.stdout.write(`Analyzer placement contract passed (${passed} checks).\n`);

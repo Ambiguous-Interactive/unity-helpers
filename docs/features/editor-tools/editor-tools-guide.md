@@ -2,7 +2,7 @@
 
 **Batch tools for the asset work Unity makes you do one asset at a time.** Crop a folder of sprites,
 build clips from a naming convention, apply one set of import settings to 400 textures, or find the
-serialized field Unity is silently throwing away — 20+ editor tools in all.
+serialized field Unity is silently throwing away — 30+ editor tools in all.
 
 Everything here lives under `Tools > Wallstop Studios > Unity Helpers` unless stated otherwise. Two
 tools also expose a public C# API you can drive from your own editor scripts:
@@ -31,6 +31,7 @@ tools also expose a public C# API you can drive from your own editor scripts:
 | Build a sprite atlas from a regex or a label       | [Sprite Atlas Generator](#sprite-atlas-generator)                           |
 | Catch broken prefabs before they ship              | [Prefab Checker](#prefab-checker)                                           |
 | Catch a missing `override` on a lifecycle method   | [Unity Method Analyzer](#unity-method-analyzer)                             |
+| Configure Unity Helpers compiler diagnostics       | [Analyzer Policies](#analyzer-policies)                                     |
 | Find a field Unity is silently not serializing     | [Serialized Field Validator](#serialized-field-validator)                   |
 | See everything wrong with the project at once      | [Asset Validation](#asset-validation)                                       |
 | React to assets being created or deleted           | [Asset Change Detection](./asset-change-detection.md)                       |
@@ -921,6 +922,22 @@ public sealed class Turret : MonoBehaviour
 > _Console output showing detected prefab issues with clickable links_
 
 ---
+
+### Analyzer Policies
+
+`Tools > Wallstop Studios > Unity Helpers > Analyzer Policies`
+
+Use this window to make the package's compiler guidance explicit for scripts under `Assets`:
+
+- **Enable All** writes every `WUH001` through `WUH018` rule as `Warning`.
+- **Disable All** writes every rule as `None`, including diagnostics that are on by default.
+- **Refresh** re-reads `Assets/Default.ruleset` and reports missing, duplicate, mixed, malformed, or
+  unknown Unity Helpers policy entries.
+
+The tool preserves rule groups owned by other analyzers. It refuses malformed XML instead of
+overwriting it. The ruleset is a project file change outside Unity's undo system, so commit it when
+the policy should be shared with the team. The window lists every diagnostic with a short
+explanation; the [Analyzer reference](../../performance/analyzers.md) has examples and fixes.
 
 ### Unity Method Analyzer
 

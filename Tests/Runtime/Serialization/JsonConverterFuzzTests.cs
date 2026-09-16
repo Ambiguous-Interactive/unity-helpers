@@ -853,7 +853,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                     writer.WriteStringValue(element.GetString() + "§second");
                     break;
                 case JsonValueKind.Number:
-                    writer.WriteNumberValue(element.GetRawText() == "0" ? 1 : 0);
+                    writer.WriteNumberValue(
+                        string.Equals(element.GetRawText(), "0", System.StringComparison.Ordinal)
+                            ? 1
+                            : 0
+                    );
                     break;
                 case JsonValueKind.True:
                     writer.WriteBooleanValue(false);

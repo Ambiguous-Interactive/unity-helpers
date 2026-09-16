@@ -41,7 +41,13 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             WButtonMethodMetadata metadata = WButtonMetadataCache
                 .GetMetadata(typeof(InvocationTarget))
-                .First(m => m.Method.Name == nameof(InvocationTarget.AsyncTaskButton));
+                .First(m =>
+                    string.Equals(
+                        m.Method.Name,
+                        nameof(InvocationTarget.AsyncTaskButton),
+                        System.StringComparison.Ordinal
+                    )
+                );
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
             WButtonMethodState methodState = targetState.GetOrCreateMethodState(metadata);
             WButtonMethodContext context = new(
@@ -70,7 +76,13 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             WButtonMethodMetadata metadata = WButtonMetadataCache
                 .GetMetadata(typeof(InvocationTarget))
-                .First(m => m.Method.Name == nameof(InvocationTarget.EnumeratorButton));
+                .First(m =>
+                    string.Equals(
+                        m.Method.Name,
+                        nameof(InvocationTarget.EnumeratorButton),
+                        System.StringComparison.Ordinal
+                    )
+                );
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
             WButtonMethodState methodState = targetState.GetOrCreateMethodState(metadata);
             WButtonMethodContext context = new(
@@ -99,7 +111,13 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             WButtonMethodMetadata metadata = WButtonMetadataCache
                 .GetMetadata(typeof(InvocationTarget))
-                .First(m => m.Method.Name == nameof(InvocationTarget.AsyncTaskButton));
+                .First(m =>
+                    string.Equals(
+                        m.Method.Name,
+                        nameof(InvocationTarget.AsyncTaskButton),
+                        System.StringComparison.Ordinal
+                    )
+                );
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
             WButtonMethodState methodState = targetState.GetOrCreateMethodState(metadata);
 

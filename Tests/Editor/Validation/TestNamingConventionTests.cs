@@ -188,10 +188,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             {
                 string attributeName = attribute.GetType().Name;
                 if (
-                    attributeName == "TestAttribute"
-                    || attributeName == "TestCaseAttribute"
-                    || attributeName == "TestCaseSourceAttribute"
-                    || attributeName == "UnityTestAttribute"
+                    string.Equals(attributeName, "TestAttribute", System.StringComparison.Ordinal)
+                    || string.Equals(
+                        attributeName,
+                        "TestCaseAttribute",
+                        System.StringComparison.Ordinal
+                    )
+                    || string.Equals(
+                        attributeName,
+                        "TestCaseSourceAttribute",
+                        System.StringComparison.Ordinal
+                    )
+                    || string.Equals(
+                        attributeName,
+                        "UnityTestAttribute",
+                        System.StringComparison.Ordinal
+                    )
                 )
                 {
                     return true;
@@ -428,7 +440,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                     foreach (object attribute in attributes)
                     {
                         Type attributeType = attribute.GetType();
-                        if (attributeType.Name != "TestCaseSourceAttribute")
+                        if (
+                            !string.Equals(
+                                attributeType.Name,
+                                "TestCaseSourceAttribute",
+                                System.StringComparison.Ordinal
+                            )
+                        )
                         {
                             continue;
                         }

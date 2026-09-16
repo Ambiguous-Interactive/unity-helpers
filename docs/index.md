@@ -142,7 +142,7 @@ Pick your starting point based on your biggest pain point:
 | Slow spatial searches             | [**Spatial Trees**](./features/spatial/spatial-trees-2d-guide.md) - O(log n) queries                                               | ~5 minutes    |
 | Random is too slow/limited        | [**Random Generators**](./features/utilities/random-generators.md) - 10-15x faster with weighted selection, Gaussian, Perlin noise | ~1 minute     |
 | Need save/load system             | [**Serialization**](./features/serialization/serialization.md) - Unity types supported                                             | ~10 minutes   |
-| Manual sprite workflows           | [**Editor Tools**](./features/editor-tools/editor-tools-guide.md) - 20+ automation tools                                           | ~3 minutes    |
+| Manual sprite workflows           | [**Editor Tools**](./features/editor-tools/editor-tools-guide.md) - 30+ automation tools                                           | ~3 minutes    |
 
 !!! tip "Not sure where to start?"
 

@@ -87,7 +87,11 @@ namespace WallstopStudios.UnityHelpers.Tests
             foreach (MethodInfo method in allMethods)
             {
                 if (
-                    method.Name == nameof(Cache<object, object>.TryGet)
+                    string.Equals(
+                        method.Name,
+                        nameof(Cache<object, object>.TryGet),
+                        System.StringComparison.Ordinal
+                    )
                     && method.GetParameters().Length == 2
                 )
                 {
@@ -321,7 +325,13 @@ namespace WallstopStudios.UnityHelpers.Tests
             List<MethodInfo> jsonStringifyMethodsList = new();
             foreach (MethodInfo method in allMethods)
             {
-                if (method.Name == nameof(Serializer.JsonStringify))
+                if (
+                    string.Equals(
+                        method.Name,
+                        nameof(Serializer.JsonStringify),
+                        System.StringComparison.Ordinal
+                    )
+                )
                 {
                     jsonStringifyMethodsList.Add(method);
                 }
@@ -339,7 +349,10 @@ namespace WallstopStudios.UnityHelpers.Tests
                 ParameterInfo[] parameters = method.GetParameters();
                 foreach (ParameterInfo parameter in parameters)
                 {
-                    if (parameter.Name == "pretty" && parameter.ParameterType == typeof(bool))
+                    if (
+                        string.Equals(parameter.Name, "pretty", System.StringComparison.Ordinal)
+                        && parameter.ParameterType == typeof(bool)
+                    )
                     {
                         hasPrettyOverload = true;
                         break;
@@ -393,7 +406,13 @@ namespace WallstopStudios.UnityHelpers.Tests
             List<MethodInfo> jsonSerializeMethodsList = new();
             foreach (MethodInfo method in allMethods)
             {
-                if (method.Name == nameof(Serializer.JsonSerialize))
+                if (
+                    string.Equals(
+                        method.Name,
+                        nameof(Serializer.JsonSerialize),
+                        System.StringComparison.Ordinal
+                    )
+                )
                 {
                     jsonSerializeMethodsList.Add(method);
                 }
@@ -756,7 +775,7 @@ namespace WallstopStudios.UnityHelpers.Tests
                 int methodCount = 0;
                 foreach (MethodInfo method in allSerializerMethods)
                 {
-                    if (method.Name == methodName)
+                    if (string.Equals(method.Name, methodName, System.StringComparison.Ordinal))
                     {
                         methodCount++;
                     }
@@ -792,7 +811,7 @@ namespace WallstopStudios.UnityHelpers.Tests
                 bool hasMethod = false;
                 foreach (MethodInfo method in allMethods)
                 {
-                    if (method.Name == methodName)
+                    if (string.Equals(method.Name, methodName, System.StringComparison.Ordinal))
                     {
                         hasMethod = true;
                         break;
@@ -809,7 +828,7 @@ namespace WallstopStudios.UnityHelpers.Tests
                 bool hasMethod = false;
                 foreach (MethodInfo method in allMethods)
                 {
-                    if (method.Name == methodName)
+                    if (string.Equals(method.Name, methodName, System.StringComparison.Ordinal))
                     {
                         hasMethod = true;
                         break;

@@ -487,7 +487,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     )
                 )
                 {
-                    if (held.BaseTypeName == baseName)
+                    if (string.Equals(held.BaseTypeName, baseName, System.StringComparison.Ordinal))
                     {
                         inventory.Reserved.Add(held);
                     }
@@ -498,7 +498,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     )
                 )
                 {
-                    if (held.BaseTypeName == baseName)
+                    if (string.Equals(held.BaseTypeName, baseName, System.StringComparison.Ordinal))
                     {
                         inventory.Reserved.Add(held);
                     }

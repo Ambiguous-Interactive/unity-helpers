@@ -59,7 +59,7 @@ Unity Helpers provides tested utilities for common Unity patterns. Benchmarks sh
 - 🔌 **Reduced boilerplate** component wiring with attributes
 - 🎮 **Designer-friendly** effects system (buffs/debuffs as ScriptableObjects)
 - 🌳 **O(log n)** spatial queries instead of O(n) loops
-- 🛠️ **20+ editor tools** that automate sprite/animation workflows
+- 🛠️ **30+ editor tools** that automate sprite/animation workflows
 - ✅ **14,000+ tests**
 
 ---
@@ -98,7 +98,7 @@ Unity Helpers provides tested utilities for common Unity patterns. Benchmarks sh
 | 🔍 Slow spatial searches             | [**Spatial Trees**](#spatial-trees) - O(log n) queries                                 | ~5 minutes    |
 | 🎲 Random is too slow/limited        | [**PRNG.Instance**](#random-number-generators) - 10-15x faster in benchmarks           | ~1 minute     |
 | 💾 Need save/load system             | [**Serialization**](#4-unity-aware-serialization) - Unity types just work              | ~10 minutes   |
-| 🛠️ Manual sprite workflows           | [**Editor Tools**](#editor-tools) - 20+ automation tools                               | ~3 minutes    |
+| 🛠️ Manual sprite workflows           | [**Editor Tools**](#editor-tools) - 30+ automation tools                               | ~3 minutes    |
 
 **Not sure where to start?** → [Getting Started Guide](./docs/overview/getting-started.md) walks through the top 3 features in ~5 minutes.
 
@@ -280,7 +280,7 @@ void ProcessEnemies(QuadTree2D<Enemy> enemyTree) {
 
 ### 6. 🛠️ Editor Tools Suite
 
-20+ tools that automate sprite cropping, animation creation, atlas generation, prefab validation:
+30+ tools that automate sprite cropping, animation creation, atlas generation, prefab validation:
 
 **Common workflows:**
 
@@ -1042,7 +1042,7 @@ See the guide: [Singleton Utilities](./docs/features/utilities/singletons.md) an
 
 ### Editor Tools
 
-Unity Helpers includes 20+ editor tools to streamline your workflow:
+Unity Helpers includes 30+ editor tools to streamline your workflow:
 
 - **Sprite Tools**: Cropper, Atlas Generator, Animation Editor, Pivot Adjuster
 - **Texture Tools**: Blur, Resize, Settings Applier, Fit Texture Size

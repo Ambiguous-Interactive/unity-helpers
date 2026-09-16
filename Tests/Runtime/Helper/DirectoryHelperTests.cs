@@ -436,7 +436,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             string testPath = Application.dataPath + "//Multiple///Separators";
             string result = DirectoryHelper.FindRootPath(
                 testPath,
-                path => path == Application.dataPath
+                path => string.Equals(path, Application.dataPath, System.StringComparison.Ordinal)
             );
             Assert.That(result, Is.Not.Null);
         }
@@ -1116,7 +1116,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             string mixedPath = Application.dataPath + @"/SubFolder\AnotherFolder/File";
             string result = DirectoryHelper.FindRootPath(
                 mixedPath,
-                path => path == Application.dataPath
+                path => string.Equals(path, Application.dataPath, System.StringComparison.Ordinal)
             );
             Assert.That(result, Is.Not.Null);
         }

@@ -109,7 +109,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             List<AuthoredAssetEntry> names = new();
             foreach (AuthoredAssetEntry entry in document.Entries)
             {
-                if (entry.Key == "_name")
+                if (string.Equals(entry.Key, "_name", System.StringComparison.Ordinal))
                 {
                     names.Add(entry);
                 }

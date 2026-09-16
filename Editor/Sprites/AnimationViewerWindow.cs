@@ -110,7 +110,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            fileSelector.PlaceInFront(root[0]);
+            fileSelector.SendToBack();
         }
 
         private static string GetLastAnimationDirectory()

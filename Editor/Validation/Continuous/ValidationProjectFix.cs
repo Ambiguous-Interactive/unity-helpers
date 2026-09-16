@@ -21,7 +21,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         internal static bool CanFix(ValidationWorkspaceSettings.RuleDefinition rule)
         {
-            return rule != null && rule.fix != "None (report only)";
+            return rule != null
+                && !string.Equals(rule.fix, "None (report only)", System.StringComparison.Ordinal);
         }
 
         internal static List<Action> ApplyMany(
@@ -67,9 +68,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             if (!CanFix(rule))
                 throw new InvalidOperationException("This rule only reports findings.");
             Object original = VerifySource(rule, finding, allowDependencyChanges);
-            if (rule.fix == ValidationWorkspaceSettings.RenameToPatternFix)
+            if (
+                string.Equals(
+                    rule.fix,
+                    ValidationWorkspaceSettings.RenameToPatternFix,
+                    System.StringComparison.Ordinal
+                )
+            )
                 return Rename(rule, finding);
-            if (rule.fix == ValidationWorkspaceSettings.SetImportMaxSizeFix)
+            if (
+                string.Equals(
+                    rule.fix,
+                    ValidationWorkspaceSettings.SetImportMaxSizeFix,
+                    System.StringComparison.Ordinal
+                )
+            )
             {
                 if (
                     !int.TryParse(
@@ -94,7 +107,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 importer.SaveAndReimport();
                 return () =>
                 {
-                    if (AssetDatabase.AssetPathToGUID(finding.AssetPath) != importerGuid)
+                    if (
+                        !string.Equals(
+                            AssetDatabase.AssetPathToGUID(finding.AssetPath),
+                            importerGuid,
+                            System.StringComparison.Ordinal
+                        )
+                    )
                         throw new InvalidOperationException(
                             "The texture asset moved or was replaced since this fix."
                         );
@@ -118,7 +137,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     throw new InvalidOperationException(
                         "The affected object no longer exists. Validate again."
                     );
-                if (rule.fix == "Force mono on import")
+                if (
+                    string.Equals(rule.fix, "Force mono on import", System.StringComparison.Ordinal)
+                )
                 {
                     AudioSource audio = resolved as AudioSource;
                     if (
@@ -140,7 +161,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     importer.SaveAndReimport();
                     return () =>
                     {
-                        if (AssetDatabase.AssetPathToGUID(clipPath) != clipGuid)
+                        if (
+                            !string.Equals(
+                                AssetDatabase.AssetPathToGUID(clipPath),
+                                clipGuid,
+                                System.StringComparison.Ordinal
+                            )
+                        )
                             throw new InvalidOperationException(
                                 "The audio asset moved or was replaced since this fix."
                             );
@@ -154,7 +181,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                         current.SaveAndReimport();
                     };
                 }
-                if (rule.fix != "Remove component")
+                if (!string.Equals(rule.fix, "Remove component", System.StringComparison.Ordinal))
                     throw new InvalidOperationException("Unknown fix: " + rule.fix);
                 Type componentType = ValidationProjectRule.PrimaryComponentType(rule);
                 Component component =
@@ -208,7 +235,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             bool allowDependencyChanges = false
         )
         {
-            if (AssetDatabase.GUIDToAssetPath(finding.AssetGuid) != finding.AssetPath)
+            if (
+                !string.Equals(
+                    AssetDatabase.GUIDToAssetPath(finding.AssetGuid),
+                    finding.AssetPath,
+                    System.StringComparison.Ordinal
+                )
+            )
                 throw new InvalidOperationException(
                     "The asset moved or was replaced since scanning. Validate again before fixing."
                 );
@@ -274,7 +307,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             string renamed = AssetDatabase.GUIDToAssetPath(finding.AssetGuid);
             return () =>
             {
-                if (AssetDatabase.GUIDToAssetPath(finding.AssetGuid) != renamed)
+                if (
+                    !string.Equals(
+                        AssetDatabase.GUIDToAssetPath(finding.AssetGuid),
+                        renamed,
+                        System.StringComparison.Ordinal
+                    )
+                )
                     throw new InvalidOperationException("The asset moved since this fix.");
                 string failure = AssetDatabase.RenameAsset(renamed, oldName);
                 if (!string.IsNullOrEmpty(failure))
@@ -289,8 +328,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         )
         {
             if (!allowDependencyChanges)
-                return current == original;
-            return current.Split(':')[0] == original.Split(':')[0];
+                return string.Equals(current, original, System.StringComparison.Ordinal);
+            return string.Equals(
+                current.Split(':')[0],
+                original.Split(':')[0],
+                System.StringComparison.Ordinal
+            );
         }
 
         private static Object Resolve(

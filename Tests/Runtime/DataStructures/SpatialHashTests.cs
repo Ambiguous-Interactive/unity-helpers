@@ -419,7 +419,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             int farCount = 0;
             foreach (string entry in coarseResults)
             {
-                if (entry == "far")
+                if (string.Equals(entry, "far", System.StringComparison.Ordinal))
                 {
                     farCount++;
                 }
@@ -704,7 +704,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             List<string> duplicates = new();
             hash.QueryRect(rect, duplicates, distinct: false);
             Assert.AreEqual(3, duplicates.Count);
-            Assert.AreEqual(2, duplicates.Count(token => token == "dup"));
+            Assert.AreEqual(
+                2,
+                duplicates.Count(token =>
+                    string.Equals(token, "dup", System.StringComparison.Ordinal)
+                )
+            );
         }
 
         [Test]
@@ -765,7 +770,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             List<string> duplicates = new();
             hash.QueryBox(bounds, duplicates, distinct: false);
             Assert.AreEqual(3, duplicates.Count);
-            Assert.AreEqual(2, duplicates.Count(token => token == "alpha"));
+            Assert.AreEqual(
+                2,
+                duplicates.Count(token =>
+                    string.Equals(token, "alpha", System.StringComparison.Ordinal)
+                )
+            );
         }
 
         [Test]

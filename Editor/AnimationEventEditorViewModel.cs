@@ -117,7 +117,10 @@ namespace WallstopStudios.UnityHelpers.Editor
                 ? string.Empty
                 : searchTerm.Trim();
 
-            if (normalizedSearch.Length == 0 || normalizedSearch == "*")
+            if (
+                normalizedSearch.Length == 0
+                || string.Equals(normalizedSearch, "*", System.StringComparison.Ordinal)
+            )
             {
                 _clipFilterBuffer.AddRange(clips);
                 return _clipFilterBuffer;
@@ -137,7 +140,10 @@ namespace WallstopStudios.UnityHelpers.Editor
                     }
 
                     token = token.Trim();
-                    if (token.Length == 0 || token == "*")
+                    if (
+                        token.Length == 0
+                        || string.Equals(token, "*", System.StringComparison.Ordinal)
+                    )
                     {
                         continue;
                     }

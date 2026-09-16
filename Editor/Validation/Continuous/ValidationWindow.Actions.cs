@@ -23,9 +23,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 return;
             Open();
             ValidationWindow window = GetWindow<ValidationWindow>();
-            if (action == "fix")
+            if (string.Equals(action, "fix", System.StringComparison.Ordinal))
                 window.FixFindings(new[] { finding });
-            else if (action == "suppress")
+            else if (string.Equals(action, "suppress", System.StringComparison.Ordinal))
                 window.SetSuppressed(finding, true);
             else
             {
@@ -33,7 +33,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 window._query = finding.AssetPath;
                 window.Refresh();
                 for (int index = 0; index < window._visible.Count; index++)
-                    if (window._visible[index].Id == finding.Id)
+                    if (
+                        string.Equals(
+                            window._visible[index].Id,
+                            finding.Id,
+                            System.StringComparison.Ordinal
+                        )
+                    )
                     {
                         window.Select(index);
                         break;
@@ -117,7 +123,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                         {
                             if (
                                 !File.Exists(DefaultSuppressionsPath)
-                                || File.ReadAllText(DefaultSuppressionsPath) != updated
+                                || !string.Equals(
+                                    File.ReadAllText(DefaultSuppressionsPath),
+                                    updated,
+                                    System.StringComparison.Ordinal
+                                )
                             )
                             {
                                 Say(
@@ -150,7 +160,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     .instance
                     .projectRules
             )
-                if (rule.id == finding.RuleId)
+                if (string.Equals(rule.id, finding.RuleId, System.StringComparison.Ordinal))
                     return rule;
             return null;
         }

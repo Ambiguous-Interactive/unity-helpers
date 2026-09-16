@@ -575,11 +575,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             {
                 string result = PRNG.Instance.NextWeightedElement(items, weights);
                 seen.Add(result);
-                if (result == "common")
+                if (string.Equals(result, "common", System.StringComparison.Ordinal))
                 {
                     commonCount++;
                 }
-                else if (result == "rare")
+                else if (string.Equals(result, "rare", System.StringComparison.Ordinal))
                 {
                     rareCount++;
                 }
@@ -629,11 +629,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             {
                 string result = PRNG.Instance.NextWeighted(items);
                 seen.Add(result);
-                if (result == "common")
+                if (string.Equals(result, "common", System.StringComparison.Ordinal))
                 {
                     commonCount++;
                 }
-                else if (result == "rare")
+                else if (string.Equals(result, "rare", System.StringComparison.Ordinal))
                 {
                     rareCount++;
                 }

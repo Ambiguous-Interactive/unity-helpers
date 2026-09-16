@@ -132,7 +132,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
             Assert.That(metadata.Count, Is.GreaterThan(0));
             Assert.That(
                 metadata.Any(m =>
-                    m.Method.Name == nameof(OdinScriptableObjectTestTarget.SimpleButton)
+                    string.Equals(
+                        m.Method.Name,
+                        nameof(OdinScriptableObjectTestTarget.SimpleButton),
+                        StringComparison.Ordinal
+                    )
                 ),
                 Is.True,
                 "Should find SimpleButton method"
@@ -149,7 +153,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
             Assert.That(metadata, Is.Not.Null);
             Assert.That(metadata.Count, Is.GreaterThan(0));
             Assert.That(
-                metadata.Any(m => m.Method.Name == nameof(OdinMonoBehaviourTestTarget.TestAction)),
+                metadata.Any(m =>
+                    string.Equals(
+                        m.Method.Name,
+                        nameof(OdinMonoBehaviourTestTarget.TestAction),
+                        StringComparison.Ordinal
+                    )
+                ),
                 Is.True,
                 "Should find TestAction method"
             );
@@ -226,16 +236,32 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
             Assert.That(metadata.Count, Is.EqualTo(4), "Should have 4 WButton methods");
 
             WButtonMethodMetadata group1Button1 = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(OdinScriptableObjectMultipleGroups.Group1Button1)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(OdinScriptableObjectMultipleGroups.Group1Button1),
+                    StringComparison.Ordinal
+                )
             );
             WButtonMethodMetadata group1Button2 = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(OdinScriptableObjectMultipleGroups.Group1Button2)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(OdinScriptableObjectMultipleGroups.Group1Button2),
+                    StringComparison.Ordinal
+                )
             );
             WButtonMethodMetadata group2Button1 = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(OdinScriptableObjectMultipleGroups.Group2Button1)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(OdinScriptableObjectMultipleGroups.Group2Button1),
+                    StringComparison.Ordinal
+                )
             );
             WButtonMethodMetadata ungroupedButton = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(OdinScriptableObjectMultipleGroups.UngroupedButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(OdinScriptableObjectMultipleGroups.UngroupedButton),
+                    StringComparison.Ordinal
+                )
             );
 
             Assert.That(group1Button1, Is.Not.Null);
@@ -289,13 +315,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
             Assert.That(metadata, Is.Not.Null);
 
             WButtonMethodMetadata stringParamMethod = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(OdinScriptableObjectWithParameters.ButtonWithStringParam)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(OdinScriptableObjectWithParameters.ButtonWithStringParam),
+                    StringComparison.Ordinal
+                )
             );
             WButtonMethodMetadata intParamMethod = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(OdinScriptableObjectWithParameters.ButtonWithIntParam)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(OdinScriptableObjectWithParameters.ButtonWithIntParam),
+                    StringComparison.Ordinal
+                )
             );
             WButtonMethodMetadata multiParamMethod = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(OdinScriptableObjectWithParameters.ButtonWithMultipleParams)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(OdinScriptableObjectWithParameters.ButtonWithMultipleParams),
+                    StringComparison.Ordinal
+                )
             );
 
             Assert.That(stringParamMethod, Is.Not.Null);
@@ -350,16 +388,32 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
             Assert.That(metadata, Is.Not.Null);
 
             WButtonMethodMetadata asyncTaskMethod = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(OdinScriptableObjectAsync.AsyncTaskButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(OdinScriptableObjectAsync.AsyncTaskButton),
+                    StringComparison.Ordinal
+                )
             );
             WButtonMethodMetadata asyncValueTaskMethod = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(OdinScriptableObjectAsync.AsyncValueTaskButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(OdinScriptableObjectAsync.AsyncValueTaskButton),
+                    StringComparison.Ordinal
+                )
             );
             WButtonMethodMetadata enumeratorMethod = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(OdinScriptableObjectAsync.EnumeratorButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(OdinScriptableObjectAsync.EnumeratorButton),
+                    StringComparison.Ordinal
+                )
             );
             WButtonMethodMetadata syncMethod = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(OdinScriptableObjectAsync.SyncButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(OdinScriptableObjectAsync.SyncButton),
+                    StringComparison.Ordinal
+                )
             );
 
             Assert.That(asyncTaskMethod, Is.Not.Null);
@@ -418,7 +472,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
 
             WButtonMethodMetadata metadata = WButtonMetadataCache
                 .GetMetadata(typeof(OdinScriptableObjectAsync))
-                .First(m => m.Method.Name == nameof(OdinScriptableObjectAsync.AsyncTaskButton));
+                .First(m =>
+                    string.Equals(
+                        m.Method.Name,
+                        nameof(OdinScriptableObjectAsync.AsyncTaskButton),
+                        StringComparison.Ordinal
+                    )
+                );
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
             WButtonMethodState methodState = targetState.GetOrCreateMethodState(metadata);
             WButtonMethodContext context = new(
@@ -450,7 +510,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
             Assert.That(metadata, Is.Not.Null);
 
             WButtonMethodMetadata cancellableMethod = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(OdinScriptableObjectCancellable.CancellableAsyncButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(OdinScriptableObjectCancellable.CancellableAsyncButton),
+                    StringComparison.Ordinal
+                )
             );
 
             Assert.That(cancellableMethod, Is.Not.Null);
@@ -470,7 +534,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
             WButtonMethodMetadata metadata = WButtonMetadataCache
                 .GetMetadata(typeof(OdinScriptableObjectCancellable))
                 .First(m =>
-                    m.Method.Name == nameof(OdinScriptableObjectCancellable.CancellableAsyncButton)
+                    string.Equals(
+                        m.Method.Name,
+                        nameof(OdinScriptableObjectCancellable.CancellableAsyncButton),
+                        StringComparison.Ordinal
+                    )
                 );
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
             WButtonMethodState methodState = targetState.GetOrCreateMethodState(metadata);
@@ -612,7 +680,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
             );
 
             WButtonMethodMetadata customDisplayMethod = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(OdinScriptableObjectTestTarget.MethodWithCustomDisplay)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(OdinScriptableObjectTestTarget.MethodWithCustomDisplay),
+                    StringComparison.Ordinal
+                )
             );
 
             Assert.That(customDisplayMethod, Is.Not.Null);
@@ -627,10 +699,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.CustomEditors
             );
 
             WButtonMethodMetadata group1Button1 = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(OdinScriptableObjectMultipleGroups.Group1Button1)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(OdinScriptableObjectMultipleGroups.Group1Button1),
+                    StringComparison.Ordinal
+                )
             );
             WButtonMethodMetadata group1Button2 = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(OdinScriptableObjectMultipleGroups.Group1Button2)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(OdinScriptableObjectMultipleGroups.Group1Button2),
+                    StringComparison.Ordinal
+                )
             );
 
             Assert.That(group1Button1, Is.Not.Null);

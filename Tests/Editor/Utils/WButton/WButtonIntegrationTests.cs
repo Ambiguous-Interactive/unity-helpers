@@ -208,7 +208,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(IntegrationTargetWithGroup)
             );
             WButtonMethodMetadata groupedButton = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(IntegrationTargetWithGroup.GroupedButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(IntegrationTargetWithGroup.GroupedButton),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(groupedButton, Is.Not.Null);
@@ -237,7 +241,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
 
             Dictionary<WButtonGroupKey, int> groupCounts = WButtonGUI.GetGroupCountsForTesting();
             List<WButtonGroupKey> sharedGroupKeys = groupCounts
-                .Keys.Where(k => k._groupName == "SharedGroup")
+                .Keys.Where(k =>
+                    string.Equals(k._groupName, "SharedGroup", System.StringComparison.Ordinal)
+                )
                 .ToList();
 
             Assert.That(
@@ -269,7 +275,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(IntegrationTargetWithGroup)
             );
             WButtonMethodMetadata groupedButton = metadata.First(m =>
-                m.Method.Name == nameof(IntegrationTargetWithGroup.GroupedButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(IntegrationTargetWithGroup.GroupedButton),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(
@@ -354,7 +364,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(IntegrationTargetModifiesFields)
             );
             WButtonMethodMetadata incrementMethod = metadata.First(m =>
-                m.Method.Name == nameof(IntegrationTargetModifiesFields.IncrementCounter)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(IntegrationTargetModifiesFields.IncrementCounter),
+                    System.StringComparison.Ordinal
+                )
             );
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
             WButtonMethodState methodState = targetState.GetOrCreateMethodState(incrementMethod);
@@ -388,7 +402,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(IntegrationTargetModifiesFields)
             );
             WButtonMethodMetadata incrementMethod = metadata.First(m =>
-                m.Method.Name == nameof(IntegrationTargetModifiesFields.IncrementCounter)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(IntegrationTargetModifiesFields.IncrementCounter),
+                    System.StringComparison.Ordinal
+                )
             );
 
             WButtonTargetState targetState1 = WButtonStateRepository.GetOrCreate(target1);
@@ -431,7 +449,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(IntegrationTargetModifiesFields)
             );
             WButtonMethodMetadata incrementMethod = metadata.First(m =>
-                m.Method.Name == nameof(IntegrationTargetModifiesFields.IncrementCounter)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(IntegrationTargetModifiesFields.IncrementCounter),
+                    System.StringComparison.Ordinal
+                )
             );
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
             WButtonMethodState methodState = targetState.GetOrCreateMethodState(incrementMethod);
@@ -502,7 +524,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(IntegrationTargetSimple)
             );
             WButtonMethodMetadata simpleButton = metadata.First(m =>
-                m.Method.Name == nameof(IntegrationTargetSimple.SimpleButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(IntegrationTargetSimple.SimpleButton),
+                    System.StringComparison.Ordinal
+                )
             );
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
             WButtonMethodState methodState = targetState.GetOrCreateMethodState(simpleButton);
@@ -543,7 +569,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(IntegrationTargetAsync)
             );
             WButtonMethodMetadata asyncMethod = metadata.First(m =>
-                m.Method.Name == nameof(IntegrationTargetAsync.AsyncButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(IntegrationTargetAsync.AsyncButton),
+                    System.StringComparison.Ordinal
+                )
             );
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
             WButtonMethodState methodState = targetState.GetOrCreateMethodState(asyncMethod);
@@ -695,7 +725,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(IntegrationTargetWithColorKey)
             );
             WButtonMethodMetadata coloredButton = metadata.First(m =>
-                m.Method.Name == nameof(IntegrationTargetWithColorKey.ColoredButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(IntegrationTargetWithColorKey.ColoredButton),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(
@@ -718,7 +752,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(IntegrationTargetThrowsException)
             );
             WButtonMethodMetadata throwingMethod = metadata.First(m =>
-                m.Method.Name == nameof(IntegrationTargetThrowsException.ThrowingButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(IntegrationTargetThrowsException.ThrowingButton),
+                    System.StringComparison.Ordinal
+                )
             );
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
             WButtonMethodState methodState = targetState.GetOrCreateMethodState(throwingMethod);
@@ -757,7 +795,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(IntegrationTargetThrowsException)
             );
             WButtonMethodMetadata throwingMethod = metadata.First(m =>
-                m.Method.Name == nameof(IntegrationTargetThrowsException.ThrowingButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(IntegrationTargetThrowsException.ThrowingButton),
+                    System.StringComparison.Ordinal
+                )
             );
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
             WButtonMethodState methodState = targetState.GetOrCreateMethodState(throwingMethod);
@@ -791,7 +833,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(IntegrationTargetThrowsException)
             );
             WButtonMethodMetadata throwingMethod = metadata.First(m =>
-                m.Method.Name == nameof(IntegrationTargetThrowsException.ThrowingButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(IntegrationTargetThrowsException.ThrowingButton),
+                    System.StringComparison.Ordinal
+                )
             );
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
             WButtonMethodState methodState = targetState.GetOrCreateMethodState(throwingMethod);
@@ -827,7 +873,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(IntegrationTargetAsyncThrows)
             );
             WButtonMethodMetadata asyncThrowingMethod = metadata.First(m =>
-                m.Method.Name == nameof(IntegrationTargetAsyncThrows.AsyncThrowingButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(IntegrationTargetAsyncThrows.AsyncThrowingButton),
+                    System.StringComparison.Ordinal
+                )
             );
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
             WButtonMethodState methodState = targetState.GetOrCreateMethodState(
@@ -979,7 +1029,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(IntegrationTargetModifiesFields)
             );
             WButtonMethodMetadata incrementMethod = metadata.First(m =>
-                m.Method.Name == nameof(IntegrationTargetModifiesFields.IncrementCounter)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(IntegrationTargetModifiesFields.IncrementCounter),
+                    System.StringComparison.Ordinal
+                )
             );
 
             WButtonTargetState targetState1 = WButtonStateRepository.GetOrCreate(target1);
@@ -1021,7 +1075,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(IntegrationTargetDerived)
             );
             WButtonMethodMetadata baseMethod = metadata.First(m =>
-                m.Method.Name == nameof(IntegrationTargetBase.BaseButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(IntegrationTargetBase.BaseButton),
+                    System.StringComparison.Ordinal
+                )
             );
 
             WButtonTargetState targetState1 = WButtonStateRepository.GetOrCreate(target1);
@@ -1110,7 +1168,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(InheritanceTargetDerivedOverride)
             );
             WButtonMethodMetadata virtualMethod = metadata.First(m =>
-                m.Method.Name == nameof(InheritanceTargetDerivedOverride.VirtualButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(InheritanceTargetDerivedOverride.VirtualButton),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(
@@ -1152,7 +1214,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(InheritanceTargetDerivedNoOverride)
             );
             WButtonMethodMetadata virtualMethod = metadata.First(m =>
-                m.Method.Name == nameof(InheritanceTargetVirtualBase.VirtualButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(InheritanceTargetVirtualBase.VirtualButton),
+                    System.StringComparison.Ordinal
+                )
             );
 
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
@@ -1183,7 +1249,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             );
 
             int virtualButtonCount = metadata.Count(m =>
-                m.Method.Name == nameof(InheritanceTargetDerivedOverride.VirtualButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(InheritanceTargetDerivedOverride.VirtualButton),
+                    System.StringComparison.Ordinal
+                )
             );
             Assert.That(
                 virtualButtonCount,
@@ -1200,9 +1270,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             );
 
             bool hasVirtualMethod = metadata.Any(m =>
-                m.Method.Name
-                == nameof(
-                    InheritanceTargetVirtualNonWButtonBase.VirtualMethodNotOverriddenAsWButton
+                string.Equals(
+                    m.Method.Name,
+                    nameof(
+                        InheritanceTargetVirtualNonWButtonBase.VirtualMethodNotOverriddenAsWButton
+                    ),
+                    System.StringComparison.Ordinal
                 )
             );
             Assert.That(
@@ -1220,7 +1293,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             );
 
             WButtonMethodMetadata concreteButton = metadata.FirstOrDefault(m =>
-                m.Method.Name == nameof(InheritanceTargetConcreteWithWButton.ConcreteButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(InheritanceTargetConcreteWithWButton.ConcreteButton),
+                    System.StringComparison.Ordinal
+                )
             );
             Assert.That(
                 concreteButton,
@@ -1241,7 +1318,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(InheritanceTargetConcreteWithWButton)
             );
             WButtonMethodMetadata concreteButton = metadata.First(m =>
-                m.Method.Name == nameof(InheritanceTargetConcreteWithWButton.ConcreteButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(InheritanceTargetConcreteWithWButton.ConcreteButton),
+                    System.StringComparison.Ordinal
+                )
             );
 
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
@@ -1272,10 +1353,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             );
 
             bool hasBaseButton = metadata.Any(m =>
-                m.Method.Name == nameof(IntegrationTargetBase.BaseButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(IntegrationTargetBase.BaseButton),
+                    System.StringComparison.Ordinal
+                )
             );
             bool hasDerivedButton = metadata.Any(m =>
-                m.Method.Name == nameof(IntegrationTargetDerived.DerivedButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(IntegrationTargetDerived.DerivedButton),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(hasBaseButton, Is.True, "Inherited base button should be discovered");
@@ -1290,13 +1379,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
             );
 
             bool hasLevel1Button = metadata.Any(m =>
-                m.Method.Name == nameof(InheritanceTargetLevel1.Level1Button)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(InheritanceTargetLevel1.Level1Button),
+                    System.StringComparison.Ordinal
+                )
             );
             bool hasLevel2Button = metadata.Any(m =>
-                m.Method.Name == nameof(InheritanceTargetLevel2.Level2Button)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(InheritanceTargetLevel2.Level2Button),
+                    System.StringComparison.Ordinal
+                )
             );
             bool hasLevel3Button = metadata.Any(m =>
-                m.Method.Name == nameof(InheritanceTargetLevel3.Level3Button)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(InheritanceTargetLevel3.Level3Button),
+                    System.StringComparison.Ordinal
+                )
             );
 
             Assert.That(hasLevel1Button, Is.True, "Level 1 button should be discovered");
@@ -1332,7 +1433,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(IntegrationTargetSimple)
             );
             WButtonMethodMetadata simpleButton = metadata.First(m =>
-                m.Method.Name == nameof(IntegrationTargetSimple.SimpleButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(IntegrationTargetSimple.SimpleButton),
+                    System.StringComparison.Ordinal
+                )
             );
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
             WButtonMethodState methodState = targetState.GetOrCreateMethodState(simpleButton);
@@ -1387,7 +1492,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Utils.WButton
                 typeof(IntegrationTargetSimple)
             );
             WButtonMethodMetadata simpleButton = metadata.First(m =>
-                m.Method.Name == nameof(IntegrationTargetSimple.SimpleButton)
+                string.Equals(
+                    m.Method.Name,
+                    nameof(IntegrationTargetSimple.SimpleButton),
+                    System.StringComparison.Ordinal
+                )
             );
 
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);

@@ -16,7 +16,7 @@ This roadmap outlines planned enhancements to Unity Helpers. All "Currently ship
 
 ## 2. Expanded Editor Tooling
 
-**Currently shipping:** Animation Creator, Sprite Sheet Animation Creator, Animation Event Editor, plus 20+ sprite/texture/prefab utilities. See [Editor Tools Guide](../features/editor-tools/editor-tools-guide.md) for full list.
+**Currently shipping:** Animation Creator, Sprite Sheet Animation Creator, Animation Event Editor, plus 30+ sprite/texture/prefab utilities. See [Editor Tools Guide](../features/editor-tools/editor-tools-guide.md) for full list.
 
 **Next up:**
 

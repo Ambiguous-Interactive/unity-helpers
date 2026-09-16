@@ -70,7 +70,13 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             WButtonMethodMetadata metadata = WButtonMetadataCache
                 .GetMetadata(typeof(DisabledStateTestTarget))
-                .First(m => m.Method.Name == nameof(DisabledStateTestTarget.SyncButton));
+                .First(m =>
+                    string.Equals(
+                        m.Method.Name,
+                        nameof(DisabledStateTestTarget.SyncButton),
+                        System.StringComparison.Ordinal
+                    )
+                );
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
             WButtonMethodState methodState = targetState.GetOrCreateMethodState(metadata);
 
@@ -88,7 +94,13 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             WButtonMethodMetadata metadata = WButtonMetadataCache
                 .GetMetadata(typeof(DisabledStateTestTarget))
-                .First(m => m.Method.Name == nameof(DisabledStateTestTarget.SlowAsyncButton));
+                .First(m =>
+                    string.Equals(
+                        m.Method.Name,
+                        nameof(DisabledStateTestTarget.SlowAsyncButton),
+                        System.StringComparison.Ordinal
+                    )
+                );
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
             WButtonMethodState methodState = targetState.GetOrCreateMethodState(metadata);
             WButtonMethodContext context = new(
@@ -129,7 +141,11 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             WButtonMethodMetadata metadata = WButtonMetadataCache
                 .GetMetadata(typeof(DisabledStateTestTarget))
                 .First(m =>
-                    m.Method.Name == nameof(DisabledStateTestTarget.CancellableAsyncButton)
+                    string.Equals(
+                        m.Method.Name,
+                        nameof(DisabledStateTestTarget.CancellableAsyncButton),
+                        System.StringComparison.Ordinal
+                    )
                 );
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
             WButtonMethodState methodState = targetState.GetOrCreateMethodState(metadata);
@@ -167,7 +183,13 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             WButtonMethodMetadata metadata = WButtonMetadataCache
                 .GetMetadata(typeof(DisabledStateTestTarget))
-                .First(m => m.Method.Name == nameof(DisabledStateTestTarget.FastAsyncButton));
+                .First(m =>
+                    string.Equals(
+                        m.Method.Name,
+                        nameof(DisabledStateTestTarget.FastAsyncButton),
+                        System.StringComparison.Ordinal
+                    )
+                );
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
             WButtonMethodState methodState = targetState.GetOrCreateMethodState(metadata);
             WButtonMethodContext context = new(
@@ -203,7 +225,11 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             WButtonMethodMetadata metadata = WButtonMetadataCache
                 .GetMetadata(typeof(DisabledStateTestTarget))
                 .First(m =>
-                    m.Method.Name == nameof(DisabledStateTestTarget.CancellableAsyncButton)
+                    string.Equals(
+                        m.Method.Name,
+                        nameof(DisabledStateTestTarget.CancellableAsyncButton),
+                        System.StringComparison.Ordinal
+                    )
                 );
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
             WButtonMethodState methodState = targetState.GetOrCreateMethodState(metadata);
@@ -240,7 +266,11 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             WButtonMethodMetadata metadata = WButtonMetadataCache
                 .GetMetadata(typeof(DisabledStateTestTarget))
                 .First(m =>
-                    m.Method.Name == nameof(DisabledStateTestTarget.CancellableAsyncButton)
+                    string.Equals(
+                        m.Method.Name,
+                        nameof(DisabledStateTestTarget.CancellableAsyncButton),
+                        System.StringComparison.Ordinal
+                    )
                 );
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
             WButtonMethodState methodState = targetState.GetOrCreateMethodState(metadata);
@@ -280,7 +310,11 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             WButtonMethodMetadata metadata = WButtonMetadataCache
                 .GetMetadata(typeof(DisabledStateTestTarget))
                 .First(m =>
-                    m.Method.Name == nameof(DisabledStateTestTarget.CancellableAsyncButton)
+                    string.Equals(
+                        m.Method.Name,
+                        nameof(DisabledStateTestTarget.CancellableAsyncButton),
+                        System.StringComparison.Ordinal
+                    )
                 );
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
             WButtonMethodState methodState = targetState.GetOrCreateMethodState(metadata);
@@ -321,7 +355,13 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             WButtonMethodMetadata metadata = WButtonMetadataCache
                 .GetMetadata(typeof(DisabledStateTestTarget))
-                .First(m => m.Method.Name == nameof(DisabledStateTestTarget.SlowAsyncButton));
+                .First(m =>
+                    string.Equals(
+                        m.Method.Name,
+                        nameof(DisabledStateTestTarget.SlowAsyncButton),
+                        System.StringComparison.Ordinal
+                    )
+                );
 
             WButtonTargetState targetState1 = WButtonStateRepository.GetOrCreate(target1);
             WButtonMethodState methodState1 = targetState1.GetOrCreateMethodState(metadata);
@@ -377,7 +417,13 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             WButtonMethodMetadata metadata = WButtonMetadataCache
                 .GetMetadata(typeof(DisabledStateTestTarget))
-                .First(m => m.Method.Name == nameof(DisabledStateTestTarget.SlowEnumeratorButton));
+                .First(m =>
+                    string.Equals(
+                        m.Method.Name,
+                        nameof(DisabledStateTestTarget.SlowEnumeratorButton),
+                        System.StringComparison.Ordinal
+                    )
+                );
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
             WButtonMethodState methodState = targetState.GetOrCreateMethodState(metadata);
             WButtonMethodContext context = new(
@@ -415,7 +461,13 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             WButtonMethodMetadata metadata = WButtonMetadataCache
                 .GetMetadata(typeof(DisabledStateTestTarget))
-                .First(m => m.Method.Name == nameof(DisabledStateTestTarget.SlowEnumeratorButton));
+                .First(m =>
+                    string.Equals(
+                        m.Method.Name,
+                        nameof(DisabledStateTestTarget.SlowEnumeratorButton),
+                        System.StringComparison.Ordinal
+                    )
+                );
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
             WButtonMethodState methodState = targetState.GetOrCreateMethodState(metadata);
             WButtonMethodContext context = new(
@@ -452,7 +504,13 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             WButtonMethodMetadata metadata = WButtonMetadataCache
                 .GetMetadata(typeof(DisabledStateTestTarget))
-                .First(m => m.Method.Name == nameof(DisabledStateTestTarget.SlowEnumeratorButton));
+                .First(m =>
+                    string.Equals(
+                        m.Method.Name,
+                        nameof(DisabledStateTestTarget.SlowEnumeratorButton),
+                        System.StringComparison.Ordinal
+                    )
+                );
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
             WButtonMethodState methodState = targetState.GetOrCreateMethodState(metadata);
             WButtonMethodContext context = new(
@@ -492,7 +550,13 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             WButtonMethodMetadata metadata = WButtonMetadataCache
                 .GetMetadata(typeof(DisabledStateTestTarget))
-                .First(m => m.Method.Name == nameof(DisabledStateTestTarget.SyncButton));
+                .First(m =>
+                    string.Equals(
+                        m.Method.Name,
+                        nameof(DisabledStateTestTarget.SyncButton),
+                        System.StringComparison.Ordinal
+                    )
+                );
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
             WButtonMethodState methodState = targetState.GetOrCreateMethodState(metadata);
             WButtonMethodContext context = new(
@@ -525,7 +589,11 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             WButtonMethodMetadata metadata = WButtonMetadataCache
                 .GetMetadata(typeof(DisabledStateTestTarget))
                 .First(m =>
-                    m.Method.Name == nameof(DisabledStateTestTarget.CancellableAsyncButton)
+                    string.Equals(
+                        m.Method.Name,
+                        nameof(DisabledStateTestTarget.CancellableAsyncButton),
+                        System.StringComparison.Ordinal
+                    )
                 );
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
             WButtonMethodState methodState = targetState.GetOrCreateMethodState(metadata);
@@ -567,7 +635,11 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             WButtonMethodMetadata metadata = WButtonMetadataCache
                 .GetMetadata(typeof(DisabledStateTestTarget))
                 .First(m =>
-                    m.Method.Name == nameof(DisabledStateTestTarget.CancellableAsyncButton)
+                    string.Equals(
+                        m.Method.Name,
+                        nameof(DisabledStateTestTarget.CancellableAsyncButton),
+                        System.StringComparison.Ordinal
+                    )
                 );
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
             WButtonMethodState methodState = targetState.GetOrCreateMethodState(metadata);
@@ -599,7 +671,13 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
 
             WButtonMethodMetadata metadata = WButtonMetadataCache
                 .GetMetadata(typeof(DisabledStateTestTarget))
-                .First(m => m.Method.Name == nameof(DisabledStateTestTarget.SlowAsyncButton));
+                .First(m =>
+                    string.Equals(
+                        m.Method.Name,
+                        nameof(DisabledStateTestTarget.SlowAsyncButton),
+                        System.StringComparison.Ordinal
+                    )
+                );
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
             WButtonMethodState methodState = targetState.GetOrCreateMethodState(metadata);
             WButtonMethodContext context = new(
@@ -650,7 +728,11 @@ namespace WallstopStudios.UnityHelpers.Tests.WButton
             WButtonMethodMetadata metadata = WButtonMetadataCache
                 .GetMetadata(typeof(DisabledStateTestTarget))
                 .First(m =>
-                    m.Method.Name == nameof(DisabledStateTestTarget.CountingCancellableButton)
+                    string.Equals(
+                        m.Method.Name,
+                        nameof(DisabledStateTestTarget.CountingCancellableButton),
+                        System.StringComparison.Ordinal
+                    )
                 );
             WButtonTargetState targetState = WButtonStateRepository.GetOrCreate(target);
             WButtonMethodState methodState = targetState.GetOrCreateMethodState(metadata);

@@ -382,7 +382,7 @@ namespace WallstopStudios.UnityHelpers.Tests.EditorFramework
             MethodInfo best = null;
             foreach (MethodInfo method in type.GetMethods(flags))
             {
-                if (method.Name != name)
+                if (!string.Equals(method.Name, name, System.StringComparison.Ordinal))
                 {
                     continue;
                 }

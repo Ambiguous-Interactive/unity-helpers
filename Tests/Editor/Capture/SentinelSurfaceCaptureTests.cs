@@ -245,7 +245,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 DropdownField fix = window
                     .rootVisualElement.Query<DropdownField>()
                     .ToList()
-                    .Single(field => field.label == "Auto-fix");
+                    .Single(field =>
+                        string.Equals(field.label, "Auto-fix", System.StringComparison.Ordinal)
+                    );
                 fix.value = ValidationWorkspaceSettings.RenameToPatternFix;
                 TextField fixValue = window.rootVisualElement.Q<TextField>("builder-fix-value");
                 Assert.IsTrue(fixValue != null);

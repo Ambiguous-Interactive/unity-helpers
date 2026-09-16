@@ -996,7 +996,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 $"Preserve flag should be false after {operation} operation"
             );
 
-            if (operation == "Clear")
+            if (string.Equals(operation, "Clear", System.StringComparison.Ordinal))
             {
                 Assert.IsTrue(dictionary.SerializedKeys == null);
                 Assert.IsTrue(dictionary.SerializedValues == null);

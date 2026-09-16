@@ -73,7 +73,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                         error = "A condition has an unsupported property or comparison.";
                         break;
                     }
-                    if (condition.comparison == ">" || condition.comparison == "<")
+                    if (
+                        string.Equals(condition.comparison, ">", System.StringComparison.Ordinal)
+                        || string.Equals(condition.comparison, "<", System.StringComparison.Ordinal)
+                    )
                     {
                         if (
                             !double.TryParse(
@@ -229,7 +232,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     GlobalObjectId id = GlobalObjectId.GetGlobalObjectIdSlow(reference);
                     if (
                         id.targetObjectId != 0
-                        && id.assetGUID.ToString() != "00000000000000000000000000000000"
+                        && !string.Equals(
+                            id.assetGUID.ToString(),
+                            "00000000000000000000000000000000",
+                            System.StringComparison.Ordinal
+                        )
                     )
                         references[property.propertyPath] = id.ToString();
                     else
@@ -247,17 +254,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         internal static bool Matches(object actual, string comparison, string expected)
         {
             bool isNull = actual == null || actual is Object unityObject && unityObject == null;
-            if (comparison == "is null" || comparison == "is missing")
+            if (
+                string.Equals(comparison, "is null", System.StringComparison.Ordinal)
+                || string.Equals(comparison, "is missing", System.StringComparison.Ordinal)
+            )
                 return isNull;
-            if (comparison == "contains")
+            if (string.Equals(comparison, "contains", System.StringComparison.Ordinal))
                 return !isNull
                     && Convert
                         .ToString(actual, CultureInfo.InvariantCulture)
                         .IndexOf(expected ?? string.Empty, StringComparison.Ordinal) != -1;
             if (isNull)
-                return comparison == "=="
+                return string.Equals(comparison, "==", System.StringComparison.Ordinal)
                         && string.Equals(expected, "null", StringComparison.OrdinalIgnoreCase)
-                    || comparison == "!="
+                    || string.Equals(comparison, "!=", System.StringComparison.Ordinal)
                         && !string.Equals(expected, "null", StringComparison.OrdinalIgnoreCase);
             string text = Convert.ToString(actual, CultureInfo.InvariantCulture);
             if (
@@ -287,9 +297,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                         return number < wanted;
                 }
             }
-            if (comparison == "==")
+            if (string.Equals(comparison, "==", System.StringComparison.Ordinal))
                 return string.Equals(text, expected, StringComparison.OrdinalIgnoreCase);
-            if (comparison == "!=")
+            if (string.Equals(comparison, "!=", System.StringComparison.Ordinal))
                 return !string.Equals(text, expected, StringComparison.OrdinalIgnoreCase);
             return false;
         }
@@ -297,7 +307,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         private static string Identity(Object subject, Transform transform)
         {
             GlobalObjectId id = GlobalObjectId.GetGlobalObjectIdSlow(subject);
-            if (id.assetGUID.ToString() != "00000000000000000000000000000000")
+            if (
+                !string.Equals(
+                    id.assetGUID.ToString(),
+                    "00000000000000000000000000000000",
+                    System.StringComparison.Ordinal
+                )
+            )
                 return id.ToString();
             string path = transform.GetSiblingIndex().ToString(CultureInfo.InvariantCulture);
             for (Transform parent = transform.parent; parent != null; parent = parent.parent)
@@ -446,7 +462,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                         return false;
                     }
                     object audioValue = null;
-                    if (property == "AudioSource.spatialBlend")
+                    if (
+                        string.Equals(
+                            property,
+                            "AudioSource.spatialBlend",
+                            System.StringComparison.Ordinal
+                        )
+                    )
                         audioValue = audio.spatialBlend;
                     else if (audio.clip != null)
                         audioValue = audio.clip.channels;
@@ -513,7 +535,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// <inheritdoc />
         public bool AppliesTo(in ValidationTarget target)
         {
-            if (ValidationWorkspaceSettings.CategoryFor(target.AssetPath) != _definition.target)
+            if (
+                !string.Equals(
+                    ValidationWorkspaceSettings.CategoryFor(target.AssetPath),
+                    _definition.target,
+                    System.StringComparison.Ordinal
+                )
+            )
             {
                 return false;
             }

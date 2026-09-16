@@ -46,7 +46,7 @@ const CHECKS = [
   },
   {
     id: "reference-upstream-drift",
-    name: "Reference upstream drift audit",
+    name: "Reference upstream drift check",
     run: "npm run test:reference-upstream-drift"
   },
   {

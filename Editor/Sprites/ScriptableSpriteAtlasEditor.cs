@@ -771,7 +771,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         serializedConfig.ApplyModifiedProperties();
                         if (
                             !string.IsNullOrWhiteSpace(newAssetName)
-                            && newAssetName != currentAssetName
+                            && !string.Equals(
+                                newAssetName,
+                                currentAssetName,
+                                System.StringComparison.Ordinal
+                            )
                             && AssetDatabase.Contains(config)
                         )
                         {

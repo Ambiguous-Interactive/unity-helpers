@@ -4007,7 +4007,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         {
                             if (
                                 originalSpritesElement is Sprite s
-                                && s.name == spriteData._originalName
+                                && string.Equals(
+                                    s.name,
+                                    spriteData._originalName,
+                                    System.StringComparison.Ordinal
+                                )
                             )
                             {
                                 originalSprite = s;

@@ -22,7 +22,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// <remarks>
     /// <para>
     /// Reference implementation: https://github.com/cocowalla/wyhash-dotnet/blob/master/src/WyHash/WyRng.cs,
-    /// audited at commit <c>3698f21da3a117cccfd323177138b15ae1a32dc7</c>.
+    /// pinned for upstream drift detection at commit <c>3698f21da3a117cccfd323177138b15ae1a32dc7</c>.
     /// </para>
     /// <para>
     /// Designed around 64-bit multiply-and-mix steps, this generator is fast and suitable for general-purpose

@@ -51,8 +51,8 @@ function validateManifest(manifest, root = repoRoot) {
     if (!Number.isInteger(entry.issue) || entry.issue < 1) {
       throw new Error(`${entry.name} needs a positive issue number.`);
     }
-    if (!commitPattern.test(entry.auditedCommit || "")) {
-      throw new Error(`${entry.name} needs a full lowercase audited commit SHA.`);
+    if (!commitPattern.test(entry.referenceCommit || "")) {
+      throw new Error(`${entry.name} needs a full lowercase reference commit SHA.`);
     }
     if (!hashPattern.test(entry.sha256 || "")) {
       throw new Error(`${entry.name} needs a lowercase SHA-256.`);
@@ -121,7 +121,7 @@ async function auditEntries(entries, loader = download) {
           issue: entry.issue,
           localPath: entry.localPath,
           upstreamUrl: entry.upstreamUrl,
-          auditedCommit: entry.auditedCommit,
+          referenceCommit: entry.referenceCommit,
           expectedSha256: entry.sha256,
           actualSha256,
           status: actualSha256 === entry.sha256 ? "current" : "drifted"
@@ -133,7 +133,7 @@ async function auditEntries(entries, loader = download) {
           issue: entry.issue,
           localPath: entry.localPath,
           upstreamUrl: entry.upstreamUrl,
-          auditedCommit: entry.auditedCommit,
+          referenceCommit: entry.referenceCommit,
           expectedSha256: entry.sha256,
           actualSha256: null,
           status: "unavailable",

@@ -443,7 +443,7 @@ For individual feature examples, see the detailed guides linked above.
 ## See Also
 
 - **[Odin Inspector Migration Guide](../../guides/odin-migration-guide.md)** - Step-by-step migration from Odin Inspector
-- **[Editor Tools Guide](../editor-tools/editor-tools-guide.md)** - 20+ automation tools for sprites, animations, validation
+- **[Editor Tools Guide](../editor-tools/editor-tools-guide.md)** - 30+ automation tools for sprites, animations, validation
 - **[Relational Components](../relational-components/relational-components.md)** - Auto-wire components with attributes
 - **[Effects System](../effects/effects-system.md)** - Data-driven buffs/debuffs
 - **[Main Documentation](../../readme.md)** - Complete feature list

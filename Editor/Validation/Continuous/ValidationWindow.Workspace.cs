@@ -51,10 +51,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         private static void RefreshFixValueField(TextField field, string fix)
         {
-            bool rename = fix == ValidationWorkspaceSettings.RenameToPatternFix;
+            bool rename = string.Equals(
+                fix,
+                ValidationWorkspaceSettings.RenameToPatternFix,
+                System.StringComparison.Ordinal
+            );
             field.EnableInClassList(
                 "dx-hidden",
-                !rename && fix != ValidationWorkspaceSettings.SetImportMaxSizeFix
+                !rename
+                    && !string.Equals(
+                        fix,
+                        ValidationWorkspaceSettings.SetImportMaxSizeFix,
+                        System.StringComparison.Ordinal
+                    )
             );
             field.label = rename ? "Name pattern" : "Maximum texture size";
             field.tooltip = rename
@@ -110,12 +119,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         {
             _activeView = name;
             foreach (KeyValuePair<string, VisualElement> view in _views)
-                view.Value.EnableInClassList("dx-hidden", view.Key != name);
+                view.Value.EnableInClassList(
+                    "dx-hidden",
+                    !string.Equals(view.Key, name, System.StringComparison.Ordinal)
+                );
             foreach (KeyValuePair<string, Button> tab in _tabs)
-                tab.Value.EnableInClassList("dx-selected", tab.Key == name);
-            if (name == "Rules")
+                tab.Value.EnableInClassList(
+                    "dx-selected",
+                    string.Equals(tab.Key, name, System.StringComparison.Ordinal)
+                );
+            if (string.Equals(name, "Rules", System.StringComparison.Ordinal))
                 RefreshRules();
-            if (name == "Settings")
+            if (string.Equals(name, "Settings", System.StringComparison.Ordinal))
                 RefreshSettings();
         }
 
@@ -185,7 +200,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             {
                 bool authored = rule is ValidationProjectRule;
                 string category = RuleCategory(rule, authored);
-                if (_ruleCategory != "All Rules" && _ruleCategory != category)
+                if (
+                    !string.Equals(_ruleCategory, "All Rules", System.StringComparison.Ordinal)
+                    && !string.Equals(_ruleCategory, category, System.StringComparison.Ordinal)
+                )
                     continue;
                 if (
                     !string.IsNullOrWhiteSpace(_ruleQuery)
@@ -232,7 +250,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     value =>
                     {
                         ValidationSeverity severity = ValidationSeverity.Warning;
-                        bool overridden = value != "Default" && Enum.TryParse(value, out severity);
+                        bool overridden =
+                            !string.Equals(value, "Default", System.StringComparison.Ordinal)
+                            && Enum.TryParse(value, out severity);
                         settings.SetRulePreference(
                             rule.RuleId,
                             settings.IsEnabled(rule.RuleId),
@@ -244,7 +264,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 );
                 int hits = 0;
                 foreach (ValidationFinding finding in _known)
-                    if (finding.RuleId == rule.RuleId)
+                    if (string.Equals(finding.RuleId, rule.RuleId, System.StringComparison.Ordinal))
                         hits++;
                 AddLabel(row, hits + " hits", "dx-muted");
                 if (authored)
@@ -256,7 +276,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                                 "Delete validation rule",
                                 () =>
                                     settings.projectRules.RemoveAll(definition =>
-                                        definition.id == rule.RuleId
+                                        string.Equals(
+                                            definition.id,
+                                            rule.RuleId,
+                                            System.StringComparison.Ordinal
+                                        )
                                     )
                             );
                             settings.SetRulePreference(
@@ -643,7 +667,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 string id = _suppressions.Ids[index];
                 ValidationFinding finding = default;
                 foreach (ValidationFinding known in _known)
-                    if (known.Id == id)
+                    if (string.Equals(known.Id, id, System.StringComparison.Ordinal))
                     {
                         finding = known;
                         break;

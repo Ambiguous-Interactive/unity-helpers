@@ -4,6 +4,11 @@ Unity Helpers ships a Roslyn analyzer that reports footguns in code that already
 the most part, already works. It runs on your code as well as the package's, because the shapes it
 finds are not specific to either.
 
+Open `Tools > Wallstop Studios > Unity Helpers > Analyzer Policies` to inspect the complete policy
+set and enable or disable it for user code. The window manages only the Unity Helpers block in
+`Assets/Default.ruleset`, preserves unrelated analyzer configuration, and reports configuration
+drift before repairing it.
+
 | Id                                                                       | Reports                                                           |
 | ------------------------------------------------------------------------ | ----------------------------------------------------------------- |
 | [`WUH001`](#wuh001-a-lookup-factory-passed-as-a-method-group)            | A lookup factory passed as a method group                         |
@@ -765,8 +770,9 @@ checks, pattern checks, `string.Equals`, `object.ReferenceEquals`, non-string op
 user-defined equality operators. It is off by default because operator equality is valid and common;
 the diagnostic is an explicit-policy audit, not a claim that ordinal comparison is wrong.
 
-The package enables this rule for the Odin source migration tool. That parser handles C# tokens and
-asset paths, so each of its string comparisons must state ordinal policy in source.
+The package enables this rule, together with `WUH010` and `WUH013`, in all five package-owned check
+projects. Runtime, Editor, integrations, runtime tests, and editor tests therefore enforce every
+`WUH###` policy while the consumer default remains unchanged.
 
 ## Turning one off
 

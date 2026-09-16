@@ -87,10 +87,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         continue;
                     }
 
-                    TextureImporterPlatformSettings ops =
-                        po.name == TexturePlatformNameHelper.DefaultPlatformName
-                            ? ti.GetDefaultPlatformTextureSettings()
-                            : ti.GetPlatformTextureSettings(po.name);
+                    TextureImporterPlatformSettings ops = string.Equals(
+                        po.name,
+                        TexturePlatformNameHelper.DefaultPlatformName,
+                        System.StringComparison.Ordinal
+                    )
+                        ? ti.GetDefaultPlatformTextureSettings()
+                        : ti.GetPlatformTextureSettings(po.name);
                     if (po.applyResizeAlgorithm)
                     {
                         changed |= ops.resizeAlgorithm != po.resizeAlgorithm;
@@ -254,10 +257,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         continue;
                     }
 
-                    TextureImporterPlatformSettings ops =
-                        po.name == TexturePlatformNameHelper.DefaultPlatformName
-                            ? localTextureImporter.GetDefaultPlatformTextureSettings()
-                            : localTextureImporter.GetPlatformTextureSettings(po.name);
+                    TextureImporterPlatformSettings ops = string.Equals(
+                        po.name,
+                        TexturePlatformNameHelper.DefaultPlatformName,
+                        System.StringComparison.Ordinal
+                    )
+                        ? localTextureImporter.GetDefaultPlatformTextureSettings()
+                        : localTextureImporter.GetPlatformTextureSettings(po.name);
                     bool any = false;
                     if (po.applyResizeAlgorithm && ops.resizeAlgorithm != po.resizeAlgorithm)
                     {
@@ -294,10 +300,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                     if (any)
                     {
-                        ops.overridden =
-                            po.name != TexturePlatformNameHelper.DefaultPlatformName
-                                ? true
-                                : ops.overridden;
+                        ops.overridden = !string.Equals(
+                            po.name,
+                            TexturePlatformNameHelper.DefaultPlatformName,
+                            System.StringComparison.Ordinal
+                        )
+                            ? true
+                            : ops.overridden;
                         EnsureUndoRecorded();
                         localTextureImporter.SetPlatformTextureSettings(ops);
                         changed = true;

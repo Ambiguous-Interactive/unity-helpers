@@ -18,7 +18,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Attributes
     {
         private static bool CacheContainsField(string cache, FieldInfo field)
         {
-            return cache == "FieldGetterCache"
+            return string.Equals(cache, "FieldGetterCache", System.StringComparison.Ordinal)
                 ? ReflectionHelpers.IsFieldGetterCached(field)
                 : ReflectionHelpers.IsFieldSetterCached(field);
         }

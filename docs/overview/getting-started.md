@@ -288,7 +288,7 @@ Based on your needs:
 
 1. **Explore Editor Tools** - Automate your asset pipeline
    - Start: [Editor Tools Guide](../features/editor-tools/editor-tools-guide.md)
-   - Why: 20+ tools for sprites, animations, validation, and more
+   - Why: 30+ tools for sprites, animations, validation, and more
 
 2. **Use ScriptableObject Singletons** - Global settings management
    - Start: [Singletons Guide](../features/utilities/singletons.md)

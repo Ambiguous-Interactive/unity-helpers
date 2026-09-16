@@ -29,7 +29,10 @@ namespace WallstopStudios.UnityHelpers.Editor
             }
 
             string cacheKey = item.search + "|" + item.typeSearch;
-            if (item.cachedLookup != null && item.lastSearchForCache == cacheKey)
+            if (
+                item.cachedLookup != null
+                && string.Equals(item.lastSearchForCache, cacheKey, System.StringComparison.Ordinal)
+            )
             {
                 return item.cachedLookup;
             }
@@ -339,7 +342,10 @@ namespace WallstopStudios.UnityHelpers.Editor
             string[] parts = raw.Split(' ');
             foreach (string token in parts)
             {
-                if (string.IsNullOrWhiteSpace(token) || token == "*")
+                if (
+                    string.IsNullOrWhiteSpace(token)
+                    || string.Equals(token, "*", System.StringComparison.Ordinal)
+                )
                 {
                     continue;
                 }

@@ -212,7 +212,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
                         + valid.Substring(nameStart + offset + 1);
                     bool decoded = Serializer.TryJsonDeserialize(mutated, out MutationSample value);
                     Assert.IsTrue(
-                        !decoded || value.Name != "abcd",
+                        !decoded
+                            || !string.Equals(value.Name, "abcd", System.StringComparison.Ordinal),
                         "fragment {0} at offset {1} decoded back to the original name",
                         fragment,
                         offset

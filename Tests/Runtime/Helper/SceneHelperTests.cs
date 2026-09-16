@@ -182,7 +182,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 TestScenePath,
                 (scene, mode) =>
                 {
-                    if (scene.path == TestScenePath)
+                    if (string.Equals(scene.path, TestScenePath, System.StringComparison.Ordinal))
                     {
                         callbackInvoked = true;
                     }
@@ -248,7 +248,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 TestScenePath,
                 (scene, mode) =>
                 {
-                    if (scene.path == TestScenePath)
+                    if (string.Equals(scene.path, TestScenePath, System.StringComparison.Ordinal))
                     {
                         callbackInvoked = true;
                     }

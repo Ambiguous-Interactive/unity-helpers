@@ -611,7 +611,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 string part = pathParts[i];
 
                 if (
-                    part == "Array"
+                    string.Equals(part, "Array", System.StringComparison.Ordinal)
                     && i + 1 < pathParts.Length
                     && pathParts[i + 1].StartsWith("data[", StringComparison.Ordinal)
                 )
@@ -1180,7 +1180,7 @@ namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
                 string part = pathParts[i];
 
                 if (
-                    part == "Array"
+                    string.Equals(part, "Array", System.StringComparison.Ordinal)
                     && i + 1 < pathParts.Length - 1
                     && pathParts[i + 1].StartsWith("data[", StringComparison.Ordinal)
                 )

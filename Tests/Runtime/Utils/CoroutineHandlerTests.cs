@@ -316,8 +316,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             yield return null;
 
             Assert.IsTrue(
-                instance.gameObject.scene.name == "DontDestroyOnLoad"
-                    || instance.gameObject.hideFlags.HasFlag(HideFlags.DontSave)
+                string.Equals(
+                    instance.gameObject.scene.name,
+                    "DontDestroyOnLoad",
+                    System.StringComparison.Ordinal
+                ) || instance.gameObject.hideFlags.HasFlag(HideFlags.DontSave)
             );
         }
 

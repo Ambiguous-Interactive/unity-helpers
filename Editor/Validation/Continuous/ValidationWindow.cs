@@ -407,7 +407,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 _known,
                 _minimum,
                 _query,
-                _includeSuppressed || _axis == "Suppressed",
+                _includeSuppressed
+                    || string.Equals(_axis, "Suppressed", System.StringComparison.Ordinal),
                 _suppressions,
                 _visible
             );

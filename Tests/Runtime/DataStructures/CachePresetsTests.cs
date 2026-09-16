@@ -572,9 +572,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.DataStructures
             cache.Set("endpoint3", "response3");
 
             Assert.AreEqual(3, cache.Count);
-            Assert.IsTrue(cache.TryGet("endpoint1", out string v1) && v1 == "response1");
-            Assert.IsTrue(cache.TryGet("endpoint2", out string v2) && v2 == "response2");
-            Assert.IsTrue(cache.TryGet("endpoint3", out string v3) && v3 == "response3");
+            Assert.IsTrue(
+                cache.TryGet("endpoint1", out string v1)
+                    && string.Equals(v1, "response1", System.StringComparison.Ordinal)
+            );
+            Assert.IsTrue(
+                cache.TryGet("endpoint2", out string v2)
+                    && string.Equals(v2, "response2", System.StringComparison.Ordinal)
+            );
+            Assert.IsTrue(
+                cache.TryGet("endpoint3", out string v3)
+                    && string.Equals(v3, "response3", System.StringComparison.Ordinal)
+            );
         }
 
         [Test]

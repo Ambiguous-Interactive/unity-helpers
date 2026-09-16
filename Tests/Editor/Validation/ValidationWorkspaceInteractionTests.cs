@@ -95,16 +95,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             return root.Query<T>()
                 .ToList()
                 .Single(element =>
-                    element is TextField text && text.label == label
-                    || element is DropdownField choice && choice.label == label
-                    || element is IntegerField integer && integer.label == label
-                    || element is Toggle toggle && toggle.label == label
+                    element is TextField text
+                        && string.Equals(text.label, label, System.StringComparison.Ordinal)
+                    || element is DropdownField choice
+                        && string.Equals(choice.label, label, System.StringComparison.Ordinal)
+                    || element is IntegerField integer
+                        && string.Equals(integer.label, label, System.StringComparison.Ordinal)
+                    || element is Toggle toggle
+                        && string.Equals(toggle.label, label, System.StringComparison.Ordinal)
                 );
         }
 
         private static Button ButtonWithText(VisualElement root, string label)
         {
-            return root.Query<Button>().ToList().Single(button => button.text == label);
+            return root.Query<Button>()
+                .ToList()
+                .Single(button =>
+                    string.Equals(button.text, label, System.StringComparison.Ordinal)
+                );
         }
 
         private static void Submit(Button button)
@@ -277,7 +285,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 Button trigger = settingsView
                     .Query<Button>()
                     .ToList()
-                    .Single(button => button.tooltip == "Prefabs: On save");
+                    .Single(button =>
+                        string.Equals(
+                            button.tooltip,
+                            "Prefabs: On save",
+                            System.StringComparison.Ordinal
+                        )
+                    );
                 Submit(trigger);
                 Assert.AreEqual(1, settings.ActiveProfile.triggers[0]);
                 Assert.AreEqual(0, settings.profiles[0].triggers[0]);
