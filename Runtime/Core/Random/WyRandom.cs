@@ -17,12 +17,13 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
-    /// A wyhash-inspired PRNG variant (WyRandom) leveraging multiply-mix operations for speed and good distribution.
+    /// A deterministic generator based on the wyhash v1 .NET port of wyrand.
     /// </summary>
     /// <remarks>
     /// <para>
     /// Reference implementation: https://github.com/cocowalla/wyhash-dotnet/blob/master/src/WyHash/WyRng.cs,
     /// pinned for upstream drift detection at commit <c>3698f21da3a117cccfd323177138b15ae1a32dc7</c>.
+    /// Wang Yi's wyhash 4.3 wyrand uses different constants and produces a different seeded stream.
     /// </para>
     /// <para>
     /// Designed around 64-bit multiply-and-mix steps, this generator is fast and suitable for general-purpose
@@ -56,9 +57,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// </example>
     [RandomGeneratorMetadata(
         RandomQuality.VeryGood,
-        "Wyhash-based generator; published testing shows it clears BigCrush/PractRand with wide seed coverage.",
-        "Wang Yi 2019",
-        "https://github.com/wangyi-fudan/wyhash",
+        "Wyhash v1 .NET port; raw 64-bit draws match cocowalla's WyRng for the same ulong seed.",
+        "cocowalla 2019 (Wang Yi's wyrand)",
+        "https://github.com/cocowalla/wyhash-dotnet",
         period: "2^64 (published)"
     )]
     [Serializable]

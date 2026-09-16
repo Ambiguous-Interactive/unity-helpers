@@ -11,10 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add an Odin migration preview/apply tool that reports every globally qualified inspector
-  attribute with safety guidance and only converts proven-equivalent `ReadOnly` and
-  `EnumToggleButtons` fields. Button findings now identify the Unity-object, argument, and method
-  signature checks that need manual review. It preserves formatting and backups, and blocks unsafe scans. See the
+- Add an Odin migration preview/apply tool for proven-equivalent `ReadOnly` and
+  `EnumToggleButtons` fields. Preview reports unsupported attributes and blocks source rewrites
+  when Odin serialization may own data. Apply preserves formatting and backups. See the
   [Odin Migration Guide](./docs/guides/odin-migration-guide.md)
   ([#794](https://github.com/Ambiguous-Interactive/unity-helpers/issues/794)).
 - Add opt-in `WUH018` warnings for string `==` and `!=` comparisons whose ordinal comparison policy
@@ -65,6 +64,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Improved
 
+- Improve `WyRandom` documentation to identify its wyhash v1 stream and distinguish it from Wang
+  Yi's wyhash 4.3 `wyrand` ([#757](https://github.com/Ambiguous-Interactive/unity-helpers/issues/757)).
 - Avoid an iterator allocation when the Animation Viewer opens or restores its
   multi-file selector ([#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781)).
 

@@ -121,6 +121,11 @@ All generators implement the `IRandom` interface:
 | `DotNetRandom`                | Very Slow | Poor         | runtime-dependent (System.Random); not fixed                                                | Bridging `System.Random` code to `IRandom`                                                 |
 | `WDoomRandom`                 | Very Slow | Poor         | 1024 draws (measured: 10 state bits live)                                                   | Retro feel, deterministic replays                                                          |
 
+`WyRandom` preserves the raw 64-bit draws of cocowalla's wyhash v1 .NET port for the same `ulong`
+seed. Wang Yi's wyhash 4.3 `wyrand` uses different constants and returns different values. Keep the package
+version pinned when replaying saved `WyRandom` state; the current upstream algorithm is tracked in
+[#757](https://github.com/Ambiguous-Interactive/unity-helpers/issues/757).
+
 ### Reading the Period column
 
 A period of 2^128 cannot be observed, so every value in that column is a claim and the column says
