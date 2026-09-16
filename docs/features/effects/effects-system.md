@@ -441,6 +441,8 @@ player.ApplyEffect(levelUpEffect);
 
 Cosmetic effects handle the visual and audio presentation of effects. They provide a clean separation between gameplay logic (tags, attributes) and presentation (particles, sounds, UI).
 
+When a cosmetic component is destroyed, it calls `OnRemoveEffect` for each tracked target that still exists. Cleanup uses a snapshot, so a removal callback can change the tracked targets without skipping the remaining callbacks.
+
 ### Architecture Overview
 
 **Component Hierarchy:**

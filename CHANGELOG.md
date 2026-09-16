@@ -311,6 +311,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix per-destruction array allocation when cosmetic effects remove tracked targets. Cleanup still visits the original target snapshot when callbacks change the target list ([#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781)).
 - Fix package compiler and analyzer warnings across supported Unity versions, including the 2021.3 serialization attribute conflict and Unity 6 obsolete build-target calls ([#766](https://github.com/Ambiguous-Interactive/unity-helpers/issues/766), [#770](https://github.com/Ambiguous-Interactive/unity-helpers/issues/770)).
 - Fix the seven UI Toolkit progress controls failing to compile on Unity 6000.6. Their UXML tags and attributes remain available on Unity 2021.3 and newer ([#759](https://github.com/Ambiguous-Interactive/unity-helpers/issues/759)).
 - Fix pooled serialization writes accepting negative or oversized advances and overflowing capacity calculations ([#760](https://github.com/Ambiguous-Interactive/unity-helpers/issues/760)).

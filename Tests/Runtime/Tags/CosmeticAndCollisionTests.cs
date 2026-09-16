@@ -41,6 +41,38 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Object.DestroyImmediate(cosmetic); // UNH-SUPPRESS: Test verifies OnDestroy callback
             Assert.AreEqual(1, SpyCosmeticComponent.RemoveInvocationCount);
         }
+
+        [Test]
+        public void OnDestroyKeepsTargetSnapshotWhenRemovalMutatesTargets()
+        {
+            GameObject cosmetic = CreateTrackedGameObject("Cosmetic", typeof(CosmeticEffectData));
+            ReentrantCosmeticComponent.ResetForTests();
+            ReentrantCosmeticComponent component =
+                cosmetic.AddComponent<ReentrantCosmeticComponent>();
+            GameObject first = CreateTrackedGameObject("First");
+            GameObject second = CreateTrackedGameObject("Second");
+            GameObject third = CreateTrackedGameObject("Third");
+            component.OnApplyEffect(first);
+            component.OnApplyEffect(second);
+            component.OnApplyEffect(third);
+            ReentrantCosmeticComponent.RemoveHook = target =>
+            {
+                if (target == first)
+                {
+                    component.OnRemoveEffect(second);
+                }
+            };
+
+            try
+            {
+                Object.DestroyImmediate(cosmetic); // UNH-SUPPRESS: Test verifies OnDestroy callback
+                Assert.AreEqual(4, ReentrantCosmeticComponent.RemovedCount);
+            }
+            finally
+            {
+                ReentrantCosmeticComponent.ResetForTests();
+            }
+        }
     }
 
     [TestFixture]

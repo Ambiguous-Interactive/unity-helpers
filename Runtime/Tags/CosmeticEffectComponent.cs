@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Tags
     using System.Collections.Generic;
     using Core.Extension;
     using UnityEngine;
+    using Utils;
 
     /// <summary>
     /// Abstract base class for cosmetic effect behaviors that provide visual or audio feedback for effects.
@@ -92,7 +93,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         }
 
         /// <summary>
-        /// Cleanup method that removes the effect from all targets when this component is destroyed.
+        /// Removes the effect from a snapshot of tracked targets when this component is destroyed.
         /// </summary>
         protected virtual void OnDestroy()
         {
@@ -101,7 +102,11 @@ namespace WallstopStudios.UnityHelpers.Tags
                 return;
             }
 
-            foreach (GameObject appliedTarget in _appliedTargets.ToArray())
+            using PooledResource<List<GameObject>> lease = Buffers<GameObject>.List.Get(
+                out List<GameObject> appliedTargets
+            );
+            appliedTargets.AddRange(_appliedTargets);
+            foreach (GameObject appliedTarget in appliedTargets)
             {
                 if (appliedTarget == null)
                 {
