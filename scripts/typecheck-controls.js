@@ -336,10 +336,10 @@ async function runProject(project, controlRoot, verbose, buildControl = build) {
     const controlPath = path.join(controlRoot, `${project.id}-${control.fileName}`);
     fs.writeFileSync(controlPath, control.render(project.anchor), "utf8");
     const attempt = await buildControl(project.project, controlPath, control.property);
-    if (verbose) {
+    const failure = classify(project, control, attempt);
+    if (verbose || failure !== null) {
       messages.push(attempt.output);
     }
-    const failure = classify(project, control, attempt);
     if (failure !== null) {
       failures.push(failure);
       continue;
