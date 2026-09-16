@@ -187,6 +187,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             yield return null;
         }
 
+        [Test]
+        public void GetHandlesWithTagClearsBufferForInvalidTag()
+        {
+            GameObject entity = CreateTrackedGameObject("Tagged", typeof(TagHandler));
+            TagHandler handler = entity.GetComponent<TagHandler>();
+            List<EffectHandle> handles = new() { default };
+
+            Assert.AreSame(handles, handler.GetHandlesWithTag(null, handles));
+            CollectionAssert.IsEmpty(handles);
+
+            handles.Add(default);
+            Assert.AreSame(handles, handler.GetHandlesWithTag(string.Empty, handles));
+            CollectionAssert.IsEmpty(handles);
+        }
+
         [UnityTest]
         public IEnumerator GetActiveTagsReturnsNewBufferWhenNeeded()
         {

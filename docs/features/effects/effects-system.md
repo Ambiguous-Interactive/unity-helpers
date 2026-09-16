@@ -1304,6 +1304,11 @@ foreach (string tag in activeTags)
 }
 ```
 
+You can pass a reusable list to `GetActiveTags`, `GetHandlesWithTag`, or `GetActiveEffects`.
+Each query clears that list before returning, including when the target has no matching handler
+or the requested tag is empty. Reusing one list across targets therefore cannot leave the previous
+target's tags or effect handles in the result.
+
 **Collection Type Support:**
 
 All tag query methods support multiple collection types with optimized implementations:

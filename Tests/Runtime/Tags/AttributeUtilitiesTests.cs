@@ -58,6 +58,37 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             Assert.IsFalse(target.HasTag("Buff"));
         }
 
+        [Test]
+        public void ReusedQueryBuffersAreEmptyWhenTheTargetIsUnavailable()
+        {
+            Object missingTarget = null;
+            GameObject withoutHandlers = CreateTrackedGameObject("No handlers");
+            List<string> tags = new() { "stale" };
+            List<EffectHandle> handles = new() { default };
+
+            Assert.AreSame(tags, missingTarget.GetActiveTags(tags));
+            CollectionAssert.IsEmpty(tags);
+            tags.Add("stale");
+            Assert.AreSame(tags, withoutHandlers.GetActiveTags(tags));
+            CollectionAssert.IsEmpty(tags);
+
+            Assert.AreSame(handles, missingTarget.GetHandlesWithTag("Buff", handles));
+            CollectionAssert.IsEmpty(handles);
+            handles.Add(default);
+            Assert.AreSame(handles, withoutHandlers.GetHandlesWithTag("Buff", handles));
+            CollectionAssert.IsEmpty(handles);
+            handles.Add(default);
+            Assert.AreSame(handles, withoutHandlers.GetHandlesWithTag(null, handles));
+            CollectionAssert.IsEmpty(handles);
+
+            handles.Add(default);
+            Assert.AreSame(handles, missingTarget.GetActiveEffects(handles));
+            CollectionAssert.IsEmpty(handles);
+            handles.Add(default);
+            Assert.AreSame(handles, withoutHandlers.GetActiveEffects(handles));
+            CollectionAssert.IsEmpty(handles);
+        }
+
         [UnityTest]
         public IEnumerator HasTagReturnsTrueWhenHandlerContainsTag()
         {

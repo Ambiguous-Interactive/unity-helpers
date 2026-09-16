@@ -310,7 +310,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// <param name="buffer">
         /// Optional buffer to populate. When <c>null</c>, a new list is created. The buffer is cleared before population.
         /// </param>
-        /// <returns>The populated buffer of active tags. The buffer is empty when no tags are present or no handler exists.</returns>
+        /// <returns>The populated buffer of active tags, or an empty buffer when the target or handler is missing.</returns>
         /// <example>
         /// <code>
         /// List&lt;string&gt; activeTags = target.GetActiveTags(_tagBuffer);
@@ -322,18 +322,13 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// </example>
         public static List<string> GetActiveTags(this Object target, List<string> buffer = null)
         {
-            if (target == null)
-            {
-                return buffer ?? new List<string>(0);
-            }
-
-            if (!target.TryGetComponent(out TagHandler tagHandler))
-            {
-                return buffer ?? new List<string>(0);
-            }
-
             List<string> targetBuffer = buffer ?? new List<string>();
             targetBuffer.Clear();
+            if (target == null || !target.TryGetComponent(out TagHandler tagHandler))
+            {
+                return targetBuffer;
+            }
+
             return tagHandler.GetActiveTags(targetBuffer);
         }
 
@@ -380,7 +375,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// <param name="buffer">
         /// Optional buffer to populate. When <c>null</c>, a new list is created. The buffer is cleared before population.
         /// </param>
-        /// <returns>The populated buffer of effect handles whose effects contain <paramref name="effectTag"/>.</returns>
+        /// <returns>The populated buffer of matching handles, or an empty buffer for an invalid tag or missing target or handler.</returns>
         /// <example>
         /// <code>
         /// List&lt;EffectHandle&gt; taggedHandles = target.GetHandlesWithTag("Burning", _handleBuffer);
@@ -396,23 +391,17 @@ namespace WallstopStudios.UnityHelpers.Tags
             List<EffectHandle> buffer = null
         )
         {
-            if (string.IsNullOrEmpty(effectTag))
-            {
-                return buffer ?? new List<EffectHandle>(0);
-            }
-
-            if (target == null)
-            {
-                return buffer ?? new List<EffectHandle>(0);
-            }
-
-            if (!target.TryGetComponent(out TagHandler tagHandler))
-            {
-                return buffer ?? new List<EffectHandle>(0);
-            }
-
             List<EffectHandle> targetBuffer = buffer ?? new List<EffectHandle>();
             targetBuffer.Clear();
+            if (
+                string.IsNullOrEmpty(effectTag)
+                || target == null
+                || !target.TryGetComponent(out TagHandler tagHandler)
+            )
+            {
+                return targetBuffer;
+            }
+
             return tagHandler.GetHandlesWithTag(effectTag, targetBuffer);
         }
 
@@ -731,7 +720,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// <param name="buffer">
         /// Optional buffer to populate. When <c>null</c>, a new list is created. The buffer is cleared before population.
         /// </param>
-        /// <returns>The populated buffer containing every active effect handle.</returns>
+        /// <returns>The populated buffer containing every active effect handle, or an empty buffer when the target or handler is missing.</returns>
         /// <example>
         /// <code>
         /// List&lt;EffectHandle&gt; handles = target.GetActiveEffects(_handleBuffer);
@@ -746,18 +735,13 @@ namespace WallstopStudios.UnityHelpers.Tags
             List<EffectHandle> buffer = null
         )
         {
-            if (target == null)
-            {
-                return buffer ?? new List<EffectHandle>(0);
-            }
-
-            if (!target.TryGetComponent(out EffectHandler effectHandler))
-            {
-                return buffer ?? new List<EffectHandle>(0);
-            }
-
             List<EffectHandle> targetBuffer = buffer ?? new List<EffectHandle>();
             targetBuffer.Clear();
+            if (target == null || !target.TryGetComponent(out EffectHandler effectHandler))
+            {
+                return targetBuffer;
+            }
+
             return effectHandler.GetActiveEffects(targetBuffer);
         }
 

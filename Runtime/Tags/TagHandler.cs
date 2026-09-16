@@ -527,7 +527,7 @@ namespace WallstopStudios.UnityHelpers.Tags
         /// <param name="buffer">
         /// Optional list to populate. When <c>null</c>, a new list is created. The buffer is cleared before population.
         /// </param>
-        /// <returns>The populated buffer containing matching effect handles.</returns>
+        /// <returns>The populated buffer containing matching effect handles, or an empty buffer for an invalid tag.</returns>
         /// <example>
         /// <code>
         /// List&lt;EffectHandle&gt; handles = tagHandler.GetHandlesWithTag("Burning", _handleBuffer);
@@ -542,18 +542,13 @@ namespace WallstopStudios.UnityHelpers.Tags
             List<EffectHandle> buffer = null
         )
         {
-            if (string.IsNullOrEmpty(effectTag))
-            {
-                return buffer ?? new List<EffectHandle>(0);
-            }
-
             List<EffectHandle> target = buffer;
             if (target != null)
             {
                 target.Clear();
             }
 
-            if (_effectHandles.Count == 0)
+            if (string.IsNullOrEmpty(effectTag) || _effectHandles.Count == 0)
             {
                 return target ?? new List<EffectHandle>(0);
             }
