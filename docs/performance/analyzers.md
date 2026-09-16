@@ -765,6 +765,9 @@ checks, pattern checks, `string.Equals`, `object.ReferenceEquals`, non-string op
 user-defined equality operators. It is off by default because operator equality is valid and common;
 the diagnostic is an explicit-policy audit, not a claim that ordinal comparison is wrong.
 
+The package enables this rule for the Odin source migration tool. That parser handles C# tokens and
+asset paths, so each of its string comparisons must state ordinal policy in source.
+
 ## Turning one off
 
 Suppress a single call site whose lookup is genuinely cold:

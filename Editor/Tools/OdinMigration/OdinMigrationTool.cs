@@ -288,7 +288,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 foreach (Object selected in Selection.objects)
                 {
                     string path = AssetDatabase.GetAssetPath(selected);
-                    if (!path.StartsWith("Assets/", StringComparison.Ordinal) && path != "Assets")
+                    if (
+                        !path.StartsWith("Assets/", StringComparison.Ordinal)
+                        && !string.Equals(path, "Assets", StringComparison.Ordinal)
+                    )
                     {
                         continue;
                     }

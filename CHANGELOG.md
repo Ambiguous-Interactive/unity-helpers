@@ -18,7 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [Odin Migration Guide](./docs/guides/odin-migration-guide.md)
   ([#794](https://github.com/Ambiguous-Interactive/unity-helpers/issues/794)).
 - Add opt-in `WUH018` warnings for string `==` and `!=` comparisons whose ordinal comparison policy
-  is implicit. Null checks and explicit comparison APIs remain quiet. See
+  is implicit. Null checks and explicit comparison APIs remain quiet. The Odin migration parser
+  enforces the rule on its own source. See
   [Analyzers](./docs/performance/analyzers.md#wuh018-implicit-string-equality-opt-in)
   ([#807](https://github.com/Ambiguous-Interactive/unity-helpers/issues/807)).
 - Add `WallMath.TryFisherExactTest` for exact two-sided comparisons of two binary groups with

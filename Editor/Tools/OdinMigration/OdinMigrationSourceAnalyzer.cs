@@ -275,7 +275,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             int position = bracketStart + 1;
             SkipWhitespace(masked, ref position, bracketEnd);
             string explicitTarget = ReadAttributeTarget(masked, ref position, bracketEnd);
-            bool allowedAttributeTarget = explicitTarget == null || explicitTarget == "field";
+            bool allowedAttributeTarget =
+                explicitTarget == null
+                || string.Equals(explicitTarget, "field", StringComparison.Ordinal);
 
             while (position < bracketEnd)
             {
@@ -362,7 +364,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             List<OdinMigrationFinding> manualReviews
         )
         {
-            if (attributeName == "OdinSerialize")
+            if (string.Equals(attributeName, "OdinSerialize", StringComparison.Ordinal))
             {
                 return;
             }
@@ -380,7 +382,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 return;
             }
 
-            if (attributeName == "Button")
+            if (string.Equals(attributeName, "Button", StringComparison.Ordinal))
             {
                 AddFinding(
                     manualReviews,
@@ -457,8 +459,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 if (ReportedOdinAttributes.Contains(attributeName))
                 {
                     string message =
-                        (attributeName == "ShowIf" || attributeName == "HideIf")
-                        && IsExactNameofArgument(source, argumentsStart, argumentsEnd)
+                        (
+                            string.Equals(attributeName, "ShowIf", StringComparison.Ordinal)
+                            || string.Equals(attributeName, "HideIf", StringComparison.Ordinal)
+                        ) && IsExactNameofArgument(source, argumentsStart, argumentsEnd)
                             ? $"{attributeName} with a nameof condition remains manual because its value type and Odin animation cannot be proven equivalent."
                             : $"{attributeName} has no proven equivalent for these arguments and was left unchanged.";
                     AddFinding(manualReviews, lineMap, nameSpan.Start, message);
@@ -484,7 +488,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             SkipWhitespace(source, ref position, argumentsEnd);
             if (
                 !TryReadIdentifier(source, ref position, argumentsEnd, out TextSpan keyword)
-                || source.Substring(keyword.Start, keyword.Length) != "nameof"
+                || !string.Equals(
+                    source.Substring(keyword.Start, keyword.Length),
+                    "nameof",
+                    StringComparison.Ordinal
+                )
             )
             {
                 return false;
@@ -837,7 +845,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             }
 
             if (
-                source.Substring(start, position - start) == "global"
+                string.Equals(
+                    source.Substring(start, position - start),
+                    "global",
+                    StringComparison.Ordinal
+                )
                 && position + 1 < limit
                 && source[position] == ':'
                 && source[position + 1] == ':'
@@ -1040,10 +1052,26 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
 
                     string writtenName = source.Substring(nameSpan.Start, nameSpan.Length);
                     if (
-                        writtenName == "global::UnityEngine.SerializeField"
-                        || writtenName == "global::UnityEngine.SerializeFieldAttribute"
-                        || writtenName == "global::UnityEngine.SerializeReference"
-                        || writtenName == "global::UnityEngine.SerializeReferenceAttribute"
+                        string.Equals(
+                            writtenName,
+                            "global::UnityEngine.SerializeField",
+                            StringComparison.Ordinal
+                        )
+                        || string.Equals(
+                            writtenName,
+                            "global::UnityEngine.SerializeFieldAttribute",
+                            StringComparison.Ordinal
+                        )
+                        || string.Equals(
+                            writtenName,
+                            "global::UnityEngine.SerializeReference",
+                            StringComparison.Ordinal
+                        )
+                        || string.Equals(
+                            writtenName,
+                            "global::UnityEngine.SerializeReferenceAttribute",
+                            StringComparison.Ordinal
+                        )
                     )
                     {
                         return true;

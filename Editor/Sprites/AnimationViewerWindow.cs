@@ -98,6 +98,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             wnd.minSize = new Vector2(750, 500);
         }
 
+        internal static void PlaceFileSelectorFirst(VisualElement root, VisualElement fileSelector)
+        {
+            if (
+                root == null
+                || fileSelector == null
+                || fileSelector.parent != root
+                || root.childCount < 2
+            )
+            {
+                return;
+            }
+
+            fileSelector.PlaceInFront(root[0]);
+        }
+
         private static string GetLastAnimationDirectory()
         {
             try
@@ -316,21 +331,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 HideMultiFileSelector();
             }
-        }
-
-        internal static void PlaceFileSelectorFirst(VisualElement root, VisualElement fileSelector)
-        {
-            if (
-                root == null
-                || fileSelector == null
-                || fileSelector.parent != root
-                || root.childCount < 2
-            )
-            {
-                return;
-            }
-
-            fileSelector.PlaceInFront(root[0]);
         }
 
         private void HideMultiFileSelector()
