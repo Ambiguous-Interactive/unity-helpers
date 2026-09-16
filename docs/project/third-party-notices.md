@@ -53,7 +53,11 @@ The following sorting algorithm implementations in `Runtime/Core/Extension/Sorti
 - Author: Orson Peters
 - Upstream: [GitHub repository](https://github.com/orlp/pdqsort)
 - License: zlib License
-- Notes: C# adaptation retaining pattern-detection heuristics while operating on `IList<T>`.
+- Notes: This package's `PatternDefeatingQuickSort` is a pdqsort-inspired median-of-three
+  introsort over `IList<T>`. It does not implement the upstream bad-partition detection,
+  pattern-breaking swaps, ninther pivot, or bounded partial insertion pass. Its public name is
+  retained for compatibility; upstream parity remains tracked in issue #756. Comparison based on
+  [pdqsort commit `b1ef26a`](https://github.com/orlp/pdqsort/blob/b1ef26a55cdb60d236a5cb199c4234c704f46726/pdqsort.h).
 
 ### Grail Sort
 
@@ -119,10 +123,10 @@ The following PRNG implementations in `Runtime/Core/Random/` are adapted from or
 ### Xoroshiro / Xoshiro / SplitMix64
 
 - Description: Fast, high-quality PRNGs with small state.
-- Authors: David Blackman, Sebastiano Vigna
+- Authors: David Blackman and Sebastiano Vigna (xoroshiro/xoshiro); Guy L. Steele Jr., Doug Lea, and Christine H. Flood (SplitMix design); Sebastiano Vigna (SplitMix64 reference implementation)
 - Upstream: [Scrambled Linear PRNGs (xoshiro/xoroshiro)](https://arxiv.org/abs/1805.01407); [reference implementations](https://prng.di.unimi.it/); [Fast Splittable PRNGs (SplitMix64)](https://2014.splashcon.org/details/oopsla2014/48/Fast-Splittable-Pseudorandom-Number-Generators)
 - License: CC0 1.0 Universal (Public Domain)
-- Notes: Implements xoroshiro128+ (returning the low 32 bits of each 64-bit output), xoshiro128\*\*, xoshiro256\*\*, and SplitMix64.
+- Notes: Implements xoroshiro128+ (returning the high 32 bits of each 64-bit output), xoshiro128\*\*, xoshiro256\*\*, and SplitMix64.
 
 ### RomuDuo
 

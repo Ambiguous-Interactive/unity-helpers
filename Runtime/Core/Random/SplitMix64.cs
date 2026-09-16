@@ -1,9 +1,10 @@
 // MIT License - Copyright (c) 2024 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 //
-// The algorithm in this file is SplitMix64, by David Blackman and Sebastiano Vigna, CC0 1.0 Universal
-// (Public Domain), https://prng.di.unimi.it/splitmix64.c. This is an adaptation of that work; the
-// design is the original authors'. See docs/project/third-party-notices.md.
+// This implementation follows Sebastiano Vigna's 2015 fixed-increment SplitMix64 reference,
+// CC0 1.0 Universal (Public Domain), https://prng.di.unimi.it/splitmix64.c. The SplitMix design
+// was introduced by Guy L. Steele Jr., Doug Lea, and Christine H. Flood in 2014.
+// See docs/project/third-party-notices.md.
 
 namespace WallstopStudios.UnityHelpers.Core.Random
 {
@@ -53,8 +54,8 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// </example>
     [RandomGeneratorMetadata(
         RandomQuality.VeryGood,
-        "Well-known SplitMix64 mixer; passes TestU01 BigCrush and PractRand up to large data sizes in literature.",
-        "Vigna 2014",
+        "SplitMix64 mixer; Vigna reports passing TestU01 BigCrush.",
+        "Vigna 2015",
         "https://prng.di.unimi.it/splitmix64.c",
         period: "2^64 (published)"
     )]

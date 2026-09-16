@@ -64,8 +64,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Improved
 
-- Improve `WyRandom` documentation to identify its wyhash v1 stream and distinguish it from Wang
-  Yi's wyhash 4.3 `wyrand` ([#757](https://github.com/Ambiguous-Interactive/unity-helpers/issues/757)).
+- Correct random reference documentation: identify `WyRandom`'s wyhash v1 stream, clarify
+  `XoroShiroRandom`'s high-half output, and distinguish the SplitMix design from Vigna's 2015
+  reference implementation without attributing an unsupported published PractRand result
+  ([#757](https://github.com/Ambiguous-Interactive/unity-helpers/issues/757)).
+- Describe `PatternDefeatingQuickSort` as the pdqsort-inspired introsort it implements; it does
+  not include upstream pattern-breaking heuristics
+  ([#756](https://github.com/Ambiguous-Interactive/unity-helpers/issues/756)).
 - Avoid an iterator allocation when the Animation Viewer opens or restores its
   multi-file selector ([#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781)).
 

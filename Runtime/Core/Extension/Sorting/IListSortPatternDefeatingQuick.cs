@@ -1,9 +1,9 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 //
-// The algorithm in this file is Pattern-Defeating Quicksort (pdqsort), by Orson Peters, zlib License,
-// https://github.com/orlp/pdqsort. This is an adaptation of that work; the design is the original
-// author's. See docs/project/third-party-notices.md.
+// Inspired by Pattern-Defeating Quicksort (pdqsort), by Orson Peters, zlib License,
+// https://github.com/orlp/pdqsort. This implementation is a median-of-three introsort and does
+// not reproduce upstream pattern detection. See docs/project/third-party-notices.md.
 
 // ReSharper disable once CheckNamespace
 namespace WallstopStudios.UnityHelpers.Core.Extension
@@ -77,12 +77,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         }
 
         /// <summary>
-        /// Sorts the elements in the list using pattern-defeating quicksort, an adaptive quicksort variant with
-        /// introspective fallbacks and pattern detection.
+        /// Sorts the elements in the list using a pdqsort-inspired introsort with a heapsort fallback.
         /// </summary>
         /// <remarks>
         /// Implementation reference: Pattern-Defeating Quicksort by Orson Peters, https://github.com/orlp/pdqsort (zlib License).
-        /// This is a C# adaptation that retains the pattern-detection heuristics while operating on <c>IList&lt;T&gt;</c>.
+        /// This adaptation uses median-of-three pivots and does not implement upstream pattern-breaking heuristics.
         /// PatternDefeatingQuickSort is not stable.
         /// </remarks>
         /// <typeparam name="T">The type of elements in the list.</typeparam>

@@ -24,7 +24,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <summary>Meteor sort algorithm - adaptive gap-based sorting variant. Not stable.</summary>
         Meteor = 3,
 
-        /// <summary>Pattern-defeating quicksort - adaptive quicksort with pattern detection. Not stable.</summary>
+        /// <summary>Pdqsort-inspired introsort with a heapsort fallback. Not stable.</summary>
         PatternDefeatingQuickSort = 4,
 
         /// <summary>Grail sort algorithm - mergesort leveraging pooled buffers. Stable.</summary>

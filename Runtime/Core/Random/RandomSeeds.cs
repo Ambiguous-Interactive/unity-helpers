@@ -1,7 +1,7 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 //
-// The mixer in this file is the SplitMix64 finalizer, by David Blackman and Sebastiano Vigna,
+// The mixer in this file follows Sebastiano Vigna's SplitMix64 reference implementation,
 // CC0 1.0 Universal (Public Domain), https://prng.di.unimi.it/splitmix64.c.
 
 namespace WallstopStudios.UnityHelpers.Core.Random
