@@ -290,7 +290,9 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
 
             Assert.IsNotEmpty(reported, shape + " must be reported");
             Assert.IsTrue(
-                reported.All(diagnostic => diagnostic.Id == NullPropagationId),
+                reported.All(diagnostic =>
+                    string.Equals(diagnostic.Id, NullPropagationId, System.StringComparison.Ordinal)
+                ),
                 shape + " must report only " + NullPropagationId
             );
             Assert.IsTrue(
@@ -382,7 +384,9 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
 
             Assert.IsNotEmpty(reported, shape + " must be reported");
             Assert.IsTrue(
-                reported.All(diagnostic => diagnostic.Id == NullAssertionId),
+                reported.All(diagnostic =>
+                    string.Equals(diagnostic.Id, NullAssertionId, System.StringComparison.Ordinal)
+                ),
                 shape + " must report only " + NullAssertionId
             );
         }
@@ -551,7 +555,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
         {
             DiagnosticDescriptor descriptor =
                 new UnityObjectNullAnalyzer().SupportedDiagnostics.Single(candidate =>
-                    candidate.Id == id
+                    string.Equals(candidate.Id, id, System.StringComparison.Ordinal)
                 );
 
             Assert.IsTrue(

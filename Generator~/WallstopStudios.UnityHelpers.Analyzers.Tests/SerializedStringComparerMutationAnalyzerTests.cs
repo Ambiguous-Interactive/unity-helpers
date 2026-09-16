@@ -727,7 +727,8 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
         {
             DiagnosticDescriptor descriptor =
                 new SerializedStringComparerMutationAnalyzer().SupportedDiagnostics.Single(
-                    candidate => candidate.Id == DiagnosticId
+                    candidate =>
+                        string.Equals(candidate.Id, DiagnosticId, System.StringComparison.Ordinal)
                 );
 
             Assert.IsTrue(descriptor.IsEnabledByDefault);

@@ -14,5 +14,13 @@
   <PropertyGroup>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <WarningLevel>9999</WarningLevel>
+    <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)CheckProjects.ruleset</CodeAnalysisRuleSet>
+    <WarningsAsErrors>$(WarningsAsErrors);WUH001;WUH002;WUH003;WUH004;WUH005;WUH006;WUH007;WUH008;WUH009;WUH010;WUH011;WUH012;WUH013;WUH014;WUH015;WUH016;WUH017;WUH018</WarningsAsErrors>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Every owned .NET project self-hosts and enforces the exact analyzer binaries shipped to Unity. -->
+    <Analyzer Include="$(MSBuildThisFileDirectory)../Runtime/Analyzers/WallstopStudios.UnityHelpers.Proto.Generator.dll" />
+    <Analyzer Include="$(MSBuildThisFileDirectory)../Runtime/Analyzers/WallstopStudios.UnityHelpers.Analyzers.dll" />
+  </ItemGroup>
 </Project>

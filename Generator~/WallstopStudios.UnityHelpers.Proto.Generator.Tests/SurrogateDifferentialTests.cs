@@ -247,7 +247,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.AreEqual(4, restored.Path[0].x);
             Assert.AreEqual(0, restored.Path[1].x);
             Assert.AreEqual(7, restored.Trailer);
-            Assert.AreEqual(9, restored.Named["k"].z);
+            Assert.AreEqual(9, restored.Named.ValueFor("k").z);
         }
 
         [Test]

@@ -163,4 +163,25 @@ check(
   enabledOptInIds.join(",")
 );
 
+const generatorBuildPolicy = fs.readFileSync(
+  path.join(root, "Generator~", "Directory.Build.props"),
+  "utf8"
+);
+for (const analyzerDll of analyzerDlls) {
+  const analyzerFileName = path.basename(analyzerDll);
+  check(
+    `every owned .NET project loads ${analyzerFileName}`,
+    generatorBuildPolicy.includes(`Runtime/Analyzers/${analyzerFileName}`),
+    "Generator~/Directory.Build.props must load the shipped binary"
+  );
+}
+const promotedPolicyIds = [...generatorBuildPolicy.matchAll(/(?:^|;)(WUH\d{3})(?=;|<)/g)].map(
+  (match) => match[1]
+);
+check(
+  "every WUH policy is promoted independently of project warning settings",
+  JSON.stringify(promotedPolicyIds) === JSON.stringify(descriptorIds),
+  `descriptors=${descriptorIds.join(",")} promoted=${promotedPolicyIds.join(",")}`
+);
+
 process.stdout.write(`Analyzer placement contract passed (${passed} checks).\n`);

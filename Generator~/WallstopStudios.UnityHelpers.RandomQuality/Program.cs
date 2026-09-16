@@ -209,9 +209,9 @@ namespace WallstopStudios.UnityHelpers.RandomQuality
 
         private static bool HasFlag(string[] args, string name)
         {
-            for (int index = 0; index < args.Length; index++)
+            foreach (string argument in args)
             {
-                if (string.Equals(args[index], name, StringComparison.Ordinal))
+                if (string.Equals(argument, name, StringComparison.Ordinal))
                 {
                     return true;
                 }

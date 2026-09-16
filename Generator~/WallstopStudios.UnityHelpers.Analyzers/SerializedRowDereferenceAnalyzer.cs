@@ -276,9 +276,8 @@ namespace WallstopStudios.UnityHelpers.Analyzers
             while (grew)
             {
                 grew = false;
-                for (int index = 0; index < copies.Count; ++index)
+                foreach (KeyValuePair<ISymbol, ISymbol> copy in copies)
                 {
-                    KeyValuePair<ISymbol, ISymbol> copy = copies[index];
                     if (aliases.Contains(copy.Value) && aliases.Add(copy.Key))
                     {
                         grew = true;

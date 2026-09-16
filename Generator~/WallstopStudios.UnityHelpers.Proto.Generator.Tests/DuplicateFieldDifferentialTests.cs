@@ -291,7 +291,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 Assert.AreEqual(9, ours.Reference.A, payload);
                 Assert.AreEqual(9, ours.Where.X, payload);
                 Assert.AreEqual(99, ours.Values[0], payload);
-                Assert.AreEqual(9, ours.Map[7], payload);
+                Assert.AreEqual(9, ours.Map.ValueFor(7), payload);
             }
 
             Assert.AreEqual(2, Decode<SeededImmutableShapes>(payloads[0]).Reference.B);
@@ -300,7 +300,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 new[] { 99, 1 },
                 Decode<SeededImmutableShapes>(payloads[2]).Values
             );
-            Assert.AreEqual(13, Decode<SeededImmutableShapes>(payloads[3]).Map[0]);
+            Assert.AreEqual(13, Decode<SeededImmutableShapes>(payloads[3]).Map.ValueFor(0));
         }
 
         [Test]

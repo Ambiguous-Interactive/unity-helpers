@@ -770,9 +770,10 @@ checks, pattern checks, `string.Equals`, `object.ReferenceEquals`, non-string op
 user-defined equality operators. It is off by default because operator equality is valid and common;
 the diagnostic is an explicit-policy audit, not a claim that ordinal comparison is wrong.
 
-The package enables this rule, together with `WUH010` and `WUH013`, in all five package-owned check
-projects. Runtime, Editor, integrations, runtime tests, and editor tests therefore enforce every
-`WUH###` policy while the consumer default remains unchanged.
+The package enables this rule, together with `WUH010` and `WUH013`, in every package-owned .NET
+project. Both analyzer implementations and their tooling self-host the shipped analyzer binaries;
+the five Unity source gates cover Runtime, Editor, integrations, runtime tests, and editor tests.
+All owned code therefore enforces every `WUH###` policy while the consumer default remains unchanged.
 
 ## Turning one off
 

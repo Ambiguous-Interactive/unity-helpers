@@ -224,7 +224,9 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
             ImmutableArray<Diagnostic> reported = Analyze(body);
             Assert.IsNotEmpty(reported, shape + " must be reported");
             Assert.IsTrue(
-                reported.All(diagnostic => diagnostic.Id == DiagnosticId),
+                reported.All(diagnostic =>
+                    string.Equals(diagnostic.Id, DiagnosticId, System.StringComparison.Ordinal)
+                ),
                 shape + " must report only WUH001"
             );
         }
@@ -377,7 +379,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
         {
             DiagnosticDescriptor descriptor =
                 new CacheFactoryAnalyzer().SupportedDiagnostics.Single(candidate =>
-                    candidate.Id == DiagnosticId
+                    string.Equals(candidate.Id, DiagnosticId, System.StringComparison.Ordinal)
                 );
 
             Assert.IsTrue(

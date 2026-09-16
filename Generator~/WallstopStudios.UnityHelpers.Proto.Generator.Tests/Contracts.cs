@@ -1,6 +1,8 @@
 // MIT License - Copyright (c) 2026 wallstop
 // Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
 
+#pragma warning disable WUH010 // IntPairs implements the dictionary indexer contract under test.
+
 namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 {
     using System;

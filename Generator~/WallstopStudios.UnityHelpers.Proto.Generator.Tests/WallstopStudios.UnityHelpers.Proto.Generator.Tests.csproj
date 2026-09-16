@@ -75,6 +75,14 @@
          retired, and an automatic pass that rewrites an unchanged file forever. -->
     <Compile Include="$(RepoRoot)/Editor/Tools/WProtoSubtypeTagManifestFile.cs" />
     <Compile Include="*.cs" />
+    <Compile
+      Include="$(RepoRoot)/Tests/Core/DictionaryAssertions.cs"
+      Link="DictionaryAssertions.cs"
+    />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="WallstopStudios.UnityHelpers.Tests.Core" />
   </ItemGroup>
 
   <ItemGroup>

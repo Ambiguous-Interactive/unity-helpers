@@ -457,7 +457,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
         {
             DiagnosticDescriptor descriptor =
                 new UntestedTryOutAnalyzer().SupportedDiagnostics.Single(candidate =>
-                    candidate.Id == DiagnosticId
+                    string.Equals(candidate.Id, DiagnosticId, System.StringComparison.Ordinal)
                 );
 
             Assert.IsTrue(

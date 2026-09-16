@@ -307,7 +307,13 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
 
             Assert.IsNotEmpty(reported, shape + " must be reported");
             Assert.IsTrue(
-                reported.All(diagnostic => diagnostic.Id == GetComponentNullComparisonId),
+                reported.All(diagnostic =>
+                    string.Equals(
+                        diagnostic.Id,
+                        GetComponentNullComparisonId,
+                        System.StringComparison.Ordinal
+                    )
+                ),
                 shape + " must report only " + GetComponentNullComparisonId
             );
             Assert.IsTrue(
@@ -340,7 +346,13 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
 
             Assert.IsNotEmpty(reported, shape + " must be reported");
             Assert.IsTrue(
-                reported.All(diagnostic => diagnostic.Id == GetComponentNullComparisonId),
+                reported.All(diagnostic =>
+                    string.Equals(
+                        diagnostic.Id,
+                        GetComponentNullComparisonId,
+                        System.StringComparison.Ordinal
+                    )
+                ),
                 shape + " must report only " + GetComponentNullComparisonId
             );
         }

@@ -84,7 +84,9 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
         private static string Override(string hook, string first, int following)
         {
             // IDisposable.Dispose must remain public even though the other hooks are protected.
-            string accessibility = hook == "Dispose" ? "public" : "protected";
+            string accessibility = string.Equals(hook, "Dispose", System.StringComparison.Ordinal)
+                ? "public"
+                : "protected";
             string after = string.Join("\n", Enumerable.Repeat("Release();", following).ToArray());
             return accessibility
                 + " override void "
@@ -451,7 +453,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
         {
             DiagnosticDescriptor descriptor =
                 new TeardownBaseCallAnalyzer().SupportedDiagnostics.Single(candidate =>
-                    candidate.Id == DiagnosticId
+                    string.Equals(candidate.Id, DiagnosticId, System.StringComparison.Ordinal)
                 );
 
             Assert.IsTrue(

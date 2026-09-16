@@ -648,12 +648,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     .Get<BclKeyContract>()
                     .TryRead(ref reader, out BclKeyContract restored)
             );
-            Assert.AreEqual(7, restored.ByDate[date]);
-            Assert.AreEqual(7, restored.ByDuration[duration]);
-            Assert.AreEqual(7, restored.ByIdentifier[identifier]);
-            Assert.AreEqual(7, restored.ByAmount[amount]);
-            Assert.AreEqual(7, restored.ByCode['A']);
-            Assert.AreEqual(0, restored.ByCode['\u00E9']);
+            Assert.AreEqual(7, restored.ByDate.ValueFor(date));
+            Assert.AreEqual(7, restored.ByDuration.ValueFor(duration));
+            Assert.AreEqual(7, restored.ByIdentifier.ValueFor(identifier));
+            Assert.AreEqual(7, restored.ByAmount.ValueFor(amount));
+            Assert.AreEqual(7, restored.ByCode.ValueFor('A'));
+            Assert.AreEqual(0, restored.ByCode.ValueFor('\u00E9'));
         }
 
         [Test]

@@ -231,8 +231,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.AreEqual(1, restored.Shapes[0][0].X);
             Assert.AreEqual(2, restored.Shapes[0][0].Y);
             Assert.AreEqual(2, restored.Tables[0].Count);
-            Assert.AreEqual(2, restored.Tables[0]["b"]);
-            CollectionAssert.AreEqual(new[] { 11, 12 }, restored.Lookup["k"]);
+            Assert.AreEqual(2, restored.Tables[0].ValueFor("b"));
+            CollectionAssert.AreEqual(new[] { 11, 12 }, restored.Lookup.ValueFor("k"));
             CollectionAssert.AreEqual(new byte[] { 13 }, restored.Blobs[0]);
         }
 
@@ -279,7 +279,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.AreEqual(0, restored.Names[0].Length);
             Assert.AreEqual(0, restored.Sets[0].Count);
             Assert.AreEqual(0, restored.Tables[0].Count);
-            Assert.AreEqual(0, restored.Lookup["k"].Count);
+            Assert.AreEqual(0, restored.Lookup.ValueFor("k").Count);
         }
 
         [Test]
@@ -309,7 +309,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
 
             Assert.AreEqual(1, restored.Lookup.Count);
-            Assert.IsTrue(restored.Lookup["k"] == null, "a null map value came back non-null");
+            Assert.IsTrue(
+                restored.Lookup.ValueFor("k") == null,
+                "a null map value came back non-null"
+            );
         }
 
         [Test]
@@ -377,7 +380,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
 
             CollectionAssert.AreEqual(new[] { 1, 2 }, restored.Rows[0]);
-            CollectionAssert.AreEqual(new[] { 3 }, restored.Lookup["k"]);
+            CollectionAssert.AreEqual(new[] { 3 }, restored.Lookup.ValueFor("k"));
         }
 
         [Test]

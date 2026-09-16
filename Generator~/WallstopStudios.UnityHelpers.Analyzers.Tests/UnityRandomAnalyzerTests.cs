@@ -508,7 +508,8 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
         public void TheDiagnosticIsOnByDefaultSuppressibleAndNeverAboveAWarning()
         {
             DiagnosticDescriptor descriptor = new UnityRandomAnalyzer().SupportedDiagnostics.Single(
-                candidate => candidate.Id == DiagnosticId
+                candidate =>
+                    string.Equals(candidate.Id, DiagnosticId, System.StringComparison.Ordinal)
             );
 
             Assert.IsTrue(

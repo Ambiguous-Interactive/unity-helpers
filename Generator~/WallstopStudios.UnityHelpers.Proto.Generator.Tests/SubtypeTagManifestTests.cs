@@ -221,7 +221,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
         private static DiagnosticSeverity Severity(ImmutableArray<Diagnostic> diagnostics)
         {
-            return diagnostics.Single(diagnostic => diagnostic.Id == "WPROTO041").Severity;
+            return diagnostics
+                .Single(diagnostic =>
+                    string.Equals(diagnostic.Id, "WPROTO041", System.StringComparison.Ordinal)
+                )
+                .Severity;
         }
 
         private static string StripComments(string rendered)
@@ -533,7 +537,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
              * contains.
              */
             Diagnostic match = Run(Fixture(string.Empty, "[WProtoSubtype(typeof(Base))]"))
-                .Single(diagnostic => diagnostic.Id == "WPROTO041");
+                .Single(diagnostic =>
+                    string.Equals(diagnostic.Id, "WPROTO041", System.StringComparison.Ordinal)
+                );
 
             Assert.AreEqual(DiagnosticSeverity.Error, match.Severity);
             StringAssert.Contains("Consumer.Sub", match.GetMessage());
@@ -555,7 +561,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     out Compilation generated,
                     "UNITY_EDITOR"
                 )
-                .Single(diagnostic => diagnostic.Id == "WPROTO041");
+                .Single(diagnostic =>
+                    string.Equals(diagnostic.Id, "WPROTO041", System.StringComparison.Ordinal)
+                );
 
             Assert.AreEqual(DiagnosticSeverity.Warning, match.Severity);
             StringAssert.Contains("on the next assembly reload", match.GetMessage());
@@ -626,7 +634,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                             "[WProtoContract] [WProtoSubtype(typeof(Base), 9)] public partial class Other : Base { [WProtoMember(1)] public int O; }"
                         )
                     )
-                    .Where(diagnostic => diagnostic.Id == "WPROTO041")
+                    .Where(diagnostic =>
+                        string.Equals(diagnostic.Id, "WPROTO041", System.StringComparison.Ordinal)
+                    )
             );
         }
 
@@ -658,7 +668,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         "[WProtoContract] [WProtoSubtype(typeof(Base), 5)] public partial class Other : Base { [WProtoMember(1)] public int O; }"
                     )
                 )
-                .Single(diagnostic => diagnostic.Id == "WPROTO039");
+                .Single(diagnostic =>
+                    string.Equals(diagnostic.Id, "WPROTO039", System.StringComparison.Ordinal)
+                );
 
             Assert.AreEqual(DiagnosticSeverity.Error, match.Severity);
             StringAssert.Contains("5", match.GetMessage());
@@ -674,7 +686,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Diagnostic match = Run(
                     Fixture(assemblyAttributes, "[WProtoSubtype(typeof(Base))]", ExtraSubtype)
                 )
-                .First(diagnostic => diagnostic.Id == "WPROTO042");
+                .First(diagnostic =>
+                    string.Equals(diagnostic.Id, "WPROTO042", System.StringComparison.Ordinal)
+                );
 
             Assert.AreEqual(DiagnosticSeverity.Error, match.Severity, label);
             StringAssert.Contains(mustSay, match.GetMessage(), label);
@@ -1221,7 +1235,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         "[WProtoSubtype(typeof(Base), 7)]"
                     )
                 )
-                .Single(diagnostic => diagnostic.Id == "WPROTO040");
+                .Single(diagnostic =>
+                    string.Equals(diagnostic.Id, "WPROTO040", System.StringComparison.Ordinal)
+                );
 
             StringAssert.Contains("Consumer.Deleted", match.GetMessage());
             StringAssert.Contains("retired", match.GetMessage());
@@ -1235,7 +1251,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         + "\n[WProtoContract] [WProtoInclude(7, typeof(Sub))] public partial class Base { [WProtoMember(1)] public int A; }"
                         + "\n[WProtoContract] public partial class Sub : Base { [WProtoMember(1)] public int B; }"
                 )
-                .Single(diagnostic => diagnostic.Id == "WPROTO013");
+                .Single(diagnostic =>
+                    string.Equals(diagnostic.Id, "WPROTO013", System.StringComparison.Ordinal)
+                );
 
             StringAssert.Contains("Consumer.Deleted", match.GetMessage());
             StringAssert.Contains("retired", match.GetMessage());
@@ -1395,7 +1413,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         "[WProtoSubtype(typeof(Base))]"
                     )
                 )
-                .First(diagnostic => diagnostic.Id == "WPROTO042");
+                .First(diagnostic =>
+                    string.Equals(diagnostic.Id, "WPROTO042", System.StringComparison.Ordinal)
+                );
 
             StringAssert.Contains("cannot name two types", match.GetMessage());
         }

@@ -56,7 +56,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
              * freezes the model.
              */
             const string v2Hex = "12020807";
-            Assert.AreEqual(default(Outer.Point), Decode(v2Hex).ById[7]);
+            Assert.AreEqual(default(Outer.Point), Decode(v2Hex).ById.ValueFor(7));
 #else
             Assert.AreEqual(OracleHex(structDefault), Encode(structDefault));
 #endif
@@ -143,13 +143,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.AreEqual("0A040A001001", currentHex, "v3 writes an explicit empty string key");
 
             V2CompatibleMapContract migrated = DecodeV2CompatibleMap(v2Hex);
-            Assert.AreEqual(1, migrated.Values[string.Empty]);
+            Assert.AreEqual(1, migrated.Values.ValueFor(string.Empty));
 
             using (MemoryStream stream = new MemoryStream(Parse(currentHex)))
             {
                 V2CompatibleMapContract readByV2 =
                     ProtoBuf.Serializer.Deserialize<V2CompatibleMapContract>(stream);
-                Assert.AreEqual(1, readByV2.Values[string.Empty]);
+                Assert.AreEqual(1, readByV2.Values.ValueFor(string.Empty));
             }
 
             V2CompatibleMapContract emptyStringValue = V2Bare(c =>
@@ -164,13 +164,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 currentValueHex,
                 "v3 writes an explicit empty string value"
             );
-            Assert.AreEqual(string.Empty, DecodeV2CompatibleMap(v2ValueHex).Sorted["b"]);
+            Assert.AreEqual(string.Empty, DecodeV2CompatibleMap(v2ValueHex).Sorted.ValueFor("b"));
 
             using (MemoryStream stream = new MemoryStream(Parse(currentValueHex)))
             {
                 V2CompatibleMapContract readByV2 =
                     ProtoBuf.Serializer.Deserialize<V2CompatibleMapContract>(stream);
-                Assert.AreEqual(string.Empty, readByV2.Sorted["b"]);
+                Assert.AreEqual(string.Empty, readByV2.Sorted.ValueFor("b"));
             }
         }
 #endif
@@ -202,7 +202,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             CollectionAssert.AreEquivalent(original.ByName, restored.ByName);
             Assert.AreEqual(1, restored.ById.Count);
-            Assert.AreEqual(1, restored.ById[7].X);
+            Assert.AreEqual(1, restored.ById.ValueFor(7).X);
             CollectionAssert.AreEquivalent(original.Sorted, restored.Sorted);
         }
 
@@ -256,19 +256,19 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             {
                 V2CompatibleMapContract oracle =
                     ProtoBuf.Serializer.Deserialize<V2CompatibleMapContract>(stream);
-                Assert.AreEqual(2, oracle.Values["a"]);
+                Assert.AreEqual(2, oracle.Values.ValueFor("a"));
             }
 
-            Assert.AreEqual(2, Decode(twice).ByName["a"]);
+            Assert.AreEqual(2, Decode(twice).ByName.ValueFor("a"));
         }
 
         [Test]
         public void AnEntryMissingItsKeyOrValueDecodesToTheProtoDefault()
         {
             // Missing string keys use the protobuf empty-string default, not the C# null default.
-            Assert.AreEqual(0, Decode("0A030A0161").ByName["a"]);
-            Assert.AreEqual(1, Decode("0A02" + "1001").ByName[string.Empty]);
-            Assert.AreEqual(0, Decode("0A00").ByName[string.Empty]);
+            Assert.AreEqual(0, Decode("0A030A0161").ByName.ValueFor("a"));
+            Assert.AreEqual(1, Decode("0A02" + "1001").ByName.ValueFor(string.Empty));
+            Assert.AreEqual(0, Decode("0A00").ByName.ValueFor(string.Empty));
 
             foreach (string hex in new[] { "0A021001", "0A00" })
             {
@@ -432,7 +432,15 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             Assert.AreEqual(
                 1,
-                value.Trace.FindAll(entry => entry == "OnBeforeSerialization").Count,
+                value
+                    .Trace.FindAll(entry =>
+                        string.Equals(
+                            entry,
+                            "OnBeforeSerialization",
+                            System.StringComparison.Ordinal
+                        )
+                    )
+                    .Count,
                 "before-serialization ran " + string.Join(", ", value.Trace)
             );
 

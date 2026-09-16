@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Turns WUH010, WUH013 and WUH018 on for all five gate projects: WallstopStudios.UnityHelpers.TypeCheck (Runtime/),
-  EditorCheck (Runtime/ + Editor/), TestCheck (Tests/Runtime/), EditorTestCheck (Tests/Editor/) and
-  IntegrationCheck (Runtime/Integrations/). The fifth was added with the project itself (#687) and
-  costs nothing: all three of its configurations compile clean with WUH010 on, so the DI tree
-  contributes ZERO of the WUH010 sites counted below.
+  Turns WUH010, WUH013 and WUH018 on for every owned .NET project through Directory.Build.props.
+  The five Unity source gates are WallstopStudios.UnityHelpers.TypeCheck (Runtime/), EditorCheck
+  (Runtime/ + Editor/), TestCheck (Tests/Runtime/), EditorTestCheck (Tests/Editor/) and
+  IntegrationCheck (Runtime/Integrations/). The remaining projects cover both analyzer
+  implementations, their tests and repository tooling.
 
   The test trees were exempt until #653. MEASURED with the four trees of the day wired up: 346
   sites, 286 of them
@@ -20,7 +20,7 @@
   The package still holds itself to all three, and this file is how.
 
   WHY A RULESET AND NOT AN .editorconfig. `dotnet_diagnostic.WUH010.severity` is matched against the
-  SOURCE FILE's path. All five projects compile files out of Runtime/, Editor/ and Tests/ - none
+  SOURCE FILE's path. The Unity source gates compile files out of Runtime/, Editor/ and Tests/ - none
   of which live under Generator~ - so a Generator~/.editorconfig
   would not reach a single analyzed file, and a repository-root one would also be read by Unity's
   own compilation of those same trees, which is the thing this must not change. A ruleset is
@@ -29,16 +29,17 @@
   Generator~/Directory.Build.props makes warnings errors, so any enabled WUH finding fails these
   builds. That is the point: the package's own opt-ins are binding.
 
-  WUH013 is also enabled for all five projects after #671 completed the remaining loop migration.
+  WUH013 was enabled for the five Unity source gates after #671 completed the remaining loop migration.
   The closing census found 306 sites: Editor 187, Tests 95, Runtime 24 (22 in integrations).
   A persistent audit found 12 more eligible sites in excluded Editor sources, and three SINGLE_THREADED pool sites, completing 321 sites.
   Ordinary array/List reads use foreach; in-place compaction and collection mutation retain their
   indexed traversal. The analyzer recognizes direct mutation, and indirect teardown mutation has
   a narrowly scoped, reasoned suppression. Consumer defaults remain unchanged.
 
-  WUH018 joined the shared policy in #808. Its closing sweep made 354 package-owned comparisons
-  explicit across Runtime, Editor and both test trees. The editor policy catalog is checked against
-  the shipped descriptors so a new analyzer cannot silently drift from the user-facing tool.
+  WUH018 joined the shared policy in #808. Its closing sweeps made 439 package-owned comparisons
+  explicit across Runtime, Editor, both test trees and Generator~. The editor policy catalog and
+  globally promoted policy IDs are checked against the shipped descriptors so a new analyzer
+  cannot silently drift from either enforcement or the user-facing tool.
 -->
 <RuleSet Name="Unity Helpers production check projects" Description="Package-internal analyzer opt-ins for the Generator~ gates over Runtime/, Editor/ and Tests/." ToolsVersion="15.0">
   <Rules AnalyzerId="WallstopStudios.UnityHelpers.Analyzers" RuleNamespace="WallstopStudios.UnityHelpers.Analyzers">

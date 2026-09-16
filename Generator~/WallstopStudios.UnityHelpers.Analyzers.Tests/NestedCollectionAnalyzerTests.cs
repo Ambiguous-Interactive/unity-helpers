@@ -396,7 +396,7 @@ namespace WallstopStudios.UnityHelpers.Analyzers.Tests
         {
             DiagnosticDescriptor descriptor =
                 new NestedCollectionAnalyzer().SupportedDiagnostics.Single(candidate =>
-                    candidate.Id == DiagnosticId
+                    string.Equals(candidate.Id, DiagnosticId, System.StringComparison.Ordinal)
                 );
 
             Assert.IsTrue(

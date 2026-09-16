@@ -42,7 +42,11 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
                 {
                     if (
                         !references.Any(reference =>
-                            Path.GetFileName(reference) == requiredReference
+                            string.Equals(
+                                Path.GetFileName(reference),
+                                requiredReference,
+                                System.StringComparison.Ordinal
+                            )
                         )
                     )
                     {
@@ -129,8 +133,12 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
                     .GetResult();
                 if (
                     diagnostics.Count(diagnostic =>
-                        diagnostic.Id == "WUH013"
-                        && diagnostic.Location.SourceTree?.FilePath == ControlPath
+                        string.Equals(diagnostic.Id, "WUH013", System.StringComparison.Ordinal)
+                        && string.Equals(
+                            diagnostic.Location.SourceTree?.FilePath,
+                            ControlPath,
+                            System.StringComparison.Ordinal
+                        )
                     ) != 1
                 )
                 {
@@ -146,13 +154,13 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
                 int findings = 0;
                 foreach (Diagnostic diagnostic in diagnostics)
                 {
-                    if (diagnostic.Id == "AD0001")
+                    if (string.Equals(diagnostic.Id, "AD0001", System.StringComparison.Ordinal))
                     {
                         throw new InvalidOperationException(diagnostic.ToString());
                     }
 
                     if (
-                        diagnostic.Id != "WUH013"
+                        !string.Equals(diagnostic.Id, "WUH013", System.StringComparison.Ordinal)
                         || !subjectPaths.Contains(
                             diagnostic.Location.SourceTree?.FilePath ?? string.Empty
                         )

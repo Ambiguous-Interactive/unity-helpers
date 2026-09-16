@@ -40,7 +40,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     continue;
                 }
 
-                if (!withSystemTextJson && assembly.GetName().Name == "System.Text.Json")
+                if (
+                    !withSystemTextJson
+                    && string.Equals(
+                        assembly.GetName().Name,
+                        "System.Text.Json",
+                        System.StringComparison.Ordinal
+                    )
+                )
                 {
                     continue;
                 }

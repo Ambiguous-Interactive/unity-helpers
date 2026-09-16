@@ -375,13 +375,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             ValueTypeCollectionContract filled = Decode(
                 "2A04" + "0801" + "1001" + "3204" + "0801" + "1001" + "3A04" + "0801" + "1001"
             );
-            Assert.AreEqual(1, filled.Pairs[1]);
+            Assert.AreEqual(1, filled.Pairs.ValueFor(1));
             Assert.AreEqual(1, filled.Pairs.Count);
-            Assert.AreEqual(70, filled.SeededPairs[7]);
-            Assert.AreEqual(1, filled.SeededPairs[1]);
+            Assert.AreEqual(70, filled.SeededPairs.ValueFor(7));
+            Assert.AreEqual(1, filled.SeededPairs.ValueFor(1));
             Assert.AreEqual(2, filled.SeededPairs.Count);
             Assert.AreEqual(1, filled.SeededOverwrittenPairs.Count);
-            Assert.AreEqual(1, filled.SeededOverwrittenPairs[1]);
+            Assert.AreEqual(1, filled.SeededOverwrittenPairs.ValueFor(1));
         }
 
         [Test]
@@ -576,7 +576,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
 
             CollectionAssert.AreEqual(new[] { 1, 2 }, decoded.Frozen);
-            Assert.AreEqual(3, decoded.FrozenMap["k"]);
+            Assert.AreEqual(3, decoded.FrozenMap.ValueFor("k"));
 
             // Separate fixtures avoid asking the oracle to read collection shapes it cannot deserialize.
             using (MemoryStream stream = new MemoryStream(Parse(OracleHex(value))))
@@ -992,8 +992,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             CollectionAssert.AreEqual(new[] { 7, 8, 1 }, mine.Listed, "Listed");
             CollectionAssert.AreEqual(new[] { 1 }, mine.OverwrittenList, "OverwrittenList");
             CollectionAssert.AreEquivalent(new[] { 7, 8, 1 }, mine.SetOf, "SetOf");
-            Assert.AreEqual(9, mine.Mapped["seed"], "Mapped keeps the seed");
-            Assert.AreEqual(1, mine.Mapped["k"], "Mapped takes the payload");
+            Assert.AreEqual(9, mine.Mapped.ValueFor("seed"), "Mapped keeps the seed");
+            Assert.AreEqual(1, mine.Mapped.ValueFor("k"), "Mapped takes the payload");
         }
 
         [Test]
@@ -1014,7 +1014,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             CollectionAssert.AreEqual(new[] { 7, 8 }, mine.Listed);
             CollectionAssert.AreEqual(new[] { 7, 8 }, mine.OverwrittenList);
             CollectionAssert.AreEquivalent(new[] { 7, 8 }, mine.SetOf);
-            Assert.AreEqual(9, mine.Mapped["seed"]);
+            Assert.AreEqual(9, mine.Mapped.ValueFor("seed"));
         }
 
         [Test]
@@ -1045,7 +1045,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             CollectionAssert.AreEqual(new[] { 3, 2, 1 }, decoded.Stacked, "Stacked");
             CollectionAssert.AreEqual(new[] { 1, 2 }, decoded.Frozen, "Frozen");
             CollectionAssert.AreEqual(new[] { 1, 2 }, decoded.Listed, "Listed");
-            Assert.AreEqual(1, decoded.Mapped["k"], "Mapped");
+            Assert.AreEqual(1, decoded.Mapped.ValueFor("k"), "Mapped");
         }
 
         [Test]

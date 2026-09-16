@@ -18,8 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [Odin Migration Guide](./docs/guides/odin-migration-guide.md)
   ([#794](https://github.com/Ambiguous-Interactive/unity-helpers/issues/794)).
 - Add opt-in `WUH018` warnings for string `==` and `!=` comparisons whose ordinal comparison policy
-  is implicit. Null checks and explicit comparison APIs remain quiet. All five package check
-  projects enforce every `WUH###` policy, including the three consumer opt-ins. See
+  is implicit. Null checks and explicit comparison APIs remain quiet. Every package-owned .NET
+  project enforces all `WUH###` policies, including the three consumer opt-ins. See
   [Analyzers](./docs/performance/analyzers.md#wuh018-implicit-string-equality-opt-in)
   ([#807](https://github.com/Ambiguous-Interactive/unity-helpers/issues/807)).
 - Add **Analyzer Policies** under `Tools > Wallstop Studios > Unity Helpers`. It explains every

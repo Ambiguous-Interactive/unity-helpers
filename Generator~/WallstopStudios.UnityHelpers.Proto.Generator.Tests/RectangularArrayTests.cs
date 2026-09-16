@@ -313,7 +313,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Assert.AreEqual(2, restored.Layers.Length);
             AssertSameShape(original.Layers[1], restored.Layers[1], "Layers[1]");
             AssertSameShape(original.Frames[0], restored.Frames[0], "Frames[0]");
-            AssertSameShape(original.Named["k"], restored.Named["k"], "Named[k]");
+            AssertSameShape(original.Named.ValueFor("k"), restored.Named.ValueFor("k"), "Named[k]");
             Assert.AreEqual(1, restored.Rows.GetLength(0));
             Assert.AreEqual(2, restored.Rows.GetLength(1));
             CollectionAssert.AreEqual(new[] { 1, 2 }, restored.Rows[0, 0]);

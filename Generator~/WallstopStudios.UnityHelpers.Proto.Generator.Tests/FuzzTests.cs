@@ -1781,15 +1781,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 ScanTopLevelFields(payload, accepted ? payload.Length : consumed, fields);
                 foreach (int field in fields)
                 {
-                    _byMember.TryGetValue(field, out int hits);
+                    int hits = _byMember.TryGetValue(field, out int currentHits) ? currentHits : 0;
                     _byMember[field] = hits + 1;
                 }
             }
 
             internal int HitsFor(int member)
             {
-                _byMember.TryGetValue(member, out int hits);
-                return hits;
+                return _byMember.TryGetValue(member, out int hits) ? hits : 0;
             }
 
             internal string Describe(string target)

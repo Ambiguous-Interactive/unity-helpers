@@ -321,7 +321,9 @@ namespace Consumer {
                 out ImmutableArray<Diagnostic> diagnostics,
                 MetadataReference.CreateFromImage(upstream)
             );
-            Diagnostic error = diagnostics.Single(item => item.Id == "WPROTO040");
+            Diagnostic error = diagnostics.Single(item =>
+                string.Equals(item.Id, "WPROTO040", System.StringComparison.Ordinal)
+            );
             Assert.AreEqual(DiagnosticSeverity.Error, error.Severity);
             StringAssert.Contains(owner, error.GetMessage());
         }
@@ -445,7 +447,9 @@ namespace Consumer {
                 reference,
                 MetadataReference.CreateFromImage(first)
             );
-            Diagnostic error = diagnostics.Single(item => item.Id == "WPROTO040");
+            Diagnostic error = diagnostics.Single(item =>
+                string.Equals(item.Id, "WPROTO040", System.StringComparison.Ordinal)
+            );
             StringAssert.Contains("FirstExtender", error.GetMessage());
         }
 
@@ -481,7 +485,11 @@ namespace Consumer {
             );
             StringAssert.Contains(
                 owner,
-                diagnostics.Single(item => item.Id == "WPROTO040").GetMessage()
+                diagnostics
+                    .Single(item =>
+                        string.Equals(item.Id, "WPROTO040", System.StringComparison.Ordinal)
+                    )
+                    .GetMessage()
             );
         }
 
@@ -556,7 +564,11 @@ namespace Consumer {
             );
             StringAssert.Contains(
                 "inaccessible",
-                diagnostics.Single(item => item.Id == "WPROTO040").GetMessage()
+                diagnostics
+                    .Single(item =>
+                        string.Equals(item.Id, "WPROTO040", System.StringComparison.Ordinal)
+                    )
+                    .GetMessage()
             );
         }
 
@@ -581,7 +593,11 @@ namespace Consumer {
             );
             StringAssert.Contains(
                 "secret",
-                diagnostics.Single(item => item.Id == "WPROTO040").GetMessage()
+                diagnostics
+                    .Single(item =>
+                        string.Equals(item.Id, "WPROTO040", System.StringComparison.Ordinal)
+                    )
+                    .GetMessage()
             );
         }
 

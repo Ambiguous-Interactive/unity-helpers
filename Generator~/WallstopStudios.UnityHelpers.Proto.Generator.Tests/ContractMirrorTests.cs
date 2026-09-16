@@ -291,7 +291,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 )
                 {
                     if (
-                        data.AttributeType.FullName == attribute
+                        string.Equals(
+                            data.AttributeType.FullName,
+                            attribute,
+                            System.StringComparison.Ordinal
+                        )
                         && 0 < data.ConstructorArguments.Count
                     )
                     {
@@ -333,8 +337,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 string key in proto.Keys.Union(wproto.Keys).OrderBy(x => x, StringComparer.Ordinal)
             )
             {
-                proto.TryGetValue(key, out string protoValue);
-                wproto.TryGetValue(key, out string wprotoValue);
+                string protoValue = proto.TryGetValue(key, out string foundProtoValue)
+                    ? foundProtoValue
+                    : null;
+                string wprotoValue = wproto.TryGetValue(key, out string foundWprotoValue)
+                    ? foundWprotoValue
+                    : null;
                 if (string.Equals(protoValue, wprotoValue, StringComparison.Ordinal))
                 {
                     continue;
@@ -477,7 +485,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 string name = argument.NameEquals.Name.Identifier.ValueText;
 
                 // Schema labels do not affect wire compatibility.
-                if (name == "Name")
+                if (string.Equals(name, "Name", System.StringComparison.Ordinal))
                 {
                     continue;
                 }
@@ -898,7 +906,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                  */
                 string referenced = entry.Value.Substring("As ".Length).Split(',', ' ')[0].Trim();
                 Assert.That(
-                    NotMirrored.Keys.Any(key => Identifier(key) == referenced),
+                    NotMirrored.Keys.Any(key =>
+                        string.Equals(Identifier(key), referenced, System.StringComparison.Ordinal)
+                    ),
                     Is.True,
                     $"'{entry.Key}' defers to '{referenced}', which is not itself listed."
                 );
@@ -954,10 +964,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             {
                 List<AttributeSyntax> attributes = Attributes(type.AttributeLists);
                 AttributeSyntax proto = attributes.FirstOrDefault(a =>
-                    NameOf(a) == "ProtoContract"
+                    string.Equals(NameOf(a), "ProtoContract", System.StringComparison.Ordinal)
                 );
                 AttributeSyntax wproto = attributes.FirstOrDefault(a =>
-                    NameOf(a) == "WProtoContract"
+                    string.Equals(NameOf(a), "WProtoContract", System.StringComparison.Ordinal)
                 );
 
                 if (proto == null && wproto == null)
@@ -1005,7 +1015,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 {
                     if (
                         0 < directive.ErrorCodes.Count
-                        && !directive.ErrorCodes.Any(code => code.ToString() == "WPROTO030")
+                        && !directive.ErrorCodes.Any(code =>
+                            string.Equals(
+                                code.ToString(),
+                                "WPROTO030",
+                                System.StringComparison.Ordinal
+                            )
+                        )
                     )
                     {
                         continue;
@@ -1028,7 +1044,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     new List<KeyValuePair<string, string>>();
                 foreach (AttributeSyntax attribute in attributes)
                 {
-                    if (NameOf(attribute) != "WProtoSubtype")
+                    if (
+                        !string.Equals(
+                            NameOf(attribute),
+                            "WProtoSubtype",
+                            System.StringComparison.Ordinal
+                        )
+                    )
                     {
                         continue;
                     }
@@ -1064,7 +1086,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             )
             {
                 return attributes
-                    .Where(attribute => NameOf(attribute) == name)
+                    .Where(attribute =>
+                        string.Equals(NameOf(attribute), name, System.StringComparison.Ordinal)
+                    )
                     .Select(attribute =>
                         string.Join(
                             ", ",
@@ -1128,7 +1152,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                             continue;
                         }
 
-                        if (bare == "Member")
+                        if (string.Equals(bare, "Member", System.StringComparison.Ordinal))
                         {
                             target["tag"] = FirstPositionalArgument(attribute);
                             foreach (
@@ -1138,7 +1162,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                                 target[named.Key] = named.Value;
                             }
                         }
-                        else if (bare == "Ignore" || MemberHookNames.Contains(bare))
+                        else if (
+                            string.Equals(bare, "Ignore", System.StringComparison.Ordinal)
+                            || MemberHookNames.Contains(bare)
+                        )
                         {
                             target[bare] = "present";
                         }

@@ -94,7 +94,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private static void AssertDiagnostic(string id, string mustName, string source)
         {
             ImmutableArray<Diagnostic> diagnostics = Run(source);
-            Diagnostic match = diagnostics.FirstOrDefault(diagnostic => diagnostic.Id == id);
+            Diagnostic match = diagnostics.FirstOrDefault(diagnostic =>
+                string.Equals(diagnostic.Id, id, System.StringComparison.Ordinal)
+            );
 
             Assert.IsTrue(
                 match != null,
@@ -491,7 +493,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void RegisterAfterGenericResolutionReplacesTheCachedFormatter()
         {
-            WProtoFormatterProvider.TryGet(out IWProtoFormatter<Unserviceable> originalFormatter);
+            IWProtoFormatter<Unserviceable> originalFormatter = WProtoFormatterProvider.TryGet(
+                out IWProtoFormatter<Unserviceable> foundFormatter
+            )
+                ? foundFormatter
+                : null;
             try
             {
                 ConditionalUnserviceableFormatter declining = new ConditionalUnserviceableFormatter(
@@ -527,9 +533,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         [Test]
         public void ScalarRegisterAfterGenericResolutionReplacesTheCachedFormatter()
         {
-            WProtoScalarFormatterProvider.TryGet(
-                out IWProtoScalarFormatter<Unserviceable> originalFormatter
-            );
+            IWProtoScalarFormatter<Unserviceable> originalFormatter =
+                WProtoScalarFormatterProvider.TryGet(
+                    out IWProtoScalarFormatter<Unserviceable> foundFormatter
+                )
+                    ? foundFormatter
+                    : null;
             try
             {
                 CountingUnserviceableScalarFormatter first =
@@ -733,7 +742,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
             Assert.IsEmpty(
                 CompileGenerated(source)
-                    .Where(diagnostic => diagnostic.Id == "CS0122")
+                    .Where(diagnostic =>
+                        string.Equals(diagnostic.Id, "CS0122", System.StringComparison.Ordinal)
+                    )
                     .Select(diagnostic => diagnostic.GetMessage()),
                 "the generated registrar names a type the consumer cannot name"
             );
@@ -777,7 +788,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
             Assert.IsEmpty(
                 CompileGenerated(source)
-                    .Where(diagnostic => diagnostic.Id == "CS0453")
+                    .Where(diagnostic =>
+                        string.Equals(diagnostic.Id, "CS0453", System.StringComparison.Ordinal)
+                    )
                     .Select(diagnostic => diagnostic.GetMessage())
             );
         }
@@ -922,9 +935,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             Assert.IsEmpty(
                 diagnostics.Where(diagnostic =>
-                    diagnostic.Id == "WPROTO019"
-                    || diagnostic.Id == "WPROTO020"
-                    || diagnostic.Id == "WPROTO021"
+                    string.Equals(diagnostic.Id, "WPROTO019", System.StringComparison.Ordinal)
+                    || string.Equals(diagnostic.Id, "WPROTO020", System.StringComparison.Ordinal)
+                    || string.Equals(diagnostic.Id, "WPROTO021", System.StringComparison.Ordinal)
                 ),
                 string.Join("; ", diagnostics.Select(diagnostic => diagnostic.Id))
             );

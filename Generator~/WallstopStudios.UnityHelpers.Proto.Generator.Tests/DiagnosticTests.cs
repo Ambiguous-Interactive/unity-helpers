@@ -360,7 +360,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         private static void AssertDiagnostic(string id, string mustName, string source)
         {
             ImmutableArray<Diagnostic> diagnostics = Run(source);
-            Diagnostic match = diagnostics.FirstOrDefault(d => d.Id == id);
+            Diagnostic match = diagnostics.FirstOrDefault(d =>
+                string.Equals(d.Id, id, System.StringComparison.Ordinal)
+            );
 
             Assert.IsTrue(
                 match != null,
@@ -757,7 +759,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             Diagnostic match = Run(
                     @"[WProtoReserved(3)] [WProtoReserved(""Poisoned"")] public enum Status { None = 0, Poisoned = 3 }"
                 )
-                .Single(diagnostic => diagnostic.Id == "WPROTO046");
+                .Single(diagnostic =>
+                    string.Equals(diagnostic.Id, "WPROTO046", System.StringComparison.Ordinal)
+                );
 
             Assert.IsTrue(match.GetMessage().Contains("the value 3"), match.GetMessage());
             Assert.IsTrue(match.GetMessage().Contains("'Poisoned'"), match.GetMessage());
@@ -813,7 +817,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             Assert.AreEqual(
                 2,
-                diagnostics.Count(diagnostic => diagnostic.Id == "WPROTO046"),
+                diagnostics.Count(diagnostic =>
+                    string.Equals(diagnostic.Id, "WPROTO046", System.StringComparison.Ordinal)
+                ),
                 string.Join("\n", diagnostics.Select(diagnostic => diagnostic.GetMessage()))
             );
         }
@@ -873,7 +879,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     @"[WProtoContract] public partial class Weapon { [WProtoMember(1)] public int Damage; }
                       public partial class PlasmaCutter : Weapon { public float Charge; }"
                 )
-                .Single(diagnostic => diagnostic.Id == "WPROTO041");
+                .Single(diagnostic =>
+                    string.Equals(diagnostic.Id, "WPROTO041", System.StringComparison.Ordinal)
+                );
 
             Assert.IsTrue(match.GetMessage().Contains("derives from"), match.GetMessage());
             Assert.IsFalse(
@@ -963,7 +971,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                       [WProtoContract] public partial class Weapon { [WProtoMember(1)] public int Damage; }
                       public partial class PlasmaCutter : Weapon { [WProtoMember(1)] public float Charge; }"
                 )
-                .Single(diagnostic => diagnostic.Id == "WPROTO047");
+                .Single(diagnostic =>
+                    string.Equals(diagnostic.Id, "WPROTO047", System.StringComparison.Ordinal)
+                );
 
             Assert.AreEqual(DiagnosticSeverity.Warning, match.Severity, match.GetMessage());
             Assert.IsTrue(match.GetMessage().Contains("WProtoContract"), match.GetMessage());
@@ -1020,7 +1030,8 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                       public partial class Leaf : Middle { }"
                 )
                 .Single(diagnostic =>
-                    diagnostic.Id == "WPROTO041" && diagnostic.GetMessage().Contains("Leaf")
+                    string.Equals(diagnostic.Id, "WPROTO041", System.StringComparison.Ordinal)
+                    && diagnostic.GetMessage().Contains("Leaf")
                 );
 
             Assert.IsTrue(match.GetMessage().Contains("Middle"), match.GetMessage());
@@ -1192,8 +1203,16 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                   public sealed class Sub : Base { }"
             );
 
-            Assert.IsNotEmpty(diagnostics.Where(diagnostic => diagnostic.Id == "WPROTO013"));
-            Assert.IsEmpty(diagnostics.Where(diagnostic => diagnostic.Id == "WPROTO044"));
+            Assert.IsNotEmpty(
+                diagnostics.Where(diagnostic =>
+                    string.Equals(diagnostic.Id, "WPROTO013", System.StringComparison.Ordinal)
+                )
+            );
+            Assert.IsEmpty(
+                diagnostics.Where(diagnostic =>
+                    string.Equals(diagnostic.Id, "WPROTO044", System.StringComparison.Ordinal)
+                )
+            );
         }
 
         /// <summary>
@@ -1231,7 +1250,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         + declaration
                         + @" public partial class PlasmaCutter : Weapon { [WProtoMember(1)] public float Charge; }"
                 )
-                .Single(diagnostic => diagnostic.Id == "WPROTO045");
+                .Single(diagnostic =>
+                    string.Equals(diagnostic.Id, "WPROTO045", System.StringComparison.Ordinal)
+                );
 
             Assert.IsTrue(match.GetMessage().Contains(named), match.GetMessage());
         }
@@ -1270,7 +1291,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
         )]
         public void OneFieldNumberCannotIdentifyTwoSubtypes(string source)
         {
-            Diagnostic match = Run(source).Single(diagnostic => diagnostic.Id == "WPROTO039");
+            Diagnostic match = Run(source)
+                .Single(diagnostic =>
+                    string.Equals(diagnostic.Id, "WPROTO039", System.StringComparison.Ordinal)
+                );
 
             Assert.AreEqual(DiagnosticSeverity.Error, match.Severity);
             Assert.IsTrue(match.GetMessage().Contains("First"), match.GetMessage());
@@ -1501,7 +1525,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 @"[WProtoContract] [WProtoSubtype(typeof(Upstream.Base), 100)] public partial class Sub : Upstream.Base { [WProtoMember(1)] public int B; }",
                 upstream
             );
-            Diagnostic match = diagnostics.Single(diagnostic => diagnostic.Id == "WPROTO040");
+            Diagnostic match = diagnostics.Single(diagnostic =>
+                string.Equals(diagnostic.Id, "WPROTO040", System.StringComparison.Ordinal)
+            );
 
             Assert.AreEqual(DiagnosticSeverity.Error, match.Severity);
             Assert.IsTrue(match.GetMessage().Contains("UpstreamAssembly"), match.GetMessage());
@@ -1519,7 +1545,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 "[WProtoContract] public partial class Sub : Upstream.Base {}",
                 upstream
             );
-            Diagnostic error = diagnostics.Single(diagnostic => diagnostic.Id == "WPROTO044");
+            Diagnostic error = diagnostics.Single(diagnostic =>
+                string.Equals(diagnostic.Id, "WPROTO044", System.StringComparison.Ordinal)
+            );
             StringAssert.Contains("extension body", error.GetMessage());
             Assert.AreEqual(DiagnosticSeverity.Error, error.Severity);
         }
@@ -1548,7 +1576,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 @"public sealed class Sub : Upstream.Base { }",
                 upstream
             );
-            Diagnostic match = diagnostics.Single(diagnostic => diagnostic.Id == "WPROTO044");
+            Diagnostic match = diagnostics.Single(diagnostic =>
+                string.Equals(diagnostic.Id, "WPROTO044", System.StringComparison.Ordinal)
+            );
 
             Assert.AreEqual(DiagnosticSeverity.Error, match.Severity);
             Assert.IsTrue(match.GetMessage().Contains("Sub"), match.GetMessage());
@@ -1569,7 +1599,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             Assert.IsEmpty(
                 Run(@"[WProtoNotSerialized] public sealed class Sub : Upstream.Base { }", upstream)
-                    .Where(diagnostic => diagnostic.Id == "WPROTO044")
+                    .Where(diagnostic =>
+                        string.Equals(diagnostic.Id, "WPROTO044", System.StringComparison.Ordinal)
+                    )
             );
         }
 
@@ -1602,7 +1634,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             Assert.IsEmpty(
                 Run(@"public sealed class IntBox : Upstream.Box<int> { }", upstream)
-                    .Where(diagnostic => diagnostic.Id == "WPROTO044")
+                    .Where(diagnostic =>
+                        string.Equals(diagnostic.Id, "WPROTO044", System.StringComparison.Ordinal)
+                    )
             );
         }
 
@@ -1633,7 +1667,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                     @"[WProtoContract] [WProtoSubtype(typeof(Upstream.Base), 100)] public partial class Sub : Upstream.Base { [WProtoMember(1)] public int B; }",
                     upstream
                 )
-                .Single(diagnostic => diagnostic.Id == "WPROTO040")
+                .Single(diagnostic =>
+                    string.Equals(diagnostic.Id, "WPROTO040", System.StringComparison.Ordinal)
+                )
                 .GetMessage();
 
             StringAssert.Contains("Rebuild", message);
@@ -1735,7 +1771,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             ImmutableArray<Diagnostic> diagnostics = Run(
                 @"[WProtoContract(SkipConstructor = true)] public partial class Generator { [WProtoMember(1)] public ulong State; private byte[] _scratch = new byte[16]; }"
             );
-            Diagnostic match = diagnostics.Single(diagnostic => diagnostic.Id == "WPROTO033");
+            Diagnostic match = diagnostics.Single(diagnostic =>
+                string.Equals(diagnostic.Id, "WPROTO033", System.StringComparison.Ordinal)
+            );
 
             Assert.AreEqual(DiagnosticSeverity.Warning, match.Severity);
             Assert.IsTrue(match.GetMessage().Contains("_scratch"), match.GetMessage());
@@ -1756,7 +1794,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             foreach (string source in clean)
             {
                 Assert.IsEmpty(
-                    Run(source).Where(diagnostic => diagnostic.Id == "WPROTO033"),
+                    Run(source)
+                        .Where(diagnostic =>
+                            string.Equals(
+                                diagnostic.Id,
+                                "WPROTO033",
+                                System.StringComparison.Ordinal
+                            )
+                        ),
                     source
                 );
             }
@@ -1766,7 +1811,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
             Assert.IsTrue(
                 property
-                    .Single(diagnostic => diagnostic.Id == "WPROTO033")
+                    .Single(diagnostic =>
+                        string.Equals(diagnostic.Id, "WPROTO033", System.StringComparison.Ordinal)
+                    )
                     .GetMessage()
                     .Contains("Scratch")
             );
@@ -1780,7 +1827,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 @"public abstract class Machinery { protected byte[] _scratch = new byte[16]; }
                   [WProtoContract(SkipConstructor = true)] public partial class Engine : Machinery { [WProtoMember(1)] public ulong State; }"
             );
-            Diagnostic match = diagnostics.Single(diagnostic => diagnostic.Id == "WPROTO033");
+            Diagnostic match = diagnostics.Single(diagnostic =>
+                string.Equals(diagnostic.Id, "WPROTO033", System.StringComparison.Ordinal)
+            );
 
             Assert.AreEqual(DiagnosticSeverity.Warning, match.Severity);
 
@@ -1792,7 +1841,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         @"public abstract class Bare { protected byte[] _scratch; }
                           [WProtoContract(SkipConstructor = true)] public partial class Plain : Bare { [WProtoMember(1)] public ulong State; }"
                     )
-                    .Where(diagnostic => diagnostic.Id == "WPROTO033")
+                    .Where(diagnostic =>
+                        string.Equals(diagnostic.Id, "WPROTO033", System.StringComparison.Ordinal)
+                    )
             );
         }
 
@@ -1806,7 +1857,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             Assert.AreEqual(
                 DiagnosticSeverity.Warning,
-                diagnostics.Single(diagnostic => diagnostic.Id == "WPROTO033").Severity
+                diagnostics
+                    .Single(diagnostic =>
+                        string.Equals(diagnostic.Id, "WPROTO033", System.StringComparison.Ordinal)
+                    )
+                    .Severity
             );
         }
 
@@ -1821,7 +1876,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 @"[WProtoContract] [WProtoInclude(100, typeof(Leaf))] public partial class Root { [WProtoMember(1)] public int A; }
                   [WProtoContract] public partial class Leaf : Root { [WProtoMember(1)] public int B; [WProtoAfterDeserialization] private void Rebuild() { } }"
             );
-            Diagnostic match = diagnostics.Single(diagnostic => diagnostic.Id == "WPROTO034");
+            Diagnostic match = diagnostics.Single(diagnostic =>
+                string.Equals(diagnostic.Id, "WPROTO034", System.StringComparison.Ordinal)
+            );
 
             Assert.AreEqual(DiagnosticSeverity.Warning, match.Severity);
 
@@ -1871,7 +1928,14 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             foreach (string source in clean)
             {
                 Assert.IsEmpty(
-                    Run(source).Where(diagnostic => diagnostic.Id == "WPROTO034"),
+                    Run(source)
+                        .Where(diagnostic =>
+                            string.Equals(
+                                diagnostic.Id,
+                                "WPROTO034",
+                                System.StringComparison.Ordinal
+                            )
+                        ),
                     source
                 );
             }
@@ -1894,7 +1958,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                                 + hook
                                 + @"] private void Hooked() { } }"
                         )
-                        .Count(diagnostic => diagnostic.Id == "WPROTO034"),
+                        .Count(diagnostic =>
+                            string.Equals(
+                                diagnostic.Id,
+                                "WPROTO034",
+                                System.StringComparison.Ordinal
+                            )
+                        ),
                     hook
                 );
             }
@@ -1922,7 +1992,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             foreach (string source in unusable)
             {
-                Diagnostic match = Run(source).Single(diagnostic => diagnostic.Id == "WPROTO035");
+                Diagnostic match = Run(source)
+                    .Single(diagnostic =>
+                        string.Equals(diagnostic.Id, "WPROTO035", System.StringComparison.Ordinal)
+                    );
                 Assert.AreEqual(DiagnosticSeverity.Warning, match.Severity, source);
             }
         }
@@ -1937,7 +2010,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                           public sealed class Box<T> where T : new() { }
                           public sealed class BoxConverter<T> : global::System.Text.Json.Serialization.JsonConverter<Box<T>> where T : new() { public override Box<T> Read(ref global::System.Text.Json.Utf8JsonReader r, System.Type t, global::System.Text.Json.JsonSerializerOptions o) => null; public override void Write(global::System.Text.Json.Utf8JsonWriter w, Box<T> v, global::System.Text.Json.JsonSerializerOptions o) { } }"
                     )
-                    .Where(diagnostic => diagnostic.Id == "WPROTO035")
+                    .Where(diagnostic =>
+                        string.Equals(diagnostic.Id, "WPROTO035", System.StringComparison.Ordinal)
+                    )
             );
         }
 
@@ -1953,7 +2028,11 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
             Assert.AreEqual(
                 DiagnosticSeverity.Warning,
-                diagnostics.Single(diagnostic => diagnostic.Id == "WPROTO036").Severity
+                diagnostics
+                    .Single(diagnostic =>
+                        string.Equals(diagnostic.Id, "WPROTO036", System.StringComparison.Ordinal)
+                    )
+                    .Severity
             );
         }
 
@@ -1963,7 +2042,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             ImmutableArray<Diagnostic> diagnostics = Run(
                 @"[global::ProtoBuf.ProtoContract] public partial class Legacy { [global::ProtoBuf.ProtoMember(1)] public int Value; }"
             );
-            Diagnostic match = diagnostics.Single(diagnostic => diagnostic.Id == "WPROTO030");
+            Diagnostic match = diagnostics.Single(diagnostic =>
+                string.Equals(diagnostic.Id, "WPROTO030", System.StringComparison.Ordinal)
+            );
 
             Assert.AreEqual(DiagnosticSeverity.Info, match.Severity);
             Assert.IsTrue(match.GetMessage().Contains("Legacy"));
@@ -1978,7 +2059,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 Run(
                         @"[global::ProtoBuf.ProtoContract] [WProtoContract] public partial class Ported { [global::ProtoBuf.ProtoMember(1)] [WProtoMember(1)] public int Value; }"
                     )
-                    .Any(diagnostic => diagnostic.Id == "WPROTO030")
+                    .Any(diagnostic =>
+                        string.Equals(diagnostic.Id, "WPROTO030", System.StringComparison.Ordinal)
+                    )
             );
         }
 
@@ -1991,7 +2074,12 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                   public partial class Legacy { public int Value; }"
             );
 
-            Assert.AreEqual(1, diagnostics.Count(diagnostic => diagnostic.Id == "WPROTO030"));
+            Assert.AreEqual(
+                1,
+                diagnostics.Count(diagnostic =>
+                    string.Equals(diagnostic.Id, "WPROTO030", System.StringComparison.Ordinal)
+                )
+            );
         }
 
         [TestCaseSource(nameof(MigrationSignalCases))]
@@ -2008,7 +2096,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                 out Compilation _
             );
             Diagnostic[] matches = diagnostics
-                .Where(diagnostic => diagnostic.Id == "WPROTO030")
+                .Where(diagnostic =>
+                    string.Equals(diagnostic.Id, "WPROTO030", System.StringComparison.Ordinal)
+                )
                 .ToArray();
 
             if (expectedDiscriminator == null)
@@ -2034,7 +2124,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                   [global::ProtoBuf.ProtoContract] public partial class DeliberatelyLegacy { }
                   #pragma warning restore WPROTO030"
             );
-            Diagnostic match = diagnostics.Single(diagnostic => diagnostic.Id == "WPROTO030");
+            Diagnostic match = diagnostics.Single(diagnostic =>
+                string.Equals(diagnostic.Id, "WPROTO030", System.StringComparison.Ordinal)
+            );
 
             Assert.IsTrue(match.IsSuppressed);
         }
@@ -2445,7 +2537,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             ImmutableArray<Diagnostic> diagnostics = Run(Chain(("Deep", 66), ("Shallow", 3)));
 
             Assert.IsEmpty(
-                diagnostics.Where(d => d.Id == "WPROTO003"),
+                diagnostics.Where(d =>
+                    string.Equals(d.Id, "WPROTO003", System.StringComparison.Ordinal)
+                ),
                 string.Join("; ", diagnostics.Select(d => d.Id + " " + d.GetMessage()))
             );
         }
@@ -2967,7 +3061,10 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
 
             Assert.IsFalse(
-                diagnostics.Any(d => d.Id == "WPROTO016" || d.Id == "WPROTO017"),
+                diagnostics.Any(d =>
+                    string.Equals(d.Id, "WPROTO016", System.StringComparison.Ordinal)
+                    || string.Equals(d.Id, "WPROTO017", System.StringComparison.Ordinal)
+                ),
                 string.Join("; ", diagnostics.Select(d => d.Id + " " + d.GetMessage()))
             );
         }
@@ -3198,7 +3295,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
 
             Assert.IsFalse(
-                reported.Any(d => d.Id == "WPROTO011"),
+                reported.Any(d =>
+                    string.Equals(d.Id, "WPROTO011", System.StringComparison.Ordinal)
+                ),
                 string.Join("; ", reported.Select(d => d.Id + " " + d.GetMessage()))
             );
 
@@ -3278,7 +3377,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                   [WProtoContract] public partial class ConsumerRoot : Reference.IThing { [WProtoMember(1)] public int A; }",
                 referencedRoots
             );
-            Diagnostic match = diagnostics.Single(diagnostic => diagnostic.Id == "WPROTO031");
+            Diagnostic match = diagnostics.Single(diagnostic =>
+                string.Equals(diagnostic.Id, "WPROTO031", System.StringComparison.Ordinal)
+            );
 
             Assert.AreEqual(DiagnosticSeverity.Warning, match.Severity);
             Assert.IsTrue(match.GetMessage().Contains("Reference.IThing"));
@@ -3305,7 +3406,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         @"[assembly: WProtoDeclaredRoot(typeof(Reference.IThing), typeof(Reference.ReferenceRoot))]",
                         referencedRoots
                     )
-                    .Any(diagnostic => diagnostic.Id == "WPROTO031")
+                    .Any(diagnostic =>
+                        string.Equals(diagnostic.Id, "WPROTO031", System.StringComparison.Ordinal)
+                    )
             );
         }
 
@@ -3330,7 +3433,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
 
             ImmutableArray<Diagnostic> diagnostics = Run("", shared, first, second);
-            Diagnostic match = diagnostics.Single(diagnostic => diagnostic.Id == "WPROTO031");
+            Diagnostic match = diagnostics.Single(diagnostic =>
+                string.Equals(diagnostic.Id, "WPROTO031", System.StringComparison.Ordinal)
+            );
 
             Assert.AreEqual(Location.None, match.Location);
             Assert.IsTrue(match.GetMessage().Contains("Shared.IThing"));
@@ -3361,7 +3466,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                   }";
 
             ImmutableArray<Diagnostic> diagnostics = Run(source);
-            Diagnostic match = diagnostics.FirstOrDefault(d => d.Id == "WPROTO028");
+            Diagnostic match = diagnostics.FirstOrDefault(d =>
+                string.Equals(d.Id, "WPROTO028", System.StringComparison.Ordinal)
+            );
 
             Assert.IsTrue(
                 match != null,
@@ -3394,7 +3501,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         @"[WProtoContract] public partial class Box<T> { [WProtoMember(1)] public T Value; }
                           public sealed class Holder<T> { private Box<T> _box; }"
                     )
-                    .Where(d => d.Id == "WPROTO028")
+                    .Where(d => string.Equals(d.Id, "WPROTO028", System.StringComparison.Ordinal))
                     .Select(d => d.GetMessage())
             );
         }
@@ -3428,7 +3535,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                   }"
             );
 
-            Diagnostic match = diagnostics.FirstOrDefault(d => d.Id == "WPROTO028");
+            Diagnostic match = diagnostics.FirstOrDefault(d =>
+                string.Equals(d.Id, "WPROTO028", System.StringComparison.Ordinal)
+            );
             Assert.IsTrue(
                 match != null,
                 "saw: " + string.Join("; ", diagnostics.Select(d => d.Id + " " + d.GetMessage()))
@@ -3454,7 +3563,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                         @"[WProtoContract] public partial class Box<T> { [WProtoMember(1)] public T Value; }
                           public sealed class Holder { private Box<dynamic> _box = new Box<dynamic>(); }"
                     )
-                    .Where(d => d.Id == "WPROTO028")
+                    .Where(d => string.Equals(d.Id, "WPROTO028", System.StringComparison.Ordinal))
                     .Select(d => d.GetMessage())
             );
 
@@ -3464,7 +3573,9 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
                   file sealed class FileHolder { private Box<Hid> _box = new Box<Hid>(); }";
 
             Assert.IsNotEmpty(
-                Run(fileLocal).Where(d => d.Id == "WPROTO028").Select(d => d.GetMessage()),
+                Run(fileLocal)
+                    .Where(d => string.Equals(d.Id, "WPROTO028", System.StringComparison.Ordinal))
+                    .Select(d => d.GetMessage()),
                 "a file-local type cannot be named from the registrar"
             );
             Assert.IsEmpty(
