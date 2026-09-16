@@ -175,6 +175,24 @@ for (const analyzerDll of analyzerDlls) {
     "Generator~/Directory.Build.props must load the shipped binary"
   );
 }
+const generatorProjectFiles = fs
+  .readdirSync(path.join(root, "Generator~"), { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .flatMap((entry) =>
+    fs
+      .readdirSync(path.join(root, "Generator~", entry.name))
+      .filter((fileName) => fileName.endsWith(".csproj"))
+      .map((fileName) => path.join(root, "Generator~", entry.name, fileName))
+  );
+check(
+  "owned projects inherit analyzer binaries exactly once",
+  generatorProjectFiles.every((projectFile) =>
+    analyzerDlls.every(
+      (analyzerDll) => !fs.readFileSync(projectFile, "utf8").includes(path.basename(analyzerDll))
+    )
+  ),
+  "individual projects must not duplicate the analyzer references from Directory.Build.props"
+);
 const promotedPolicyIds = [...generatorBuildPolicy.matchAll(/(?:^|;)(WUH\d{3})(?=;|<)/g)].map(
   (match) => match[1]
 );
