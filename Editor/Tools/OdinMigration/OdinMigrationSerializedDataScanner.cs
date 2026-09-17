@@ -191,18 +191,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             out int valueEnd
         )
         {
-            valueStart = start;
-            valueEnd = start;
             if (start == end || source[start] == '#')
             {
+                valueStart = start;
+                valueEnd = start;
                 return false;
             }
 
             char quote = source[start];
             if (quote == '\'' || quote == '"')
             {
-                valueStart = start + 1;
-                for (int position = valueStart; position < end; position++)
+                int scalarStart = start + 1;
+                for (int position = scalarStart; position < end; position++)
                 {
                     if (quote == '"' && source[position] == '\\')
                     {
@@ -221,14 +221,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     }
                     if (source[position] == quote)
                     {
+                        valueStart = scalarStart;
                         valueEnd = position;
                         return true;
                     }
                 }
+                valueStart = start;
+                valueEnd = start;
                 return false;
             }
 
-            valueEnd = end;
+            int scalarEnd = end;
             for (int position = start; position < end; position++)
             {
                 if (
@@ -236,18 +239,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                     && (position == start || char.IsWhiteSpace(source[position - 1]))
                 )
                 {
-                    valueEnd = position;
+                    scalarEnd = position;
                     break;
                 }
             }
-            while (valueStart < valueEnd && char.IsWhiteSpace(source[valueStart]))
+            int unquotedStart = start;
+            while (unquotedStart < scalarEnd && char.IsWhiteSpace(source[unquotedStart]))
             {
-                valueStart++;
+                unquotedStart++;
             }
-            while (valueStart < valueEnd && char.IsWhiteSpace(source[valueEnd - 1]))
+            while (unquotedStart < scalarEnd && char.IsWhiteSpace(source[scalarEnd - 1]))
             {
-                valueEnd--;
+                scalarEnd--;
             }
+            valueStart = unquotedStart;
+            valueEnd = scalarEnd;
             return valueStart < valueEnd;
         }
 
