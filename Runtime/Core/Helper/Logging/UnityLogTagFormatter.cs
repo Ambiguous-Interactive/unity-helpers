@@ -6,7 +6,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper.Logging
     using System;
     using System.Collections.Generic;
     using System.Diagnostics;
-    using System.Linq;
     using System.Text;
     using System.Threading;
     using Extension;
@@ -61,11 +60,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper.Logging
 
         private static readonly string NewLine = Environment.NewLine;
 
-        private static readonly Dictionary<string, string> ColorNamesToHex = ReflectionHelpers
-            .LoadStaticPropertiesForType<Color>()
-            .Where(kvp => kvp.Value.PropertyType == typeof(Color))
-            .Select(kvp => (kvp.Key, ((Color)kvp.Value.GetValue(null)).ToHex()))
-            .ToDictionary(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, string> ColorNamesToHex = LoadColorNamesToHex();
         private static readonly Stopwatch FallbackStopwatch = Stopwatch.StartNew();
         private static int _unityMainThreadId;
         private static int _mainThreadCaptured;
@@ -73,8 +68,19 @@ namespace WallstopStudios.UnityHelpers.Core.Helper.Logging
         /// <summary>
         /// All currently registered decorations by tag.
         /// </summary>
-        public IEnumerable<string> Decorations =>
-            _matchingDecorations.Values.SelectMany(x => x).Select(value => value.Tag);
+        public IEnumerable<string> Decorations
+        {
+            get
+            {
+                foreach (List<DecorationEntry> entries in _matchingDecorations.Values)
+                {
+                    foreach (DecorationEntry entry in entries)
+                    {
+                        yield return entry.Tag;
+                    }
+                }
+            }
+        }
 
         public IReadOnlyCollection<IReadOnlyList<DecorationEntry>> MatchingDecorations =>
             _matchingDecorations.Values;
@@ -183,6 +189,25 @@ namespace WallstopStudios.UnityHelpers.Core.Helper.Logging
                 editorOnly: true,
                 force: true
             );
+        }
+
+        private static Dictionary<string, string> LoadColorNamesToHex()
+        {
+            Dictionary<string, string> colors = new(StringComparer.OrdinalIgnoreCase);
+            foreach (
+                KeyValuePair<
+                    string,
+                    System.Reflection.PropertyInfo
+                > property in ReflectionHelpers.LoadStaticPropertiesForType<Color>()
+            )
+            {
+                if (property.Value.PropertyType == typeof(Color))
+                {
+                    colors.Add(property.Key, ((Color)property.Value.GetValue(null)).ToHex());
+                }
+            }
+
+            return colors;
         }
 
         [HideInCallstack]
