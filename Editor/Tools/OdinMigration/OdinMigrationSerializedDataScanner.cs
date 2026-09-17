@@ -94,6 +94,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 SkipWhitespace(source, ref position, end);
             }
 
+            char keyQuote =
+                source[position] == '\'' || source[position] == '"' ? source[position++] : '\0';
             int keyStart = position;
             while (
                 position < end
@@ -103,6 +105,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 position++;
             }
             int keyLength = position - keyStart;
+            if (keyQuote != '\0')
+            {
+                if (position == end || source[position] != keyQuote)
+                {
+                    return;
+                }
+                position++;
+            }
             SkipWhitespace(source, ref position, end);
             if (keyLength == 0 || position == end || source[position] != ':')
             {

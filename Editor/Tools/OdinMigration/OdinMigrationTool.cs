@@ -38,9 +38,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 return result;
             }
 
-            int totalFiles = assetPaths.Count + serializedAssetPaths.Count;
+            int sourceFileCount = assetPaths.Count;
+            int serializedFileCount = serializedAssetPaths.Count;
+            int totalFiles = sourceFileCount + serializedFileCount;
 
-            for (int index = 0; index < assetPaths.Count; index++)
+            for (int index = 0; index < sourceFileCount; index++)
             {
                 string assetPath = assetPaths[index];
                 if (context.ShouldCancel(assetPath, index, totalFiles))
@@ -112,52 +114,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 return result;
             }
 
-            for (int index = 0; index < serializedAssetPaths.Count; index++)
+            for (int index = 0; index < serializedFileCount; index++)
             {
                 string assetPath = serializedAssetPaths[index];
-                if (context.ShouldCancel(assetPath, assetPaths.Count + index, totalFiles))
+                if (context.ShouldCancel(assetPath, sourceFileCount + index, totalFiles))
                 {
                     result.Cancelled = true;
                     break;
                 }
 
-                try
-                {
-                    byte[] bytes = context.ReadAllBytes(context.GetFullPath(assetPath));
-                    if (
-                        !OdinMigrationEncodedSource.TryDecode(
-                            bytes,
-                            out OdinMigrationDecodedSource decoded,
-                            out string decodeFailure
-                        )
-                    )
-                    {
-                        result.SerializedScanFailures.Add($"{assetPath}: {decodeFailure}");
-                        continue;
-                    }
-                    if (!OdinMigrationSerializedDataScanner.LooksLikeUnityYaml(decoded.Source))
-                    {
-                        result.SerializedScanFailures.Add(
-                            $"{assetPath}: not Unity text YAML; serialized data cannot be checked."
-                        );
-                        continue;
-                    }
-
-                    IReadOnlyList<OdinMigrationFinding> findings =
-                        OdinMigrationSerializedDataScanner.Analyze(decoded.Source);
-                    result.SerializedAssetsScanned++;
-                    result.SerializedDataFindings += findings.Count;
-                    if (0 < findings.Count)
-                    {
-                        result.SerializedAnalyses.Add(
-                            new SerializedFileAnalysis(assetPath, findings)
-                        );
-                    }
-                }
-                catch (Exception exception)
-                {
-                    result.SerializedScanFailures.Add($"{assetPath}: {exception.Message}");
-                }
+                ScanSerializedAsset(assetPath, context, result);
             }
 
             return result;
@@ -169,6 +135,58 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 && 0 < result.Plans.Count
                 && !result.Cancelled
                 && result.Failures.Count == 0;
+        }
+
+        private static void ScanSerializedAsset(
+            string assetPath,
+            IOdinMigrationScanContext context,
+            ScanResult result
+        )
+        {
+            try
+            {
+                ScanSerializedAssetContents(assetPath, context, result);
+            }
+            catch (Exception exception)
+            {
+                result.SerializedScanFailures.Add($"{assetPath}: {exception.Message}");
+            }
+        }
+
+        private static void ScanSerializedAssetContents(
+            string assetPath,
+            IOdinMigrationScanContext context,
+            ScanResult result
+        )
+        {
+            byte[] bytes = context.ReadAllBytes(context.GetFullPath(assetPath));
+            if (
+                !OdinMigrationEncodedSource.TryDecode(
+                    bytes,
+                    out OdinMigrationDecodedSource decoded,
+                    out string decodeFailure
+                )
+            )
+            {
+                result.SerializedScanFailures.Add($"{assetPath}: {decodeFailure}");
+                return;
+            }
+            if (!OdinMigrationSerializedDataScanner.LooksLikeUnityYaml(decoded.Source))
+            {
+                result.SerializedScanFailures.Add(
+                    $"{assetPath}: not Unity text YAML; serialized data cannot be checked."
+                );
+                return;
+            }
+
+            IReadOnlyList<OdinMigrationFinding> findings =
+                OdinMigrationSerializedDataScanner.Analyze(decoded.Source);
+            result.SerializedAssetsScanned++;
+            result.SerializedDataFindings += findings.Count;
+            if (0 < findings.Count)
+            {
+                result.SerializedAnalyses.Add(new SerializedFileAnalysis(assetPath, findings));
+            }
         }
 
         [MenuItem(MenuRoot + "Preview Assets")]

@@ -60,6 +60,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         }
 
         [Test]
+        public void FindsQuotedMappingKeysWithoutMatchingSimilarNames()
+        {
+            const string Source =
+                "  'serializationData': {}\n"
+                + "  \"_serializationData\": {}\n"
+                + "  'propertyPath': 'serializationData.serializedBytes'\n"
+                + "  'serializationDataBackup': {}\n"
+                + "  'serializationData: {}\n";
+
+            IReadOnlyList<OdinMigrationFinding> findings =
+                OdinMigrationSerializedDataScanner.Analyze(Source);
+
+            Assert.AreEqual(3, findings.Count);
+            Assert.AreEqual(1, findings[0].Line);
+            Assert.AreEqual(2, findings[1].Line);
+            Assert.AreEqual(3, findings[2].Line);
+        }
+
+        [Test]
         public void HandlesMixedLineEndingsAndNullSource()
         {
             const string Source = "serializationData:\r_property:\n_serializationData:\r\n";
