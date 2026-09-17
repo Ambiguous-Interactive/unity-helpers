@@ -67,7 +67,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 + "  \"_serializationData\": {}\n"
                 + "  'propertyPath': 'serializationData.serializedBytes'\n"
                 + "  'serializationDataBackup': {}\n"
-                + "  'serializationData: {}\n";
+                + "  'serializationData: {}\n"
+                + "  - ";
 
             IReadOnlyList<OdinMigrationFinding> findings =
                 OdinMigrationSerializedDataScanner.Analyze(Source);

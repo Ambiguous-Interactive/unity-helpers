@@ -94,6 +94,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 SkipWhitespace(source, ref position, end);
             }
 
+            if (position == end)
+            {
+                return;
+            }
+
             char keyQuote =
                 source[position] == '\'' || source[position] == '"' ? source[position++] : '\0';
             int keyStart = position;
