@@ -45,8 +45,20 @@ identifiers such as `@SerializationData` are recognized. These names can be shad
 each finding means the file needs inspection; the text scanner does not prove that Odin owns its
 data.
 Always run Preview first and inspect the Console report. Cancelling a scan stops before reading the
-next file. Cancellation or any scan failure disables Apply, so a partial scan cannot write source
-files.
+next file. Cancellation or any source-script scan failure disables Apply, so a partial source scan
+cannot write source files.
+
+Every Preview and Apply command also checks Unity text `.unity`, `.prefab`, and `.asset` files under
+`Assets`, even when source scripts are selected. It reports the file and line of possible Odin
+`serializationData` or `_serializationData` payloads and prefab overrides that target those fields.
+These findings need manual review; migrate the data only when Odin owns it. They do not block Apply, which changes only the
+proven-equivalent inspector attributes in source files and leaves serialized data untouched.
+Unreadable or non-YAML serialized assets appear as data-scan failures; they do not block those
+source-only edits, but the data report is incomplete. The scan reads files as text and does not
+load Unity objects or change serialized data. Set **Edit > Project Settings > Editor > Asset
+Serialization** to **Force Text** to make Unity assets inspectable, then preview again. A clear
+report means only that these recognized payload shapes were absent from the text files scanned; it
+is not a data migration or proof that all Odin-owned state has been converted.
 
 > [!CAUTION]
 > Replacing an Odin serialized base, `[OdinSerialize]`, or a custom serialization path is a data

@@ -12,8 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add an Odin migration preview/apply tool for proven-equivalent `ReadOnly` and
-  `EnumToggleButtons` fields. Preview reports unsupported attributes and blocks source rewrites
-  when Odin serialization may own data. Apply preserves formatting and backups. See the
+  `EnumToggleButtons` fields. Preview reports possible Odin-owned data in scenes, prefabs, and assets;
+  source-only edits leave that data untouched. See the
   [Odin Migration Guide](./docs/guides/odin-migration-guide.md)
   ([#794](https://github.com/Ambiguous-Interactive/unity-helpers/issues/794)).
 - Add opt-in `WUH018` warnings for string `==` and `!=` comparisons whose ordinal comparison policy

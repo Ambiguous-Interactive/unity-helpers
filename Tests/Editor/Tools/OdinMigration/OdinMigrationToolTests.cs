@@ -856,6 +856,92 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         }
 
         [Test]
+        public void SerializedOdinDataIsReportedWithoutBlockingSafeSourceApply()
+        {
+            const string ScriptPath = "Assets/Safe.cs";
+            const string AssetPath = "Assets/State.prefab";
+            FakeScanContext context = new FakeScanContext();
+            context.Files[ScriptPath] = Encoding.UTF8.GetBytes(
+                "class Safe { [global::Sirenix.OdinInspector.ReadOnly] public int value; }"
+            );
+            context.Files[AssetPath] = Encoding.UTF8.GetBytes(
+                "%YAML 1.1\n--- !u!114 &11400000\nMonoBehaviour:\n  serializationData:\n    SerializedBytes: 0102\n"
+            );
+
+            OdinMigrationTool.ScanResult result = OdinMigrationTool.BuildPlans(
+                new[] { ScriptPath },
+                new[] { AssetPath },
+                context
+            );
+
+            Assert.AreEqual(1, result.Plans.Count);
+            Assert.AreEqual(1, result.SerializedAssetsScanned);
+            Assert.AreEqual(1, result.SerializedDataFindings);
+            Assert.IsTrue(OdinMigrationTool.CanApply(result));
+            Assert.AreEqual(AssetPath, result.SerializedAnalyses[0].AssetPath);
+            Assert.AreEqual(4, result.SerializedAnalyses[0].Findings[0].Line);
+            CollectionAssert.AreEqual(new[] { ScriptPath, AssetPath }, context.Reads);
+        }
+
+        [Test]
+        public void SerializedAssetScanMustCompleteBeforeSourceApply()
+        {
+            const string ScriptPath = "Assets/Safe.cs";
+            const string AssetPath = "Assets/State.asset";
+            FakeScanContext context = new FakeScanContext();
+            context.Files[ScriptPath] = Encoding.UTF8.GetBytes(
+                "class Safe { [global::Sirenix.OdinInspector.ReadOnly] public int value; }"
+            );
+            context.Files[AssetPath] = Encoding.UTF8.GetBytes(
+                "%YAML 1.1\n--- !u!114 &11400000\nMonoBehaviour:\n  m_Name: Safe\n"
+            );
+
+            OdinMigrationTool.ScanResult result = OdinMigrationTool.BuildPlans(
+                new[] { ScriptPath },
+                new[] { AssetPath },
+                context
+            );
+            Assert.IsTrue(OdinMigrationTool.CanApply(result));
+            Assert.AreEqual(1, result.SerializedAssetsScanned);
+
+            context.Reads.Clear();
+            context.CancelAtIndex = 1;
+            result = OdinMigrationTool.BuildPlans(
+                new[] { ScriptPath },
+                new[] { AssetPath },
+                context
+            );
+            Assert.IsTrue(result.Cancelled);
+            Assert.IsFalse(OdinMigrationTool.CanApply(result));
+            CollectionAssert.AreEqual(new[] { ScriptPath }, context.Reads);
+        }
+
+        [Test]
+        public void UnreadableOrNonYamlSerializedAssetKeepsSourceApplyAvailable()
+        {
+            const string ScriptPath = "Assets/Safe.cs";
+            const string BinaryPath = "Assets/Binary.asset";
+            const string MissingPath = "Assets/Missing.prefab";
+            FakeScanContext context = new FakeScanContext();
+            context.Files[ScriptPath] = Encoding.UTF8.GetBytes(
+                "class Safe { [global::Sirenix.OdinInspector.ReadOnly] public int value; }"
+            );
+            context.Files[BinaryPath] = new byte[] { 0, 1, 2, 3 };
+
+            OdinMigrationTool.ScanResult result = OdinMigrationTool.BuildPlans(
+                new[] { ScriptPath },
+                new[] { BinaryPath, MissingPath },
+                context
+            );
+
+            Assert.AreEqual(0, result.Failures.Count);
+            Assert.AreEqual(2, result.SerializedScanFailures.Count);
+            Assert.IsTrue(OdinMigrationTool.CanApply(result));
+            StringAssert.Contains(BinaryPath, result.SerializedScanFailures[0]);
+            StringAssert.Contains(MissingPath, result.SerializedScanFailures[1]);
+        }
+
+        [Test]
         public void TransactionRejectsConcurrentEditBeforeWriting()
         {
             byte[] original = { 1 };
