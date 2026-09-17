@@ -26,8 +26,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 + "    propertyPath: '_serializationData.serializedBytes'\r\n"
                 + "    propertyPath: \"m_Component.serializationData.serializedBytes\"\r\n";
 
-            IReadOnlyList<OdinMigrationFinding> findings =
-                OdinMigrationSerializedDataScanner.Analyze(Source);
+            Assert.IsTrue(
+                OdinMigrationSerializedDataScanner.TryAnalyze(
+                    Source,
+                    out IReadOnlyList<OdinMigrationFinding> findings
+                )
+            );
 
             Assert.AreEqual(5, findings.Count);
             Assert.AreEqual(4, findings[0].Line);
@@ -41,7 +45,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         public void FlagsExactKeysButIgnoresCommentsAndSimilarNames()
         {
             const string Source =
-                "# serializationData:\n"
+                "--- !u!114 &11400000\n"
+                + "MonoBehaviour:\n"
+                + "# serializationData:\n"
                 + "  note: serializationData:\n"
                 + "  serializationData: ordinary text\n"
                 + "  _serializationData: \"ordinary text\"\n"
@@ -49,48 +55,80 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
                 + "  propertyPath: m_Component.serializationDataBackup\n"
                 + "  propertyPath: \"m_Component._serializationDataBackup\"\n"
                 + "  # propertyPath: serializationData.serializedBytes\n"
-                + "  propertyPath: m_Component.notes # serializationData.serializedBytes\n";
+                + "  propertyPath: m_Component.notes # serializationData.serializedBytes\n"
+                + "  note: |\n"
+                + "    serializationData: block scalar text\n";
 
-            IReadOnlyList<OdinMigrationFinding> findings =
-                OdinMigrationSerializedDataScanner.Analyze(Source);
+            Assert.IsTrue(
+                OdinMigrationSerializedDataScanner.TryAnalyze(
+                    Source,
+                    out IReadOnlyList<OdinMigrationFinding> findings
+                )
+            );
 
             Assert.AreEqual(2, findings.Count);
-            Assert.AreEqual(3, findings[0].Line);
-            Assert.AreEqual(4, findings[1].Line);
+            Assert.AreEqual(5, findings[0].Line);
+            Assert.AreEqual(6, findings[1].Line);
         }
 
         [Test]
         public void FindsQuotedMappingKeysWithoutMatchingSimilarNames()
         {
             const string Source =
-                "  'serializationData': {}\n"
+                "--- !u!114 &11400000\n"
+                + "MonoBehaviour:\n"
+                + "  'serializationData': {}\n"
                 + "  \"_serializationData\": {}\n"
                 + "  'propertyPath': 'serializationData.serializedBytes'\n"
                 + "  'serializationDataBackup': {}\n"
                 + "  'serializationData: {}\n"
                 + "  - ";
 
-            IReadOnlyList<OdinMigrationFinding> findings =
-                OdinMigrationSerializedDataScanner.Analyze(Source);
+            Assert.IsTrue(
+                OdinMigrationSerializedDataScanner.TryAnalyze(
+                    Source,
+                    out IReadOnlyList<OdinMigrationFinding> findings
+                )
+            );
 
             Assert.AreEqual(3, findings.Count);
-            Assert.AreEqual(1, findings[0].Line);
-            Assert.AreEqual(2, findings[1].Line);
-            Assert.AreEqual(3, findings[2].Line);
+            Assert.AreEqual(3, findings[0].Line);
+            Assert.AreEqual(4, findings[1].Line);
+            Assert.AreEqual(5, findings[2].Line);
         }
 
         [Test]
         public void HandlesMixedLineEndingsAndNullSource()
         {
-            const string Source = "serializationData:\r_property:\n_serializationData:\r\n";
+            const string Source =
+                "--- !u!114 &11400000\r\n"
+                + "MonoBehaviour:\r\n"
+                + "serializationData:\r_property:\n_serializationData:\r\n";
 
-            IReadOnlyList<OdinMigrationFinding> findings =
-                OdinMigrationSerializedDataScanner.Analyze(Source);
+            Assert.IsTrue(
+                OdinMigrationSerializedDataScanner.TryAnalyze(
+                    Source,
+                    out IReadOnlyList<OdinMigrationFinding> findings
+                )
+            );
 
             Assert.AreEqual(2, findings.Count);
-            Assert.AreEqual(1, findings[0].Line);
-            Assert.AreEqual(3, findings[1].Line);
-            Assert.IsEmpty(OdinMigrationSerializedDataScanner.Analyze(null));
+            Assert.AreEqual(3, findings[0].Line);
+            Assert.AreEqual(5, findings[1].Line);
+            Assert.IsFalse(
+                OdinMigrationSerializedDataScanner.TryAnalyze(
+                    null,
+                    out IReadOnlyList<OdinMigrationFinding> empty
+                )
+            );
+            Assert.IsEmpty(empty);
+            Assert.IsFalse(
+                OdinMigrationSerializedDataScanner.TryAnalyze(
+                    "%YAML 1.1\n",
+                    out IReadOnlyList<OdinMigrationFinding> noDocuments
+                )
+            );
+            Assert.IsEmpty(noDocuments);
         }
 
         [Test]

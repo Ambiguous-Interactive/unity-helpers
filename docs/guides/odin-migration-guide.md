@@ -51,9 +51,11 @@ cannot write source files.
 Every Preview and Apply command also checks Unity text `.unity`, `.prefab`, and `.asset` files under
 `Assets`, even when source scripts are selected. It reports the file and line of possible Odin
 `serializationData` or `_serializationData` payloads and prefab overrides that target those fields.
+The data scan uses the authored-asset reader, which recognizes quoted keys and skips text inside
+block scalars.
 These findings need manual review; migrate the data only when Odin owns it. They do not block Apply, which changes only the
 proven-equivalent inspector attributes in source files and leaves serialized data untouched.
-Unreadable or non-YAML serialized assets appear as data-scan failures; they do not block those
+Unreadable assets and files with no Unity YAML document appear as data-scan failures; they do not block those
 source-only edits, but the data report is incomplete. The scan reads files as text and does not
 load Unity objects or change serialized data. Set **Edit > Project Settings > Editor > Asset
 Serialization** to **Force Text** to make Unity assets inspectable, then preview again. A clear

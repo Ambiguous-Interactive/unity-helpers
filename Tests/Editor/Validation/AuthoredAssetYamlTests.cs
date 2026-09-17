@@ -142,6 +142,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         }
 
         [Test]
+        public void QuotedKeysAreNormalizedAndMalformedQuotesAreIgnored()
+        {
+            string[] lines =
+            {
+                "--- !u!114 &11400000",
+                "MonoBehaviour:",
+                "  'serializationData': {}",
+                "  \"_serializationData\": {}",
+                "  'serializationData: {}",
+            };
+
+            AuthoredAssetDocument document = AuthoredAssetYaml.ReadDocuments(lines)[0];
+
+            Assert.AreEqual(2, document.Entries.Count);
+            Assert.AreEqual("serializationData", document.Entries[0].Key);
+            Assert.AreEqual(3, document.Entries[0].LineNumber);
+            Assert.AreEqual("_serializationData", document.Entries[1].Key);
+            Assert.AreEqual(4, document.Entries[1].LineNumber);
+        }
+
+        [Test]
         public void TheShallowestEntryWinsWhenANestedTypeReusesAKey()
         {
             AuthoredAssetDocument document = AuthoredAssetYaml.ReadDocuments(MonoBehaviourAsset)[0];

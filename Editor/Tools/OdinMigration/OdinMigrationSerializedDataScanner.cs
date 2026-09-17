@@ -5,6 +5,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
 {
     using System;
     using System.Collections.Generic;
+    using System.IO;
+    using WallstopStudios.UnityHelpers.Editor.Validation;
 
     internal static class OdinMigrationSerializedDataScanner
     {
@@ -12,40 +14,85 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
         private const string PrivateSerializationData = "_serializationData";
         private const string PropertyPath = "propertyPath";
 
-        internal static IReadOnlyList<OdinMigrationFinding> Analyze(string source)
+        internal static bool TryAnalyze(
+            string source,
+            out IReadOnlyList<OdinMigrationFinding> findings
+        )
         {
-            List<OdinMigrationFinding> findings = new List<OdinMigrationFinding>();
+            List<OdinMigrationFinding> parsedFindings = new List<OdinMigrationFinding>();
             if (string.IsNullOrEmpty(source))
             {
-                return findings;
+                findings = parsedFindings;
+                return false;
             }
 
-            int line = 1;
-            int lineStart = 0;
-            while (lineStart < source.Length)
+            List<string> lines = new List<string>();
+            using (StringReader reader = new StringReader(source))
             {
-                int lineEnd = lineStart;
-                while (
-                    lineEnd < source.Length && source[lineEnd] != '\n' && source[lineEnd] != '\r'
-                )
+                string line;
+                while ((line = reader.ReadLine()) != null)
                 {
-                    lineEnd++;
+                    lines.Add(line);
                 }
-
-                AnalyzeLine(source, lineStart, lineEnd, line, findings);
-                lineStart = lineEnd;
-                if (lineStart < source.Length && source[lineStart] == '\r')
-                {
-                    lineStart++;
-                }
-                if (lineStart < source.Length && source[lineStart] == '\n')
-                {
-                    lineStart++;
-                }
-                line++;
             }
 
-            return findings;
+            IReadOnlyList<AuthoredAssetDocument> documents = AuthoredAssetYaml.ReadDocuments(lines);
+            int documentCount = documents.Count;
+            if (documentCount == 0)
+            {
+                findings = parsedFindings;
+                return false;
+            }
+            for (int documentIndex = 0; documentIndex < documentCount; documentIndex++)
+            {
+                IReadOnlyList<AuthoredAssetEntry> entries = documents[documentIndex].Entries;
+                int entryCount = entries.Count;
+                for (int entryIndex = 0; entryIndex < entryCount; entryIndex++)
+                {
+                    AuthoredAssetEntry entry = entries[entryIndex];
+                    if (
+                        string.Equals(entry.Key, SerializationData, StringComparison.Ordinal)
+                        || string.Equals(
+                            entry.Key,
+                            PrivateSerializationData,
+                            StringComparison.Ordinal
+                        )
+                    )
+                    {
+                        parsedFindings.Add(
+                            new OdinMigrationFinding(
+                                entry.LineNumber,
+                                "A serialized-data key may hold Odin state and requires a staged data migration review."
+                            )
+                        );
+                        continue;
+                    }
+
+                    string value = entry.InlineValue;
+                    if (
+                        string.Equals(entry.Key, PropertyPath, StringComparison.Ordinal)
+                        && TryReadScalar(
+                            value,
+                            0,
+                            value.Length,
+                            out int valueStart,
+                            out int valueEnd
+                        )
+                        && TargetsSerializationData(value, valueStart, valueEnd)
+                    )
+                    {
+                        parsedFindings.Add(
+                            new OdinMigrationFinding(
+                                entry.LineNumber,
+                                "A prefab override targets a serialized-data key that may be Odin-owned and requires review."
+                            )
+                        );
+                    }
+                }
+            }
+
+            findings = parsedFindings;
+            return true;
         }
 
         internal static bool LooksLikeUnityYaml(string source)
@@ -67,96 +114,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
             SkipWhitespace(source, ref position, source.Length);
             return StartsWith(source, position, "%YAML 1.1")
                 || StartsWith(source, position, "--- !u!");
-        }
-
-        private static void AnalyzeLine(
-            string source,
-            int start,
-            int end,
-            int line,
-            List<OdinMigrationFinding> findings
-        )
-        {
-            int position = start;
-            SkipWhitespace(source, ref position, end);
-            if (position == end || source[position] == '#')
-            {
-                return;
-            }
-
-            if (
-                source[position] == '-'
-                && position + 1 < end
-                && char.IsWhiteSpace(source[position + 1])
-            )
-            {
-                position++;
-                SkipWhitespace(source, ref position, end);
-            }
-
-            if (position == end)
-            {
-                return;
-            }
-
-            char keyQuote =
-                source[position] == '\'' || source[position] == '"' ? source[position++] : '\0';
-            int keyStart = position;
-            while (
-                position < end
-                && (char.IsLetterOrDigit(source[position]) || source[position] == '_')
-            )
-            {
-                position++;
-            }
-            int keyLength = position - keyStart;
-            if (keyQuote != '\0')
-            {
-                if (position == end || source[position] != keyQuote)
-                {
-                    return;
-                }
-                position++;
-            }
-            SkipWhitespace(source, ref position, end);
-            if (keyLength == 0 || position == end || source[position] != ':')
-            {
-                return;
-            }
-            position++;
-            SkipWhitespace(source, ref position, end);
-
-            if (
-                IsKey(source, keyStart, keyLength, SerializationData)
-                || IsKey(source, keyStart, keyLength, PrivateSerializationData)
-            )
-            {
-                findings.Add(
-                    new OdinMigrationFinding(
-                        line,
-                        "A serialized-data key may hold Odin state and requires a staged data migration review."
-                    )
-                );
-                return;
-            }
-
-            if (
-                !IsKey(source, keyStart, keyLength, PropertyPath)
-                || !TryReadScalar(source, position, end, out int valueStart, out int valueEnd)
-            )
-            {
-                return;
-            }
-
-            if (TargetsSerializationData(source, valueStart, valueEnd))
-            {
-                findings.Add(
-                    new OdinMigrationFinding(
-                        line,
-                        "A prefab override targets a serialized-data key that may be Odin-owned and requires review."
-                    )
-                );
-            }
         }
 
         private static bool IsKey(string source, int start, int length, string key)

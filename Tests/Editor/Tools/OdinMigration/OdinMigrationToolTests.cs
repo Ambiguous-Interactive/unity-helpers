@@ -917,28 +917,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools.OdinMigration
         }
 
         [Test]
-        public void UnreadableOrNonYamlSerializedAssetKeepsSourceApplyAvailable()
+        public void UnreadableNonYamlOrDocumentlessSerializedAssetKeepsSourceApplyAvailable()
         {
             const string ScriptPath = "Assets/Safe.cs";
             const string BinaryPath = "Assets/Binary.asset";
             const string MissingPath = "Assets/Missing.prefab";
+            const string HeaderOnlyPath = "Assets/HeaderOnly.asset";
             FakeScanContext context = new FakeScanContext();
             context.Files[ScriptPath] = Encoding.UTF8.GetBytes(
                 "class Safe { [global::Sirenix.OdinInspector.ReadOnly] public int value; }"
             );
             context.Files[BinaryPath] = new byte[] { 0, 1, 2, 3 };
+            context.Files[HeaderOnlyPath] = Encoding.UTF8.GetBytes("%YAML 1.1\n");
 
             OdinMigrationTool.ScanResult result = OdinMigrationTool.BuildPlans(
                 new[] { ScriptPath },
-                new[] { BinaryPath, MissingPath },
+                new[] { BinaryPath, MissingPath, HeaderOnlyPath },
                 context
             );
 
             Assert.AreEqual(0, result.Failures.Count);
-            Assert.AreEqual(2, result.SerializedScanFailures.Count);
+            Assert.AreEqual(3, result.SerializedScanFailures.Count);
             Assert.IsTrue(OdinMigrationTool.CanApply(result));
             StringAssert.Contains(BinaryPath, result.SerializedScanFailures[0]);
             StringAssert.Contains(MissingPath, result.SerializedScanFailures[1]);
+            StringAssert.Contains(HeaderOnlyPath, result.SerializedScanFailures[2]);
         }
 
         [Test]

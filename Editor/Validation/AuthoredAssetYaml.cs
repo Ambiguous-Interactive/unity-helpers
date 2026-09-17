@@ -314,6 +314,40 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
 
         internal static bool TrySplitEntry(string content, out string key, out string inlineValue)
         {
+            if (string.IsNullOrEmpty(content))
+            {
+                key = null;
+                inlineValue = string.Empty;
+                return false;
+            }
+
+            char quote = content[0];
+            if (quote == '\'' || quote == '"')
+            {
+                int closingQuote = 1;
+                while (closingQuote < content.Length && IsKeyCharacter(content[closingQuote]))
+                {
+                    ++closingQuote;
+                }
+
+                if (
+                    closingQuote <= 1
+                    || content.Length <= closingQuote + 1
+                    || content[closingQuote] != quote
+                    || content[closingQuote + 1] != ':'
+                    || (closingQuote + 2 < content.Length && content[closingQuote + 2] != ' ')
+                )
+                {
+                    key = null;
+                    inlineValue = string.Empty;
+                    return false;
+                }
+
+                key = content.Substring(1, closingQuote - 1);
+                inlineValue = content.Substring(closingQuote + 2).Trim();
+                return true;
+            }
+
             int separator = -1;
             for (int index = 0; index < content.Length; ++index)
             {

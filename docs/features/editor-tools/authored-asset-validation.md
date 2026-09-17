@@ -208,6 +208,8 @@ class id, anchor, line range, and every key at any depth — and `MonoScriptInde
 document's `m_Script` guid to a type and back. They exist so the checks above share one parser
 rather than four, because four parsers are four chances for one of them to drift into reporting
 clean.
+The reader removes surrounding quotes from mapping keys and skips text inside block scalars, so
+neither quoting nor a key-like line of text changes what a check sees.
 
 `MonoScriptIndex`'s forward lookup is name-narrowed first, which is fast and correct _while_ a
 script asset is named after the type it binds — the second script-binding rule above. When it is

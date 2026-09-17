@@ -14,7 +14,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     /// </remarks>
     public readonly struct AuthoredAssetEntry
     {
-        /// <summary>The key exactly as Unity wrote it, without its trailing colon.</summary>
+        /// <summary>The key Unity wrote, with any surrounding quotes removed.</summary>
         public string Key { get; }
 
         /// <summary>
@@ -36,7 +36,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         public bool HasBlockValue => LineNumber + 1 < EndLineNumber;
 
         /// <summary>Initializes a new instance of the <see cref="AuthoredAssetEntry"/> struct.</summary>
-        /// <param name="key">The key exactly as Unity wrote it.</param>
+        /// <param name="key">The key with any surrounding quotes removed.</param>
         /// <param name="inlineValue">The value on the same line, trimmed; empty when the value is a block.</param>
         /// <param name="indent">How many leading spaces the key carries.</param>
         /// <param name="lineNumber">The one-based line the key is on.</param>

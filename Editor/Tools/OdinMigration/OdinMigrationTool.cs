@@ -179,8 +179,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 return;
             }
 
-            IReadOnlyList<OdinMigrationFinding> findings =
-                OdinMigrationSerializedDataScanner.Analyze(decoded.Source);
+            if (
+                !OdinMigrationSerializedDataScanner.TryAnalyze(
+                    decoded.Source,
+                    out IReadOnlyList<OdinMigrationFinding> findings
+                )
+            )
+            {
+                result.SerializedScanFailures.Add(
+                    $"{assetPath}: no Unity YAML documents were found; serialized data cannot be checked."
+                );
+                return;
+            }
             result.SerializedAssetsScanned++;
             result.SerializedDataFindings += findings.Count;
             if (0 < findings.Count)
