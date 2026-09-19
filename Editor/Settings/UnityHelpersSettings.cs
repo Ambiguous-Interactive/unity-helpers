@@ -4003,11 +4003,26 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                     settingsChanged = true;
                 }
             }
-            settingsChanged |= EnsureFoldoutTweenDefaults();
-            settingsChanged |= EnsureWButtonCustomColorDefaults();
-            settingsChanged |= EnsureWEnumToggleButtonsCustomColorDefaults();
-            settingsChanged |= EnsureSerializableTypePatternDefaults();
-            settingsChanged |= EnsureSerializableSetTweenDefaults();
+            if (EnsureFoldoutTweenDefaults())
+            {
+                settingsChanged = true;
+            }
+            if (EnsureWButtonCustomColorDefaults())
+            {
+                settingsChanged = true;
+            }
+            if (EnsureWEnumToggleButtonsCustomColorDefaults())
+            {
+                settingsChanged = true;
+            }
+            if (EnsureSerializableTypePatternDefaults())
+            {
+                settingsChanged = true;
+            }
+            if (EnsureSerializableSetTweenDefaults())
+            {
+                settingsChanged = true;
+            }
             ApplyRuntimeConfiguration();
             if (settingsChanged && !_saveAfterLoadQueued)
             {
@@ -4021,14 +4036,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             _wbuttonCustomColors ??= new WButtonCustomColorDictionary();
 
             bool changed = false;
-            changed |= MigrateLegacyWButtonPalette();
+            if (MigrateLegacyWButtonPalette())
+            {
+                changed = true;
+            }
 
             // Migrate explicit-color flags before deriving colors can overwrite authored choices.
             foreach (WButtonCustomColor stored in _wbuttonCustomColors.Values)
             {
                 if (stored != null)
                 {
-                    changed |= stored.MigrateChosenTextColor();
+                    if (stored.MigrateChosenTextColor())
+                    {
+                        changed = true;
+                    }
                 }
             }
 
@@ -4057,16 +4078,26 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 changed = true;
             }
 
-            changed |= EnsureWButtonThemeEntry(
-                WButtonLightThemeColorKey,
-                DefaultLightThemeButtonColor,
-                Color.black
-            );
-            changed |= EnsureWButtonThemeEntry(
-                WButtonDarkThemeColorKey,
-                DefaultDarkThemeButtonColor,
-                Color.white
-            );
+            if (
+                EnsureWButtonThemeEntry(
+                    WButtonLightThemeColorKey,
+                    DefaultLightThemeButtonColor,
+                    Color.black
+                )
+            )
+            {
+                changed = true;
+            }
+            if (
+                EnsureWButtonThemeEntry(
+                    WButtonDarkThemeColorKey,
+                    DefaultDarkThemeButtonColor,
+                    Color.white
+                )
+            )
+            {
+                changed = true;
+            }
 
             int paletteIndex = 0;
             foreach (
@@ -4347,7 +4378,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             {
                 if (stored != null)
                 {
-                    changed |= stored.MigrateChosenTextColors();
+                    if (stored.MigrateChosenTextColors())
+                    {
+                        changed = true;
+                    }
                 }
             }
 
@@ -4374,20 +4408,30 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 changed = true;
             }
 
-            changed |= EnsureWEnumToggleButtonsThemeEntry(
-                WEnumToggleButtonsLightThemeColorKey,
-                DefaultLightThemeEnumSelectedColor,
-                DefaultLightThemeEnumSelectedTextColor,
-                DefaultLightThemeEnumInactiveColor,
-                DefaultLightThemeEnumInactiveTextColor
-            );
-            changed |= EnsureWEnumToggleButtonsThemeEntry(
-                WEnumToggleButtonsDarkThemeColorKey,
-                DefaultDarkThemeEnumSelectedColor,
-                DefaultDarkThemeEnumSelectedTextColor,
-                DefaultDarkThemeEnumInactiveColor,
-                DefaultDarkThemeEnumInactiveTextColor
-            );
+            if (
+                EnsureWEnumToggleButtonsThemeEntry(
+                    WEnumToggleButtonsLightThemeColorKey,
+                    DefaultLightThemeEnumSelectedColor,
+                    DefaultLightThemeEnumSelectedTextColor,
+                    DefaultLightThemeEnumInactiveColor,
+                    DefaultLightThemeEnumInactiveTextColor
+                )
+            )
+            {
+                changed = true;
+            }
+            if (
+                EnsureWEnumToggleButtonsThemeEntry(
+                    WEnumToggleButtonsDarkThemeColorKey,
+                    DefaultDarkThemeEnumSelectedColor,
+                    DefaultDarkThemeEnumSelectedTextColor,
+                    DefaultDarkThemeEnumInactiveColor,
+                    DefaultDarkThemeEnumInactiveTextColor
+                )
+            )
+            {
+                changed = true;
+            }
 
             foreach (
                 KeyValuePair<

@@ -244,7 +244,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             if (TryGetInstance(out UnityMainThreadDispatcher dispatcher) && dispatcher != null)
             {
-                destroyed |= DestroyDispatcherObject(dispatcher, immediate);
+                if (DestroyDispatcherObject(dispatcher, immediate))
+                {
+                    destroyed = true;
+                }
             }
 
             UnityMainThreadDispatcher[] allDispatchers =
@@ -253,7 +256,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 foreach (UnityMainThreadDispatcher localDispatcher in allDispatchers)
                 {
-                    destroyed |= DestroyDispatcherObject(localDispatcher, immediate);
+                    if (DestroyDispatcherObject(localDispatcher, immediate))
+                    {
+                        destroyed = true;
+                    }
                 }
             }
 
