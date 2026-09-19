@@ -163,71 +163,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return WriteStagedAsync(path, null, contents, cancellationToken);
         }
 
-        private static async ValueTask<Exception> WriteStagedAsync(
-            string path,
-            string textContents,
-            byte[] byteContents,
-            CancellationToken cancellationToken
-        )
-        {
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return new ArgumentException("A destination path is required.", nameof(path));
-            }
-
-            SemaphoreLease gate;
-            try
-            {
-                gate = await EnterGateAsync(path, cancellationToken).ConfigureAwait(false);
-            }
-            catch (Exception e)
-            {
-                return e;
-            }
-
-            using (gate)
-            {
-                string temporaryPath = path + TemporarySuffix;
-                FileStream staging;
-                byte[] bytes;
-                try
-                {
-                    bytes =
-                        byteContents
-                        ?? (
-                            textContents == null
-                                ? Array.Empty<byte>()
-                                : Utf8NoByteOrderMark.GetBytes(textContents)
-                        );
-                    EnsureDirectory(path);
-                    staging = OpenStagingStream(temporaryPath, useAsync: true);
-                }
-                catch (Exception e)
-                {
-                    return e;
-                }
-
-                try
-                {
-                    using (staging)
-                    {
-                        await staging
-                            .WriteAsync(bytes, 0, bytes.Length, cancellationToken)
-                            .ConfigureAwait(false);
-                        staging.Flush(flushToDisk: true);
-                    }
-
-                    Swap(temporaryPath, path);
-                    return null;
-                }
-                catch (Exception e)
-                {
-                    DiscardStagedFile(temporaryPath);
-                    return e;
-                }
-            }
-        }
-
         /// <summary>
         /// Appends text to a file, flushing before returning.
         /// </summary>
@@ -502,6 +437,71 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             catch (Exception)
             {
                 return false;
+            }
+        }
+
+        private static async ValueTask<Exception> WriteStagedAsync(
+            string path,
+            string textContents,
+            byte[] byteContents,
+            CancellationToken cancellationToken
+        )
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return new ArgumentException("A destination path is required.", nameof(path));
+            }
+
+            SemaphoreLease gate;
+            try
+            {
+                gate = await EnterGateAsync(path, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception e)
+            {
+                return e;
+            }
+
+            using (gate)
+            {
+                string temporaryPath = path + TemporarySuffix;
+                FileStream staging;
+                byte[] bytes;
+                try
+                {
+                    bytes =
+                        byteContents
+                        ?? (
+                            textContents == null
+                                ? Array.Empty<byte>()
+                                : Utf8NoByteOrderMark.GetBytes(textContents)
+                        );
+                    EnsureDirectory(path);
+                    staging = OpenStagingStream(temporaryPath, useAsync: true);
+                }
+                catch (Exception e)
+                {
+                    return e;
+                }
+
+                try
+                {
+                    using (staging)
+                    {
+                        await staging
+                            .WriteAsync(bytes, 0, bytes.Length, cancellationToken)
+                            .ConfigureAwait(false);
+                        staging.Flush(flushToDisk: true);
+                    }
+
+                    Swap(temporaryPath, path);
+                    return null;
+                }
+                catch (Exception e)
+                {
+                    DiscardStagedFile(temporaryPath);
+                    return e;
+                }
             }
         }
 
