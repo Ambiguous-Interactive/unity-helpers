@@ -1,5 +1,5 @@
 # MkDocs Documentation Dependencies
-# Install with: pip install -r requirements-docs.txt
+# Direct documentation dependencies. Install the compiled requirements-docs.lock.
 
 mkdocs~=1.6.1
 mkdocs-material~=9.6.0

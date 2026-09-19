@@ -382,7 +382,7 @@ show_optional_tools() {
     echo ""
     
     echo "yamllint - YAML linting"
-    echo "  Install: pip install yamllint"
+    echo "  Install: uv tool install yamllint==1.38.0"
     echo "  Or:      brew install yamllint (macOS)"
     echo ""
     

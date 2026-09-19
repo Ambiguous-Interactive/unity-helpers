@@ -274,13 +274,14 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh
     python3-pip \
     python3-venv \
     && python3 -m venv /opt/python-tools \
-    && /opt/python-tools/bin/pip install --no-cache-dir --requirement /tmp/requirements-tools.txt \
     && /opt/python-tools/bin/pip install --no-cache-dir "uv==0.12.10" \
+    && /opt/python-tools/bin/uv pip install --python /opt/python-tools/bin/python --no-cache --requirement /tmp/requirements-tools.txt \
     && UV_TOOL_DIR=/opt/mcp-uv-tools UV_TOOL_BIN_DIR=/usr/local/bin UV_PYTHON_PREFERENCE=only-system \
         /opt/python-tools/bin/uv tool install "mcp-server-git==2026.8.18" \
     && UV_TOOL_DIR=/opt/mcp-uv-tools UV_TOOL_BIN_DIR=/usr/local/bin UV_PYTHON_PREFERENCE=only-system \
         /opt/python-tools/bin/uv tool install "mcp-server-fetch==2026.8.18" \
     && test -x /opt/python-tools/bin/uv \
+    && ln -sf /opt/python-tools/bin/uv /usr/local/bin/uv \
     && test -x /usr/local/bin/mcp-server-git \
     && test -x /usr/local/bin/mcp-server-fetch \
     && ln -sf /opt/python-tools/bin/yamllint /usr/local/bin/yamllint \

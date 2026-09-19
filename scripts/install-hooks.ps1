@@ -527,7 +527,7 @@ function Show-OptionalTools {
     Write-Host ""
     
     Write-Host "yamllint - YAML linting"
-    Write-Host "  Install: pip install yamllint"
+    Write-Host "  Install: uv tool install yamllint==1.38.0"
     Write-Host "  Or:      choco install yamllint (Windows)"
     Write-Host ""
     

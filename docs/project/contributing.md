@@ -59,6 +59,55 @@ These tools are required and installed via npm/dotnet:
 - YAML linting: yamllint
 - Workflow linting: actionlint
 
+## Python Tooling
+
+Use Python 3.11 for the repository's Python checks. The dev container pins `uv==0.12.10` and
+exposes it as `uv`. Documentation CI installs that same version with pip, then installs the
+fully pinned `requirements-docs.lock` with uv. `requirements-docs.txt` lists the direct
+constraints; the lock records their transitive versions. Run locally with:
+
+```bash
+uv venv .venv --python 3.11
+uv pip install --python .venv/bin/python -r requirements-docs.lock
+.venv/bin/mkdocs build --strict
+```
+
+| Python path                                   | Dependency source                                     | Installer and cache                                                 | Invocation                                                                                                |
+| --------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Documentation validation and Pages deployment | `requirements-docs.lock` from `requirements-docs.txt` | Pinned uv; `setup-python` caches the pip bootstrap wheel            | `mkdocs build --strict`                                                                                   |
+| Wiki link validation                          | `requirements-wiki.txt` from `requirements-wiki.in`   | pip, without a persisted cache                                      | `python -m pytest scripts/wiki/test_wiki_scripts.py -v`; wiki generation scripts use the standard library |
+| Local Gates bounded-random proof              | `requirements-random-quality.txt`                     | pip cache from `setup-python`                                       | `python3 scripts/random-quality/verify-bounded-sampling.py`                                               |
+| Dev container image                           | `.devcontainer/requirements-tools.txt`                | Pinned uv installs yamllint and pinned MCP tools; pip bootstraps uv | Tools run from the image, not during hooks                                                                |
+| Optional local hooks and Unity/result helpers | No Python packages installed by hooks                 | Existing interpreter or optional yamllint tool                      | Hooks call `yamllint` when available; helper scripts call `python3`                                       |
+
+The other Python entry points use the interpreter and standard library without installing
+packages: `scripts/wiki/*.py` outside the pytest suite, `scripts/generate-test-*.py`,
+`scripts/pr-feedback.sh`, and `scripts/unity/lib/nunit-results.sh`. The wiki deployment
+workflow runs the wiki scripts directly. The local wiki guide installs from the same locked
+requirements file as CI.
+
+The pip exceptions are measured. On Python 3.11, fresh environments with separate cold and
+warm caches gave documentation installs of 8.66/5.90 seconds with pip and 5.42/0.15 seconds
+with uv. Pytest took 1.26/0.85 seconds with pip and 0.35/0.04 seconds with uv; Z3 took
+2.94/0.76 seconds with pip and 2.20/0.04 seconds with uv. Bootstrapping pinned uv itself
+with pip took another 3.57/0.99 seconds. Thus the two small CI installs stay on pip; adding
+uv there would increase their cold and warm runtime. These are local install measurements,
+not full GitHub runner timings.
+
+To update Python dependencies, edit the direct constraints, then regenerate the locks with
+the pinned uv version:
+
+```bash
+uv pip compile --universal --python-version 3.11 requirements-docs.txt --output-file requirements-docs.lock
+uv pip compile --universal --python-version 3.11 requirements-wiki.in --output-file requirements-wiki.txt
+```
+
+Review the lock diff, install into a fresh Python 3.11 environment, run the strict MkDocs
+build and wiki tests, and keep the CI `uv` pin aligned with `.devcontainer/Dockerfile`. The
+single Z3 requirement and container tooling requirements are exact pins; update those and
+their checks together. The `pip install` commands that bootstrap uv are deliberate because
+uv cannot install itself into an otherwise empty runner or container.
+
 ## LLM Scratch Artifacts
 
 - Files or folders starting with `_llm_` are git-ignored and automatically removed from the Unity package during imports.

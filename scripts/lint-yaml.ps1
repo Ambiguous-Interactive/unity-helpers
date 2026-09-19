@@ -58,7 +58,7 @@ if (-not $yamllint) {
 }
 
 if (-not $yamllint) {
-    Write-Warning "yamllint not found. Install with: pip install yamllint"
+    Write-Warning "yamllint not found. Install with: uv tool install yamllint==1.38.0"
     Write-Warning "Skipping YAML lint check."
     exit 0
 }

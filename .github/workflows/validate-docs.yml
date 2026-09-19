@@ -16,6 +16,7 @@ on:
       - "*.md"
       - "mkdocs.yml"
       - "requirements-docs.txt"
+      - "requirements-docs.lock"
       - ".github/workflows/validate-docs.yml"
   pull_request:
     paths:
@@ -23,6 +24,7 @@ on:
       - "*.md"
       - "mkdocs.yml"
       - "requirements-docs.txt"
+      - "requirements-docs.lock"
       - ".github/workflows/validate-docs.yml"
   workflow_dispatch:
 
@@ -48,18 +50,13 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: requirements-docs.txt
+          cache-dependency-path: requirements-docs.lock
 
-      # uv resolves and installs by hard-linking from its cache instead of unpacking wheels.
-      # Measured on this repository's requirements-docs.txt into a fresh environment, both with a
-      # warm cache: pip 5.20 s best of three, uv 0.06 s -- and this step is 11 s of a 31 s job
-      # (#338). pip installs uv itself in ~2 s, which keeps setup-python's cache doing the
-      # downloading and adds no new action to pin.
       - name: Install dependencies
         run: |
           set -euo pipefail
-          pip install uv==0.12.6
-          uv pip install --system -r requirements-docs.txt
+          python -m pip install --disable-pip-version-check uv==0.12.10
+          uv pip install --system -r requirements-docs.lock
 
       - name: Build MkDocs site
         run: mkdocs build --strict
