@@ -381,6 +381,44 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
         }
 
         [Test]
+        public void OnEnableNormalizesWithoutSavingDuringLoad()
+        {
+            UnityHelpersSettings settings = UnityHelpersSettings.instance;
+            settings.SaveSettings();
+            using SerializedObject serialized = new(settings);
+            SerializedProperty initialized = serialized.FindProperty(
+                UnityHelpersSettings.SerializedPropertyNames.FoldoutTweenSettingsInitialized
+            );
+            bool original = initialized.boolValue;
+            int saveCount = 0;
+            Action onSaved = () => saveCount++;
+
+            try
+            {
+                initialized.boolValue = false;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+                UnityHelpersSettings.OnSettingsSaved += onSaved;
+
+                settings.OnEnable();
+                settings.OnEnable();
+                Assert.That(saveCount, Is.Zero);
+                serialized.Update();
+                Assert.That(initialized.boolValue, Is.True);
+                settings.SaveAfterLoad();
+                settings.SaveAfterLoad();
+                Assert.That(saveCount, Is.EqualTo(1));
+            }
+            finally
+            {
+                UnityHelpersSettings.OnSettingsSaved -= onSaved;
+                serialized.Update();
+                initialized.boolValue = original;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+                settings.SaveSettings();
+            }
+        }
+
+        [Test]
         public void SaveSettingsPropagatesRegexConfiguration()
         {
             UnityHelpersSettings settings = UnityHelpersSettings.instance;

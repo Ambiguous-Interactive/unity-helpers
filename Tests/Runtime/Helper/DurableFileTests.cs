@@ -426,6 +426,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(DurableFile.TryDelete(Path.Combine(_testDirectory, "absent.json")));
         }
 
+        [Test]
+        public void DeleteReportsFailureForDirectoryPath()
+        {
+            Assert.IsFalse(DurableFile.TryDelete(_testDirectory));
+            Assert.IsTrue(Directory.Exists(_testDirectory));
+        }
+
         [UnityTest]
         public IEnumerator WriteAsyncReplacesExistingContentEntirely()
         {

@@ -77,7 +77,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     [ProtoInclude(102, typeof(XorShiftRandom))]
     [ProtoInclude(103, typeof(WyRandom))]
     [ProtoInclude(104, typeof(XoroShiroRandom))]
+#if UNITY_5_3_OR_NEWER
     [ProtoInclude(105, typeof(UnityRandom))]
+#endif
     [ProtoInclude(106, typeof(SystemRandom))]
     [ProtoInclude(107, typeof(LinearCongruentialGenerator))]
     [ProtoInclude(108, typeof(SquirrelRandom))]
@@ -1362,7 +1364,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         /// The mirror of <see cref="OnAfterDeserialization"/>, and declared here for the same
         /// reason: the root owns the wire shape, so a hook on a subtype runs under some readers and
         /// writers and not others (WPROTO034). A generator whose state is not entirely in its own
-        /// fields -- <see cref="UnityRandom"/>, whose position belongs to the engine -- uses this to
+        /// fields -- <c>UnityRandom</c>, whose position belongs to the engine -- uses this to
         /// put that state into a member before the member is read.
         /// </remarks>
         protected virtual void OnBeforeSerialization() { }

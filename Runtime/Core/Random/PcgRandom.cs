@@ -73,7 +73,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// <description>Cryptographic or adversarial scenarios.</description>
     /// </item>
     /// <item>
-    /// <description>When you specifically need UnityEngine.Random’s global state behavior; use <see cref="UnityRandom"/> for parity.</description>
+    /// <description>When you specifically need UnityEngine.Random’s global state behavior; use <c>UnityRandom</c> for parity.</description>
     /// </item>
     /// </list>
     /// <para>

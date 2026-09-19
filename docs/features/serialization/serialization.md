@@ -1099,6 +1099,14 @@ polyfill. A test double derived from a `[WProtoContract]` base can carry
 point inherited-only subclasses to this opt-out; see
 [A subclass that is not serialized](#a-subclass-that-is-not-serialized).
 
+When a plain .NET project links selected runtime sources, it can omit `UnityRandom.cs` without
+changing `AbstractRandom.cs`: the protobuf-net subtype entry for `UnityRandom` is included only
+when `UNITY_5_3_OR_NEWER` is defined. Unity builds keep its existing tag, 105. This does not make
+the whole runtime tree independent of Unity: `IRandom` and `AbstractRandom` still expose Unity
+noise types, and the Unity surrogate and bootstrap sources still require Unity assemblies. A
+non-Unity source project must select the files it uses and supply compatible Unity types for any
+Unity APIs it keeps.
+
 The package ships a Roslyn source generator as a `RoslynAnalyzer`-labelled asset, so it runs on
 **your** assemblies as well as its own, including `Assembly-CSharp`. Nothing needs installing and
 nothing needs registering: a `[WProtoContract]` in your code gets a nested `WProtoFormatter` and an

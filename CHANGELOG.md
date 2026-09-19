@@ -115,8 +115,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix `DurableFile.TryDelete` reporting success for a directory or inaccessible target ([#817](https://github.com/Ambiguous-Interactive/unity-helpers/issues/817)).
+- Fix an Editor startup persistence error when Unity Helpers upgrades saved project settings ([#814](https://github.com/Ambiguous-Interactive/unity-helpers/issues/814)).
 - Fix `NextSubset` reading a lazy source when asked for zero items. It now returns empty without enumerating the source. See [Random Generators](./docs/features/utilities/random-generators.md#subset-sampling) ([#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781)).
-- Fix WallstopProto registrar generation on `netstandard2.1` without a consumer polyfill, and explain `[WProtoNotSerialized]` in inherited-contract errors for test doubles ([#815](https://github.com/Ambiguous-Interactive/unity-helpers/issues/815)).
+- Fix WallstopProto registrar generation on `netstandard2.1` without a consumer polyfill, explain `[WProtoNotSerialized]` for inherited test doubles, and let non-Unity source builds omit `UnityRandom` without editing `AbstractRandom` ([#815](https://github.com/Ambiguous-Interactive/unity-helpers/issues/815)).
 
 ## [3.6.0] - 2026-09-12
 

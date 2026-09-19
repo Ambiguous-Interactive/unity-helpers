@@ -1332,6 +1332,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         [Range(MinFoldoutSpeed, MaxFoldoutSpeed)]
         private float _inlineEditorFoldoutSpeed = DefaultFoldoutSpeed;
 
+        [NonSerialized]
+        private bool _saveAfterLoadQueued;
+
         /// <summary>
         /// Returns the configured page size, falling back to defaults if unset.
         /// </summary>
@@ -3806,6 +3809,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         /// </summary>
         public void SaveSettings()
         {
+            if (_saveAfterLoadQueued)
+            {
+                EditorApplication.delayCall -= SaveAfterLoad;
+                _saveAfterLoadQueued = false;
+            }
+
             EnsureWButtonCustomColorDefaults();
             EnsureWEnumToggleButtonsCustomColorDefaults();
             ApplyRuntimeConfiguration();
@@ -3865,10 +3874,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         }
 
         /// <summary>
-        /// Ensures persisted data stays within valid range.
+        /// Normalizes loaded settings and saves changes after loading completes.
         /// </summary>
         internal void OnEnable()
         {
+            bool settingsChanged = false;
             _stringInListPageSize = Mathf.Clamp(
                 _stringInListPageSize <= 0 ? DefaultStringInListPageSize : _stringInListPageSize,
                 MinPageSize,
@@ -3990,36 +4000,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 )
                 {
                     _failedTestsOutputDirectory = validatedDirectory;
-                    SaveSettings();
+                    settingsChanged = true;
                 }
             }
-            if (EnsureFoldoutTweenDefaults())
+            settingsChanged |= EnsureFoldoutTweenDefaults();
+            settingsChanged |= EnsureWButtonCustomColorDefaults();
+            settingsChanged |= EnsureWEnumToggleButtonsCustomColorDefaults();
+            settingsChanged |= EnsureSerializableTypePatternDefaults();
+            settingsChanged |= EnsureSerializableSetTweenDefaults();
+            ApplyRuntimeConfiguration();
+            if (settingsChanged && !_saveAfterLoadQueued)
             {
-                SaveSettings();
-            }
-            if (EnsureWButtonCustomColorDefaults())
-            {
-                SaveSettings();
-            }
-            if (EnsureWEnumToggleButtonsCustomColorDefaults())
-            {
-                SaveSettings();
-            }
-
-            bool shouldApplyRuntimeConfig = true;
-            if (EnsureSerializableTypePatternDefaults())
-            {
-                SaveSettings();
-                shouldApplyRuntimeConfig = false;
-            }
-            if (EnsureSerializableSetTweenDefaults())
-            {
-                SaveSettings();
-                shouldApplyRuntimeConfig = false;
-            }
-            if (shouldApplyRuntimeConfig)
-            {
-                ApplyRuntimeConfiguration();
+                _saveAfterLoadQueued = true;
+                EditorApplication.delayCall += SaveAfterLoad;
             }
         }
 
@@ -4133,6 +4126,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             }
 
             return changed;
+        }
+
+        internal void SaveAfterLoad()
+        {
+            if (!_saveAfterLoadQueued)
+            {
+                return;
+            }
+
+            EditorApplication.delayCall -= SaveAfterLoad;
+            _saveAfterLoadQueued = false;
+            if (this != null)
+            {
+                SaveSettings();
+            }
         }
 
         private void InvalidateSerializableTypePatternCache()

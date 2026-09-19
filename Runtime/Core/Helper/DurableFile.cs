@@ -413,7 +413,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         /// <summary>
-        /// Deletes a file if it exists, reporting failure rather than throwing.
+        /// Deletes a file, reporting failure rather than throwing.
         /// </summary>
         /// <param name="path">File to delete.</param>
         /// <returns>True when no file remains at <paramref name="path"/>.</returns>
@@ -426,12 +426,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             try
             {
-                // Another deleter can win the race; the contract only requires the file to be absent.
-                if (File.Exists(path))
-                {
-                    File.Delete(path);
-                }
-
+                File.Delete(path);
                 return true;
             }
             catch (Exception)

@@ -601,6 +601,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
             Assert.AreEqual(random.InternalState, deserialized.InternalState);
         }
 
+        [Test]
+        public void UnityRandomProtobufNetBaseRoundTripKeepsSubtypeTag()
+        {
+            UnityRandom random = new(42);
+            random.NextUint();
+
+            using MemoryStream written = new();
+            ProtoBuf.Serializer.Serialize(written, (AbstractRandom)random);
+            using MemoryStream read = new(written.ToArray());
+            AbstractRandom restored = ProtoBuf.Serializer.Deserialize<AbstractRandom>(read);
+
+            Assert.IsInstanceOf<UnityRandom>(restored);
+            Assert.AreEqual(random.InternalState, restored.InternalState);
+        }
+
         /*
             Advance the engine between save and load to prove snapshots restore position rather than just a
             seed.

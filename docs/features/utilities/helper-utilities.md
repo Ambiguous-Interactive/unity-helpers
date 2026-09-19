@@ -1000,6 +1000,7 @@ guarantee without changing any code.
 
 A leftover `.tmp` sibling (`DurableFile.TemporarySuffix`) is what an interrupted write leaves behind; it is
 safe to ignore or delete.
+`DurableFile.TryDelete` succeeds when a file is absent and reports failure for a directory or a file it cannot delete.
 
 ---
 
