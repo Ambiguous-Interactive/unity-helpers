@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
     using UnityEngine.TestTools;
     using UnityEngine.U2D;
     using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Editor.Extensions;
     using WallstopStudios.UnityHelpers.Editor.Sprites;
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -72,7 +73,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
 
             ScriptableSpriteAtlas config = ScriptableObject.CreateInstance<ScriptableSpriteAtlas>(); // UNH-SUPPRESS: Asset becomes persistent via CreateAsset below
             config.name = "TestAtlasConfig";
-            config.sourceFolderEntries.Add(new SourceFolderEntry { folderPath = Root });
+            using (SerializedObject serializedConfig = new(config))
+            {
+                SerializedProperty entries = serializedConfig.FindProperty(
+                    nameof(ScriptableSpriteAtlas.sourceFolderEntries)
+                );
+                SerializedProperty entry = entries.AppendArrayElement();
+                ScriptableSpriteAtlasEditor.InitializeSourceFolderEntry(entry);
+                entry.FindPropertyRelative(nameof(SourceFolderEntry.folderPath)).stringValue = Root;
+                serializedConfig.ApplyModifiedProperties();
+            }
             config.outputSpriteAtlasDirectory = Root;
             string atlasPath = AssetDatabase.GenerateUniqueAssetPath(
                 Path.Combine(Root, "TestAtlas.spriteatlas").SanitizePath()
@@ -83,6 +93,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             AssetDatabase.CreateAsset(config, configPath);
             TrackAssetPath(configPath);
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
+
+            config.outputSpriteAtlasDirectory = "Packages";
+            string invalidOutput = config.FullOutputPath;
+            string invalidMessage =
+                $"'{config.name}': Output atlas path '{invalidOutput}' must be under Assets/ and cannot be empty or contain relative segments.";
+            LogAssert.Expect(LogType.Error, invalidMessage);
+            Assert.IsFalse(ScriptableSpriteAtlasGenerator.Generate(config));
+            LogAssert.Expect(LogType.Error, invalidMessage);
+            Assert.IsFalse(ScriptableSpriteAtlasGenerator.TryGenerateAll(out int generated));
+            Assert.AreEqual(0, generated);
+            config.outputSpriteAtlasDirectory = Root;
 
             List<Sprite> toAdd = new();
             List<Sprite> toRemove = new();

@@ -137,7 +137,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// <summary>Generates one atlas and reports whether it changed.</summary>
         public static bool Generate(ScriptableSpriteAtlas config)
         {
-            if (!IsValid(config) || IsBlockedByOtherAsset(config))
+            if (!IsValidForGeneration(config) || IsBlockedByOtherAsset(config))
             {
                 return false;
             }
@@ -152,12 +152,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             return changed;
         }
 
-        /// <summary>Generates all configured atlases and returns the number changed.</summary>
+        /// <summary>Generates all configured atlases and returns the number changed, or -1 if a config failed.</summary>
         public static int GenerateAll()
         {
+            return TryGenerateAll(out int changed) ? changed : -1;
+        }
+
+        /// <summary>Generates configured atlases and reports whether every configuration succeeded.</summary>
+        public static bool TryGenerateAll(out int changed)
+        {
             string[] guids = AssetDatabase.FindAssets("t:ScriptableSpriteAtlas");
-            int changed = 0;
+            changed = 0;
             bool normalized = false;
+            bool succeeded = true;
             using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
             {
                 foreach (string guid in guids)
@@ -169,8 +176,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                     ScriptableSpriteAtlas config =
                         AssetDatabase.LoadAssetAtPath<ScriptableSpriteAtlas>(path);
-                    if (!IsValid(config) || IsBlockedByOtherAsset(config))
+                    if (!IsValidForGeneration(config) || IsBlockedByOtherAsset(config))
                     {
+                        succeeded = false;
                         continue;
                     }
                     if (GenerateCore(config))
@@ -185,13 +193,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
             }
-            return changed;
+            return succeeded;
         }
 
         /// <summary>Generates and packs all configured atlases in batch mode.</summary>
         public static void GenerateAndPackAllForBatch()
         {
-            GenerateAll();
+            if (!TryGenerateAll(out _))
+            {
+                Debug.LogError("Sprite atlas generation failed for one or more configurations.");
+                if (Application.isBatchMode)
+                {
+                    EditorApplication.Exit(1);
+                }
+                return;
+            }
             PackAll(EditorUserBuildSettings.activeBuildTarget);
         }
 
@@ -308,7 +324,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         internal static bool GenerateWithoutRefresh(ScriptableSpriteAtlas config)
         {
-            if (!IsValid(config) || IsBlockedByOtherAsset(config))
+            if (!IsValidForGeneration(config) || IsBlockedByOtherAsset(config))
             {
                 return false;
             }
@@ -943,6 +959,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 && path.StartsWith("Assets/", StringComparison.Ordinal)
                 && !path.Contains("/../")
                 && !path.Contains("/./");
+        }
+
+        private static bool IsValidForGeneration(ScriptableSpriteAtlas config)
+        {
+            if (IsValid(config))
+            {
+                return true;
+            }
+
+            Debug.LogError(
+                config == null
+                    ? "Sprite atlas configuration is missing."
+                    : $"'{config.name}': Output atlas path '{config.FullOutputPath}' must be under Assets/ and cannot be empty or contain relative segments.",
+                config
+            );
+            return false;
         }
 
         private static bool IsOutputOccupied(string path)

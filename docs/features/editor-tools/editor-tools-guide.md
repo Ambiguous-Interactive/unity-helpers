@@ -768,7 +768,8 @@ Closing the window releases its cached state.
    | `Labels`          | Asset labels, combined by **Label Selection Mode**: `All` (every label) or `AnyOf` (any one). |
    | `Regex \| Labels` | Both, joined by **Regex & Tags Logic** (`And` / `Or`).                                        |
 
-5. Click **Scan Folders for '<config name>'**. The window reports `To Add: N sprites.` and
+5. Click **Scan Folders for '<config name>'**. New folder entries start with Regex selection and no
+   patterns, so they include sprites until you narrow them. The window reports `To Add: N sprites.` and
    `To Remove: N sprites.` before anything changes.
 6. Click **Sync List To Scan Result (N add, N remove)**.
 7. Click **Generate/Update '<name>.spriteatlas' ONLY**, then **Pack All Generated Sprite Atlases** —
@@ -782,10 +783,13 @@ before synchronizing.
 Pass `removeUnmatchedSprites: true` to remove every sprite absent from the scanned folders, including
 manual entries. The window's **Sync List To Scan Result** button uses that removal mode. `Generate(config)` writes one atlas
 and returns whether it changed; `GenerateAll()` writes all configured atlases in one asset batch and
-returns the number changed. `PackAll(target)` packs for a chosen build target. A CI check can call
+returns the number changed, or `-1` if any config failed. `TryGenerateAll(out changed)` also reports
+whether every config was valid.
+`PackAll(target)` packs for a chosen build target. A CI check can call
 `TryFindDrift(config, differences)` and fail if it returns `false` or adds any differences. It checks
 packables and generated settings without changing the atlas. To regenerate and pack in Unity batch
 mode, use `-executeMethod WallstopStudios.UnityHelpers.Editor.Sprites.ScriptableSpriteAtlasGenerator.GenerateAndPackAllForBatch`.
+That command skips packing and exits with code 1 if a config has an invalid or occupied output path.
 Generation and packing write assets and may trigger imports; Unity Undo cannot reverse all file and
 import effects.
 

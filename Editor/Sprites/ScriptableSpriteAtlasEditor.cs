@@ -161,6 +161,29 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             return result;
         }
 
+        internal static void InitializeSourceFolderEntry(SerializedProperty entry)
+        {
+            if (entry == null)
+            {
+                return;
+            }
+
+            entry.FindPropertyRelative(nameof(SourceFolderEntry.selectionMode)).intValue = (int)
+                SpriteSelectionMode.Regex;
+            entry.FindPropertyRelative(nameof(SourceFolderEntry.labelSelectionMode)).intValue =
+                (int)LabelSelectionMode.All;
+            entry.FindPropertyRelative(nameof(SourceFolderEntry.regexAndTagLogic)).intValue = (int)
+                SpriteSelectionBooleanLogic.And;
+            entry
+                .FindPropertyRelative(nameof(SourceFolderEntry.excludeLabelSelectionMode))
+                .intValue = (int)LabelSelectionMode.AnyOf;
+            entry.FindPropertyRelative(nameof(SourceFolderEntry.regexes)).arraySize = 0;
+            entry.FindPropertyRelative(nameof(SourceFolderEntry.labels)).arraySize = 0;
+            entry.FindPropertyRelative(nameof(SourceFolderEntry.excludeRegexes)).arraySize = 0;
+            entry.FindPropertyRelative(nameof(SourceFolderEntry.excludeLabels)).arraySize = 0;
+            entry.FindPropertyRelative(nameof(SourceFolderEntry.excludePathPrefixes)).arraySize = 0;
+        }
+
         private static int CompareAtlasConfigNames(
             AtlasConfigSortEntry left,
             AtlasConfigSortEntry right
@@ -798,6 +821,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                 {
                                     SerializedProperty newEntryProp =
                                         sourceFolderEntriesProp.AppendArrayElement();
+                                    InitializeSourceFolderEntry(newEntryProp);
                                     newEntryProp
                                         .FindPropertyRelative(nameof(SourceFolderEntry.folderPath))
                                         .stringValue = relativePath;
