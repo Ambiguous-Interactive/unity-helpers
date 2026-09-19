@@ -162,7 +162,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         public static bool TryGenerateAll(out int changed)
         {
             string[] guids = AssetDatabase.FindAssets("t:ScriptableSpriteAtlas");
-            changed = 0;
+            int generated = 0;
             bool normalized = false;
             bool succeeded = true;
             using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
@@ -183,16 +183,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                     if (GenerateCore(config))
                     {
-                        ++changed;
+                        ++generated;
                     }
                     normalized |= RemoveNullSprites(config);
                 }
             }
-            if (0 < changed || normalized)
+            if (0 < generated || normalized)
             {
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
             }
+            changed = generated;
             return succeeded;
         }
 
