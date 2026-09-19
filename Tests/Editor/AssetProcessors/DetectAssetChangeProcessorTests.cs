@@ -1081,6 +1081,8 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
         private abstract class InheritedHandlerBase
         {
+            public static void Clear() { }
+
             [DetectAssetChanged(typeof(TestDetectableAsset))]
             public virtual void OnAssetChanged() { }
         }
