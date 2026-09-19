@@ -30,6 +30,8 @@ The `UnityHelpersSettings` asset provides project-wide configuration for paginat
 3. Or navigate to `ProjectSettings/UnityHelpersSettings.asset` directly
 
 **Note:** The asset is created automatically on first use. If missing, any inspector feature will generate it.
+When Unity loads saved settings, it validates the saved test output directory and applies the saved
+pool purging options. Any normalized defaults are saved after the Editor becomes idle.
 
 ![Project Settings window showing Unity Helpers settings](../../images/inspector/unity-helper-settings.png)
 

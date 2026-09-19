@@ -1640,40 +1640,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         /// </returns>
         public static string GetFailedTestsOutputDirectory()
         {
-            string directory = instance._failedTestsOutputDirectory;
-            if (string.IsNullOrWhiteSpace(directory))
-            {
-                return DefaultFailedTestsOutputDirectory;
-            }
-
-            directory = directory.Replace('\\', '/').TrimEnd('/');
-
-            if (Path.IsPathRooted(directory) || directory.Contains(".."))
-            {
-                return DefaultFailedTestsOutputDirectory;
-            }
-
-            try
-            {
-                string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-                string fullPath = Path.GetFullPath(Path.Combine(projectRoot, directory));
-
-                if (!fullPath.StartsWith(projectRoot, StringComparison.OrdinalIgnoreCase))
-                {
-                    return DefaultFailedTestsOutputDirectory;
-                }
-
-                if (!Directory.Exists(fullPath))
-                {
-                    return DefaultFailedTestsOutputDirectory;
-                }
-
-                return directory;
-            }
-            catch
-            {
-                return DefaultFailedTestsOutputDirectory;
-            }
+            return ValidateFailedTestsOutputDirectory(instance._failedTestsOutputDirectory);
         }
 
         /// <summary>
@@ -1760,39 +1727,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         /// </summary>
         public static void ApplyPoolPurgingSettingsToRuntime()
         {
-            UnityHelpersSettings settings = instance;
-            PoolPurgeSettings.GlobalEnabled = settings._poolPurgingEnabled;
-            PoolPurgeSettings.DefaultGlobalIdleTimeoutSeconds = Mathf.Max(
-                0f,
-                settings._poolIdleTimeoutSeconds
-            );
-            PoolPurgeSettings.DefaultGlobalMinRetainCount = Mathf.Max(
-                0,
-                settings._poolMinRetainCount
-            );
-            PoolPurgeSettings.DefaultGlobalWarmRetainCount = Mathf.Max(
-                0,
-                settings._poolWarmRetainCount
-            );
-            PoolPurgeSettings.DefaultGlobalMaxPoolSize = Mathf.Max(0, settings._poolMaxSize);
-            PoolPurgeSettings.DefaultGlobalBufferMultiplier = Mathf.Max(
-                1f,
-                settings._poolBufferMultiplier
-            );
-            PoolPurgeSettings.DefaultGlobalRollingWindowSeconds = Mathf.Max(
-                1f,
-                settings._poolRollingWindowSeconds
-            );
-            PoolPurgeSettings.DefaultGlobalHysteresisSeconds = Mathf.Max(
-                0f,
-                settings._poolHysteresisSeconds
-            );
-            PoolPurgeSettings.DefaultGlobalSpikeThresholdMultiplier = Mathf.Max(
-                1f,
-                settings._poolSpikeThresholdMultiplier
-            );
-
-            ApplyPoolTypeConfigurationsToRuntime(settings._poolTypeConfigurations);
+            ApplyPoolPurgingSettingsToRuntime(instance);
         }
 
         internal static void SetWGroupFoldoutTweenEnabled(bool value)
@@ -1899,6 +1834,79 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         {
             _cachedSettingsSerializedObject?.Dispose();
             _cachedSettingsSerializedObject = null;
+        }
+
+        private static string ValidateFailedTestsOutputDirectory(string directory)
+        {
+            if (string.IsNullOrWhiteSpace(directory))
+            {
+                return DefaultFailedTestsOutputDirectory;
+            }
+
+            directory = directory.Replace('\\', '/').TrimEnd('/');
+
+            if (Path.IsPathRooted(directory) || directory.Contains(".."))
+            {
+                return DefaultFailedTestsOutputDirectory;
+            }
+
+            try
+            {
+                string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+                string fullPath = Path.GetFullPath(Path.Combine(projectRoot, directory));
+
+                if (!fullPath.StartsWith(projectRoot, StringComparison.OrdinalIgnoreCase))
+                {
+                    return DefaultFailedTestsOutputDirectory;
+                }
+
+                if (!Directory.Exists(fullPath))
+                {
+                    return DefaultFailedTestsOutputDirectory;
+                }
+
+                return directory;
+            }
+            catch
+            {
+                return DefaultFailedTestsOutputDirectory;
+            }
+        }
+
+        private static void ApplyPoolPurgingSettingsToRuntime(UnityHelpersSettings settings)
+        {
+            PoolPurgeSettings.GlobalEnabled = settings._poolPurgingEnabled;
+            PoolPurgeSettings.DefaultGlobalIdleTimeoutSeconds = Mathf.Max(
+                0f,
+                settings._poolIdleTimeoutSeconds
+            );
+            PoolPurgeSettings.DefaultGlobalMinRetainCount = Mathf.Max(
+                0,
+                settings._poolMinRetainCount
+            );
+            PoolPurgeSettings.DefaultGlobalWarmRetainCount = Mathf.Max(
+                0,
+                settings._poolWarmRetainCount
+            );
+            PoolPurgeSettings.DefaultGlobalMaxPoolSize = Mathf.Max(0, settings._poolMaxSize);
+            PoolPurgeSettings.DefaultGlobalBufferMultiplier = Mathf.Max(
+                1f,
+                settings._poolBufferMultiplier
+            );
+            PoolPurgeSettings.DefaultGlobalRollingWindowSeconds = Mathf.Max(
+                1f,
+                settings._poolRollingWindowSeconds
+            );
+            PoolPurgeSettings.DefaultGlobalHysteresisSeconds = Mathf.Max(
+                0f,
+                settings._poolHysteresisSeconds
+            );
+            PoolPurgeSettings.DefaultGlobalSpikeThresholdMultiplier = Mathf.Max(
+                1f,
+                settings._poolSpikeThresholdMultiplier
+            );
+
+            ApplyPoolTypeConfigurationsToRuntime(settings._poolTypeConfigurations);
         }
 
         private static void ApplyPoolTypeConfigurationsToRuntime(
@@ -3990,7 +3998,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
 
             if (!string.IsNullOrEmpty(_failedTestsOutputDirectory))
             {
-                string validatedDirectory = GetFailedTestsOutputDirectory();
+                string validatedDirectory = ValidateFailedTestsOutputDirectory(
+                    _failedTestsOutputDirectory
+                );
                 if (
                     !string.Equals(
                         _failedTestsOutputDirectory,
@@ -4218,7 +4228,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             IReadOnlyList<string> patterns = GetSerializableTypeIgnorePatterns();
             SerializableTypeCatalog.ConfigureTypeNameIgnorePatterns(patterns);
 
-            ApplyPoolPurgingSettingsToRuntime();
+            ApplyPoolPurgingSettingsToRuntime(this);
         }
 
         private bool EnsureSerializableTypePatternDefaults()
