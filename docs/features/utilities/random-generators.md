@@ -274,6 +274,13 @@ For saved simulations upgrading from an earlier version, finite-bound draw seque
 streams are unchanged. Calls with infinite bounds can now consume different draws and produce
 different values; replay files using those calls should record their package version.
 
+### Subset sampling
+
+`random.NextSubset(items, count)` draws without replacement. A zero count returns an empty
+sequence without enumerating `items`, so it also works with a lazy or unbounded source. A positive
+count requires a finite source; the method materializes sources that are not read-only lists before
+sampling them. Null sources and negative counts still raise argument exceptions.
+
 ### Exact sampling and stalled sources
 
 `AbstractRandom.TryNextUint`, `TryNextUlong`, `TryNextDouble` and `TryNextGaussian` return

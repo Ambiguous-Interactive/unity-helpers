@@ -970,6 +970,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         }
 
         [Test]
+        public void NextSubsetCountZeroDoesNotEnumerateSource()
+        {
+            SystemRandom rng = new(5);
+            IEnumerable<int> source = new[] { 1, 2, 3 }.Where(_ =>
+                throw new InvalidOperationException("Zero-count sampling enumerated the source.")
+            );
+
+            IEnumerable<int> subset = rng.NextSubset(source, 0);
+
+            CollectionAssert.IsEmpty(subset);
+        }
+
+        [Test]
         public void NextSubsetThrowsWhenCountExceedsSource()
         {
             SystemRandom rng = new(5);

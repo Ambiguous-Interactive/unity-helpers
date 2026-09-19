@@ -26,7 +26,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Thread Safety: Thread-safe if random is thread-safe and items is not modified during execution.
         /// Performance: O(n) where n is items.Count - uses reservoir sampling algorithm. Materializes non-list collections.
         /// Allocations: Uses pooled array for result (returned to pool when disposed). Materializes IEnumerable to array/list.
-        /// Edge Cases: count=0 returns empty enumerable. Uses Algorithm R (reservoir sampling) for uniform selection probability.
+        /// Edge Cases: count=0 returns empty without reading items. Uses Algorithm R (reservoir sampling) for uniform selection probability.
         /// The returned array is pooled and will be returned to the pool - caller should not hold reference long-term.
         /// A source that is not an <see cref="IReadOnlyList{T}"/> is copied once into an array this
         /// method owns, because the sampling itself is deferred and a pooled staging buffer would
@@ -48,6 +48,11 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 throw new ArgumentOutOfRangeException(nameof(count), "Count cannot be negative");
             }
 
+            if (count == 0)
+            {
+                return Array.Empty<T>();
+            }
+
             if (items is IReadOnlyList<T> itemsList)
             {
                 if (itemsList.Count < count)
@@ -56,11 +61,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                         "Count cannot exceed the number of items",
                         nameof(count)
                     );
-                }
-
-                if (count == 0)
-                {
-                    return Array.Empty<T>();
                 }
 
                 return NextSubsetIterator(random, itemsList, count);
@@ -75,11 +75,6 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                     "Count cannot exceed the number of items",
                     nameof(count)
                 );
-            }
-
-            if (count == 0)
-            {
-                return Array.Empty<T>();
             }
 
             // The deferred iterator outlives this pool lease; give it an owned copy.

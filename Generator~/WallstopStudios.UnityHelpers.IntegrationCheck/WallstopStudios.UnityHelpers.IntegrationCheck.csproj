@@ -224,10 +224,6 @@
     as the one gate with no bundled reference to parse.
   -->
   <ItemGroup>
-    <!-- Unity's BCL exposes ModuleInitializerAttribute and the netstandard2.1 reference assemblies
-         do not, so the generator's registrar needs TypeCheck's polyfill here too. It is `internal`,
-         which is why it is compiled rather than inherited through the reference. -->
-    <Compile Include="$(RepoRoot)/Generator~/WallstopStudios.UnityHelpers.TypeCheck/Shims/ModuleInitializerShim.cs" />
     <!-- The three DI containers, each declaring only what these 19 files name. -->
     <Compile Include="Shims/*.cs" />
     <!-- The three integration asmdefs' scope, in full. There are no exclusions and there should

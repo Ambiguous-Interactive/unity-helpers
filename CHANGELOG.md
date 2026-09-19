@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `DurableFile.WriteAllBytesAsync` for staged, cancellable binary saves with the same durability guarantees as synchronous byte writes. See [Durable Writes for Player Data](./docs/features/utilities/helper-utilities.md#durable-writes-for-player-data) ([#816](https://github.com/Ambiguous-Interactive/unity-helpers/issues/816)).
 - Add an Odin migration preview/apply tool for proven-equivalent `ReadOnly` and
   `EnumToggleButtons` fields. Preview reports possible Odin-owned data, including quoted keys, in scenes, prefabs, and assets;
   source-only edits leave that data untouched. See the
@@ -111,6 +112,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Defer SerializableType ignore-pattern match counts until the settings window displays them, avoiding a scan of every loaded type on each domain reload ([#786](https://github.com/Ambiguous-Interactive/unity-helpers/issues/786)).
 - Improve Sprite Cropper and Sprite Sheet Extractor memory reuse for dynamically sized pixel output, with measured size-aware parallel row copies for large images ([#754](https://github.com/Ambiguous-Interactive/unity-helpers/issues/754)).
 - Remove avoidable allocations from asset watcher discovery and WallstopProto source generation while preserving handler and diagnostic ordering ([#764](https://github.com/Ambiguous-Interactive/unity-helpers/issues/764), [#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781)).
+
+### Fixed
+
+- Fix `NextSubset` reading a lazy source when asked for zero items. It now returns empty without enumerating the source. See [Random Generators](./docs/features/utilities/random-generators.md#subset-sampling) ([#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781)).
+- Fix WallstopProto registrar generation on `netstandard2.1` without a consumer polyfill, and explain `[WProtoNotSerialized]` in inherited-contract errors for test doubles ([#815](https://github.com/Ambiguous-Interactive/unity-helpers/issues/815)).
 
 ## [3.6.0] - 2026-09-12
 

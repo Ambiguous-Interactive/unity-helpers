@@ -1092,6 +1092,13 @@ failure instead of handing back an object whose derived state was rebuilt from h
 
 ### The generator
 
+For a plain `netstandard2.1` consumer, the generator supplies `ModuleInitializerAttribute` if the
+target framework does not define it. The generated registrar therefore compiles without a consumer
+polyfill. A test double derived from a `[WProtoContract]` base can carry
+`[WProtoNotSerialized]` when it never reaches the serializer. `WPROTO001` and `WPROTO011` now
+point inherited-only subclasses to this opt-out; see
+[A subclass that is not serialized](#a-subclass-that-is-not-serialized).
+
 The package ships a Roslyn source generator as a `RoslynAnalyzer`-labelled asset, so it runs on
 **your** assemblies as well as its own, including `Assembly-CSharp`. Nothing needs installing and
 nothing needs registering: a `[WProtoContract]` in your code gets a nested `WProtoFormatter` and an

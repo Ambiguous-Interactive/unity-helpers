@@ -46,7 +46,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             new DiagnosticDescriptor(
                 "WPROTO001",
                 "WallstopProto contract must be partial",
-                "'{0}' is a [WProtoContract] but is not declared partial. The generated formatter is emitted as a nested type so it can reach private members and hooks without reflection, which requires a partial declaration. Add 'partial' to '{0}' and to every type that encloses it.",
+                "'{0}' is serialized as a [WProtoContract] but is not declared partial. The generated formatter is emitted as a nested type so it can reach private members and hooks without reflection, which requires a partial declaration. Add 'partial' to '{0}' and to every type that encloses it. If '{0}' only inherits the contract and is never serialized, mark it [WProtoNotSerialized] instead.",
                 "WallstopProto",
                 DiagnosticSeverity.Error,
                 isEnabledByDefault: true
@@ -131,7 +131,7 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator
             new DiagnosticDescriptor(
                 "WPROTO011",
                 "WallstopProto contract has no parameterless constructor",
-                "'{0}' is a [WProtoContract] class with no parameterless constructor, so the formatter cannot create an instance to read into. Add one -- it may be private, since the formatter is nested inside '{0}'.",
+                "'{0}' is serialized as a [WProtoContract] class with no parameterless constructor, so the formatter cannot create an instance to read into. Add one -- it may be private, since the formatter is nested inside '{0}'. If '{0}' only inherits the contract and is never serialized, mark it [WProtoNotSerialized] instead.",
                 "WallstopProto",
                 DiagnosticSeverity.Error,
                 isEnabledByDefault: true

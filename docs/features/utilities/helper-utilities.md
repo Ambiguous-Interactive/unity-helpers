@@ -956,10 +956,10 @@ if (!DurableFile.TryWriteAllText(savePath, json, out Exception error))
 }
 ```
 
-For binary saves, `TryWriteAllBytes` accepts the serialized `byte[]` directly (added in the upcoming
-release). It uses the same staging and flush guarantees as text writes, without encoding or copying the
-payload. Missing directories are created; null or empty bytes replace the destination with an empty
-file. Keep the array unchanged until the call returns.
+For binary saves, `TryWriteAllBytes` and `WriteAllBytesAsync` accept the serialized `byte[]` directly.
+They use the same staging and flush guarantees as text writes, without encoding or copying the payload.
+Missing directories are created; null or empty bytes replace the destination with an empty file. Keep the
+array unchanged until the call completes.
 
 ```csharp
 if (!DurableFile.TryWriteAllBytes(savePath, serializedBytes, out Exception error))
@@ -973,6 +973,7 @@ success):
 
 ```csharp
 Exception error = await DurableFile.WriteAllTextAsync(savePath, json, cancellationToken);
+Exception binaryError = await DurableFile.WriteAllBytesAsync(savePath, serializedBytes, cancellationToken);
 
 // Append is stronger still: it never rewrites bytes that are already on disk.
 DurableFile.TryAppendAllText(ledgerPath, $"{score}\n", out Exception appendError);

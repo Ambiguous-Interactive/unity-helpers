@@ -644,6 +644,41 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
             );
         }
 
+        [Test]
+        public void InheritedContractErrorsExplainHowToOptOut()
+        {
+            ImmutableArray<Diagnostic> nonPartial = Run(
+                @"[assembly: WProtoSubtypeTag(""Consumer.Preview"", typeof(Consumer.Base), 100)]
+                  [WProtoContract] public partial class Base { [WProtoMember(1)] public int Value; }
+                  public class Preview : Base { }"
+            );
+            Diagnostic partialError = nonPartial.First(diagnostic =>
+                string.Equals(diagnostic.Id, "WPROTO001", StringComparison.Ordinal)
+            );
+            StringAssert.Contains("[WProtoNotSerialized]", partialError.GetMessage());
+
+            ImmutableArray<Diagnostic> noConstructor = Run(
+                @"[assembly: WProtoSubtypeTag(""Consumer.Preview"", typeof(Consumer.Base), 100)]
+                  [WProtoContract] public partial class Base { [WProtoMember(1)] public int Value; }
+                  public partial class Preview : Base { public Preview(int seed) { } }"
+            );
+            Diagnostic constructorError = noConstructor.First(diagnostic =>
+                string.Equals(diagnostic.Id, "WPROTO011", StringComparison.Ordinal)
+            );
+            StringAssert.Contains("[WProtoNotSerialized]", constructorError.GetMessage());
+
+            ImmutableArray<Diagnostic> optedOut = Run(
+                @"[WProtoContract] public partial class Base { [WProtoMember(1)] public int Value; }
+                  [WProtoNotSerialized] public class Preview : Base { public Preview(int seed) { } }"
+            );
+            Assert.IsFalse(
+                optedOut.Any(diagnostic =>
+                    string.Equals(diagnostic.Id, "WPROTO001", StringComparison.Ordinal)
+                    || string.Equals(diagnostic.Id, "WPROTO011", StringComparison.Ordinal)
+                )
+            );
+        }
+
         /// <summary>
         /// A subtype neither end declared is discovered rather than refused.
         /// </summary>

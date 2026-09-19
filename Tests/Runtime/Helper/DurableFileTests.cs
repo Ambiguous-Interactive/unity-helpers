@@ -461,6 +461,70 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [UnityTest]
+        public IEnumerator WriteBytesAsyncReplacesExistingContentAndAcceptsNull()
+        {
+            string path = WriteDirectly("save.bin", "a much longer previous document");
+            byte[] contents = { 0, 1, 255, 2 };
+
+            Task<Exception> write = DurableFile.WriteAllBytesAsync(path, contents).AsTask();
+            while (!write.IsCompleted)
+            {
+                yield return null;
+            }
+
+            Assert.IsTrue(write.Result == null);
+            CollectionAssert.AreEqual(contents, File.ReadAllBytes(path));
+            Assert.IsFalse(File.Exists(path + DurableFile.TemporarySuffix));
+
+            Task<Exception> clear = DurableFile.WriteAllBytesAsync(path, null).AsTask();
+            while (!clear.IsCompleted)
+            {
+                yield return null;
+            }
+
+            Assert.IsTrue(clear.Result == null);
+            Assert.AreEqual(0, new FileInfo(path).Length);
+        }
+
+        [UnityTest]
+        public IEnumerator WriteBytesAsyncPreservesDestinationWhenStagingFails()
+        {
+            string path = WriteDirectly("save.bin", "previous document");
+            BlockStaging(path);
+
+            Task<Exception> write = DurableFile
+                .WriteAllBytesAsync(path, new byte[] { 1, 2 })
+                .AsTask();
+            while (!write.IsCompleted)
+            {
+                yield return null;
+            }
+
+            Assert.IsTrue(write.Result != null);
+            Assert.AreEqual("previous document", File.ReadAllText(path));
+        }
+
+        [UnityTest]
+        public IEnumerator WriteBytesAsyncReportsCancellationWithoutChangingDestination()
+        {
+            string path = WriteDirectly("save.bin", "previous document");
+            using CancellationTokenSource cancellation = new();
+            cancellation.Cancel();
+
+            Task<Exception> write = DurableFile
+                .WriteAllBytesAsync(path, new byte[] { 1, 2 }, cancellation.Token)
+                .AsTask();
+            while (!write.IsCompleted)
+            {
+                yield return null;
+            }
+
+            Assert.IsInstanceOf<OperationCanceledException>(write.Result);
+            Assert.AreEqual("previous document", File.ReadAllText(path));
+            Assert.IsFalse(File.Exists(path + DurableFile.TemporarySuffix));
+        }
+
+        [UnityTest]
         public IEnumerator AppendAsyncCreatesThenAccumulates()
         {
             string path = Path.Combine(_testDirectory, "ledger.log");
