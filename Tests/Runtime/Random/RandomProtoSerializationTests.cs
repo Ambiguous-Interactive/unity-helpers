@@ -602,6 +602,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Random
         }
 
         [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
         public void UnityRandomProtobufNetBaseRoundTripKeepsSubtypeTag()
         {
             UnityRandom random = new(42);
