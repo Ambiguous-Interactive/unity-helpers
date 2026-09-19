@@ -402,11 +402,11 @@ else
         "offenders: $offenders"
 fi
 
-# The agent-facing instructions have to name the replacement, or the removed snippet is simply a
-# gap that the next session fills by guessing.
-if grep -q 'scripts/github-token.sh' "$REPO_ROOT/.llm/context.md" \
+# The agent-facing instructions have to name the replacement in their canonical content. Context
+# and ship-changes route detailed guidance through references; their short entrypoints link there.
+if grep -q 'scripts/github-token.sh' "$REPO_ROOT/.llm/references/context-agent-operations.md" \
     && grep -q 'scripts/github-token.sh' "$REPO_ROOT/.llm/skills/github-operations.md" \
-    && grep -q 'scripts/github-token.sh' "$REPO_ROOT/.llm/skills/ship-changes.md"; then
+    && grep -q 'scripts/github-token.sh' "$REPO_ROOT/.llm/references/ship-changes-part-2.md"; then
     pass "all GitHub agent guidance names scripts/github-token.sh as the credential source"
 else
     fail "all GitHub agent guidance names scripts/github-token.sh as the credential source" \

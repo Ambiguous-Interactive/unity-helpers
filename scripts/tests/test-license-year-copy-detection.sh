@@ -513,10 +513,9 @@ fi
 # =============================================================================
 # The pathspec narrowing's canary
 # =============================================================================
-# The walk is narrowed to '*.cs' (#680), which can only change an answer if git ever paired a .cs
-# path with a non-.cs one through a rename or a copy. It never has here, and a rename is visible
-# without paying for copy detection, so the cheap unnarrowed walk is enough to notice the day that
-# stops being true. It sees renames only, so this is a canary rather than a proof.
+# The walk is narrowed to '*.cs' (#680), which can change a C# header's source year only if git
+# paired a non-.cs source with a .cs target through a rename or copy. Copies in the reverse
+# direction, such as a C# example quoted in a Markdown reference, produce no C# target.
 echo ""
 echo "=== Pathspec narrowing ==="
 
@@ -531,17 +530,26 @@ copy_detection_records=$(
         --reverse --name-status \
         --diff-filter=RC --format='' --find-renames -C --find-copies-harder 2>/dev/null
 )
-cross_extension_pairs=$(
+unsafe_source_pairs=$(
     printf '%s\n' "$copy_detection_records" |
-        awk -F'\t' 'NF == 3 { source_is_cs = ($2 ~ /\.cs$/); target_is_cs = ($3 ~ /\.cs$/); if (source_is_cs != target_is_cs) { print } }'
+        awk -F'\t' 'NF == 3 && $2 !~ /\.cs$/ && $3 ~ /\.cs$/ { print }'
 )
 rename_record_count=$(printf '%s\n' "$copy_detection_records" | grep -c . || true)
-if [[ -z "$cross_extension_pairs" && 0 -lt "$rename_record_count" ]]; then
-    pass "No rename or copy in $rename_record_count records pairs a .cs path with a non-.cs path"
+run_test
+direction_fixture=$(printf 'C069\tguide.md\tRuntime/Example.cs\nC069\tRuntime/Example.cs\tguide.md\n' |
+    awk -F'\t' 'NF == 3 && $2 !~ /\.cs$/ && $3 ~ /\.cs$/ { print }')
+if [[ "$direction_fixture" == $'C069\tguide.md\tRuntime/Example.cs' ]]; then
+    pass "The narrowing canary catches non-C# sources copied into C# targets"
 else
-    fail "No rename or copy pairs a .cs path with a non-.cs path" \
-        "no cross-extension pairing, out of a non-empty record set" \
-        "$rename_record_count records, cross-extension: ${cross_extension_pairs:-(none)}"
+    fail "The narrowing canary catches non-C# sources copied into C# targets" \
+        $'C069\tguide.md\tRuntime/Example.cs' "${direction_fixture:-(none)}"
+fi
+if [[ -z "$unsafe_source_pairs" && 0 -lt "$rename_record_count" ]]; then
+    pass "No rename or copy in $rename_record_count records gives a C# target a non-C# source"
+else
+    fail "No rename or copy gives a C# target a non-C# source" \
+        "no non-C# source for a C# target, out of a non-empty record set" \
+        "$rename_record_count records, unsafe source: ${unsafe_source_pairs:-(none)}"
 fi
 
 # =============================================================================

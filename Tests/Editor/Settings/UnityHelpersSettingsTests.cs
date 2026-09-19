@@ -404,8 +404,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Settings
                 Assert.That(saveCount, Is.Zero);
                 serialized.Update();
                 Assert.That(initialized.boolValue, Is.True);
-                settings.SaveAfterLoad();
-                settings.SaveAfterLoad();
+                settings.SaveAfterLoad(true);
+                Assert.That(saveCount, Is.Zero);
+                settings.SaveAfterLoad(false);
+                settings.SaveAfterLoad(false);
                 Assert.That(saveCount, Is.EqualTo(1));
             }
             finally

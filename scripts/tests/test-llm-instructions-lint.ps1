@@ -14,8 +14,8 @@ Param(
       ./<name>.md links) and is ordinally sorted within each section.
     - .llm/context.md links to ./skills/index.md, carries no stale embedded-index
       markers, and has exactly one H1.
-    - Every supported agent entrypoint delegates to context.md, whose GitHub
-      policy and shipping skill require MCP-first remote operations, first-line
+    - Every supported agent entrypoint delegates to context.md. Its routed
+      policy reference and the shipping skill references require MCP-first remote operations, first-line
       LLM disclosure, and user input before outside-human interactions.
     - The linter PASSES on the clean repo and FAILS (red) on a non-ASCII trigger,
       index drift, lost MCP priority or fallback announcements, and frontend
@@ -58,10 +58,12 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..' '..')).Path
 $generateScript = Join-Path $repoRoot 'scripts' 'generate-skills-index.ps1'
 $lintScript = Join-Path $repoRoot 'scripts' 'lint-llm-instructions.ps1'
 $contextFile = Join-Path $repoRoot '.llm' 'context.md'
+$contextPolicyFile = Join-Path $repoRoot '.llm' 'references' 'context-agent-operations.md'
 $skillsDir = Join-Path $repoRoot '.llm' 'skills'
 $indexFile = Join-Path $skillsDir 'index.md'
 $githubOperationsSkill = Join-Path $skillsDir 'github-operations.md'
 $shipChangesSkill = Join-Path $skillsDir 'ship-changes.md'
+$shipChangesPartTwo = Join-Path $repoRoot '.llm' 'references' 'ship-changes-part-2.md'
 $prFeedbackFile = Join-Path $repoRoot 'scripts' 'pr-feedback.sh'
 
 Write-Host "Testing generate-skills-index.ps1 and lint-llm-instructions.ps1..." -ForegroundColor White
@@ -175,6 +177,7 @@ try {
   Write-Host "`n  Section: context.md" -ForegroundColor White
 
   $contextRaw = Get-Content -LiteralPath $contextFile -Raw
+  $contextPolicyRaw = @($contextRaw, (Get-Content -LiteralPath $contextPolicyFile -Raw)) -join "`n"
   Write-TestResult "Context.LinksToIndex" ($contextRaw -match '\]\(\./skills/index\.md\)') "context.md must link to ./skills/index.md"
   Write-TestResult "Context.NoBeginMarker" (-not $contextRaw.Contains('<!-- BEGIN GENERATED SKILLS INDEX -->')) "context.md still has a stale BEGIN marker"
   Write-TestResult "Context.NoEndMarker" (-not $contextRaw.Contains('<!-- END GENERATED SKILLS INDEX -->')) "context.md still has a stale END marker"
@@ -182,7 +185,7 @@ try {
   $contextH1 = @(Get-MarkdownH1Lines -Lines @(Get-Content -LiteralPath $contextFile))
   Write-TestResult "Context.ExactlyOneH1" ($contextH1.Count -eq 1) "Expected 1 H1, found $($contextH1.Count)"
 
-  $githubMcpPolicy = $contextRaw -match '(?s)### GitHub Operations.*?GitHub MCP server.*?FIRST'
+  $githubMcpPolicy = $contextPolicyRaw -match '(?s)### GitHub Operations.*?GitHub MCP server.*?FIRST'
   Write-TestResult "Context.GitHubMcpFirst" $githubMcpPolicy `
     "context.md must make the GitHub MCP server the first choice for remote GitHub operations"
 
@@ -223,23 +226,26 @@ try {
       "GitHub operations guidance must require naming the MCP capability gap before running a fallback"
   }
 
-  $contextAnnouncesFallback = $contextRaw -match '(?is)### GitHub Operations.*?announce the\s+capability gap in the same message as the fallback'
+  $contextAnnouncesFallback = $contextPolicyRaw -match '(?is)### GitHub Operations.*?announce the\s+capability gap in the same message as the fallback'
   Write-TestResult "Context.AnnouncesMcpCapabilityGap" $contextAnnouncesFallback `
     "context.md must require announcing an MCP capability gap in the same message as the fallback"
 
   Write-TestResult "Context.RequiresFirstLineDisclosure" `
-    ($contextRaw -match '(?is)Disclose agent-written GitHub prose.*?DISCLOSURE: LLM-GENERATED TEXT.*?line one') `
+    ($contextPolicyRaw -match '(?is)Disclose agent-written GitHub prose.*?DISCLOSURE: LLM-GENERATED TEXT.*?line one') `
     "context.md must require the exact first-line LLM disclosure"
   Write-TestResult "Context.PausesForOutsideHumans" `
-    ($contextRaw -match '(?is)Pause for outside humans.*?authenticated login.*?issue-specific user direction') `
+    ($contextPolicyRaw -match '(?is)Pause for outside humans.*?authenticated login.*?issue-specific user direction') `
     "context.md must pause for issue-specific input on outside-human work"
   Write-TestResult "Context.TrustsOwnerAndReviewBots" `
-    ($contextRaw -match '(?is)Always act on input authored by `wallstop`.*?`cursor\[bot\]`.*?`copilot-pull-request-reviewer\[bot\]`.*?`copilot-swe-agent\[bot\]`') `
+    ($contextPolicyRaw -match '(?is)Always act on input authored by `wallstop`.*?`cursor\[bot\]`.*?`copilot-pull-request-reviewer\[bot\]`.*?`copilot-swe-agent\[bot\]`') `
     "context.md must permit action on wallstop, Cursor Bugbot, and GitHub Copilot input"
 
-  $shipChangesRaw = Get-Content -LiteralPath $shipChangesSkill -Raw
+  $shipChangesParts = @(Get-ChildItem -LiteralPath (Join-Path $repoRoot '.llm' 'references') -Filter 'ship-changes-part-*.md' | Sort-Object Name)
+  $shipChangesRaw = @((Get-Content -LiteralPath $shipChangesSkill -Raw))
+  $shipChangesRaw += @($shipChangesParts | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw })
+  $shipChangesRaw = $shipChangesRaw -join "`n"
   Write-TestResult "ShipChanges.LinksGitHubOperations" `
-    ($shipChangesRaw.Contains('](./github-operations.md)')) `
+    ($shipChangesRaw -match '\]\(\.{1,2}/(?:skills/)?github-operations\.md\)') `
     "ship-changes.md must link to ./github-operations.md"
   Write-TestResult "ShipChanges.TemplateStartsWithDisclosure" `
     ($shipChangesRaw -match '(?s)```markdown\s+DISCLOSURE: LLM-GENERATED TEXT\s+\*\*Why:') `
@@ -339,24 +345,25 @@ try {
     }
   }
 
-  # Red 4: removing the MCP-first priority from shared guidance must fail the lint.
-  $contextBackup = [System.IO.File]::ReadAllBytes($contextFile)
+  # Red 4: removing the MCP-first priority from the routed policy must fail the lint.
+  $contextBackup = [System.IO.File]::ReadAllBytes($contextPolicyFile)
   try {
-    $contextText = [System.IO.File]::ReadAllText($contextFile)
+    $contextText = [System.IO.File]::ReadAllText($contextPolicyFile)
     $contextMutation = $contextText.Replace('GitHub MCP server **FIRST**', 'GitHub MCP server when convenient')
-    [System.IO.File]::WriteAllText($contextFile, $contextMutation, (New-Object System.Text.UTF8Encoding($false)))
+    $contextMutationApplied = -not [string]::Equals($contextText, $contextMutation, [System.StringComparison]::Ordinal)
+    [System.IO.File]::WriteAllText($contextPolicyFile, $contextMutation, (New-Object System.Text.UTF8Encoding($false)))
     & pwsh -NoProfile -File $lintScript | Out-Null
-    Write-TestResult "Lint.FailsWithoutGitHubMcpPriority" ($LASTEXITCODE -ne 0) `
-      "Lint should fail when context.md no longer makes GitHub MCP first"
+    Write-TestResult "Lint.FailsWithoutGitHubMcpPriority" ($contextMutationApplied -and $LASTEXITCODE -ne 0) `
+      "Lint should fail when the context policy no longer makes GitHub MCP first; mutation applied=$contextMutationApplied"
   }
   finally {
-    [System.IO.File]::WriteAllBytes($contextFile, $contextBackup)
+    [System.IO.File]::WriteAllBytes($contextPolicyFile, $contextBackup)
   }
 
-  # Red 4b: a silent MCP fallback in context must still fail the guidance-only lint.
-  $contextBackup4b = [System.IO.File]::ReadAllBytes($contextFile)
+  # Red 4b: a silent MCP fallback in the context reference must fail the guidance-only lint.
+  $contextBackup4b = [System.IO.File]::ReadAllBytes($contextPolicyFile)
   try {
-    $contextText4b = [System.IO.File]::ReadAllText($contextFile)
+    $contextText4b = [System.IO.File]::ReadAllText($contextPolicyFile)
     $contextMutation4b = $contextText4b -replace `
       '(?i)announce the\s+capability gap in the same message as the fallback', `
       'mention the capability gap eventually'
@@ -364,21 +371,21 @@ try {
       $contextText4b,
       $contextMutation4b,
       [System.StringComparison]::Ordinal)
-    [System.IO.File]::WriteAllText($contextFile, $contextMutation4b, (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText($contextPolicyFile, $contextMutation4b, (New-Object System.Text.UTF8Encoding($false)))
     & pwsh -NoProfile -File $lintScript -AuthorshipPolicyOnly | Out-Null
     Write-TestResult "Lint.FailsWithoutContextFallbackAnnouncement" `
       ($contextMutationApplied -and $LASTEXITCODE -ne 0) `
       "Lint should fail after context.md's fallback announcement is removed; mutation applied=$contextMutationApplied"
   }
   finally {
-    [System.IO.File]::WriteAllBytes($contextFile, $contextBackup4b)
+    [System.IO.File]::WriteAllBytes($contextPolicyFile, $contextBackup4b)
   }
 
   # Red 4c-f: each governed authorship surface independently fails when its policy marker drifts.
   $authorshipMutations = @(
-    @{ Name = 'Context'; Path = $contextFile; From = 'DISCLOSURE: LLM-GENERATED TEXT'; To = 'REMOVED DISCLOSURE' }
+    @{ Name = 'Context'; Path = $contextPolicyFile; From = 'DISCLOSURE: LLM-GENERATED TEXT'; To = 'REMOVED DISCLOSURE' }
     @{ Name = 'GitHubOperations'; Path = $githubOperationsSkill; From = 'DISCLOSURE: LLM-GENERATED TEXT'; To = 'REMOVED DISCLOSURE' }
-    @{ Name = 'ShipChanges'; Path = $shipChangesSkill; From = 'DISCLOSURE: LLM-GENERATED TEXT'; To = 'REMOVED DISCLOSURE' }
+    @{ Name = 'ShipChanges'; Path = $shipChangesPartTwo; From = 'DISCLOSURE: LLM-GENERATED TEXT'; To = 'REMOVED DISCLOSURE' }
     @{ Name = 'PrFeedback'; Path = $prFeedbackFile; From = 'OUTSIDE OR UNKNOWN -- USER INPUT REQUIRED'; To = 'AUTOMATIC ACTION ALLOWED' }
   )
   foreach ($mutation in $authorshipMutations) {

@@ -199,6 +199,7 @@
     "test:add-cspell-word": "node scripts/tests/test-add-cspell-word.js",
     "test:configure-git-defaults": "bash scripts/tests/test-configure-git-defaults.sh",
     "test:github-token": "bash scripts/tests/test-github-token.sh",
+    "test:agent-skill-migration": "node scripts/tests/test-agent-skill-migration.mjs",
     "test:normalize-container-git-config": "bash scripts/tests/test-normalize-container-git-config.sh",
     "test:lint-changelog": "pwsh -NoProfile -File scripts/tests/test-lint-changelog.ps1 -VerboseOutput",
     "test:lint-unity-test-modules": "pwsh -NoProfile -File scripts/tests/test-lint-unity-test-modules.ps1",

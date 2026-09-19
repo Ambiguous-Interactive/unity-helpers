@@ -3811,7 +3811,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         {
             if (_saveAfterLoadQueued)
             {
-                EditorApplication.delayCall -= SaveAfterLoad;
+                EditorApplication.update -= SaveAfterLoad;
                 _saveAfterLoadQueued = false;
             }
 
@@ -3874,7 +3874,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
         }
 
         /// <summary>
-        /// Normalizes loaded settings and saves changes after loading completes.
+        /// Normalizes loaded settings and saves changes when the editor is idle.
         /// </summary>
         internal void OnEnable()
         {
@@ -4012,7 +4012,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
             if (settingsChanged && !_saveAfterLoadQueued)
             {
                 _saveAfterLoadQueued = true;
-                EditorApplication.delayCall += SaveAfterLoad;
+                EditorApplication.update += SaveAfterLoad;
             }
         }
 
@@ -4130,17 +4130,29 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
 
         internal void SaveAfterLoad()
         {
+            SaveAfterLoad(EditorApplication.isUpdating || EditorApplication.isCompiling);
+        }
+
+        internal void SaveAfterLoad(bool editorIsBusy)
+        {
             if (!_saveAfterLoadQueued)
             {
                 return;
             }
 
-            EditorApplication.delayCall -= SaveAfterLoad;
-            _saveAfterLoadQueued = false;
-            if (this != null)
+            if (this == null)
             {
-                SaveSettings();
+                EditorApplication.update -= SaveAfterLoad;
+                _saveAfterLoadQueued = false;
+                return;
             }
+
+            if (editorIsBusy)
+            {
+                return;
+            }
+
+            SaveSettings();
         }
 
         private void InvalidateSerializableTypePatternCache()
