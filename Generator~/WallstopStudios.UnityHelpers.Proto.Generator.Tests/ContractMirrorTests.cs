@@ -363,10 +363,13 @@ namespace WallstopStudios.UnityHelpers.Proto.Generator.Tests
 
         private static IEnumerable<ContractDeclaration> RuntimeContracts()
         {
+            CSharpParseOptions unityOptions = CSharpParseOptions.Default.WithPreprocessorSymbols(
+                "UNITY_5_3_OR_NEWER"
+            );
             foreach (string file in RuntimeSources())
             {
                 SyntaxNode root = CSharpSyntaxTree
-                    .ParseText(File.ReadAllText(file, Encoding.UTF8))
+                    .ParseText(File.ReadAllText(file, Encoding.UTF8), unityOptions)
                     .GetRoot();
 
                 foreach (
