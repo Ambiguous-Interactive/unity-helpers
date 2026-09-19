@@ -2,252 +2,51 @@
 
 <!-- trigger: css, theme, theming, pages styling | GitHub Pages CSS theming, Jekyll theme customization | Feature -->
 
-**Trigger**: When customizing CSS themes for GitHub Pages or Jekyll documentation sites.
+## Reference Parts
 
----
+- [Part 1](../references/github-pages-theming-part-1.md)
+- [Part 2](../references/github-pages-theming-part-2.md)
 
 ## When to Use
 
-This skill applies when:
-
-- Overriding remote Jekyll themes (like `pages-themes/minimal`)
-- Creating dark/light theme switching
-- Fixing "box" appearance issues in themed pages
-- Adding CSS accessibility features
-- Debugging CSS specificity issues with framework components
-
----
+[Read section](../references/github-pages-theming-part-1.md#when-to-use)
 
 ## CSS Variables in `:root`
 
-**Always define default CSS variables in `:root`** to ensure themes work before JavaScript loads:
-
-```css
-:root {
-  /* Define ALL theme variables with defaults */
-  --bg-primary: #1e1e1e;
-  --bg-secondary: #252526;
-  --text-primary: #d4d4d4;
-  --text-secondary: #b0b0b0;
-  --border-color: #3c3c3c;
-  --link-color: #569cd6;
-  /* ... all other variables */
-}
-```
-
----
+[Read section](../references/github-pages-theming-part-1.md#css-variables-in-root)
 
 ## Override Remote Theme Elements Comprehensively
 
-When using a remote theme (like `pages-themes/minimal`), override ALL structural elements to prevent "box" appearance:
-
-```css
-/* Make all nested elements transparent */
-.wrapper,
-.wrapper > *,
-.inner,
-header,
-header *,
-section,
-section *,
-footer,
-footer * {
-  background-color: transparent !important;
-  box-shadow: none !important;
-}
-
-/* Re-apply backgrounds ONLY to root containers */
-body {
-  background-color: var(--bg-primary) !important;
-}
-
-header {
-  background-color: var(--bg-primary) !important;
-  border-bottom: 1px solid var(--border-color) !important;
-}
-
-section {
-  background-color: var(--bg-primary) !important;
-}
-
-footer {
-  background-color: var(--bg-primary) !important;
-  border-top: 1px solid var(--border-color) !important;
-}
-```
-
----
+[Read section](../references/github-pages-theming-part-1.md#override-remote-theme-elements-comprehensively)
 
 ## Theming Best Practices
 
-| Principle                    | Implementation                                                        |
-| ---------------------------- | --------------------------------------------------------------------- |
-| Transparent nested elements  | Apply `background: transparent` to all children                       |
-| Root-only backgrounds        | Apply background colors only to `body`, `header`, `section`, `footer` |
-| Consistent color family      | Use same `--bg-primary` for all containers                            |
-| No box shadows on containers | Remove `box-shadow` from theme elements                               |
-| Use `!important` sparingly   | Required to override remote theme styles                              |
-
----
+[Read section](../references/github-pages-theming-part-1.md#theming-best-practices)
 
 ## Theme Switching Support
 
-```css
-/* Dark theme (default) */
-[data-theme="dark"] {
-  --bg-primary: var(--dark-bg-primary);
-  --text-primary: var(--dark-text-primary);
-  /* ... */
-}
-
-/* Light theme */
-[data-theme="light"] {
-  --bg-primary: var(--light-bg-primary);
-  --text-primary: var(--light-text-primary);
-  /* ... */
-}
-```
-
----
+[Read section](../references/github-pages-theming-part-1.md#theme-switching-support)
 
 ## CSS Accessibility Requirements
 
-**Always respect `prefers-reduced-motion` for animations**. This is required by WCAG 2.1 SC 2.3.3 (Animation from Interactions) for users with vestibular disorders.
-
-```css
-/* ✅ CORRECT: Completely disable animation */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0s !important;
-    transition-duration: 0s !important;
-    scroll-behavior: auto !important;
-  }
-}
-
-/* ❌ WRONG: Near-zero values still trigger animation */
-@media (prefers-reduced-motion: reduce) {
-  * {
-    animation-duration: 0.01ms !important; /* Still plays briefly! */
-  }
-}
-```
-
-**Why `0s` not `0.01ms`**:
-
-- `0s` truly disables the animation—no visual flicker, no animation callbacks
-- `0.01ms` was a legacy workaround for old browser bugs that is now obsolete
-- Semantically clearer: `0s` means "no animation" while `0.01ms` implies "very fast animation"
-
----
+[Read section](../references/github-pages-theming-part-1.md#css-accessibility-requirements)
 
 ## CSS Selector Scoping Consistency
 
-**CRITICAL**: When styling components in a framework (MkDocs, Jekyll themes, etc.), use consistent scoping for related rules. Inconsistent prefixes cause specificity bugs.
-
-```css
-/* ❌ WRONG: Inconsistent scoping - some rules use .md-typeset, some don't */
-.md-typeset table {
-  width: 100%;
-}
-.md-typeset th {
-  background: var(--bg-secondary);
-}
-td {
-  /* Missing .md-typeset prefix! */
-  padding: 0.5rem;
-}
-
-/* ✅ CORRECT: All related rules use same scoping */
-.md-typeset table {
-  width: 100%;
-}
-.md-typeset th {
-  background: var(--bg-secondary);
-}
-.md-typeset td {
-  padding: 0.5rem;
-}
-```
-
-**Why this matters:**
-
-1. **Specificity consistency** — All rules have same weight, predictable cascade
-2. **Scope isolation** — Styles only affect intended context, don't leak
-3. **Maintainability** — Easy to identify which rules belong together
-
-**Rule**: If one rule in a group uses a parent scope (`.md-typeset`, `.markdown-body`, etc.), ALL related rules must use the same scope.
-
----
+[Read section](../references/github-pages-theming-part-1.md#css-selector-scoping-consistency)
 
 ## Avoid Overly Broad Structural Selectors
 
-When targeting specific page elements (banners, hero sections, featured content), use pseudo-classes to prevent unintended side effects on similar elements:
-
-```css
-/* ❌ WRONG: Affects ALL centered paragraphs including badges */
-section p[align="center"] {
-  margin: 1rem auto;
-  max-width: 800px;
-}
-
-/* ✅ CORRECT: Only affects the first centered paragraph (banner) */
-section p[align="center"]:first-of-type {
-  margin: 1rem auto;
-  max-width: 800px;
-}
-```
-
-**Why this matters:**
-
-1. **Unintended cascade** — Multiple elements may match broad selectors
-2. **Structural precision** — `:first-of-type`, `:last-of-type`, `:nth-of-type()` target specific positions
-3. **Future-proofing** — Prevents CSS conflicts when page content structure changes
-
----
+[Read section](../references/github-pages-theming-part-2.md#avoid-overly-broad-structural-selectors)
 
 ## Use ARIA Attributes for JavaScript-Controlled States
 
-```css
-/* ❌ WRONG: CSS class never applied by JavaScript */
-table[data-sortable] th.sort-indicator-active::after {
-  display: none;
-}
-
-/* ✅ CORRECT: Use ARIA attributes that JavaScript already manages */
-table[data-sortable] th[aria-sort]:not([aria-sort="none"])::after {
-  display: none;
-}
-```
-
-**Why ARIA over custom classes:**
-
-1. **Single source of truth** — JavaScript sets ARIA for accessibility; CSS uses same attributes
-2. **No orphaned classes** — Can't have CSS targeting a class that JavaScript never applies
-3. **Accessibility alignment** — Visual presentation matches what screen readers see
-
----
+[Read section](../references/github-pages-theming-part-2.md#use-aria-attributes-for-javascript-controlled-states)
 
 ## Preserve Semantic Sort Order with `data-sort-value`
 
-For categorical table values (for example `Fastest`, `Very Fast`, `Very Slow`), lexical sorting is usually wrong.
-Emit an explicit semantic key in markup and prefer it in the sorter:
-
-```html
-<td data-sort-value="6">Fastest</td>
-<td data-sort-value="1">Very Slow</td>
-```
-
-```js
-const valueA = (cellA.getAttribute("data-sort-value") || cellA.textContent).trim();
-```
-
-This keeps display labels user-friendly while ensuring GitHub Pages sorting remains numerically meaningful.
-
----
+[Read section](../references/github-pages-theming-part-2.md#preserve-semantic-sort-order-with-data-sort-value)
 
 ## Related Skills
 
-- [github-pages](./github-pages.md) — Jekyll configuration, markdown links, CI/CD validation
-- [markdown-reference](./markdown-reference.md) — Link formatting, escaping, linting rules
+[Read section](../references/github-pages-theming-part-2.md#related-skills)

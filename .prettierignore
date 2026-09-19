@@ -25,6 +25,9 @@ perf-results/**
 # out of Prettier so a formatting pass can never reshape the canonical bytes the
 # linter enforces (UTF-8 no BOM, LF, ordinal order, unpadded table cells).
 .llm/skills/index.md
+.llm/references/*-part-*.md
+.agents/skills/**
+.claude/skills/**
 
 # Agent planning scaffolding, exempt from the markdown gates by the same decision that put it in
 # .markdownlintignore and cspell's ignorePaths. Prettier used to exempt it as a side effect of

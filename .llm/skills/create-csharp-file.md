@@ -2,449 +2,58 @@
 
 <!-- trigger: create, new, file, class, csharp, cs | Creating any new .cs file | Core -->
 
-**Trigger**: When creating any new `.cs` file in this repository.
+## Reference Parts
 
----
+- [Part 1](../references/create-csharp-file-part-1.md)
+- [Part 2](../references/create-csharp-file-part-2.md)
+- [Part 3](../references/create-csharp-file-part-3.md)
 
 ## Pre-Creation Checklist
 
-1. **Determine file location**:
-   - Runtime code → `Runtime/` folder tree
-   - Editor-only code → `Editor/` folder tree
-   - Tests → `Tests/Runtime/` or `Tests/Editor/` (mirror source structure)
-
-2. **One file per MonoBehaviour/ScriptableObject**:
-   - Each class deriving from `MonoBehaviour` or `ScriptableObject` MUST have its own dedicated `.cs` file
-   - This applies to **ALL code**: production (`Runtime/`, `Editor/`) AND tests (`Tests/`)
-   - ❌ Multiple MonoBehaviours/ScriptableObjects in the same file
-   - ❌ Test helper MonoBehaviours/ScriptableObjects defined inside test class files
-   - ❌ Nested classes deriving from MonoBehaviour/ScriptableObject
-   - ✅ Create separate `MyTestComponent.cs`, `TestHelperScriptableObject.cs` files
-   - Enforced by pre-commit hook and CI/CD analyzer
-
----
+[Read section](../references/create-csharp-file-part-1.md#pre-creation-checklist)
 
 ## File Template
 
-```csharp
-// MIT License - Copyright (c) {CURRENT_YEAR} wallstop
-// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
+[Read section](../references/create-csharp-file-part-1.md#file-template)
 
-namespace WallstopStudios.UnityHelpers.{Subsystem}
-{
-#if CONDITIONAL_FEATURE
-    using System;
-#endif
-    using System.Collections.Generic;
-    using UnityEngine;
-
-    public sealed class MyClass
-    {
-        // Implementation - let descriptive names speak for themselves
-    }
-}
-```
-
-### License Header (REQUIRED)
-
-Every new C# file MUST include the MIT license header as the **first two lines**:
-
-```csharp
-// MIT License - Copyright (c) {CURRENT_YEAR} wallstop
-// Full license text: https://github.com/wallstop/unity-helpers/blob/main/LICENSE
-```
-
-**Critical**: Replace `{CURRENT_YEAR}` with the **actual current year** when creating the file:
-
-- ✅ `// MIT License - Copyright (c) 2026 wallstop` (if current year is 2026)
-- ❌ `// MIT License - Copyright (c) 2023 wallstop` (hardcoded past year)
-
-The year reflects when the file was created, NOT when the project started. Use the current calendar year at the time of file creation.
-
-See [license-headers](./license-headers.md) for full rules.
-
----
+### [License Header (REQUIRED)](../references/create-csharp-file-part-1.md#license-header-required)
 
 ## Critical Rules
 
-### 1. `using` Directives INSIDE Namespace
+[Read section](../references/create-csharp-file-part-1.md#critical-rules)
 
-✅ **CORRECT**:
+### [1. `using` Directives INSIDE Namespace](../references/create-csharp-file-part-1.md#1-using-directives-inside-namespace)
 
-```csharp
-namespace WallstopStudios.UnityHelpers.Core
-{
-    using System;
-    using UnityEngine;
+### [2. NO Underscores in Method Names](../references/create-csharp-file-part-1.md#2-no-underscores-in-method-names)
 
-    public sealed class MyClass { }
-}
-```
+### [3. Explicit Types Over `var`](../references/create-csharp-file-part-1.md#3-explicit-types-over-var)
 
-❌ **INCORRECT**:
+### [4. Braces Required for All Control Structures](../references/create-csharp-file-part-1.md#4-braces-required-for-all-control-structures)
 
-```csharp
-using System;
-using UnityEngine;
+### [5. NEVER Use `#region`](../references/create-csharp-file-part-1.md#5-never-use-region)
 
-namespace WallstopStudios.UnityHelpers.Core
-{
-    public sealed class MyClass { }
-}
-```
+### [5b. Member Ordering (#672) and Nested Types Go LAST](../references/create-csharp-file-part-1.md#5b-member-ordering-672-and-nested-types-go-last)
 
-### 2. NO Underscores in Method Names
+### [6. NEVER Use Nullable Reference Types](../references/create-csharp-file-part-2.md#6-never-use-nullable-reference-types)
 
-- ✅ `GetValueWhenInputIsEmpty`
-- ❌ `GetValue_When_Input_Is_Empty`
-- Applies to ALL methods including tests
+### [7. Unity Object Null Checks](../references/create-csharp-file-part-2.md#7-unity-object-null-checks)
 
-### 3. Explicit Types Over `var`
+### [8. Qualify `Object` References](../references/create-csharp-file-part-2.md#8-qualify-object-references)
 
-- ✅ `List<string> items = new List<string>();`
-- ❌ `var items = new List<string>();`
+### [9. Minimal Comments](../references/create-csharp-file-part-2.md#9-minimal-comments)
 
-### 4. Braces Required for All Control Structures
+### [10. Preprocessor Directives: `#define` vs `#if`](../references/create-csharp-file-part-2.md#10-preprocessor-directives-define-vs-if)
 
-```csharp
-// ✅ CORRECT
-if (condition)
-{
-    DoSomething();
-}
-
-// ❌ INCORRECT
-if (condition)
-    DoSomething();
-```
-
-### 5. NEVER Use `#region`
-
-- ❌ `#region Helper Methods`
-- ❌ `#endregion`
-- Organize code through class structure and file organization instead
-- See [no-regions](./no-regions.md) for alternatives
-
-### 5b. Member Ordering (#672) and Nested Types Go LAST
-
-**One member ordering, enforced at 100%** by `npm run lint:nested-type-placement` (which also
-enforces the nested-type rule below). Every tier is ordered `public` → `protected` → `internal` →
-`private`, including `const`:
-
-1. `const`
-2. events
-3. delegates
-4. static properties
-5. static fields
-6. properties
-7. fields
-8. constructors
-9. static methods
-10. methods
-
-Two details are deliberate and recorded in the issue so nobody "fixes" them back: static
-properties come before static fields and properties before fields (the reverse of StyleCop's
-SA1201 default), and `const` takes the accessibility ordering too. Events and delegates — which
-the issue's list does not name — take one tier of their own immediately after `const`: declared
-surface reads like the consts it accompanies.
-
-```csharp
-public sealed class Attribute
-{
-    public const int MaxValue = 100;          // 1. const (public before private)
-    public event Action Changed;              // 2. events
-    public static float DefaultScale { get; set; }   // 4. static properties
-    internal static int Instances;            // 5. static fields
-    public float CurrentValue => ...;         // 6. properties
-    private readonly float _baseValue;        // 7. fields
-    public Attribute(float baseValue) { ... } // 8. constructors
-    public static Attribute Default() => ...; // 9. static methods
-    private RemainingActions ApplyModificationsInOrder(...) { ... }  // 10. methods
-
-    // nested type last (see below)
-    private readonly struct RemainingActions
-    {
-        public readonly bool hasMultiplication;
-    }
-}
-```
-
-**Nested types go LAST** — after every member — or in their own file. Never between members. A
-reader scrolling for a method should not have to step over a type declaration to find it, and a
-nested type in the middle reads as the start of a new file's worth of content. Owner review, PR
-\#574. `--fix` moves what it can, and refuses a type whose move would take it across a `#if`
-boundary into a different build. The backlog it was written for -- 459 sites across 177 files --
-is swept to zero ([#575](https://github.com/Ambiguous-Interactive/unity-helpers/issues/575)); the
-member-ordering sweep that adopted the full rule across 2224 files is #672.
-
-### 6. NEVER Use Nullable Reference Types
-
-- ❌ `string?`, `object?`, `List<string>?`, `MyClass?`
-- ❌ `#nullable enable`
-- ❌ Null-forgiving operator `!` (e.g., `value!`)
-- ✅ `int?`, `float?`, `bool?` — Nullable VALUE types are OK
-
-### 7. Unity Object Null Checks
-
-For `UnityEngine.Object`-derived types (`GameObject`, `Component`, `MonoBehaviour`, etc.):
-
-- ❌ `gameObject?.SetActive(true)` — Bypasses Unity's null check
-- ❌ `component ?? fallback` — Bypasses Unity's null check
-- ❌ `_cached ??= GetComponent<T>()` — Bypasses Unity's null check
-- ❌ `ReferenceEquals(gameObject, null)` — Bypasses Unity's null check
-- ✅ `if (gameObject != null) gameObject.SetActive(true)`
-- ✅ `component != null ? component : fallback`
-- ✅ `if (_cached == null) _cached = GetComponent<T>()`
-
-**The one legitimate `ReferenceEquals`, and the rule that comes with it.** The two operators ask
-different questions: `ReferenceEquals(x, null)` asks _was anything handed in_, and `x == null` asks
-_is it gone_ — true for a destroyed object as well as for a null reference. Code that tracks Unity
-objects it did not create needs both, because an item destroyed while checked out is still the entry
-in the tracking list: removing it must not be guarded by `== null`, and re-using it must be.
-
-When you need that distinction, **name it** — an inline `ReferenceEquals` reads as a bug to every
-reader and every reviewer, and an inline `== null` reads as an ordinary null check and is not one:
-
-```csharp
-private static bool WasHandedIn(T candidate) => !ReferenceEquals(candidate, null);
-
-private static bool IsGone(T candidate) => candidate == null;
-```
-
-`where T : UnityEngine.Object` is what makes the distinction expressible: `T` is then always a
-reference type, so there is no value-type case. See `TrackedObjectPool<T>` for the worked example.
-
-### 8. Qualify `Object` References
-
-```csharp
-// ✅ CORRECT - Add using alias or fully qualify
-using Object = UnityEngine.Object;
-
-// or
-UnityEngine.Object obj = ...;
-```
-
-### 9. Minimal Comments
-
-**Aim for zero.** A comment is an exception, not a habit: the target is code whose class, method
-and variable names make it unnecessary, and the first move when a comment feels needed is a better
-name, not a better sentence. Spell names out -- `attributeMetadataCache`, not `attrCache`; prefer
-the descriptive form over the short one everywhere
-([#635](https://github.com/Ambiguous-Interactive/unity-helpers/issues/635)).
-
-When one does survive that test, it explains **why**, never **what**, and stays
-extremely minimal: one short sentence, common words, active voice
-([Simplified Technical English](./ship-changes.md#step-9b-open-the-pull-request-yourself)).
-If it takes two sentences, either the code needs a better name or the reason
-belongs in a commit message, the PR, or an issue.
-
-- ✅ Comments explaining **why** a non-obvious approach is used
-- ✅ Comments documenting Unity quirks or platform-specific behavior
-- ✅ Brief notes on edge cases that aren't obvious from context
-- ❌ Comments describing **what** readable code does
-- ❌ Comments restating the method/variable name
-- ❌ Commented-out code (use version control)
-- ❌ TODO/FIXME without associated issue tracking
-- ❌ Section dividers like `// ========= METHODS =========`
-
-A non-doc comment **inside a type or a member** that spans more than one line uses the block form,
-so a reader can see where it ends without counting slashes. `npm run lint:comment-block-form`
-enforces this across `Runtime/`, `Editor/`, `Tests/`, and `Generator~/`, with no baseline exemptions:
-
-```csharp
-/*
-    Written as one block because it spans more than one line.
-    A run of `//` lines is not the house style.
-*/
-```
-
-Two things are not comments for this purpose. XML documentation stays `///` -- every public member
-still needs its `<summary>`. And the **two-line file license header** stays exactly as it is: it is
-a fixed banner every file carries, `scripts/lint-license-headers.ps1` matches it literally, and
-rewriting it as a block would be a 1,900-file diff that changes nothing a reader cares about.
-
-```csharp
-// ❌ BAD - States the obvious
-// Increment the counter
-counter++;
-
-// ❌ BAD - Restates the name
-// Gets the active enemies
-public void GetActiveEnemies(List<Enemy> result) { }
-
-// ✅ GOOD - Explains why (non-obvious behavior)
-// Unity's null-check operator doesn't work with destroyed objects
-if (gameObject != null) { }
-
-// ✅ GOOD - Documents a constraint not obvious from code
-// Must be called after Awake() completes across all objects
-public void Initialize() { }
-```
-
-### 10. Preprocessor Directives: `#define` vs `#if`
-
-**`#define` directives** MUST be placed at the **top of the file** before any tokens. This is a C# language requirement (error CS1032):
-
-```csharp
-// ✅ CORRECT - #define / #undef at file top (C# requirement)
-#define ENABLE_UBERLOGGING
-
-namespace WallstopStudios.UnityHelpers.Tests.Extensions
-{
-    // ...
-}
-```
-
-`#undef` obeys the same rule, and it undefines a compiler-supplied symbol for that file only —
-which is how `ConditionalLoggingStrippedTests` reproduces a release build inside an editor test run
-(a `[Conditional]` call is resolved against the symbols in effect at the **call site's file
-position**).
-
-Note the package itself no longer carries a file-scoped `#define ENABLE_UBERLOGGING`: the logging
-gate moved onto the methods as `[Conditional]`, so the decision belongs to the calling assembly.
-
-**`#if` conditional blocks** (without `#define`) should be placed **inside** the namespace for consistency:
-
-✅ **CORRECT**:
-
-```csharp
-namespace WallstopStudios.UnityHelpers.Core
-{
-#if SINGLE_THREADED
-    using System.Collections.Generic;
-#else
-    using System.Collections.Concurrent;
-#endif
-
-    public sealed class MyCache { }
-}
-```
-
-❌ **INCORRECT**:
-
-```csharp
-#if SINGLE_THREADED
-using System.Collections.Generic;
-#else
-using System.Collections.Concurrent;
-#endif
-
-namespace WallstopStudios.UnityHelpers.Core
-{
-    public sealed class MyCache { }
-}
-```
-
-**Exception**: Unity-standard defines like `UNITY_EDITOR`, `UNITY_2021_3_OR_NEWER` may wrap entire file contents when necessary.
-
-**Third-party package defines** (`WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR`, `VCONTAINER`, `ZENJECT`, etc.) should also be placed inside the namespace:
-
-```csharp
-// ✅ CORRECT - Odin directive inside namespace
-namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
-{
-#if UNITY_EDITOR && WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
-    using Sirenix.OdinInspector.Editor;
-
-    public sealed class MyOdinDrawer : OdinAttributeDrawer<MyAttribute>
-    {
-        // Implementation
-    }
-#endif
-}
-
-// ❌ INCORRECT - Odin directive outside namespace
-#if UNITY_EDITOR && WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR
-namespace WallstopStudios.UnityHelpers.Editor.CustomDrawers
-{
-    public sealed class MyOdinDrawer : OdinAttributeDrawer<MyAttribute>
-    {
-        // Implementation
-    }
-}
-#endif
-```
-
-See [integrate-optional-dependency](./integrate-optional-dependency.md) for complete patterns.
-
-### 11. Default Construction of Configuration Objects
-
-Public reference-type options, limits, or configuration objects intended to support default
-construction need a real public parameterless constructor. When a configured constructor defines
-the defaults, delegate the parameterless constructor to it with explicit intended defaults.
-An all-optional constructor permits `new Options()` but does not
-satisfy `where T : new()`; verify that contract through a generic factory test asserting the defaults.
-Apply this rule to default configuration contracts, not unrelated attributes, required-input types,
-Unity objects, structs, or resource-owning services. For structs, define what zero-initialized
-`default` means separately; it bypasses constructor logic.
-
----
+### [11. Default Construction of Configuration Objects](../references/create-csharp-file-part-3.md#11-default-construction-of-configuration-objects)
 
 ## Post-Creation Steps (MANDATORY)
 
-1. **Generate meta file** (required — do not skip):
-
-   ```bash
-   ./scripts/generate-meta.sh <path-to-file.cs>
-   ```
-
-   > ⚠️ See [create-unity-meta](./create-unity-meta.md) for full details. This step is **mandatory** — every `.cs` file MUST have a corresponding `.meta` file.
-
-2. **Format code**:
-
-   ```bash
-   dotnet tool run csharpier format .
-   ```
-
-3. **Spell-check** (cspell lints C# comments, XML docs, and log strings):
-
-   ```bash
-   npm run lint:spelling
-   ```
-
-   See [Rule 4: Spell-Check Every Change cspell Covers](./validate-before-commit.md#rule-4-spell-check-every-change-cspell-covers) for the failure-recovery decision tree.
-
-4. **Add XML documentation** for all public types and members:
-
-   ```csharp
-   /// <summary>
-   /// Brief description of the type or member.
-   /// </summary>
-   /// <param name="paramName">Description of parameter.</param>
-   /// <returns>Description of return value.</returns>
-   public int MyMethod(string paramName) { }
-   ```
-
-   > See [update-documentation](./update-documentation.md) for XML doc standards.
-
-5. **Update CHANGELOG** for user-facing changes:
-   - New features → `### Added` section
-   - Bug fixes → `### Fixed` section
-   - See [update-documentation](./update-documentation.md) for format
-
-6. **Verify no errors**:
-   - Check IDE for compilation errors
-   - Ensure `.asmdef` references are correct if adding new namespaces
-
----
+[Read section](../references/create-csharp-file-part-3.md#post-creation-steps-mandatory)
 
 ## Related Skills
 
-- [high-performance-csharp](./high-performance-csharp.md) — Zero-allocation patterns (MANDATORY for all code)
-- [defensive-programming](./defensive-programming.md) — Robust error handling (MANDATORY for all code)
-- [create-test](./create-test.md) — Testing guidelines
-- [update-documentation](./update-documentation.md) — Documentation standards
-- [create-unity-meta](./create-unity-meta.md) — Meta file generation
-
----
+[Read section](../references/create-csharp-file-part-3.md#related-skills)
 
 ## Naming Conventions Quick Reference
 
-| Element               | Convention  | Example                     |
-| --------------------- | ----------- | --------------------------- |
-| Types, public members | PascalCase  | `SerializableDictionary`    |
-| Fields, locals        | camelCase   | `keyValue`, `itemCount`     |
-| Interfaces            | `I` prefix  | `IResolver`, `ISpatialTree` |
-| Type parameters       | `T` prefix  | `TKey`, `TValue`            |
-| Events                | `On` prefix | `OnValueChanged`            |
-| Constants (public)    | PascalCase  | `DefaultCapacity`           |
+[Read section](../references/create-csharp-file-part-3.md#naming-conventions-quick-reference)

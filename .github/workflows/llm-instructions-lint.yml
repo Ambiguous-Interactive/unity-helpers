@@ -6,9 +6,14 @@ on:
       - main
     paths:
       - ".llm/**"
+      - ".agents/**"
+      - ".claude/**"
       - "scripts/pr-feedback.sh"
       - "scripts/lint-llm-instructions.ps1"
       - "scripts/generate-skills-index.ps1"
+      - "scripts/generate-agent-skill-stubs.mjs"
+      - "scripts/migrate-agent-skills.mjs"
+      - "scripts/tests/test-agent-skill-migration.mjs"
       - "scripts/tests/test-lint-skill-sizes.ps1"
       - "scripts/tests/test-llm-instructions-lint.ps1"
       - "scripts/lint-skill-sizes.ps1"
@@ -16,9 +21,14 @@ on:
   pull_request:
     paths:
       - ".llm/**"
+      - ".agents/**"
+      - ".claude/**"
       - "scripts/pr-feedback.sh"
       - "scripts/lint-llm-instructions.ps1"
       - "scripts/generate-skills-index.ps1"
+      - "scripts/generate-agent-skill-stubs.mjs"
+      - "scripts/migrate-agent-skills.mjs"
+      - "scripts/tests/test-agent-skill-migration.mjs"
       - "scripts/tests/test-lint-skill-sizes.ps1"
       - "scripts/tests/test-llm-instructions-lint.ps1"
       - "scripts/lint-skill-sizes.ps1"
@@ -83,6 +93,9 @@ jobs:
       - name: Test skill size linter
         shell: pwsh
         run: ./scripts/tests/test-lint-skill-sizes.ps1 -VerboseOutput
+
+      - name: Test agent skill migration and discovery
+        run: node ./scripts/tests/test-agent-skill-migration.mjs
 
       - name: Check skill file sizes
         shell: pwsh

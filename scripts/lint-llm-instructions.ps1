@@ -70,6 +70,8 @@ $repoRoot = (Get-Item $PSScriptRoot).Parent.FullName
 $skillsDir = Join-Path -Path $repoRoot -ChildPath '.llm/skills'
 $contextFile = Join-Path -Path $repoRoot -ChildPath '.llm/context.md'
 $generateScript = Join-Path -Path $repoRoot -ChildPath 'scripts/generate-skills-index.ps1'
+$agentSkillsScript = Join-Path -Path $repoRoot -ChildPath 'scripts/generate-agent-skill-stubs.mjs'
+$skillMigrationScript = Join-Path -Path $repoRoot -ChildPath 'scripts/migrate-agent-skills.mjs'
 $indexFileName = 'index.md'
 $indexFile = Join-Path -Path $skillsDir -ChildPath $indexFileName
 $githubOperationsFile = Join-Path -Path $skillsDir -ChildPath 'github-operations.md'
@@ -92,6 +94,8 @@ foreach ($required in @(
         @{ Path = $skillsDir; Label = 'Skills directory' }
         @{ Path = $contextFile; Label = 'context.md' }
         @{ Path = $generateScript; Label = 'generate-skills-index.ps1' }
+        @{ Path = $agentSkillsScript; Label = 'generate-agent-skill-stubs.mjs' }
+        @{ Path = $skillMigrationScript; Label = 'migrate-agent-skills.mjs' }
         @{ Path = $githubOperationsFile; Label = 'GitHub operations skill' }
         @{ Path = $shipChangesFile; Label = 'ship-changes.md' }
         @{ Path = $prFeedbackFile; Label = 'PR feedback helper' }
@@ -176,6 +180,23 @@ if ($malformedTriggers.Count -gt 0) {
 
 if ($missingTriggers.Count -eq 0 -and $nonAsciiTriggers.Count -eq 0 -and $malformedTriggers.Count -eq 0) {
     Write-SuccessMsg "All $($skillFiles.Count) skill files have valid ASCII trigger comments"
+}
+
+if ($Fix) {
+    & node $agentSkillsScript --write
+}
+else {
+    & node $agentSkillsScript --check
+}
+if ($LASTEXITCODE -ne 0) {
+    Write-ErrorMsg 'Agent discovery skills are missing or stale.'
+    $exitCode = 1
+}
+
+& node $skillMigrationScript --check
+if ($LASTEXITCODE -ne 0) {
+    Write-ErrorMsg 'Canonical skill split reconstruction or size validation failed.'
+    $exitCode = 1
 }
 
 # =============================================================================
@@ -306,6 +327,10 @@ Write-Host ""
 Write-Host "Validating context.md..." -ForegroundColor Blue
 
 $contextContent = Get-Content -LiteralPath $contextFile -Raw
+$contextPolicyContent = @(
+    $contextContent
+    (Get-Content -LiteralPath (Join-Path $repoRoot '.llm/references/context-agent-operations.md') -Raw)
+) -join "`n"
 
 foreach ($staleMarker in @('<!-- BEGIN GENERATED SKILLS INDEX -->', '<!-- END GENERATED SKILLS INDEX -->')) {
     if ($contextContent.Contains($staleMarker)) {
@@ -329,12 +354,12 @@ if ($contextH1Lines.Count -ne 1) {
     $exitCode = 1
 }
 
-if ($contextContent -notmatch '(?s)### GitHub Operations.*?GitHub MCP server \*\*FIRST\*\*') {
+if ($contextPolicyContent -notmatch '(?s)### GitHub Operations.*?GitHub MCP server \*\*FIRST\*\*') {
     Write-ErrorMsg 'context.md must make the GitHub MCP server FIRST for remote GitHub operations.'
     $exitCode = 1
 }
 
-if ($contextContent -notmatch '(?is)### GitHub Operations.*?announce the\s+capability gap in the same message as the fallback') {
+if ($contextPolicyContent -notmatch '(?is)### GitHub Operations.*?announce the\s+capability gap in the same message as the fallback') {
     Write-ErrorMsg 'context.md must require announcing an MCP capability gap in the same message as the fallback.'
     $exitCode = 1
 }
@@ -347,7 +372,7 @@ $contextAuthorshipRequirements = @(
     @{ Pattern = '(?is)Always act on input authored by `wallstop`.*?`cursor\[bot\]`.*?`copilot-pull-request-reviewer\[bot\]`.*?`copilot-swe-agent\[bot\]`'; Label = 'trusted owner and review bots' }
 )
 foreach ($requirement in $contextAuthorshipRequirements) {
-    if ($contextContent -notmatch $requirement.Pattern) {
+    if ($contextPolicyContent -notmatch $requirement.Pattern) {
         Write-ErrorMsg "context.md is missing required GitHub authorship policy: $($requirement.Label)."
         $exitCode = 1
     }
@@ -385,8 +410,11 @@ foreach ($requirement in $githubOperationsRequirements) {
     }
 }
 
-$shipChangesContent = Get-Content -LiteralPath $shipChangesFile -Raw
-if (-not $shipChangesContent.Contains('](./github-operations.md)')) {
+$shipChangesParts = @(Get-ChildItem -LiteralPath (Join-Path $repoRoot '.llm/references') -Filter 'ship-changes-part-*.md' | Sort-Object Name)
+$shipChangesContent = @((Get-Content -LiteralPath $shipChangesFile -Raw))
+$shipChangesContent += @($shipChangesParts | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw })
+$shipChangesContent = $shipChangesContent -join "`n"
+if ($shipChangesContent -notmatch '\]\(\.{1,2}/(?:skills/)?github-operations\.md\)') {
     Write-ErrorMsg 'ship-changes.md must link to the GitHub MCP-first operations guide.'
     $exitCode = 1
 }

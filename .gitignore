@@ -409,6 +409,8 @@ artifacts.meta
 .claude*/**
 !.claude/settings.json
 !.claude/.gitkeep
+!/.claude/skills/
+!/.claude/skills/**
 .claude*.meta
 .codex*/
 .codex*.meta

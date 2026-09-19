@@ -2,414 +2,102 @@
 
 <!-- trigger: extension, utility, collection, string, color | Collection, string, color utilities | Feature -->
 
-**Trigger**: When manipulating collections, strings, or colors and need convenient, performant utilities beyond built-in methods.
+## Reference Parts
 
----
+- [Part 1](../references/use-extension-methods-part-1.md)
+- [Part 2](../references/use-extension-methods-part-2.md)
+- [Part 3](../references/use-extension-methods-part-3.md)
 
 ## Dictionary Extensions
 
-### GetOrAdd - Add If Missing
+[Read section](../references/use-extension-methods-part-1.md#dictionary-extensions)
 
-```csharp
-using WallstopStudios.UnityHelpers.Core.Extension;
+### [GetOrAdd - Add If Missing](../references/use-extension-methods-part-1.md#getoradd---add-if-missing)
 
-// Get existing or create new value with factory
-Dictionary<string, List<Item>> itemsByCategory = new();
-List<Item> weapons = itemsByCategory.GetOrAdd("weapons", () => new List<Item>());
-weapons.Add(sword);
+### [GetOrElse - Default Without Modification](../references/use-extension-methods-part-1.md#getorelse---default-without-modification)
 
-// With key-based factory
-Dictionary<int, PlayerData> playerCache = new();
-PlayerData data = playerCache.GetOrAdd(playerId, id => LoadPlayerData(id));
+### [TryRemove - Safe Removal With Value](../references/use-extension-methods-part-1.md#tryremove---safe-removal-with-value)
 
-// With parameterless constructor constraint
-Dictionary<string, List<int>> scores = new();
-List<int> playerScores = scores.GetOrAdd<string, List<int>>("player1");  // Creates new List<int>()
-```
+### [AddOrUpdate - Upsert Pattern](../references/use-extension-methods-part-1.md#addorupdate---upsert-pattern)
 
-### GetOrElse - Default Without Modification
-
-```csharp
-// Get value or return default without modifying dictionary
-IReadOnlyDictionary<string, int> config = GetConfig();
-int maxPlayers = config.GetOrElse("maxPlayers", () => 4);
-int timeout = config.GetOrElse("timeout", 30);  // Direct value overload
-```
-
-### TryRemove - Safe Removal With Value
-
-```csharp
-// Remove and get removed value in one operation
-Dictionary<int, Enemy> enemies = new();
-if (enemies.TryRemove(enemyId, out Enemy removed))
-{
-    removed.OnDespawn();
-}
-```
-
-### AddOrUpdate - Upsert Pattern
-
-```csharp
-// Add new or update existing
-Dictionary<string, int> scoreboard = new();
-scoreboard.AddOrUpdate(
-    playerName,
-    key => 1,                           // Creator: first kill
-    (key, existing) => existing + 1     // Updater: increment kills
-);
-```
-
-### Merge - Combine Dictionaries
-
-```csharp
-// Merge two dictionaries (right overwrites left)
-var defaults = new Dictionary<string, int> { ["a"] = 1, ["b"] = 2 };
-var overrides = new Dictionary<string, int> { ["b"] = 5, ["c"] = 3 };
-Dictionary<string, int> merged = defaults.Merge(overrides);
-// Result: { ["a"] = 1, ["b"] = 5, ["c"] = 3 }
-```
-
----
+### [Merge - Combine Dictionaries](../references/use-extension-methods-part-1.md#merge---combine-dictionaries)
 
 ## List Extensions
 
-### Shuffle - Fisher-Yates In-Place
+[Read section](../references/use-extension-methods-part-1.md#list-extensions)
 
-```csharp
-using WallstopStudios.UnityHelpers.Core.Extension;
+### [Shuffle - Fisher-Yates In-Place](../references/use-extension-methods-part-1.md#shuffle---fisher-yates-in-place)
 
-List<Card> deck = GetAllCards();
+### [GetRandomElement - Random Selection](../references/use-extension-methods-part-1.md#getrandomelement---random-selection)
 
-// Shuffle using default PRNG
-deck.Shuffle();
+### [RemoveAtSwapBack - Fast Unordered Removal](../references/use-extension-methods-part-1.md#removeatswapback---fast-unordered-removal)
 
-// Shuffle with custom random
-deck.Shuffle(myRandom);
-```
+### [IndexOf / LastIndexOf with Predicate](../references/use-extension-methods-part-1.md#indexof--lastindexof-with-predicate)
 
-**Performance**: O(n), **Allocations**: None
+### [Shift - Rotate Elements](../references/use-extension-methods-part-1.md#shift---rotate-elements)
 
-### GetRandomElement - Random Selection
+### [Reverse Range](../references/use-extension-methods-part-1.md#reverse-range)
 
-```csharp
-List<Enemy> enemies = GetAllEnemies();
-Enemy target = enemies.GetRandomElement();           // Uses PRNG.Instance
-Enemy target2 = enemies.GetRandomElement(myRandom);  // Custom random
-```
-
-**Performance**: O(1), **Allocations**: None
-
-### RemoveAtSwapBack - Fast Unordered Removal
-
-```csharp
-// ❌ Standard removal: O(n) - shifts all elements after index
-enemies.RemoveAt(index);
-
-// ✅ Swap-back removal: O(1) - swaps with last element, then removes last
-enemies.RemoveAtSwapBack(index);  // Does not preserve order!
-```
-
-**Performance**: O(1), **Allocations**: None
-
-### IndexOf / LastIndexOf with Predicate
-
-```csharp
-List<Enemy> enemies = GetEnemies();
-
-// Find first enemy with low health
-int index = enemies.IndexOf(e => e.Health < 10);
-
-// Find last enemy that can attack
-int lastIndex = enemies.LastIndexOf(e => e.CanAttack);
-```
-
-**Performance**: O(n), **Allocations**: None
-
-### Shift - Rotate Elements
-
-```csharp
-List<int> numbers = new() { 1, 2, 3, 4, 5 };
-
-numbers.Shift(2);   // Result: { 4, 5, 1, 2, 3 } (shift right)
-numbers.Shift(-1);  // Result: { 2, 3, 4, 5, 1 } (shift left)
-```
-
-**Performance**: O(n), **Allocations**: None
-
-### Reverse Range
-
-```csharp
-List<int> numbers = new() { 1, 2, 3, 4, 5 };
-numbers.Reverse(1, 3);  // Result: { 1, 4, 3, 2, 5 }
-```
-
-**Performance**: O(n), **Allocations**: None
-
-### Pooled Sorting
-
-```csharp
-using WallstopStudios.UnityHelpers.Core.Extension;
-
-List<Enemy> enemies = GetEnemies();
-
-// Sort with custom comparer and algorithm
-enemies.Sort(
-    Comparer<Enemy>.Create((a, b) => a.Distance.CompareTo(b.Distance)),
-    SortAlgorithm.Grail  // Stable, allocation-free
-);
-
-// Available algorithms:
-// - Grail (default): Stable, O(n log n), allocation-free
-// - Tim: Stable, fast for partially sorted data
-// - PatternDefeatingQuickSort: Fast unstable sort
-// - Insertion: Best for small or nearly-sorted lists
-// - Ghost, Meteor, Power, Ska, Ipn, Smooth, Block, Ips4o, Glide, Flux
-```
-
----
+### [Pooled Sorting](../references/use-extension-methods-part-1.md#pooled-sorting)
 
 ## IEnumerable Extensions
 
-### AsList - Avoid Unnecessary Allocation
+[Read section](../references/use-extension-methods-part-2.md#ienumerable-extensions)
 
-```csharp
-// ✅ Returns original if already IList, otherwise creates new List
-IList<Item> items = someEnumerable.AsList();
-```
+### [AsList - Avoid Unnecessary Allocation](../references/use-extension-methods-part-2.md#aslist---avoid-unnecessary-allocation)
 
-### Shuffled - Returns New Shuffled Sequence
+### [Shuffled - Returns New Shuffled Sequence](../references/use-extension-methods-part-2.md#shuffled---returns-new-shuffled-sequence)
 
-```csharp
-// Returns lazy enumerable in random order
-IEnumerable<Card> shuffled = cards.Shuffled();
-IEnumerable<Card> shuffled2 = cards.Shuffled(myRandom);
-```
+### [Infinite - Repeating Sequence](../references/use-extension-methods-part-2.md#infinite---repeating-sequence)
 
-**Note**: Allocates. For in-place shuffle, use `list.Shuffle()` instead.
+### [Ordered - Natural Ordering](../references/use-extension-methods-part-2.md#ordered---natural-ordering)
 
-### Infinite - Repeating Sequence
-
-```csharp
-// Create infinite repeating sequence
-IEnumerable<Color> colors = new[] { Color.red, Color.green, Color.blue }.Infinite();
-
-// Take first 10 from infinite cycle
-var first10 = colors.Take(10).ToList();
-```
-
-### Ordered - Natural Ordering
-
-```csharp
-// Sort by natural IComparable order
-IEnumerable<int> sorted = numbers.Ordered();
-```
-
-### ToLinkedList
-
-```csharp
-LinkedList<Item> linked = items.ToLinkedList();
-```
-
----
+### [ToLinkedList](../references/use-extension-methods-part-2.md#tolinkedlist)
 
 ## String Extensions
 
-### Case Conversion
+[Read section](../references/use-extension-methods-part-2.md#string-extensions)
 
-```csharp
-using WallstopStudios.UnityHelpers.Core.Extension;
+### [Case Conversion](../references/use-extension-methods-part-2.md#case-conversion)
 
-string input = "helloWorld";
+### [Byte Conversion](../references/use-extension-methods-part-2.md#byte-conversion)
 
-input.ToCase(StringCase.PascalCase);    // "HelloWorld"
-input.ToCase(StringCase.CamelCase);     // "helloWorld"
-input.ToCase(StringCase.SnakeCase);     // "hello_world"
-input.ToCase(StringCase.KebabCase);     // "hello-world"
-input.ToCase(StringCase.TitleCase);     // "Hello World"
-input.ToCase(StringCase.UpperCase);     // "HELLOWORLD"
-input.ToCase(StringCase.LowerCase);     // "helloworld"
-```
+### [JSON Serialization](../references/use-extension-methods-part-2.md#json-serialization)
 
-### Byte Conversion
+### [LevenshteinDistance - Fuzzy Matching](../references/use-extension-methods-part-2.md#levenshteindistance---fuzzy-matching)
 
-```csharp
-// String to UTF-8 bytes
-byte[] bytes = "Hello".GetBytes();
-
-// Bytes back to string
-string text = bytes.GetString();
-```
-
-### JSON Serialization
-
-```csharp
-// Serialize any object to JSON
-string json = myObject.ToJson();
-```
-
-### LevenshteinDistance - Fuzzy Matching
-
-```csharp
-// Calculate edit distance between strings
-int distance = "kitten".LevenshteinDistance("sitting");  // Returns 3
-```
-
-**Performance**: O(n\*m), **Allocations**: Uses pooled arrays
-
-### Center - Pad String
-
-```csharp
-string centered = "hi".Center(6);  // "  hi  "
-```
-
----
+### [Center - Pad String](../references/use-extension-methods-part-2.md#center---pad-string)
 
 ## Color Extensions
 
-### ToHex - Color to Hex String
+[Read section](../references/use-extension-methods-part-2.md#color-extensions)
 
-```csharp
-using WallstopStudios.UnityHelpers.Core.Extension;
+### [ToHex - Color to Hex String](../references/use-extension-methods-part-2.md#tohex---color-to-hex-string)
 
-Color color = new Color(1f, 0.5f, 0f, 1f);
+### [GetAverageColor - Sprite Color Analysis](../references/use-extension-methods-part-2.md#getaveragecolor---sprite-color-analysis)
 
-string hexRGBA = color.ToHex();              // "#FF8000FF"
-string hexRGB = color.ToHex(includeAlpha: false);  // "#FF8000"
-```
-
-**Performance**: O(1), **Allocations**: One string
-
-### GetAverageColor - Sprite Color Analysis
-
-```csharp
-// Get average color from sprite
-Color avg = sprite.GetAverageColor();
-
-// With specific averaging method
-Color avgLAB = sprite.GetAverageColor(ColorAveragingMethod.LAB);      // Perceptually accurate
-Color avgHSV = sprite.GetAverageColor(ColorAveragingMethod.HSV);      // Preserves vibrancy
-Color avgWeighted = sprite.GetAverageColor(ColorAveragingMethod.Weighted);
-Color dominant = sprite.GetAverageColor(ColorAveragingMethod.Dominant);  // Most common color
-
-// From multiple sprites
-Color combined = sprites.GetAverageColor();
-```
-
-**Warning**: NOT thread-safe, modifies texture import settings.
-
-### GetComplement - Complementary Color
-
-```csharp
-// Get complementary color (180° hue rotation)
-Color complement = color.GetComplement();
-
-// With randomization for variety
-Color varied = color.GetComplement(PRNG.Instance, variance: 0.1f);
-```
-
-**Performance**: O(1), **Allocations**: None
-
----
+### [GetComplement - Complementary Color](../references/use-extension-methods-part-2.md#getcomplement---complementary-color)
 
 ## Performance Summary
 
-### Zero-Allocation Methods ✅
+[Read section](../references/use-extension-methods-part-2.md#performance-summary)
 
-| Extension                | Type       | Notes                        |
-| ------------------------ | ---------- | ---------------------------- |
-| `Shuffle()`              | IList      | Fisher-Yates in-place        |
-| `GetRandomElement()`     | IList      | O(1)                         |
-| `RemoveAtSwapBack()`     | IList      | O(1), unordered              |
-| `IndexOf(predicate)`     | IList      | O(n)                         |
-| `LastIndexOf(predicate)` | IList      | O(n)                         |
-| `Shift()`                | IList      | Three reversals              |
-| `Reverse(start, end)`    | IList      | In-place                     |
-| `Sort()`                 | IList      | Pooled sorting algorithms    |
-| `TryRemove()`            | Dictionary | -                            |
-| `GetOrElse()`            | Dictionary | Read-only                    |
-| `ToHex()`                | Color      | Allocates result string only |
-| `GetComplement()`        | Color      | -                            |
+### [Zero-Allocation Methods ✅](../references/use-extension-methods-part-2.md#zero-allocation-methods-)
 
-### Allocating Methods ⚠️
-
-| Extension           | Type        | Allocation                |
-| ------------------- | ----------- | ------------------------- |
-| `GetOrAdd()`        | Dictionary  | Value if created          |
-| `Merge()`           | Dictionary  | New dictionary            |
-| `Shuffled()`        | IEnumerable | LINQ structures           |
-| `AsList()`          | IEnumerable | List if not already IList |
-| `ToLinkedList()`    | IEnumerable | New LinkedList            |
-| `FindAll()`         | IList       | New List                  |
-| `GetAverageColor()` | Sprite      | Pixel array               |
-
----
+### [Allocating Methods ⚠️](../references/use-extension-methods-part-2.md#allocating-methods-)
 
 ## Common Patterns
 
-### Pattern: Safe Dictionary Access
+[Read section](../references/use-extension-methods-part-3.md#common-patterns)
 
-```csharp
-// ❌ Verbose null checking
-if (!cache.TryGetValue(key, out var value))
-{
-    value = CreateValue();
-    cache[key] = value;
-}
+### [Pattern: Safe Dictionary Access](../references/use-extension-methods-part-3.md#pattern-safe-dictionary-access)
 
-// ✅ Concise with GetOrAdd
-var value = cache.GetOrAdd(key, () => CreateValue());
-```
+### [Pattern: Fast Collection Processing](../references/use-extension-methods-part-3.md#pattern-fast-collection-processing)
 
-### Pattern: Fast Collection Processing
+### [Pattern: Unordered Fast Removal](../references/use-extension-methods-part-3.md#pattern-unordered-fast-removal)
 
-```csharp
-// ❌ LINQ with allocations
-var randomEnemy = enemies.OrderBy(_ => random.Next()).First();
-
-// ✅ Zero-allocation random selection
-var randomEnemy = enemies.GetRandomElement();
-```
-
-### Pattern: Unordered Fast Removal
-
-```csharp
-// ❌ O(n) removal in hot path
-for (int i = activeProjectiles.Count - 1; i >= 0; i--)
-{
-    if (activeProjectiles[i].IsExpired)
-    {
-        activeProjectiles.RemoveAt(i);  // Shifts all elements!
-    }
-}
-
-// ✅ O(1) removal when order doesn't matter
-for (int i = activeProjectiles.Count - 1; i >= 0; i--)
-{
-    if (activeProjectiles[i].IsExpired)
-    {
-        activeProjectiles.RemoveAtSwapBack(i);  // Just swaps with last
-    }
-}
-```
-
-### Pattern: Thread-Safe Dictionary Operations
-
-```csharp
-// Works with ConcurrentDictionary automatically
-ConcurrentDictionary<int, Player> players = new();
-
-// These use ConcurrentDictionary's native thread-safe methods
-players.GetOrAdd(playerId, id => new Player(id));
-players.TryRemove(playerId, out var removed);
-players.AddOrUpdate(playerId, _ => new Player(playerId), (_, p) => p.Update());
-```
-
----
+### [Pattern: Thread-Safe Dictionary Operations](../references/use-extension-methods-part-3.md#pattern-thread-safe-dictionary-operations)
 
 ## Namespace
 
-```csharp
-using WallstopStudios.UnityHelpers.Core.Extension;
-```
-
-All extension methods are in this namespace and available on their respective types once imported.
+[Read section](../references/use-extension-methods-part-3.md#namespace)

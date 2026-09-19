@@ -2,291 +2,69 @@
 
 <!-- trigger: il2cpp, aot, build, platform, webgl | IL2CPP build issues or AOT errors | Feature -->
 
-**Trigger**: When debugging IL2CPP build issues, platform-specific problems, or AOT compilation errors.
+## Reference Parts
 
----
+- [Part 1](../references/debug-il2cpp-part-1.md)
+- [Part 2](../references/debug-il2cpp-part-2.md)
 
 ## Common IL2CPP Issues
 
-### 1. Code Stripping
+[Read section](../references/debug-il2cpp-part-1.md#common-il2cpp-issues)
 
-IL2CPP strips unused code. Reflection targets may be removed.
+### [1. Code Stripping](../references/debug-il2cpp-part-1.md#1-code-stripping)
 
-**Symptoms**:
+### [2. Generic Virtual Methods](../references/debug-il2cpp-part-1.md#2-generic-virtual-methods)
 
-- `TypeLoadException` at runtime
-- Missing methods/types in builds
-- Works in Editor, fails in build
-
-**Solutions**:
-
-```csharp
-// Mark types accessed via reflection
-[Preserve]
-public class MyReflectedClass
-{
-    [Preserve]
-    public void ReflectedMethod() { }
-}
-```
-
-Or use `link.xml`:
-
-```xml
-<linker>
-    <assembly fullname="Assembly-CSharp">
-        <type fullname="MyNamespace.MyClass" preserve="all"/>
-    </assembly>
-</linker>
-```
-
-### 2. Generic Virtual Methods
-
-**Symptoms**:
-
-- `ExecutionEngineException`
-- Missing method exceptions for generic calls
-
-**Solution**: Avoid generic virtual methods, or ensure concrete instantiations exist:
-
-```csharp
-// ❌ Problematic
-public virtual T GetValue<T>() { ... }
-
-// ✅ Better - use non-generic
-public virtual object GetValue(Type type) { ... }
-
-// ✅ Or ensure instantiations exist
-private void EnsureGenericInstantiations()
-{
-    GetValue<int>();    // Forces AOT compilation
-    GetValue<string>();
-    GetValue<float>();
-}
-```
-
-### 3. Reflection.Emit
-
-**Symptoms**:
-
-- `PlatformNotSupportedException`
-- Dynamic code generation failures
-
-**Solution**: IL2CPP doesn't support `System.Reflection.Emit`. Use alternatives:
-
-```csharp
-// ❌ Not supported
-DynamicMethod method = new DynamicMethod(...);
-
-// ✅ Use expression trees (limited support)
-Expression<Func<int, int>> expr = x => x * 2;
-Func<int, int> func = expr.Compile();
-
-// ✅ Or use source generators (compile-time)
-```
-
----
+### [3. Reflection.Emit](../references/debug-il2cpp-part-1.md#3-reflectionemit)
 
 ## Forbidden C# Features
 
-These cause IL2CPP compilation failures or runtime issues:
-
-| Feature                              | Issue                     |
-| ------------------------------------ | ------------------------- |
-| Nullable reference types (`string?`) | Compilation failures      |
-| `#nullable enable`                   | Not supported             |
-| Null-forgiving operator (`!`)        | Requires nullable context |
-| `required` modifier                  | C# 11, not available      |
-| `init` accessors                     | Limited support           |
-| File-scoped types                    | C# 11, not available      |
-| Raw string literals                  | C# 11, not available      |
-| Generic attributes                   | C# 11, not available      |
-| Static abstract interface members    | Limited support           |
-
----
+[Read section](../references/debug-il2cpp-part-1.md#forbidden-c-features)
 
 ## Platform-Specific Constraints
 
-### WebGL
+[Read section](../references/debug-il2cpp-part-1.md#platform-specific-constraints)
 
-```csharp
-// ❌ No threading
-Task.Run(() => { ... });
-new Thread(() => { ... });
+### [WebGL](../references/debug-il2cpp-part-1.md#webgl)
 
-// ❌ No file system
-File.ReadAllText(path);
-Directory.GetFiles(path);
+### [iOS (AOT)](../references/debug-il2cpp-part-1.md#ios-aot)
 
-// ✅ Use Unity APIs
-UnityWebRequest.Get(url);
-PlayerPrefs.GetString(key);
-```
-
-### iOS (AOT)
-
-```csharp
-// ❌ No runtime code generation
-Activator.CreateInstance(type);  // May fail for some types
-
-// ✅ Use factory methods
-public static T Create<T>() where T : new() => new T();
-
-// ✅ Register types explicitly
-[Preserve]
-private static void RegisterTypes()
-{
-    // Force AOT compilation
-    var _ = new MyClass();
-}
-```
-
-### Android
-
-```csharp
-// 64-bit requirements - ensure all native plugins support arm64
-
-// JNI limitations - be careful with AndroidJavaObject
-using (AndroidJavaClass jc = new AndroidJavaClass("com.example.MyClass"))
-{
-    // Keep references short-lived
-}
-```
-
----
+### [Android](../references/debug-il2cpp-part-1.md#android)
 
 ## Debugging Techniques
 
-### 1. Check IL2CPP Logs
+[Read section](../references/debug-il2cpp-part-2.md#debugging-techniques)
 
-Build logs contain IL2CPP errors:
+### [1. Check IL2CPP Logs](../references/debug-il2cpp-part-2.md#1-check-il2cpp-logs)
 
-- Windows: `%LOCALAPPDATA%\Unity\Editor\Editor.log`
-- macOS: `~/Library/Logs/Unity/Editor.log`
+### [2. Development Builds](../references/debug-il2cpp-part-2.md#2-development-builds)
 
-Look for:
+### [3. Managed Stripping Level](../references/debug-il2cpp-part-2.md#3-managed-stripping-level)
 
-- `IL2CPP error`
-- `Unresolved extern method`
-- `GenericInstanceMethod`
-
-### 2. Development Builds
-
-```csharp
-// Enable Development Build in Build Settings
-// Provides better error messages and stack traces
-```
-
-### 3. Managed Stripping Level
-
-In Player Settings > Other Settings > Managed Stripping Level:
-
-- **Minimal**: Less stripping, larger build
-- **Low**: Some stripping
-- **Medium**: Balanced (default)
-- **High**: Aggressive stripping, smallest build
-
-Try **Low** or **Minimal** if experiencing stripping issues.
-
-### 4. Script Debugging
-
-Enable "Script Debugging" in Build Settings for:
-
-- Breakpoints in IL2CPP builds
-- Better stack traces
-- Slower performance (debug only)
-
----
+### [4. Script Debugging](../references/debug-il2cpp-part-2.md#4-script-debugging)
 
 ## Testing Checklist
 
-### Before Release
+[Read section](../references/debug-il2cpp-part-2.md#testing-checklist)
 
-1. **Test on actual hardware** — Simulators may hide issues
-2. **Test IL2CPP specifically** — Don't assume Mono behavior matches
-3. **Check all platforms** — Each has unique constraints
-4. **Verify all reflection usage** — Ensure `[Preserve]` is applied
-5. **Test with high stripping** — Catches missing preservations
+### [Before Release](../references/debug-il2cpp-part-2.md#before-release)
 
-### Quick IL2CPP Test
-
-```csharp
-#if ENABLE_IL2CPP
-    Debug.Log("Running on IL2CPP");
-#else
-    Debug.Log("Running on Mono");
-#endif
-```
-
----
+### [Quick IL2CPP Test](../references/debug-il2cpp-part-2.md#quick-il2cpp-test)
 
 ## Preserve Patterns
 
-### Class Level
+[Read section](../references/debug-il2cpp-part-2.md#preserve-patterns)
 
-```csharp
-[Preserve]
-public class MySerializedClass
-{
-    public int Value;
-}
-```
+### [Class Level](../references/debug-il2cpp-part-2.md#class-level)
 
-### Assembly Level
+### [Assembly Level](../references/debug-il2cpp-part-2.md#assembly-level)
 
-```csharp
-// In AssemblyInfo.cs
-[assembly: Preserve]
-```
-
-### link.xml (Fine-Grained)
-
-```xml
-<linker>
-    <!-- Preserve entire assembly -->
-    <assembly fullname="MyAssembly" preserve="all"/>
-
-    <!-- Preserve specific type -->
-    <assembly fullname="Assembly-CSharp">
-        <type fullname="MyNamespace.MyClass" preserve="all"/>
-    </assembly>
-
-    <!-- Preserve specific members -->
-    <assembly fullname="Assembly-CSharp">
-        <type fullname="MyNamespace.MyClass">
-            <method name="MyMethod"/>
-            <field name="myField"/>
-        </type>
-    </assembly>
-</linker>
-```
-
----
+### [link.xml (Fine-Grained)](../references/debug-il2cpp-part-2.md#linkxml-fine-grained)
 
 ## Common Error Messages
 
-| Error                           | Likely Cause      | Solution                     |
-| ------------------------------- | ----------------- | ---------------------------- |
-| `TypeLoadException`             | Type stripped     | Add `[Preserve]` or link.xml |
-| `MissingMethodException`        | Method stripped   | Add `[Preserve]`             |
-| `ExecutionEngineException`      | Generic AOT issue | Avoid generic virtuals       |
-| `PlatformNotSupportedException` | Unsupported API   | Use alternative API          |
-| `NotSupportedException: IL2CPP` | Reflection.Emit   | Avoid dynamic code gen       |
-
----
+[Read section](../references/debug-il2cpp-part-2.md#common-error-messages)
 
 ## Unity Helpers Compatibility
 
-This package is tested on IL2CPP with these considerations:
-
-1. **Serialization**: JSON and Protobuf work correctly
-2. **Reflection**: Minimal, with `[Preserve]` where needed
-3. **PRNGs**: All implementations are AOT-compatible
-4. **Collections**: No dynamic code generation
-5. **Spatial structures**: Pure managed code
-
-If you encounter IL2CPP issues with Unity Helpers, check:
-
-1. Proper assembly references in `.asmdef`
-2. No accidental use of reflection in your code
-3. Stripping level settings
+[Read section](../references/debug-il2cpp-part-2.md#unity-helpers-compatibility)

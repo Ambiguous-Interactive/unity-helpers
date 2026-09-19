@@ -2,426 +2,54 @@
 
 <!-- trigger: ship, release, finalize, pre-landing, merge-ready, pr-ready | End-to-end workflow for shipping changes: validate, review, version, changelog, commit | Core -->
 
-**Trigger**: When changes are ready to be finalized, committed, and prepared for merge.
+## Reference Parts
 
----
+- [Part 1](../references/ship-changes-part-1.md)
+- [Part 2](../references/ship-changes-part-2.md)
+- [Part 3](../references/ship-changes-part-3.md)
 
 ## When to Use
 
-- After implementation is complete and you want to ship
-- When preparing a PR or final commit
-- When asked to "ship it", "finalize", or "wrap up"
-
----
+[Read section](../references/ship-changes-part-1.md#when-to-use)
 
 ## When NOT to Use
 
-- When implementation is still in progress
-- When there are known failing tests or unresolved issues
-- For documentation-only changes (use [update-documentation](./update-documentation.md) directly)
-
----
+[Read section](../references/ship-changes-part-1.md#when-not-to-use)
 
 ## Ship Workflow
 
-Execute these steps in order. Each step must pass before proceeding.
+[Read section](../references/ship-changes-part-1.md#ship-workflow)
 
-### Step 1: Pre-Flight Checks
+### [Step 1: Pre-Flight Checks](../references/ship-changes-part-1.md#step-1-pre-flight-checks)
 
-Run changed-file preflight, all checks relevant to the change, and the fast push safety check:
+### [Step 2: Test Verification](../references/ship-changes-part-1.md#step-2-test-verification)
 
-```bash
-npm run agent:preflight
-npm run validate:prepush
-```
+### [Step 3: Pre-Landing Review](../references/ship-changes-part-1.md#step-3-pre-landing-review)
 
-`validate:prepush` is deliberately a roughly one-second last-resort Git/config check. Do not expand it with
-repository-wide lint or test suites. Run targeted lint/test commands for the files changed; use
-`npm run validate:local` only when a complete repository-wide aggregate is warranted. Exhaustive
-synthetic Git-hook fixtures remain mandatory in CI; if hook or agent-preflight behavior changed,
-also run `npm run validate:tests:hook-regressions`. **All applicable checks must pass.**
+### [Step 4: CHANGELOG Update](../references/ship-changes-part-1.md#step-4-changelog-update)
 
-**Blocker rule — do NOT push if any of these fail:**
+### [Step 5: Documentation Check](../references/ship-changes-part-1.md#step-5-documentation-check)
 
-- Any applicable targeted lint, formatting, typecheck, or test command — a failure must be fixed at
-  Step 1, never deferred to push-time or CI.
-- `validate:local` — mandatory only when the change's risk or breadth warrants the complete
-  repository-wide aggregate.
-- `validate:tests:hook-regressions` — mandatory when `.githooks/**`, `scripts/agent-preflight.ps1`,
-  or their helpers/tests change.
+### [Step 6: Version Assessment](../references/ship-changes-part-1.md#step-6-version-assessment)
 
-If any check fails:
+### [Step 7: Commit Hygiene](../references/ship-changes-part-1.md#step-7-commit-hygiene)
 
-1. Fix the issue (see [validate-before-commit](./validate-before-commit.md#rule-4-spell-check-every-change-cspell-covers) for the spelling decision tree)
-2. Re-run the failing check in isolation
-3. When all pass, re-run the relevant targeted command, then the fast `npm run validate:prepush`
-4. Only then proceed
+### [Step 8: Ship Summary](../references/ship-changes-part-1.md#step-8-ship-summary)
 
-### Step 2: Test Verification
+### [Step 9: Push to Remote](../references/ship-changes-part-2.md#step-9-push-to-remote)
 
-Verify tests pass. If this is a Unity package change:
+#### [When the HTTPS push hangs: the forwarded SSH agent](../references/ship-changes-part-2.md#when-the-https-push-hangs-the-forwarded-ssh-agent)
 
-1. Confirm all existing tests still pass conceptually (note: Unity tests require Unity Editor)
-2. Verify new tests exist for new functionality
-3. Check test naming follows conventions: `MethodName_Condition_ExpectedResult`
+### [Step 9b: Open the pull request yourself](../references/ship-changes-part-2.md#step-9b-open-the-pull-request-yourself)
 
-### Step 3: Pre-Landing Review
+#### [Title and body: short and plain](../references/ship-changes-part-2.md#title-and-body-short-and-plain)
 
-Execute a [review-code-changes](./review-code-changes.md) pass on all staged/modified files:
+### [Step 10: Read the checks, and know which ones are ours](../references/ship-changes-part-3.md#step-10-read-the-checks-and-know-which-ones-are-ours)
 
-1. Run two-pass review (Critical, then Informational)
-2. Auto-fix mechanical issues (formatting, spelling, missing null checks)
-3. Track risk score per [self-regulate-changes](./self-regulate-changes.md)
-4. If critical issues found, fix and restart from Step 1
+### [Step 10b: Find the feedback -- it lives on four endpoints, not one](../references/ship-changes-part-3.md#step-10b-find-the-feedback----it-lives-on-four-endpoints-not-one)
 
-### Step 4: CHANGELOG Update
-
-If changes include user-facing modifications:
-
-1. Add entry under `## [Unreleased]` section
-2. Use correct subsection: `### Added`, `### Fixed`, `### Changed`, `### Removed`
-3. Reference issue numbers where applicable: `[#NNN](https://github.com/wallstop/unity-helpers/issues/NNN)` <!-- cspell:ignore NNN -->
-4. **Keep entries SHORT — one or two sentences, plain language, user-visible effect first.** No
-   root-cause narration, no mechanism, no run IDs. Put the long version in the commit body and, if
-   users need it, a `docs/` guide you link to. See
-   [update-documentation](./update-documentation.md#writing-good-changelog-entries).
-
-### Step 5: Documentation Check
-
-Per [update-documentation](./update-documentation.md):
-
-1. Public API changes have XML doc comments
-2. README updated if public-facing behavior changed
-3. Skill files updated if workflow changed
-4. `.meta` files exist for all new assets
-
-### Step 6: Version Assessment
-
-Assess whether version bump is needed (do NOT bump automatically — note for human):
-
-| Change Type                      | Version Impact        |
-| -------------------------------- | --------------------- |
-| Bug fix, no API change           | Patch (3.2.1 → 3.2.2) |
-| New feature, backward compatible | Minor (3.2.1 → 3.3.0) |
-| Breaking API change              | Major (3.2.1 → 4.0.0) |
-| Internal refactor only           | No bump needed        |
-
-Report assessment but do not modify `package.json` version without explicit approval.
-
-### Step 7: Commit Hygiene
-
-Ensure commits are bisectable:
-
-| Rule                      | Description                                              |
-| ------------------------- | -------------------------------------------------------- |
-| **Each commit compiles**  | No commit should leave the project in a broken state     |
-| **Each commit is atomic** | One logical change per commit                            |
-| **Message format**        | Imperative mood, <72 chars first line, body explains why |
-| **Body is STE-simple**    | Short sentences, active voice, why first. No narration   |
-| **No fixup commits**      | Squash "fix typo" commits into the original              |
-
-### Step 8: Ship Summary
-
-Output a final summary:
-
-```text
-Ship Summary:
-  Pre-flight: PASS
-  Tests: PASS | N/A (requires Unity Editor)
-  Review: PASS (risk score: N/25)
-  CHANGELOG: Updated | Not needed
-  Documentation: Updated | Not needed
-  Version: No bump needed | Recommend PATCH/MINOR/MAJOR
-  Commits: N commits, all bisectable
-  Ready to merge: YES | NO (blockers: list)
-```
-
-### Step 9: Push to Remote
-
-The repo pre-configures `push.autoSetupRemote=true` and `push.default=simple`
-locally during `npm run hooks:install` (and the devcontainer post-create), so
-`git push` on a new branch sets upstream automatically — **do not** pass
-`--set-upstream` / `-u` flags and never run wrapper scripts around `git push`.
-
-Rules when pushing:
-
-| Rule                           | Why                                                                                                                                                             |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Never redirect output**      | `git push 2> pre-push.txt` creates gitignored pollution that confuses agents                                                                                    |
-| **Never use `--no-verify`**    | Bypassing the pre-push hook skips the last-resort local safety gate                                                                                             |
-| **Let stderr stream normally** | Errors must be visible in the live output, not hidden in files                                                                                                  |
-| **Never pass a credential**    | github.com resolves through the cached-only helper; a push that reports no credential means the cache is empty, not that the push needs one on the command line |
-
-If `fatal: The current branch <x> has no upstream branch` appears, the local
-config is missing. Remediation: `npm run agent:preflight:fix` (restores
-`push.autoSetupRemote=true` and removes any stray
-`<hook-name>.{txt,log,out,err,tmp}` artifact files). Do **not** work around it
-with `git push -u origin <branch>`
-— fix the config once so every future push is clean.
-
-If a push is rejected for non-fast-forward reasons, prefer
-`git pull --rebase`. Stash any unrelated local changes manually first; never
-silently clobber history with `--force` without explicit user consent.
-
-#### When the HTTPS push hangs: the forwarded SSH agent
-
-`scripts/github-token.sh` exiting 3 does **not** mean the container cannot push.
-It means the token cache is empty. There is a second path, and it needs no
-token, no cache and no dialog: the Dev Containers extension forwards the
-**host's SSH agent** into the container.
-
-```bash
-ssh-add -l                                                   # keys the host forwarded
-ssh -o StrictHostKeyChecking=accept-new -T git@github.com    # "Hi <user>!" = authenticated
-git push git@github.com:<owner>/<repo>.git HEAD:<branch>
-```
-
-Check this **before** concluding a push is blocked. Three sessions handed a
-finished branch back unpushed on the strength of exit 3 alone; this session's
-push succeeded on the first SSH attempt after four HTTPS attempts hung.
-
-**Why the HTTPS push hangs rather than failing.** `/etc/gitconfig` installs the
-Dev Containers credential helper for every URL, so it is tried before
-`GIT_ASKPASS` and before the refuse script ever runs. `GIT_TRACE=1` shows the
-push reaching `git-credential-helper get` and stopping there — that block is a
-dialog on the owner's desktop waiting to be answered, one per attempt. Do not
-retry it.
-
-SSH covers git only. The **API** — a pull request body, an issue comment, a
-label — still needs a token, so `github-token.sh` remains the path for those.
-
-### Step 9b: Open the pull request yourself
-
-A push alone runs almost nothing. The Unity matrix, the lint workflows and the
-review bots are **`pull_request`-triggered**, so a branch sitting on the remote
-with no pull request has proven only that `Spelling Check` passes. Opening it is
-part of shipping, not a hand-back.
-
-#### Title and body: short and plain
-
-Someone reads the pull request to decide if it affects them. Write for that
-person. Say what changed and why. Say nothing else.
-
-**Title.** One line, 50 characters or fewer, imperative mood. Name the effect
-the user sees, not the mechanism. Do not join two changes with "and" -- title
-the one that matters most and let the body carry the rest.
-
-**Body.** Copy this template. Add nothing to it.
-
-```markdown
-DISCLOSURE: LLM-GENERATED TEXT
-
-**Why:** <the problem, in one sentence>
-
-**What:**
-
-- <one change, one line>
-- <two to five bullets>
-
-Fixes #123
-```
-
-The disclosure is mandatory for agent-written text and is not part of the sentence or bullet
-limits. Follow the outside-contributor gate in
-[github-operations](./github-operations.md#authorship-and-outside-contributors) before creating,
-editing, reviewing, or merging a pull request from another person.
-
-| Limit            | Value         |
-| ---------------- | ------------- |
-| Title            | 50 characters |
-| `**Why:**`       | 1 sentence    |
-| `**What:**`      | 2 to 5 lines  |
-| Words per bullet | 12            |
-
-Write short sentences. Use the active voice. Use common words. Give a number
-only when the number is the point (`60% smaller`, `2x faster`).
-
-Write in Simplified Technical English. One idea per sentence -- about 15
-words, never more than 25. Common words over jargon (`change`, not
-`refactor/adjust/modify`). Active voice: someone did something. No filler --
-cut `basically`, `additionally`, `in order to`, `it should be noted that`,
-and every sentence that only warms up the next one. Answer **why**, **how**,
-and **what**, in that order, then stop.
-
-**Never put these in a pull request:** root causes, measurements, run IDs,
-session numbers, CI results, a list of what you validated, byte traces, the
-diff, or the file list. They go in the commit body or the linked issue. Local
-progress notes stay ignored and must never be staged.
-
-Count the title before you send it. Nine of the twelve titles before this rule
-existed were over 60 characters, so count rather than judge:
-
-```bash
-printf '%s' "$TITLE" | wc -c # 50 or fewer
-```
-
-The same branch, written both ways:
-
-| Verdict | Title                                                                                                                           |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| Avoid   | `Stop writing a derived hash the reader recomputes, keep tag 4 for z so legacy payloads still parse, and widen the parity gate` |
-| Prefer  | `Shrink grid payloads by 60%`                                                                                                   |
-
-| Verdict | Body                                                                                                                 |
-| ------- | -------------------------------------------------------------------------------------------------------------------- |
-| Avoid   | Six paragraphs of measurement, a byte-level trace, the golden vectors that changed, and the local gates that passed. |
-| Prefer  | `**Why:** every grid cell carried a hash the reader threw away.` then three bullets and `Fixes #519`.                |
-
-Use the configured GitHub MCP server first to find or create the pull request, then verify the
-returned number, URL, head, and base. Follow [github-operations](./github-operations.md) for every
-other remote GitHub read or mutation in this workflow.
-
-The API is reachable from inside the devcontainer. The example below is a fallback only when the
-current GitHub MCP toolset does not expose pull-request creation. `scripts/github-token.sh` is the
-only supported source of the fallback credential and it **never prompts**: it reads a non-empty
-`$GITHUB_TOKEN` / `$GH_TOKEN` or a 0600 cache, and exits 3 with the command that fixes it when there
-is neither. Never run the credential helper directly — Dev Containers answers by raising a dialog
-on the owner's desktop on every invocation, and the one deliberate prompt is a human running
-`npm run github:token:bootstrap`. See the GitHub access notes in [context](../context.md).
-
-```bash
-GH_TOKEN="$(bash scripts/github-token.sh)" # exits 3, loudly, when there is none
-export GH_TOKEN
-python3 - <<'PY'
-import json, os, pathlib, urllib.request
-body = pathlib.Path("<body file>").read_text()
-if not body.startswith("DISCLOSURE: LLM-GENERATED TEXT\n\n"):
-    raise SystemExit("Pull request body is missing the first-line LLM disclosure")
-payload = {
-    "title": "<summary line>",
-    "head": "<branch>",
-    "base": "main",
-    "body": body,
-}
-req = urllib.request.Request(
-    "https://api.github.com/repos/Ambiguous-Interactive/unity-helpers/pulls",
-    data=json.dumps(payload).encode(),
-    headers={"Authorization": "Bearer " + os.environ["GH_TOKEN"],
-             "Accept": "application/vnd.github+json",
-             "Content-Type": "application/json",
-             "User-Agent": "unity-helpers-agent"},
-    method="POST")
-with urllib.request.urlopen(req, timeout=60) as r:
-    print(json.load(r)["html_url"])
-PY
-```
-
-Write the body to a file first rather than inlining it — a heredoc carrying
-backticks and `$` through two layers of quoting is how a body arrives mangled.
-The same call with `/issues` instead of `/pulls`, and `{"title", "body"}`, files
-a follow-up issue. Apply the same first-line validation to that issue body and to every body edit.
-
-### Step 10: Read the checks, and know which ones are ours
-
-Use GitHub MCP first to read pull-request checks, workflow runs, jobs, annotations, and failed logs.
-Poll through GitHub MCP until repository-owned checks reach terminal states. Use a repository script
-or direct API only when the exposed MCP tools lack the exact operation, as defined in
-[github-operations](./github-operations.md).
-
-"All checks green" means **every repository-owned check**: the workflows in
-`.github/workflows/`, which this repository can fix. A pull request also carries
-checks from GitHub Apps whose success depends on an account entitlement rather
-than on the code, and those cannot be driven green from a branch.
-
-The known case is the automatic Copilot reviewer (#428). Its signature:
-
-| Signal                                      | Reading                           |
-| ------------------------------------------- | --------------------------------- |
-| `copilot-pull-request-reviewer` fails       | Not a repository workflow         |
-| HTTP 402 / `exceeded your monthly quota`    | Account entitlement, not the diff |
-| No review comments and no analysis produced | It never read the code            |
-| Sub-minute duration                         | It failed before reviewing        |
-
-**Policy: that failure does not block landing, and re-pushing cannot clear it.**
-Every push re-requests the review and reproduces it. Record it in the pull
-request summary as an external check, keep the repository's own checks green,
-and rely on the Cursor review plus CI. Restoring the quota, or dropping the
-reviewer from the required set, is an organization-settings action for the
-owner — never work around it by requesting bot reviews by hand.
-
-Anything else red is ours until proven otherwise. Read the annotations before
-concluding a leg is infrastructure: a `Stale pull request run for <sha>` marks a
-run the head moved past, not breakage.
-
-### Step 10b: Find the feedback -- it lives on four endpoints, not one
-
-Inspect reviews and comments through GitHub MCP first. Then run the repository coverage command
-below after every push and before completion; it verifies all four surfaces even when the current
-MCP toolset does not expose one of them.
-
-**`GET /issues/{n}/comments` does not return inline review threads.** A session that
-polls only that one sees an empty list and reports "no reviewer feedback" while a
-human is waiting on a comment pinned to a line. Nothing in this skill said where to
-look until PR #652, where the owner's only comment was an inline one.
-
-```bash
-npm run pr:feedback -- 652            # every surface, one pass
-```
-
-| Surface                   | Endpoint                        | Who leaves it here                       |
-| ------------------------- | ------------------------------- | ---------------------------------------- |
-| **Inline review threads** | `GET /pulls/{n}/comments`       | a human pointing at a line; review bots  |
-| Review submissions        | `GET /pulls/{n}/reviews`        | approve / request-changes, and bot notes |
-| Conversation comments     | `GET /issues/{n}/comments`      | prose that is not about a line           |
-| Check-run annotations     | `GET /commits/{sha}/check-runs` | findings that never become a comment     |
-
-The second row is not redundant: the Copilot reviewer's _reason_ for failing
-("reached their quota limit") arrives only there -- not in the run log, and not as a
-comment. Reading it is how you tell an entitlement failure from a real review.
-
-Reply into a thread with the **numeric** comment id -- the number in the
-`#discussion_r...` anchor, never the `PRRT_` GraphQL node id:
-
-```text
-POST /repos/<owner>/<repo>/pulls/<n>/comments/<comment-id>/replies
-```
-
-Two rules about when and how:
-
-- **Poll after every push AND before declaring the work done.** A human comments on
-  their own clock, not CI's, so "the checks went green" is not the moment to stop
-  looking.
-- **Resolve the authenticated login before acting.** If the author is an outside human or cannot be
-  resolved, report the thread and wait for issue-specific user direction before changing code or
-  replying. `author_association` does not establish identity.
-- **After that direction, treat the human's inline comment as policy.**
-  "Should this be `TryGetValue`?" on one call site was, in its own next clause, "force
-  `Try*` style APIs throughout". Fix the line, then sweep the class, then ask whether
-  the package should carry a rule for it -- and say in the reply which of the three you
-  did.
-- **Begin an agent-written reply with `DISCLOSURE: LLM-GENERATED TEXT` and a blank line.** The
-  disclosure identifies authorship; it does not replace the outside-human direction.
-
-### Step 11: Answer review feedback with a measurement
-
-A reviewer's "could this be faster with X?" is a hypothesis, not an instruction and not a mistake.
-Measure X. Reply with the numbers. Do not accept it to be agreeable, and do not decline it from
-memory -- both are guesses wearing different clothes. For an outside human, do this only after the
-issue-specific direction required above.
-
-Rules:
-
-- **Measure the thing asked about**, at more than one input size. A ratio that stays flat as the
-  input grows is per-item cost; a ratio that shrinks was fixed overhead. They lead to opposite
-  conclusions.
-- **Then measure one step out.** A suggestion can be wrong where it points and right about the
-  problem. Answering only the literal question hides that.
-- **Reply with the table**, and say plainly which parts you did and did not take.
-- **Keep the reply short.** Same STE bar as the pull request body: the table, one
-  line per decision (fix / sweep / rule / declined, with the number), and the
-  linked issue. No narration of the investigation.
-- **A win you decline needs a home.** File the issue with the numbers and the reason, and link it.
-  "Measured, rejected" that nobody wrote down gets re-asked next quarter.
-- **Record the answer where the question arose** -- a `<remarks>` block on the method, and the skill
-  that carries the general rule -- so the next reader gets the measurement instead of re-asking.
-
----
+### [Step 11: Answer review feedback with a measurement](../references/ship-changes-part-3.md#step-11-answer-review-feedback-with-a-measurement)
 
 ## Related Skills
 
-- [github-operations](./github-operations.md) - GitHub MCP-first remote operations and fallbacks
-- [review-code-changes](./review-code-changes.md) - Pre-landing review (Step 3)
-- [self-regulate-changes](./self-regulate-changes.md) - Risk scoring during review
-- [validate-before-commit](./validate-before-commit.md) - Pre-flight checks (Step 1)
-- [update-documentation](./update-documentation.md) - Documentation check (Step 5)
-- [apply-completeness](./apply-completeness.md) - Don't ship incomplete work
+[Read section](../references/ship-changes-part-3.md#related-skills)

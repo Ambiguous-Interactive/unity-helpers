@@ -2,434 +2,82 @@
 
 <!-- trigger: test, fail, failure, timeout, flaky | ANY test failure - investigate before fixing | Core -->
 
-**Trigger**: When ANY test fails, times out, or behaves inconsistently.
+## Reference Parts
 
----
+- [Part 1](../references/investigate-test-failures-part-1.md)
+- [Part 2](../references/investigate-test-failures-part-2.md)
+- [Part 3](../references/investigate-test-failures-part-3.md)
 
 ## Zero-Flaky Test Policy (MANDATORY)
 
-**This repository enforces a strict zero-flaky test policy.** Every test failure is treated as a real bug that requires comprehensive investigation and resolution.
+[Read section](../references/investigate-test-failures-part-1.md#zero-flaky-test-policy-mandatory)
 
-### Core Principle
+### [Core Principle](../references/investigate-test-failures-part-1.md#core-principle)
 
-> **A test failure ALWAYS indicates a bug—either in production code OR in the test itself. Both require full investigation and proper fixes.**
-
-### What This Means
-
-| Forbidden Action                               | Required Action                                      |
-| ---------------------------------------------- | ---------------------------------------------------- |
-| "Make the test pass" without understanding why | Investigate root cause before any code changes       |
-| Ignore intermittent failures                   | Treat as highest priority—flaky tests mask real bugs |
-| Disable or skip failing tests                  | Fix the underlying issue in production or test code  |
-| Add retry logic to hide flakiness              | Eliminate the source of non-determinism              |
-| Assume "it works on my machine"                | Reproduce and fix environment-specific issues        |
-| Blame external factors (timing, resources)     | Design tests to be deterministic and isolated        |
-
----
+### [What This Means](../references/investigate-test-failures-part-1.md#what-this-means)
 
 ## Investigation Process
 
-### Step 1: Reproduce and Understand
+[Read section](../references/investigate-test-failures-part-1.md#investigation-process)
 
-Before making ANY code changes:
+### [Step 1: Reproduce and Understand](../references/investigate-test-failures-part-1.md#step-1-reproduce-and-understand)
 
-1. **Read the full error message** — Stack traces, assertion messages, expected vs actual values
-2. **Understand the test's intent** — What behavior is being verified?
-3. **Identify the failure pattern** — Consistent failure? Intermittent? Environment-specific?
-4. **Check recent changes** — Did a recent commit introduce this failure?
+### [Adding Diagnostic Logging](../references/investigate-test-failures-part-1.md#adding-diagnostic-logging)
 
-### Adding Diagnostic Logging
+### [Step 2: Classify the Bug](../references/investigate-test-failures-part-1.md#step-2-classify-the-bug)
 
-When investigating failures, add diagnostic output to understand state WITHOUT modifying assertions. This is critical for preserving test intent while gathering information.
+#### [Production Bug](../references/investigate-test-failures-part-1.md#production-bug)
 
-```csharp
-// WRONG: Modifying assertion while investigating
-Assert.AreEqual(5, result); // Changed from 10 to 5 to make test pass
+#### [Test Bug](../references/investigate-test-failures-part-1.md#test-bug)
 
-// CORRECT: Add logging without changing assertion
-TestContext.WriteLine($"Input values: {string.Join(", ", inputs)}");
-TestContext.WriteLine($"Intermediate state: {processor.State}");
-TestContext.WriteLine($"Actual result: {result}");
-Assert.AreEqual(10, result); // Keep original assertion unchanged
-```
+### [Step 3: Implement Proper Fix](../references/investigate-test-failures-part-1.md#step-3-implement-proper-fix)
 
-**Diagnostic Logging Rules:**
+#### [For Production Bugs](../references/investigate-test-failures-part-1.md#for-production-bugs)
 
-1. **NEVER modify assertions while investigating** — The original assertion defines expected behavior
-2. **Add `TestContext.WriteLine` to capture state** — Log values at the failure point
-3. **Include all relevant context** — Collection contents, input values, timing info, intermediate state
-4. **Remove diagnostic logging after fix** — Once root cause is identified and fixed, clean up verbose output
-
-Example of comprehensive diagnostic logging:
-
-```csharp
-[Test]
-public void CacheEvictionFollowsLruPolicy()
-{
-    var cache = new Cache<int, string>(maxSize: 3);
-    cache.Set(1, "a");
-    cache.Set(2, "b");
-    cache.Set(3, "c");
-    _ = cache.Get(1); // Access key 1 to make it recently used
-    cache.Set(4, "d"); // Should evict key 2 (least recently used)
-
-    // Diagnostic logging for investigation
-    TestContext.WriteLine($"Cache count: {cache.Count}");
-    TestContext.WriteLine($"Keys present: {string.Join(", ", cache.Keys)}");
-    TestContext.WriteLine($"Key 1 present: {cache.ContainsKey(1)}");
-    TestContext.WriteLine($"Key 2 present: {cache.ContainsKey(2)}");
-
-    Assert.IsFalse(cache.ContainsKey(2), "Key 2 should have been evicted as LRU");
-}
-```
-
-### Step 2: Classify the Bug
-
-Every test failure falls into one of two categories:
-
-#### Production Bug
-
-The test correctly identifies broken behavior in production code.
-
-**Signs:**
-
-- Test assertion accurately describes expected behavior
-- Production code doesn't match documented/intended behavior
-- Edge case not handled in production code
-- Regression from recent changes
-
-**Resolution:** Fix the production code, keep the test unchanged.
-
-#### Test Bug
-
-The test itself is flawed—either in its assertions, setup, or design.
-
-**Signs:**
-
-- Test makes incorrect assumptions about expected behavior
-- Test has race conditions or timing dependencies
-- Test doesn't properly isolate from external state
-- Test setup is incomplete or incorrect
-- Test assertions are too strict or too loose
-
-**Resolution:** Fix the test to correctly verify intended behavior.
-
-### Step 3: Implement Proper Fix
-
-#### For Production Bugs
-
-1. Understand the intended behavior from documentation, interfaces, or design
-2. Write the minimal fix that corrects the behavior
-3. Verify the fix addresses the root cause, not just symptoms
-4. Consider if additional tests are needed for related edge cases
-5. **Update CHANGELOG** — Production bug fixes are user-facing changes and MUST have a CHANGELOG entry under `### Fixed`
-
-#### For Test Bugs
-
-1. Understand what behavior the test SHOULD verify
-2. Fix the test to correctly verify that behavior
-3. Ensure the test is deterministic and isolated
-4. Verify the test fails when production code is broken (test the test)
-
----
+#### [For Test Bugs](../references/investigate-test-failures-part-1.md#for-test-bugs)
 
 ## Common Test Bug Categories
 
-### Non-Deterministic Tests
+[Read section](../references/investigate-test-failures-part-2.md#common-test-bug-categories)
 
-**Problem:** Tests pass/fail unpredictably.
+### [Non-Deterministic Tests](../references/investigate-test-failures-part-2.md#non-deterministic-tests)
 
-| Anti-Pattern                  | Correct Pattern                               |
-| ----------------------------- | --------------------------------------------- |
-| `DateTime.Now` in assertions  | Inject `ITimeProvider` or use fixed values    |
-| `Random` without seed         | Use seeded PRNG: `new PcgRandom(fixedSeed)`   |
-| Depending on dictionary order | Use ordered collections or sort before assert |
-| Timing-dependent assertions   | Use synchronization primitives or callbacks   |
-| Floating-point exact equality | Use tolerance: `Assert.AreEqual(a, b, 0.001)` |
+### [Virtual-Clock + Throttled Operations](../references/investigate-test-failures-part-2.md#virtual-clock--throttled-operations)
 
-### Virtual-Clock + Throttled Operations
+### [State Leakage](../references/investigate-test-failures-part-2.md#state-leakage)
 
-**Problem:** Production code that rate-limits an operation by a single timestamp (`_lastDoneTime`) silently drops work when a test drives it with a coarse virtual clock.
+### [Brittle Assertions](../references/investigate-test-failures-part-2.md#brittle-assertions)
 
-**Mechanism:**
+### [Missing Isolation](../references/investigate-test-failures-part-2.md#missing-isolation)
 
-1. Test sets `_currentTime = T` and triggers operation A → operation advances `_lastDoneTime = T`.
-2. Test triggers operation B at the SAME `_currentTime = T` → throttle check `now - _lastDoneTime < threshold` is true → B is skipped.
-3. Operation B's intended effect (e.g., a capacity-bounded purge, a state-triggered callback) never fires. The test's assertion for "B's side effect" fails with no error message — just a missing observable.
-
-**Diagnosis signals:**
-
-- Test advances virtual time in large jumps (`_currentTime = 1f; ... _currentTime = 10f`) and sees intermittent "didn't happen" failures.
-- Production code has a single `_lastXTime` variable gated by a threshold.
-- Failure mode is a dropped notification/callback rather than a wrong value.
-- Only one of two same-tick operations' effects is observable.
-
-**Fix patterns (choose based on operation semantics):**
-
-| Symptom                                              | Remediation                                                                                                  |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Some throttled operations are safety-critical        | Add an orthogonal bypass condition (e.g., "over capacity" → skip throttle); let the critical path run always |
-| All calls at the same tick should deduplicate        | Keep single-timestamp throttle; document that same-tick calls coalesce and test with distinct `_currentTime` |
-| Virtual clock is too coarse for the production logic | Use per-path timestamps (`_lastRentPurgeTime`, `_lastReturnPurgeTime`) so paths don't starve each other      |
-
-**Concurrency subtlety:** in multithreaded code, two callers may read `_lastXTime` before either writes, serialize through a lock in arbitrary order, and race to write their timestamps. If the earlier timestamp lands last, the throttle clock regresses. Use CAS max-semantics:
-
-```csharp
-while (true)
-{
-    float current = Volatile.Read(ref _lastXTime);
-    if (candidate <= current) { break; }                  // someone newer already wrote
-    float observed = Interlocked.CompareExchange(ref _lastXTime, candidate, current);
-    if (observed == current) { break; }                   // we won the CAS
-    // else: someone else advanced; retry and re-check the condition
-}
-```
-
-Loop is bounded: each failed CAS means the observed value strictly increased, so either the break-on-smaller condition trips or one of the contending writers wins.
-
-**Benign-race reads** for fast-path checks (e.g., `int sizeHint = collection.Count` outside a lock): safe on platforms where `int` reads are atomic and the result is only used as a hint. Re-verify inside the lock for correctness. Applies to `List<T>.Count`, `Queue<T>.Count`, etc.
-
-### State Leakage
-
-**Problem:** Tests affect each other.
-
-| Anti-Pattern                                                           | Correct Pattern                                                                     |
-| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Static mutable state                                                   | Reset in `[TearDown]` or use instance state                                         |
-| Shared test fixtures without reset                                     | `[SetUp]` creates fresh state each test                                             |
-| Global singletons                                                      | Use test-specific instances                                                         |
-| File system side effects                                               | Use temp directories, clean up in teardown                                          |
-| Test backups in Resources/ folder discoverable by FindObjectsOfTypeAll | Store backups outside Resources/ (e.g., Assets/Temp/)                               |
-| Not clearing singleton cache between tests                             | Call `ScriptableObjectSingleton<T>.ClearInstance()` in setup                        |
-| Pool fixture mutating `PoolPurgeSettings` without reset                | Call `PoolPurgeSettings.ResetToDefaults()` in both SetUp AND TearDown               |
-| Disabling `MemoryPressureMonitor` without save/restore                 | Capture `_wasEnabled = MemoryPressureMonitor.Enabled` in SetUp, restore in TearDown |
-
-**Pool test fixture hygiene checklist** — any `[TestFixture]` that constructs `WallstopGenericPool<T>` or touches the purge system:
-
-```csharp
-[SetUp]
-public void SetUp()
-{
-    PoolPurgeSettings.ResetToDefaults();                         // Static policy state
-    _wasMemoryPressureEnabled = MemoryPressureMonitor.Enabled;   // Save prior value
-    MemoryPressureMonitor.Enabled = false;                       // Deterministic behavior
-}
-
-[TearDown]
-public void TearDown()
-{
-    PoolPurgeSettings.ResetToDefaults();                         // Leak-proof to next fixture
-    MemoryPressureMonitor.Enabled = _wasMemoryPressureEnabled;   // Restore prior value
-}
-```
-
-### Brittle Assertions
-
-**Problem:** Tests break from unrelated changes.
-
-| Anti-Pattern                                         | Correct Pattern                              |
-| ---------------------------------------------------- | -------------------------------------------- |
-| Asserting on `ToString()` format                     | Assert on semantic properties                |
-| Exact string matching                                | Contains/Regex for format-independent checks |
-| Asserting collection order when order doesn't matter | Use `CollectionAssert.AreEquivalent`         |
-| Over-specifying mock interactions                    | Verify only essential interactions           |
-
-### Missing Isolation
-
-**Problem:** Tests depend on external systems.
-
-| Anti-Pattern             | Correct Pattern                        |
-| ------------------------ | -------------------------------------- |
-| Real file system access  | Mock file operations or use temp files |
-| Network calls            | Mock HTTP clients                      |
-| Database dependencies    | In-memory test databases or mocks      |
-| Unity scene dependencies | Create test GameObjects in code        |
-
-### Serialization Layer Mismatches
-
-**Problem:** Tests assume values survive Unity serialization unchanged.
-
-| Anti-Pattern                                                          | Correct Pattern                                                                |
-| --------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| Setting field to `null`, then asserting `stringValue` is null         | Assert `stringValue` is `""` (Unity converts null to empty)                    |
-| Expecting null-check code to execute through property drawers         | Null checks on `stringValue` are dead code; test the empty-string path instead |
-| Testing distinct behavior for null vs `""` through SerializedProperty | Both map to `""` through serialization; test them as equivalent                |
-
-**Root cause**: `SerializedProperty.stringValue` always converts null strings to `""`. This means any test that sets a backing string field to `null` and then reads it through `SerializedObject.Update()` / `SerializedProperty` will see `""`, not `null`. See [defensive-editor-programming](./defensive-editor-programming.md) for the full serialization behavior documentation.
-
----
+### [Serialization Layer Mismatches](../references/investigate-test-failures-part-2.md#serialization-layer-mismatches)
 
 ## Unity-Specific Test Issues
 
-### Editor State
+[Read section](../references/investigate-test-failures-part-3.md#unity-specific-test-issues)
 
-```csharp
-// ❌ Test depends on editor selection state
-[Test]
-public void BrokenTest()
-{
-    // Fails if nothing selected in editor
-    GameObject selected = Selection.activeGameObject;
-}
+### [Editor State](../references/investigate-test-failures-part-3.md#editor-state)
 
-// ✅ Test creates its own controlled state
-[Test]
-public void CorrectTest()
-{
-    GameObject testObject = new GameObject("TestObject");
-    try
-    {
-        // Test with controlled object
-    }
-    finally
-    {
-        Object.DestroyImmediate(testObject);
-    }
-}
-```
+### [Async Operations](../references/investigate-test-failures-part-3.md#async-operations)
 
-### Async Operations
-
-```csharp
-// ❌ Race condition—coroutine may not complete
-[UnityTest]
-public IEnumerator BrokenAsyncTest()
-{
-    StartSomeCoroutine();
-    // Immediate assertion without waiting
-    Assert.IsTrue(operationComplete);
-}
-
-// ✅ Properly wait for completion
-[UnityTest]
-public IEnumerator CorrectAsyncTest()
-{
-    bool completed = false;
-    StartCoroutine(DoOperation(() => completed = true));
-
-    yield return new WaitUntil(() => completed);
-
-    Assert.IsTrue(operationComplete);
-}
-```
-
-### Frame-Dependent Logic
-
-```csharp
-// ❌ Assumes operation completes in one frame
-[UnityTest]
-public IEnumerator BrokenFrameTest()
-{
-    TriggerAnimation();
-    yield return null; // Only one frame
-    Assert.IsTrue(animationComplete); // May still be running
-}
-
-// ✅ Wait for actual completion signal
-[UnityTest]
-public IEnumerator CorrectFrameTest()
-{
-    bool animationDone = false;
-    TriggerAnimation(onComplete: () => animationDone = true);
-
-    yield return new WaitUntil(() => animationDone);
-
-    Assert.IsTrue(animationComplete);
-}
-```
-
----
+### [Frame-Dependent Logic](../references/investigate-test-failures-part-3.md#frame-dependent-logic)
 
 ## Investigation Checklist
 
-Use this checklist for every test failure:
-
-```markdown
-### Test Failure Investigation: [TestName]
-
-- [ ] Read complete error message and stack trace
-- [ ] Understand what behavior the test verifies
-- [ ] Reproduce failure consistently (or identify intermittent pattern)
-- [ ] Classify: Production bug or Test bug?
-
-#### If Production Bug:
-
-- [ ] Identify the incorrect production behavior
-- [ ] Determine root cause (not just symptoms)
-- [ ] Implement minimal fix to production code
-- [ ] Verify test passes with fix
-- [ ] Consider additional edge case tests
-
-#### If Test Bug:
-
-- [ ] Identify the test defect (assertion, setup, isolation, determinism)
-- [ ] Fix test to correctly verify intended behavior
-- [ ] Verify test fails when it should (mutation testing)
-- [ ] Ensure test is deterministic across runs
-
-#### Final Verification:
-
-- [ ] Run full test suite to check for regressions
-- [ ] Confirm no new flakiness introduced
-```
-
----
+[Read section](../references/investigate-test-failures-part-3.md#investigation-checklist)
 
 ## Red Flags Requiring Deep Investigation
 
-These patterns indicate systemic issues requiring thorough analysis:
-
-| Red Flag                                 | Indicates                                          |
-| ---------------------------------------- | -------------------------------------------------- |
-| Test passes locally, fails in CI         | Environment dependency or race condition           |
-| Test fails on first run, passes on retry | Static state leakage or initialization order       |
-| Multiple unrelated tests fail together   | Shared state corruption                            |
-| Test fails only with other tests         | Test isolation violation                           |
-| Test fails near resource limits          | Memory leak or resource exhaustion                 |
-| Test fails at specific times             | Time-dependent logic or timezone issues            |
-| Test fails after assembly restructuring  | Stale hardcoded assembly name lists or IVT entries |
-
----
+[Read section](../references/investigate-test-failures-part-3.md#red-flags-requiring-deep-investigation)
 
 ## Documentation Requirements
 
-When fixing test failures, document:
-
-1. **Root cause** — What was actually broken (production or test)?
-2. **Fix approach** — Why this fix addresses the root cause
-3. **Prevention** — How similar issues can be avoided
-
-**CRITICAL — CHANGELOG updates for production bugs:**
-
-When a test failure investigation reveals a **production bug**, the fix is a user-facing change that **MUST** have a CHANGELOG entry. Test-only fixes (no production code changes) do NOT require a CHANGELOG entry. This distinction is easy to miss because the task starts as "fix test failures" but the actual fix touches production code.
-
-| Classification                         | CHANGELOG Required               | Example                                        |
-| -------------------------------------- | -------------------------------- | ---------------------------------------------- |
-| Production bug found via test failure  | **YES** — add `### Fixed` entry  | Path mismatch in generator, missing null check |
-| Test bug only (test setup, assertions) | No                               | Wrong expected value, missing yield            |
-| Both production and test fixes         | **YES** — for the production fix | Stale paths in both production and test code   |
-
-For significant fixes, update relevant documentation or add code comments explaining non-obvious design decisions.
-
----
+[Read section](../references/investigate-test-failures-part-3.md#documentation-requirements)
 
 ## Summary
 
-**Never "just make tests pass."** Every test failure is a signal that requires:
-
-1. Full investigation to understand root cause
-2. Classification as production bug or test bug
-3. Comprehensive fix addressing the actual problem
-4. Verification that the fix is correct and complete
-
-Tests are production code. Treat them with the same rigor.
-
----
+[Read section](../references/investigate-test-failures-part-3.md#summary)
 
 ## Related Skills
 
-- [create-test](./create-test.md) — General test creation guidelines
-- [test-data-driven](./test-data-driven.md) — Data-driven testing with TestCase and TestCaseSource
-- [test-naming-conventions](./test-naming-conventions.md) — Naming rules and legacy test migration
-- [test-unity-lifecycle](./test-unity-lifecycle.md) — Track(), DestroyImmediate, object management
-- [validate-before-commit](./validate-before-commit.md) — Pre-commit validation workflow
+[Read section](../references/investigate-test-failures-part-3.md#related-skills)

@@ -2,452 +2,156 @@
 
 <!-- trigger: lint, linter, csharpier, prettier, cspell | Detailed linter commands, configurations | Core -->
 
-**Trigger**: When you need detailed linter commands, configurations, or to understand what each linter checks.
+## Reference Parts
+
+- [Part 1](../references/linter-reference-part-1.md)
+- [Part 2](../references/linter-reference-part-2.md)
+- [Part 3](../references/linter-reference-part-3.md)
 
 ## When to Use
 
-Use this reference when you need:
-
-- Complete linter command documentation
-- Configuration file locations and settings
-- Understanding what specific rules check
-
-For the quick validation workflow, see [validate-before-commit](./validate-before-commit.md).
+[Read section](../references/linter-reference-part-1.md#when-to-use)
 
 ## All Linter Commands
 
-### Master Validation Command
+[Read section](../references/linter-reference-part-1.md#all-linter-commands)
 
-```bash
-# Run ALL checks at once (recommended before commit/push)
-npm run validate:local
-```
+### [Master Validation Command](../references/linter-reference-part-1.md#master-validation-command)
 
-### Individual Commands
-
-| Command                                         | Description                                  |
-| ----------------------------------------------- | -------------------------------------------- |
-| `npm run lint:spelling`                         | Spell check all documentation (CSpell)       |
-| `npm run lint:spelling:config`                  | Lint cspell.json for config issues           |
-| `npm run lint:spelling:config:fix`              | Auto-fix cspell.json config issues           |
-| `npm run lint:docs`                             | Check markdown links and backtick refs       |
-| `npm run lint:markdown`                         | Markdownlint structural rules                |
-| `npm run lint:yaml`                             | YAML syntax validation                       |
-| `npm run lint:dependabot`                       | Dependabot config schema validation          |
-| `npm run lint:pwsh-invocations`                 | Bash->PowerShell invocation anti-patterns    |
-| `npm run validate:lint-error-codes`             | cspell coverage for lint-error-code prefixes |
-| `npm run lint:csharp-naming`                    | C# naming conventions (method casing, etc.)  |
-| `npm run format:md:check`                       | Check markdown formatting (Prettier)         |
-| `npm run format:json:check`                     | Check JSON/ASMDEF formatting (Prettier)      |
-| `npm run format:yaml:check`                     | Check YAML formatting (Prettier)             |
-| `npm run eol:check`                             | Line endings (CRLF) and BOM check            |
-| `npm run lint:tests`                            | Test lifecycle lint (Track() usage)          |
-| `npm run validate:tests:fast`                   | Fast repository contract suites              |
-| `npm run validate:tests:hook-regressions`       | Exhaustive synthetic hook fixtures           |
-| `npm run validate:tests`                        | Complete CI contract suite                   |
-| `npm run test:sync-script-contracts`            | Sync newline + cspell contract regressions   |
-| `bash scripts/audit-license-years.sh --summary` | License year header audit                    |
+### [Individual Commands](../references/linter-reference-part-1.md#individual-commands)
 
 ## CSpell Spell Checker
 
-### Command
+[Read section](../references/linter-reference-part-1.md#cspell-spell-checker)
 
-```bash
-npm run lint:spelling
-```
+### [Command](../references/linter-reference-part-1.md#command)
 
-### Configuration
+### [Configuration](../references/linter-reference-part-1.md#configuration)
 
-Located at `cspell.json` in the project root.
+### [Adding Words to Dictionary](../references/linter-reference-part-1.md#adding-words-to-dictionary)
 
-### Adding Words to Dictionary
+### [Config Lint](../references/linter-reference-part-1.md#config-lint)
 
-Add words to the appropriate categorized dictionary in `cspell.json`, not the root `words` array:
+### [Lint-Error-Code Coverage (Contract)](../references/linter-reference-part-1.md#lint-error-code-coverage-contract)
 
-| Dictionary      | Purpose                                  | Examples                                |
-| --------------- | ---------------------------------------- | --------------------------------------- |
-| `unity-terms`   | Unity Engine APIs, components, lifecycle | MonoBehaviour, GetComponent, OnValidate |
-| `csharp-terms`  | C# language features, .NET types         | readonly, nullable, IVT, StringBuilder  |
-| `package-terms` | This package's public API and type names | WallstopStudios, IRandom, SpatialHash   |
-| `tech-terms`    | General programming/tooling terms        | async, config, JSON, IL2CPP             |
-
-When adding technical abbreviations (e.g., IVT for InternalsVisibleTo), place them in the matching category (`csharp-terms` for C# concepts, `tech-terms` for general tooling). Only use the root `words` array for project-specific words that don't fit any category.
-
-**Lint-error-code prefixes** (2 or more uppercase letters used in codes like
-`UNH001`, `PWS002`) belong in the root `words` array. Whenever a new lint
-script emits a new prefix, register the prefix in cspell and run
-`npm run validate:lint-error-codes` to confirm the contract still holds.
-
-Since `caseSensitive` is `false` in this project, only ONE case variant per word is needed (e.g., `ulf` covers `ULF`, `Ulf`, etc.).
-
-### Config Lint
-
-```bash
-npm run lint:spelling:config       # Check for case-redundant entries
-npm run lint:spelling:config:fix   # Auto-fix case-redundant entries
-```
-
-The config linter catches case-redundant dictionary entries (error, blocking) and cross-dictionary duplicates (warning, non-blocking). It does not auto-classify root words into categorized dictionaries. That remains a review-time policy decision.
-
-### Lint-Error-Code Coverage (Contract)
-
-`npm run validate:lint-error-codes` enforces that every `^[A-Z]{2,}\d{3}$` token emitted by `scripts/lint-*.{ps1,js}`, `scripts/tests/test-lint-*.{ps1,js,sh}`, or `.githooks/*` has its prefix registered with cspell; on drift it prints a copy-pasteable JSON patch. Regression test: `scripts/tests/test-validate-lint-error-codes.ps1`. Wired into `validate:content`, `validate:tests`, and CI; run it before pushing when any file in those scan roots, `cspell.json`, the validator, or its test changes.
-
-### Inline Ignores
-
-For single occurrences, use CSpell ignore comments:
-
-```markdown
-<!-- cspell:ignore someword -->
-```
-
-Or in code:
-
-```csharp
-// cspell:ignore someword
-```
+### [Inline Ignores](../references/linter-reference-part-1.md#inline-ignores)
 
 ## Markdownlint
 
-### Command
+[Read section](../references/linter-reference-part-1.md#markdownlint)
 
-```bash
-npm run lint:markdown
-```
+### [Command](../references/linter-reference-part-1.md#command-1)
 
-### Configuration
+### [Configuration](../references/linter-reference-part-1.md#configuration-1)
 
-Located at `.markdownlint.json` in the project root.
+### [Disabled Rules](../references/linter-reference-part-1.md#disabled-rules)
 
-### Disabled Rules
-
-These rules are disabled in this project:
-
-| Rule    | Description                  | Why Disabled           |
-| ------- | ---------------------------- | ---------------------- |
-| `MD013` | Line length                  | Prettier handles this  |
-| `MD041` | First line should be heading | Some files have badges |
-| `MD033` | Inline HTML                  | Needed for formatting  |
-| `MD024` | Duplicate headings           | Allowed in this repo   |
-
-### Common Rule Violations
-
-| Rule    | Issue                                   | Fix                             |
-| ------- | --------------------------------------- | ------------------------------- |
-| `MD007` | Wrong list indentation                  | Use 2 spaces for nested lists   |
-| `MD009` | Trailing spaces                         | Remove trailing whitespace      |
-| `MD012` | Multiple consecutive blank lines        | Reduce to single blank line     |
-| `MD022` | Headings should be surrounded by blanks | Add blank lines around headings |
-| `MD032` | Lists should be surrounded by blanks    | Add blank lines around lists    |
+### [Common Rule Violations](../references/linter-reference-part-1.md#common-rule-violations)
 
 ## Link Linter (lint:docs)
 
-### Command
+[Read section](../references/linter-reference-part-1.md#link-linter-lintdocs)
 
-```bash
-npm run lint:docs # full scan; use scripts/lint-doc-links.ps1 -Paths <files> for scoped checks
-```
+### [Command](../references/linter-reference-part-1.md#command-2)
 
-### What It Checks
+### [What It Checks](../references/linter-reference-part-1.md#what-it-checks)
 
-1. **Broken internal links** — Links to non-existent files
-2. **Missing anchors** — Links to non-existent headings
-3. **Backtick file references** — Using backtick-wrapped filenames instead of proper links
-
-### Link Format Requirements
-
-```markdown
-<!-- ✅ CORRECT: Use relative paths with ./ or ../ -->
-
-[create-test](./create-test.md)
-[context](../context.md)
-
-<!-- ❌ WRONG: No relative prefix -->
-
-[create-test](create-test.md)
-```
+### [Link Format Requirements](../references/linter-reference-part-1.md#link-format-requirements)
 
 ## Prettier
 
-### Commands
+[Read section](../references/linter-reference-part-2.md#prettier)
 
-```bash
-# Check formatting
-node scripts/run-prettier.js --check -- .
-node scripts/run-prettier.js --check -- <file>
+### [Commands](../references/linter-reference-part-2.md#commands)
 
-# Fix formatting
-node scripts/run-prettier.js --write -- .
-node scripts/run-prettier.js --write -- <file>
-```
+### [Configuration](../references/linter-reference-part-2.md#configuration)
 
-### Configuration
+### [File Coverage](../references/linter-reference-part-2.md#file-coverage)
 
-Located at `.prettierrc.json`:
-
-```json
-{
-  "proseWrap": "always",
-  "printWidth": 100,
-  "tabWidth": 2,
-  "trailingComma": "es5"
-}
-```
-
-### File Coverage
-
-Prettier handles these file types:
-
-- Markdown (`.md`)
-- JSON (`.json`, `.asmdef`)
-- YAML (`.yml`, `.yaml`)
-- JavaScript (`.js`)
-
-### Ignored Files
-
-See `.prettierignore` for files excluded from formatting.
+### [Ignored Files](../references/linter-reference-part-2.md#ignored-files)
 
 ## CSharpier
 
-### Command
+[Read section](../references/linter-reference-part-2.md#csharpier)
 
-```bash
-dotnet tool run csharpier format .
-```
+### [Command](../references/linter-reference-part-2.md#command)
 
-### Configuration
+### [Configuration](../references/linter-reference-part-2.md#configuration-1)
 
-Located at `.csharpierrc.json`:
-
-```json
-{
-  "printWidth": 100,
-  "useTabs": false,
-  "tabWidth": 4
-}
-```
-
-### Important Notes
-
-- CSharpier only formats C# files
-- Always run after ANY `.cs` file modification
-- Cannot fix naming convention violations (use manual fixes)
+### [Important Notes](../references/linter-reference-part-2.md#important-notes)
 
 ## C# Naming Linter
 
-### Command
+[Read section](../references/linter-reference-part-2.md#c-naming-linter)
 
-```bash
-npm run lint:csharp-naming
-```
+### [Command](../references/linter-reference-part-2.md#command-1)
 
-### What It Checks
-
-| Pattern           | Requirement              | Example         |
-| ----------------- | ------------------------ | --------------- |
-| Public methods    | PascalCase               | `GetValue()`    |
-| Private methods   | PascalCase               | `ProcessData()` |
-| Public properties | PascalCase               | `Count`         |
-| Private fields    | `_camelCase` with prefix | `_myField`      |
-| Constants         | PascalCase or UPPER_CASE | `MaxValue`      |
-| Parameters        | camelCase                | `itemCount`     |
-| Type parameters   | `T` or `T` + PascalCase  | `T`, `TValue`   |
+### [What It Checks](../references/linter-reference-part-2.md#what-it-checks)
 
 ## YAML Linter
 
-### Command
+[Read section](../references/linter-reference-part-2.md#yaml-linter)
 
-```bash
-npm run lint:yaml
-```
+### [Command](../references/linter-reference-part-2.md#command-2)
 
-### What It Checks
+### [What It Checks](../references/linter-reference-part-2.md#what-it-checks-1)
 
-- YAML syntax validity
-- Proper indentation
-- Duplicate keys
-
-### For GitHub Workflow Files
-
-```bash
-# Additional check for workflow files
-actionlint
-```
+### [For GitHub Workflow Files](../references/linter-reference-part-2.md#for-github-workflow-files)
 
 ## Test Lifecycle Linter
 
-### Command
+[Read section](../references/linter-reference-part-2.md#test-lifecycle-linter)
 
-```bash
-npm run lint:tests
-```
+### [Command](../references/linter-reference-part-2.md#command-3)
 
-### What It Checks
+### [What It Checks](../references/linter-reference-part-2.md#what-it-checks-2)
 
-1. **Allowlist path validation** (on startup): All paths in `$allowedHelperFiles` must exist on disk. Fails immediately with exit code 1 if any path is stale (file moved/renamed/deleted).
-2. **UNH001**: Direct `Destroy`/`DestroyImmediate` calls without `Track()`
-3. **UNH002**: Untracked Unity object allocation (`new GameObject(...)` etc.)
-4. **UNH003**: Test classes missing `CommonTestBase` inheritance
-5. **UNH004**: Underscores in test names
-6. **UNH005**: `Assert.IsNull`/`Assert.IsNotNull` (should use `Assert.IsTrue` for Unity null checks)
-7. **UNH011**: Editor-only references (`UnityEditor`, `WallstopStudios.UnityHelpers.Editor`) in
-   player-compiled test code (anything under `Tests/` except `Tests/Editor/`) must be inside
-   `#if UNITY_EDITOR`. Otherwise the editor assembly is stripped from the standalone player build
-   and the leg fails with `CS0234` before any test runs. Add `// UNH-SUPPRESS UNH011` to opt out.
-8. **UNH012**: A test must never `yield return` a `WaitForEndOfFrame` (e.g.
-   `yield return new WaitForEndOfFrame();` or `yield return Buffers.WaitForEndOfFrame;`). Under
-   `-batchmode -nographics` (the headless CI legs) there is no end-of-frame callback, so the yield
-   never resumes: the PlayMode run hangs until it is force-killed and emits a misleading `total=0`
-   `results.xml` that aborts the whole leg. Use `yield return null` (the production helper is
-   batchmode-safe). A bare reference without `yield return` is not flagged. Add `// UNH-SUPPRESS`
-   to opt out.
-9. **UNH013**: Non-performance `Tests/Runtime/Tags` tests must not construct
-   `WaitForSeconds` or `WaitForSecondsRealtime`; use deterministic `EffectHandler` clock/tick seams.
-   Add `// UNH-SUPPRESS UNH013` only for tests that intentionally verify real Unity lifecycle timing.
-
-All Unity object creation in tests must use `Track()`:
-
-```csharp
-// ✅ CORRECT: Track() ensures cleanup
-GameObject obj = Track(new GameObject("Test"));
-MyComponent comp = Track(obj.AddComponent<MyComponent>());
-
-// ❌ WRONG: Untracked objects may leak
-GameObject obj = new GameObject("Test");
-```
-
-### Tests
-
-```bash
-pwsh -NoProfile -File scripts/tests/test-lint-tests.ps1
-```
-
-Tests cover allowlist path existence, UNH error detection, clean file acceptance, and helper file allowlisting.
+### [Tests](../references/linter-reference-part-2.md#tests)
 
 ## Line Ending Linter
 
-### Command
+[Read section](../references/linter-reference-part-2.md#line-ending-linter)
 
-```bash
-npm run eol:check
-```
+### [Command](../references/linter-reference-part-2.md#command-4)
 
-### Requirements
+### [Requirements](../references/linter-reference-part-2.md#requirements)
 
-- All files must use CRLF line endings
-- No UTF-8 BOM (Byte Order Mark)
-
-### Fixing Line Endings
-
-```bash
-npm run eol:fix
-```
+### [Fixing Line Endings](../references/linter-reference-part-2.md#fixing-line-endings)
 
 ## Meta File Linter
 
-### Command
+[Read section](../references/linter-reference-part-3.md#meta-file-linter)
 
-```bash
-pwsh -NoProfile -File scripts/lint-meta-files.ps1
-pwsh -NoProfile -File scripts/lint-meta-files.ps1 -VerboseOutput  # detailed output
-```
+### [Command](../references/linter-reference-part-3.md#command)
 
-### What It Checks
+### [What It Checks](../references/linter-reference-part-3.md#what-it-checks)
 
-Every file and directory under scanned source roots (`Runtime`, `Editor`, `Tests`, `Samples~`, `Shaders`, `Styles`, `URP`, `docs`, `scripts`) has a corresponding `.meta` file, and every `.meta` file has a corresponding source file/directory.
+### [Exclusion Configuration](../references/linter-reference-part-3.md#exclusion-configuration)
 
-### Exclusion Configuration
+### [Adding New Exclusions](../references/linter-reference-part-3.md#adding-new-exclusions)
 
-The script excludes certain paths from requiring `.meta` files. Exclusions are defined in three arrays at
-the top of [lint-meta-files.ps1](../../scripts/lint-meta-files.ps1):
+### [Test-ShouldExclude Function](../references/linter-reference-part-3.md#test-shouldexclude-function)
 
-| Array                  | Purpose                                          | Examples                                                      |
-| ---------------------- | ------------------------------------------------ | ------------------------------------------------------------- |
-| `$excludeDirs`         | Directories excluded entirely (and all contents) | `node_modules`, `.pytest_cache`, `__pycache__`, `.mypy_cache` |
-| `$excludeFilePatterns` | File name/glob patterns excluded                 | `.gitkeep`, `.DS_Store`, `Thumbs.db`, `*.pyc`, `*.swp`        |
-| `$excludeDirPatterns`  | Directory name patterns excluded                 | `Samples~`                                                    |
-
-### Adding New Exclusions
-
-When introducing new tooling that creates cache or artifact directories inside source roots:
-
-1. Add the directory name to `$excludeDirs` (for directories) or file pattern to `$excludeFilePatterns`
-   (for files)
-2. Add test cases to [test-lint-meta-exclusions.sh](../../scripts/tests/test-lint-meta-exclusions.sh)
-3. Run the tests: `bash scripts/tests/test-lint-meta-exclusions.sh`
-
-### Test-ShouldExclude Function
-
-The `Test-ShouldExclude` function checks whether a path should be excluded. For `$excludeDirs` entries,
-it matches:
-
-- The directory itself: `$relativePath -eq $dir` or `$relativePath -like "*/$dir"`
-- Contents at root level: `$relativePath -like "$dir/*"`
-- Nested contents: `$relativePath -like "*/$dir/*"`
-
-Patterns must match **both** the excluded directory itself **and** its contents. If only contents are
-matched (e.g., `$dir/*` without `$dir`), orphaned `.meta` files for the directory itself won't be
-detected correctly.
-
-### Tests
-
-```bash
-bash scripts/tests/test-lint-meta-exclusions.sh
-```
-
-Tests cover all exclusion categories: tooling cache dirs, OS metadata, git placeholders, compiled bytecode, and editor temp files.
+### [Tests](../references/linter-reference-part-3.md#tests)
 
 ## NPM Script Breakdown
 
-### validate:local
+[Read section](../references/linter-reference-part-3.md#npm-script-breakdown)
 
-Runs these in sequence:
+### [validate:local](../references/linter-reference-part-3.md#validatelocal)
 
-1. `validate:content` (docs + formatting)
-2. `eol:check`
-3. `validate:tests:fast` (CI's full `validate:tests` also runs synthetic hook regressions)
-4. `lint:csharp-naming`
+### [validate:prepush](../references/linter-reference-part-3.md#validateprepush)
 
-### validate:prepush
-
-Runs only the fast `validate:git-push-config` safety check. Repository-wide lint and contract
-suites belong in targeted developer commands, `validate:local`, and CI—not in the push path.
-
-### validate:content
-
-Runs these in sequence:
-
-1. `lint:docs`
-2. `lint:markdown`
-3. `format:md:check`
-4. `format:json:check`
-5. `format:yaml:check`
+### [validate:content](../references/linter-reference-part-3.md#validatecontent)
 
 ## Shared Helpers
 
-| Helper                          | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `scripts/comment-stripping.ps1` | Language-aware comment masker used by `lint-doc-links`, `lint-csharp-naming`, `lint-odin-undo-safety`, `lint-drawer-multiobject`, `lint-tests`. Replaces comment characters with spaces while preserving line/column offsets so downstream regex scans don't false-positive on commented-out code. Public API: `Get-LanguageFromExtension`, `Get-CommentMaskedLines`, `Get-CommentRanges`. Pinned by `scripts/tests/test-comment-stripping.ps1`. |
-| `scripts/git-path-helpers.ps1`  | Normalizes filesystem paths to repo-relative POSIX form for safe use with `git check-ignore` and related plumbing.                                                                                                                                                                                                                                                                                                                               |
-
-When adding a new lint script that scans source-code text, prefer dot-sourcing `comment-stripping.ps1` over hand-rolling a comment scrubber.
+[Read section](../references/linter-reference-part-3.md#shared-helpers)
 
 ## Configuration File Locations
 
-| Tool         | Config File          | Purpose                |
-| ------------ | -------------------- | ---------------------- |
-| CSpell       | `cspell.json`        | Spell check dictionary |
-| Markdownlint | `.markdownlint.json` | Markdown rules         |
-| Prettier     | `.prettierrc.json`   | Formatting options     |
-| Prettier     | `.prettierignore`    | Ignored files          |
-| CSharpier    | `.csharpierrc.json`  | C# formatting options  |
-| ESLint       | `.eslintrc.json`     | JavaScript linting     |
-| EditorConfig | `.editorconfig`      | Editor settings        |
+[Read section](../references/linter-reference-part-3.md#configuration-file-locations)
 
 ## Related Skills
 
-- [validate-before-commit](./validate-before-commit.md) — Quick validation workflow
-- [validation-troubleshooting](./validation-troubleshooting.md) — Common errors and fixes
-- [formatting](./formatting.md) — CSharpier, Prettier, markdownlint workflow
-- [markdown-reference](./markdown-reference.md) — Link formatting, structural rules
-- [license-headers](./license-headers.md) — License header year rules and auto-fix
+[Read section](../references/linter-reference-part-3.md#related-skills)

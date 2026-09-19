@@ -2,234 +2,61 @@
 
 <!-- trigger: region, regions, #region, #endregion, code organization | ALL C# code - never use #region/#endregion | Core -->
 
-**Trigger**: When writing or reviewing any C# code in this repository.
+## Reference Parts
 
----
+- [Part 1](../references/no-regions-part-1.md)
+- [Part 2](../references/no-regions-part-2.md)
 
 ## The Rule
 
-**NEVER use `#region` or `#endregion` in any C# code.** This is an absolute, non-negotiable rule.
-
-This rule is enforced by:
-
-1. AI agent guidelines (this document and [LLM context](../context.md))
-2. Pre-commit git hook (blocks commits containing regions)
-3. Code review policy
-
----
+[Read section](../references/no-regions-part-1.md#the-rule)
 
 ## Why Regions Are Forbidden
 
-### 1. Code Smell Indicator
+[Read section](../references/no-regions-part-1.md#why-regions-are-forbidden)
 
-Regions often indicate a class has grown too large and should be refactored:
+### [1. Code Smell Indicator](../references/no-regions-part-1.md#1-code-smell-indicator)
 
-- If you need regions to organize a file, the file is too big
-- Extract classes, use composition, or split into multiple files
-- Well-organized small classes do not need artificial grouping
+### [2. Hidden Complexity](../references/no-regions-part-1.md#2-hidden-complexity)
 
-### 2. Hidden Complexity
+### [3. IDE Navigation Interference](../references/no-regions-part-1.md#3-ide-navigation-interference)
 
-Regions hide code rather than organize it:
-
-- Collapsed regions obscure what code exists in a file
-- Developers skip reading collapsed sections, missing important details
-- Code reviews become less thorough when regions are collapsed
-
-### 3. IDE Navigation Interference
-
-Modern IDEs provide superior navigation:
-
-- Outline views show class structure without regions
-- Go-to-definition, find references, and search work better without regions
-- Regions add noise to these navigation tools
-
-### 4. Inconsistent Usage
-
-Regions lead to bikeshedding and inconsistency:
-
-- Teams argue about what to group and how to name regions
-- Different developers use different grouping strategies
-- This wastes time and creates unnecessary diff noise
-
----
+### [4. Inconsistent Usage](../references/no-regions-part-1.md#4-inconsistent-usage)
 
 ## What To Do Instead
 
-### Organize Through File Structure
+[Read section](../references/no-regions-part-1.md#what-to-do-instead)
 
-```text
-Runtime/
-  Core/
-    DataStructure/
-      Cache/
-        Cache.cs           # Main Cache<TKey, TValue> implementation
-        CacheEntry.cs      # Entry struct
-        CachePresets.cs    # Factory methods for common configurations
-        ICachePolicy.cs    # Eviction policy interface
-```
+### [Organize Through File Structure](../references/no-regions-part-1.md#organize-through-file-structure)
 
-### Use Partial Classes (Sparingly)
+### [Use Partial Classes (Sparingly)](../references/no-regions-part-1.md#use-partial-classes-sparingly)
 
-For genuinely large classes that cannot be split, use partial classes in separate files:
+### [Follow Consistent Member Ordering](../references/no-regions-part-1.md#follow-consistent-member-ordering)
 
-```csharp
-// SpatialHash.cs - Core implementation
-public sealed partial class SpatialHash<T>
-{
-    public void Add(T item) { /* ... */ }
-    public void Remove(T item) { /* ... */ }
-}
-
-// SpatialHash.Queries.cs - Query methods
-public sealed partial class SpatialHash<T>
-{
-    public void QueryRadius(Vector2 center, float radius, List<T> results) { /* ... */ }
-    public void QueryRect(Rect bounds, List<T> results) { /* ... */ }
-}
-```
-
-### Follow Consistent Member Ordering
-
-Organize members in a consistent order without regions:
-
-1. Constants and static readonly fields
-2. Instance fields
-3. Constructors
-4. Public properties
-5. Public methods
-6. Private/internal methods
-7. Nested types (if any)
-
-This ordering is self-documenting and does not require regions.
-
-### Extract Classes
-
-If a class has many methods, extract related functionality:
-
-```csharp
-// Before: One large class with regions
-public class PlayerController
-{
-    #region Movement
-    // 200 lines of movement code
-    #endregion
-
-    #region Combat
-    // 200 lines of combat code
-    #endregion
-
-    #region Inventory
-    // 200 lines of inventory code
-    #endregion
-}
-
-// After: Composition with focused classes
-public sealed class PlayerController
-{
-    private readonly PlayerMovement _movement;
-    private readonly PlayerCombat _combat;
-    private readonly PlayerInventory _inventory;
-}
-```
-
----
+### [Extract Classes](../references/no-regions-part-1.md#extract-classes)
 
 ## Examples
 
-### Forbidden Patterns
+[Read section](../references/no-regions-part-2.md#examples)
 
-```csharp
-// All of these are FORBIDDEN:
+### [Forbidden Patterns](../references/no-regions-part-2.md#forbidden-patterns)
 
-#region Fields
-private int _count;
-private string _name;
-#endregion
-
-#region Public Methods
-public void DoSomething() { }
-#endregion
-
-#region Private Helpers
-private void Helper() { }
-#endregion
-
-#region Unity Lifecycle
-private void Awake() { }
-private void Update() { }
-#endregion
-
-#region Interface Implementation
-// IDisposable implementation
-#endregion
-```
-
-### Acceptable Alternatives
-
-```csharp
-// Just organize code naturally without regions:
-
-public sealed class MyClass : IDisposable
-{
-    private int _count;
-    private string _name;
-
-    public void DoSomething()
-    {
-        // Implementation
-    }
-
-    public void Dispose()
-    {
-        // Cleanup
-    }
-
-    private void Helper()
-    {
-        // Implementation
-    }
-}
-```
-
----
+### [Acceptable Alternatives](../references/no-regions-part-2.md#acceptable-alternatives)
 
 ## Edge Cases
 
-### Third-Party Generated Code
+[Read section](../references/no-regions-part-2.md#edge-cases)
 
-If you must include generated code that contains regions, isolate it in clearly marked generated files. Prefer regenerating without regions if the tool supports it.
+### [Third-Party Generated Code](../references/no-regions-part-2.md#third-party-generated-code)
 
-### Copying Code From External Sources
+### [Copying Code From External Sources](../references/no-regions-part-2.md#copying-code-from-external-sources)
 
-When copying code from external sources that uses regions, remove the regions during the copy process. This is non-negotiable.
-
-### Legacy Code
-
-There is no legacy exception. If you encounter regions in existing code, remove them when you modify that file.
-
----
+### [Legacy Code](../references/no-regions-part-2.md#legacy-code)
 
 ## Git Hook Enforcement
 
-The pre-commit hook will reject any commit containing `#region` or `#endregion`. If you see this error:
-
-```text
-Error: C# regions (#region/#endregion) are forbidden in this codebase.
-The following files contain regions:
-  Runtime/Core/MyClass.cs:15: #region Helper Methods
-  Runtime/Core/MyClass.cs:45: #endregion
-
-Remove all #region and #endregion directives before committing.
-See .llm/skills/no-regions.md for guidance on code organization alternatives.
-```
-
-The solution is to remove the regions, not bypass the hook.
-
----
+[Read section](../references/no-regions-part-2.md#git-hook-enforcement)
 
 ## Related Skills
 
-- [create-csharp-file](./create-csharp-file.md) - C# file creation standards
-- [high-performance-csharp](./high-performance-csharp.md) - Performance patterns
-- [validate-before-commit](./validate-before-commit.md) - Pre-commit validation
+[Read section](../references/no-regions-part-2.md#related-skills)

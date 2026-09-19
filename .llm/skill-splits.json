@@ -1,0 +1,614 @@
+{
+  "version": 1,
+  "skills": [
+    {
+      "name": "add-inspector-attribute",
+      "sha256": "0ec0a10580170c359a6e68602c3aab4943523dd03e637f2f97e641ee2ee7246f",
+      "parts": [
+        "add-inspector-attribute-part-1.md",
+        "add-inspector-attribute-part-2.md",
+        "add-inspector-attribute-part-3.md"
+      ],
+      "routerSha256": "9081b2a4469e25774123c26e22d8b0c875f7fe71a5c9f7cbc0b557eea72c21ad"
+    },
+    {
+      "name": "asset-postprocessor-safety",
+      "sha256": "2d31b7449738992a8ab2be3e532af02a82d7595b054b8522679286fb99809fb7",
+      "parts": ["asset-postprocessor-safety-part-1.md", "asset-postprocessor-safety-part-2.md"],
+      "routerSha256": "472e37281b4e88027843a79076d4fdaff26350b70a827d9f6c6069427a56b3ad"
+    },
+    {
+      "name": "avoid-magic-strings",
+      "sha256": "a30f9f6a12ea2978a38070afbf14571bc2b24e57c9f271f3681804976af56172",
+      "parts": [
+        "avoid-magic-strings-part-1.md",
+        "avoid-magic-strings-part-2.md",
+        "avoid-magic-strings-part-3.md"
+      ],
+      "routerSha256": "4f9b536d5eab65c16181ed978de6547109cb7ea2630807acd554c3f562cadc4f"
+    },
+    {
+      "name": "avoid-reflection",
+      "sha256": "8b083202f8331761e9159f7f317f087a9a6ce8aef1860d43b4282230dcf2358d",
+      "parts": ["avoid-reflection-part-1.md", "avoid-reflection-part-2.md"],
+      "routerSha256": "d9d0748a7f8782677f897b396994d260daea9240daff339b3c6588c46e59da3e"
+    },
+    {
+      "name": "bash-pwsh-invocation",
+      "sha256": "cac150418d9c357bc1f6588fc830c1f51f829d072738feffec1ea373181b4cc6",
+      "parts": ["bash-pwsh-invocation-part-1.md", "bash-pwsh-invocation-part-2.md"],
+      "routerSha256": "f0cca73c9fab5ed1dbde785e8d10dc8f8942b589578f56dc76fef65d72e6b21f"
+    },
+    {
+      "name": "create-csharp-file",
+      "sha256": "ed0050ede9c64d70ffc3f32166debe88fc29b02fcc437e2d7f96a18ac64d024d",
+      "parts": [
+        "create-csharp-file-part-1.md",
+        "create-csharp-file-part-2.md",
+        "create-csharp-file-part-3.md"
+      ],
+      "routerSha256": "9aaf6824edef48b276ace256f878bf66a8cd365a5b97de7406f3937487da4773"
+    },
+    {
+      "name": "create-editor-tool",
+      "sha256": "b45a5470271f652ba8912a17e32af0578c0c3f0c04f094e8a4e1806cafab8a25",
+      "parts": [
+        "create-editor-tool-part-1.md",
+        "create-editor-tool-part-2.md",
+        "create-editor-tool-part-3.md"
+      ],
+      "routerSha256": "2f245be9107e7ca256a4f50f5b188196a62b3a05c3daf60119f72690ebd97660"
+    },
+    {
+      "name": "create-enum",
+      "sha256": "83fb09f2c8374df555a9c469683b4933e56ca580759df68b56507ecb01347326",
+      "parts": ["create-enum-part-1.md", "create-enum-part-2.md"],
+      "routerSha256": "2e2d8a6a6a83c1f1fd29a95844dfa58b7e7a01c7c59b859edd67d8bac32bd139"
+    },
+    {
+      "name": "create-property-drawer",
+      "sha256": "0d03148fce0699e6939b6df24c757740f046ff7b97288ce03ee01531786bb3cc",
+      "parts": ["create-property-drawer-part-1.md", "create-property-drawer-part-2.md"],
+      "routerSha256": "e3e529c7d503bf482675db01ca5eeafbb1715d8e5f470c876d90267309f2954c"
+    },
+    {
+      "name": "create-scriptable-object",
+      "sha256": "57ce61754dab83fe96d6a72f5f48147e5256d93bbe8c18d69bee603b1a55e93c",
+      "parts": [
+        "create-scriptable-object-part-1.md",
+        "create-scriptable-object-part-2.md",
+        "create-scriptable-object-part-3.md"
+      ],
+      "routerSha256": "5a877cd4a00e82b347c760a9a1d0ef03f8bcb0b2f91b018b7b189ccc95b46a5f"
+    },
+    {
+      "name": "create-test",
+      "sha256": "6f9706c770356ddd7d639dc98a119ce784b2144efe649ebedd0b65a6f12d6dc6",
+      "parts": ["create-test-part-1.md", "create-test-part-2.md", "create-test-part-3.md"],
+      "routerSha256": "2222492a292925bc47b896c9b4e36c675e49601bf1a41a80179a1989f443a6bd"
+    },
+    {
+      "name": "create-unity-meta",
+      "sha256": "7ee0b743975811372e112d35b70fa04a4a8bff15cb632d4a3aa8b0489b21c093",
+      "parts": ["create-unity-meta-part-1.md", "create-unity-meta-part-2.md"],
+      "routerSha256": "684b7626da0dee0a977c04bb893b15e972c3fe1868873e188e02a88d883c7172"
+    },
+    {
+      "name": "debug-il2cpp",
+      "sha256": "4ed38a5b99a02961c5d23d08fb765d7b67196d9116caf3e66ef468bc28d1fd0c",
+      "parts": ["debug-il2cpp-part-1.md", "debug-il2cpp-part-2.md"],
+      "routerSha256": "64b4987f47dde9c8f66c590943e2fb4e6754bd6af2f04e9cbfbe3ffd4e1f5f4c"
+    },
+    {
+      "name": "defensive-programming",
+      "sha256": "450f75030aa58501a768ce92ed199b92bac11e6342b1506ac3d4b6c98929647f",
+      "parts": [
+        "defensive-programming-part-1.md",
+        "defensive-programming-part-2.md",
+        "defensive-programming-part-3.md"
+      ],
+      "routerSha256": "ee2597e27e447127731dd58ed6ede06dd654c4e79e28a56edaeec123c4204edd"
+    },
+    {
+      "name": "documentation-consistency",
+      "sha256": "0c7ee353fbd2da86cc47d6cc92d8024439ac1332d2cbc8eaa18ca5966d19ad01",
+      "parts": [
+        "documentation-consistency-part-1.md",
+        "documentation-consistency-part-2.md",
+        "documentation-consistency-part-3.md"
+      ],
+      "routerSha256": "463a085b0666066357b9f7397da03a0e3b56ac612426351f8c1c72642844b52c"
+    },
+    {
+      "name": "editor-caching-patterns",
+      "sha256": "ad69fb0022fcf6a61a36859f50c06c037359831a9b8a806ec477641a65d6aaaf",
+      "parts": [
+        "editor-caching-patterns-part-1.md",
+        "editor-caching-patterns-part-2.md",
+        "editor-caching-patterns-part-3.md"
+      ],
+      "routerSha256": "f765bcf8f5daad1916b70d558989c526a3e5f4350b8be35c67a5d25bf8e3e4d0"
+    },
+    {
+      "name": "editor-multi-object-editing",
+      "sha256": "7df7740d0ce1ae42a20a74478832179a6b2faaf70241fcd3d5a363e76135afd9",
+      "parts": ["editor-multi-object-editing-part-1.md", "editor-multi-object-editing-part-2.md"],
+      "routerSha256": "e46e652adb33ae31b0c7e021b29d19e01c15810335c8288b1ce74590c1ec56f3"
+    },
+    {
+      "name": "formatting",
+      "sha256": "9898a424d5fbe9c64c1bab9bd7ae7cfde20ac99a79edb9c4b7153fd3aac2f772",
+      "parts": ["formatting-part-1.md", "formatting-part-2.md"],
+      "routerSha256": "b0630668a19f5417e169caac274bea181fd12a9f1e42a0a162cc32bf70ce72ce"
+    },
+    {
+      "name": "gc-architecture-unity",
+      "sha256": "f18adbf5733d4e7cb6ce3af288b5361df5e1b31796de4e8efe719c4007cbcae0",
+      "parts": ["gc-architecture-unity-part-1.md", "gc-architecture-unity-part-2.md"],
+      "routerSha256": "f03a0a8c3034cd7c875bd609cb1a2556b977740402a0e49a06c51207cde85d6f"
+    },
+    {
+      "name": "git-hook-lifecycle-debugging",
+      "sha256": "7c20d6fd399cb3a5717b837420e5793d91874e6b3dca20d6c19ad7c825b69cb1",
+      "parts": ["git-hook-lifecycle-debugging-part-1.md", "git-hook-lifecycle-debugging-part-2.md"],
+      "routerSha256": "72cc1016f3b6f7812d274e3781319cb7729cf2fa694d81a9f3f6a898ccacb4f6"
+    },
+    {
+      "name": "git-hook-syntax-portability",
+      "sha256": "2cb4ee6ce7f046385c3e7a54e75fb1bc158d1d018a710dbbd7d06555774c312e",
+      "parts": ["git-hook-syntax-portability-part-1.md", "git-hook-syntax-portability-part-2.md"],
+      "routerSha256": "c0d1f5f6d59b681e1b72b69dd15ab3de730e731a2ea513a812171111bfaf96e7"
+    },
+    {
+      "name": "git-safe-operations",
+      "sha256": "e6b37a99828d6bd1baceab5b0932ca6015317953db671f5c864f886c03663ff2",
+      "parts": ["git-safe-operations-part-1.md", "git-safe-operations-part-2.md"],
+      "routerSha256": "c7b6df73087a90fed3760731c78a182736147a7ff5b54dd2240b23e7a9b6e396"
+    },
+    {
+      "name": "git-staging-helpers",
+      "sha256": "f79028665a0c62b8e99bc74b72f6006c85927f8c26e4b2de2708ecc09001d8a8",
+      "parts": ["git-staging-helpers-part-1.md", "git-staging-helpers-part-2.md"],
+      "routerSha256": "b34eebfdffced07107347edf5e497d2c596edbe3b3e9dff538e2137216ef6460"
+    },
+    {
+      "name": "github-actions-shell-foundations",
+      "sha256": "ad170065a8d77c7481c25fad5126c87856009b5e13ddc8110c57ee6eebd7306f",
+      "parts": [
+        "github-actions-shell-foundations-part-1.md",
+        "github-actions-shell-foundations-part-2.md",
+        "github-actions-shell-foundations-part-3.md"
+      ],
+      "routerSha256": "b33b63c3e113947f42c08840e87191b17bcae1e059fbe6288af12c2b2be32270"
+    },
+    {
+      "name": "github-actions-shell-workflow-patterns",
+      "sha256": "31737d76daf43ab2a2faf131c8d3700b7f93bc7e97ae6f61dee806f2c8738ac8",
+      "parts": [
+        "github-actions-shell-workflow-patterns-part-1.md",
+        "github-actions-shell-workflow-patterns-part-2.md"
+      ],
+      "routerSha256": "bbb90416a00d83328385914568cd1e7cb89d082e808ec264b6c69feb6be6122e"
+    },
+    {
+      "name": "github-pages",
+      "sha256": "ba3bd6fe1e82a3008ee497f6be954cfffbc0625c155b63bbac7ef07773abea49",
+      "parts": ["github-pages-part-1.md", "github-pages-part-2.md"],
+      "routerSha256": "6e36607eaf8dbb96084c782bc771ce8133896f0a71c62d29efeff501facde975"
+    },
+    {
+      "name": "github-pages-theming",
+      "sha256": "01774971bb7c73708ee23d02756039da69e9d8a472e1988f5de1cd862226e8d2",
+      "parts": ["github-pages-theming-part-1.md", "github-pages-theming-part-2.md"],
+      "routerSha256": "2b8c2b3f9db676d5d1c3b09cdb463ea6019f9b9c4e073d0600093fc49f5d7121"
+    },
+    {
+      "name": "github-workflow-permissions",
+      "sha256": "281ad146d75e21e931e018566fbfdb57e666a04a816635a2d21a8980d905d06a",
+      "parts": ["github-workflow-permissions-part-1.md", "github-workflow-permissions-part-2.md"],
+      "routerSha256": "f0ee7909631fd91992ee3d0563f9a3820f5da5ba7bb4cf97255dac0964d73e6e"
+    },
+    {
+      "name": "integrate-odin-inspector",
+      "sha256": "23b023fdf877d11310982b710690d4fa05b941fd79ba40d2fce0ec84053e8fb1",
+      "parts": [
+        "integrate-odin-inspector-part-1.md",
+        "integrate-odin-inspector-part-2.md",
+        "integrate-odin-inspector-part-3.md"
+      ],
+      "routerSha256": "67972b27ce1e58cd92f41a40c549de13b958d80be757446ffd9488adddeb9b6c"
+    },
+    {
+      "name": "integrate-optional-dependency",
+      "sha256": "40a1539feab92a1f1819abd56fcfaa476a346d951e73b35d25cbb744c08114a3",
+      "parts": [
+        "integrate-optional-dependency-part-1.md",
+        "integrate-optional-dependency-part-2.md",
+        "integrate-optional-dependency-part-3.md"
+      ],
+      "routerSha256": "25af0b9345766944790ef1a5402ddad2758bfea19896b286e269225540a17425"
+    },
+    {
+      "name": "investigate-test-failures",
+      "sha256": "762c0146bd66911ba1c0bc30cb26855bea6b9e4c0a5803f4be19f6eba491d120",
+      "parts": [
+        "investigate-test-failures-part-1.md",
+        "investigate-test-failures-part-2.md",
+        "investigate-test-failures-part-3.md"
+      ],
+      "routerSha256": "eff573165a81c50e5819be693142b947ba79afff687feea76a306826a44056b9"
+    },
+    {
+      "name": "linq-elimination-patterns",
+      "sha256": "bd837f82bd6d6924bf76cfa0341493a01868137d96b5ecd2a85e116166964db0",
+      "parts": [
+        "linq-elimination-patterns-part-1.md",
+        "linq-elimination-patterns-part-2.md",
+        "linq-elimination-patterns-part-3.md"
+      ],
+      "routerSha256": "d895ead1f397791337bb0bdfbbf6ce29eb51060110fce768b425d151b71135da"
+    },
+    {
+      "name": "linter-reference",
+      "sha256": "a4ff677ad4cf0620008ae9387cab50d69543500b1a354fa0a52d86e5a4d809df",
+      "parts": [
+        "linter-reference-part-1.md",
+        "linter-reference-part-2.md",
+        "linter-reference-part-3.md"
+      ],
+      "routerSha256": "fd88da3739e671e3f43c8d34c5c72098cc10f70a7e636bc147bc0208a6e85bc9"
+    },
+    {
+      "name": "manage-skills",
+      "sha256": "fa33cba337e40f4f792540806447ae1e438832f698aca7904648b71768aa0551",
+      "parts": ["manage-skills-part-1.md", "manage-skills-part-2.md"],
+      "routerSha256": "94d8d8dd1d43f6fde5dddf4ead2118a369216a82d98ef7dbc2ae85b75157cb04"
+    },
+    {
+      "name": "markdown-reference",
+      "sha256": "30ad8a962978768e3e028aa3b4095db84edf763c8355d9877687b2d3d328ff2e",
+      "parts": [
+        "markdown-reference-part-1.md",
+        "markdown-reference-part-2.md",
+        "markdown-reference-part-3.md"
+      ],
+      "routerSha256": "4acc67fbab652263512bd09fbceaed311efeaa26fbc7a1ce518bafe2027b3ea2"
+    },
+    {
+      "name": "memory-allocation-traps",
+      "sha256": "2c958da45b35f5aaac233a0b55032bc0091ff35cd2500c892d1337959c264426",
+      "parts": [
+        "memory-allocation-traps-part-1.md",
+        "memory-allocation-traps-part-2.md",
+        "memory-allocation-traps-part-3.md"
+      ],
+      "routerSha256": "d08534114e2d3bc1e7e24309eaee3e98d498867fc45f9a7d0fadba57bf64da51"
+    },
+    {
+      "name": "mobile-xr-optimization",
+      "sha256": "622b15458aae3e1cbf5b12cd2a383217840e2f411b84f7e3062111f9e9dd0954",
+      "parts": [
+        "mobile-xr-optimization-part-1.md",
+        "mobile-xr-optimization-part-2.md",
+        "mobile-xr-optimization-part-3.md"
+      ],
+      "routerSha256": "4b3f65335b7cda76cf63c33fe89737796dca3712c9e1445c703938edf5bf33b5"
+    },
+    {
+      "name": "no-regions",
+      "sha256": "534442e51dc1987ac1bf259a2e265b88584df302418a0c165e643b2f311d3f6b",
+      "parts": ["no-regions-part-1.md", "no-regions-part-2.md"],
+      "routerSha256": "ca2ea743924ece45d960f06a58aa39a0a17ea16d999e640483b65e92ae13e6c9"
+    },
+    {
+      "name": "optimize-unity-physics",
+      "sha256": "23be97fbfbe9fa2a084b0c7d6c9651fdc4755c1c437ef544010f4f12678d2588",
+      "parts": [
+        "optimize-unity-physics-part-1.md",
+        "optimize-unity-physics-part-2.md",
+        "optimize-unity-physics-part-3.md"
+      ],
+      "routerSha256": "6deb1732a346eed22c31645fea7183ceda963f68ca9a69dda47cdb498711f95a"
+    },
+    {
+      "name": "optimize-unity-rendering",
+      "sha256": "ab9e4e2c795366906b69d00bccdc4b6780984a8717f30dacb7e74b6fb176e0f3",
+      "parts": [
+        "optimize-unity-rendering-part-1.md",
+        "optimize-unity-rendering-part-2.md",
+        "optimize-unity-rendering-part-3.md"
+      ],
+      "routerSha256": "0d70756420822166e7d82ed678e4639176654f1c2874d5ee19daeb658506f007"
+    },
+    {
+      "name": "performance-audit",
+      "sha256": "a3a1476c67bba67fc5cf8708d51fbfb942996d0bb9a4ca85d7616cf3238f5673",
+      "parts": [
+        "performance-audit-part-1.md",
+        "performance-audit-part-2.md",
+        "performance-audit-part-3.md"
+      ],
+      "routerSha256": "93b588839c868307c5f5d6b29da2b083d743d58c61de55255670a8aa367a35c1"
+    },
+    {
+      "name": "prefer-logging-extensions",
+      "sha256": "791be724e90411424ed3186b18e8fc6cff8c7f554efc5e300dca3f46c8578647",
+      "parts": [
+        "prefer-logging-extensions-part-1.md",
+        "prefer-logging-extensions-part-2.md",
+        "prefer-logging-extensions-part-3.md"
+      ],
+      "routerSha256": "aeaad18c385848814304da1c94249d58af8d6c7dce09763c8bfd4b419ed8e5e2"
+    },
+    {
+      "name": "profile-debug-performance",
+      "sha256": "63a632e2823c901066ac21f2f00d867274dcc7e3c957442bf00a39480458120f",
+      "parts": [
+        "profile-debug-performance-part-1.md",
+        "profile-debug-performance-part-2.md",
+        "profile-debug-performance-part-3.md"
+      ],
+      "routerSha256": "f5e907189059df073602873500ea16eed9c78312fc353ecd71c492dc5ef0f00d"
+    },
+    {
+      "name": "property-drawer-rules",
+      "sha256": "e0167662f7bbb47715fde965d7fef6c6d3591c03019c1dadb2e9d1ab0c70eb29",
+      "parts": [
+        "property-drawer-rules-part-1.md",
+        "property-drawer-rules-part-2.md",
+        "property-drawer-rules-part-3.md"
+      ],
+      "routerSha256": "2c37de8e84a5c659f6fe1df8f3e39201e108cb8d95f32bafc26e7e74a92e3f19"
+    },
+    {
+      "name": "refactor-to-zero-alloc",
+      "sha256": "daaed0f771f3804d2527fb722951353cc97cec8c8a585d0a72900e1caa20cfde",
+      "parts": [
+        "refactor-to-zero-alloc-part-1.md",
+        "refactor-to-zero-alloc-part-2.md",
+        "refactor-to-zero-alloc-part-3.md"
+      ],
+      "routerSha256": "8d5756cd0dc0dedb4d41c08d084644ed4f1452fa2255d8cc980168c2d9d59f23"
+    },
+    {
+      "name": "search-codebase",
+      "sha256": "3597202cd1ee5c124dad066184b66114fbce46b0852ca309c0e74ca5997e1e5b",
+      "parts": ["search-codebase-part-1.md", "search-codebase-part-2.md"],
+      "routerSha256": "9afa682f4be164259d4f7c45cd94fe0913344e8ab9f4cf36606b5b4f92dd637f"
+    },
+    {
+      "name": "ship-changes",
+      "sha256": "5fc15ad2c9255247acc4d7116b0daaef3d073a35e684d87d8c9008d41b23ae2e",
+      "parts": ["ship-changes-part-1.md", "ship-changes-part-2.md", "ship-changes-part-3.md"],
+      "routerSha256": "852ebc3ef301ae063b169fbae6aef48f853fe5997de9e79b0fcae01d9331f184"
+    },
+    {
+      "name": "test-data-driven",
+      "sha256": "08f25312a9d2d8a13479213f99de26482a90086a12ce1f79b7abfed274f6e409",
+      "parts": ["test-data-driven-part-1.md", "test-data-driven-part-2.md"],
+      "routerSha256": "3089d8c05d044bfbf2293181678d8e278fe83b7dff761e8daba487520fbc8065"
+    },
+    {
+      "name": "test-naming-conventions",
+      "sha256": "1903ba031e8d9ffb541523b13f8909a174083347ab6ec9ba42aa45a38ace4c33",
+      "parts": ["test-naming-conventions-part-1.md", "test-naming-conventions-part-2.md"],
+      "routerSha256": "311ca5a81ccbd2826459a4a74a74f763840b5822e8b3f22a7bd9daf6c7e14e0c"
+    },
+    {
+      "name": "test-odin-drawers",
+      "sha256": "2bd784636d61185142d79b61c0befca7e930783df23c53e2649f4ffb22994ee9",
+      "parts": [
+        "test-odin-drawers-part-1.md",
+        "test-odin-drawers-part-2.md",
+        "test-odin-drawers-part-3.md"
+      ],
+      "routerSha256": "6b08f4a1aecddbee880388585b676856b524f7ef5dafcf0fd2135e1b21787424"
+    },
+    {
+      "name": "test-unity-lifecycle",
+      "sha256": "cdfcefe4b5da829f37ca7f7750b4e7a24ca03d08c8e1ec62e7c6112268eca41b",
+      "parts": [
+        "test-unity-lifecycle-part-1.md",
+        "test-unity-lifecycle-part-2.md",
+        "test-unity-lifecycle-part-3.md"
+      ],
+      "routerSha256": "a4bf7c613ea1fb9548b39cdbd90cb71e89471ce38358f76496b3c1a01a04474d"
+    },
+    {
+      "name": "unity-api-costs",
+      "sha256": "37a2e942f28ee53b0447bbd135f99e4834d92abceb08df6ee1538ec788b939c3",
+      "parts": ["unity-api-costs-part-1.md", "unity-api-costs-part-2.md"],
+      "routerSha256": "18412fe0284b330ad9f13df33d7380a0fec0371aeb046a93a901357e50d3ab2d"
+    },
+    {
+      "name": "unity-devcontainer-testing",
+      "sha256": "1156137458f7eb0624ed3adf50b7ff362f571debadc6c240b5e55d1e3d1c798a",
+      "parts": ["unity-devcontainer-testing-part-1.md", "unity-devcontainer-testing-part-2.md"],
+      "routerSha256": "fa86a9af1341f30288b94f1f6fd4a2a39fde13e2a82ec7a148d4d6a88b15bcb6"
+    },
+    {
+      "name": "unity-mcp-fixture-runner",
+      "sha256": "c870473c8d0b849846ad569b11e1bca1824782bab93b62ad6184a38136789392",
+      "parts": [
+        "unity-mcp-fixture-runner-part-1.md",
+        "unity-mcp-fixture-runner-part-2.md",
+        "unity-mcp-fixture-runner-part-3.md"
+      ],
+      "routerSha256": "eb5d855ae47ea6901443ccbdb70a53c16825d013834996ae6291718855a2b12f"
+    },
+    {
+      "name": "unity-performance-patterns",
+      "sha256": "1d213753d504fdaad3f383986285926ae61797804aa89396def3e658d4160ec4",
+      "parts": [
+        "unity-performance-patterns-part-1.md",
+        "unity-performance-patterns-part-2.md",
+        "unity-performance-patterns-part-3.md"
+      ],
+      "routerSha256": "4b9f7b8d95b46872e7101c016dacc14c4ac7b1abd0f5addf5380ef16f9238981"
+    },
+    {
+      "name": "update-documentation",
+      "sha256": "4588fe2e6ee9608e2947e8c65037a09c5374e9af703451b803a14172fc7f5222",
+      "parts": [
+        "update-documentation-part-1.md",
+        "update-documentation-part-2.md",
+        "update-documentation-part-3.md"
+      ],
+      "routerSha256": "ce1bce2f5675228112f419d1ea9b43984a46ba9114aaa7f5b01860e5d8f47f1b"
+    },
+    {
+      "name": "use-algorithmic-structures",
+      "sha256": "c0943e85befed623aa285aa7fc7d9fd065020d6b248aca02937e76f1516bb303",
+      "parts": [
+        "use-algorithmic-structures-part-1.md",
+        "use-algorithmic-structures-part-2.md",
+        "use-algorithmic-structures-part-3.md"
+      ],
+      "routerSha256": "2e5e5a6a7164fc2cef4bff900a71ef4fa156c8b7c27758ab9943b37d5689772e"
+    },
+    {
+      "name": "use-data-structures",
+      "sha256": "d81550c770bcfb6a2973c3b0f55b613596784cd65ebe7ea01ad0f64ae423786c",
+      "parts": ["use-data-structures-part-1.md", "use-data-structures-part-2.md"],
+      "routerSha256": "d69d20b8dfee6c2a8b40a00a62822b80b9ffdddac74ced48e996241b8857c7e2"
+    },
+    {
+      "name": "use-discriminated-union",
+      "sha256": "4f7d07beb7376d0e612bed0a0e73c65e786818602202858ac6ffe7964bb34211",
+      "parts": [
+        "use-discriminated-union-part-1.md",
+        "use-discriminated-union-part-2.md",
+        "use-discriminated-union-part-3.md"
+      ],
+      "routerSha256": "e988bc70843685e27f62ae57f095991ce0c3424e1f263626bae406e5056317b4"
+    },
+    {
+      "name": "use-effects-system",
+      "sha256": "4e0adf76dda63e6372af6775af6c4e4ce16a52a4cacb255488bf36b40d2bf9e8",
+      "parts": [
+        "use-effects-system-part-1.md",
+        "use-effects-system-part-2.md",
+        "use-effects-system-part-3.md"
+      ],
+      "routerSha256": "fb7d18ceafe8d70e0a2a86198dc82a5d98902abd4db05947d32ce33bfb24a999"
+    },
+    {
+      "name": "use-extension-methods",
+      "sha256": "66269e83fd58a413700d8344698f896a084fc851939c8b9f79f3f59bca34f945",
+      "parts": [
+        "use-extension-methods-part-1.md",
+        "use-extension-methods-part-2.md",
+        "use-extension-methods-part-3.md"
+      ],
+      "routerSha256": "cf2e88360e44fc254a51a0dac5df026faa578d30d2da50f54b955647eeccd549"
+    },
+    {
+      "name": "use-pooling",
+      "sha256": "119a6a288296d662fffe9794dba5b9b489080f9aa8ed35ba4645c6946a57e5a5",
+      "parts": ["use-pooling-part-1.md", "use-pooling-part-2.md", "use-pooling-part-3.md"],
+      "routerSha256": "ef790a628da0a47ec1958188ea11a44db2c1f05326f1d5dd9bb3754940f2871d"
+    },
+    {
+      "name": "use-priority-structures",
+      "sha256": "6786c73d780879e94fb8ae3deabe013a35ae505e81984086f27064e78bc84e0f",
+      "parts": ["use-priority-structures-part-1.md", "use-priority-structures-part-2.md"],
+      "routerSha256": "e927a969aec9bd1fcaaaa9c730015654f48c464a6774d5dc1f6a553693bebaac"
+    },
+    {
+      "name": "use-prng",
+      "sha256": "be2731d4db07822bbd2c5a559972d1035ee63a806cfa0b9874cd2f9a48730bd5",
+      "parts": ["use-prng-part-1.md", "use-prng-part-2.md"],
+      "routerSha256": "c486a1a085a760b7ade73114a01766a6680c007d3a13d39e7018c5a509704449"
+    },
+    {
+      "name": "use-queue-structures",
+      "sha256": "b244aa20acf699e028d91a13a5654cd7b2c0d046b0cf951469625e279cb9d8e8",
+      "parts": [
+        "use-queue-structures-part-1.md",
+        "use-queue-structures-part-2.md",
+        "use-queue-structures-part-3.md"
+      ],
+      "routerSha256": "897c431a539d7831c6ef8097764323d39e5b426623ecfd5a43806202c654447f"
+    },
+    {
+      "name": "use-relational-attributes",
+      "sha256": "33ab4dd858aa846b44c33b14cbfa9d255b2a13a1125336a184eeb4f9268d5170",
+      "parts": ["use-relational-attributes-part-1.md", "use-relational-attributes-part-2.md"],
+      "routerSha256": "cd392ef914f8b2554a1e69e50650a4741ad5409cd12384ed223a33983ed2dd19"
+    },
+    {
+      "name": "use-serializable-types",
+      "sha256": "607e8f3cfd828d3b794c36f017f85c4953ce83885ac1e7482c4b53ec216b82d8",
+      "parts": [
+        "use-serializable-types-part-1.md",
+        "use-serializable-types-part-2.md",
+        "use-serializable-types-part-3.md"
+      ],
+      "routerSha256": "bb19359470a2c5313fd0a524458514c814b22faf58df38878062532cb9dfb6b2"
+    },
+    {
+      "name": "use-serializable-types-patterns",
+      "sha256": "ac8a5a8e2a5971c99ec82beef196e25df8dadff76096ca98a8907a5fe7f0bfab",
+      "parts": [
+        "use-serializable-types-patterns-part-1.md",
+        "use-serializable-types-patterns-part-2.md",
+        "use-serializable-types-patterns-part-3.md"
+      ],
+      "routerSha256": "6beda1704722f0f4006bf24fbea105b002bb2971c2dde78b6dad82e57105e260"
+    },
+    {
+      "name": "use-serialization",
+      "sha256": "a82f9820390cfbd52164ee858b6bc179cad8d3ff6ef68b70f0a6491fa63a018c",
+      "parts": [
+        "use-serialization-part-1.md",
+        "use-serialization-part-2.md",
+        "use-serialization-part-3.md"
+      ],
+      "routerSha256": "47d17553d223b5ed07a7c24397b3c38546248f782f17423e5064b4fa23fdaf9f"
+    },
+    {
+      "name": "use-singleton",
+      "sha256": "a51bc93cbf9bd9f648d059bfb76213cdb8fc3ab10a2c63dba00ff67690e1bdf2",
+      "parts": ["use-singleton-part-1.md", "use-singleton-part-2.md", "use-singleton-part-3.md"],
+      "routerSha256": "ea34b485303ce46c1231f620a4e2fc26d35735ed9deb2cac324fe8107e996fd8"
+    },
+    {
+      "name": "use-spatial-structure",
+      "sha256": "674b41ae3717a5509538444cf012f2c16c3696274486cc967aa101c6c28984bc",
+      "parts": ["use-spatial-structure-part-1.md", "use-spatial-structure-part-2.md"],
+      "routerSha256": "2ecd7c1c29f34ee80e489f853af7c9df27382e4048da3d1a29e567fc9276d83c"
+    },
+    {
+      "name": "use-threading",
+      "sha256": "abe3103dc2a01ef4c271ad8b58ca578cc178135bdb786c4a813bb315410caf59",
+      "parts": ["use-threading-part-1.md", "use-threading-part-2.md", "use-threading-part-3.md"],
+      "routerSha256": "dcbc8c68cfcae0b64362972b0dfafe9914427b2a0a3142daa7a28277aabf9496"
+    },
+    {
+      "name": "validate-before-commit",
+      "sha256": "1df1f25626e861e97b6c504112e4f59aecb3aa86e0f19324abe39260f3a48629",
+      "parts": [
+        "validate-before-commit-part-1.md",
+        "validate-before-commit-part-2.md",
+        "validate-before-commit-part-3.md"
+      ],
+      "routerSha256": "7b7cedfd5c5b92811516ee6a55821311e371aaf5dbb4fa3df074957ab1e8a532"
+    },
+    {
+      "name": "validation-troubleshooting",
+      "sha256": "7f29d22d62c5518eae824c7e97961410bde4a348cfd130cd52aea9ead121cc38",
+      "parts": [
+        "validation-troubleshooting-part-1.md",
+        "validation-troubleshooting-part-2.md",
+        "validation-troubleshooting-part-3.md"
+      ],
+      "routerSha256": "f0aa5f3d2580badef7eb10929ad7d30409d87981d29e29a94f23865e7cc6a10e"
+    },
+    {
+      "name": "wiki-generation",
+      "sha256": "6fb1f83948fde5fc14af658f276f363960b87f52daf846456a5cfd95d0c65059",
+      "parts": ["wiki-generation-part-1.md", "wiki-generation-part-2.md"],
+      "routerSha256": "4e9918fa4d0d112a183e6a063c6f410997fad78e672f1392b657d74df7c7ed72"
+    }
+  ]
+}

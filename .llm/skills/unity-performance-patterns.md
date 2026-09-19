@@ -2,374 +2,84 @@
 
 <!-- trigger: unity, api, component, cache, pool | Unity-specific optimizations (APIs, pooling) | Performance -->
 
-**Trigger**: When writing Unity-specific code, accessing Unity APIs, or working with MonoBehaviours, GameObjects, or other Unity systems. This skill complements [high-performance-csharp](./high-performance-csharp.md) with Unity-specific patterns.
+## Reference Parts
 
----
+- [Part 1](../references/unity-performance-patterns-part-1.md)
+- [Part 2](../references/unity-performance-patterns-part-2.md)
+- [Part 3](../references/unity-performance-patterns-part-3.md)
 
 ## Unity's Garbage Collector
 
-Unity's Boehm GC differs significantly from .NET's generational collector. Key points:
-
-- **Non-generational** — scans entire heap on every collection
-- **No compaction** — memory fragments over time
-- **Stop-the-world** — game freezes during collection
-
-**Target**: 0 bytes allocated per frame. At 60 FPS with 1KB/frame = **3.6 MB/minute** of garbage.
-
-See [gc-architecture-unity](./gc-architecture-unity.md) for detailed architecture, incremental GC, and when to manually trigger collection.
-
----
+[Read section](../references/unity-performance-patterns-part-1.md#unitys-garbage-collector)
 
 ## Component & Reference Caching
 
-### Cache Component References
+[Read section](../references/unity-performance-patterns-part-1.md#component--reference-caching)
 
-`GetComponent<T>()` involves internal lookups and should **never** be called in `Update()`.
+### [Cache Component References](../references/unity-performance-patterns-part-1.md#cache-component-references)
 
-```csharp
-// ❌ NEVER: Expensive lookup every frame
-void Update()
-{
-    Rigidbody rb = GetComponent<Rigidbody>();
-    rb.AddForce(Vector3.up);
-}
-
-// ✅ ALWAYS: Cache in Awake()
-private Rigidbody _rigidbody;
-private Transform _transform;
-private Camera _mainCamera;
-
-void Awake()
-{
-    _rigidbody = GetComponent<Rigidbody>();
-    _transform = transform;  // Cache transform property too
-    _mainCamera = Camera.main;
-}
-
-void Update()
-{
-    _rigidbody.AddForce(Vector3.up);
-    _transform.position = _mainCamera.transform.position;
-}
-```
-
-### Cache Expensive Properties
-
-Many Unity properties perform work each access:
-
-```csharp
-// ❌ BAD: Camera.main performs FindGameObjectWithTag internally
-void Update()
-{
-    Vector3 camPos = Camera.main.transform.position;  // Lookup + property access
-}
-
-// ✅ GOOD: Cached reference
-private Camera _mainCamera;
-void Awake() { _mainCamera = Camera.main; }
-void Update()
-{
-    Vector3 camPos = _mainCamera.transform.position;
-}
-```
-
----
+### [Cache Expensive Properties](../references/unity-performance-patterns-part-1.md#cache-expensive-properties)
 
 ## Never Use SendMessage
 
-`SendMessage()` and `BroadcastMessage()` are **up to 1000x slower** than direct function calls due to reflection-based method lookup:
-
-```csharp
-// ❌ NEVER: Extremely slow, no compile-time safety
-gameObject.SendMessage("OnDamage", damage);
-gameObject.BroadcastMessage("OnHit");
-
-// ✅ ALWAYS: Direct interface calls
-var damageable = gameObject.GetComponent<IDamageable>();
-if (damageable != null)
-{
-    damageable.OnDamage(damage);
-}
-
-// ✅ Or use events/delegates
-public event Action<float> OnDamage;
-OnDamage?.Invoke(damage);
-```
-
----
+[Read section](../references/unity-performance-patterns-part-1.md#never-use-sendmessage)
 
 ## Unity API Allocation Traps
 
-### Array-Valued Properties Create Copies
+[Read section](../references/unity-performance-patterns-part-1.md#unity-api-allocation-traps)
 
-Many Unity properties return **new array copies** on each access:
+### [Array-Valued Properties Create Copies](../references/unity-performance-patterns-part-1.md#array-valued-properties-create-copies)
 
-```csharp
-// ❌ TERRIBLE: Creates 4 array copies per iteration!
-void Update()
-{
-    for (int i = 0; i < mesh.vertices.Length; i++)
-    {
-        float x = mesh.vertices[i].x;  // New array!
-        float y = mesh.vertices[i].y;  // New array!
-        float z = mesh.vertices[i].z;  // New array!
-    }
-}
-
-// ✅ BEST: Use non-allocating API
-private List<Vector3> _vertices = new List<Vector3>();
-
-void Update()
-{
-    mesh.GetVertices(_vertices);  // No allocation!
-    for (int i = 0; i < _vertices.Count; i++)
-    {
-        DoSomething(_vertices[i].x, _vertices[i].y, _vertices[i].z);
-    }
-}
-```
-
-### Non-Allocating Unity API Alternatives
-
-| Allocating API             | Non-Allocating Alternative                             |
-| -------------------------- | ------------------------------------------------------ |
-| `mesh.vertices`            | `mesh.GetVertices(list)`                               |
-| `mesh.normals`             | `mesh.GetNormals(list)`                                |
-| `mesh.uv`                  | `mesh.GetUVs(channel, list)`                           |
-| `mesh.triangles`           | `mesh.GetTriangles(list, submesh)`                     |
-| `Input.touches`            | `Input.touchCount` + `Input.GetTouch(i)`               |
-| `Animator.parameters`      | `Animator.parameterCount` + `Animator.GetParameter(i)` |
-| `Renderer.sharedMaterials` | `Renderer.GetSharedMaterials(list)`                    |
-| `gameObject.tag`           | `gameObject.CompareTag("Tag")`                         |
-| `gameObject.name`          | Cache in Awake if needed repeatedly                    |
-
-For physics-specific non-alloc APIs, see [optimize-unity-physics](./optimize-unity-physics.md).
-
----
+### [Non-Allocating Unity API Alternatives](../references/unity-performance-patterns-part-1.md#non-allocating-unity-api-alternatives)
 
 ## Tag & Layer Comparisons
 
-### Avoid String Allocation
+[Read section](../references/unity-performance-patterns-part-1.md#tag--layer-comparisons)
 
-```csharp
-// ❌ BAD: .tag allocates a new string
-if (gameObject.tag == "Player") { }
-
-// ❌ BAD: .name also allocates
-if (gameObject.name == "Enemy") { }
-
-// ✅ GOOD: CompareTag is allocation-free
-if (gameObject.CompareTag("Player")) { }
-
-// ✅ GOOD: Cache name if needed repeatedly
-private string _cachedName;
-void Awake() { _cachedName = gameObject.name; }
-```
-
----
+### [Avoid String Allocation](../references/unity-performance-patterns-part-1.md#avoid-string-allocation)
 
 ## Update Methods and Coroutines
 
-Choosing between `Update`/`FixedUpdate`/`LateUpdate`, removing empty callbacks, replacing hundreds
-of `Update` calls with one manager, and caching `WaitForSeconds` are in
-[unity-frame-loop](./unity-frame-loop.md).
-
----
+[Read section](../references/unity-performance-patterns-part-1.md#update-methods-and-coroutines)
 
 ## GameObject Pooling
 
-### Unity's ObjectPool (Unity 2021+)
+[Read section](../references/unity-performance-patterns-part-2.md#gameobject-pooling)
 
-```csharp
-using UnityEngine.Pool;
+### [Unity's ObjectPool (Unity 2021+)](../references/unity-performance-patterns-part-2.md#unitys-objectpool-unity-2021)
 
-public class BulletManager : MonoBehaviour
-{
-    [SerializeField] private GameObject _bulletPrefab;
-
-    private ObjectPool<GameObject> _bulletPool;
-
-    void Awake()
-    {
-        _bulletPool = new ObjectPool<GameObject>(
-            createFunc: () => Instantiate(_bulletPrefab),
-            actionOnGet: bullet => bullet.SetActive(true),
-            actionOnRelease: bullet => bullet.SetActive(false),
-            actionOnDestroy: bullet => Destroy(bullet),
-            defaultCapacity: 50,
-            maxSize: 200
-        );
-    }
-
-    public GameObject SpawnBullet(Vector3 position)
-    {
-        GameObject bullet = _bulletPool.Get();
-        bullet.transform.position = position;
-        return bullet;
-    }
-
-    public void ReturnBullet(GameObject bullet)
-    {
-        _bulletPool.Release(bullet);
-    }
-}
-```
-
-### What to Pool
-
-- Projectiles (bullets, missiles)
-- Particle effects
-- Enemies that spawn/despawn frequently
-- UI elements that appear/disappear
-- Audio sources for sound effects
-- Any frequently Instantiated/Destroyed object
-
-See [use-pooling](./use-pooling.md) for detailed pooling patterns.
-
----
+### [What to Pool](../references/unity-performance-patterns-part-2.md#what-to-pool)
 
 ## Debug.Log Performance
 
-### Remove in Production
+[Read section](../references/unity-performance-patterns-part-2.md#debuglog-performance)
 
-```csharp
-// ❌ BAD: Debug.Log still executes in builds (string allocation)
-Debug.Log($"Player position: {transform.position}");
-
-// ✅ GOOD: Conditional compilation
-#if UNITY_EDITOR
-Debug.Log($"Player position: {transform.position}");
-#endif
-
-// ✅ GOOD: Use [Conditional] attribute for debug methods
-[System.Diagnostics.Conditional("UNITY_EDITOR")]
-private void LogDebug(string message)
-{
-    Debug.Log(message);
-}
-```
-
----
+### [Remove in Production](../references/unity-performance-patterns-part-2.md#remove-in-production)
 
 ## String Operations in Unity
 
-### Update Text Efficiently
+[Read section](../references/unity-performance-patterns-part-2.md#string-operations-in-unity)
 
-```csharp
-// ❌ BAD: Creates strings every frame
-void Update()
-{
-    scoreText.text = "Score: " + score.ToString();  // 3 allocations!
-}
-
-// ✅ BETTER: Only update when changed
-private int _lastScore = -1;
-
-void Update()
-{
-    if (score != _lastScore)
-    {
-        scoreText.text = "Score: " + score.ToString();
-        _lastScore = score;
-    }
-}
-
-// ✅ BEST: Separate label from value
-public TMP_Text scoreLabelText;  // "Score: "
-public TMP_Text scoreValueText;  // Just the number
-
-void Start()
-{
-    scoreLabelText.text = "Score: ";
-}
-
-void UpdateScore()
-{
-    scoreValueText.text = score.ToString();
-}
-```
-
----
+### [Update Text Efficiently](../references/unity-performance-patterns-part-2.md#update-text-efficiently)
 
 ## Async Operations
 
-### Use Unity's Awaitable (Unity 2023+)
+[Read section](../references/unity-performance-patterns-part-2.md#async-operations)
 
-```csharp
-// ✅ GOOD: Unity's Awaitable uses pooling internally
-async Awaitable LoadDataAsync()
-{
-    await Awaitable.WaitForSecondsAsync(1f);
-    await Awaitable.NextFrameAsync();
-}
-
-// ✅ GOOD: Load scenes asynchronously
-public async Awaitable LoadSceneAsync(string sceneName)
-{
-    AsyncOperation asyncLoad = SceneManager.LoadSceneAsync(sceneName);
-    asyncLoad.allowSceneActivation = false;
-
-    while (asyncLoad.progress < 0.9f)
-    {
-        await Awaitable.NextFrameAsync();
-    }
-    asyncLoad.allowSceneActivation = true;
-}
-```
-
----
+### [Use Unity's Awaitable (Unity 2023+)](../references/unity-performance-patterns-part-2.md#use-unitys-awaitable-unity-2023)
 
 ## Memory Cleanup
 
-### Scene Transitions
+[Read section](../references/unity-performance-patterns-part-2.md#memory-cleanup)
 
-```csharp
-// Call during scene transitions to clean up
-public void CleanupMemory()
-{
-    Resources.UnloadUnusedAssets();
-    System.GC.Collect();
-}
-```
+### [Scene Transitions](../references/unity-performance-patterns-part-2.md#scene-transitions)
 
-### Addressables Cleanup
-
-```csharp
-// When using Addressables
-Addressables.Release(handle);
-Addressables.ReleaseInstance(gameObject);
-```
-
----
+### [Addressables Cleanup](../references/unity-performance-patterns-part-2.md#addressables-cleanup)
 
 ## Quick Reference: Unity Anti-Patterns
 
-| ❌ Anti-Pattern                  | ✅ Solution                 |
-| -------------------------------- | --------------------------- |
-| `GetComponent<T>()` in Update    | Cache in Awake/Start        |
-| `Camera.main` in Update          | Cache the reference         |
-| `mesh.vertices` repeatedly       | Use `GetVertices(list)`     |
-| `gameObject.tag == "Tag"`        | Use `CompareTag("Tag")`     |
-| `new WaitForSeconds()` in loop   | Cache yield instructions    |
-| `Debug.Log` in builds            | Use conditional compilation |
-| Empty Update/FixedUpdate         | Remove unused callbacks     |
-| `Instantiate`/`Destroy` spam     | Use object pooling          |
-| `SendMessage`/`BroadcastMessage` | Direct interface calls      |
-| Many MonoBehaviours with Update  | Centralized update manager  |
-
-See also: [optimize-unity-physics](./optimize-unity-physics.md), [optimize-unity-rendering](./optimize-unity-rendering.md)
-
----
+[Read section](../references/unity-performance-patterns-part-3.md#quick-reference-unity-anti-patterns)
 
 ## Related Skills
 
-- [high-performance-csharp](./high-performance-csharp.md) — Core performance patterns (MANDATORY)
-- [unity-frame-loop](./unity-frame-loop.md) — Per-frame callbacks, update managers, coroutines
-- [optimize-unity-physics](./optimize-unity-physics.md) — Physics, colliders, raycasts
-- [optimize-unity-rendering](./optimize-unity-rendering.md) — Materials, shaders, batching
-- [use-pooling](./use-pooling.md) — Collection pooling patterns
-- [refactor-to-zero-alloc](./refactor-to-zero-alloc.md) — Migration guide
-- [performance-audit](./performance-audit.md) — Performance review checklist
-- [gc-architecture-unity](./gc-architecture-unity.md) — Unity GC architecture details
-- [memory-allocation-traps](./memory-allocation-traps.md) — Hidden allocation sources
-- [mobile-xr-optimization](./mobile-xr-optimization.md) — Mobile and XR patterns
+[Read section](../references/unity-performance-patterns-part-3.md#related-skills)

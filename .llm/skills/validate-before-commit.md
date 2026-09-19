@@ -2,465 +2,98 @@
 
 <!-- trigger: validate, commit, lint, check, verify, spell, cspell, spelling | Before completing any task (run linters!) | Core -->
 
-**Trigger**: **MANDATORY** before completing any task that modifies code or documentation.
+## Reference Parts
 
----
+- [Part 1](../references/validate-before-commit-part-1.md)
+- [Part 2](../references/validate-before-commit-part-2.md)
+- [Part 3](../references/validate-before-commit-part-3.md)
 
 ## When to Use
 
-Use this skill for pre-commit validation:
-
-- Before completing any coding task
-- Before asking user to review changes
-- Before any discussion of "done" or "complete"
-- After making ANY modifications to files
-
-For detailed linter commands and configurations, see [linter-reference](./linter-reference.md).
-For troubleshooting common errors, see [validation-troubleshooting](./validation-troubleshooting.md).
-
----
+[Read section](../references/validate-before-commit-part-1.md#when-to-use)
 
 ## Quick Reference
 
-```bash
-# Fast changed-file preflight (MANDATORY before marking task complete)
-npm run agent:preflight:fix
-
-# Final fast Git/config safety check before pushing
-npm run validate:prepush
-```
-
-Run `agent:preflight:fix` during edits, targeted checks before pushing, and `validate:prepush` last. Use `validate:local` for a warranted repository aggregate.
-CI also runs exhaustive hook fixtures; run `npm run validate:tests:hook-regressions` locally when hook or agent-preflight behavior changes.
-
-For Unity workflow or cleanup changes, run `npm run test:portable-cleanup-classifier` with `BUILD_LOCK_POLICY_ROOT` pointing to the exact central action checkout.
-Resolve that revision with `scripts/resolve-build-lock-pin.js`. CI supplies this checkout; local aggregates otherwise skip the contract.
-A skip does not validate cleanup. Preserve classifier, executor and final-gate coverage when replacing a legacy caller.
-
-**C#/tests/JSON/YAML/skill/CHANGELOG edits: run `npm run lint:spelling`** — cspell covers every file matching its `files` glob, not just Markdown. See [Rule 4: Spell-Check EVERY Change cspell Covers](#rule-4-spell-check-every-change-cspell-covers) for the failure-recovery decision tree. To add a new word: `npm run lint:spelling:add -- <bucket> <word>`.
-
----
+[Read section](../references/validate-before-commit-part-1.md#quick-reference)
 
 ## The Golden Rules
 
-### Rule 0: Preflight Before Completion
+[Read section](../references/validate-before-commit-part-1.md#the-golden-rules)
 
-Run `npm run agent:preflight:fix` before declaring a task complete.
+### [Rule 0: Preflight Before Completion](../references/validate-before-commit-part-1.md#rule-0-preflight-before-completion)
 
-Hooks are a last-resort safety net. Do not rely on hook-time auto-fixes as the normal workflow.
+### [Rule 1: Format IMMEDIATELY After Every Change](../references/validate-before-commit-part-1.md#rule-1-format-immediately-after-every-change)
 
-This catches hook-class failures early for changed files:
+### [Rule 2: Run Linters IMMEDIATELY After Every Change](../references/validate-before-commit-part-1.md#rule-2-run-linters-immediately-after-every-change)
 
-- Missing Unity `.meta` files on changed paths
-- Unstaged Unity `.meta` companions for currently staged source files
-- Spelling regressions in changed markdown files (`.md`, `.markdown`)
-- Skill/context files approaching hard size limits
-- LLM index/trigger drift when `.llm/` files changed
-- Test-lint regressions with auto-fix for Unity null assertions
-
-After creating any file/folder under Unity meta-required roots (`Runtime/`, `Editor/`, `Tests/`, `Samples~/`, `Shaders/`, `Styles/`, `URP/`, `docs/`, `scripts/`):
-
-1. Generate `.meta` immediately with `./scripts/generate-meta.sh <path>` for new or empty folders, or `npm run agent:preflight:fix` for changed files discovered by Git.
-2. Run `npm run agent:preflight:fix` before continuing work.
-
-Run `agent:preflight:fix` after staging candidate files (right before commit prep) so staged `.meta` companion drift is corrected before hooks run.
-By default (no `-Paths`), preflight validates all changed files from git; passing `-Paths` scopes checks to those targets.
-
-Preferred commit prep order:
-
-1. Stage candidate files.
-2. Run `npm run agent:preflight:fix`.
-3. Resolve any reported issues.
-4. Commit (hooks should only catch unexpected regressions).
-
-### Rule 1: Format IMMEDIATELY After Every Change
-
-**Do NOT batch formatting at the end of a task.** Format immediately after each file modification.
-
-| File Type       | Formatter | Command                                          |
-| --------------- | --------- | ------------------------------------------------ |
-| C# (`.cs`)      | CSharpier | `dotnet tool run csharpier format .`             |
-| Everything else | Prettier  | `node scripts/run-prettier.js --write -- <file>` |
-
-### Rule 2: Run Linters IMMEDIATELY After Every Change
-
-**Do NOT wait until task completion.** Run the appropriate linter after each file modification and fix issues before proceeding.
-
-### Rule 3: Fix Before Moving On
-
-1. Make a change to a file
-2. Run the appropriate linter(s) for that file type
-3. Fix any issues found
-4. Only then move to the next file or task
-
----
+### [Rule 3: Fix Before Moving On](../references/validate-before-commit-part-1.md#rule-3-fix-before-moving-on)
 
 ## Common Mistakes
 
-**Wrong** (batching until end):
+[Read section](../references/validate-before-commit-part-1.md#common-mistakes)
 
-1. Edit markdown file
-2. Edit C# file
-3. Edit YAML file
-4. ... more edits ...
-5. Run all formatters/linters at the end
+### [A new analyzer diagnostic needs a CLEAN typecheck, because the incremental one lies](../references/validate-before-commit-part-1.md#a-new-analyzer-diagnostic-needs-a-clean-typecheck-because-the-incremental-one-lies)
 
-**Correct** (format immediately after each):
-
-1. Edit markdown -> `node scripts/run-prettier.js --write -- <file>` -> `npm run lint:markdown`
-2. Edit C# -> `dotnet tool run csharpier format .`
-3. Edit YAML -> `node scripts/run-prettier.js --write -- <file>` -> `pwsh -NoProfile -File scripts/lint-yaml.ps1 -Paths <file>`
-4. Edit test file -> `pwsh -NoProfile -File scripts/lint-tests.ps1` -> `dotnet tool run csharpier format .`
-
-For detailed workflow patterns and more examples, see [formatting](./formatting.md).
-
-### A new analyzer diagnostic needs a CLEAN typecheck, because the incremental one lies
-
-`npm run typecheck:tests` exited **0** on a tree the same command reported **four `WPROTO044`
-errors** on once `TestCheck/obj` was deleted (session 238): the `.cs` files had not changed, MSBuild
-skipped the compile, and a gate that looked at nothing prints what a pass prints. Deleting `obj/` is
-not sufficient either -- session 239, a shared `VBCSCompiler` served a stale snapshot and reported
-diagnostics at pre-edit line numbers.
-
-```bash
-npm run typecheck:unity:clean               # every tree
-npm run typecheck:unity:clean typecheck:tests   # or just one
-```
-
-It deletes every `Generator~/*/obj` and `bin` and exports `UseSharedCompilation=false`, which
-MSBuild reads as a global property. Several times slower, so reach for it only when an analyzer DLL
-is in the diff.
-
-### Editor test fixtures
-
-`EditorTestCheck` compiles `Tests/Editor/**` and is the only thing that does
-([#616](https://github.com/Ambiguous-Interactive/unity-helpers/issues/616)); before it landed, one
-fixture reached the Unity matrix twice with `typecheck:tests` green both times.
-
-A `[WProtoContract]` fixture there has one trap: `WPROTO001` wants `partial` on the type **and
-every type enclosing it**, because the formatter is nested. A `[TestFixture]` cannot be partial, so
-put such fixtures at namespace scope.
-
-**A new `Runtime/` file that an existing `Runtime/` file depends on breaks a build no typecheck
-project runs.** `Proto.Generator.Tests` names its Runtime sources one by one rather than globbing,
-so an interface `SerializableValueTuple` implements compiled clean in all sixteen `typecheck:unity`
-legs and failed there with `CS0246` (session 240). When the diff adds a `Runtime/` file that
-something in that csproj references, run `dotnet test -c Release -p:ProtobufNetOracle=v3` there.
-
-**`WPROTO044` is Unity-only, and no check project can change that.** It reports a subclass whose
-base is in **another assembly**, and every check project flattens many asmdefs into ONE compilation,
-where "same assembly" is the _correct_ answer -- so narrowing the guard does not help. The rule is
-held cross-assembly in the generator's own suite instead, and a **generic** base is deliberately
-exempt forever. Full reasoning, the blocker for a split project, and the tests recording both
-decisions are in `EditorTestCheck`'s csproj header
-([#650](https://github.com/Ambiguous-Interactive/unity-helpers/issues/650)).
-
----
+### [Editor test fixtures](../references/validate-before-commit-part-1.md#editor-test-fixtures)
 
 ## Workflow by File Type
 
-### Rule 4: Spell-Check EVERY Change cspell Covers
+[Read section](../references/validate-before-commit-part-2.md#workflow-by-file-type)
 
-**MANDATORY, NOT just for docs.** cspell's `files` glob in [cspell.json](../../cspell.json) covers every file extension that agent preflight and full validation spell-check:
+### [Rule 4: Spell-Check EVERY Change cspell Covers](../references/validate-before-commit-part-2.md#rule-4-spell-check-every-change-cspell-covers)
 
-- Markdown: `**/*.{md,markdown}` (docs tree, root README/CHANGELOG/PLAN/AGENTS/CLAUDE, LLM instruction tree, GitHub templates)
-- C#: `**/*.cs` (every source file under `Runtime/`, `Editor/`, `Tests/`, samples, and scripts)
-- YAML: `**/*.{yml,yaml}` (workflows, yamllint config, any config YAML)
-- JSON-family: `**/*.{json,jsonc,asmdef,asmref}` (package.json, `.asmdef`/`.asmref`, tool configs)
-- JavaScript: `**/*.js` (scripts/ helpers, tests, hook scripts)
+### [C# Changes](../references/validate-before-commit-part-2.md#c-changes)
 
-The `cspell.json` `files` glob and agent-preflight's pass-through list are kept in lock-step by `scripts/tests/test-cspell-hook-files-parity.sh` (run via `npm run validate:cspell-files-parity`). If you see drift, fix `cspell.json`'s `files` glob -- never narrow agent-preflight's pass-through.
+### [Documentation Changes](../references/validate-before-commit-part-2.md#documentation-changes)
 
-If you modified ANY file in that set -- C# sources, tests, CHANGELOG, skill files, docs, YAML, JSON, `.asmdef`/`.asmref`, `.js` scripts -- you MUST run `npm run lint:spelling` before declaring work complete. `npm run agent:preflight` checks the same changed-file set before hooks are involved, and `npm run validate:local`/CI run full spelling validation. Do NOT mentally gate "this is a code change, no spelling matters" -- cspell lints identifiers in comments, XML docs, and log strings, which is where most typos actually land.
+### [CHANGELOG or Project JSON Changes](../references/validate-before-commit-part-2.md#changelog-or-project-json-changes)
 
-Run `npm run lint:spelling` manually before declaring work complete. Agent preflight and CI check the
-same files, but they are final gates rather than a substitute for checking each change promptly.
+### [YAML Changes](../references/validate-before-commit-part-2.md#yaml-changes)
 
-Failure-recovery decision tree (when cspell reports `Unknown word`):
+### [Test File Changes](../references/validate-before-commit-part-2.md#test-file-changes)
 
-1. Is it a typo? Fix the source file. Done.
-2. Is it a valid term already in a dictionary, just in a different case? cspell is case-insensitive here, so this should not happen — re-read the error.
-3. Is it a valid term missing from the dictionary? Pick the right bucket using [linter-reference](./linter-reference.md#adding-words-to-dictionary):
-   - Unity engine API → `unity-terms`
-   - C# language / BCL type → `csharp-terms`
-   - This package's public symbol → `package-terms`
-   - General programming/tooling → `tech-terms`
-   - Lint-error-code prefix (e.g. `UNH`, `PWS`) → root `words`
-   - Project-specific, none of the above → root `words`
-4. To add a word, prefer the helper script over editing `cspell.json` by hand:
-
-   ```bash
-   npm run lint:spelling:add -- <bucket> <word> [<word>...]
-   # Example: npm run lint:spelling:add -- tech-terms reentrant reentrantly
-   ```
-
-   Buckets: `unity-terms`, `csharp-terms`, `package-terms`, `tech-terms`, `words` (root). The helper deduplicates, validates JSON round-trip, and rejects cross-bucket duplicates.
-
-5. After editing `cspell.json`, re-run `npm run lint:spelling` AND `npm run lint:spelling:config` to catch case-redundant and cross-dictionary duplicates.
-
-### C# Changes
-
-```bash
-# After EVERY .cs file modification (even single-line edits):
-dotnet tool run csharpier format .
-npm run lint:csharp-naming
-npm run lint:spelling    # 🚨 MANDATORY — cspell lints C# comments/XML-doc/log-strings
-```
-
-Also verify license headers on new or modified files — see [license-headers](./license-headers.md).
-
-### Documentation Changes
-
-```bash
-# After EVERY .md file modification:
-node scripts/run-prettier.js --write -- <file>
-npm run lint:spelling    # 🚨 #1 CI failure cause!
-npm run lint:docs         # Validates links
-npm run lint:markdown     # Structural rules
-```
-
-**A link from `docs/` to a file OUTSIDE `docs/` needs the MkDocs build, not `lint:docs`.**
-`lint:docs` walks markdown-to-markdown links and passes a link to a `.sh`, `.ps1` or any other repo
-file — while `Validate Documentation` fails the whole run on it, because `mkdocs build --strict`
-turns "target not found among documentation files" into an error. Reference such a file in
-backticks, or link the GitHub blob URL the way
-[the llms.txt page](../../docs/project/llms-txt.md) does. The strict build is runnable in this
-devcontainer and takes about 40 seconds, which is far cheaper than finding out on a pull request:
-
-```bash
-.venv/bin/mkdocs build --strict    # writes to the gitignored site/
-```
-
-### CHANGELOG or Project JSON Changes
-
-```bash
-# After EVERY CHANGELOG.md / package.json / asmdef / asmref edit:
-node scripts/run-prettier.js --write -- <file>
-npm run lint:spelling    # 🚨 validate:local/CI spell-check CHANGELOG + JSON
-```
-
-### YAML Changes
-
-```bash
-# After EVERY .yml/.yaml file modification:
-node scripts/run-prettier.js --write -- <file>
-pwsh -NoProfile -File scripts/lint-yaml.ps1 -Paths <changed files>
-
-# For workflow files (.github/workflows/*.yml), also run:
-actionlint
-```
-
-### Test File Changes
-
-```bash
-# 🚨 MANDATORY: After EVERY test file modification:
-pwsh -NoProfile -File scripts/lint-tests.ps1
-
-# Recommended fast-path (runs test lint + safe auto-fixes on changed files):
-npm run agent:preflight:fix
-
-# Also run standard C# formatting:
-dotnet tool run csharpier format .
-npm run lint:csharp-naming
-npm run lint:spelling    # 🚨 MANDATORY — cspell lints test comments + strings
-```
-
-**CRITICAL**: The test linter is **MANDATORY** for any test file changes (files in `Tests/` directory). You **MUST** run it **IMMEDIATELY** after each test file modification — do NOT batch these checks at the end of your task.
-
-**Why this matters**: Test lifecycle lint failures block `agent:preflight`, `validate:local`, and CI. Catching and fixing these issues early (after each file change) prevents frustrating failures when you prepare to push.
-
-### Assembly Definition Changes (`.asmdef`)
-
-```bash
-# 🚨 MANDATORY: After EVERY .asmdef file creation or modification:
-pwsh -NoProfile -File scripts/lint-asmdef.ps1
-
-# Also run standard JSON formatting:
-node scripts/run-prettier.js --write -- <file>
-```
-
-**CRITICAL**: The asmdef linter checks JSON shape, references, and Unity version-define grammar. For optional Odin code, also run `pwsh -NoProfile -File scripts/tests/test-sync-script-contracts.ps1`; it verifies that Sirenix references stay behind `WALLSTOP_UNITY_HELPERS_ODIN_INSPECTOR` and that runtime Odin base aliases keep Unity fallbacks. See [manage-assembly-definitions](./manage-assembly-definitions.md).
+### [Assembly Definition Changes (`.asmdef`)](../references/validate-before-commit-part-2.md#assembly-definition-changes-asmdef)
 
 ### Skill File and Context Changes (`.llm/skills/*.md`, [context](../context.md))
 
-```bash
-# 🚨 MANDATORY: After EVERY skill file or context.md modification:
-npm run lint:spelling
-pwsh -NoProfile -File scripts/lint-skill-sizes.ps1
-
-# Recommended strict changed-file check (fails on critical near-limit sizes):
-npm run agent:preflight
-
-# Also run standard markdown formatting:
-node scripts/run-prettier.js --write -- <file>
-npm run lint:markdown
-```
-
-**CRITICAL**: Skill files and [context](../context.md) have a **500-line hard limit** enforced by the pre-commit hook. Files exceeding this limit **CANNOT be committed** and require human judgment to split or reduce.
-
-`agent:preflight` treats critical near-limit sizes as failures for changed files, so growth pressure is addressed before the pre-commit hook becomes the final stop.
-
-| Lines   | Action Required                                          |
-| ------- | -------------------------------------------------------- |
-| <300    | No action needed                                         |
-| 300-500 | Consider splitting preemptively to avoid future blockers |
-| >500    | **MUST split before commit** — hook will reject the file |
-
-**Why this matters**: Splitting large skill files requires human judgment (deciding topic boundaries, updating cross-references). Catching size issues early prevents blocking commits when you've completed all other work.
+[Read section](../references/validate-before-commit-part-2.md#skill-file-and-context-changes-llmskillsmd-context)
 
 ### LLM Instructions Changes ([LLM context](../context.md), skills index)
 
-```bash
-# 🚨 MANDATORY: After ANY change to .llm/context.md, a skill trigger, or the index:
-pwsh -NoProfile -File scripts/lint-llm-instructions.ps1
-
-# Auto-fix mode (regenerates .llm/skills/index.md):
-pwsh -NoProfile -File scripts/lint-llm-instructions.ps1 -Fix
-```
-
-**CRITICAL**: The skills index is the generated [Skills Index](./index.md) file (linked from the [LLM context file](../context.md)), NOT an embedded block. It is byte-for-byte deterministic across OS (ordinal sort, UTF-8 no BOM, LF) and Prettier-ignored — regenerate it with the generator, never hand-edit it. Trigger descriptions MUST be ASCII (use `-`, not an em-dash); a non-ASCII trigger is the cross-OS drift class the lint rejects. The lint also verifies the context file keeps exactly one H1 and links to the index.
-
-**Tests**: Run `pwsh -NoProfile -File scripts/tests/test-llm-instructions-lint.ps1` to verify the lint script itself (test cases covering generator output validation, lint correctness, H1/H2 detection, and pattern matching).
-
----
+[Read section](../references/validate-before-commit-part-2.md#llm-instructions-changes-llm-context-skills-index)
 
 ## What Gets Validated
 
-The `npm run validate:local` command runs these checks:
-
-> **Agents do not run this aggregate by default.** CI runs the same gates. Use it only when the user
-> explicitly requests a full local aggregate, or when the aggregate runner itself changed and
-> targeted integration evidence cannot answer the question. Do not start it while another external
-> repository aggregate, whole-tree linter, build, or interrupted child is alive. Concurrency managed
-> by a single runner invocation is expected.
-> The
-> edit loop is `npm run agent:preflight` (2.9 s) plus the one targeted check for what you touched
-> (`node scripts/run-contract-tests.js --only <id>`, `node scripts/run-repo-lint.js --only <id>`,
-> `dotnet test --filter`). Reach for the cheapest instrument that answers the question -- a `rg` for
-> the shape beats a whole-tree rebuild -- and when you skip a gate, **name what is unverified**
-> rather than reporting it as clean.
-
-1. **validate:content** — Documentation and formatting
-   - `lint:docs` — Markdown links (no backtick `.md` refs)
-   - `lint:markdown` — Markdownlint rules
-   - `format:md:check` — Prettier markdown formatting
-   - `format:json:check` — Prettier JSON/asmdef formatting
-   - `format:yaml:check` — Prettier YAML formatting
-   - `validate:lint-error-codes` — cspell coverage for every `^[A-Z]{2,}\d{3}$` prefix emitted by `scripts/lint-*.{ps1,js}`, `scripts/tests/test-lint-*.{ps1,js,sh}`, or `.githooks/*`
-
-2. **lint:spelling** — CSpell validation on the repository
-
-3. **eol:check** — Line endings (CRLF, no BOM)
-
-4. **validate:tests:fast** — Fast repository contract tests, run concurrently by
-   `scripts/run-contract-tests.js` (~2.5 min, was ~10 as a serial chain); exhaustive synthetic hook
-   fixtures stay in CI. **Adding a check means adding a registry entry, not appending `&&` to the npm
-   script** — a contract test fails if the chain comes back. If a check mutates the working tree
-   (rewrites a tracked file, drops a canary), mark it `exclusive: true` or it will flake every other
-   check intermittently. **Never pipe the runner's output through `tail`**: it captures each check's
-   full output into a fold, and that fold is the only thing that names a failing assertion
-
-5. **lint:csharp-naming** — C# naming conventions
-
----
+[Read section](../references/validate-before-commit-part-3.md#what-gets-validated)
 
 ## Critical Link Formatting Rules
 
-For complete link formatting rules, escaping patterns, and linting rules, see [markdown-reference](./markdown-reference.md).
-
-Key requirements:
-
-- **ALL internal links MUST use `./` or `../` prefix** — no bare paths
-- **NEVER use backtick-wrapped file references** — use proper markdown links
-- **NEVER use absolute GitHub Pages paths** — no `/unity-helpers/...` paths
-
----
+[Read section](../references/validate-before-commit-part-3.md#critical-link-formatting-rules)
 
 ## Documentation Checklist
 
-Before completing ANY task:
+[Read section](../references/validate-before-commit-part-3.md#documentation-checklist)
 
-### Prettier Self-Check (MANDATORY)
+### [Prettier Self-Check (MANDATORY)](../references/validate-before-commit-part-3.md#prettier-self-check-mandatory)
 
-- [ ] Did I run `node scripts/run-prettier.js --write -- <file>` IMMEDIATELY after EVERY non-C# file?
-- [ ] Did I verify each file with `node scripts/run-prettier.js --check -- <file>`?
-- [ ] Did I check config files too? (`.devcontainer/devcontainer.json`, `package.json`, etc.)
-- [ ] Final check: `node scripts/run-prettier.js --check -- .` passes?
+### [For New Features](../references/validate-before-commit-part-3.md#for-new-features)
 
-### For New Features
+### [For Bug Fixes](../references/validate-before-commit-part-3.md#for-bug-fixes)
 
-- [ ] Feature documentation added/updated
-- [ ] XML documentation on all public types/members
-- [ ] At least one working code sample
-- [ ] CHANGELOG entry in `### Added` section
-- [ ] llms.txt updated if feature adds new capabilities
-
-### For Bug Fixes
-
-- [ ] CHANGELOG entry in `### Fixed` section
-- [ ] Documentation corrected if it described wrong behavior
-
-### For API Changes
-
-- [ ] All documentation referencing old API updated
-- [ ] CHANGELOG entry (in `### Changed`, marked Breaking if applicable)
-- [ ] XML docs updated
-- [ ] Code samples updated
-
----
+### [For API Changes](../references/validate-before-commit-part-3.md#for-api-changes)
 
 ## Pre-Existing Warnings
 
-Some lint warnings may exist in the main branch. Focus on:
-
-1. **New warnings** introduced by your changes
-2. **Failing checks** (exit code 1)
-
-If `validate:content` and `lint:csharp-naming` pass, your changes are ready.
-
----
+[Read section](../references/validate-before-commit-part-3.md#pre-existing-warnings)
 
 ## CLI Argument Safety
 
-When passing file lists to CLI tools (prettier, markdownlint, yamllint, etc.), ALWAYS use a `--` end-of-options separator before the file arguments.
+[Read section](../references/validate-before-commit-part-3.md#cli-argument-safety)
 
-### Why
+### [Why](../references/validate-before-commit-part-3.md#why)
 
-Without `--`, a staged filename like `--plugin=./evil.js` or `--config=malicious.yml` would be interpreted as a CLI option, not a filename. This is an option injection vulnerability.
-
-### Pattern
-
-```bash
-# WRONG - filenames can be interpreted as options
-node scripts/run-prettier.js --write "${FILES[@]}"
-
-# CORRECT - `--` prevents filenames from being treated as options
-node scripts/run-prettier.js --write -- "${FILES[@]}"
-```
-
-This applies to ALL tools that accept file arguments:
-
-- `node scripts/run-prettier.js --write -- "${FILES[@]}"`
-- `node scripts/run-node-bin.js markdownlint --fix --config X -- "${FILES[@]}"`
-- `yamllint -c config.yaml -- "${FILES[@]}"`
-
-In PowerShell scripts, add `'--'` to argument arrays before file paths:
-
-```powershell
-$cmdArgs = @((Join-Path $repoRoot 'scripts/run-node-bin.js'), 'markdownlint', '--fix', '--config', '.markdownlint.json', '--') + $filePaths
-```
-
----
+### [Pattern](../references/validate-before-commit-part-3.md#pattern)
 
 ## Related Skills
 
-- [linter-reference](./linter-reference.md) — Detailed linter commands and configurations
-- [validation-troubleshooting](./validation-troubleshooting.md) — Common errors and fixes
-- [update-documentation](./update-documentation.md) — Documentation requirements
-- [formatting](./formatting.md) — CSharpier, Prettier, markdownlint workflow
-- [markdown-reference](./markdown-reference.md) — Link formatting, structural rules
-- [create-test](./create-test.md) — Test file requirements
-- [test-data-driven](./test-data-driven.md) — Data-driven testing patterns
-- [test-naming-conventions](./test-naming-conventions.md) — Naming rules and legacy test migration
-- [manage-skills](./manage-skills.md) — Skill file maintenance and index regeneration
-- [license-headers](./license-headers.md) — License header requirements and year validation
+[Read section](../references/validate-before-commit-part-3.md#related-skills)

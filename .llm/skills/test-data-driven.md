@@ -2,280 +2,63 @@
 
 <!-- trigger: testcase, testcasesource, data-driven, parameterized | Data-driven testing with TestCase and TestCaseSource | Core -->
 
-**Trigger**: When writing data-driven tests using `[TestCase]` or `[TestCaseSource]` attributes.
+## Reference Parts
 
----
+- [Part 1](../references/test-data-driven-part-1.md)
+- [Part 2](../references/test-data-driven-part-2.md)
 
 ## When to Use
 
-- Testing multiple input/output combinations for the same logic
-- Covering edge cases, boundary values, and error conditions systematically
-- Reducing code duplication across similar test scenarios
-- Testing with computed or complex test data
-
----
+[Read section](../references/test-data-driven-part-1.md#when-to-use)
 
 ## When NOT to Use
 
-- Simple tests with a single scenario (use plain `[Test]` instead)
-- Tests that require completely different setup/teardown per case
-- When test logic differs significantly between cases
-
----
+[Read section](../references/test-data-driven-part-1.md#when-not-to-use)
 
 ## Data-Driven Testing Overview
 
-Data-driven tests using `[TestCase]` and `[TestCaseSource]` are **strongly preferred** in this repository. They provide comprehensive coverage with minimal code duplication.
-
----
+[Read section](../references/test-data-driven-part-1.md#data-driven-testing-overview)
 
 ## When to Use `[TestCase]`
 
-Use for simple inline test cases with primitive values:
-
-```csharp
-[Test]
-[TestCase(null, false, TestName = "Input.Null.ReturnsFalse")]
-[TestCase("", false, TestName = "Input.Empty.ReturnsFalse")]
-[TestCase("valid", true, TestName = "Input.Valid.ReturnsTrue")]
-public void IsValidReturnsExpectedResult(string input, bool expected)
-{
-    bool result = MyValidator.IsValid(input);
-
-    Assert.AreEqual(expected, result);
-}
-```
+[Read section](../references/test-data-driven-part-1.md#when-to-use-testcase)
 
 ### Best Practices for `[TestCase]`
 
-| Practice                             | Example                                |
-| ------------------------------------ | -------------------------------------- |
-| Use dot notation in TestName         | `TestName = "Input.Null.ReturnsFalse"` |
-| Group related cases together         | All null cases, then empty, then valid |
-| Include expected result as parameter | `[TestCase("input", "expected")]`      |
-| Keep inline data simple              | Primitives, strings, small arrays      |
-
----
+[Read section](../references/test-data-driven-part-1.md#best-practices-for-testcase)
 
 ## When to Use `[TestCaseSource]`
 
-Use for complex test data, computed values, or many test cases:
-
-```csharp
-[Test]
-[TestCaseSource(nameof(EdgeCaseTestData))]
-public void ProcessHandlesEdgeCases(int[] input, int expected)
-{
-    int result = MyProcessor.Process(input);
-
-    Assert.AreEqual(expected, result);
-}
-
-private static IEnumerable<TestCaseData> EdgeCaseTestData()
-{
-    yield return new TestCaseData(Array.Empty<int>(), 0)
-        .SetName("Input.Empty.ReturnsZero");
-    yield return new TestCaseData(new[] { 42 }, 42)
-        .SetName("Input.SingleElement.ReturnsElement");
-    yield return new TestCaseData(new[] { int.MaxValue }, int.MaxValue)
-        .SetName("Input.MaxValue.HandlesCorrectly");
-}
-```
+[Read section](../references/test-data-driven-part-1.md#when-to-use-testcasesource)
 
 ### Best Practices for `[TestCaseSource]`
 
-| Practice                                                                  | Example                                              |
-| ------------------------------------------------------------------------- | ---------------------------------------------------- |
-| Use `nameof()` for method reference                                       | `[TestCaseSource(nameof(TestData))]`                 |
-| PascalCase method names                                                   | `EdgeCaseTestData()`, NOT `edge_case_data()`         |
-| Use `.SetName()` with dot notation                                        | `.SetName("Input.Empty.ReturnsZero")`                |
-| Return `IEnumerable<TestCaseData>`                                        | Allows `.SetName()` and other configuration          |
-| Compute environment-dependent expectations in test body, not in test data | `bool expected = !EditorUi.Suppress \|\| allowFlag;` |
-
----
+[Read section](../references/test-data-driven-part-1.md#best-practices-for-testcasesource)
 
 ## Test Case Naming (CRITICAL)
 
-All data-driven test names must use `.` (dot) separator or PascalCase—**NEVER underscores**.
+[Read section](../references/test-data-driven-part-1.md#test-case-naming-critical)
 
-### Correct Patterns
+### [Correct Patterns](../references/test-data-driven-part-1.md#correct-patterns)
 
-```csharp
-// Dot-separated hierarchy (preferred for categorization)
-[TestCase(null, false, TestName = "Input.Null.ReturnsFalse")]
-[TestCase("", false, TestName = "Input.Empty.ReturnsFalse")]
-[TestCase("valid", true, TestName = "Input.Valid.ReturnsTrue")]
+### [Anti-Patterns to Avoid](../references/test-data-driven-part-1.md#anti-patterns-to-avoid)
 
-// PascalCase descriptive (good for simple cases)
-[TestCase(1, TestName = "SingleFolder")]
-[TestCase(5, TestName = "MultipleFolders")]
-
-// SetName with dot notation
-yield return new TestCaseData(null).SetName("Input.Null.Throws");
-yield return new TestCaseData(Array.Empty<int>()).SetName("Input.Empty.ReturnsZero");
-```
-
-### Anti-Patterns to Avoid
-
-```csharp
-// WRONG - Underscores in TestName
-[TestCase(null, TestName = "Input_Null_Returns_False")]
-[TestCase("", TestName = "Empty_String")]
-
-// WRONG - Underscores in SetName()
-yield return new TestCaseData(null).SetName("Null_Input_Throws");
-yield return new TestCaseData(Array.Empty<int>()).SetName("Empty_Array");
-
-// WRONG - Underscore-separated TestCaseSource method names
-private static IEnumerable<TestCaseData> Edge_Case_Test_Data() { }
-private static IEnumerable<TestCaseData> null_input_cases() { }
-```
-
-### Correct TestCaseSource Method Pattern
-
-```csharp
-// CORRECT - PascalCase method names, dot notation in SetName
-private static IEnumerable<TestCaseData> EdgeCaseTestData()
-{
-    yield return new TestCaseData(null).SetName("Input.Null.Throws");
-    yield return new TestCaseData(Array.Empty<int>()).SetName("Input.Empty.ReturnsZero");
-}
-```
-
----
+### [Correct TestCaseSource Method Pattern](../references/test-data-driven-part-1.md#correct-testcasesource-method-pattern)
 
 ## Organizing Test Case Categories
 
-Structure your test cases to cover all required categories:
+[Read section](../references/test-data-driven-part-2.md#organizing-test-case-categories)
 
-| Category       | Examples                   | Why Test                       |
-| -------------- | -------------------------- | ------------------------------ |
-| **Normal**     | `"hello"`, `[1,2,3]`, `42` | Verify basic functionality     |
-| **Null**       | `null`, `default`          | Prevent NullReferenceException |
-| **Empty**      | `""`, `[]`, `{}`           | Handle degenerate cases        |
-| **Single**     | `"a"`, `[1]`               | Off-by-one errors              |
-| **Boundary**   | `0`, `-1`, `int.MaxValue`  | Overflow, underflow            |
-| **Large**      | 10K+ elements              | Performance, memory            |
-| **Invalid**    | `"@#$%"`, `(MyEnum)999`    | Graceful error handling        |
-| **Concurrent** | Parallel access            | Thread safety                  |
-
-### Example: Comprehensive Test Case Coverage
-
-```csharp
-[Test]
-[TestCaseSource(nameof(ProcessTestCases))]
-public void ProcessHandlesAllCases(int[] input, int expected, string scenario)
-{
-    int result = MyProcessor.Process(input);
-
-    Assert.AreEqual(expected, result, $"Failed for scenario: {scenario}");
-}
-
-private static IEnumerable<TestCaseData> ProcessTestCases()
-{
-    // Normal cases
-    yield return new TestCaseData(new[] { 1, 2, 3 }, 6, "normal sum")
-        .SetName("Input.Normal.SumsCorrectly");
-
-    // Null/Empty cases
-    yield return new TestCaseData(null, 0, "null input")
-        .SetName("Input.Null.ReturnsZero");
-    yield return new TestCaseData(Array.Empty<int>(), 0, "empty array")
-        .SetName("Input.Empty.ReturnsZero");
-
-    // Single element
-    yield return new TestCaseData(new[] { 42 }, 42, "single element")
-        .SetName("Input.Single.ReturnsElement");
-
-    // Boundary values
-    yield return new TestCaseData(new[] { 0 }, 0, "zero")
-        .SetName("Input.Boundary.Zero");
-    yield return new TestCaseData(new[] { int.MaxValue }, int.MaxValue, "max value")
-        .SetName("Input.Boundary.MaxValue");
-}
-```
-
----
+### [Example: Comprehensive Test Case Coverage](../references/test-data-driven-part-2.md#example-comprehensive-test-case-coverage)
 
 ## `[TestCaseSource]` with `[UnityTest]` (IEnumerator Tests)
 
-**CRITICAL**: Two rules for parameterized `[UnityTest]` coroutine tests:
-
-1. **Never combine `[TestCase]` with `[UnityTest]`** — not reliably supported across Unity versions.
-2. **Always add `.Returns(null)` to every `TestCaseData`** — NUnit requires this when the test method has a non-void return type (`IEnumerator`). Without it, NUnit reports: _"Method has non-void return value, but no result is expected."_
-
-```csharp
-// CORRECT - TestCaseSource with UnityTest and .Returns(null)
-private static IEnumerable<TestCaseData> SuppressionFlagTestCases()
-{
-    yield return new TestCaseData(true, false)
-        .Returns(null)
-        .SetName("Suppression.Enabled.AllowFalse");
-    yield return new TestCaseData(true, true)
-        .Returns(null)
-        .SetName("Suppression.Enabled.AllowTrue");
-}
-
-[UnityTest]
-[TestCaseSource(nameof(SuppressionFlagTestCases))]
-public IEnumerator GenerateCacheRespectsSuppressionFlags(
-    bool suppressEditorUi,
-    bool allowDuringSuppression
-)
-{
-    // Compute environment-dependent expectation in the test body
-    bool expectCacheCreated = !EditorUi.Suppress || allowDuringSuppression;
-    // ... coroutine test body with yield return null
-}
-
-// WRONG - Missing .Returns(null) causes NUnit error
-private static IEnumerable<TestCaseData> BrokenTestCases()
-{
-    yield return new TestCaseData(true, false)
-        .SetName("SomeCase"); // BUG: "Method has non-void return value"
-}
-
-// WRONG - TestCase with UnityTest (unreliable)
-[UnityTest]
-[TestCase(true, false, false, TestName = "SomeCase")]
-public IEnumerator SomeTest(bool param1, bool param2, bool param3)
-{
-    yield return null; // May not work correctly
-}
-```
-
-| Pattern            | Use With                                   | `.Returns(null)` Required |
-| ------------------ | ------------------------------------------ | ------------------------- |
-| `[TestCase]`       | `[Test]` (synchronous `void` methods only) | N/A                       |
-| `[TestCaseSource]` | `[Test]` (synchronous `void` methods)      | No                        |
-| `[TestCaseSource]` | `[UnityTest]` (`IEnumerator` methods)      | **YES — MANDATORY**       |
-
----
+[Read section](../references/test-data-driven-part-2.md#testcasesource-with-unitytest-ienumerator-tests)
 
 ## Automated Enforcement
 
-**MANDATORY:** After creating or modifying ANY test file, run the test linter:
-
-```bash
-pwsh -NoProfile -File scripts/lint-tests.ps1
-```
-
-The linter detects naming violations:
-
-| Violation Type                          | Example                     |
-| --------------------------------------- | --------------------------- |
-| Underscores in test method names        | `Process_Null_Input_Throws` |
-| Underscores in `TestName` values        | `TestName = "Null_Input"`   |
-| Underscores in `SetName()` calls        | `.SetName("Empty_Array")`   |
-| Non-PascalCase `TestCaseSource` methods | `edge_case_data()`          |
-
-**Note:** Pre-commit hooks enforce these rules automatically, but running the linter manually during development catches issues before commit.
-
----
+[Read section](../references/test-data-driven-part-2.md#automated-enforcement)
 
 ## Related Skills
 
-- [create-test](./create-test.md) — Overall test creation guidance
-- [test-naming-conventions](./test-naming-conventions.md) — Detailed naming rules and migration
-- [test-unity-lifecycle](./test-unity-lifecycle.md) — Unity object lifecycle management
-- [investigate-test-failures](./investigate-test-failures.md) — Root cause analysis for test failures
+[Read section](../references/test-data-driven-part-2.md#related-skills)

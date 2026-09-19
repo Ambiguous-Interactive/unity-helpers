@@ -190,8 +190,6 @@ If you believe a test should use `[Parallelizable]`, verify ALL of the following
 
 If ANY checkbox is unchecked, do NOT add `[Parallelizable]`.
 
----
-
 ## Related Skills
 
 - [create-test](./create-test.md) - General test creation guidelines

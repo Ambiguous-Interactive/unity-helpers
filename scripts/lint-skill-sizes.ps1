@@ -3,18 +3,18 @@
     Validates LLM skill file and context file sizes against documented limits.
 
 .DESCRIPTION
-    Checks all .llm/skills/**/*.md files (including subdirectories) and .llm/context.md
+    Checks all .llm/skills/**/*.md files, .llm/references/**/*.md, and .llm/context.md
     against size thresholds:
-    - >500 lines: ERROR (MUST split per manage-skills.md)
-    - 480-500 lines: CRITICAL WARNING (always shown, near limit)
-    - >300 lines: WARNING (consider splitting, shown with -VerboseOutput)
+    - >=200 lines: ERROR (split into routed references)
+    - 199 lines: CRITICAL WARNING (always shown, at the limit)
+    - >180 lines: WARNING (consider splitting, shown with -VerboseOutput)
 
     Skill file messages use the [skill-sizes] prefix.
     Context file messages use the [context-size] prefix.
 
 .PARAMETER VerboseOutput
     If specified, outputs detailed information during validation including
-    OK status for files within limits and WARNING status for files over 300 lines.
+    OK status for files within limits and WARNING status for files over 180 lines.
 
 .EXAMPLE
     pwsh -NoProfile -File scripts/lint-skill-sizes.ps1
@@ -57,9 +57,9 @@ function Write-SuccessMsg($msg, $prefix = "[skill-sizes]") {
 $repoRoot = (Get-Item $PSScriptRoot).Parent.FullName
 $skillsDir = Join-Path -Path $repoRoot -ChildPath '.llm/skills'
 $contextFile = Join-Path -Path $repoRoot -ChildPath '.llm/context.md'
-$maxLines = 500
-$criticalLines = 480
-$warningLines = 300
+$maxLines = 199
+$criticalLines = 199
+$warningLines = 180
 $exitCode = 0
 
 function Get-LineCount {
@@ -84,8 +84,8 @@ if (-not (Test-Path $skillsDir)) {
 # Exclude the generated index.md: it is machine-written (scripts/generate-skills-index.ps1),
 # not an authored skill, so the authored-skill line limits do not apply to it.
 $skillFiles = @(
-    Get-ChildItem -Path $skillsDir -Filter '*.md' -Recurse |
-        Where-Object { $_.Name -ne 'index.md' } |
+    Get-ChildItem -Path (Join-Path $repoRoot '.llm') -Filter '*.md' -Recurse |
+        Where-Object { $_.FullName -ne $contextFile -and $_.FullName -ne (Join-Path $skillsDir 'index.md') } |
         Sort-Object FullName
 )
 $checkContext = $true
@@ -111,7 +111,8 @@ if ($null -ne $Paths -and $Paths.Count -gt 0) {
             continue
         }
 
-        if ($relativePath -like '.llm/skills/*.md' -and $relativePath -ne '.llm/skills/index.md') {
+        if (($relativePath -like '.llm/skills/*.md' -and $relativePath -ne '.llm/skills/index.md') -or
+            $relativePath -like '.llm/references/*.md') {
             $fullPath = Join-Path -Path $repoRoot -ChildPath $relativePath
             if ((Test-Path -Path $fullPath) -and $seen.Add($fullPath)) {
                 $selectedSkillFiles.Add((Get-Item -LiteralPath $fullPath)) | Out-Null
@@ -129,7 +130,7 @@ $okCount = 0
 
 foreach ($file in $skillFiles) {
     $lineCount = @(Get-Content $file.FullName).Count
-    $relativePath = $file.FullName.Substring($skillsDir.Length + 1).Replace('\', '/')
+    $relativePath = $file.FullName.Substring($repoRoot.Length + 1).Replace('\', '/')
 
     if ($lineCount -gt $maxLines) {
         Write-ErrorMsg "${relativePath}: $lineCount lines (max: $maxLines) - MUST split"
