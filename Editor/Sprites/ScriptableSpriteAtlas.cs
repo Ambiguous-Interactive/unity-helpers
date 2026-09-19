@@ -146,7 +146,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         [Header("Sprite Sources")]
         [Tooltip(
-            "Manually added sprites. These will always be included in addition to scanned sprites."
+            "Sprites included in the atlas. Folder sync can remove entries absent from scanned folders."
         )]
         public List<Sprite> spritesToPack = new();
 

@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
     using NUnit.Framework;
     using UnityEditor;
     using UnityEngine;
+    using UnityEngine.TestTools;
     using UnityEngine.U2D;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Sprites;
@@ -71,26 +72,83 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
 
             ScriptableSpriteAtlas config = ScriptableObject.CreateInstance<ScriptableSpriteAtlas>(); // UNH-SUPPRESS: Asset becomes persistent via CreateAsset below
             config.name = "TestAtlasConfig";
-            config.spritesToPack.Add(AssetDatabase.LoadAssetAtPath<Sprite>(spritePath));
+            config.sourceFolderEntries.Add(new SourceFolderEntry { folderPath = Root });
             config.outputSpriteAtlasDirectory = Root;
-            config.outputSpriteAtlasName = "TestAtlas";
+            string atlasPath = AssetDatabase.GenerateUniqueAssetPath(
+                Path.Combine(Root, "TestAtlas.spriteatlas").SanitizePath()
+            );
+            config.outputSpriteAtlasName = Path.GetFileNameWithoutExtension(atlasPath);
+            config.overrideStandalone = true;
             string configPath = Path.Combine(Root, "TestAtlasConfig.asset").SanitizePath();
             AssetDatabase.CreateAsset(config, configPath);
             TrackAssetPath(configPath);
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
 
-            ScriptableSpriteAtlasEditor window = Track(
-                ScriptableObject.CreateInstance<ScriptableSpriteAtlasEditor>()
+            List<Sprite> toAdd = new();
+            List<Sprite> toRemove = new();
+            Assert.IsTrue(ScriptableSpriteAtlasGenerator.Scan(config, toAdd, toRemove));
+            Assert.AreEqual(1, toAdd.Count);
+            Assert.IsEmpty(toRemove);
+            Assert.IsTrue(ScriptableSpriteAtlasGenerator.Synchronize(config, toAdd, toRemove));
+            config.spritesToPack.Add(null);
+            TrackAssetPath(atlasPath);
+            config.outputSpriteAtlasName = "Occupied";
+            string occupiedPath = AssetDatabase.GenerateUniqueAssetPath(
+                Path.Combine(Root, "Occupied.spriteatlas").SanitizePath()
             );
-            window.LoadAtlasConfigs();
-            window.GenerateAllAtlases();
+            config.outputSpriteAtlasName = Path.GetFileNameWithoutExtension(occupiedPath);
+            TrackAssetPath(occupiedPath);
+            string occupiedFile = RelToFull(occupiedPath);
+            File.WriteAllText(occupiedFile, "occupied");
+            LogAssert.Expect(
+                LogType.Error,
+                $"'{config.name}': Output path '{occupiedPath}' is occupied by another asset."
+            );
+            Assert.IsFalse(ScriptableSpriteAtlasGenerator.Generate(config));
+            Assert.AreEqual("occupied", File.ReadAllText(occupiedFile));
+            Assert.AreEqual(2, config.spritesToPack.Count);
+            File.Delete(occupiedFile);
+            config.outputSpriteAtlasName = Path.GetFileNameWithoutExtension(atlasPath);
+            Assert.IsTrue(
+                ScriptableSpriteAtlasGenerator.Generate(config),
+                "generate after collision"
+            );
+            CollectionAssert.DoesNotContain(config.spritesToPack, null);
+            List<string> differences = new();
+            Assert.IsTrue(
+                ScriptableSpriteAtlasGenerator.TryFindDrift(config, differences),
+                "drift after initial generate"
+            );
+            Assert.IsEmpty(differences);
+            Assert.IsFalse(ScriptableSpriteAtlasGenerator.Generate(config));
 
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
-            string atlasPath = Path.Combine(Root, "TestAtlas.spriteatlas").SanitizePath();
-            TrackAssetPath(atlasPath);
             SpriteAtlas atlas = AssetDatabase.LoadAssetAtPath<SpriteAtlas>(atlasPath);
             Assert.IsTrue(atlas != null, ".spriteatlas should be generated");
+            ScriptableSpriteAtlasEditor window = Track(
+                ScriptableObject.CreateInstance<ScriptableSpriteAtlasEditor>()
+            );
+            ScriptableSpriteAtlasEditor.ScanResult cachedScan = new() { hasScanned = true };
+            cachedScan.spritesToRemove.Add(config.spritesToPack[0]);
+            config.sourceFolderEntries[0].folderPath = Root + "/Missing";
+            LogAssert.Expect(
+                LogType.Error,
+                $"'{config.name}': Invalid or empty folder path '{Root}/Missing' prevents a complete scan."
+            );
+            window.SyncListToScanResult(config, cachedScan);
+            Assert.IsFalse(cachedScan.hasScanned);
+            Assert.IsEmpty(cachedScan.spritesToRemove);
+            Assert.AreEqual(1, config.spritesToPack.Count);
+            config.sourceFolderEntries[0].folderPath = Root;
+            config.padding = 16;
+            config.overrideStandalone = false;
+            Assert.IsTrue(ScriptableSpriteAtlasGenerator.TryFindDrift(config, differences));
+            CollectionAssert.Contains(differences, "Packing settings differ.");
+            CollectionAssert.Contains(differences, "Standalone platform settings differ.");
+            Assert.IsTrue(ScriptableSpriteAtlasGenerator.Generate(config));
+            Assert.IsTrue(ScriptableSpriteAtlasGenerator.TryFindDrift(config, differences));
+            Assert.IsEmpty(differences);
         }
 
         [Test]
@@ -115,6 +173,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 ScriptableSpriteAtlasEditor.ToObjectArray(sprites)
             );
             CollectionAssert.IsEmpty(ScriptableSpriteAtlasEditor.ToObjectArray(null));
+
+            ScriptableSpriteAtlas config = Track(
+                ScriptableObject.CreateInstance<ScriptableSpriteAtlas>()
+            );
+            config.spritesToPack.Add(first);
+            Assert.IsTrue(
+                ScriptableSpriteAtlasGenerator.Synchronize(
+                    config,
+                    new[] { second },
+                    new[] { first }
+                )
+            );
+            CollectionAssert.AreEquivalent(new[] { first, second }, config.spritesToPack);
+            Assert.IsTrue(
+                ScriptableSpriteAtlasGenerator.Synchronize(
+                    config,
+                    System.Array.Empty<Sprite>(),
+                    new[] { first },
+                    removeUnmatchedSprites: true
+                )
+            );
+            CollectionAssert.AreEqual(new[] { second }, config.spritesToPack);
 
             Object.DestroyImmediate(second); // UNH-SUPPRESS: Exercises destroyed Sprite filtering.
 

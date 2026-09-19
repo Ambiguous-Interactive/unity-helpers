@@ -774,6 +774,21 @@ Closing the window releases its cached state.
 7. Click **Generate/Update '<name>.spriteatlas' ONLY**, then **Pack All Generated Sprite Atlases** —
    or **Generate + Pack** to do both.
 
+Scripts and batch jobs can use the same configuration without opening the window. Call
+`ScriptableSpriteAtlasGenerator.Scan(config, toAdd, toRemove)` to preview folder changes, then
+`Synchronize(config, toAdd, toRemove)` to add found sprites while keeping existing manual entries.
+If a source folder or filter is invalid, `Scan` returns `false` with empty results; fix the config
+before synchronizing.
+Pass `removeUnmatchedSprites: true` to remove every sprite absent from the scanned folders, including
+manual entries. The window's **Sync List To Scan Result** button uses that removal mode. `Generate(config)` writes one atlas
+and returns whether it changed; `GenerateAll()` writes all configured atlases in one asset batch and
+returns the number changed. `PackAll(target)` packs for a chosen build target. A CI check can call
+`TryFindDrift(config, differences)` and fail if it returns `false` or adds any differences. It checks
+packables and generated settings without changing the atlas. To regenerate and pack in Unity batch
+mode, use `-executeMethod WallstopStudios.UnityHelpers.Editor.Sprites.ScriptableSpriteAtlasGenerator.GenerateAndPackAllForBatch`.
+Generation and packing write assets and may trigger imports; Unity Undo cannot reverse all file and
+import effects.
+
 A character atlas that picks up every new idle frame automatically:
 
 ```text

@@ -174,150 +174,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 : left.OriginalIndex.CompareTo(right.OriginalIndex);
         }
 
-        private static void AppendNonEmptyStrings(
-            IReadOnlyList<string> source,
-            List<string> destination
-        )
-        {
-            if (source == null || destination == null)
-            {
-                return;
-            }
-
-            for (int i = 0; i < source.Count; ++i)
-            {
-                string value = source[i];
-                if (!string.IsNullOrWhiteSpace(value))
-                {
-                    destination.Add(value);
-                }
-            }
-        }
-
-        private static void AppendSanitizedPrefixes(
-            IReadOnlyList<string> source,
-            List<string> destination
-        )
-        {
-            if (source == null || destination == null)
-            {
-                return;
-            }
-
-            for (int i = 0; i < source.Count; ++i)
-            {
-                string prefix = source[i];
-                if (string.IsNullOrWhiteSpace(prefix))
-                {
-                    continue;
-                }
-
-                destination.Add(prefix.SanitizePath());
-            }
-        }
-
-        private static bool MatchesLabelRule(
-            IReadOnlyList<string> configuredLabels,
-            LabelSelectionMode selectionMode,
-            IReadOnlyList<string> assetLabels
-        )
-        {
-            if (configuredLabels == null || configuredLabels.Count == 0)
-            {
-                return true;
-            }
-
-            if (assetLabels == null || assetLabels.Count == 0)
-            {
-                return false;
-            }
-
-            switch (selectionMode)
-            {
-                case LabelSelectionMode.All:
-                {
-                    for (int i = 0; i < configuredLabels.Count; ++i)
-                    {
-                        if (!AssetLabelsContain(assetLabels, configuredLabels[i]))
-                        {
-                            return false;
-                        }
-                    }
-                    return true;
-                }
-                case LabelSelectionMode.AnyOf:
-                {
-                    for (int i = 0; i < configuredLabels.Count; ++i)
-                    {
-                        if (AssetLabelsContain(assetLabels, configuredLabels[i]))
-                        {
-                            return true;
-                        }
-                    }
-                    return false;
-                }
-                default:
-                    return false;
-            }
-        }
-
-        private static bool AssetLabelsContain(IReadOnlyList<string> assetLabels, string label)
-        {
-            if (assetLabels == null || assetLabels.Count == 0 || string.IsNullOrWhiteSpace(label))
-            {
-                return false;
-            }
-
-            for (int i = 0; i < assetLabels.Count; ++i)
-            {
-                if (string.Equals(assetLabels[i], label, StringComparison.Ordinal))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool IsValidLabelSelectionMode(LabelSelectionMode mode)
-        {
-            return mode == LabelSelectionMode.All || mode == LabelSelectionMode.AnyOf;
-        }
-
-        private static string[] LoadAssetLabels(string assetPath)
-        {
-            Object mainAsset = AssetDatabase.LoadMainAssetAtPath(assetPath);
-            if (mainAsset == null)
-            {
-                return Array.Empty<string>();
-            }
-
-            string[] labels = AssetDatabase.GetLabels(mainAsset);
-            return labels ?? Array.Empty<string>();
-        }
-
-        private static void ApplyPlatformSettings(
-            SpriteAtlas atlas,
-            string platformName,
-            int maxTextureSize,
-            TextureImporterCompression compression,
-            bool useCrunch,
-            int crunchLevel
-        )
-        {
-            TextureImporterPlatformSettings ps = atlas.GetPlatformSettings(platformName);
-            if (string.IsNullOrWhiteSpace(ps.name))
-            {
-                ps.name = platformName;
-            }
-            ps.overridden = true;
-            ps.maxTextureSize = maxTextureSize;
-            ps.textureCompression = compression;
-            ps.crunchedCompression = useCrunch;
-            ps.compressionQuality = Mathf.Clamp(crunchLevel, 0, 100);
-            atlas.SetPlatformSettings(ps);
-        }
-
         private static void PingAtlas(string outputPath)
         {
             if (string.IsNullOrWhiteSpace(outputPath))
@@ -414,6 +270,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             int totalConfigs = _atlasConfigs.Count;
             int currentConfig = 0;
+            bool changed = false;
 
             try
             {
@@ -433,7 +290,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             $"Processing: {config.name}",
                             progress
                         );
-                        GenerateSingleAtlas(config, false);
+                        changed |= ScriptableSpriteAtlasGenerator.GenerateWithoutRefresh(config);
                     }
                 }
             }
@@ -441,18 +298,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 Utils.EditorUi.ClearProgress();
             }
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
+            if (changed)
+            {
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+            }
         }
 
         internal void PackAllProjectAtlases()
         {
-            this.Log(
-                $"Starting to pack all Sprite Atlases in the project for target: {EditorUserBuildSettings.activeBuildTarget}"
-            );
-            SpriteAtlasUtility.PackAllAtlases(EditorUserBuildSettings.activeBuildTarget);
-            this.Log($"Finished packing all Sprite Atlases.");
-            AssetDatabase.Refresh();
+            ScriptableSpriteAtlasGenerator.PackAll(EditorUserBuildSettings.activeBuildTarget);
         }
 
         internal void ForceUncompressedSourceSprites(ScriptableSpriteAtlas config)
@@ -620,6 +475,25 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     + $"Successfully modified importers for: {modifiedCount} textures.\n"
                     + $"Errors/Skipped duplicates: {errorCount + (spritesToProcess.Count - processedAssetPaths.Count)}.";
                 this.Log($"{summaryMessage}");
+            }
+        }
+
+        internal void SyncListToScanResult(ScriptableSpriteAtlas config, ScanResult result)
+        {
+            if (!TryRefreshScanResult(config, result))
+            {
+                return;
+            }
+            if (
+                ScriptableSpriteAtlasGenerator.Synchronize(
+                    config,
+                    result.spritesToAdd,
+                    result.spritesToRemove,
+                    removeUnmatchedSprites: true
+                )
+            )
+            {
+                ScanFoldersForConfig(config);
             }
         }
 
@@ -1096,515 +970,23 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private void ScanFoldersForConfig(ScriptableSpriteAtlas config)
         {
-            if (config.sourceFolderEntries == null || config.sourceFolderEntries.Count == 0)
+            if (config == null)
             {
-                this.LogWarn(
-                    $"'{config.name}': No source folder entries defined. Scan will find nothing from folders."
-                );
-                _scanResultsCache[config] = new ScanResult { hasScanned = true };
-                Repaint();
                 return;
             }
-
-            ScanResult currentScan = new ScanResult();
-            int totalFoundSprites = 0;
-            int potentialAddCount = 0;
-            int potentialRemoveCount = 0;
-
-            using (
-                PooledResource<HashSet<Sprite>> foundSpritesLease = Buffers<Sprite>.HashSet.Get(
-                    out HashSet<Sprite> foundSpritesInFolders
-                )
-            )
-            using (
-                PooledResource<HashSet<Sprite>> configSpritesLease = Buffers<Sprite>.HashSet.Get(
-                    out HashSet<Sprite> configSprites
-                )
-            )
-            using (
-                PooledResource<List<Sprite>> validSpritesLease = Buffers<Sprite>.List.Get(
-                    out List<Sprite> validSpritesInConfigList
-                )
-            )
-            {
-                foreach (Sprite sprite in config.spritesToPack)
-                {
-                    if (sprite == null)
-                    {
-                        continue;
-                    }
-
-                    validSpritesInConfigList.Add(sprite);
-                    configSprites.Add(sprite);
-                }
-
-                foreach (SourceFolderEntry entry in config.sourceFolderEntries)
-                {
-                    ProcessSourceFolderEntry(config, entry, foundSpritesInFolders);
-                }
-
-                foreach (Sprite sprite in foundSpritesInFolders)
-                {
-                    if (sprite != null && !configSprites.Contains(sprite))
-                    {
-                        currentScan.spritesToAdd.Add(sprite);
-                    }
-                }
-
-                foreach (Sprite sprite in validSpritesInConfigList)
-                {
-                    if (!foundSpritesInFolders.Contains(sprite))
-                    {
-                        currentScan.spritesToRemove.Add(sprite);
-                    }
-                }
-
-                totalFoundSprites = foundSpritesInFolders.Count;
-                potentialAddCount = currentScan.spritesToAdd.Count;
-                potentialRemoveCount = currentScan.spritesToRemove.Count;
-            }
-
-            currentScan.hasScanned = true;
-            _scanResultsCache[config] = currentScan;
-            this.Log(
-                $"'{config.name}': Scan complete. Total unique sprites found across all folder entries: {totalFoundSprites}. Potential to add: {potentialAddCount}, Potential to remove: {potentialRemoveCount}."
+            ScanResult result = new ScanResult();
+            result.hasScanned = ScriptableSpriteAtlasGenerator.Scan(
+                config,
+                result.spritesToAdd,
+                result.spritesToRemove
             );
+            _scanResultsCache[config] = result;
             Repaint();
-        }
-
-        private void ProcessSourceFolderEntry(
-            ScriptableSpriteAtlas config,
-            SourceFolderEntry entry,
-            HashSet<Sprite> foundSpritesInFolders
-        )
-        {
-            if (entry == null)
-            {
-                return;
-            }
-
-            if (
-                string.IsNullOrWhiteSpace(entry.folderPath)
-                || !AssetDatabase.IsValidFolder(entry.folderPath)
-            )
-            {
-                this.LogWarn(
-                    $"'{config.name}': Invalid or empty folder path '{entry.folderPath}' in an entry. Skipping this entry."
-                );
-                return;
-            }
-
-            bool includeRegexFilter = entry.selectionMode.HasFlagNoAlloc(SpriteSelectionMode.Regex);
-            bool includeLabelFilter =
-                entry.selectionMode.HasFlagNoAlloc(SpriteSelectionMode.Labels)
-                && entry.labels is { Count: > 0 };
-
-            List<string> includeLabels = null;
-            List<string> excludeLabels = null;
-            List<string> excludePrefixes = null;
-            List<Regex> compiledRegexes = null;
-            List<Regex> compiledExcludeRegexes = null;
-
-            PooledResource<List<string>> includeLabelsLease = default;
-            PooledResource<List<string>> excludeLabelsLease = default;
-            PooledResource<List<string>> excludePrefixesLease = default;
-            PooledResource<List<Regex>> compiledRegexesLease = default;
-            PooledResource<List<Regex>> compiledExcludeRegexesLease = default;
-
-            using (
-                PooledResource<List<string>> guidListLease = Buffers<string>.List.Get(
-                    out List<string> guidList
-                )
-            )
-            {
-                try
-                {
-                    if (includeLabelFilter)
-                    {
-                        includeLabelsLease = Buffers<string>.List.Get(out includeLabels);
-                        AppendNonEmptyStrings(entry.labels, includeLabels);
-                        if (includeLabels.Count == 0)
-                        {
-                            includeLabelFilter = false;
-                        }
-                        else if (!IsValidLabelSelectionMode(entry.labelSelectionMode))
-                        {
-                            this.LogError(
-                                $"'{config.name}', Folder '{entry.folderPath}': Invalid LabelSelectionMode value '{entry.labelSelectionMode}'. Skipping label filtering for this entry."
-                            );
-                            includeLabelFilter = false;
-                        }
-                    }
-
-                    bool hasExcludeLabels = entry.excludeLabels is { Count: > 0 };
-                    if (hasExcludeLabels)
-                    {
-                        excludeLabelsLease = Buffers<string>.List.Get(out excludeLabels);
-                        AppendNonEmptyStrings(entry.excludeLabels, excludeLabels);
-                        if (excludeLabels.Count == 0)
-                        {
-                            hasExcludeLabels = false;
-                        }
-                        else if (!IsValidLabelSelectionMode(entry.excludeLabelSelectionMode))
-                        {
-                            this.LogError(
-                                $"'{config.name}', Folder '{entry.folderPath}': Invalid LabelSelectionMode value '{entry.excludeLabelSelectionMode}'. Skipping exclude label filtering for this entry."
-                            );
-                            hasExcludeLabels = false;
-                        }
-                    }
-
-                    bool hasExcludePrefixes = entry.excludePathPrefixes is { Count: > 0 };
-                    if (hasExcludePrefixes)
-                    {
-                        excludePrefixesLease = Buffers<string>.List.Get(out excludePrefixes);
-                        AppendSanitizedPrefixes(entry.excludePathPrefixes, excludePrefixes);
-                        if (excludePrefixes.Count == 0)
-                        {
-                            hasExcludePrefixes = false;
-                        }
-                    }
-
-                    bool searchedByLabels =
-                        includeLabelFilter
-                        && TryFindLabelFilteredAssets(config, entry, includeLabels, guidList);
-
-                    if (!searchedByLabels)
-                    {
-                        string[] defaultGuids = AssetDatabase.FindAssets(
-                            "t:Texture2D",
-                            new[] { entry.folderPath }
-                        );
-                        if (defaultGuids != null && 0 < defaultGuids.Length)
-                        {
-                            guidList.AddRange(defaultGuids);
-                        }
-                    }
-
-                    if (includeRegexFilter && entry.regexes is { Count: > 0 })
-                    {
-                        compiledRegexesLease = Buffers<Regex>.List.Get(out compiledRegexes);
-                        CompileRegexPatterns(
-                            config,
-                            entry,
-                            entry.regexes,
-                            compiledRegexes,
-                            "Regex"
-                        );
-                    }
-
-                    bool hasExcludeRegexes = entry.excludeRegexes is { Count: > 0 };
-                    if (hasExcludeRegexes)
-                    {
-                        compiledExcludeRegexesLease = Buffers<Regex>.List.Get(
-                            out compiledExcludeRegexes
-                        );
-                        CompileRegexPatterns(
-                            config,
-                            entry,
-                            entry.excludeRegexes,
-                            compiledExcludeRegexes,
-                            "Exclude Regex"
-                        );
-                        if (compiledExcludeRegexes.Count == 0)
-                        {
-                            hasExcludeRegexes = false;
-                        }
-                    }
-
-                    if (guidList.Count == 0)
-                    {
-                        return;
-                    }
-
-                    bool needsExcludeLabels =
-                        hasExcludeLabels && excludeLabels != null && 0 < excludeLabels.Count;
-                    bool needsLabels = includeLabelFilter || needsExcludeLabels;
-
-                    foreach (string guid in guidList)
-                    {
-                        string assetPath = AssetDatabase.GUIDToAssetPath(guid);
-                        if (string.IsNullOrWhiteSpace(assetPath))
-                        {
-                            continue;
-                        }
-
-                        string fileName = Path.GetFileName(assetPath);
-                        bool regexMatch = true;
-                        if (
-                            compiledRegexes != null
-                            && 0 < compiledRegexes.Count
-                            && !string.IsNullOrEmpty(fileName)
-                        )
-                        {
-                            foreach (Regex rx in compiledRegexes)
-                            {
-                                if (!rx.IsMatch(fileName))
-                                {
-                                    regexMatch = false;
-                                    break;
-                                }
-                            }
-                        }
-
-                        string[] assetLabels = needsLabels
-                            ? LoadAssetLabels(assetPath)
-                            : Array.Empty<string>();
-                        bool labelMatch = true;
-                        if (includeLabelFilter)
-                        {
-                            labelMatch = MatchesLabelRule(
-                                includeLabels,
-                                entry.labelSelectionMode,
-                                assetLabels
-                            );
-                        }
-
-                        bool passesFilters;
-                        if (includeRegexFilter && includeLabelFilter)
-                        {
-                            switch (entry.regexAndTagLogic)
-                            {
-                                case SpriteSelectionBooleanLogic.And:
-                                    passesFilters = regexMatch && labelMatch;
-                                    break;
-                                case SpriteSelectionBooleanLogic.Or:
-                                    passesFilters = regexMatch || labelMatch;
-                                    break;
-                                default:
-                                    this.LogError(
-                                        $"'{config.name}', Folder '{entry.folderPath}': Invalid SpriteSelectionBooleanLogic value '{entry.regexAndTagLogic}'. Defaulting to AND logic."
-                                    );
-                                    passesFilters = regexMatch && labelMatch;
-                                    break;
-                            }
-                        }
-                        else if (includeRegexFilter)
-                        {
-                            passesFilters = regexMatch;
-                        }
-                        else if (includeLabelFilter)
-                        {
-                            passesFilters = labelMatch;
-                        }
-                        else
-                        {
-                            passesFilters = true;
-                        }
-
-                        if (!passesFilters)
-                        {
-                            continue;
-                        }
-
-                        bool excluded = false;
-                        if (!excluded && hasExcludePrefixes && excludePrefixes != null)
-                        {
-                            string sanitizedAssetPath = assetPath.SanitizePath();
-                            foreach (string prefix in excludePrefixes)
-                            {
-                                if (
-                                    sanitizedAssetPath.StartsWith(
-                                        prefix,
-                                        StringComparison.OrdinalIgnoreCase
-                                    )
-                                )
-                                {
-                                    excluded = true;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (
-                            !excluded
-                            && hasExcludeRegexes
-                            && compiledExcludeRegexes != null
-                            && !string.IsNullOrEmpty(fileName)
-                        )
-                        {
-                            foreach (Regex rx in compiledExcludeRegexes)
-                            {
-                                if (rx.IsMatch(fileName))
-                                {
-                                    excluded = true;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (!excluded && needsExcludeLabels)
-                        {
-                            excluded = MatchesLabelRule(
-                                excludeLabels,
-                                entry.excludeLabelSelectionMode,
-                                assetLabels
-                            );
-                        }
-
-                        if (excluded)
-                        {
-                            continue;
-                        }
-
-                        Object[] assets = AssetDatabase.LoadAllAssetsAtPath(assetPath);
-                        if (assets == null || assets.Length == 0)
-                        {
-                            continue;
-                        }
-
-                        foreach (Object asset in assets)
-                        {
-                            if (asset is Sprite spriteAsset && spriteAsset != null)
-                            {
-                                foundSpritesInFolders.Add(spriteAsset);
-                            }
-                        }
-                    }
-                }
-                finally
-                {
-                    compiledRegexesLease.Dispose();
-                    compiledExcludeRegexesLease.Dispose();
-                    includeLabelsLease.Dispose();
-                    excludeLabelsLease.Dispose();
-                    excludePrefixesLease.Dispose();
-                }
-            }
-        }
-
-        private bool TryFindLabelFilteredAssets(
-            ScriptableSpriteAtlas config,
-            SourceFolderEntry entry,
-            IReadOnlyList<string> includeLabels,
-            List<string> guidList
-        )
-        {
-            if (includeLabels == null || includeLabels.Count == 0)
-            {
-                return false;
-            }
-
-            if (!IsValidLabelSelectionMode(entry.labelSelectionMode))
-            {
-                this.LogError(
-                    $"'{config.name}', Folder '{entry.folderPath}': Invalid LabelSelectionMode value '{entry.labelSelectionMode}'. Skipping label pre-filter."
-                );
-                return false;
-            }
-
-            switch (entry.labelSelectionMode)
-            {
-                case LabelSelectionMode.All:
-                {
-                    string query = "t:Texture2D";
-                    for (int i = 0; i < includeLabels.Count; ++i)
-                    {
-                        string label = includeLabels[i];
-                        if (!string.IsNullOrWhiteSpace(label))
-                        {
-                            query += $" l:{label}";
-                        }
-                    }
-
-                    string[] guids = AssetDatabase.FindAssets(query, new[] { entry.folderPath });
-                    if (guids != null && 0 < guids.Length)
-                    {
-                        guidList.AddRange(guids);
-                    }
-                    return true;
-                }
-                case LabelSelectionMode.AnyOf:
-                {
-                    using (
-                        PooledResource<HashSet<string>> setLease = Buffers<string>.HashSet.Get(
-                            out HashSet<string> set
-                        )
-                    )
-                    {
-                        for (int i = 0; i < includeLabels.Count; ++i)
-                        {
-                            string label = includeLabels[i];
-                            if (string.IsNullOrWhiteSpace(label))
-                            {
-                                continue;
-                            }
-
-                            string query = $"t:Texture2D l:{label}";
-                            string[] guids = AssetDatabase.FindAssets(
-                                query,
-                                new[] { entry.folderPath }
-                            );
-                            if (guids == null || guids.Length == 0)
-                            {
-                                continue;
-                            }
-
-                            foreach (string guidsElement in guids)
-                            {
-                                set.Add(guidsElement);
-                            }
-                        }
-
-                        if (0 < set.Count)
-                        {
-                            guidList.AddRange(set);
-                        }
-                    }
-                    return true;
-                }
-                default:
-                {
-                    return false;
-                }
-            }
-        }
-
-        private void CompileRegexPatterns(
-            ScriptableSpriteAtlas config,
-            SourceFolderEntry entry,
-            IReadOnlyList<string> patterns,
-            List<Regex> destination,
-            string description
-        )
-        {
-            if (patterns == null || destination == null)
-            {
-                return;
-            }
-
-            for (int i = 0; i < patterns.Count; ++i)
-            {
-                string pattern = patterns[i];
-                if (string.IsNullOrWhiteSpace(pattern))
-                {
-                    continue;
-                }
-
-                try
-                {
-                    destination.Add(
-                        new Regex(
-                            pattern,
-                            RegexOptions.IgnoreCase
-                                | RegexOptions.CultureInvariant
-                                | RegexOptions.Compiled
-                        )
-                    );
-                }
-                catch (ArgumentException e)
-                {
-                    this.LogError(
-                        $"'{config.name}', Folder '{entry.folderPath}': Invalid {description} pattern '{pattern}'. This pattern will be ignored.",
-                        e
-                    );
-                }
-            }
         }
 
         private void AddScannedSprites(ScriptableSpriteAtlas config, ScanResult result)
         {
-            if (result.spritesToAdd.Count <= 0)
+            if (!TryRefreshScanResult(config, result) || result.spritesToAdd.Count <= 0)
             {
                 return;
             }
@@ -1657,7 +1039,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private void RemoveUnfoundSprites(ScriptableSpriteAtlas config, ScanResult result)
         {
-            if (result.spritesToRemove.Count <= 0)
+            if (!TryRefreshScanResult(config, result) || result.spritesToRemove.Count <= 0)
             {
                 return;
             }
@@ -1703,208 +1085,35 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             bool refreshAssetsImmediately = true
         )
         {
-            if (config == null)
-            {
-                this.LogError($"Attempted to generate atlas from a null config.");
-                return;
-            }
-            string outputPath = config.FullOutputPath;
-            if (string.IsNullOrWhiteSpace(outputPath))
-            {
-                this.LogError(
-                    $"'{config.name}': Output path or name is not set. Cannot generate atlas."
-                );
-                return;
-            }
-
-            string directory = Path.GetDirectoryName(outputPath);
-            if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-                AssetDatabase.Refresh();
-            }
-
-            SpriteAtlas atlas = AssetDatabase.LoadAssetAtPath<SpriteAtlas>(outputPath);
-            bool newAtlas = false;
-            if (atlas == null)
-            {
-                atlas = new SpriteAtlas();
-                newAtlas = true;
-                this.Log($"'{config.name}': Creating new SpriteAtlas at {outputPath}");
-            }
-            else
-            {
-                this.Log($"'{config.name}': Updating existing SpriteAtlas at {outputPath}");
-                atlas.Remove(atlas.GetPackables());
-            }
-
-            SpriteAtlasPackingSettings packingSettings = atlas.GetPackingSettings();
-            packingSettings.enableRotation = config.enableRotation;
-            packingSettings.padding = config.padding;
-            packingSettings.enableTightPacking = config.enableTightPacking;
-            packingSettings.enableAlphaDilation = config.enableAlphaDilation;
-            atlas.SetPackingSettings(packingSettings);
-
-            SpriteAtlasTextureSettings textureSettings = atlas.GetTextureSettings();
-            textureSettings.readable = config.readWriteEnabled;
-            atlas.SetTextureSettings(textureSettings);
-
-            TextureImporterPlatformSettings platformSettings = atlas.GetPlatformSettings(
-                TexturePlatformNameHelper.DefaultPlatformName
-            );
-            if (string.IsNullOrWhiteSpace(platformSettings.name))
-            {
-                platformSettings.name = TexturePlatformNameHelper.DefaultPlatformName;
-            }
-
-            platformSettings.overridden = true;
-            platformSettings.maxTextureSize = config.maxTextureSize;
-            platformSettings.crunchedCompression = config.useCrunchCompression;
-            platformSettings.compressionQuality = config.crunchCompressionLevel;
-            platformSettings.format = TextureImporterFormat.Automatic;
-            platformSettings.textureCompression = config.compression;
-            atlas.SetPlatformSettings(platformSettings);
-
-            if (config.overrideStandalone)
-            {
-                ApplyPlatformSettings(
-                    atlas,
-                    "Standalone",
-                    config.standaloneMaxTextureSize,
-                    config.standaloneCompression,
-                    config.standaloneUseCrunchCompression,
-                    config.standaloneCrunchCompressionLevel
-                );
-            }
-            if (config.overrideIPhone)
-            {
-                ApplyPlatformSettings(
-                    atlas,
-                    "iPhone",
-                    config.iPhoneMaxTextureSize,
-                    config.iPhoneCompression,
-                    config.iPhoneUseCrunchCompression,
-                    config.iPhoneCrunchCompressionLevel
-                );
-            }
-            if (config.overrideAndroid)
-            {
-                ApplyPlatformSettings(
-                    atlas,
-                    "Android",
-                    config.androidMaxTextureSize,
-                    config.androidCompression,
-                    config.androidUseCrunchCompression,
-                    config.androidCrunchCompressionLevel
-                );
-            }
-
-            // No need to remove null sprites from atlas contents here; we control packables below.
-
-            int removed = config.spritesToPack.RemoveAll(sprite => sprite == null);
-            if (0 < removed)
-            {
-                EditorUtility.SetDirty(config);
-            }
-
-            if (0 < config.spritesToPack.Count)
-            {
-                Object[] spritesToAdd = ToObjectArray(config.spritesToPack);
-                atlas.Add(spritesToAdd);
-            }
-            else
-            {
-                this.LogWarn(
-                    $"'{config.name}': No sprites in the 'spritesToPack' list. Atlas will be empty."
-                );
-            }
-
-            if (newAtlas)
-            {
-                AssetDatabaseBatchHelper.EnsureAssetParentFolder(outputPath);
-                AssetDatabase.CreateAsset(atlas, outputPath);
-            }
-            else
-            {
-                EditorUtility.SetDirty(atlas);
-            }
-
             if (refreshAssetsImmediately)
             {
-                AssetDatabase.SaveAssets();
-                AssetDatabase.Refresh();
+                ScriptableSpriteAtlasGenerator.Generate(config);
             }
-            this.Log(
-                $"'{config.name}': Successfully generated/updated at {outputPath}. Sprites included: {config.spritesToPack.Count}."
-            );
+            else
+            {
+                ScriptableSpriteAtlasGenerator.GenerateWithoutRefresh(config);
+            }
         }
 
-        private void SyncListToScanResult(ScriptableSpriteAtlas config, ScanResult result)
+        private bool TryRefreshScanResult(ScriptableSpriteAtlas config, ScanResult result)
         {
             if (config == null || result == null || !result.hasScanned)
             {
-                return;
+                return false;
             }
-
-            using SerializedObject so = new(config);
-            SerializedProperty spritesListProp = so.FindProperty(
-                nameof(ScriptableSpriteAtlas.spritesToPack)
+            result.hasScanned = ScriptableSpriteAtlasGenerator.Scan(
+                config,
+                result.spritesToAdd,
+                result.spritesToRemove
             );
-
-            Undo.RecordObject(config, "Sync Sprites To Scan Result");
-
-            using PooledResource<HashSet<Sprite>> targetSetRes = Buffers<Sprite>.HashSet.Get(
-                out HashSet<Sprite> targetSet
-            );
-
-            for (int i = 0; i < spritesListProp.arraySize; ++i)
+            if (!result.hasScanned)
             {
-                Object o = spritesListProp.GetArrayElementAtIndex(i).objectReferenceValue;
-                if (o is Sprite s && s != null)
-                {
-                    targetSet.Add(s);
-                }
+                Repaint();
             }
-
-            foreach (Sprite s in result.spritesToAdd)
-            {
-                if (s != null)
-                {
-                    targetSet.Add(s);
-                }
-            }
-            foreach (Sprite s in result.spritesToRemove)
-            {
-                if (s != null)
-                {
-                    targetSet.Remove(s);
-                }
-            }
-
-            while (0 < spritesListProp.arraySize)
-            {
-                spritesListProp.DeleteArrayElementAtIndex(spritesListProp.arraySize - 1);
-            }
-            foreach (Sprite s in targetSet)
-            {
-                SerializedProperty newElement = spritesListProp.AppendArrayElement();
-                newElement.objectReferenceValue = s;
-            }
-
-            so.ApplyModifiedProperties();
-            config.spritesToPack.SortByName();
-            EditorUtility.SetDirty(config);
-            this.Log(
-                $"'{config.name}': Synchronized sprite list to scan result. Now contains {config.spritesToPack.Count} sprites."
-            );
-
-            result.spritesToAdd.Clear();
-            result.spritesToRemove.Clear();
-            ScanFoldersForConfig(config);
-            Repaint();
+            return result.hasScanned;
         }
 
-        private sealed class ScanResult
+        internal sealed class ScanResult
         {
             public List<Sprite> spritesToAdd = new();
             public List<Sprite> spritesToRemove = new();
