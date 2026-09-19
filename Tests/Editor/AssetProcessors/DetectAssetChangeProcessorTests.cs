@@ -165,6 +165,33 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         }
 
         [Test]
+        public void InheritedHandlerOverrideIsRegistered()
+        {
+            Assert.IsTrue(
+                _fixtureSettings.WatchersByAssetType.TryGetValue(
+                    typeof(TestDetectableAsset),
+                    out DetectAssetChangeProcessor.AssetWatcher watcher
+                )
+            );
+
+            foreach (
+                DetectAssetChangeProcessor.MethodSubscription subscription in watcher.Subscriptions
+            )
+            {
+                if (subscription._declaringType == typeof(InheritedHandler))
+                {
+                    Assert.AreEqual(
+                        nameof(InheritedHandler.OnAssetChanged),
+                        subscription._method.Name
+                    );
+                    return;
+                }
+            }
+
+            Assert.Fail("Inherited handler override was not registered.");
+        }
+
+        [Test]
         public void InvokesHandlersWhenAssetsAreDeleted()
         {
             CreatePayloadAssetAt(PayloadPath);
@@ -1050,6 +1077,17 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             DetectAssetChangeProcessor.EnabledOverride = true;
             DetectAssetChangeProcessor.IncludeTestAssets = true;
             DetectAssetChangeProcessor.TestAssetFolderAllowlist = FixtureAllowlist;
+        }
+
+        private abstract class InheritedHandlerBase
+        {
+            [DetectAssetChanged(typeof(TestDetectableAsset))]
+            public virtual void OnAssetChanged() { }
+        }
+
+        private sealed class InheritedHandler : InheritedHandlerBase
+        {
+            public override void OnAssetChanged() { }
         }
     }
 }

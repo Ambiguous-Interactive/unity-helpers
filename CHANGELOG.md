@@ -66,6 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Improved
 
+- Speed up `[DetectAssetChanged]` watcher initialization by finding handler methods through Unity's type cache instead of inspecting every method in loaded assemblies ([#783](https://github.com/Ambiguous-Interactive/unity-helpers/issues/783), [#818](https://github.com/Ambiguous-Interactive/unity-helpers/issues/818)).
 - Avoid a staging copy for `ICollection<T>` sources in `OrderBy`, `Ordered`, and `Shuffled`, while
   keeping compact returned lists for other sources
   ([#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781)).

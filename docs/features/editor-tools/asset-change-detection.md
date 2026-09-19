@@ -544,6 +544,9 @@ If your instance method on a MonoBehaviour isn't being called:
 
 ### Performance Issues
 
+Watcher initialization uses Unity's type cache to find annotated methods. Profile asset matching
+and callback work if imports remain slow.
+
 - Profile with Unity Profiler during asset import
 - Consider deferring work with `EditorApplication.delayCall`
 - Use `static` methods to avoid unnecessary instance lookups

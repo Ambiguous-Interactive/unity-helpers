@@ -82,10 +82,10 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
         /// Whether the watcher may initialize. Defaults to off in batch mode.
         /// </summary>
         /// <remarks>
-        /// <see cref="BuildWatchers"/> is an all-types / all-methods reflection scan. Running it
-        /// inside Unity's import phase destabilizes the asset pipeline: a native mono crash
-        /// (STATUS_ACCESS_VIOLATION inside GetMethodsByName_native) on some Unity versions,
-        /// multi-minute importer stalls on others. The play-mode guard in
+        /// <see cref="BuildWatchers"/> inspects loaded types for assignable asset matches and
+        /// uses Unity's type cache to discover attributed methods. Running watcher construction
+        /// inside Unity's import phase has caused native mono crashes and importer stalls on
+        /// some Unity versions. The play-mode guard in
         /// <see cref="OnPostprocessAllAssets"/> covers one door into that scan; a headless
         /// `-batchmode` run is not play mode and went through the other one. The watcher is an
         /// editor-authoring convenience, and a headless run has no author to act on a callback, so
@@ -1056,107 +1056,169 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                     }
                 }
             }
-            foreach (Type type in loadedTypes)
+            List<MethodInfo> attributedMethods = new();
+            HashSet<MethodInfo> discoveredMethods = new();
+            HashSet<Type> inheritedHandlerBases = new();
+            foreach (
+                MethodInfo method in TypeCache.GetMethodsWithAttribute<DetectAssetChangedAttribute>()
+            )
             {
+                if (discoveredMethods.Add(method))
+                {
+                    attributedMethods.Add(method);
+                }
+                if (method.IsVirtual && method.DeclaringType != null)
+                {
+                    inheritedHandlerBases.Add(method.DeclaringType);
+                }
+            }
+
+            if (0 < inheritedHandlerBases.Count)
+            {
+                BindingFlags inheritedFlags =
+                    BindingFlags.Instance
+                    | BindingFlags.Static
+                    | BindingFlags.Public
+                    | BindingFlags.NonPublic
+                    | BindingFlags.DeclaredOnly;
+                foreach (Type type in loadedTypes)
+                {
+                    if (type.IsAbstract && !type.IsSealed)
+                    {
+                        continue;
+                    }
+                    bool inheritsHandler = false;
+                    for (
+                        Type ancestor = type.BaseType;
+                        ancestor != null;
+                        ancestor = ancestor.BaseType
+                    )
+                    {
+                        if (
+                            inheritedHandlerBases.Contains(ancestor)
+                            || (
+                                ancestor.IsGenericType
+                                && inheritedHandlerBases.Contains(
+                                    ancestor.GetGenericTypeDefinition()
+                                )
+                            )
+                        )
+                        {
+                            inheritsHandler = true;
+                            break;
+                        }
+                    }
+                    if (!inheritsHandler)
+                    {
+                        continue;
+                    }
+                    foreach (MethodInfo method in type.GetMethods(inheritedFlags))
+                    {
+                        if (
+                            method.IsVirtual
+                            && discoveredMethods.Add(method)
+                            && method.GetAllAttributesSafe<DetectAssetChangedAttribute>().Length
+                                != 0
+                        )
+                        {
+                            attributedMethods.Add(method);
+                        }
+                    }
+                }
+            }
+
+            foreach (MethodInfo method in attributedMethods)
+            {
+                Type type = method.DeclaringType;
                 // Static classes are abstract sealed and can still declare handlers.
                 if (type == null || (type.IsAbstract && !type.IsSealed))
                 {
                     continue;
                 }
 
-                BindingFlags flags =
-                    BindingFlags.Instance
-                    | BindingFlags.Static
-                    | BindingFlags.Public
-                    | BindingFlags.NonPublic
-                    | BindingFlags.DeclaredOnly;
-                MethodInfo[] methods = type.GetMethods(flags);
-                foreach (MethodInfo method in methods)
+                DetectAssetChangedAttribute[] attributes =
+                    method.GetAllAttributesSafe<DetectAssetChangedAttribute>();
+                if (attributes.Length == 0)
                 {
-                    DetectAssetChangedAttribute[] attributes =
-                        method.GetAllAttributesSafe<DetectAssetChangedAttribute>();
-                    if (attributes.Length == 0)
+                    continue;
+                }
+
+                if (
+                    !TryResolveParameterMode(
+                        type,
+                        method,
+                        out SubscriptionParameterMode parameterMode,
+                        out Type createdElementType
+                    )
+                )
+                {
+                    continue;
+                }
+
+                foreach (DetectAssetChangedAttribute attribute in attributes)
+                {
+                    if (
+                        parameterMode == SubscriptionParameterMode.CreatedAndDeleted
+                        && !ResolutionSupportsAssetType(createdElementType, attribute.AssetType)
+                    )
                     {
+                        Debug.LogWarning(
+                            $"[DetectAssetChanged] {type.FullName}.{method.Name} expects created asset parameter type {createdElementType.FullName}, which is not compatible with watched asset type {attribute.AssetType.FullName}."
+                        );
                         continue;
                     }
 
+                    bool includeAssignableTypes = attribute.IncludeAssignableTypes;
                     if (
-                        !TryResolveParameterMode(
-                            type,
-                            method,
-                            out SubscriptionParameterMode parameterMode,
-                            out Type createdElementType
+                        !WatchersByAssetType.TryGetValue(
+                            attribute.AssetType,
+                            out AssetWatcher watcher
                         )
                     )
                     {
-                        continue;
+                        watcher = new AssetWatcher(attribute.AssetType, includeAssignableTypes);
+                        PopulateKnownAssetPaths(watcher, loadedTypes);
+                        WatchersByAssetType.Add(attribute.AssetType, watcher);
+                    }
+                    else if (includeAssignableTypes && !watcher.IncludeAssignableTypes)
+                    {
+                        watcher.EnableAssignableMatching();
+                        PopulateKnownAssetPaths(watcher, loadedTypes);
                     }
 
-                    foreach (DetectAssetChangedAttribute attribute in attributes)
+                    MethodSubscription subscription = new()
                     {
-                        if (
-                            parameterMode == SubscriptionParameterMode.CreatedAndDeleted
-                            && !ResolutionSupportsAssetType(createdElementType, attribute.AssetType)
-                        )
-                        {
-                            Debug.LogWarning(
-                                $"[DetectAssetChanged] {type.FullName}.{method.Name} expects created asset parameter type {createdElementType.FullName}, which is not compatible with watched asset type {attribute.AssetType.FullName}."
-                            );
-                            continue;
-                        }
+                        _declaringType = type,
+                        _method = method,
+                        _flags = attribute.Flags,
+                        _parameterMode = parameterMode,
+                        _createdParameterElementType = createdElementType,
+                        _searchPrefabs = attribute.SearchPrefabs,
+                        _searchSceneObjects = attribute.SearchSceneObjects,
+                    };
 
-                        bool includeAssignableTypes = attribute.IncludeAssignableTypes;
-                        if (
-                            !WatchersByAssetType.TryGetValue(
-                                attribute.AssetType,
-                                out AssetWatcher watcher
-                            )
-                        )
-                        {
-                            watcher = new AssetWatcher(attribute.AssetType, includeAssignableTypes);
-                            PopulateKnownAssetPaths(watcher, loadedTypes);
-                            WatchersByAssetType.Add(attribute.AssetType, watcher);
-                        }
-                        else if (includeAssignableTypes && !watcher.IncludeAssignableTypes)
-                        {
-                            watcher.EnableAssignableMatching();
-                            PopulateKnownAssetPaths(watcher, loadedTypes);
-                        }
+                    if (attribute.SearchPrefabs && !watcher.SearchPrefabs)
+                    {
+                        watcher.EnablePrefabSearch();
+                    }
 
-                        MethodSubscription subscription = new()
-                        {
-                            _declaringType = type,
-                            _method = method,
-                            _flags = attribute.Flags,
-                            _parameterMode = parameterMode,
-                            _createdParameterElementType = createdElementType,
-                            _searchPrefabs = attribute.SearchPrefabs,
-                            _searchSceneObjects = attribute.SearchSceneObjects,
-                        };
+                    if (attribute.SearchSceneObjects && !watcher.SearchSceneObjects)
+                    {
+                        watcher.EnableSceneObjectSearch();
+                    }
 
-                        if (attribute.SearchPrefabs && !watcher.SearchPrefabs)
+                    bool alreadyExists = false;
+                    foreach (MethodSubscription existing in watcher.Subscriptions)
+                    {
+                        if (existing._declaringType == type && existing._method == method)
                         {
-                            watcher.EnablePrefabSearch();
+                            alreadyExists = true;
+                            break;
                         }
-
-                        if (attribute.SearchSceneObjects && !watcher.SearchSceneObjects)
-                        {
-                            watcher.EnableSceneObjectSearch();
-                        }
-
-                        bool alreadyExists = false;
-                        foreach (MethodSubscription existing in watcher.Subscriptions)
-                        {
-                            if (existing._declaringType == type && existing._method == method)
-                            {
-                                alreadyExists = true;
-                                break;
-                            }
-                        }
-                        if (!alreadyExists)
-                        {
-                            watcher.Subscriptions.Add(subscription);
-                        }
+                    }
+                    if (!alreadyExists)
+                    {
+                        watcher.Subscriptions.Add(subscription);
                     }
                 }
             }
