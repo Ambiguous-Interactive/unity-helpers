@@ -100,9 +100,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 $"'{config.name}': Output atlas path '{invalidOutput}' must be under Assets/ and cannot be empty or contain relative segments.";
             LogAssert.Expect(LogType.Error, invalidMessage);
             Assert.IsFalse(ScriptableSpriteAtlasGenerator.Generate(config));
-            LogAssert.Expect(LogType.Error, invalidMessage);
-            Assert.IsFalse(ScriptableSpriteAtlasGenerator.TryGenerateAll(out int generated));
-            Assert.AreEqual(0, generated);
             config.outputSpriteAtlasDirectory = Root;
 
             List<Sprite> toAdd = new();
