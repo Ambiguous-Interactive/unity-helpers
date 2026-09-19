@@ -6,7 +6,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using System;
     using System.Collections.Generic;
     using DataStructure.Adapters;
+#if UNITY_5_3_OR_NEWER
     using UnityEngine;
+#endif
 
     /// <summary>
     /// Unified random number generator interface implemented by all PRNGs in this package.
@@ -355,6 +357,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         )
             where T : unmanaged, Enum;
 
+#if UNITY_5_3_OR_NEWER
         /// <summary>
         /// Generates a 2D Perlin noise map with the specified parameters.
         /// </summary>
@@ -379,6 +382,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             float octaveOffsetRange = 100000f,
             bool normalize = true
         );
+#endif
 
         /// <summary>
         /// Creates a deep copy of this random number generator with the same internal state.

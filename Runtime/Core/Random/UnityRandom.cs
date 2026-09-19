@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Core.Random
 {
+#if UNITY_5_3_OR_NEWER
     using System;
     using System.Runtime.Serialization;
     using System.Text;
@@ -226,4 +227,5 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             UnityEngine.Random.state = parsed;
         }
     }
+#endif
 }

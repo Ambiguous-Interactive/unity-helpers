@@ -4,7 +4,9 @@
 namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
     using System;
+#if UNITY_5_3_OR_NEWER
     using UnityEngine.Scripting;
+#endif
 
     /// <summary>
     /// A field number that was assigned to a subtype which no longer exists, and which must never be
@@ -25,7 +27,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// puts in front of a reviewer rather than resolving on its own.
     /// </para>
     /// </remarks>
+#if UNITY_5_3_OR_NEWER
     [Preserve]
+#endif
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true, Inherited = false)]
     public sealed class WProtoRetiredSubtypeTagAttribute : Attribute
     {

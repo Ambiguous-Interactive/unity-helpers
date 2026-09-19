@@ -135,6 +135,7 @@ function findDeclarations(files) {
 function attributeBlockAbove(lines, index) {
   const block = [];
   let depth = 0;
+  let conditionalStart = -1;
   for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
     const line = lines[cursor];
     const trimmed = line.trim();
@@ -142,6 +143,16 @@ function attributeBlockAbove(lines, index) {
     if (depth > 0) {
       block.push(line);
       depth += countUnescaped(line, "]") - countUnescaped(line, "[");
+      continue;
+    }
+
+    if (trimmed === "#endif" && conditionalStart < 0) {
+      conditionalStart = block.length;
+      continue;
+    }
+
+    if (conditionalStart >= 0 && trimmed === "#if UNITY_5_3_OR_NEWER") {
+      conditionalStart = -1;
       continue;
     }
 
@@ -162,7 +173,13 @@ function attributeBlockAbove(lines, index) {
       continue;
     }
 
+    if (conditionalStart >= 0) {
+      block.length = conditionalStart;
+    }
     break;
+  }
+  if (conditionalStart >= 0) {
+    block.length = conditionalStart;
   }
   return block;
 }

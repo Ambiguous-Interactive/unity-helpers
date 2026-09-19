@@ -4,7 +4,9 @@
 namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
     using System;
+#if UNITY_5_3_OR_NEWER
     using UnityEngine.Scripting;
+#endif
 
     /// <summary>
     /// Declares, from the subtype, that it may be written in place of <see cref="BaseType"/>.
@@ -46,7 +48,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// and startup refuse conflicting owners rather than silently discarding a subtype.
     /// </para>
     /// </remarks>
+#if UNITY_5_3_OR_NEWER
     [Preserve]
+#endif
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
     public sealed class WProtoSubtypeAttribute : Attribute
     {

@@ -4,7 +4,9 @@
 namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
     using System;
+#if UNITY_5_3_OR_NEWER
     using UnityEngine.Scripting;
+#endif
 
     /// <summary>
     /// Assigns a wire field number, and optionally an explicit schema name, to a member.
@@ -16,7 +18,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// the schema is consumed. Leaving it unset defaults the schema name to the member name, which
     /// is exactly the coupling <see cref="Name"/> lets a contract break.
     /// </remarks>
+#if UNITY_5_3_OR_NEWER
     [Preserve]
+#endif
     [AttributeUsage(
         AttributeTargets.Field | AttributeTargets.Property,
         AllowMultiple = false,

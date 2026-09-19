@@ -1099,13 +1099,17 @@ polyfill. A test double derived from a `[WProtoContract]` base can carry
 point inherited-only subclasses to this opt-out; see
 [A subclass that is not serialized](#a-subclass-that-is-not-serialized).
 
-When a plain .NET project links selected runtime sources, it can omit `UnityRandom.cs` without
-changing `AbstractRandom.cs`: the protobuf-net subtype entry for `UnityRandom` is included only
-when `UNITY_5_3_OR_NEWER` is defined. Unity builds keep its existing tag, 105. This does not make
-the whole runtime tree independent of Unity: `IRandom` and `AbstractRandom` still expose Unity
-noise types, and the Unity surrogate and bootstrap sources still require Unity assemblies. A
-non-Unity source project must select the files it uses and supply compatible Unity types for any
-Unity APIs it keeps.
+A plain `netstandard2.1` project with the needed platform-neutral dependencies can link
+`Core/Random/*.cs`, `Core/Serialization/WallstopProto/*.cs`, and
+`ProtobufUnitySurrogates.cs` without Unity-only shims.
+Outside Unity, `UnityRandom` and the Unity bootstrap are absent. The Unity noise-map method on
+`IRandom` and `AbstractRandom` is absent because its signature uses `UnityEngine.Vector2`;
+`PerlinNoise` itself remains available. The surrogate source keeps its platform-neutral
+FastVector, Parabola, ImmutableBitSet, and collection wrappers, while Unity type surrogates and
+registrations are present only when `UNITY_5_3_OR_NEWER` is defined. Unity builds keep the
+`UnityRandom` subtype tag at 105 and the same startup registration. A source project that also
+links other Unity-dependent helpers, `Serializer.cs`, or Unity JSON converters still needs Unity
+assemblies or its own compatibility types for those APIs.
 
 The package ships a Roslyn source generator as a `RoslynAnalyzer`-labelled asset, so it runs on
 **your** assemblies as well as its own, including `Assembly-CSharp`. Nothing needs installing and

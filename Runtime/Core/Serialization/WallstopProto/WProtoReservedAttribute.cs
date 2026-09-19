@@ -5,7 +5,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
     using System;
     using System.Collections.Generic;
+#if UNITY_5_3_OR_NEWER
     using UnityEngine.Scripting;
+#endif
 
     /// <summary>
     /// Field numbers, or member names, that a removed <c>[WProtoMember]</c> -- or, on an enum, a
@@ -54,7 +56,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// rather than silently outranking it.
     /// </para>
     /// </remarks>
+#if UNITY_5_3_OR_NEWER
     [Preserve]
+#endif
     [AttributeUsage(
         AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Enum,
         AllowMultiple = true,

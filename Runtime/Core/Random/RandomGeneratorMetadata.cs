@@ -4,8 +4,10 @@
 namespace WallstopStudios.UnityHelpers.Core.Random
 {
     using System;
-    using UnityEngine.Scripting;
     using WallstopStudios.UnityHelpers.Core.Helper;
+#if UNITY_5_3_OR_NEWER
+    using UnityEngine.Scripting;
+#endif
 
     /// <summary>
     /// Coarse statistical quality ratings for RNG implementations.
@@ -25,7 +27,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     /// Describes statistical quality metadata that can be attached to <see cref="IRandom"/> implementations.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
+#if UNITY_5_3_OR_NEWER
     [Preserve]
+#endif
     public sealed class RandomGeneratorMetadataAttribute : Attribute
     {
         public RandomQuality Quality { get; }

@@ -3,10 +3,12 @@
 
 namespace WallstopStudios.UnityHelpers.Core.Serialization
 {
-    using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.Math;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+#if UNITY_5_3_OR_NEWER
+    using UnityEngine;
+#endif
 
     // Root marshals avoid reflection-only generic closures unavailable under IL2CPP.
 
@@ -90,6 +92,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         protected abstract TReal FromSurrogate(in TSurrogate surrogate);
     }
 
+#if UNITY_5_3_OR_NEWER
     /// <summary>Serializes a <see cref="Vector2"/> root through its surrogate.</summary>
     internal sealed class Vector2MarshalFormatter
         : SurrogateMarshalFormatter<Vector2, Vector2Surrogate>
@@ -276,6 +279,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         /// <inheritdoc />
         protected override Resolution FromSurrogate(in ResolutionSurrogate surrogate) => surrogate;
     }
+#endif
 
     /// <summary>Serializes a <see cref="Parabola"/> root through its surrogate.</summary>
     internal sealed class ParabolaMarshalFormatter

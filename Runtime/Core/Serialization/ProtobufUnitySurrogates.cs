@@ -8,12 +8,15 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     using System.Collections.ObjectModel;
     using ProtoBuf;
     using ProtoBuf.Meta;
-    using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.DataStructure;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Core.Math;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+#if UNITY_5_3_OR_NEWER
+    using UnityEngine;
+#endif
 
+#if UNITY_5_3_OR_NEWER
     [ProtoContract]
     [WProtoContract]
     public partial struct Vector2Surrogate
@@ -385,6 +388,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             return r;
         }
     }
+#endif
 
     // Mutable surrogates avoid protobuf-net reflection paths that cannot construct readonly structs on AOT.
 
@@ -710,6 +714,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 model = null;
             }
 
+#if UNITY_5_3_OR_NEWER
             Register<Vector2, Vector2Surrogate>(model);
             Register<Vector3, Vector3Surrogate>(model);
             Register<Quaternion, QuaternionSurrogate>(model);
@@ -722,6 +727,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             Register<Vector2Int, Vector2IntSurrogate>(model);
             Register<Vector3Int, Vector3IntSurrogate>(model);
             Register<Resolution, ResolutionSurrogate>(model);
+#endif
 
             // Disable direct contract inference so readonly structs use mutable surrogates.
             Register<FastVector2Int, FastVector2IntSurrogate>(model);
@@ -773,7 +779,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             catch (Exception error)
             {
                 RegistrationFailures.Add(typeof(TReal).Name);
-#if ENABLE_IL2CPP
+#if ENABLE_IL2CPP || !UNITY_5_3_OR_NEWER
                 _ = error;
 #else
                 // AOT always uses WallstopProto; expected protobuf-net refusals must not log startup errors.

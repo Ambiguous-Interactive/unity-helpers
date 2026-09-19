@@ -108,6 +108,7 @@
       default, then without it to preserve the legacy protobuf-net fallback branch. Both halves ship,
       so both have to compile.
     -->
+    <DefineConstants>$(DefineConstants);UNITY_5_3_OR_NEWER</DefineConstants>
     <DefineConstants Condition="'$(WallstopProto)' == 'true'"
       >$(DefineConstants);WALLSTOP_PROTO</DefineConstants>
     <!--

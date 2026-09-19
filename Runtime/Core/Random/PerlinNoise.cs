@@ -10,7 +10,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 {
     using System;
     using Extension;
-    using UnityEngine;
+#if UNITY_5_3_OR_NEWER
+    using FloorMath = UnityEngine.Mathf;
+#else
+    using FloorMath = System.MathF;
+#endif
 
     public sealed class PerlinNoise
     {
@@ -327,11 +331,11 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 
         public float Noise(float x, float y)
         {
-            int clampedX = (int)Mathf.Floor(x) & 255;
-            int clampedY = (int)Mathf.Floor(y) & 255;
+            int clampedX = (int)FloorMath.Floor(x) & 255;
+            int clampedY = (int)FloorMath.Floor(y) & 255;
 
-            x -= Mathf.Floor(x);
-            y -= Mathf.Floor(y);
+            x -= FloorMath.Floor(x);
+            y -= FloorMath.Floor(y);
 
             float u = Fade(x);
             float v = Fade(y);

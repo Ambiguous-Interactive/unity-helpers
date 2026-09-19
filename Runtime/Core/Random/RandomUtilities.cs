@@ -5,7 +5,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
 {
     using System;
     using System.Buffers.Binary;
+#if UNITY_5_3_OR_NEWER
     using UnityEngine;
+#endif
 
     public static class RandomUtilities
     {
@@ -86,7 +88,9 @@ namespace WallstopStudios.UnityHelpers.Core.Random
         {
             if (variance < 0.0f)
             {
+#if UNITY_5_3_OR_NEWER
                 Debug.LogError("Variance cannot be negative");
+#endif
                 return baseValue;
             }
 

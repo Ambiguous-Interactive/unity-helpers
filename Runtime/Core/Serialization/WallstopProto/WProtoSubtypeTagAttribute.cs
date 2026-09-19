@@ -4,7 +4,9 @@
 namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
     using System;
+#if UNITY_5_3_OR_NEWER
     using UnityEngine.Scripting;
+#endif
 
     /// <summary>
     /// One entry of an assembly's subtype tag manifest: the field number assigned to
@@ -40,7 +42,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// type name, with a dot before a nested type, compared as an ordinal string.
     /// </para>
     /// </remarks>
+#if UNITY_5_3_OR_NEWER
     [Preserve]
+#endif
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true, Inherited = false)]
     public sealed class WProtoSubtypeTagAttribute : Attribute
     {

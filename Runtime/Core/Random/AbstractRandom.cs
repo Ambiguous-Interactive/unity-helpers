@@ -9,9 +9,12 @@ namespace WallstopStudios.UnityHelpers.Core.Random
     using System.Runtime.Serialization;
     using DataStructure.Adapters;
     using ProtoBuf;
-    using UnityEngine;
     using Utils;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
+#if UNITY_5_3_OR_NEWER
+    using UnityEngine;
+#endif
+
 #if !SINGLE_THREADED
     using System.Collections.Concurrent;
 #else
@@ -1218,6 +1221,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             return new WGuid(GenerateGuidBytes());
         }
 
+#if UNITY_5_3_OR_NEWER
         /// <summary>
         /// Fills a noise map using positive finite parameters and a finite base offset.
         /// </summary>
@@ -1340,6 +1344,7 @@ namespace WallstopStudios.UnityHelpers.Core.Random
             }
             return noiseMap;
         }
+#endif
 
         public abstract IRandom Copy();
 

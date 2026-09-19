@@ -4,7 +4,9 @@
 namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
     using System;
+#if UNITY_5_3_OR_NEWER
     using UnityEngine.Scripting;
+#endif
 
     /// <summary>
     /// Declares a subtype that may be written in place of the annotated base type.
@@ -22,7 +24,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// per base and produce identical bytes.
     /// </para>
     /// </remarks>
+#if UNITY_5_3_OR_NEWER
     [Preserve]
+#endif
     [AttributeUsage(
         AttributeTargets.Class | AttributeTargets.Interface,
         AllowMultiple = true,

@@ -8,6 +8,7 @@ using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
 // FastVector formatters recompute cached hashes instead of trusting serialized values.
 
+#if UNITY_5_3_OR_NEWER
 [assembly: WProtoSurrogate(typeof(UnityEngine.Vector2), typeof(Vector2Surrogate))]
 [assembly: WProtoSurrogate(typeof(UnityEngine.Vector3), typeof(Vector3Surrogate))]
 [assembly: WProtoSurrogate(typeof(UnityEngine.Quaternion), typeof(QuaternionSurrogate))]
@@ -20,6 +21,7 @@ using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 [assembly: WProtoSurrogate(typeof(UnityEngine.Vector2Int), typeof(Vector2IntSurrogate))]
 [assembly: WProtoSurrogate(typeof(UnityEngine.Vector3Int), typeof(Vector3IntSurrogate))]
 [assembly: WProtoSurrogate(typeof(UnityEngine.Resolution), typeof(ResolutionSurrogate))]
+#endif
 [assembly: WProtoSurrogate(
     typeof(WallstopStudios.UnityHelpers.Core.Math.Parabola),
     typeof(ParabolaSurrogate)
@@ -31,6 +33,7 @@ using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
 // Root marshals also need registration: member surrogate mappings alone cannot serve root values.
 
+#if UNITY_5_3_OR_NEWER
 [assembly: WProtoRootMarshal(typeof(UnityEngine.Vector2), typeof(Vector2MarshalFormatter))]
 [assembly: WProtoRootMarshal(typeof(UnityEngine.Vector3), typeof(Vector3MarshalFormatter))]
 [assembly: WProtoRootMarshal(typeof(UnityEngine.Quaternion), typeof(QuaternionMarshalFormatter))]
@@ -43,6 +46,7 @@ using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 [assembly: WProtoRootMarshal(typeof(UnityEngine.Vector2Int), typeof(Vector2IntMarshalFormatter))]
 [assembly: WProtoRootMarshal(typeof(UnityEngine.Vector3Int), typeof(Vector3IntMarshalFormatter))]
 [assembly: WProtoRootMarshal(typeof(UnityEngine.Resolution), typeof(ResolutionMarshalFormatter))]
+#endif
 [assembly: WProtoRootMarshal(
     typeof(WallstopStudios.UnityHelpers.Core.Math.Parabola),
     typeof(ParabolaMarshalFormatter)

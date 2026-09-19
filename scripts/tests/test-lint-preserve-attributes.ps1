@@ -169,6 +169,41 @@ namespace Fixture
 $result = Invoke-LinterForDeclaration -Declaration $commentAndWrapped
 Write-TestResult -TestName 'Doc comment, [Preserve], comment and a wrapped attribute together pass' -Passed ($result.ExitCode -eq 0) -Message $result.Output
 
+$unityGuarded = @'
+namespace Fixture
+{
+    using System;
+#if UNITY_5_3_OR_NEWER
+    using UnityEngine.Scripting;
+#endif
+
+#if UNITY_5_3_OR_NEWER
+    [Preserve]
+#endif
+    [AttributeUsage(AttributeTargets.Class)]
+    public sealed class FixtureAttribute : Attribute { }
+}
+'@
+
+$result = Invoke-LinterForDeclaration -Declaration $unityGuarded
+Write-TestResult -TestName '[Preserve] in the Unity branch passes' -Passed ($result.ExitCode -eq 0) -Message $result.Output
+
+$nonUnityGuarded = @'
+namespace Fixture
+{
+    using System;
+
+#if !UNITY_5_3_OR_NEWER
+    [Preserve]
+#endif
+    [AttributeUsage(AttributeTargets.Class)]
+    public sealed class FixtureAttribute : Attribute { }
+}
+'@
+
+$result = Invoke-LinterForDeclaration -Declaration $nonUnityGuarded
+Write-TestResult -TestName '[Preserve] outside Unity does not satisfy the gate' -Passed ($result.ExitCode -eq 1) -Message $result.Output
+
 # A [Preserve] that belongs to something else must not be borrowed by the declaration below it.
 $preserveOnAnotherMember = @'
 namespace Fixture

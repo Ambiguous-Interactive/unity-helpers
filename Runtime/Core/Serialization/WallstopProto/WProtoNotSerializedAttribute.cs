@@ -4,7 +4,9 @@
 namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
     using System;
+#if UNITY_5_3_OR_NEWER
     using UnityEngine.Scripting;
+#endif
 
     /// <summary>
     /// Records that a subclass of a <see cref="WProtoContractAttribute"/> is deliberately never
@@ -43,7 +45,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
     /// together are a contradiction rather than a suppression.
     /// </para>
     /// </remarks>
+#if UNITY_5_3_OR_NEWER
     [Preserve]
+#endif
     [AttributeUsage(
         AttributeTargets.Class | AttributeTargets.Struct,
         AllowMultiple = false,

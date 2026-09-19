@@ -3,6 +3,7 @@
 
 namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
 {
+#if UNITY_5_3_OR_NEWER
     using UnityEngine;
 #if UNITY_EDITOR
     using UnityEditor;
@@ -52,4 +53,5 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto
             WProtoScalarFormatters.RegisterAll();
         }
     }
+#endif
 }
