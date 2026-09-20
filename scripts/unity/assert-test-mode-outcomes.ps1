@@ -1,12 +1,9 @@
 #!/usr/bin/env pwsh
-[CmdletBinding()]
-param([switch]$CoreOnly)
-
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $selected = @($env:SELECTED_MODES | ConvertFrom-Json)
-$known = if ($CoreOnly) { @('editmode', 'playmode') } else { @('editmode', 'playmode', 'standalone') }
+$known = @('editmode', 'playmode', 'standalone')
 if ($selected.Count -eq 0 -or @($selected | Select-Object -Unique).Count -ne $selected.Count) {
     throw "Selected Unity modes must be a non-empty set: $env:SELECTED_MODES"
 }

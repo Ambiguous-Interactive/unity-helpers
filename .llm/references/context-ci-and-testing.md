@@ -6,6 +6,10 @@
 editmode, playmode and gated IL2CPP standalone. That is expensive and slow. Treat a push as a
 deliberate act, not the tail of every commit.
 
+The separate 6000.6 `SINGLE_THREADED` job runs core EditMode, PlayMode, and IL2CPP Standalone
+assemblies with the define in every assembly. Its Standalone result is independently verified,
+redacted, uploaded, and required by the aggregate gate (#813).
+
 - **Commit locally as often as is useful; push once**, when a coherent unit of work is verified.
   Small, focused commits are still right -- it is the _pushing_ that is costly, not the committing.
 - **Exhaust the local gates first.** In rough order of cost, all of them cheaper than one CI run:

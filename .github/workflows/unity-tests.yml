@@ -77,6 +77,7 @@ jobs:
       standalone-integration-assemblies: ${{ steps.assemblies.outputs.standalone_integrations }}
       editmode-core-assemblies: ${{ steps.assemblies.outputs.editmode_core }}
       playmode-core-assemblies: ${{ steps.assemblies.outputs.playmode_core }}
+      standalone-core-assemblies: ${{ steps.assemblies.outputs.standalone_core }}
       integration-assembly-profiles: ${{ steps.assemblies.outputs.integration_profiles }}
       core-assembly-profiles: ${{ steps.assemblies.outputs.core_profiles }}
       superseded: ${{ steps.superseded.outputs.superseded }}
@@ -111,7 +112,8 @@ jobs:
               includeIntegrations: true
             },
             editmode_core: { target: "editmode", editorOnly: true },
-            playmode_core: { target: "playmode" }
+            playmode_core: { target: "playmode" },
+            standalone_core: { target: "standalone", runtimeOnly: true }
           };
           const resolved = Object.fromEntries(Object.entries(profiles).map(([name, options]) => {
             const assemblies = discovery.defaultIncludeAssemblies(process.cwd(), options).join(";");
@@ -127,7 +129,8 @@ jobs:
           })}`);
           lines.push(`core_profiles=${JSON.stringify({
             editmode: resolved.editmode_core,
-            playmode: resolved.playmode_core
+            playmode: resolved.playmode_core,
+            standalone: resolved.standalone_core
           })}`);
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `${lines.join("\n")}\n`, "utf8");
           NODE
@@ -881,8 +884,8 @@ jobs:
   # single-threaded behavior on `#if SINGLE_THREADED`, OFF by default). This job
   # builds+tests with SINGLE_THREADED (and WALLSTOP_CONCAVE_HULL_STATS) defined as
   # GLOBAL scripting symbols so EVERY asmdef test assembly compiles the
-  # single-threaded path. Restricted to the latest Unity 6 (6000.6.0f1) editmode+playmode to
-  # keep time small (no IL2CPP standalone build). Core-only (no integrations): the
+  # single-threaded path. Restricted to the latest Unity 6 (6000.6.0f1) across
+  # EditMode, PlayMode, and Standalone. Core-only (no integrations): the
   # single-threaded toggle is a core-runtime concern, so installing the DI packages
   # would only add cost. It is a SEPARATE job from unity-tests but shares the SAME
   # self-hosted Unity seat.
@@ -937,7 +940,7 @@ jobs:
         with:
           unity-version: ${{ matrix.unity-version }}
           install-root: ${{ runner.tool_cache }}\u6-v3
-          provisioning-profile: EditorOnly
+          provisioning-profile: StandaloneWindowsIl2Cpp
           diagnostics-path: unity-editor-check.json
           ci-managed-only: true
           require-healthy-existing: true
@@ -1011,9 +1014,8 @@ jobs:
         id: run_editmode
         if: ${{ !cancelled() && steps.unity_lock.outputs.acquired == 'true' }}
         continue-on-error: true
-        # editmode + playmode ONLY (no standalone IL2CPP build). Measured worst case
-        # for this leg across the 60 most recent runs is 7.8 min, so 40 keeps >5x
-        # headroom while failing a hang 50 min sooner than the old 90 -- a stuck
+        # Forty minutes keeps headroom for an editor mode while failing a hang
+        # 50 minutes sooner than the old 90 -- a stuck
         # licensed leg strands its runner and delays queued organization work for
         # exactly this long. See the default matrix job for the full
         # measurement note. Stays under the job timeout (1200).
@@ -1088,6 +1090,48 @@ jobs:
             -ReleaseCodeOptimization `
             -ReleasePlayerBuild
 
+      - name: Require current PR head before Standalone (SINGLE_THREADED)
+        id: standalone_head
+        if: ${{ !cancelled() && steps.unity_lock.outputs.acquired == 'true' }}
+        continue-on-error: true
+        timeout-minutes: 2
+        uses: Ambiguous-Interactive/ambiguous-organization-build-lock/.github/actions/require-current-pr-head@d79e1cc2acc892b619db2ca46f78291ca427016b
+        with:
+          github-token: ${{ github.token }}
+          pull-request-number: ${{ github.event.pull_request.number }}
+          expected-head-sha: ${{ github.event.pull_request.head.sha }}
+
+      - name: Run Standalone tests (SINGLE_THREADED)
+        id: run_standalone
+        if: ${{ !cancelled() && steps.unity_lock.outputs.acquired == 'true' && steps.standalone_head.outcome == 'success' }}
+        continue-on-error: true
+        timeout-minutes: 60
+        shell: pwsh
+        env:
+          UNITY_EDITOR_PATH: ${{ steps.ensure_unity_editor.outputs.editor-path }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
+          UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.standalone-core-assemblies }}
+          UH_CENTRAL_LICENSE_RETURN: "true"
+          UH_UNITY_TEST_CATEGORY: "!Performance;!Stress"
+          UH_STREAM_TEST_RESULTS: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./scripts/unity/assert-no-active-unity-editor.ps1
+          ./scripts/unity/run-ci-tests.ps1 `
+            -UnityVersion '${{ matrix.unity-version }}' `
+            -TestMode 'standalone' `
+            -AssemblyNames $env:UH_TEST_ASSEMBLIES `
+            -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-standalone-single-threaded' `
+            -ProjectRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace') `
+            -ProjectScope 'single-threaded' `
+            -AdditionalScriptingDefines SINGLE_THREADED,WALLSTOP_CONCAVE_HULL_STATS `
+            -ReleaseCodeOptimization `
+            -ReleasePlayerBuild `
+            -Il2CppCompilerConfiguration 'Release'
+
       - name: Return Unity license
         id: return_unity_license
         if: ${{ always() && steps.unity_lock.outputs.acquired == 'true' }}
@@ -1149,6 +1193,17 @@ jobs:
             Write-Host "::notice::No results.xml at $results to report slow tests."
           }
 
+      - name: Report slowest Standalone tests (SINGLE_THREADED)
+        if: always()
+        shell: pwsh
+        run: |
+          $results = '.artifacts/unity/${{ matrix.unity-version }}-standalone-single-threaded/results.xml'
+          if (Test-Path -LiteralPath $results) {
+            ./scripts/unity/report-slow-tests.ps1 -ResultsPath $results -Top 30 -FixtureBudgetSeconds 120 -StepSummary
+          } else {
+            Write-Host "::notice::No results.xml at $results to report slow tests."
+          }
+
       - name: Dump EditMode log tail on failure (SINGLE_THREADED)
         if: ${{ steps.checkout.outcome == 'success' && (always() && steps.run_editmode.outcome != 'success' && steps.run_editmode.outcome != 'skipped') }}
         uses: ./.github/actions/dump-unity-log-tail
@@ -1162,6 +1217,13 @@ jobs:
         with:
           results-dir: .artifacts/unity/${{ matrix.unity-version }}-playmode-single-threaded
           label: Unity ${{ matrix.unity-version }} playmode (SINGLE_THREADED)
+
+      - name: Dump Standalone log tail on failure (SINGLE_THREADED)
+        if: ${{ steps.checkout.outcome == 'success' && (always() && steps.run_standalone.outcome != 'success' && steps.run_standalone.outcome != 'skipped') }}
+        uses: ./.github/actions/dump-unity-log-tail
+        with:
+          results-dir: .artifacts/unity/${{ matrix.unity-version }}-standalone-single-threaded
+          label: Unity ${{ matrix.unity-version }} standalone (SINGLE_THREADED)
 
       - name: Verify EditMode tests actually ran (SINGLE_THREADED)
         id: verify_editmode
@@ -1181,6 +1243,16 @@ jobs:
         with:
           results-dir: .artifacts/unity/${{ matrix.unity-version }}-playmode-single-threaded
           label: Unity ${{ matrix.unity-version }} playmode (SINGLE_THREADED)
+          expected-empty: false
+
+      - name: Verify Standalone tests actually ran (SINGLE_THREADED)
+        id: verify_standalone
+        if: ${{ always() && !cancelled() && steps.run_standalone.outcome != 'skipped' }}
+        continue-on-error: true
+        uses: ./.github/actions/verify-unity-results
+        with:
+          results-dir: .artifacts/unity/${{ matrix.unity-version }}-standalone-single-threaded
+          label: Unity ${{ matrix.unity-version }} standalone (SINGLE_THREADED)
           expected-empty: false
 
       # LEAK GUARD: Unity writes its license identity into unity.log and
@@ -1243,12 +1315,32 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      - name: Redact credentials from Standalone artifacts (SINGLE_THREADED)
+        id: redact_standalone
+        if: ${{ steps.checkout.outcome == 'success' && always() }}
+        continue-on-error: true
+        timeout-minutes: 2
+        uses: ./.github/actions/redact-unity-artifacts
+        with:
+          paths: .artifacts/unity/${{ matrix.unity-version }}-standalone-single-threaded
+
+      - name: Upload Standalone artifacts (SINGLE_THREADED)
+        id: upload_standalone
+        if: ${{ always() && steps.redact_standalone.outcome == 'success' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: unity-${{ matrix.unity-version }}-standalone-single-threaded
+          path: .artifacts/unity/${{ matrix.unity-version }}-standalone-single-threaded
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Require every SINGLE_THREADED Unity mode
         id: require_selected_modes
         if: ${{ always() && !cancelled() }}
         shell: pwsh
         env:
-          SELECTED_MODES: '["editmode","playmode"]'
+          SELECTED_MODES: '["editmode","playmode","standalone"]'
           EDITMODE_RUN: ${{ steps.run_editmode.outcome }}
           EDITMODE_VERIFY: ${{ steps.verify_editmode.outcome }}
           EDITMODE_REDACT: ${{ steps.redact_editmode.outcome }}
@@ -1257,9 +1349,13 @@ jobs:
           PLAYMODE_VERIFY: ${{ steps.verify_playmode.outcome }}
           PLAYMODE_REDACT: ${{ steps.redact_playmode.outcome }}
           PLAYMODE_UPLOAD: ${{ steps.upload_playmode.outcome }}
+          STANDALONE_RUN: ${{ steps.run_standalone.outcome }}
+          STANDALONE_VERIFY: ${{ steps.verify_standalone.outcome }}
+          STANDALONE_REDACT: ${{ steps.redact_standalone.outcome }}
+          STANDALONE_UPLOAD: ${{ steps.upload_standalone.outcome }}
         run: |
           $ErrorActionPreference = 'Stop'
-          ./scripts/unity/assert-test-mode-outcomes.ps1 -CoreOnly
+          ./scripts/unity/assert-test-mode-outcomes.ps1
 
       - name: Require confirmed Unity cleanup
         if: always()
