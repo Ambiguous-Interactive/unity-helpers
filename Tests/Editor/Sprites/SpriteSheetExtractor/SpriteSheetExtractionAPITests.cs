@@ -20,6 +20,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         private const string Source = Root + "/source.png";
         private const string Output = Root + "/output.png";
         private const string Prefab = Root + "/reference.prefab";
+        private const string SecondPrefab = Root + "/second-reference.prefab";
         private const string WindowOutput = Root + "/window_000.png";
 
         private static List<SpriteSheetExtractionRequest> Requests()
@@ -71,6 +72,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         {
             AssetDatabase.DeleteAsset(Output);
             AssetDatabase.DeleteAsset(Prefab);
+            AssetDatabase.DeleteAsset(SecondPrefab);
             AssetDatabase.DeleteAsset(WindowOutput);
             base.TearDown();
         }
@@ -318,6 +320,48 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Undo.FlushUndoRecordObjects();
             Undo.PerformUndo();
             Assert.That(prefab.GetComponent<SpriteRenderer>().sprite, Is.EqualTo(source));
+        }
+
+        [Test]
+        public void ReferenceReplacementFlushesUndoForEveryChangedPrefab()
+        {
+            SpriteSheetExtractionResult extraction = SpriteSheetExtractionAPI.Extract(Requests());
+            Assert.That(extraction.Errors, Is.Empty);
+            Sprite source = AssetDatabase.LoadAssetAtPath<Sprite>(Source);
+            Sprite replacement = AssetDatabase.LoadAssetAtPath<Sprite>(Output);
+            Assert.IsTrue(source != null);
+            Assert.IsTrue(replacement != null);
+
+            GameObject firstOriginal = Track(new GameObject("FirstReferenceHolder"));
+            firstOriginal.AddComponent<SpriteRenderer>().sprite = source;
+            PrefabUtility.SaveAsPrefabAsset(firstOriginal, Prefab);
+            GameObject secondOriginal = Track(new GameObject("SecondReferenceHolder"));
+            secondOriginal.AddComponent<SpriteRenderer>().sprite = source;
+            PrefabUtility.SaveAsPrefabAsset(secondOriginal, SecondPrefab);
+
+            GameObject firstPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(Prefab);
+            GameObject secondPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(SecondPrefab);
+            Assert.IsTrue(firstPrefab != null);
+            Assert.IsTrue(secondPrefab != null);
+
+            Undo.IncrementCurrentGroup();
+            SpriteReferenceReplacementResult result = SpriteSheetReferenceReplacementAPI.Run(
+                new Dictionary<Sprite, Sprite> { { source, replacement } },
+                new[] { Prefab, SecondPrefab },
+                applyChanges: true
+            );
+
+            Assert.That(result.Errors, Is.Empty);
+            Assert.That(result.ModifiedAssets, Is.EqualTo(2));
+            Assert.That(firstPrefab.GetComponent<SpriteRenderer>().sprite, Is.EqualTo(replacement));
+            Assert.That(
+                secondPrefab.GetComponent<SpriteRenderer>().sprite,
+                Is.EqualTo(replacement)
+            );
+
+            Undo.PerformUndo();
+            Assert.That(firstPrefab.GetComponent<SpriteRenderer>().sprite, Is.EqualTo(source));
+            Assert.That(secondPrefab.GetComponent<SpriteRenderer>().sprite, Is.EqualTo(source));
         }
 
         [Test]

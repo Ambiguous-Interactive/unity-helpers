@@ -246,6 +246,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     if (objectChanged)
                     {
                         serialized.ApplyModifiedPropertiesWithoutUndo();
+                        Undo.FlushUndoRecordObjects();
                         assetModified = true;
                         EditorUtility.SetDirty(target);
                     }
