@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `AnimationCreatorAPI` to build sprite clips and write uniquely named animation assets from editor scripts without opening the window. See [Animation Creator](./docs/features/editor-tools/editor-tools-guide.md#animation-creator) ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Add `ImageBlurAPI` to blur textures or write blurred project assets from editor scripts without opening the window. See [Image Blur Tool](./docs/features/editor-tools/editor-tools-guide.md#image-blur-tool) ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Batch sprite reference replacement asset edits and finalize one Undo record per changed object ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Add `SpriteSheetExtractionAPI` to find sprite sheets and extract selected rectangles from scripts or batch mode without opening the window. See [Sprite Sheet Extractor](./docs/features/editor-tools/editor-tools-guide.md#sprite-sheet-extractor) ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).

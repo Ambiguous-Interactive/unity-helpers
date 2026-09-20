@@ -6,11 +6,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
 #if UNITY_EDITOR
     using System;
     using System.Collections.Generic;
+    using System.IO;
     using NUnit.Framework;
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Animation;
     using WallstopStudios.UnityHelpers.Editor.Sprites;
+    using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Tests.Core;
 
     /// <summary>
@@ -1198,6 +1200,131 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                     $"Curve mode keyframe {i} should not be null"
                 );
             }
+        }
+
+        [Test]
+        public void CreateAssetWritesUniqueClipsBesideSprite()
+        {
+            const string folder = "Assets/AnimationCreatorAPITests";
+            const string spritePath = folder + "/frame.png";
+            AssetDatabase.DeleteAsset(folder);
+            try
+            {
+                Assert.IsNotEmpty(AssetDatabase.CreateFolder("Assets", "AnimationCreatorAPITests"));
+                Texture2D texture = Track(new Texture2D(2, 2, TextureFormat.RGBA32, false));
+                texture.SetPixels32(
+                    new[]
+                    {
+                        new Color32(255, 0, 0, 255),
+                        new Color32(0, 255, 0, 255),
+                        new Color32(0, 0, 255, 255),
+                        new Color32(255, 255, 255, 255),
+                    }
+                );
+                texture.Apply();
+                File.WriteAllBytes(
+                    Path.Combine(Application.dataPath, "AnimationCreatorAPITests", "frame.png"),
+                    texture.EncodeToPNG()
+                );
+                AssetDatabase.ImportAsset(spritePath);
+                TextureImporter importer = AssetImporter.GetAtPath(spritePath) as TextureImporter;
+                Assert.IsTrue(importer != null);
+                importer.textureType = TextureImporterType.Sprite;
+                importer.spriteImportMode = SpriteImportMode.Single;
+                importer.SaveAndReimport();
+                Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(spritePath);
+                Assert.IsTrue(sprite != null);
+
+                AnimationData data = new()
+                {
+                    animationName = "Idle",
+                    frames = new List<Sprite> { null, sprite },
+                    framesPerSecond = 12f,
+                    loop = true,
+                };
+                Assert.IsTrue(
+                    AnimationCreatorAPI.TryCreateAsset(
+                        data,
+                        out string firstPath,
+                        out string firstError
+                    ),
+                    firstError
+                );
+                Assert.IsTrue(
+                    AnimationCreatorAPI.TryCreateAsset(
+                        data,
+                        out string secondPath,
+                        out string secondError
+                    ),
+                    secondError
+                );
+                string batchedPath;
+                using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
+                {
+                    Assert.IsTrue(
+                        AnimationCreatorAPI.TryCreateAsset(
+                            data,
+                            out batchedPath,
+                            out string batchError,
+                            saveAssets: false
+                        ),
+                        batchError
+                    );
+                }
+                AssetDatabase.SaveAssets();
+                Assert.AreNotEqual(firstPath, secondPath);
+                Assert.AreNotEqual(firstPath, batchedPath);
+                Assert.AreNotEqual(secondPath, batchedPath);
+                Assert.IsTrue(firstPath.StartsWith(folder + "/", StringComparison.Ordinal));
+                Assert.IsTrue(secondPath.StartsWith(folder + "/", StringComparison.Ordinal));
+                Assert.IsTrue(batchedPath.StartsWith(folder + "/", StringComparison.Ordinal));
+                AnimationClip first = AssetDatabase.LoadAssetAtPath<AnimationClip>(firstPath);
+                AnimationClip second = AssetDatabase.LoadAssetAtPath<AnimationClip>(secondPath);
+                AnimationClip batched = AssetDatabase.LoadAssetAtPath<AnimationClip>(batchedPath);
+                Assert.IsTrue(first != null);
+                Assert.IsTrue(second != null);
+                Assert.IsTrue(batched != null);
+                EditorCurveBinding[] bindings = AnimationUtility.GetObjectReferenceCurveBindings(
+                    first
+                );
+                Assert.AreEqual(1, bindings.Length);
+                ObjectReferenceKeyframe[] keyframes = AnimationUtility.GetObjectReferenceCurve(
+                    first,
+                    bindings[0]
+                );
+                Assert.AreEqual(1, keyframes.Length);
+                Assert.AreSame(sprite, keyframes[0].value);
+            }
+            finally
+            {
+                AssetDatabase.DeleteAsset(folder);
+            }
+        }
+
+        [Test]
+        public void CreateAPIRejectsInvalidInputs()
+        {
+            Assert.IsFalse(
+                AnimationCreatorAPI.TryCreateClip(
+                    new AnimationData(),
+                    new List<Sprite> { null },
+                    out AnimationClip clip,
+                    out string error
+                )
+            );
+            Assert.IsTrue(clip == null);
+            Assert.IsNotEmpty(error);
+
+            AnimationData unsafeName = new() { animationName = "../Outside" };
+            Assert.IsFalse(
+                AnimationCreatorAPI.TryCreateAsset(
+                    unsafeName,
+                    out string assetPath,
+                    out string assetError
+                )
+            );
+            Assert.IsTrue(assetPath == null);
+            Assert.IsNotEmpty(assetError);
         }
 
         private List<Sprite> CreateSpriteList(int count)

@@ -21,8 +21,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Utils;
     using Object = UnityEngine.Object;
-    // Both extension namespaces declare UnityExtensions; this alias selects the runtime helper.
-    using UnityExtensions = WallstopStudios.UnityHelpers.Core.Extension.UnityExtensions;
 
     /// <summary>
     /// Data class representing a single animation definition with frames, timing, and preview settings.
@@ -380,61 +378,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             List<Sprite> validFrames
         )
         {
-            float baseFrameRate =
-                0 < data.framesPerSecond
-                    ? data.framesPerSecond
-                    : AnimationData.DefaultFramesPerSecond;
-
-            AnimationClip clip = new() { frameRate = baseFrameRate };
-
-            ObjectReferenceKeyframe[] keyframes = new ObjectReferenceKeyframe[validFrames.Count];
-
-            float currentTime = 0f;
-
-            for (int i = 0; i < validFrames.Count; i++)
-            {
-                keyframes[i].time = currentTime;
-                keyframes[i].value = validFrames[i];
-
-                if (i < validFrames.Count - 1)
-                {
-                    float fps;
-                    if (data.framerateMode == FramerateMode.Curve)
-                    {
-                        float normalizedPosition =
-                            1 < validFrames.Count ? (float)i / (validFrames.Count - 1) : 0f;
-
-                        fps = data.framesPerSecondCurve.Evaluate(normalizedPosition);
-                        if (fps <= 0)
-                        {
-                            fps = baseFrameRate;
-                        }
-                    }
-                    else
-                    {
-                        fps = baseFrameRate;
-                    }
-
-                    currentTime += 1f / fps;
-                }
-            }
-
-            AnimationUtility.SetObjectReferenceCurve(
-                clip,
-                EditorCurveBinding.PPtrCurve(
-                    "",
-                    typeof(SpriteRenderer),
-                    UnityExtensions.SpriteBindingProperty
-                ),
-                keyframes
-            );
-
-            AnimationClipSettings settings = AnimationUtility.GetAnimationClipSettings(clip);
-            settings.loopTime = data.loop;
-            settings.cycleOffset = Mathf.Clamp01(data.cycleOffset);
-            AnimationUtility.SetAnimationClipSettings(clip, settings);
-
-            return clip;
+            return AnimationCreatorAPI.TryCreateClip(
+                data,
+                validFrames,
+                out AnimationClip clip,
+                out _
+            )
+                ? clip
+                : null;
         }
 
         internal static int CalculateScrubberFrame(float scrubberValue, int frameCount)
@@ -2382,52 +2333,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             (float)currentAnimationIndex / totalAnimations
                         );
 
-                        List<Sprite> frames = data.frames;
-                        if (frames is not { Count: > 0 })
+                        if (
+                            AnimationCreatorAPI.TryCreateAsset(
+                                data,
+                                out string finalPath,
+                                out string error,
+                                saveAssets: false
+                            )
+                        )
                         {
-                            this.LogWarn(
-                                $"Ignoring animation '{animationName}' because it has no frames."
-                            );
-                            continue;
+                            this.Log($"Created animation at '{finalPath}'.");
                         }
-
-                        using PooledResource<List<Sprite>> validFramesResource =
-                            Buffers<Sprite>.List.Get(out List<Sprite> validFrames);
-                        foreach (Sprite f in frames)
+                        else
                         {
-                            if (f != null)
-                            {
-                                validFrames.Add(f);
-                            }
+                            this.LogWarn($"Ignoring animation '{animationName}': {error}");
                         }
-                        if (validFrames.Count == 0)
-                        {
-                            this.LogWarn(
-                                $"Ignoring animation '{animationName}' because it only contains null frames."
-                            );
-                            continue;
-                        }
-
-                        validFrames.Sort(
-                            (s1, s2) => EditorUtility.NaturalCompare(s1.name, s2.name)
-                        );
-
-                        AnimationClip animationClip = CreateAnimationClip(data, validFrames);
-
-                        string firstFramePath = AssetDatabase.GetAssetPath(validFrames[0]);
-                        string assetPath =
-                            Path.GetDirectoryName(firstFramePath).SanitizePath() ?? "Assets";
-                        if (!assetPath.EndsWith("/"))
-                        {
-                            assetPath += "/";
-                        }
-
-                        string finalPath = AssetDatabase.GenerateUniqueAssetPath(
-                            $"{assetPath}{animationName}.anim"
-                        );
-                        AssetDatabaseBatchHelper.EnsureAssetParentFolder(finalPath);
-                        AssetDatabase.CreateAsset(animationClip, finalPath);
-                        this.Log($"Created animation at '{finalPath}'.");
                     }
                 }
             }
@@ -2451,66 +2371,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
             }
-        }
-
-        private AnimationClip CreateAnimationClip(AnimationData data, List<Sprite> validFrames)
-        {
-            float baseFrameRate =
-                0 < data.framesPerSecond
-                    ? data.framesPerSecond
-                    : AnimationData.DefaultFramesPerSecond;
-
-            AnimationClip clip = new() { frameRate = baseFrameRate };
-
-            // Unity reads the entire keyframe array; oversized pooled arrays would add null animation frames.
-            ObjectReferenceKeyframe[] keyframes = new ObjectReferenceKeyframe[validFrames.Count];
-
-            float currentTime = 0f;
-
-            for (int i = 0; i < validFrames.Count; i++)
-            {
-                keyframes[i].time = currentTime;
-                keyframes[i].value = validFrames[i];
-
-                if (i < validFrames.Count - 1)
-                {
-                    float fps;
-                    if (data.framerateMode == FramerateMode.Curve)
-                    {
-                        float normalizedPosition =
-                            1 < validFrames.Count ? (float)i / (validFrames.Count - 1) : 0f;
-
-                        fps = data.framesPerSecondCurve.Evaluate(normalizedPosition);
-                        if (fps <= 0)
-                        {
-                            fps = baseFrameRate;
-                        }
-                    }
-                    else
-                    {
-                        fps = baseFrameRate;
-                    }
-
-                    currentTime += 1f / fps;
-                }
-            }
-
-            AnimationUtility.SetObjectReferenceCurve(
-                clip,
-                EditorCurveBinding.PPtrCurve(
-                    "",
-                    typeof(SpriteRenderer),
-                    UnityExtensions.SpriteBindingProperty
-                ),
-                keyframes
-            );
-
-            AnimationClipSettings settings = AnimationUtility.GetAnimationClipSettings(clip);
-            settings.loopTime = data.loop;
-            settings.cycleOffset = Mathf.Clamp01(data.cycleOffset);
-            AnimationUtility.SetAnimationClipSettings(clip, settings);
-
-            return clip;
         }
 
         private void UpdateRegex()

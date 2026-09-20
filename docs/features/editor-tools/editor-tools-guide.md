@@ -572,6 +572,14 @@ applying:
 There is no output folder picker — use [Animation Copier](#animation-copier) to move a generated set
 into `Assets/Animations`.
 
+Editor scripts can call `AnimationCreatorAPI.TryCreateClip(data, frames, out clip, out error)` to
+build a clip in the supplied frame order without writing an asset. Call
+`AnimationCreatorAPI.TryCreateAsset(data, out path, out error)` to ignore null frames, naturally
+sort the remaining sprites, and save a uniquely named `.anim` beside the first sprite. The
+sprite must already be an asset under `Assets`. When creating several clips inside an
+`AssetDatabaseBatchHelper` scope, pass `saveAssets: false` and call `AssetDatabase.SaveAssets()`
+after the batch.
+
 **Also worth knowing:**
 
 - **Prefix Leaf Folder Name** / **Prefix Full Folder Path** keep `Idle` from four different
