@@ -294,7 +294,8 @@ Editor scripts can call `SpritePivotAdjusterAPI.TryFind(folders, nameRegex, path
 with `Assets/...` folders, then call `SpritePivotAdjusterAPI.Run(paths, options)` to preview or
 `Run(paths, options, applyChanges: true)` to apply. The result reports changes, skips, cancellation,
 warnings, and errors. These calls normalize backslashes, trailing folder slashes, and the `Assets`
-prefix casing. Neither call opens the window.
+prefix casing. Invalid paths are counted as skipped and reported in the result errors. Neither call
+opens the window.
 
 Each changed importer is recorded as an `Adjust Sprite Pivot` undo step. The reimport side effect
 may require regeneration after Undo.

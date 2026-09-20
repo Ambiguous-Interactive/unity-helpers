@@ -169,7 +169,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 for (int index = 0; index < assetPaths.Count; ++index)
                 {
                     string path = NormalizeAssetPath(assetPaths[index]);
-                    if (string.IsNullOrWhiteSpace(path) || !processedPaths.Add(path))
+                    if (
+                        string.IsNullOrEmpty(path)
+                        || !path.StartsWith("Assets/", StringComparison.Ordinal)
+                    )
+                    {
+                        ++result.SkippedNotSprite;
+                        result.AddError(
+                            $"Invalid asset path at index {index}: expected a path under Assets."
+                        );
+                        continue;
+                    }
+                    if (!processedPaths.Add(path))
                     {
                         continue;
                     }

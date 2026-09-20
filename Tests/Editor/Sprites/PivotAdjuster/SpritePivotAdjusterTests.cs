@@ -109,6 +109,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             imp = AssetImporter.GetAtPath(path) as TextureImporter;
             Assert.That(imp.spritePivot, Is.EqualTo(new Vector2(0.5f, 0.5f)));
 
+            SpritePivotAdjusterAPI.Result invalidPath = SpritePivotAdjusterAPI.Run(
+                new[] { "Outside/pivot.png", "Assets" },
+                new SpritePivotAdjusterAPI.Options()
+            );
+            Assert.That(invalidPath.SkippedNotSprite, Is.EqualTo(2));
+            Assert.That(invalidPath.Errors, Has.Count.EqualTo(2));
+            Assert.That(invalidPath.Changed, Is.Zero);
+
             SpritePivotAdjusterAPI.Result canceled = SpritePivotAdjusterAPI.Run(
                 paths,
                 new SpritePivotAdjusterAPI.Options(),
