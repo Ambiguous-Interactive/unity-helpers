@@ -691,6 +691,16 @@ under `Assets` or a writable local `Packages` path. The API returns extracted an
 plus errors, and never opens a window or displays a prompt. Set `dryRun: true` to preview the count
 without changing files or importers.
 
+Use `SpriteSheetExtractionAPI.Discover` with folder asset paths and an optional filename regex to
+get the same sprite texture list as the window. Its result includes warnings for invalid folders
+and an error for an invalid or timed-out regex.
+
+`SpriteSheetReferenceReplacementAPI.Run` accepts an explicit map from source sprites to extracted
+sprites and explicit asset paths. It previews matching references by default; pass
+`applyChanges: true` to write them. The window uses this API after its Danger Zone confirmation.
+Unity records object changes for Undo, but saved asset edits should still be protected by version
+control.
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Editor.Sprites;

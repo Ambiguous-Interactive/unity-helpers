@@ -297,17 +297,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// </remarks>
         private static readonly bool DiagnosticsEnabled = false;
 
-        private static readonly string[] ImageFileExtensions =
-        {
-            ".png",
-            ".jpg",
-            ".jpeg",
-            ".bmp",
-            ".tga",
-            ".psd",
-            ".gif",
-        };
-
         /// <summary>
         /// Common sprite cell sizes for grid detection candidate generation.
         /// Avoids allocation during DetectOptimalGridFromTransparency calls.
@@ -475,7 +464,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private SerializedProperty _sourcePreviewFoldoutProperty;
         private SerializedProperty _dangerZoneFoldoutProperty;
 
-        private Regex _regex;
         private string _regexError;
         private string _lastValidatedRegex;
 
@@ -3063,25 +3051,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             _discoveredSheets ??= new List<SpriteSheetEntry>();
             _discoveredSheets.Clear();
 
-            _regex = null;
-            if (!string.IsNullOrWhiteSpace(_spriteNameRegex))
-            {
-                try
-                {
-                    _regex = new Regex(
-                        _spriteNameRegex,
-                        RegexOptions.Compiled | RegexOptions.CultureInvariant
-                    );
-                }
-                catch (ArgumentException e)
-                {
-                    this.LogWarn($"Invalid regex '{_spriteNameRegex}'", e);
-                    _regexError = e.Message;
-                    Repaint();
-                    return;
-                }
-            }
-
             if (_inputDirectories == null || _inputDirectories.Count == 0)
             {
                 this.LogWarn($"No input directories selected.");
@@ -3089,81 +3058,61 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            using PooledResource<HashSet<string>> seenLease = SetBuffers<string>
-                .GetHashSetPool(StringComparer.OrdinalIgnoreCase)
-                .Get(out HashSet<string> seen);
-
-            foreach (Object maybeDirectory in _inputDirectories)
+            List<string> folders = new(_inputDirectories.Count);
+            foreach (Object directory in _inputDirectories)
             {
-                if (maybeDirectory == null)
+                if (directory == null)
                 {
                     continue;
                 }
 
-                string assetPath = AssetDatabase.GetAssetPath(maybeDirectory);
-                if (!AssetDatabase.IsValidFolder(assetPath))
+                folders.Add(AssetDatabase.GetAssetPath(directory));
+            }
+
+            if (folders.Count == 0)
+            {
+                this.LogWarn($"No input directories selected.");
+                Repaint();
+                return;
+            }
+
+            SpriteSheetDiscoveryResult discovery = SpriteSheetExtractionAPI.Discover(
+                folders,
+                _spriteNameRegex
+            );
+            if (!discovery.Success)
+            {
+                _regexError = discovery.Error;
+                this.LogWarn($"{discovery.Error}");
+                Repaint();
+                return;
+            }
+
+            _regexError = null;
+            foreach (string warning in discovery.Warnings)
+            {
+                this.LogWarn($"{warning}");
+            }
+
+            foreach (string assetPath in discovery.AssetPaths)
+            {
+                if (
+                    AssetImporter.GetAtPath(assetPath)
+                    is not TextureImporter { textureType: TextureImporterType.Sprite } importer
+                )
                 {
-                    this.LogWarn($"Skipping invalid path: {assetPath}");
                     continue;
                 }
 
-                string[] guids = AssetDatabase.FindAssets("t:Texture2D", new[] { assetPath });
-                foreach (string guidsElement in guids)
+                SpriteSheetEntry entry = CreateSpriteSheetEntry(assetPath, importer);
+                if (entry == null)
                 {
-                    string file = AssetDatabase.GUIDToAssetPath(guidsElement);
-                    if (string.IsNullOrEmpty(file))
-                    {
-                        continue;
-                    }
-
-                    bool hasValidExtension = false;
-                    foreach (string imageFileExtensionsElement in ImageFileExtensions)
-                    {
-                        if (
-                            file.EndsWith(
-                                imageFileExtensionsElement,
-                                StringComparison.OrdinalIgnoreCase
-                            )
-                        )
-                        {
-                            hasValidExtension = true;
-                            break;
-                        }
-                    }
-
-                    if (!hasValidExtension)
-                    {
-                        continue;
-                    }
-
-                    string fileName = Path.GetFileNameWithoutExtension(file);
-                    if (_regex != null && !_regex.IsMatch(fileName))
-                    {
-                        continue;
-                    }
-
-                    if (!seen.Add(file))
-                    {
-                        continue;
-                    }
-
-                    if (
-                        AssetImporter.GetAtPath(file)
-                        is not TextureImporter { textureType: TextureImporterType.Sprite } importer
-                    )
-                    {
-                        continue;
-                    }
-
-                    SpriteSheetEntry entry = CreateSpriteSheetEntry(file, importer);
-                    if (entry != null)
-                    {
-                        TryAutoLoadConfig(entry);
-                        // Loading configuration can change settings included in the cache key.
-                        entry._lastCacheKey = entry.GetBoundsCacheKey(this);
-                        _discoveredSheets.Add(entry);
-                    }
+                    continue;
                 }
+
+                TryAutoLoadConfig(entry);
+                entry._lastCacheKey = entry.GetBoundsCacheKey(this);
+                _discoveredSheets.Add(entry);
             }
 
             if (generatePreviews)
@@ -3834,18 +3783,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         }
 
                         Sprite originalSprite = null;
-                        foreach (UnityEngine.Object originalSpritesElement in originalSprites)
+                        foreach (Object asset in originalSprites)
                         {
                             if (
-                                originalSpritesElement is Sprite s
+                                asset is Sprite sprite
                                 && string.Equals(
-                                    s.name,
+                                    sprite.name,
                                     spriteData._originalName,
-                                    System.StringComparison.Ordinal
+                                    StringComparison.Ordinal
                                 )
                             )
                             {
-                                originalSprite = s;
+                                originalSprite = sprite;
                                 break;
                             }
                         }
@@ -3858,8 +3807,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         string prefix = string.IsNullOrWhiteSpace(_namingPrefix)
                             ? Path.GetFileNameWithoutExtension(entry._assetPath)
                             : _namingPrefix;
-                        string extractedFileName = $"{prefix}_{j:D3}.png";
-                        string extractedPath = Path.Combine(outputPath, extractedFileName);
+                        string extractedPath = Path.Combine(outputPath, $"{prefix}_{j:D3}.png");
                         Sprite extractedSprite = AssetDatabase.LoadAssetAtPath<Sprite>(
                             extractedPath
                         );
@@ -3876,113 +3824,35 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     return;
                 }
 
-                string[] allAssets = AssetDatabase.GetAllAssetPaths();
-                string[] candidateExts =
-                {
-                    ".prefab",
-                    ".unity",
-                    ".asset",
-                    ".mat",
-                    ".anim",
-                    ".overrideController",
-                };
-                int modifiedAssets = 0;
-
-                using (AssetDatabaseBatchHelper.BeginBatch())
-                {
-                    for (int i = 0; i < allAssets.Length; ++i)
-                    {
-                        string path = allAssets[i];
-                        if (!path.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
-                        {
-                            continue;
-                        }
-
-                        bool hasValidExt = false;
-                        foreach (string candidateExtsElement in candidateExts)
-                        {
-                            if (
-                                path.EndsWith(
-                                    candidateExtsElement,
-                                    StringComparison.OrdinalIgnoreCase
-                                )
-                            )
-                            {
-                                hasValidExt = true;
-                                break;
-                            }
-                        }
-                        if (!hasValidExt)
-                        {
-                            continue;
-                        }
-
-                        if (
-                            Utils.EditorUi.CancelableProgress(
-                                "Replacing Sprite References",
-                                $"Scanning {i + 1}/{allAssets.Length}: {Path.GetFileName(path)}",
-                                i / (float)allAssets.Length
-                            )
+                string[] assetPaths = AssetDatabase.GetAllAssetPaths();
+                SpriteReferenceReplacementResult result = SpriteSheetReferenceReplacementAPI.Run(
+                    mapping,
+                    assetPaths,
+                    applyChanges: true,
+                    cancelRequested: (processed, total) =>
+                        Utils.EditorUi.CancelableProgress(
+                            "Replacing Sprite References",
+                            $"Scanning {processed + 1}/{total}",
+                            total == 0 ? 0f : (float)processed / total
                         )
-                        {
-                            this.LogWarn($"Reference replacement cancelled by user.");
-                            break;
-                        }
-
-                        bool assetModified = false;
-                        Object[] objs = AssetDatabase.LoadAllAssetsAtPath(path);
-                        foreach (Object o in objs)
-                        {
-                            if (o == null)
-                            {
-                                continue;
-                            }
-
-                            using SerializedObject so = new(o);
-                            SerializedProperty it = so.GetIterator();
-                            bool enter = true;
-                            while (it.NextVisible(enter))
-                            {
-                                enter = false;
-                                if (it.propertyType != SerializedPropertyType.ObjectReference)
-                                {
-                                    continue;
-                                }
-
-                                Sprite s = it.objectReferenceValue as Sprite;
-                                if (s != null && mapping.TryGetValue(s, out Sprite replacement))
-                                {
-                                    Undo.RecordObject(o, "Replace sprite reference");
-                                    it.objectReferenceValue = replacement;
-                                    assetModified = true;
-                                    this.Log(
-                                        $"Replaced reference in {path}: {s.name} -> {replacement.name}"
-                                    );
-                                }
-                            }
-
-                            if (assetModified)
-                            {
-                                so.ApplyModifiedPropertiesWithoutUndo();
-                                EditorUtility.SetDirty(o);
-                            }
-                        }
-                        if (assetModified)
-                        {
-                            ++modifiedAssets;
-                        }
-                    }
+                );
+                foreach (string error in result.Errors)
+                {
+                    this.LogError($"{error}");
                 }
 
-                AssetDatabase.SaveAssets();
+                if (result.Canceled)
+                {
+                    this.LogWarn($"Reference replacement cancelled by user.");
+                }
 
                 this.Log(
-                    $"Reference replacement complete. Modified assets: {modifiedAssets}. Mapped pairs: {mapping.Count}."
+                    $"Reference replacement complete. Modified assets: {result.ModifiedAssets}. Mapped pairs: {mapping.Count}."
                 );
             }
-            catch (Exception e)
+            catch (Exception error)
             {
-                this.LogError($"Error during reference replacement", e);
+                this.LogError($"Error during reference replacement", error);
             }
             finally
             {

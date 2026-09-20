@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using System;
     using System.Collections.Generic;
     using System.IO;
+    using System.Text.RegularExpressions;
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Editor.Utils;
@@ -75,10 +76,140 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     }
 
     /// <summary>
+    /// Reports sprite textures found in explicit project folders.
+    /// </summary>
+    public sealed class SpriteSheetDiscoveryResult
+    {
+        /// <summary>Gets the matching sprite texture asset paths.</summary>
+        public IReadOnlyList<string> AssetPaths => _assetPaths;
+
+        /// <summary>Gets folders that could not be scanned.</summary>
+        public IReadOnlyList<string> Warnings => _warnings;
+
+        /// <summary>Gets an input or regex error, if discovery failed.</summary>
+        public string Error { get; internal set; }
+
+        /// <summary>Gets whether discovery completed.</summary>
+        public bool Success => string.IsNullOrEmpty(Error);
+
+        private readonly List<string> _assetPaths = new();
+        private readonly List<string> _warnings = new();
+
+        internal void AddAssetPath(string assetPath)
+        {
+            _assetPaths.Add(assetPath);
+        }
+
+        internal void AddWarning(string warning)
+        {
+            _warnings.Add(warning);
+        }
+    }
+
+    /// <summary>
     /// Extracts sprites from explicit asset paths and pixel rectangles without an editor window.
     /// </summary>
     public static class SpriteSheetExtractionAPI
     {
+        private static readonly string[] ImageFileExtensions =
+        {
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".bmp",
+            ".tga",
+            ".psd",
+            ".gif",
+        };
+
+        /// <summary>
+        /// Finds sprite textures in explicit project folders without creating previews.
+        /// </summary>
+        public static SpriteSheetDiscoveryResult Discover(
+            IReadOnlyList<string> folderAssetPaths,
+            string spriteNameRegex = null
+        )
+        {
+            SpriteSheetDiscoveryResult result = new();
+            if (folderAssetPaths == null || folderAssetPaths.Count == 0)
+            {
+                result.Error = "No input folders were provided.";
+                return result;
+            }
+
+            Regex nameFilter = null;
+            if (!string.IsNullOrWhiteSpace(spriteNameRegex))
+            {
+                try
+                {
+                    nameFilter = new Regex(
+                        spriteNameRegex,
+                        RegexOptions.Compiled | RegexOptions.CultureInvariant,
+                        TimeSpan.FromMilliseconds(250)
+                    );
+                }
+                catch (ArgumentException error)
+                {
+                    result.Error = $"Invalid sprite name regex: {error.Message}";
+                    return result;
+                }
+            }
+
+            HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < folderAssetPaths.Count; ++i)
+            {
+                string folder = folderAssetPaths[i];
+                if (string.IsNullOrWhiteSpace(folder) || !AssetDatabase.IsValidFolder(folder))
+                {
+                    result.AddWarning($"Skipping invalid folder: '{folder}'.");
+                    continue;
+                }
+
+                try
+                {
+                    string[] guids = AssetDatabase.FindAssets("t:Texture2D", new[] { folder });
+                    foreach (string guid in guids)
+                    {
+                        string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                        if (string.IsNullOrEmpty(assetPath) || !HasImageExtension(assetPath))
+                        {
+                            continue;
+                        }
+
+                        if (
+                            nameFilter != null
+                            && !nameFilter.IsMatch(Path.GetFileNameWithoutExtension(assetPath))
+                        )
+                        {
+                            continue;
+                        }
+
+                        if (
+                            AssetImporter.GetAtPath(assetPath)
+                                is not TextureImporter { textureType: TextureImporterType.Sprite }
+                            || !seen.Add(assetPath)
+                        )
+                        {
+                            continue;
+                        }
+
+                        result.AddAssetPath(assetPath);
+                    }
+                }
+                catch (RegexMatchTimeoutException error)
+                {
+                    result.Error = $"Sprite name regex timed out: {error.Message}";
+                    return result;
+                }
+                catch (Exception error)
+                {
+                    result.AddWarning($"Failed to scan '{folder}': {error.Message}");
+                }
+            }
+
+            return result;
+        }
+
         /// <summary>
         /// Extracts selected sprites and returns counts and errors without displaying prompts.
         /// </summary>
@@ -282,6 +413,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             return true;
+        }
+
+        private static bool HasImageExtension(string assetPath)
+        {
+            foreach (string extension in ImageFileExtensions)
+            {
+                if (assetPath.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static bool IsSafeAssetPath(string assetPath)

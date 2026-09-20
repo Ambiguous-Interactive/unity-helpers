@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add `SpriteSheetExtractionAPI` to extract selected sprite rectangles from scripts or batch mode without opening the Sprite Sheet Extractor window. See [Sprite Sheet Extractor](./docs/features/editor-tools/editor-tools-guide.md#sprite-sheet-extractor) ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
+- Add `SpriteSheetExtractionAPI` to find sprite sheets and extract selected rectangles from scripts or batch mode without opening the window. See [Sprite Sheet Extractor](./docs/features/editor-tools/editor-tools-guide.md#sprite-sheet-extractor) ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
+- Add `SpriteSheetReferenceReplacementAPI` to preview and replace sprite references in explicit project assets from scripts. See [Sprite Sheet Extractor](./docs/features/editor-tools/editor-tools-guide.md#sprite-sheet-extractor) ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Add `AnimationCopierAPI` to analyze, preview, copy, and clean up standalone animation clips from scripts or batch mode without opening its window. See [Animation Copier](./docs/features/editor-tools/editor-tools-guide.md#animation-copier) ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Add `FitTextureSizeAPI` to preview and apply texture import sizes from scripts or batch mode without opening its window. See [Fit Texture Size](./docs/features/editor-tools/editor-tools-guide.md#fit-texture-size) ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Add `ProtoSchemaExporter` to write selected or discovered project contracts from Editor code without opening a window. See [Serialization](./docs/features/serialization/serialization.md#exporting-a-proto3-schema) ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).

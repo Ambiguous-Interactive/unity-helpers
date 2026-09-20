@@ -18,6 +18,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         private const string Root = "Assets/SpriteSheetExtractionAPITests";
         private const string Source = Root + "/source.png";
         private const string Output = Root + "/output.png";
+        private const string Prefab = Root + "/reference.prefab";
         private const string WindowOutput = Root + "/window_000.png";
 
         private static List<SpriteSheetExtractionRequest> Requests()
@@ -68,6 +69,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         public override void TearDown()
         {
             AssetDatabase.DeleteAsset(Output);
+            AssetDatabase.DeleteAsset(Prefab);
             AssetDatabase.DeleteAsset(WindowOutput);
             base.TearDown();
         }
@@ -207,6 +209,109 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             TextureImporter importer = AssetImporter.GetAtPath(WindowOutput) as TextureImporter;
             Assert.IsTrue(importer != null);
             Assert.That(importer.textureType, Is.EqualTo(TextureImporterType.Sprite));
+        }
+
+        [Test]
+        public void DiscoveryAndWindowFindSameSpriteTexture()
+        {
+            SpriteSheetDiscoveryResult discovery = SpriteSheetExtractionAPI.Discover(
+                new[] { Root, Root },
+                "^source$"
+            );
+            SpriteSheetDiscoveryResult invalid = SpriteSheetExtractionAPI.Discover(
+                new[] { Root },
+                "["
+            );
+
+            Assert.That(discovery.Success, Is.True);
+            Assert.That(discovery.AssetPaths, Is.EqualTo(new[] { Source }));
+            Assert.That(invalid.Success, Is.False);
+            Assert.That(invalid.AssetPaths, Is.Empty);
+
+            SpriteSheetExtractor window = Track(
+                ScriptableObject.CreateInstance<SpriteSheetExtractor>()
+            );
+            UnityEngine.Object folder = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(Root);
+            Assert.IsTrue(folder != null);
+            window._inputDirectories = new List<UnityEngine.Object> { folder, folder };
+            window._spriteNameRegex = "^source$";
+            window.DiscoverSpriteSheets(generatePreviews: false);
+
+            Assert.That(window._discoveredSheets.Count, Is.EqualTo(1));
+            Assert.That(window._discoveredSheets[0]._assetPath, Is.EqualTo(Source));
+        }
+
+        [Test]
+        public void ReferenceReplacementPreviewsThenChangesPrefab()
+        {
+            SpriteSheetExtractionResult extraction = SpriteSheetExtractionAPI.Extract(Requests());
+            Assert.That(extraction.Errors, Is.Empty);
+            Sprite source = AssetDatabase.LoadAssetAtPath<Sprite>(Source);
+            Sprite replacement = AssetDatabase.LoadAssetAtPath<Sprite>(Output);
+            Assert.IsTrue(source != null);
+            Assert.IsTrue(replacement != null);
+
+            GameObject original = Track(new GameObject("ReferenceHolder"));
+            SpriteRenderer renderer = original.AddComponent<SpriteRenderer>();
+            renderer.sprite = source;
+            PrefabUtility.SaveAsPrefabAsset(original, Prefab);
+
+            Dictionary<Sprite, Sprite> mapping = new() { { source, replacement } };
+            SpriteReferenceReplacementResult preview = SpriteSheetReferenceReplacementAPI.Run(
+                mapping,
+                new[] { Prefab }
+            );
+            Assert.That(preview.Errors, Is.Empty);
+            Assert.That(preview.ModifiedAssets, Is.EqualTo(1));
+            Assert.That(preview.MatchedReferences, Is.EqualTo(1));
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(Prefab);
+            Assert.IsTrue(prefab != null);
+            Assert.That(prefab.GetComponent<SpriteRenderer>().sprite, Is.EqualTo(source));
+
+            SpriteReferenceReplacementResult canceled = SpriteSheetReferenceReplacementAPI.Run(
+                mapping,
+                new[] { Prefab },
+                applyChanges: true,
+                cancelRequested: (_, _) => true
+            );
+            SpriteReferenceReplacementResult noOp = SpriteSheetReferenceReplacementAPI.Run(
+                new Dictionary<Sprite, Sprite> { { source, source } },
+                new[] { Prefab },
+                applyChanges: true
+            );
+            Assert.That(canceled.Canceled, Is.True);
+            Assert.That(canceled.ModifiedAssets, Is.Zero);
+            Assert.That(noOp.ModifiedAssets, Is.Zero);
+            Assert.That(prefab.GetComponent<SpriteRenderer>().sprite, Is.EqualTo(source));
+
+            SpriteReferenceReplacementResult applied = SpriteSheetReferenceReplacementAPI.Run(
+                mapping,
+                new[] { Prefab },
+                applyChanges: true
+            );
+            Assert.That(applied.Errors, Is.Empty);
+            Assert.That(applied.ModifiedAssets, Is.EqualTo(1));
+            Assert.That(prefab.GetComponent<SpriteRenderer>().sprite, Is.EqualTo(replacement));
+        }
+
+        [Test]
+        public void ReferenceReplacementRejectsTransientSprites()
+        {
+            Sprite source = AssetDatabase.LoadAssetAtPath<Sprite>(Source);
+            Assert.IsTrue(source != null);
+            Texture2D texture = Track(new Texture2D(1, 1, TextureFormat.RGBA32, false));
+            Sprite transient = Track(
+                Sprite.Create(texture, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f))
+            );
+
+            SpriteReferenceReplacementResult result = SpriteSheetReferenceReplacementAPI.Run(
+                new Dictionary<Sprite, Sprite> { { source, transient } },
+                new[] { Prefab },
+                applyChanges: true
+            );
+
+            Assert.That(result.Errors, Is.Not.Empty);
+            Assert.That(result.ModifiedAssets, Is.Zero);
         }
     }
 #endif
