@@ -324,16 +324,25 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         }
 
         /// <summary>
-        /// Previews or replaces references to original sprites with their cropped counterparts.
+        /// Previews or replaces references to original sprites with separate cropped outputs.
         /// </summary>
         public static SpriteReferenceReplacementResult ReplaceReferences(
             IReadOnlyList<string> inputFolders,
             bool applyChanges = false,
             Func<int, int, bool> cancelRequested = null,
-            string outputFolder = null
+            string outputFolder = null,
+            bool overwriteOriginals = false
         )
         {
             SpriteReferenceReplacementResult emptyResult = new();
+            if (overwriteOriginals)
+            {
+                emptyResult.AddError(
+                    "Reference replacement requires separate Cropped_* outputs; overwritten sprites keep their original asset paths."
+                );
+                return emptyResult;
+            }
+
             try
             {
                 Dictionary<Sprite, Sprite> replacements = new();

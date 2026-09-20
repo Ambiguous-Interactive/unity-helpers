@@ -174,6 +174,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.IsTrue(cropped != null);
             Assert.IsTrue(replacements.TryGetValue(original, out Sprite mapped));
             Assert.AreSame(cropped, mapped);
+
+            SpriteReferenceReplacementResult overwriteReplacement =
+                SpriteCropperAPI.ReplaceReferences(
+                    new[] { Root },
+                    applyChanges: true,
+                    outputFolder: outDir,
+                    overwriteOriginals: true
+                );
+            Assert.That(overwriteReplacement.ModifiedAssets, Is.Zero);
+            Assert.That(overwriteReplacement.MatchedReferences, Is.Zero);
+            Assert.That(overwriteReplacement.Errors, Has.Count.EqualTo(1));
         }
 
         private void CreatePngWithOpaqueRect(

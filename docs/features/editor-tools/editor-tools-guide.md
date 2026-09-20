@@ -147,7 +147,9 @@ status, and any error. The window uses the same crop operation for each selected
 `SpriteCropperAPI.TryBuildReplacementMap(folders, mapping, out error)` finds existing
 `Cropped_*` pairs, and `SpriteCropperAPI.ReplaceReferences(folders, applyChanges)` previews or
 applies reference changes across project assets. Both accept an optional output folder when
-cropped files were written away from their sources. The Danger Zone button calls the apply form.
+cropped files were written away from their sources. Replacement is only for separate `Cropped_*`
+outputs; the Danger Zone button is disabled when **Overwrite Originals** is on. Script callers can
+pass `overwriteOriginals: true` to make `ReplaceReferences` reject that combination.
 
 **Before you run it:**
 

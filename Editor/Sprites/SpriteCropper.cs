@@ -772,7 +772,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     "I understand the risks and want to proceed.",
                     _ackDanger
                 );
-                using (new EditorGUI.DisabledScope(!_ackDanger))
+                using (new EditorGUI.DisabledScope(!_ackDanger || _overwriteOriginals))
                 {
                     if (GUILayout.Button("Replace Sprite References With Cropped_* Versions"))
                     {
@@ -820,7 +820,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             $"Scanning {index + 1}/{total}",
                             total == 0 ? 0f : index / (float)total
                         ),
-                    outputFolder: outputFolder
+                    outputFolder: outputFolder,
+                    overwriteOriginals: _overwriteOriginals
                 );
             }
             finally
