@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Tests.Sprites
 {
 #if UNITY_EDITOR
+    using System.Collections.Generic;
     using System.IO;
     using NUnit.Framework;
     using UnityEditor;
@@ -80,6 +81,40 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             imp.isReadable = true;
             imp.spritePivot = new Vector2(0.5f, 0.5f);
             imp.SaveAndReimport();
+
+            List<string> paths = new();
+            Assert.IsFalse(
+                SpritePivotAdjusterAPI.TryFind(new[] { Root }, "[", paths, out string regexError)
+            );
+            Assert.IsNotEmpty(regexError);
+            Assert.IsTrue(
+                SpritePivotAdjusterAPI.TryFind(
+                    new[] { Root },
+                    "pivot",
+                    paths,
+                    out string findError
+                ),
+                findError
+            );
+            CollectionAssert.Contains(paths, path);
+
+            SpritePivotAdjusterAPI.Result preview = SpritePivotAdjusterAPI.Run(
+                paths,
+                new SpritePivotAdjusterAPI.Options { SkipUnchanged = false }
+            );
+            Assert.That(preview.Changed, Is.EqualTo(1));
+            Assert.IsEmpty(preview.Errors);
+            imp = AssetImporter.GetAtPath(path) as TextureImporter;
+            Assert.That(imp.spritePivot, Is.EqualTo(new Vector2(0.5f, 0.5f)));
+
+            SpritePivotAdjusterAPI.Result canceled = SpritePivotAdjusterAPI.Run(
+                paths,
+                new SpritePivotAdjusterAPI.Options(),
+                cancelRequested: (_, _) => throw new System.InvalidOperationException("Injected")
+            );
+            Assert.IsTrue(canceled.Canceled);
+            Assert.That(canceled.Changed, Is.Zero);
+            Assert.That(canceled.Errors, Has.Count.EqualTo(1));
 
             SpritePivotAdjuster window = Track(
                 ScriptableObject.CreateInstance<SpritePivotAdjuster>()

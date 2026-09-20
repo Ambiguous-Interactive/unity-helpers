@@ -83,24 +83,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             imp.spritePivot = new Vector2(0.5f, 0.5f);
             imp.SaveAndReimport();
 
-            SpritePivotAdjuster window = Track(
-                ScriptableObject.CreateInstance<SpritePivotAdjuster>()
+            SpritePivotAdjusterAPI.Result directResult = SpritePivotAdjusterAPI.Run(
+                new[] { src },
+                new SpritePivotAdjusterAPI.Options
+                {
+                    AlphaCutoff = 0.1f,
+                    SkipUnchanged = false,
+                    ForceReimport = true,
+                },
+                applyChanges: true
             );
-            window._directoryPaths = new System.Collections.Generic.List<Object>
-            {
-                AssetDatabase.LoadAssetAtPath<Object>(Root),
-            };
-            window._skipUnchanged = false;
-            window.FindFilesToProcess();
-
-            window._alphaCutoff = 0.1f;
-            window._forceReimport = true;
-            window.AdjustPivotsInDirectory(false);
+            Assert.That(directResult.Changed, Is.EqualTo(1));
+            Assert.IsEmpty(directResult.Errors);
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
             imp = AssetImporter.GetAtPath(src) as TextureImporter;
             Vector2 pivotLow = imp.spritePivot;
 
-            window = Track(ScriptableObject.CreateInstance<SpritePivotAdjuster>());
+            SpritePivotAdjuster window = Track(
+                ScriptableObject.CreateInstance<SpritePivotAdjuster>()
+            );
             window._directoryPaths = new System.Collections.Generic.List<Object>
             {
                 AssetDatabase.LoadAssetAtPath<Object>(Root),

@@ -280,7 +280,7 @@ inside one `AssetDatabase.StartAssetEditing()` block. The default-platform name 
 
 A walk cycle where the character leans forward on some frames wobbles if every pivot is `(0.5, 0.5)`,
 because the geometric center of the texture is not the visual center of the character. This computes
-an alpha-weighted center of mass per sprite and writes it as a custom pivot.
+the center of pixels above the alpha cutoff and writes it as a custom pivot.
 
 1. Add `Assets/Sprites/Characters/Player` to **Input Directories**.
 2. Leave **Alpha Cutoff** at `0.01` so anti-aliased fringe pixels do not drag the pivot outward.
@@ -289,7 +289,13 @@ an alpha-weighted center of mass per sprite and writes it as a custom pivot.
 4. Click **Find Sprites To Process**, then **Dry Run** to see the counts, then
    **Adjust Pivots in Directory**.
 
-Import settings only; each changed importer is recorded as an `Adjust Sprite Pivot` undo step.
+Editor scripts can call `SpritePivotAdjusterAPI.TryFind(folders, nameRegex, paths, out error)`
+with `Assets/...` folders, then call `SpritePivotAdjusterAPI.Run(paths, options)` to preview or
+`Run(paths, options, applyChanges: true)` to apply. The result reports changes, skips, cancellation,
+warnings, and errors. Neither call opens the window.
+
+Each changed importer is recorded as an `Adjust Sprite Pivot` undo step. The reimport side effect
+may require regeneration after Undo.
 Center-of-mass scans run directly below 65,536 pixels and for one-row sprites. Larger scans use
 parallel row partitions, so small sprite batches avoid worker startup without slowing large art.
 Folder and file-extension filtering also scans directly without per-file predicate allocations.
@@ -303,7 +309,7 @@ Folder and file-extension filtering also scans directly without per-file predica
 
 > **Visual Reference**
 >
-> ![Sprite Pivot Adjuster window showing alpha-weighted pivot calculation](../../images/editor-tools/sprite-pivot-adjuster.png)
+> ![Sprite Pivot Adjuster window showing cutoff-based pivot calculation](../../images/editor-tools/sprite-pivot-adjuster.png)
 >
 > _Sprite Pivot Adjuster with alpha cutoff slider and directory selection_
 
