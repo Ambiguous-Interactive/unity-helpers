@@ -265,10 +265,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 // Case-mismatch tests on a case-insensitive file system leave duplicates behind.
                 TryDeleteFolderAndDuplicates("Assets/Resources", "CreatorTests");
                 TryDeleteFolderAndDuplicates("Assets/Resources", "CaseTest");
-                TryDeleteFolderAndDuplicates("Assets/Resources", "casetest");
-                TryDeleteFolderAndDuplicates("Assets/Resources", "CASETEST");
-                TryDeleteFolderAndDuplicates("Assets/Resources", "cASEtest");
-                TryDeleteFolderAndDuplicates("Assets/Resources", "CaseTEST");
 
                 AssetDatabase.SaveAssets();
             }
@@ -287,10 +283,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             {
                 // Before each test: a data-driven case would otherwise inherit the previous one's folders.
                 TryDeleteFolderAndDuplicates("Assets/Resources", "CaseTest");
-                TryDeleteFolderAndDuplicates("Assets/Resources", "casetest");
-                TryDeleteFolderAndDuplicates("Assets/Resources", "CASETEST");
-                TryDeleteFolderAndDuplicates("Assets/Resources", "cASEtest");
-                TryDeleteFolderAndDuplicates("Assets/Resources", "CaseTEST");
                 AssetDatabase.SaveAssets();
             }
             yield return null;
@@ -361,10 +353,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 TryDeleteFolderAndDuplicates("Assets/Resources", "CreatorTests");
 
                 TryDeleteFolderAndDuplicates("Assets/Resources", "CaseTest");
-                TryDeleteFolderAndDuplicates("Assets/Resources", "casetest");
-                TryDeleteFolderAndDuplicates("Assets/Resources", "CASETEST");
-                TryDeleteFolderAndDuplicates("Assets/Resources", "cASEtest");
-                TryDeleteFolderAndDuplicates("Assets/Resources", "CaseTEST");
 
                 TryDeleteFolder("Assets/Resources");
 
@@ -1192,10 +1180,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         public IEnumerator CaseMismatchFoldersCleanupBetweenTests()
         {
             TryDeleteFolderAndDuplicates("Assets/Resources", "CaseTest");
-            TryDeleteFolderAndDuplicates("Assets/Resources", "casetest");
-            TryDeleteFolderAndDuplicates("Assets/Resources", "CASETEST");
-            TryDeleteFolderAndDuplicates("Assets/Resources", "cASEtest");
-            TryDeleteFolderAndDuplicates("Assets/Resources", "CaseTEST");
             AssetDatabaseBatchHelper.SaveAndRefreshIfNotBatching();
             yield return null;
 
@@ -1279,7 +1263,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
                 $"No duplicate folder should be created for case-insensitive match. {diagnostics}"
             );
 
-            TryDeleteFolderAndDuplicates("Assets/Resources", "cAsEtEsT");
             TryDeleteFolderAndDuplicates("Assets/Resources", "CaseTest");
         }
 

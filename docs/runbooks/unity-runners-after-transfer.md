@@ -206,6 +206,16 @@ database and the compiled assemblies. That project lives **outside the checkout*
 <RUNNER_WORKSPACE>\unity-workspace\cache\<unity-version>
 ```
 
+The Unity test workflow runs EditMode and PlayMode serially with
+`-ShareEditorProject`, so both use the existing
+`<unity-version>-editmode[-<scope>]` project. The `single-threaded` scope keeps
+its different scripting defines separate from the default editor project.
+Standalone uses `<unity-version>-standalone[-<scope>]`
+because its player build settings differ. Each mode still writes its own logs and
+`results.xml` under `.artifacts/unity/`. If EditMode fails, PlayMode uses its
+separate `<unity-version>-playmode[-<scope>]` project so the second result remains
+independent of assets left by the failed run.
+
 It has to. `actions/checkout` runs `git clean -ffdx` at the top of every job and `-x`
 means gitignored, so anything under the repository's `.artifacts/` tree is deleted
 before the job starts, including the `Library` the previous leg had just built on

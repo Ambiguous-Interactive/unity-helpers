@@ -1878,6 +1878,7 @@ foreach ($mode in $defaultModeContracts) {
     $timeout = [int]$mode.Timeout
     $assemblyOutput = [string]$mode.AssemblyOutput
     $runStep = Get-UnityWorkflowStepText -JobText $unityTestsMatrixJob -StepName "Run $label tests"
+    $runConditions = ($runStep -split '(?m)^\s+env:\s*$', 2)[0]
     $reportStep = Get-UnityWorkflowStepText -JobText $unityTestsMatrixJob -StepName "Report slowest $label tests"
     $verifyStep = Get-UnityWorkflowStepText -JobText $unityTestsMatrixJob -StepName "Verify $label tests actually ran"
     $redactStep = Get-UnityWorkflowStepText -JobText $unityTestsMatrixJob -StepName "Redact credentials from $label artifacts"
@@ -1894,10 +1895,11 @@ foreach ($mode in $defaultModeContracts) {
         -not $runStep.Contains('matrix.test-mode') -and
         $runStep.Contains("steps.unity_lock.outputs.acquired == 'true'") -and
         $runStep.Contains($selection) -and
-        $runStep -notmatch 'steps\.run_(?:editmode|playmode|standalone)\.(?:outcome|conclusion)' -and
+        $runConditions -notmatch 'steps\.run_(?:editmode|playmode|standalone)\.(?:outcome|conclusion)' -and
         $runStep.Contains("timeout-minutes: $timeout") -and
         $runStep.Contains("UH_TEST_ASSEMBLIES: `${{ needs.matrix-config.outputs.$assemblyOutput }}") -and
         $runStep.Contains("-TestMode '$key'") -and
+        ($runStep.Contains('-ShareEditorProject') -eq ($key -ne 'standalone')) -and
         $runStep.Contains("-ArtifactsPath '$path'") -and
         $runStep.Contains("-ProjectRoot (Join-Path `$env:RUNNER_WORKSPACE 'unity-workspace')") -and
         $runStep.Contains('-IncludeIntegrations') -and
@@ -1938,6 +1940,13 @@ foreach ($mode in $defaultModeContracts) {
             $headStep.Contains($selection) -and
             $headStep -notmatch 'steps\.run_(?:editmode|playmode|standalone)\.(?:outcome|conclusion)' -and
             $runStep.Contains("steps.$($key)_head.outcome == 'success'")
+        )
+    }
+    if ($key -eq 'playmode') {
+        $modeIsComplete = (
+            $modeIsComplete -and
+            $runStep.Contains('EDITMODE_OUTCOME: ${{ steps.run_editmode.outcome }}') -and
+            $runStep.Contains("-ShareEditorProject:(`$env:EDITMODE_OUTCOME -eq 'success')")
         )
     }
     if (-not $modeIsComplete) {
@@ -1989,6 +1998,7 @@ foreach ($mode in @(
     $key = [string]$mode.Key
     $assemblyOutput = [string]$mode.AssemblyOutput
     $runStep = Get-UnityWorkflowStepText -JobText $unityTestsSingleThreadedJob -StepName "Run $label tests (SINGLE_THREADED)"
+    $runConditions = ($runStep -split '(?m)^\s+env:\s*$', 2)[0]
     $reportStep = Get-UnityWorkflowStepText -JobText $unityTestsSingleThreadedJob -StepName "Report slowest $label tests (SINGLE_THREADED)"
     $verifyStep = Get-UnityWorkflowStepText -JobText $unityTestsSingleThreadedJob -StepName "Verify $label tests actually ran (SINGLE_THREADED)"
     $redactStep = Get-UnityWorkflowStepText -JobText $unityTestsSingleThreadedJob -StepName "Redact credentials from $label artifacts (SINGLE_THREADED)"
@@ -2002,9 +2012,10 @@ foreach ($mode in @(
         $runStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
         $runStep.Contains('!cancelled()') -and
         $runStep.Contains("steps.unity_lock.outputs.acquired == 'true'") -and
-        $runStep -notmatch 'steps\.run_(?:editmode|playmode|standalone)\.(?:outcome|conclusion)' -and
+        $runConditions -notmatch 'steps\.run_(?:editmode|playmode|standalone)\.(?:outcome|conclusion)' -and
         $runStep.Contains("UH_TEST_ASSEMBLIES: `${{ needs.matrix-config.outputs.$assemblyOutput }}") -and
         $runStep.Contains("-TestMode '$key'") -and
+        ($runStep.Contains('-ShareEditorProject') -eq ($key -ne 'standalone')) -and
         $runStep.Contains("-ArtifactsPath '$path'") -and
         $runStep.Contains("-ProjectScope 'single-threaded'") -and
         $reportStep.Contains("$path/results.xml") -and
@@ -2025,6 +2036,8 @@ foreach ($mode in @(
         $headStep = Get-UnityWorkflowStepText -JobText $unityTestsSingleThreadedJob -StepName 'Require current PR head before PlayMode (SINGLE_THREADED)'
         $singleThreadedModesAreComplete = (
             $singleThreadedModesAreComplete -and
+            $runStep.Contains('EDITMODE_OUTCOME: ${{ steps.run_editmode.outcome }}') -and
+            $runStep.Contains("-ShareEditorProject:(`$env:EDITMODE_OUTCOME -eq 'success')") -and
             $headStep -match '(?m)^\s+id:\s+playmode_head\s*$' -and
             $headStep -match '(?m)^\s+continue-on-error:\s+true\s*$' -and
             $headStep -notmatch 'steps\.run_editmode\.(?:outcome|conclusion)' -and
@@ -2062,10 +2075,10 @@ foreach ($key in @('editmode', 'playmode', 'standalone')) {
     }
 }
 if (-not $singleThreadedModesAreComplete) {
-    Write-Host '::error file=.github/workflows/unity-tests.yml::The SINGLE_THREADED job must group EditMode, PlayMode, and Standalone under one Unity version while retaining distinct scoped projects, result verification, redaction, uploads, and an outcome-based final gate.'
+    Write-Host '::error file=.github/workflows/unity-tests.yml::The SINGLE_THREADED job must group EditMode, PlayMode, and Standalone under one Unity version while sharing only the serial editor project; result verification, redaction, uploads, and the final outcome gate remain distinct.'
     $failed = $true
 } elseif ($VerboseOutput) {
-    Write-Info 'Checked SINGLE_THREADED EditMode, PlayMode, and Standalone share one version job without sharing project leaves or outcomes.'
+    Write-Info 'Checked SINGLE_THREADED EditMode and PlayMode share a scoped editor project while Standalone and all mode outcomes remain separate.'
 }
 
 $matrixConfigAssemblyDiscoveryIsCentralized = (

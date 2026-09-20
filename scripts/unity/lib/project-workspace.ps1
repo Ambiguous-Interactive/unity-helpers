@@ -31,8 +31,13 @@ function Get-UnityProjectLeafName {
     param(
         [Parameter(Mandatory = $true)][string]$Version,
         [Parameter(Mandatory = $true)][string]$Mode,
-        [string]$Scope
+        [string]$Scope,
+        [switch]$ShareEditorProject
     )
+
+    if ($ShareEditorProject -and $Mode -eq 'playmode') {
+        $Mode = 'editmode'
+    }
 
     if ([string]::IsNullOrWhiteSpace($Scope)) {
         return "$Version-$Mode"
@@ -67,11 +72,12 @@ function Resolve-UnityProjectWorkspace {
         [Parameter(Mandatory = $true)][string]$Version,
         [Parameter(Mandatory = $true)][string]$Mode,
         [string]$Scope,
+        [switch]$ShareEditorProject,
         [string]$ExplicitProjectPath,
         [string]$PersistentRoot
     )
 
-    $leaf = Get-UnityProjectLeafName -Version $Version -Mode $Mode -Scope $Scope
+    $leaf = Get-UnityProjectLeafName -Version $Version -Mode $Mode -Scope $Scope -ShareEditorProject:$ShareEditorProject
     $repoProjects = Join-Path (Join-Path (Join-Path $RepoRoot '.artifacts') 'unity') 'projects'
     $repoCaches = Join-Path (Join-Path (Join-Path $RepoRoot '.artifacts') 'unity') 'cache'
 

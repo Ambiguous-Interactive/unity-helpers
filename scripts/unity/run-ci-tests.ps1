@@ -29,6 +29,11 @@ param(
     [ValidatePattern('^[A-Za-z0-9._-]*$')]
     [string]$ProjectScope,
 
+    # EditMode and PlayMode run serially with the same package manifest and
+    # scripting defines, so they can reuse one generated project's Library.
+    # Standalone keeps its own project because it changes player build settings.
+    [switch]$ShareEditorProject,
+
     # Root for the generated project and the UPM caches, OUTSIDE the repository.
     # CI sets this to a per-runner directory so `actions/checkout`'s
     # `git clean -ffdx` (which deletes the gitignored .artifacts tree, Library and
@@ -3906,6 +3911,7 @@ $ProjectWorkspace = Resolve-UnityProjectWorkspace `
     -Version $UnityVersion `
     -Mode $TestMode `
     -Scope $ProjectScope `
+    -ShareEditorProject:$ShareEditorProject `
     -ExplicitProjectPath $ProjectPath `
     -PersistentRoot $ProjectRoot
 $ProjectPath = Resolve-FullPath -Path $ProjectWorkspace.ProjectPath

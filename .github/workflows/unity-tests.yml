@@ -458,6 +458,7 @@ jobs:
           ./scripts/unity/run-ci-tests.ps1 `
             -UnityVersion '${{ matrix.unity-version }}' `
             -TestMode 'editmode' `
+            -ShareEditorProject `
             -AssemblyNames $env:UH_TEST_ASSEMBLIES `
             -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-editmode' `
             -ProjectRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace') `
@@ -492,6 +493,7 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
           UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.playmode-integration-assemblies }}
+          EDITMODE_OUTCOME: ${{ steps.run_editmode.outcome }}
           UH_CENTRAL_LICENSE_RETURN: "true"
           UH_UNITY_TEST_CATEGORY: "!Performance;!Stress"
           UH_STREAM_TEST_RESULTS: "1"
@@ -501,6 +503,7 @@ jobs:
           ./scripts/unity/run-ci-tests.ps1 `
             -UnityVersion '${{ matrix.unity-version }}' `
             -TestMode 'playmode' `
+            -ShareEditorProject:($env:EDITMODE_OUTCOME -eq 'success') `
             -AssemblyNames $env:UH_TEST_ASSEMBLIES `
             -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-playmode' `
             -ProjectRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace') `
@@ -1041,6 +1044,7 @@ jobs:
           ./scripts/unity/run-ci-tests.ps1 `
             -UnityVersion '${{ matrix.unity-version }}' `
             -TestMode 'editmode' `
+            -ShareEditorProject `
             -AssemblyNames $env:UH_TEST_ASSEMBLIES `
             -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-editmode-single-threaded' `
             -ProjectRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace') `
@@ -1073,6 +1077,7 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
           UNITY_ACCELERATOR_ENDPOINT: ${{ secrets.UNITY_ACCELERATOR_ENDPOINT }}
           UH_TEST_ASSEMBLIES: ${{ needs.matrix-config.outputs.playmode-core-assemblies }}
+          EDITMODE_OUTCOME: ${{ steps.run_editmode.outcome }}
           UH_CENTRAL_LICENSE_RETURN: "true"
           UH_UNITY_TEST_CATEGORY: "!Performance;!Stress"
           UH_STREAM_TEST_RESULTS: "1"
@@ -1082,6 +1087,7 @@ jobs:
           ./scripts/unity/run-ci-tests.ps1 `
             -UnityVersion '${{ matrix.unity-version }}' `
             -TestMode 'playmode' `
+            -ShareEditorProject:($env:EDITMODE_OUTCOME -eq 'success') `
             -AssemblyNames $env:UH_TEST_ASSEMBLIES `
             -ArtifactsPath '.artifacts/unity/${{ matrix.unity-version }}-playmode-single-threaded' `
             -ProjectRoot (Join-Path $env:RUNNER_WORKSPACE 'unity-workspace') `

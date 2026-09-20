@@ -90,6 +90,10 @@ Write-Host 'Get-UnityProjectLeafName' -ForegroundColor White
 Assert-Equal -TestName 'leaf without scope' -Expected '6000.3.16f1-editmode' -Actual (Get-UnityProjectLeafName -Version '6000.3.16f1' -Mode 'editmode')
 Assert-Equal -TestName 'leaf with scope' -Expected '6000.3.16f1-editmode-single-threaded' -Actual (Get-UnityProjectLeafName -Version '6000.3.16f1' -Mode 'editmode' -Scope 'single-threaded')
 Assert-Equal -TestName 'whitespace scope is no scope' -Expected '6000.3.16f1-playmode' -Actual (Get-UnityProjectLeafName -Version '6000.3.16f1' -Mode 'playmode' -Scope '   ')
+Assert-Equal -TestName 'shared EditMode leaf' -Expected '6000.3.16f1-editmode' -Actual (Get-UnityProjectLeafName -Version '6000.3.16f1' -Mode 'editmode' -ShareEditorProject)
+Assert-Equal -TestName 'shared PlayMode leaf' -Expected '6000.3.16f1-editmode' -Actual (Get-UnityProjectLeafName -Version '6000.3.16f1' -Mode 'playmode' -ShareEditorProject)
+Assert-Equal -TestName 'shared scoped editor leaf' -Expected '6000.3.16f1-editmode-single-threaded' -Actual (Get-UnityProjectLeafName -Version '6000.3.16f1' -Mode 'playmode' -Scope 'single-threaded' -ShareEditorProject)
+Assert-Equal -TestName 'Standalone remains separate' -Expected '6000.3.16f1-standalone' -Actual (Get-UnityProjectLeafName -Version '6000.3.16f1' -Mode 'standalone' -ShareEditorProject)
 
 Write-Host ''
 Write-Host 'Resolve-UnityProjectWorkspace' -ForegroundColor White
@@ -118,6 +122,13 @@ Assert-Equal -TestName 'persistent is flagged persistent' -Expected $true -Actua
 Assert-Equal -TestName 'persistent prune root is the projects parent' `
     -Expected (Join-Segments @($fakePersistent, 'projects')) `
     -Actual $persistent.PruneRoot
+
+$sharedEditMode = Resolve-UnityProjectWorkspace -RepoRoot $fakeRepo -Version '6000.3.16f1' -Mode 'editmode' -Scope 'single-threaded' -PersistentRoot $fakePersistent -ShareEditorProject
+$sharedPlayMode = Resolve-UnityProjectWorkspace -RepoRoot $fakeRepo -Version '6000.3.16f1' -Mode 'playmode' -Scope 'single-threaded' -PersistentRoot $fakePersistent -ShareEditorProject
+Assert-Equal -TestName 'serial editor modes reuse the same persistent project' -Expected $sharedEditMode.ProjectPath -Actual $sharedPlayMode.ProjectPath
+Assert-Equal -TestName 'shared editor scope remains separate from default' `
+    -Expected (Join-Segments @($fakePersistent, 'projects', '6000.3.16f1-editmode-single-threaded')) `
+    -Actual $sharedPlayMode.ProjectPath
 
 # The UPM caches must move with the project. Leaving them under .artifacts/ would
 # put them back in `git clean -ffdx`'s path, re-downloading every UPM dependency
