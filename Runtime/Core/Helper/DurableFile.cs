@@ -348,6 +348,29 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             return CopyAsync(sourcePath, destinationPath, DefaultBufferSize, cancellationToken);
         }
 
+        /// <summary>
+        /// Deletes a file, reporting failure rather than throwing.
+        /// </summary>
+        /// <param name="path">File to delete.</param>
+        /// <returns>True when no file remains at <paramref name="path"/>.</returns>
+        public static bool TryDelete(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return false;
+            }
+
+            try
+            {
+                File.Delete(path);
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
         internal static async ValueTask<Exception> CopyAsync(
             string sourcePath,
             string destinationPath,
@@ -422,29 +445,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     DiscardStagedFile(temporaryPath);
                     return e;
                 }
-            }
-        }
-
-        /// <summary>
-        /// Deletes a file, reporting failure rather than throwing.
-        /// </summary>
-        /// <param name="path">File to delete.</param>
-        /// <returns>True when no file remains at <paramref name="path"/>.</returns>
-        public static bool TryDelete(string path)
-        {
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                return false;
-            }
-
-            try
-            {
-                File.Delete(path);
-                return true;
-            }
-            catch (Exception)
-            {
-                return false;
             }
         }
 
