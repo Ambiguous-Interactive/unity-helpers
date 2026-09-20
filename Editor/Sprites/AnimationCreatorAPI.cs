@@ -42,12 +42,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             out string error
         )
         {
-            clip = null;
+            AnimationClip createdClip = null;
             try
             {
                 if (data == null || frames == null || frames.Count == 0)
                 {
                     error = "Animation data and at least one sprite frame are required.";
+                    clip = null;
                     return false;
                 }
 
@@ -56,6 +57,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     if (frames[index] == null)
                     {
                         error = "Sprite frames cannot contain null entries.";
+                        clip = null;
                         return false;
                     }
                 }
@@ -66,7 +68,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     && !float.IsInfinity(data.framesPerSecond)
                         ? data.framesPerSecond
                         : AnimationData.DefaultFramesPerSecond;
-                clip = new AnimationClip { frameRate = baseFrameRate };
+                createdClip = new AnimationClip { frameRate = baseFrameRate };
                 ObjectReferenceKeyframe[] keyframes = new ObjectReferenceKeyframe[frames.Count];
                 float currentTime = 0f;
 
@@ -97,7 +99,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
 
                 AnimationUtility.SetObjectReferenceCurve(
-                    clip,
+                    createdClip,
                     EditorCurveBinding.PPtrCurve(
                         "",
                         typeof(SpriteRenderer),
@@ -105,21 +107,24 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     ),
                     keyframes
                 );
-                AnimationClipSettings settings = AnimationUtility.GetAnimationClipSettings(clip);
+                AnimationClipSettings settings = AnimationUtility.GetAnimationClipSettings(
+                    createdClip
+                );
                 settings.loopTime = data.loop;
                 settings.cycleOffset = Mathf.Clamp01(data.cycleOffset);
-                AnimationUtility.SetAnimationClipSettings(clip, settings);
+                AnimationUtility.SetAnimationClipSettings(createdClip, settings);
                 error = null;
+                clip = createdClip;
                 return true;
             }
             catch (Exception exception)
             {
-                if (clip != null)
+                if (createdClip != null)
                 {
-                    UnityEngine.Object.DestroyImmediate(clip);
-                    clip = null;
+                    UnityEngine.Object.DestroyImmediate(createdClip);
                 }
                 error = exception.Message;
+                clip = null;
                 return false;
             }
         }
@@ -140,8 +145,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             catch (Exception exception)
             {
-                assetPath = null;
                 error = exception.Message;
+                assetPath = null;
                 return false;
             }
         }
@@ -153,10 +158,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             bool saveAssets
         )
         {
-            assetPath = null;
             if (data == null || string.IsNullOrWhiteSpace(data.animationName))
             {
                 error = "An animation name is required.";
+                assetPath = null;
                 return false;
             }
             if (
@@ -166,11 +171,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             )
             {
                 error = "The animation name must be a single valid file name.";
+                assetPath = null;
                 return false;
             }
             if (data.frames == null || data.frames.Count == 0)
             {
                 error = "At least one sprite frame is required.";
+                assetPath = null;
                 return false;
             }
 
@@ -187,6 +194,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             if (validFrames.Count == 0)
             {
                 error = "At least one non-null sprite frame is required.";
+                assetPath = null;
                 return false;
             }
             validFrames.Sort((left, right) => EditorUtility.NaturalCompare(left.name, right.name));
@@ -195,6 +203,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             if (!firstFramePath.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
             {
                 error = "The first sprite must be a project asset under Assets.";
+                assetPath = null;
                 return false;
             }
 
@@ -202,11 +211,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             if (string.IsNullOrWhiteSpace(directory))
             {
                 error = "The first sprite has no project asset directory.";
+                assetPath = null;
                 return false;
             }
 
             if (!TryCreateClip(data, validFrames, out AnimationClip clip, out error))
             {
+                assetPath = null;
                 return false;
             }
 
@@ -222,14 +233,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 {
                     UnityEngine.Object.DestroyImmediate(clip);
                     error = $"Unity did not create an animation asset at '{finalPath}'.";
+                    assetPath = null;
                     return false;
                 }
                 if (saveAssets)
                 {
                     AssetDatabase.SaveAssets();
                 }
-                assetPath = finalPath;
                 error = null;
+                assetPath = finalPath;
                 return true;
             }
             catch (Exception exception)
@@ -239,6 +251,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     UnityEngine.Object.DestroyImmediate(clip);
                 }
                 error = exception.Message;
+                assetPath = null;
                 return false;
             }
         }
