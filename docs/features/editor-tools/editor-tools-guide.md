@@ -138,6 +138,17 @@ Assets/Sprites/Characters/
 
 **Overwrite Originals** writes in place instead.
 
+Editor scripts can call `SpriteCropperAPI.TryFind(inputFolders, spriteNameRegex, singlePaths,
+multiPaths, out error)` with `Assets/...` folder paths. It returns project asset paths for
+single-sprite images and reports multi-sprite sheets separately. The window uses this same
+discovery path. `SpriteCropperAPI.Crop(assetPath, options)` crops one sprite with explicit padding,
+destination, overwrite, readability, and platform-setting options, and returns the output path,
+status, and any error. The window uses the same crop operation for each selected sprite.
+`SpriteCropperAPI.TryBuildReplacementMap(folders, mapping, out error)` finds existing
+`Cropped_*` pairs, and `SpriteCropperAPI.ReplaceReferences(folders, applyChanges)` previews or
+applies reference changes across project assets. Both accept an optional output folder when
+cropped files were written away from their sources. The Danger Zone button calls the apply form.
+
 **Before you run it:**
 
 - Output is always PNG bytes. In overwrite mode a `.jpg` source keeps its `.jpg` name and holds PNG

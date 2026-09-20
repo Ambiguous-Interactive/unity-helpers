@@ -7,7 +7,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using System;
     using System.Collections.Generic;
     using System.IO;
-    using System.Text.RegularExpressions;
     using System.Threading.Tasks;
     using UnityEditor;
     using UnityEngine;
@@ -50,11 +49,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     /// </remarks>
     public sealed class SpriteCropper : EditorWindow
     {
+        internal const float AlphaThreshold = 0.01f;
+
         private const string Name = "Sprite Cropper";
-
-        private const string CroppedPrefix = "Cropped_";
-
-        private const float AlphaThreshold = 0.01f;
 
         private const long ParallelPixelCopyThreshold = 1_048_576L;
 
@@ -63,17 +60,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private const long ParallelPixelScanThreshold = 8_388_608L;
 
         private const int ParallelScanRowThreshold = 512;
-
-        private static readonly string[] ImageFileExtensions =
-        {
-            ".png",
-            ".jpg",
-            ".jpeg",
-            ".bmp",
-            ".tga",
-            ".psd",
-            ".gif",
-        };
 
         internal SerializedObject SerializedStateForTesting => _serializedObject;
 
@@ -123,8 +109,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private SerializedProperty _outputDirectoryProperty;
         private SerializedProperty _outputReadabilityProperty;
         private SerializedProperty _copyDefaultPlatformSettingsProperty;
-
-        private Regex _regex;
 
         private readonly List<string> _multiSpriteFiles = new();
 
@@ -364,16 +348,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
         }
 
-        private static Vector2 GetSpritePivot(TextureImporter importer)
-        {
-            if (importer.spriteImportMode == SpriteImportMode.Single)
-            {
-                return importer.spritePivot;
-            }
-
-            return new Vector2(0.5f, 0.5f);
-        }
-
         private static void CopyCropRow(
             int y,
             Color32[] pixels,
@@ -420,60 +394,30 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         internal void FindFilesToProcess()
         {
             _filesToProcess ??= new List<string>();
-            _filesToProcess.Clear();
-            if (_inputDirectories is not { Count: > 0 })
+            using PooledResource<List<string>> folderLease = Buffers<string>.List.Get(
+                out List<string> folders
+            );
+            if (_inputDirectories != null)
             {
-                this.LogWarn($"No input directories selected.");
-                return;
+                foreach (Object maybeDirectory in _inputDirectories)
+                {
+                    if (maybeDirectory != null)
+                    {
+                        folders.Add(AssetDatabase.GetAssetPath(maybeDirectory));
+                    }
+                }
             }
-
-            foreach (Object maybeDirectory in _inputDirectories)
+            if (
+                !SpriteCropperAPI.TryFind(
+                    folders,
+                    _spriteNameRegex,
+                    _filesToProcess,
+                    _multiSpriteFiles,
+                    out string error
+                )
+            )
             {
-                if (maybeDirectory == null)
-                {
-                    continue;
-                }
-
-                string assetPath = AssetDatabase.GetAssetPath(maybeDirectory);
-                if (!AssetDatabase.IsValidFolder(assetPath))
-                {
-                    this.LogWarn($"Skipping invalid path: {assetPath}");
-                    continue;
-                }
-
-                string[] files = Directory.GetFiles(assetPath, "*.*", SearchOption.AllDirectories);
-                foreach (string file in files)
-                {
-                    if (!SpriteFileExtensions.HasAny(file, ImageFileExtensions))
-                    {
-                        continue;
-                    }
-
-                    if (file.Contains(CroppedPrefix, StringComparison.OrdinalIgnoreCase))
-                    {
-                        continue;
-                    }
-
-                    string fileName = Path.GetFileNameWithoutExtension(file);
-                    if (_regex != null && !_regex.IsMatch(fileName))
-                    {
-                        continue;
-                    }
-
-                    if (AssetImporter.GetAtPath(file) is TextureImporter ti)
-                    {
-                        if (
-                            ti.textureType == TextureImporterType.Sprite
-                            && ti.spriteImportMode != SpriteImportMode.Single
-                        )
-                        {
-                            _multiSpriteFiles.Add(file);
-                            continue;
-                        }
-                    }
-
-                    _filesToProcess.Add(file);
-                }
+                this.LogWarn($"{error}");
             }
             Repaint();
         }
@@ -772,10 +716,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
             if (GUILayout.Button("Find Sprites To Process"))
             {
-                _regex = !string.IsNullOrWhiteSpace(_spriteNameRegex)
-                    ? new Regex(_spriteNameRegex)
-                    : null;
-                _multiSpriteFiles.Clear();
                 FindFilesToProcess();
             }
 
@@ -844,168 +784,61 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private void ReplaceSpriteReferencesWithCropped()
         {
-            try
+            using PooledResource<List<string>> folderLease = Buffers<string>.List.Get(
+                out List<string> folders
+            );
+            if (_inputDirectories != null)
             {
-                Dictionary<Sprite, Sprite> mapping = new();
-                if (_inputDirectories is not { Count: > 0 })
-                {
-                    this.LogWarn(
-                        $"No input directories selected; cannot build replacement mapping."
-                    );
-                    return;
-                }
-
                 foreach (Object maybeDirectory in _inputDirectories)
                 {
-                    if (maybeDirectory == null)
+                    if (maybeDirectory != null)
                     {
-                        continue;
-                    }
-
-                    string dirPath = AssetDatabase.GetAssetPath(maybeDirectory);
-                    if (!AssetDatabase.IsValidFolder(dirPath))
-                    {
-                        continue;
-                    }
-
-                    string[] files = Directory.GetFiles(
-                        dirPath,
-                        "*.*",
-                        SearchOption.AllDirectories
-                    );
-                    foreach (string file in files)
-                    {
-                        if (!SpriteFileExtensions.HasAny(file, ImageFileExtensions))
-                        {
-                            continue;
-                        }
-
-                        if (file.Contains(CroppedPrefix, StringComparison.OrdinalIgnoreCase))
-                        {
-                            continue;
-                        }
-                        string croppedPath = Path.Combine(
-                            Path.GetDirectoryName(file) ?? string.Empty,
-                            CroppedPrefix + Path.GetFileName(file)
-                        );
-                        if (!File.Exists(croppedPath))
-                        {
-                            continue;
-                        }
-
-                        Sprite original = AssetDatabase.LoadAssetAtPath<Sprite>(file);
-                        Sprite cropped = AssetDatabase.LoadAssetAtPath<Sprite>(croppedPath);
-                        if (original != null && cropped != null)
-                        {
-                            mapping[original] = cropped;
-                        }
+                        folders.Add(AssetDatabase.GetAssetPath(maybeDirectory));
                     }
                 }
+            }
 
-                if (mapping.Count == 0)
+            string outputFolder = null;
+            if (_outputDirectory != null)
+            {
+                string selectedFolder = AssetDatabase.GetAssetPath(_outputDirectory);
+                if (AssetDatabase.IsValidFolder(selectedFolder))
                 {
-                    this.LogWarn(
-                        $"No original→Cropped_* sprite pairs found. Aborting replacement."
-                    );
-                    return;
+                    outputFolder = selectedFolder;
                 }
+            }
 
-                string[] allAssets = AssetDatabase.GetAllAssetPaths();
-                string[] candidateExts =
-                {
-                    ".prefab",
-                    ".unity",
-                    ".asset",
-                    ".mat",
-                    ".anim",
-                    ".overrideController",
-                };
-                int modifiedAssets = 0;
-
-                using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: true))
-                {
-                    try
-                    {
-                        for (int i = 0; i < allAssets.Length; ++i)
-                        {
-                            string path = allAssets[i];
-                            if (!path.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
-                            {
-                                continue;
-                            }
-                            if (!SpriteFileExtensions.HasAny(path, candidateExts))
-                            {
-                                continue;
-                            }
-
-                            if (
-                                Utils.EditorUi.CancelableProgress(
-                                    "Replacing Sprite References",
-                                    $"Scanning {i + 1}/{allAssets.Length}: {Path.GetFileName(path)}",
-                                    i / (float)allAssets.Length
-                                )
-                            )
-                            {
-                                this.LogWarn($"Reference replacement cancelled by user.");
-                                break;
-                            }
-
-                            bool assetModified = false;
-                            Object[] objs = AssetDatabase.LoadAllAssetsAtPath(path);
-                            foreach (Object o in objs)
-                            {
-                                if (o == null)
-                                {
-                                    continue;
-                                }
-                                bool objectModified = false;
-                                using SerializedObject so = new(o);
-                                SerializedProperty it = so.GetIterator();
-                                bool enter = true;
-                                while (it.NextVisible(enter))
-                                {
-                                    enter = false;
-                                    if (it.propertyType == SerializedPropertyType.ObjectReference)
-                                    {
-                                        Sprite s = it.objectReferenceValue as Sprite;
-                                        if (
-                                            s != null
-                                            && mapping.TryGetValue(s, out Sprite replacement)
-                                        )
-                                        {
-                                            it.objectReferenceValue = replacement;
-                                            objectModified = true;
-                                        }
-                                    }
-                                }
-                                if (objectModified)
-                                {
-                                    so.ApplyModifiedProperties();
-                                    EditorUtility.SetDirty(o);
-                                    assetModified = true;
-                                }
-                            }
-                            if (assetModified)
-                            {
-                                modifiedAssets++;
-                            }
-                        }
-                    }
-                    finally
-                    {
-                        Utils.EditorUi.ClearProgress();
-                        AssetDatabase.SaveAssets();
-                    }
-                }
-
-                this.Log(
-                    $"Reference replacement complete. Modified assets: {modifiedAssets}. Mapped pairs: {mapping.Count}."
+            SpriteReferenceReplacementResult result;
+            try
+            {
+                result = SpriteCropperAPI.ReplaceReferences(
+                    folders,
+                    applyChanges: true,
+                    cancelRequested: (index, total) =>
+                        Utils.EditorUi.CancelableProgress(
+                            "Replacing Sprite References",
+                            $"Scanning {index + 1}/{total}",
+                            total == 0 ? 0f : index / (float)total
+                        ),
+                    outputFolder: outputFolder
                 );
             }
-            catch (Exception e)
+            finally
             {
-                this.LogError($"Error during reference replacement.", e);
+                Utils.EditorUi.ClearProgress();
             }
+
+            foreach (string error in result.Errors)
+            {
+                this.LogError($"{error}");
+            }
+            if (result.Canceled)
+            {
+                this.LogWarn($"Reference replacement cancelled by user.");
+            }
+            this.Log(
+                $"Reference replacement complete. Modified assets: {result.ModifiedAssets}. Matched references: {result.MatchedReferences}."
+            );
         }
 
         private TextureImporter ProcessSprite(
@@ -1014,181 +847,46 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             Dictionary<string, bool> originalReadable
         )
         {
-            string assetDirectory = Path.GetDirectoryName(assetPath);
-            if (string.IsNullOrWhiteSpace(assetDirectory))
-            {
-                outcome = ProcessOutcome.FatalError;
-                return null;
-            }
-
-            if (
-                AssetImporter.GetAtPath(assetPath)
-                is not TextureImporter { textureType: TextureImporterType.Sprite } importer
-            )
-            {
-                outcome = ProcessOutcome.FatalError;
-                return null;
-            }
-
-            if (importer.spriteImportMode != SpriteImportMode.Single)
-            {
-                this.LogWarn($"Skipping texture with Multiple sprite mode: {assetPath}");
-                outcome = ProcessOutcome.SkippedNoChange;
-                return null;
-            }
-
-            Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
-            if (tex == null)
-            {
-                outcome = ProcessOutcome.RetryableError;
-                return null;
-            }
-
-            Color32[] pixels = tex.GetPixels32();
-            int width = tex.width;
-            int height = tex.height;
-            CropComputation crop = ComputeCrop(
-                pixels,
-                width,
-                height,
-                _leftPadding,
-                _rightPadding,
-                _topPadding,
-                _bottomPadding,
-                AlphaThreshold,
-                GetSpritePivot(importer),
-                _onlyNecessary
-            );
-
-            if (crop.ShouldSkipNoChange)
-            {
-                outcome = ProcessOutcome.SkippedNoChange;
-                return null;
-            }
-
-            int visibleMinX = crop.VisibleMinX;
-            int visibleMinY = crop.VisibleMinY;
-            int visibleMaxX = crop.VisibleMaxX;
-            int visibleMaxY = crop.VisibleMaxY;
-            int cropWidth = crop.CropWidth;
-            int cropHeight = crop.CropHeight;
-
-            Texture2D cropped = new(cropWidth, cropHeight, TextureFormat.RGBA32, false);
-            {
-                int pixelCount = cropWidth * cropHeight;
-                using PooledArray<Color32> croppedPixelsLease = SystemArrayPool<Color32>.Get(
-                    pixelCount,
-                    out Color32[] croppedPixels
-                );
-
-                CopyCropPixels(
-                    pixels,
-                    width,
-                    height,
-                    visibleMinX,
-                    visibleMinY,
-                    visibleMaxX,
-                    visibleMaxY,
-                    cropWidth,
-                    cropHeight,
-                    croppedPixels
-                );
-
-                cropped.SetPixels32(0, 0, cropWidth, cropHeight, croppedPixels, 0);
-                cropped.Apply();
-            }
-
-            string outputDirectory = assetDirectory;
+            string outputFolder = null;
             if (!_overwriteOriginals && _outputDirectory != null)
             {
-                string dirPath = AssetDatabase.GetAssetPath(_outputDirectory);
-                if (!string.IsNullOrWhiteSpace(dirPath) && AssetDatabase.IsValidFolder(dirPath))
+                string selectedFolder = AssetDatabase.GetAssetPath(_outputDirectory);
+                if (AssetDatabase.IsValidFolder(selectedFolder))
                 {
-                    outputDirectory = dirPath;
+                    outputFolder = selectedFolder;
                 }
             }
 
-            string outputFileName = _overwriteOriginals
-                ? Path.GetFileName(assetPath)
-                : CroppedPrefix + Path.GetFileName(assetPath);
-            string newPath = Path.Combine(outputDirectory, outputFileName);
-
-            byte[] pngBytes = cropped.EncodeToPNG();
-            File.WriteAllBytes(newPath, pngBytes);
-            DestroyImmediate(cropped);
-            AssetDatabase.ImportAsset(newPath);
-
-            TextureImporter newImporter = AssetImporter.GetAtPath(newPath) as TextureImporter;
-            if (newImporter == null)
+            SpriteCropperAPI.CropOptions options = new()
             {
-                outcome = ProcessOutcome.RetryableError;
-                return null;
-            }
-
-            TextureImporterSettings newSettings = new();
-            importer.ReadTextureSettings(newSettings);
-            Vector2 newPivotNorm = crop.NewPivot;
-
-            Vector4 border = newSettings.spriteBorder;
-            int deltaLeft = visibleMinX;
-            int deltaBottom = visibleMinY;
-            int deltaRight = width - 1 - visibleMaxX;
-            int deltaTop = height - 1 - visibleMaxY;
-            border.x = Mathf.Max(0, border.x - deltaLeft);
-            border.y = Mathf.Max(0, border.y - deltaBottom);
-            border.z = Mathf.Max(0, border.z - deltaRight);
-            border.w = Mathf.Max(0, border.w - deltaTop);
-
-            newSettings.spritePivot = newPivotNorm;
-            newSettings.spriteAlignment = (int)SpriteAlignment.Custom;
-            newSettings.spriteBorder = border;
-            newImporter.SetTextureSettings(newSettings);
-            // Single-sprite output preserves correctness until full metadata migration exists.
-            newImporter.spriteImportMode = SpriteImportMode.Single;
-            newImporter.spritePivot = newPivotNorm;
-            newImporter.textureType = importer.textureType;
-            newImporter.filterMode = importer.filterMode;
-            newImporter.textureCompression = importer.textureCompression;
-            newImporter.wrapMode = importer.wrapMode;
-            newImporter.mipmapEnabled = importer.mipmapEnabled;
-            newImporter.spritePixelsPerUnit = importer.spritePixelsPerUnit;
-
-            if (_copyDefaultPlatformSettings)
-            {
-                try
-                {
-                    TextureImporterPlatformSettings srcDefault =
-                        importer.GetDefaultPlatformTextureSettings();
-                    if (!string.IsNullOrWhiteSpace(srcDefault.name))
-                    {
-                        newImporter.SetPlatformTextureSettings(srcDefault);
-                    }
-                }
-                catch (Exception e)
-                {
-                    this.LogWarn($"Failed to copy default platform settings for '{assetPath}'.", e);
-                }
-            }
-
-            bool srcOriginalReadable = originalReadable.TryGetValue(assetPath, out bool wasReadable)
+                LeftPadding = _leftPadding,
+                RightPadding = _rightPadding,
+                TopPadding = _topPadding,
+                BottomPadding = _bottomPadding,
+                OnlyNecessary = _onlyNecessary,
+                OverwriteOriginals = _overwriteOriginals,
+                OutputFolder = outputFolder,
+                OutputReadability = (SpriteCropperAPI.OutputReadability)_outputReadability,
+                CopyDefaultPlatformSettings = _copyDefaultPlatformSettings,
+            };
+            bool sourceWasReadable = originalReadable.TryGetValue(assetPath, out bool wasReadable)
                 ? wasReadable
-                : importer.isReadable;
-            switch (_outputReadability)
+                : true;
+            SpriteCropperAPI.CropResult result = SpriteCropperAPI.CropPrepared(
+                assetPath,
+                options,
+                sourceWasReadable
+            );
+            if (!string.IsNullOrWhiteSpace(result.Warning))
             {
-                case OutputReadability.MirrorSource:
-                    newImporter.isReadable = srcOriginalReadable;
-                    break;
-                case OutputReadability.Readable:
-                    newImporter.isReadable = true;
-                    break;
-                case OutputReadability.NotReadable:
-                    newImporter.isReadable = false;
-                    break;
+                this.LogWarn($"{result.Warning}");
             }
-            newImporter.SaveAndReimport();
-
-            outcome = ProcessOutcome.Success;
-            return newImporter;
+            if (!string.IsNullOrWhiteSpace(result.Error))
+            {
+                this.LogWarn($"{result.Error}");
+            }
+            outcome = (ProcessOutcome)result.Status;
+            return result.OutputImporter;
         }
 
         internal enum OutputReadability

@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Tests.Sprites
 {
 #if UNITY_EDITOR
+    using System.Collections.Generic;
     using System.IO;
     using NUnit.Framework;
     using UnityEditor;
@@ -81,14 +82,31 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             imp.isReadable = true;
             imp.SaveAndReimport();
 
-            SpriteCropper window = Track(ScriptableObject.CreateInstance<SpriteCropper>());
-            window._overwriteOriginals = true;
-            window._inputDirectories = new System.Collections.Generic.List<Object>
-            {
-                AssetDatabase.LoadAssetAtPath<Object>(Root),
-            };
-            window.FindFilesToProcess();
-            window.ProcessFoundSprites();
+            List<string> directPaths = new();
+            List<string> multiSpritePaths = new();
+            Assert.IsTrue(
+                SpriteCropperAPI.TryFind(
+                    new[] { Root },
+                    "src",
+                    directPaths,
+                    multiSpritePaths,
+                    out string discoveryError
+                ),
+                discoveryError
+            );
+            CollectionAssert.Contains(directPaths, src);
+            Assert.IsEmpty(multiSpritePaths);
+
+            SpriteCropperAPI.CropResult result = SpriteCropperAPI.Crop(
+                src,
+                new SpriteCropperAPI.CropOptions { OverwriteOriginals = true }
+            );
+            Assert.That(
+                result.Status,
+                Is.EqualTo(SpriteCropperAPI.CropStatus.Success),
+                result.Error
+            );
+            Assert.That(result.OutputPath, Is.EqualTo(src));
 
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
 
@@ -139,6 +157,23 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.IsTrue(tex != null);
             Assert.That(tex.width, Is.EqualTo(4));
             Assert.That(tex.height, Is.EqualTo(4));
+
+            Dictionary<Sprite, Sprite> replacements = new();
+            Assert.IsTrue(
+                SpriteCropperAPI.TryBuildReplacementMap(
+                    new[] { Root },
+                    replacements,
+                    out string mappingError,
+                    outDir
+                ),
+                mappingError
+            );
+            Sprite original = AssetDatabase.LoadAssetAtPath<Sprite>(src);
+            Sprite cropped = AssetDatabase.LoadAssetAtPath<Sprite>(dst);
+            Assert.IsTrue(original != null);
+            Assert.IsTrue(cropped != null);
+            Assert.IsTrue(replacements.TryGetValue(original, out Sprite mapped));
+            Assert.AreSame(cropped, mapped);
         }
 
         private void CreatePngWithOpaqueRect(
