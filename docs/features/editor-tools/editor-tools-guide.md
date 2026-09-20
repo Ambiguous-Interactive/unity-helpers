@@ -430,6 +430,37 @@ progress bar. **Apply to Standalone / Android / iOS** additionally writes a plat
 the same size. **Fit Mode** is not persisted across a domain reload — re-select it after a
 recompile.
 
+Scripts and batch-mode jobs can run the same operation without opening the window:
+
+```csharp
+List<string> textureGuids = new();
+if (FitTextureSizeAPI.TryFindTextures(new[] { "Assets/Sprites" }, true, textureGuids, out string error))
+{
+    FitTextureSizeAPI.Options options = new() { FitMode = FitMode.GrowAndShrink, OnlySprites = true };
+    FitTextureSizeAPI.Result preview = FitTextureSizeAPI.Run(textureGuids, options, false);
+    if (!preview.Succeeded)
+    {
+        Debug.LogError(preview.Error);
+    }
+    else if (preview.Changed > 0)
+    {
+        FitTextureSizeAPI.Result applied = FitTextureSizeAPI.Run(textureGuids, options, true);
+        if (!applied.Succeeded)
+        {
+            Debug.LogError(applied.Error);
+        }
+    }
+}
+else
+{
+    Debug.LogError(error);
+}
+```
+
+`Run` reports counts, cancellation, and errors; a failed apply may report partial changes. Import
+settings writes and reimports cannot be fully reversed by Unity Undo alone. Supply explicit asset
+paths or GUIDs instead of relying on the current editor selection.
+
 > **Visual Reference**
 >
 > ![Fit Texture Size window showing fit mode options and preview](../../images/editor-tools/fit-texture-size.png)

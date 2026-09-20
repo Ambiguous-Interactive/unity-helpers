@@ -11,7 +11,7 @@
     produced `error CS0103: The name 'ColorQuantization' does not exist in the current context` on
     two Unity editmode legs with every local gate green, roughly fifty minutes after the push.
 
-    215 of the 223 files under `Editor/` compile here, in the four configurations that ship. It
+    230 of the 237 files under `Editor/` compile here, in the four configurations that ship. It
     compiles the REAL sources against the REAL analyzers, so a WPROTO/WUH diagnostic fires exactly
     as it does in the editor. It is a type-checker, not a test runner.
 
@@ -50,7 +50,7 @@
 
     ============================ WHAT IT DOES NOT COVER ============================
 
-    EIGHT files under `Editor/` are excluded. Every one, with its reason:
+    SEVEN files under `Editor/` are excluded. Every one, with its reason:
 
       1. Editor/Visuals/EnhancedImageEditor.cs
          Binds `Visuals.UGUI.EnhancedImage` and `UnityEditor.UI.ImageEditor`. uGUI ships as a Unity
@@ -61,28 +61,25 @@
       3. Editor/AnimationEventEditor.cs
          `AssetDatabase.SaveAssetIfDirty` (one call site, line ~526). Absent from the 2021.1.14
          reference assembly; present in 2021.3, the package's real support floor, and in every
-         editor CI runs. HARNESS GAP, not a package one. STOOD IN FOR, like 5: dropping the file
+         editor CI runs. HARNESS GAP, not a package one. STOOD IN FOR, like 4: dropping the file
          also drops the type name, and `Editor/AnimationEventEditorViewModel.cs`, which is NOT
          excluded, carries a `<see cref="AnimationEventEditor"/>` that a consumer's IDE resolves
          perfectly well. `Shims/AnimationEventEditorShim.cs` declares the name and nothing else.
-      4. Editor/FitTextureSizeWindow.cs
-         `TextureImporter.GetSourceTextureWidthAndHeight` (one call site, line ~656). Same shape as
-         3: added after 2021.1, present everywhere the package ships.
-      5. Editor/CustomDrawers/Utils/ValidationShared.cs
+      4. Editor/CustomDrawers/Utils/ValidationShared.cs
          Reads `SerializedProperty.managedReferenceValue`. Unity added that property's GETTER after
          2021.1 - the reference assembly carries the setter alone, so the read is CS0154 rather
-         than CS1061. Same shape as 3 and 4. This one is STOOD IN FOR rather than merely dropped:
+         than CS1061. This one is STOOD IN FOR rather than merely dropped:
          see `Shims/ValidationSharedShim.cs`, which mirrors its signatures so the eight real files
          that only NAME it still compile - including five of the twelve Odin files this project
          exists to reach.
-      6. Editor/CustomDrawers/SerializableDictionaryPropertyDrawer.cs
-         Reads `managedReferenceValue` at three sites. Same missing getter as 5.
-      7. Editor/CustomDrawers/SerializableSetPropertyDrawer.cs
+      5. Editor/CustomDrawers/SerializableDictionaryPropertyDrawer.cs
+         Reads `managedReferenceValue` at three sites. Same missing getter as 4.
+      6. Editor/CustomDrawers/SerializableSetPropertyDrawer.cs
          CASCADE ONLY. It names `SerializableDictionaryPropertyDrawer` and
-         `SerializableCollectionTweenDiagnostics`, both declared in 6. Nothing is wrong with it;
+         `SerializableCollectionTweenDiagnostics`, both declared in 5. Nothing is wrong with it;
          it cannot compile without the file above.
 
-      8. Editor/Validation/Continuous/ValidationManagedReferences.cs
+      7. Editor/Validation/Continuous/ValidationManagedReferences.cs
          Reads `SerializedProperty.managedReferenceId`, available at the 2021.3 support floor.
          The 2021.1 host reference lacks it; the matching shim throws if executed, so compilation
          cannot be mistaken for managed-reference traversal evidence.
@@ -254,17 +251,14 @@
       Exclude="$(RepoRoot)/Runtime/Integrations/**/*.cs;$(RepoRoot)/Runtime/Analyzers/**/*.cs;$(RepoRoot)/Runtime/Core/Extension/Partials/UI.cs;$(RepoRoot)/Runtime/Utils/MatchColliderToSprite.cs;$(RepoRoot)/Runtime/Visuals/UGUI/EnhancedImage.cs"
     />
     <!--
-      The editor asmdef's scope: 215 of the 223 files under `Editor/`. The eight that are dropped
+      The editor asmdef's scope: 230 of the 237 files under `Editor/`. The seven that are dropped
       are removed ONE PER LINE rather than through a semicolon-packed `Exclude`, so each reason
       travels with the exclusion it explains instead of living only in the header, and so the two
       KINDS stay apart. Two are PERMANENT: they bind uGUI, which has no NuGet equivalent at all, so
-      nothing short of a Unity install would fix them. THREE are marked PIN-DRIVEN: `Unity3D.SDK` is
-      pinned at 2021.1.14, and the member each of those three binds IS present in 2021.3, the
-      package's real support floor, and in every editor CI runs, so the FILE is correct and the
-      harness is what is behind. Those three go the day a UnityEditor reference assembly newer than
-      2021.1.14 exists on nuget.org, and so do the last two, which are the same missing getter one
-      level removed: one is stood in for by a shim mirroring its whole surface, the other is a pure
-      cascade of the file above it.
+      nothing short of a Unity install would fix them. The PIN-DRIVEN exclusions bind members
+      present in 2021.3, the package's support floor, but absent from the 2021.1.14 reference
+      assembly. Those files go the day a newer UnityEditor reference assembly exists on nuget.org.
+      The remaining set drawer is a cascade of the missing managed-reference getter.
     -->
     <Compile Include="$(RepoRoot)/Editor/**/*.cs" />
     <!-- PERMANENT. Binds `Visuals.UGUI.EnhancedImage` and `UnityEditor.UI.ImageEditor`; uGUI
@@ -277,9 +271,6 @@
          `Shims/AnimationEventEditorShim.cs`, which keeps the type NAME resolvable so the
          `<see cref="AnimationEventEditor"/>` in the non-excluded view-model still binds. -->
     <Compile Remove="$(RepoRoot)/Editor/AnimationEventEditor.cs" />
-    <!-- PIN-DRIVEN. Missing member: `TextureImporter.GetSourceTextureWidthAndHeight`, one call site.
-         Absent from Unity3D.SDK 2021.1.14, present in 2021.3 and every editor CI runs. -->
-    <Compile Remove="$(RepoRoot)/Editor/FitTextureSizeWindow.cs" />
     <!-- PIN-DRIVEN. Missing member: the GETTER of `SerializedProperty.managedReferenceValue`, read
          at three sites. 2021.1.14 carries the setter alone, so the read is CS0154 rather than
          CS1061; the getter is present in 2021.3 and every editor CI runs. -->
@@ -329,7 +320,7 @@
        those known compiler errors cannot silently disable the counting-loop diagnostic. -->
   <Target Name="AuditExcludedCountingLoops" AfterTargets="Build">
     <ItemGroup>
-      <CountingLoopSubject Include="$(RepoRoot)/Editor/Visuals/EnhancedImageEditor.cs;$(RepoRoot)/Editor/CustomEditors/MatchColliderToSpriteEditor.cs;$(RepoRoot)/Editor/AnimationEventEditor.cs;$(RepoRoot)/Editor/FitTextureSizeWindow.cs;$(RepoRoot)/Editor/CustomDrawers/SerializableDictionaryPropertyDrawer.cs;$(RepoRoot)/Editor/CustomDrawers/Utils/ValidationShared.cs;$(RepoRoot)/Editor/CustomDrawers/SerializableSetPropertyDrawer.cs;$(RepoRoot)/Runtime/Core/Extension/Partials/UI.cs;$(RepoRoot)/Runtime/Utils/MatchColliderToSprite.cs;$(RepoRoot)/Runtime/Visuals/UGUI/EnhancedImage.cs" />
+      <CountingLoopSubject Include="$(RepoRoot)/Editor/Visuals/EnhancedImageEditor.cs;$(RepoRoot)/Editor/CustomEditors/MatchColliderToSpriteEditor.cs;$(RepoRoot)/Editor/AnimationEventEditor.cs;$(RepoRoot)/Editor/CustomDrawers/SerializableDictionaryPropertyDrawer.cs;$(RepoRoot)/Editor/CustomDrawers/Utils/ValidationShared.cs;$(RepoRoot)/Editor/CustomDrawers/SerializableSetPropertyDrawer.cs;$(RepoRoot)/Runtime/Core/Extension/Partials/UI.cs;$(RepoRoot)/Runtime/Utils/MatchColliderToSprite.cs;$(RepoRoot)/Runtime/Visuals/UGUI/EnhancedImage.cs" />
       <CountingLoopSubject
         Include="$(WallstopCountingLoopAuditControl)"
         Condition="'$(WallstopCountingLoopAuditControl)' != ''"

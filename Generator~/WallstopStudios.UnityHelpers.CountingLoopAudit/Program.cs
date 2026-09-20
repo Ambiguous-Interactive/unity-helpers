@@ -61,7 +61,6 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
                     "/Editor/Visuals/EnhancedImageEditor.cs",
                     "/Editor/CustomEditors/MatchColliderToSpriteEditor.cs",
                     "/Editor/AnimationEventEditor.cs",
-                    "/Editor/FitTextureSizeWindow.cs",
                     "/Editor/CustomDrawers/SerializableDictionaryPropertyDrawer.cs",
                     "/Editor/CustomDrawers/Utils/ValidationShared.cs",
                     "/Editor/CustomDrawers/SerializableSetPropertyDrawer.cs",
@@ -78,7 +77,7 @@ namespace WallstopStudios.UnityHelpers.CountingLoopAudit
                 )
                 {
                     throw new InvalidOperationException(
-                        "The ten excluded production sources must all be audit subjects."
+                        "The nine excluded production sources must all be audit subjects."
                     );
                 }
 

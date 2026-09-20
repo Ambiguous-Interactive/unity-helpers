@@ -110,6 +110,82 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
         }
 
         [Test]
+        public void FitTextureSizeAPIWorksWithoutWindowState()
+        {
+            string path = CloneSharedTexture(_shared300x100Path, "direct-api");
+            Assert.That(path, Is.Not.Null);
+            TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+            Assert.That(importer, Is.Not.Null);
+            importer.maxTextureSize = 128;
+            ExecuteWithImmediateImport(() => importer.SaveAndReimport());
+
+            List<string> guids = new();
+            bool found = FitTextureSizeAPI.TryFindTextures(
+                new[] { path },
+                false,
+                guids,
+                out string error
+            );
+            Assert.That(found, Is.True, error);
+            Assert.That(guids, Does.Contain(AssetDatabase.AssetPathToGUID(path)));
+
+            FitTextureSizeAPI.Options options = new() { FitMode = FitMode.GrowOnly };
+            FitTextureSizeAPI.Result preview = FitTextureSizeAPI.Run(guids, options, false);
+            Assert.That(preview.Succeeded, Is.True, preview.Error);
+            Assert.That(preview.Changed, Is.EqualTo(1));
+            Assert.That(
+                (AssetImporter.GetAtPath(path) as TextureImporter).maxTextureSize,
+                Is.EqualTo(128)
+            );
+
+            FitTextureSizeAPI.Result cancelled = FitTextureSizeAPI.Run(
+                guids,
+                options,
+                true,
+                (assetPath, index, total) => true
+            );
+            Assert.That(cancelled.Cancelled, Is.True);
+            Assert.That(cancelled.Changed, Is.Zero);
+            Assert.That(
+                (AssetImporter.GetAtPath(path) as TextureImporter).maxTextureSize,
+                Is.EqualTo(128)
+            );
+
+            FitTextureSizeAPI.Result applied = FitTextureSizeAPI.Run(guids, options, true);
+            Assert.That(applied.Succeeded, Is.True, applied.Error);
+            Assert.That(applied.Changed, Is.EqualTo(preview.Changed));
+            Assert.That(applied.Grown, Is.EqualTo(1));
+            Assert.That(
+                (AssetImporter.GetAtPath(path) as TextureImporter).maxTextureSize,
+                Is.EqualTo(512)
+            );
+        }
+
+        [TestCase(1024, 32, FitMode.GrowAndShrink)]
+        [TestCase(1, 16385, FitMode.GrowAndShrink)]
+        [TestCase(32, 8192, (FitMode)9)]
+        public void FitTextureSizeAPIRejectsInvalidOptionsBeforeMutation(
+            int minimum,
+            int maximum,
+            FitMode mode
+        )
+        {
+            FitTextureSizeAPI.Options options = new()
+            {
+                MinAllowedTextureSize = minimum,
+                MaxAllowedTextureSize = maximum,
+                FitMode = mode,
+            };
+            FitTextureSizeAPI.Result result = FitTextureSizeAPI.Run(
+                new[] { AssetDatabase.AssetPathToGUID(_shared300x100Path) },
+                options,
+                true
+            );
+            Assert.That(result.Succeeded, Is.False);
+            Assert.That(result.Changed, Is.Zero);
+        }
+
+        [Test]
         public void GrowOnlyRaisesToNextPowerOfTwo()
         {
             string path = CloneSharedTexture(_shared300x100Path, "grow");

@@ -85,6 +85,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
 
         private static IEnumerable<TestCaseData> GrowOnlyModeTestCases()
         {
+            yield return new TestCaseData(400, 240, 0, 512).SetName(
+                "GrowOnly.400x240.CurrentZero.GrowsWithoutLooping"
+            );
             yield return new TestCaseData(400, 240, 256, 512).SetName(
                 "GrowOnly.400x240.Current256.Grows512"
             );

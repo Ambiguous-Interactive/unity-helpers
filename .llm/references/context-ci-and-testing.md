@@ -33,13 +33,13 @@ deliberate act, not the tail of every commit.
     `AttributeEffect` -- so a change without the matching branch passes every unguarded local gate
     and costs a matrix run. That branch compiled nowhere until #347, which is how #275 shipped a
     compile break. Odin is paid with no NuGet package, so each shim declares only the base classes
-    the sources alias. `typecheck:editor` adds 215 of the 223 files under `Editor/`, its `:odin` leg
+    the sources alias. `typecheck:editor` adds 230 of the 237 files under `Editor/`, its `:odin` leg
     the only thing that compiles the nine editor drawers and three inspectors (#347). **Its
     `UnityEditor` half is `Unity3D.SDK` 2021.1.14 -- two minor versions BELOW the 2021.3 floor, and
     the newest ever published** -- so a 2021.2/2021.3 member reads as absent: #553 one notch worse.
-    Exclude such a file rather than "fixing" the source; the eight exclusions and their
+    Exclude such a file rather than "fixing" the source; the seven exclusions and their
     compile shims are enumerated in the csproj. **These exclusions still lack complete local API binding checks**. The editor build runs a
-    separate WUH013 audit over ten excluded runtime/editor subjects, including the dictionary and set
+    separate WUH013 audit over nine excluded runtime/editor subjects, including the dictionary and set
     drawers, with an in-compilation reporting control; this certifies only counting-loop diagnostics.
     Other changes still require real Unity verification. Copy the check
     project, drop those two `<Compile Remove>` lines and build that: the only `CS####` it should
@@ -47,7 +47,7 @@ deliberate act, not the tail of every commit.
     for. Session 251 shipped a `CS0103` in both and cost the whole eight-leg matrix.
     `typecheck:editor-tests` is the FOURTH tree, `Tests/Editor/**`, and the only gate that compiles it
     ([#616](https://github.com/Ambiguous-Interactive/unity-helpers/issues/616)); two ways, default and
-    `:odin`. It inherits the editor pin and so EditorCheck's exclusions -- 41 of 655 files, one line
+    `:odin`. It inherits the editor pin and so EditorCheck's exclusions -- 42 of 820 files, one line
     with its reason each in the csproj.
     `typecheck:integrations` is the FIFTH tree: `Runtime/Integrations/**`, the 19 Reflex/VContainer/Zenject files EVERY other project named in an `Exclude`, so no `WUH###` rule ever ran there and four `??`-on-a-`ScriptableObject` sites shipped; no DI package is on nuget.org, so it takes the Odin route -- three shims declaring only what those 19 name -- and builds default, `:legacy-reflex` and `:player` ([#687](https://github.com/Ambiguous-Interactive/unity-helpers/issues/687)).
   - `dotnet test -c Release -p:ProtobufNetOracle=v3` and then

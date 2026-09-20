@@ -126,7 +126,7 @@
 
     ============================ WHAT IT DOES NOT COVER ============================
 
-    43 of the 807 files under `Tests/Editor/` are excluded, in FIVE groups, every one of them
+    42 of the 820 files under `Tests/Editor/` are excluded, in FIVE groups, every one of them
     removed ONE PER LINE WITH ITS REASON below rather than through a semicolon-packed `Exclude`, so
     each reason travels with the exclusion it explains. Not one of them is excluded because the
     fixture is wrong:
@@ -146,9 +146,10 @@
          `UnityEngine.Texture2D`. `UnityEngine.Modules` publishes the PLAYER reference assemblies, so
          the member is absent here and present in every editor, including 2021.3. Six bind it
          directly; four are pure cascades of the two shared fixtures among those six.
-      4. 3 files that bind `FitTextureSizeWindow` or `AnimationEventEditor`, which EditorCheck
-         excludes because their APIs postdate 2021.1. Native ownership tests cannot bind the
-         name-only animation shim.
+      4. 2 native-window lifecycle files bind `AnimationEventEditor`, which EditorCheck excludes
+         because `AssetDatabase.SaveAssetIfDirty` postdates 2021.1. The name-only animation shim
+         cannot verify ownership. Texture fitting and its tests now compile through a host shim
+         for `TextureImporter.GetSourceTextureWidthAndHeight`.
       5. 1 uGUI cascade, `MatchColliderToSpriteEditorTests`, whose component and custom editor
          are excluded from the source projects because their UI references are unavailable here.
 
@@ -168,8 +169,8 @@
     can stand in for those two drawers the way `Shims/ValidationSharedShim.cs` stands in for
     `ValidationShared`, because the fixtures bind roughly 130 distinct members and nested types
     across them and a shim that drifts from 18,000 lines of real drawer would hand back a confident
-    GREEN, which is worse than the red it replaced. Both this group and group 4 evaporate the day a
-    `UnityEditor` reference assembly newer than 2021.1.14 exists on nuget.org; until then the only
+    GREEN, which is worse than the red it replaced. This group and the animation lifecycle gap
+    evaporate the day a `UnityEditor` reference assembly newer than 2021.1.14 exists; until then the only
     other way to close them is a real editor, which is what the Unity editmode legs already are.
 
     NoWarn is EditorCheck's set plus one:
@@ -354,8 +355,6 @@
     <!-- PIN-DRIVEN. `AssetDatabase.SaveAssetIfDirty`, absent from Unity3D.SDK 2021.1.14 and present
          in 2021.3. Stood in for by EditorCheck's `Shims/AnimationEventEditorShim.cs`. -->
     <Compile Remove="$(RepoRoot)/Editor/AnimationEventEditor.cs" />
-    <!-- PIN-DRIVEN. `TextureImporter.GetSourceTextureWidthAndHeight`, same shape. -->
-    <Compile Remove="$(RepoRoot)/Editor/FitTextureSizeWindow.cs" />
     <!-- PIN-DRIVEN. Reads the GETTER of `SerializedProperty.managedReferenceValue` at three sites;
          2021.1.14 carries the setter alone, so the read is CS0154. -->
     <Compile Remove="$(RepoRoot)/Editor/CustomDrawers/SerializableDictionaryPropertyDrawer.cs" />
@@ -470,19 +469,11 @@
     <Compile Remove="$(RepoRoot)/Tests/Editor/Sprites/SpriteSheetExtractor/SpriteSheetExtractorVerificationTests.cs" />
     <!-- CASCADE ONLY: names `SharedSpriteTestFixtures`. -->
     <Compile Remove="$(RepoRoot)/Tests/Editor/Sprites/SpriteSheetExtractor/SpriteTestAssemblySetup.cs" />
-    <!--
-      GROUP 4, 4 files: cascade off the native windows removed above because
-      `TextureImporter.GetSourceTextureWidthAndHeight` postdates the 2021.1.14 editor pin. The window
-      declares both `FitTextureSizeWindow` and the `FitMode` enum these two bind.
-    -->
-    <Compile Remove="$(RepoRoot)/Tests/Editor/Windows/FitTextureSizeMathTests.cs" />
-    <Compile Remove="$(RepoRoot)/Tests/Editor/Windows/FitTextureSizeWindowTests.cs" />
-    <!-- Native window lifetimes bind both excluded FitTextureSizeWindow and AnimationEventEditor.
-         Run these fixtures in Unity; the name-only animation shim cannot verify ownership. -->
+    <!-- Native window lifetimes bind excluded AnimationEventEditor. Run these fixtures in Unity;
+         the name-only animation shim cannot verify ownership. -->
     <Compile Remove="$(RepoRoot)/Tests/Editor/EditorWindowNativeResourceTests.cs" />
-    <!-- Serialized-state ownership across all nine windows, FitTextureSizeWindow included. A shim
-         declaring `SerializedStateForTesting` would hand back a confident GREEN for the one member
-         the fixture exists to check, so this one runs in Unity too. -->
+    <!-- Serialized-state ownership also binds excluded AnimationEventEditor. A shim declaring
+         its state would falsely pass the member under test, so this fixture runs in Unity. -->
     <Compile Remove="$(RepoRoot)/Tests/Editor/EditorWindowSerializedStateTests.cs" />
   </ItemGroup>
   <!--
