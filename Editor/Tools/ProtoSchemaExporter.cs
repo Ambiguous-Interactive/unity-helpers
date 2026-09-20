@@ -151,9 +151,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 }
                 catch (Exception exception) when (exception is not OutOfMemoryException)
                 {
+                    string target = layout == ExportLayout.SingleFile ? destination : file.Group;
                     return new ExportResult(
                         false,
-                        $"Could not render schema for {file.Group}: {exception.Message}",
+                        $"Could not render schema for {target}: {exception.Message}",
                         Array.Empty<string>(),
                         diagnostics
                     );
@@ -161,7 +162,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 if (!rendered)
                 {
                     diagnostics.Add(
-                        $"{file.Group}: nothing rendered; no [WProtoContract] type in this group."
+                        layout == ExportLayout.SingleFile
+                            ? "Nothing rendered; no [WProtoContract] type in this file."
+                            : $"{file.Group}: nothing rendered; no [WProtoContract] type in this group."
                     );
                     continue;
                 }

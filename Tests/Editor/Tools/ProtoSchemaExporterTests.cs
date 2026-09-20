@@ -4,6 +4,7 @@
 namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
 {
     using System;
+    using System.Collections;
     using System.Collections.Generic;
     using System.IO;
     using NUnit.Framework;
@@ -244,6 +245,58 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             Assert.IsTrue(explicitResult.Success, explicitResult.Message);
             Assert.AreEqual(discoveredSchema, File.ReadAllText(_outputPath));
             StringAssert.Contains("Vector2Surrogate", discoveredSchema);
+        }
+
+        [Test]
+        public void SingleFileRenderFailureNamesTheDestination()
+        {
+            ProtoSchemaExporter.ExportResult result = ProtoSchemaExporter.Export(
+                new[] { typeof(ProtoSchemaExporterSurrogateContract) },
+                _outputPath,
+                ProtoSchemaExporter.ExportLayout.SingleFile,
+                null,
+                new ThrowingSurrogateMap()
+            );
+
+            Assert.IsFalse(result.Success);
+            StringAssert.Contains(_outputPath, result.Message);
+            StringAssert.Contains("Surrogate lookup failed", result.Message);
+            StringAssert.DoesNotContain("for :", result.Message);
+            Assert.IsFalse(File.Exists(_outputPath));
+        }
+
+        private sealed class ThrowingSurrogateMap : IReadOnlyDictionary<Type, Type>
+        {
+            public Type this[Type key] => throw new InvalidOperationException();
+
+            public IEnumerable<Type> Keys => Array.Empty<Type>();
+
+            public IEnumerable<Type> Values => Array.Empty<Type>();
+
+            public int Count => 0;
+
+            public bool ContainsKey(Type key)
+            {
+                return false;
+            }
+
+            public bool TryGetValue(Type key, out Type value)
+            {
+                value = null;
+                throw new InvalidOperationException("Surrogate lookup failed.");
+            }
+
+            public IEnumerator<KeyValuePair<Type, Type>> GetEnumerator()
+            {
+                return (
+                    (IEnumerable<KeyValuePair<Type, Type>>)Array.Empty<KeyValuePair<Type, Type>>()
+                ).GetEnumerator();
+            }
+
+            IEnumerator IEnumerable.GetEnumerator()
+            {
+                return GetEnumerator();
+            }
         }
     }
 
