@@ -33,13 +33,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
             RegexOptions.Compiled
         );
 
-        [SetUp]
-        public override void BaseSetUp()
-        {
-            base.BaseSetUp();
-            EnsureFolder(Root);
-        }
-
         [TearDown]
         public override void TearDown()
         {
@@ -54,6 +47,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         public override void CommonOneTimeSetUp()
         {
             base.CommonOneTimeSetUp();
+            ExecuteWithImmediateImport(() => EnsureFolder(Root));
         }
 
         [OneTimeTearDown]
