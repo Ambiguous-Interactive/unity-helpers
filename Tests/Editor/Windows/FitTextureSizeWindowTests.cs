@@ -85,7 +85,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Windows
             Track(_sharedWindow);
             _trackedObjects.Remove(_sharedWindow); // Managed manually in one-time teardown
 
-            EnsureFolderStatic(Root);
+            ExecuteWithImmediateImport(() => EnsureFolder(Root));
         }
 
         [OneTimeTearDown]
