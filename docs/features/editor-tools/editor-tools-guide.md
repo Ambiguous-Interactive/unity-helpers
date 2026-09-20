@@ -430,6 +430,8 @@ you ship at and you want the bigger pixels baked into the file rather than paid 
 - Only `.png` files are processed; anything else is counted as skipped.
 - With **Output Folder** empty this **overwrites the originals in place** and there is no undo. Set
   **Output Folder** to write copies instead.
+- PNG writes are staged before replacement. A failed write reports an error rather than leaving
+  a partly written PNG.
 - The stock multipliers (`0.54` width, `0.245` height) grow a texture non-uniformly — a 128x128
   becomes 130x133 in one pass. Set both to the same value if you want a square scale.
 - The final size is clamped to 16384 on each axis.
@@ -1088,9 +1090,11 @@ Use this window to make the package's compiler guidance explicit for scripts und
   unknown Unity Helpers policy entries.
 
 The tool preserves rule groups owned by other analyzers. It refuses malformed XML instead of
-overwriting it. The ruleset is a project file change outside Unity's undo system, so commit it when
-the policy should be shared with the team. The window lists every diagnostic with a short
-explanation; the [Analyzer reference](../../performance/analyzers.md) has examples and fixes.
+overwriting it. Ruleset writes are staged before replacement, and failures are reported without
+leaving a partly written ruleset. The ruleset is a project file change outside Unity's undo system,
+so commit it when the policy should be shared with the team. The window lists every diagnostic
+with a short explanation; the [Analyzer reference](../../performance/analyzers.md) has examples and
+fixes.
 
 ### Unity Method Analyzer
 

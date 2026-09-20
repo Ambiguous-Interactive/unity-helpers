@@ -12,6 +12,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
     using System.Xml.Linq;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     internal sealed class AnalyzerPolicyWindow : EditorWindow
     {
@@ -540,7 +541,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 return false;
             }
 
-            string temporaryPath = path + ".wallstop.tmp";
             try
             {
                 Directory.CreateDirectory(directory);
@@ -551,18 +551,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     NewLineChars = "\n",
                     NewLineHandling = NewLineHandling.Replace,
                 };
-                using (XmlWriter writer = XmlWriter.Create(temporaryPath, settings))
+                using MemoryStream output = new();
+                using (XmlWriter writer = XmlWriter.Create(output, settings))
                 {
                     document.Save(writer);
                 }
 
-                if (File.Exists(path))
+                if (!DurableFile.TryWriteAllBytes(path, output.ToArray(), out Exception writeError))
                 {
-                    File.Replace(temporaryPath, path, null);
-                }
-                else
-                {
-                    File.Move(temporaryPath, path);
+                    message =
+                        "Assets/Default.ruleset could not be written: "
+                        + (writeError != null ? writeError.Message : "Unknown write failure.");
+                    return false;
                 }
 
                 message = null;
@@ -576,19 +576,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             {
                 message = "Assets/Default.ruleset could not be written: " + exception.Message;
                 return false;
-            }
-            finally
-            {
-                if (File.Exists(temporaryPath))
-                {
-                    try
-                    {
-                        File.Delete(temporaryPath);
-                    }
-                    catch (Exception exception)
-                        when (exception is IOException || exception is UnauthorizedAccessException)
-                    { }
-                }
             }
         }
     }

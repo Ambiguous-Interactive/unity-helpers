@@ -355,24 +355,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                 }
 
                                 string fullDest = ToFullPath(finalAssetPath);
-                                string tempPath = fullDest + ".tmp";
-
-                                File.WriteAllBytes(tempPath, bytes);
-
-                                if (File.Exists(fullDest))
+                                if (
+                                    !DurableFile.TryWriteAllBytes(
+                                        fullDest,
+                                        bytes,
+                                        out Exception writeError
+                                    )
+                                )
                                 {
-                                    string backupPath = fullDest + ".bak";
-                                    File.Replace(tempPath, fullDest, backupPath, true);
-                                    // Best-effort cleanup of backup to avoid clutter in VCS; keep if replace failed.
-                                    try
-                                    {
-                                        File.Delete(backupPath);
-                                    }
-                                    catch { }
-                                }
-                                else
-                                {
-                                    File.Move(tempPath, fullDest);
+                                    ++errors;
+                                    this.LogError($"Failed to resize {texture.name}.", writeError);
+                                    continue;
                                 }
 
                                 anyChanges = true;
