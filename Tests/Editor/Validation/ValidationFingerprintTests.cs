@@ -41,6 +41,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             ValidationPreferences.Enabled = _sentinelEnabled;
         }
 
+        [OneTimeTearDown]
+        public override void OneTimeTearDown()
+        {
+            try
+            {
+                CleanupTrackedFoldersAndAssets();
+            }
+            finally
+            {
+                base.OneTimeTearDown();
+            }
+        }
+
         [TestCase(false)]
         [TestCase(true)]
         public void ScalarNamedInstanceIdChangesFingerprint(bool nested)

@@ -62,6 +62,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             return targets;
         }
 
+        [OneTimeTearDown]
+        public override void OneTimeTearDown()
+        {
+            try
+            {
+                CleanupTrackedFoldersAndAssets();
+            }
+            finally
+            {
+                base.OneTimeTearDown();
+            }
+        }
+
         [Test]
         public void AnEmptyRunIsCompleteBeforeItStarts()
         {
