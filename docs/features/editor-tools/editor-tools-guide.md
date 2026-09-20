@@ -685,6 +685,26 @@ whenever something downstream wants files rather than sub-assets — a third-par
    **X** / **Y**.
 5. Set **Output Directory**, then click **Extract N Sprite(s)**.
 
+Scripts and batch jobs can call `SpriteSheetExtractionAPI.Extract` with explicit source and output
+asset paths, a pixel rectangle, normalized pivot, and border. The output folder must already exist
+under `Assets` or a writable local `Packages` path. The API returns extracted and skipped counts
+plus errors, and never opens a window or displays a prompt. Set `dryRun: true` to preview the count
+without changing files or importers.
+
+```csharp
+using UnityEngine;
+using WallstopStudios.UnityHelpers.Editor.Sprites;
+
+SpriteSheetExtractionRequest request = new(
+    "Assets/Sprites/characters.png",
+    "Assets/Extracted/hero.png",
+    new Rect(0, 0, 32, 32),
+    new Vector2(0.5f, 0.5f),
+    Vector4.zero
+);
+SpriteSheetExtractionResult result = SpriteSheetExtractionAPI.Extract(new[] { request });
+```
+
 **Auto-detection:** with **Grid Size Mode** on `Auto`, the **Algorithm** dropdown picks how cell size
 is inferred: `AutoBest` (tries each and stops once one reaches 90% confidence), `UniformGrid`,
 `BoundaryScoring`, `ClusterCentroid`, `DistanceTransform` or `RegionGrowing`. Filling in

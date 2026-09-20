@@ -3707,14 +3707,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            _lastExtractedCount = 0;
-            _lastSkippedCount = 0;
-            _lastErrorCount = 0;
-
-            bool canceled = false;
-            int totalSprites = 0;
-            int processedSprites = 0;
-
+            List<SpriteSheetExtractionRequest> requests = new();
             foreach (SpriteSheetEntry entry in _discoveredSheets)
             {
                 if (!entry._isSelected || entry._sprites == null)
@@ -3722,223 +3715,65 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     continue;
                 }
 
-                foreach (
-                    WallstopStudios.UnityHelpers.Editor.Sprites.SpriteSheetExtractor.SpriteEntryData spritesElement in entry._sprites
-                )
+                List<SpriteEntryData> sortedSprites = GetSortedSprites(entry._sprites);
+                string prefix = string.IsNullOrWhiteSpace(_namingPrefix)
+                    ? Path.GetFileNameWithoutExtension(entry._assetPath)
+                    : _namingPrefix;
+                if (string.IsNullOrWhiteSpace(prefix))
                 {
-                    if (spritesElement._isSelected)
+                    this.LogError($"Output filename prefix is empty for '{entry._assetPath}'.");
+                    continue;
+                }
+
+                for (int i = 0; i < sortedSprites.Count; ++i)
+                {
+                    SpriteEntryData sprite = sortedSprites[i];
+                    if (!sprite._isSelected)
                     {
-                        ++totalSprites;
+                        continue;
                     }
+
+                    requests.Add(
+                        new SpriteSheetExtractionRequest(
+                            entry._assetPath,
+                            Path.Combine(outputPath, $"{prefix}_{i:D3}.png").Replace('\\', '/'),
+                            sprite._rect,
+                            GetEffectivePivot(entry, sprite),
+                            sprite._border
+                        )
+                    );
                 }
             }
 
-            if (totalSprites == 0)
+            if (requests.Count == 0)
             {
                 this.LogWarn($"No sprites selected for extraction.");
                 return;
             }
 
-            WallstopGenericPool<Dictionary<string, bool>> originalReadablePool = DictionaryBuffer<
-                string,
-                bool
-            >.GetDictionaryPool(StringComparer.OrdinalIgnoreCase);
-            using PooledResource<Dictionary<string, bool>> originalReadableLease =
-                originalReadablePool.Get(out Dictionary<string, bool> originalReadable);
-
-            using PooledResource<List<PendingImportSettings>> pendingImportsLease =
-                Buffers<PendingImportSettings>.List.Get(
-                    out List<PendingImportSettings> pendingImports
-                );
-
-            using PooledResource<List<string>> pendingPathsLease = Buffers<string>.List.Get(
-                out List<string> pendingPaths
-            );
-
             try
             {
-                using (AssetDatabaseBatchHelper.BeginBatch())
-                {
-                    for (int i = 0; i < _discoveredSheets.Count && !canceled; ++i)
-                    {
-                        SpriteSheetEntry entry = _discoveredSheets[i];
-                        if (!entry._isSelected || entry._sprites == null)
-                        {
-                            continue;
-                        }
-
-                        if (
-                            Utils.EditorUi.CancelableProgress(
-                                Name,
-                                $"Making readable: {Path.GetFileName(entry._assetPath)}",
-                                (float)i / _discoveredSheets.Count * 0.05f
-                            )
+                SpriteSheetExtractionResult result = SpriteSheetExtractionAPI.Extract(
+                    requests,
+                    _overwriteExisting,
+                    _preserveImportSettings,
+                    _dryRun,
+                    (processed, total) =>
+                        Utils.EditorUi.CancelableProgress(
+                            Name,
+                            $"Extracting {processed + 1} of {total}",
+                            total == 0 ? 0f : (float)processed / total
                         )
-                        {
-                            canceled = true;
-                            break;
-                        }
-
-                        if (!entry._importer.isReadable)
-                        {
-                            originalReadable[entry._assetPath] = false;
-                            entry._importer.isReadable = true;
-                            entry._importer.SaveAndReimport();
-                        }
-                        else
-                        {
-                            originalReadable[entry._assetPath] = true;
-                        }
-                    }
-                }
-
-                AssetDatabase.SaveAssets();
-
-                if (!canceled)
+                );
+                _lastExtractedCount = result.ExtractedCount;
+                _lastSkippedCount = result.SkippedCount;
+                _lastErrorCount = result.Errors.Count;
+                foreach (string error in result.Errors)
                 {
-                    for (int i = 0; i < _discoveredSheets.Count && !canceled; ++i)
-                    {
-                        SpriteSheetEntry entry = _discoveredSheets[i];
-                        if (!entry._isSelected || entry._sprites == null)
-                        {
-                            continue;
-                        }
-
-                        entry._texture = AssetDatabase.LoadAssetAtPath<Texture2D>(entry._assetPath);
-                        if (entry._texture == null)
-                        {
-                            this.LogWarn($"Failed to reload texture: {entry._assetPath}");
-                            continue;
-                        }
-
-                        List<SpriteEntryData> sortedSprites = GetSortedSprites(entry._sprites);
-
-                        for (int j = 0; j < sortedSprites.Count && !canceled; ++j)
-                        {
-                            SpriteEntryData sprite = sortedSprites[j];
-                            if (!sprite._isSelected)
-                            {
-                                continue;
-                            }
-
-                            if (
-                                Utils.EditorUi.CancelableProgress(
-                                    Name,
-                                    $"Writing: {sprite._originalName}",
-                                    0.05f + (float)processedSprites / totalSprites * 0.35f
-                                )
-                            )
-                            {
-                                canceled = true;
-                                break;
-                            }
-
-                            string extractedPath = ExtractSpriteDeferred(
-                                entry,
-                                sprite,
-                                outputPath,
-                                j,
-                                pendingImports
-                            );
-                            if (extractedPath != null)
-                            {
-                                pendingPaths.Add(extractedPath);
-                                ++_lastExtractedCount;
-                            }
-                            ++processedSprites;
-                        }
-                    }
+                    this.LogError($"{error}");
                 }
 
-                if (!canceled && 0 < pendingPaths.Count)
-                {
-                    using (AssetDatabaseBatchHelper.BeginBatch())
-                    {
-                        for (int i = 0; i < pendingPaths.Count; ++i)
-                        {
-                            if (
-                                Utils.EditorUi.CancelableProgress(
-                                    Name,
-                                    $"Importing: {Path.GetFileName(pendingPaths[i])}",
-                                    0.4f + (float)i / pendingPaths.Count * 0.3f
-                                )
-                            )
-                            {
-                                canceled = true;
-                                break;
-                            }
-
-                            AssetDatabase.ImportAsset(pendingPaths[i]);
-                        }
-                    }
-                }
-
-                if (!canceled && _preserveImportSettings && 0 < pendingImports.Count)
-                {
-                    using (AssetDatabaseBatchHelper.BeginBatch())
-                    {
-                        for (int i = 0; i < pendingImports.Count; ++i)
-                        {
-                            PendingImportSettings pending = pendingImports[i];
-
-                            if (
-                                Utils.EditorUi.CancelableProgress(
-                                    Name,
-                                    $"Applying settings: {Path.GetFileName(pending.OutputPath)}",
-                                    0.7f + (float)i / pendingImports.Count * 0.2f
-                                )
-                            )
-                            {
-                                canceled = true;
-                                break;
-                            }
-
-                            ApplyImportSettingsDeferred(
-                                pending.OutputPath,
-                                pending.SourceImporter,
-                                pending.Sprite,
-                                pending.Entry
-                            );
-                        }
-                    }
-                }
-
-                if (0 < originalReadable.Count)
-                {
-                    using PooledResource<List<string>> keysLease = Buffers<string>.List.Get(
-                        out List<string> keys
-                    );
-                    foreach (KeyValuePair<string, bool> kvp in originalReadable)
-                    {
-                        if (kvp.Value)
-                        {
-                            continue;
-                        }
-
-                        keys.Add(kvp.Key);
-                    }
-
-                    using (AssetDatabaseBatchHelper.BeginBatch())
-                    {
-                        foreach (string key in keys)
-                        {
-                            if (
-                                AssetImporter.GetAtPath(key) is TextureImporter
-                                {
-                                    textureType: TextureImporterType.Sprite
-                                } imp
-                            )
-                            {
-                                imp.isReadable = false;
-                                imp.SaveAndReimport();
-                            }
-                        }
-                    }
-                }
-
-                AssetDatabase.SaveAssets();
-
-                if (canceled)
+                if (result.Canceled)
                 {
                     this.LogWarn($"Extraction canceled by user.");
                 }
@@ -3949,10 +3784,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         $"{mode} complete. Extracted: {_lastExtractedCount}, Skipped: {_lastSkippedCount}, Errors: {_lastErrorCount}"
                     );
                 }
-            }
-            catch (Exception e)
-            {
-                this.LogError($"Error during extraction", e);
             }
             finally
             {
@@ -7551,354 +7382,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
         }
 
-        private bool ExtractSprite(
-            SpriteSheetEntry sheet,
-            SpriteEntryData sprite,
-            string outputPath,
-            int index
-        )
-        {
-            if (sheet?._texture == null)
-            {
-                this.LogError($"Cannot extract sprite: texture is null.");
-                ++_lastErrorCount;
-                return false;
-            }
-
-            if (sprite == null)
-            {
-                ++_lastErrorCount;
-                return false;
-            }
-
-            try
-            {
-                string prefix = string.IsNullOrWhiteSpace(_namingPrefix)
-                    ? Path.GetFileNameWithoutExtension(sheet._assetPath)
-                    : _namingPrefix;
-
-                if (string.IsNullOrWhiteSpace(prefix))
-                {
-                    this.LogError(
-                        $"Cannot extract sprite '{sprite._originalName}': output filename prefix is empty."
-                    );
-                    ++_lastErrorCount;
-                    return false;
-                }
-
-                string outputFileName = $"{prefix}_{index:D3}.png";
-                string fullOutputPath = Path.Combine(outputPath, outputFileName);
-
-                if (!_overwriteExisting && File.Exists(fullOutputPath))
-                {
-                    ++_lastSkippedCount;
-                    return false;
-                }
-
-                if (_dryRun)
-                {
-                    this.Log($"Would extract: {sprite._originalName} -> {fullOutputPath}");
-                    return true;
-                }
-
-                int x = Mathf.FloorToInt(sprite._rect.x);
-                int y = Mathf.FloorToInt(sprite._rect.y);
-                int width = Mathf.FloorToInt(sprite._rect.width);
-                int height = Mathf.FloorToInt(sprite._rect.height);
-
-                x = Mathf.Clamp(x, 0, sheet._texture.width - 1);
-                y = Mathf.Clamp(y, 0, sheet._texture.height - 1);
-                width = Mathf.Clamp(width, 1, sheet._texture.width - x);
-                height = Mathf.Clamp(height, 1, sheet._texture.height - y);
-
-                if (!IsTextureFormatSupportedForGetPixels(sheet._texture.format))
-                {
-                    this.LogError(
-                        $"Texture format '{sheet._texture.format}' does not support GetPixels32 for {sheet._assetPath}. Extraction skipped."
-                    );
-                    ++_lastErrorCount;
-                    return false;
-                }
-
-                Color32[] pixels = sheet._texture.GetPixels32();
-                int srcWidth = sheet._texture.width;
-                int pixelCount = width * height;
-                Texture2D extracted = null;
-                try
-                {
-                    {
-                        using PooledArray<Color32> destinationLease = SystemArrayPool<Color32>.Get(
-                            pixelCount,
-                            out Color32[] destPixels
-                        );
-
-                        CopyPixelRows(pixels, srcWidth, x, y, width, height, destPixels);
-
-                        extracted = new Texture2D(width, height, TextureFormat.RGBA32, false);
-                        ApplyPixelBuffer(extracted, width, height, destPixels);
-                    }
-
-                    byte[] pngBytes = extracted.EncodeToPNG();
-                    File.WriteAllBytes(fullOutputPath, pngBytes);
-                }
-                finally
-                {
-                    if (extracted != null)
-                    {
-                        DestroyImmediate(extracted);
-                    }
-                }
-
-                AssetDatabase.ImportAsset(fullOutputPath);
-
-                if (_preserveImportSettings)
-                {
-                    ApplyImportSettings(fullOutputPath, sheet._importer, sprite, sheet);
-                }
-
-                return true;
-            }
-            catch (Exception e)
-            {
-                this.LogError($"Failed to extract sprite '{sprite._originalName}'", e);
-                ++_lastErrorCount;
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Extracts a sprite to a PNG file without importing it. This is the deferred variant
-        /// that writes the file to disk but does NOT call AssetDatabase.ImportAsset or ApplyImportSettings.
-        /// </summary>
-        /// <param name="sheet">The sprite sheet entry containing the source texture.</param>
-        /// <param name="sprite">The sprite data to extract.</param>
-        /// <param name="outputPath">The output directory path.</param>
-        /// <param name="index">The sprite index for naming.</param>
-        /// <param name="pendingImports">List to add pending import settings if _preserveImportSettings is true.</param>
-        /// <returns>The full output path if successful, null if skipped or failed.</returns>
-        private string ExtractSpriteDeferred(
-            SpriteSheetEntry sheet,
-            SpriteEntryData sprite,
-            string outputPath,
-            int index,
-            List<PendingImportSettings> pendingImports
-        )
-        {
-            if (sheet?._texture == null)
-            {
-                this.LogError($"Cannot extract sprite: texture is null.");
-                ++_lastErrorCount;
-                return null;
-            }
-
-            if (sprite == null)
-            {
-                ++_lastErrorCount;
-                return null;
-            }
-
-            try
-            {
-                string prefix = string.IsNullOrWhiteSpace(_namingPrefix)
-                    ? Path.GetFileNameWithoutExtension(sheet._assetPath)
-                    : _namingPrefix;
-
-                if (string.IsNullOrWhiteSpace(prefix))
-                {
-                    this.LogError(
-                        $"Cannot extract sprite '{sprite._originalName}': output filename prefix is empty."
-                    );
-                    ++_lastErrorCount;
-                    return null;
-                }
-
-                string outputFileName = $"{prefix}_{index:D3}.png";
-                string fullOutputPath = Path.Combine(outputPath, outputFileName);
-
-                if (!_overwriteExisting && File.Exists(fullOutputPath))
-                {
-                    ++_lastSkippedCount;
-                    return null;
-                }
-
-                if (_dryRun)
-                {
-                    this.Log($"Would extract: {sprite._originalName} -> {fullOutputPath}");
-                    // Return path for dry run to count as "success" but don't add to pending imports
-                    return fullOutputPath;
-                }
-
-                int x = Mathf.FloorToInt(sprite._rect.x);
-                int y = Mathf.FloorToInt(sprite._rect.y);
-                int width = Mathf.FloorToInt(sprite._rect.width);
-                int height = Mathf.FloorToInt(sprite._rect.height);
-
-                x = Mathf.Clamp(x, 0, sheet._texture.width - 1);
-                y = Mathf.Clamp(y, 0, sheet._texture.height - 1);
-                width = Mathf.Clamp(width, 1, sheet._texture.width - x);
-                height = Mathf.Clamp(height, 1, sheet._texture.height - y);
-
-                if (!IsTextureFormatSupportedForGetPixels(sheet._texture.format))
-                {
-                    this.LogError(
-                        $"Texture format '{sheet._texture.format}' does not support GetPixels32 for {sheet._assetPath}. Extraction skipped."
-                    );
-                    ++_lastErrorCount;
-                    return null;
-                }
-
-                Color32[] pixels = sheet._texture.GetPixels32();
-                int srcWidth = sheet._texture.width;
-                int pixelCount = width * height;
-                Texture2D extracted = null;
-                try
-                {
-                    {
-                        using PooledArray<Color32> destinationLease = SystemArrayPool<Color32>.Get(
-                            pixelCount,
-                            out Color32[] destPixels
-                        );
-
-                        CopyPixelRows(pixels, srcWidth, x, y, width, height, destPixels);
-
-                        extracted = new Texture2D(width, height, TextureFormat.RGBA32, false);
-                        ApplyPixelBuffer(extracted, width, height, destPixels);
-                    }
-
-                    byte[] pngBytes = extracted.EncodeToPNG();
-                    File.WriteAllBytes(fullOutputPath, pngBytes);
-                }
-                finally
-                {
-                    if (extracted != null)
-                    {
-                        DestroyImmediate(extracted);
-                    }
-                }
-
-                if (_preserveImportSettings)
-                {
-                    pendingImports.Add(
-                        new PendingImportSettings(fullOutputPath, sheet._importer, sprite, sheet)
-                    );
-                }
-
-                return fullOutputPath;
-            }
-            catch (Exception e)
-            {
-                this.LogError($"Failed to extract sprite '{sprite._originalName}'", e);
-                ++_lastErrorCount;
-                return null;
-            }
-        }
-
-        private void ApplyImportSettings(
-            string outputPath,
-            TextureImporter sourceImporter,
-            SpriteEntryData sprite,
-            SpriteSheetEntry entry
-        )
-        {
-            if (AssetImporter.GetAtPath(outputPath) is not TextureImporter newImporter)
-            {
-                return;
-            }
-
-            newImporter.textureType = TextureImporterType.Sprite;
-            newImporter.spriteImportMode = SpriteImportMode.Single;
-            newImporter.spritePixelsPerUnit = sourceImporter.spritePixelsPerUnit;
-            newImporter.filterMode = sourceImporter.filterMode;
-            newImporter.textureCompression = sourceImporter.textureCompression;
-            newImporter.wrapMode = sourceImporter.wrapMode;
-            newImporter.mipmapEnabled = sourceImporter.mipmapEnabled;
-            newImporter.isReadable = sourceImporter.isReadable;
-
-            Vector2 pivot = GetEffectivePivot(entry, sprite);
-
-            TextureImporterSettings settings = new();
-            newImporter.ReadTextureSettings(settings);
-            settings.spritePivot = pivot;
-            settings.spriteAlignment = (int)SpriteAlignment.Custom;
-            settings.spriteBorder = sprite._border;
-            newImporter.SetTextureSettings(settings);
-            newImporter.spritePivot = pivot;
-
-            try
-            {
-                TextureImporterPlatformSettings srcDefault =
-                    sourceImporter.GetDefaultPlatformTextureSettings();
-                if (!string.IsNullOrWhiteSpace(srcDefault.name))
-                {
-                    newImporter.SetPlatformTextureSettings(srcDefault);
-                }
-            }
-            catch (Exception e)
-            {
-                this.LogWarn($"Failed to copy platform settings for '{outputPath}'", e);
-            }
-
-            newImporter.SaveAndReimport();
-        }
-
-        /// <summary>
-        /// Applies import settings to an extracted sprite without calling SaveAndReimport.
-        /// This is the deferred variant that copies settings and marks the importer dirty,
-        /// allowing the batch scope to handle the reimport.
-        /// </summary>
-        /// <param name="outputPath">The asset path of the extracted sprite.</param>
-        /// <param name="sourceImporter">The source texture importer to copy settings from.</param>
-        /// <param name="sprite">The sprite entry data containing pivot, border, and other settings.</param>
-        /// <param name="entry">The parent sheet entry for additional context.</param>
-        private void ApplyImportSettingsDeferred(
-            string outputPath,
-            TextureImporter sourceImporter,
-            SpriteEntryData sprite,
-            SpriteSheetEntry entry
-        )
-        {
-            if (AssetImporter.GetAtPath(outputPath) is not TextureImporter newImporter)
-            {
-                return;
-            }
-
-            newImporter.textureType = TextureImporterType.Sprite;
-            newImporter.spriteImportMode = SpriteImportMode.Single;
-            newImporter.spritePixelsPerUnit = sourceImporter.spritePixelsPerUnit;
-            newImporter.filterMode = sourceImporter.filterMode;
-            newImporter.textureCompression = sourceImporter.textureCompression;
-            newImporter.wrapMode = sourceImporter.wrapMode;
-            newImporter.mipmapEnabled = sourceImporter.mipmapEnabled;
-            newImporter.isReadable = sourceImporter.isReadable;
-
-            Vector2 pivot = GetEffectivePivot(entry, sprite);
-
-            TextureImporterSettings settings = new();
-            newImporter.ReadTextureSettings(settings);
-            settings.spritePivot = pivot;
-            settings.spriteAlignment = (int)SpriteAlignment.Custom;
-            settings.spriteBorder = sprite._border;
-            newImporter.SetTextureSettings(settings);
-            newImporter.spritePivot = pivot;
-
-            try
-            {
-                TextureImporterPlatformSettings srcDefault =
-                    sourceImporter.GetDefaultPlatformTextureSettings();
-                if (!string.IsNullOrWhiteSpace(srcDefault.name))
-                {
-                    newImporter.SetPlatformTextureSettings(srcDefault);
-                }
-            }
-            catch (Exception e)
-            {
-                this.LogWarn($"Failed to copy platform settings for '{outputPath}'", e);
-            }
-
-            // SetDirty does not apply importer settings; SaveAndReimport is required even inside a batch.
-            newImporter.SaveAndReimport();
-        }
-
         /// <summary>
         /// Represents a discovered sprite sheet with its metadata.
         /// </summary>
@@ -8068,46 +7551,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             /// UI-only preference; not saved to per-sheet config files.
             /// </summary>
             internal Color _pivotColorOverride;
-        }
-
-        /// <summary>
-        /// Holds deferred import data for batch processing during sprite extraction.
-        /// This allows writing all PNG files first, then batching all import operations together.
-        /// </summary>
-        internal readonly struct PendingImportSettings
-        {
-            /// <summary>
-            /// The output path where the sprite was written.
-            /// </summary>
-            internal readonly string OutputPath;
-
-            /// <summary>
-            /// The source texture importer to copy settings from.
-            /// </summary>
-            internal readonly TextureImporter SourceImporter;
-
-            /// <summary>
-            /// The sprite entry data containing pivot, border, and other sprite-specific settings.
-            /// </summary>
-            internal readonly SpriteEntryData Sprite;
-
-            /// <summary>
-            /// The parent sheet entry for additional context.
-            /// </summary>
-            internal readonly SpriteSheetEntry Entry;
-
-            internal PendingImportSettings(
-                string outputPath,
-                TextureImporter sourceImporter,
-                SpriteEntryData sprite,
-                SpriteSheetEntry entry
-            )
-            {
-                OutputPath = outputPath;
-                SourceImporter = sourceImporter;
-                Sprite = sprite;
-                Entry = entry;
-            }
         }
 
         public enum SortMode
