@@ -242,6 +242,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                     first.Result ? firstBytes : secondBytes,
                     File.ReadAllBytes(destinationPath)
                 );
+                Assert.That(File.Exists(first.Result ? firstStage : secondStage), Is.False);
+                Assert.That(File.Exists(first.Result ? secondStage : firstStage), Is.True);
             }
             finally
             {
@@ -262,6 +264,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 SpriteSheetExtractionResult result = SpriteSheetExtractionAPI.Extract(Requests());
 
                 Assert.That(result.ExtractedCount, Is.Zero);
+                Assert.That(result.SkippedCount, Is.Zero);
                 Assert.That(result.Errors, Is.Not.Empty);
                 Assert.That(
                     Directory.GetFiles(ToFullPath(Root)).Length,

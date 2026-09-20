@@ -759,7 +759,7 @@ plus errors, and never opens a window or displays a prompt. Set `dryRun: true` t
 without changing files or importers.
 With the default `overwriteExisting: false`, an output that appears during extraction is skipped
 and left unchanged. With `overwriteExisting: true`, the encoded PNG is staged before replacing the
-existing file. Extraction removes its temporary file if publishing fails. A failed or interrupted
+existing file. Extraction attempts to remove its temporary file if publishing fails. A failed or interrupted
 copy to a new output can leave an incomplete new file; remove it before retrying.
 
 Use `SpriteSheetExtractionAPI.Discover` with folder asset paths and an optional filename regex to

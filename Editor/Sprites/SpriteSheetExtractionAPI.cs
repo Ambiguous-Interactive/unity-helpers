@@ -377,16 +377,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         internal static bool TryPublishNewFile(string stagedPath, string destinationPath)
         {
-            try
-            {
-                File.Copy(stagedPath, destinationPath, overwrite: false);
-                File.Delete(stagedPath);
-                return true;
-            }
-            catch (IOException) when (File.Exists(destinationPath))
-            {
-                return false;
-            }
+            return ExclusiveFilePublisher.TryPublishNewFile(stagedPath, destinationPath);
         }
 
         private static bool Validate(

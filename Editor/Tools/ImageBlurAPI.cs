@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
     using System.IO;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Editor.Utils;
 
     /// <summary>
     /// Creates Gaussian-blurred textures without opening the Image Blur window.
@@ -309,16 +310,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
         internal static bool TryPublishNewFile(string stagedPath, string destinationPath)
         {
-            try
-            {
-                File.Copy(stagedPath, destinationPath, overwrite: false);
-                File.Delete(stagedPath);
-                return true;
-            }
-            catch (IOException) when (File.Exists(destinationPath))
-            {
-                return false;
-            }
+            return ExclusiveFilePublisher.TryPublishNewFile(stagedPath, destinationPath);
         }
 
         private static string AppendError(string existing, string additional)
