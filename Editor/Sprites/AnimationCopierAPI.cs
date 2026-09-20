@@ -285,19 +285,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     string destinationPath = deletingDestination ? path : destinationRoot + suffix;
                     try
                     {
-                        (bool succeeded, bool eligible, string itemError) = ProcessOne(
+                        ProcessOneResult item = ProcessOne(
                             sourcePath,
                             destinationPath,
                             operation,
                             applyChanges,
                             forceReplaceUnchanged
                         );
-                        if (!succeeded)
+                        if (!item.Succeeded)
                         {
                             failed++;
-                            diagnostics.Add($"{path}: {itemError}");
+                            diagnostics.Add($"{path}: {item.Error}");
                         }
-                        else if (eligible)
+                        else if (item.Eligible)
                         {
                             processed++;
                         }
@@ -346,7 +346,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             );
         }
 
-        private static (bool Succeeded, bool Eligible, string Error) ProcessOne(
+        private static ProcessOneResult ProcessOne(
             string sourcePath,
             string destinationPath,
             Operation operation,
@@ -365,55 +365,55 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 if (!destinationExists)
                 {
-                    return (true, eligible, error);
+                    return new ProcessOneResult(true, eligible, error);
                 }
                 if (sourceExists)
                 {
-                    return (true, eligible, error);
+                    return new ProcessOneResult(true, eligible, error);
                 }
                 if (AssetDatabase.LoadAssetAtPath<AnimationClip>(destinationPath) == null)
                 {
                     error = "Destination is not an animation clip.";
-                    return (false, eligible, error);
+                    return new ProcessOneResult(false, eligible, error);
                 }
                 eligible = true;
                 if (applyChanges && !AssetDatabase.DeleteAsset(destinationPath))
                 {
                     error = "Could not delete the destination clip.";
-                    return (false, eligible, error);
+                    return new ProcessOneResult(false, eligible, error);
                 }
-                return (true, eligible, error);
+                return new ProcessOneResult(true, eligible, error);
             }
 
             if (!sourceExists)
             {
                 error = "Source clip does not exist.";
-                return (false, eligible, error);
+                return new ProcessOneResult(false, eligible, error);
             }
             AnimationClip sourceClip = AssetDatabase.LoadAssetAtPath<AnimationClip>(sourcePath);
             if (sourceClip == null)
             {
                 error = "Source is not an animation clip.";
-                return (false, eligible, error);
+                return new ProcessOneResult(false, eligible, error);
             }
             if (!TryClassify(sourceClip, destinationPath, out Status status, out error))
             {
-                return (false, eligible, error);
+                return new ProcessOneResult(false, eligible, error);
             }
 
             if (operation == Operation.DeleteUnchangedSource)
             {
                 if (status != Status.Unchanged)
                 {
-                    return (true, eligible, error);
+                    return new ProcessOneResult(true, eligible, error);
                 }
                 eligible = true;
                 if (applyChanges && !AssetDatabase.DeleteAsset(sourcePath))
                 {
                     error = "Could not delete the source clip.";
-                    return (false, eligible, error);
+                    return new ProcessOneResult(false, eligible, error);
                 }
-                return (true, eligible, error);
+                return new ProcessOneResult(true, eligible, error);
             }
 
             eligible = operation switch
@@ -425,30 +425,30 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             };
             if (!eligible || !applyChanges)
             {
-                return (true, eligible, error);
+                return new ProcessOneResult(true, eligible, error);
             }
             if (status == Status.New)
             {
                 if (!AssetDatabaseBatchHelper.EnsureAssetParentFolder(destinationPath))
                 {
                     error = "Could not create the destination folder.";
-                    return (false, eligible, error);
+                    return new ProcessOneResult(false, eligible, error);
                 }
                 if (!AssetDatabase.CopyAsset(sourcePath, destinationPath))
                 {
                     error = "Could not copy the source clip.";
-                    return (false, eligible, error);
+                    return new ProcessOneResult(false, eligible, error);
                 }
-                return (true, eligible, error);
+                return new ProcessOneResult(true, eligible, error);
             }
             if (!destinationExists)
             {
                 error = "Destination clip disappeared before replacement.";
-                return (false, eligible, error);
+                return new ProcessOneResult(false, eligible, error);
             }
             FileUtil.ReplaceFile(sourceFullPath, destinationFullPath);
             AssetDatabase.ImportAsset(destinationPath, ImportAssetOptions.ForceUpdate);
-            return (true, eligible, error);
+            return new ProcessOneResult(true, eligible, error);
         }
 
         private static bool TryClassify(
@@ -465,20 +465,34 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 error = string.Empty;
                 return true;
             }
-            AnimationClip destination = AssetDatabase.LoadAssetAtPath<AnimationClip>(
-                destinationPath
-            );
-            if (source == null || destination == null)
+            if (source == null)
             {
                 status = Status.New;
-                error = "Source or destination file is not an animation clip.";
+                error = "Source is not an animation clip.";
                 return false;
             }
-            status = AnimationClipContentComparer.AreAnimationClipsContentEqual(source, destination)
-                ? Status.Unchanged
-                : Status.Changed;
-            error = string.Empty;
-            return true;
+            try
+            {
+                AnimationClip destination = AssetDatabase.LoadAssetAtPath<AnimationClip>(
+                    destinationPath
+                );
+                status =
+                    destination != null
+                    && AnimationClipContentComparer.AreAnimationClipsContentEqual(
+                        source,
+                        destination
+                    )
+                        ? Status.Unchanged
+                        : Status.Changed;
+                error = string.Empty;
+                return true;
+            }
+            catch (Exception)
+            {
+                status = Status.Changed;
+                error = string.Empty;
+                return true;
+            }
         }
 
         private static bool TryValidateRoots(
@@ -719,6 +733,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 FailedCount = failedCount;
                 Error = error;
                 Diagnostics = diagnostics;
+            }
+        }
+
+        private readonly struct ProcessOneResult
+        {
+            public bool Succeeded { get; }
+
+            public bool Eligible { get; }
+
+            public string Error { get; }
+
+            public ProcessOneResult(bool succeeded, bool eligible, string error)
+            {
+                Succeeded = succeeded;
+                Eligible = eligible;
+                Error = error;
             }
         }
     }

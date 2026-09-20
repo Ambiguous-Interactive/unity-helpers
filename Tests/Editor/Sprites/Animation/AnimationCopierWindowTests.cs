@@ -548,6 +548,67 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         }
 
         [Test]
+        public void ApiAnalysisContinuesWhenDestinationAnimationCannotLoad()
+        {
+            string sourceFolder = Path.Combine(SrcRoot, "InvalidDestination").SanitizePath();
+            string destinationFolder = Path.Combine(DstRoot, "InvalidDestination").SanitizePath();
+            EnsureFolder(sourceFolder);
+            EnsureFolder(destinationFolder);
+            string firstSource = Path.Combine(sourceFolder, "First.anim").SanitizePath();
+            string secondSource = Path.Combine(sourceFolder, "Second.anim").SanitizePath();
+            string invalidDestination = Path.Combine(destinationFolder, "First.anim")
+                .SanitizePath();
+            CreateEmptyClip(firstSource);
+            CreateEmptyClip(secondSource);
+            AssetDatabase.SaveAssets();
+            File.WriteAllText(ToFull(invalidDestination), "invalid animation clip");
+            try
+            {
+                Assert.IsTrue(
+                    AssetDatabase.LoadAssetAtPath<AnimationClip>(invalidDestination) == null
+                );
+
+                List<AnimationCopierAPI.Entry> entries = new();
+                List<AnimationCopierAPI.Entry> orphans = new();
+                Assert.IsTrue(
+                    AnimationCopierAPI.TryAnalyze(
+                        sourceFolder,
+                        destinationFolder,
+                        entries,
+                        orphans,
+                        out string error
+                    ),
+                    error
+                );
+                Assert.AreEqual(2, entries.Count);
+                Assert.IsTrue(
+                    entries.Exists(entry =>
+                        string.Equals(
+                            entry.SourcePath,
+                            firstSource,
+                            System.StringComparison.Ordinal
+                        )
+                        && entry.Classification == AnimationCopierAPI.Status.Changed
+                    )
+                );
+                Assert.IsTrue(
+                    entries.Exists(entry =>
+                        string.Equals(
+                            entry.SourcePath,
+                            secondSource,
+                            System.StringComparison.Ordinal
+                        )
+                        && entry.Classification == AnimationCopierAPI.Status.New
+                    )
+                );
+            }
+            finally
+            {
+                File.Delete(ToFull(invalidDestination));
+            }
+        }
+
+        [Test]
         public void ApiRechecksCurrentStateBeforeDeletingClips()
         {
             string sourceFolder = Path.Combine(SrcRoot, "DirectApiDelete").SanitizePath();
