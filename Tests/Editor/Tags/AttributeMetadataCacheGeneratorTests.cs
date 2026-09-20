@@ -43,6 +43,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         private bool _tempFolderExistedBefore;
         private byte[] _assetBackup;
         private byte[] _assetMetaBackup;
+        private string _setUpTestId;
         private bool _previousAllowAssetCreationDuringSuppression;
 
         private static void ImportAssetIfExists(string assetPath)
@@ -142,6 +143,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         [UnitySetUp]
         public IEnumerator SetUp()
         {
+            _setUpTestId = TestContext.CurrentContext.Test.ID;
             _setUpComplete = false;
             _suppressionCaptured = false;
             _assetBackedUp = false;
@@ -192,6 +194,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
         public override IEnumerator UnityTearDown()
         {
             yield return base.UnityTearDown();
+
+            if (
+                string.IsNullOrEmpty(_setUpTestId)
+                || !string.Equals(
+                    _setUpTestId,
+                    TestContext.CurrentContext.Test.ID,
+                    StringComparison.Ordinal
+                )
+            )
+            {
+                yield break;
+            }
 
             if (_suppressionCaptured)
             {
