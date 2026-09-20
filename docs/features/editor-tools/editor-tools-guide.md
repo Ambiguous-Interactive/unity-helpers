@@ -591,6 +591,10 @@ apart and moves only what matters.
 Copying a changed clip preserves its GUID, so every Animator that already references it keeps
 working.
 
+Enable **Include Unchanged in Copy All (force replace)** when you need to refresh selected clips
+that the last analysis classified as unchanged. **Copy All** then replaces those destination files
+too and preserves their GUIDs.
+
 "Changed" is decided by comparing clip contents field by field — frame rate, length, wrap mode, every
 curve key, every event and its parameters — not by an asset hash, so a re-import that produces an
 identical clip does not show up as a change.

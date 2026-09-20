@@ -55,6 +55,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             set => _dryRun = value;
         }
 
+        internal bool IncludeUnchangedInCopyAll
+        {
+            get => _includeUnchangedInCopyAll;
+            set => _includeUnchangedInCopyAll = value;
+        }
+
         internal int NewCount => _newAnimations.Count;
         internal int ChangedCount => _changedAnimations.Count;
         internal int UnchangedCount => _unchangedAnimations.Count;
@@ -872,6 +878,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                     animationsToCopy.AddRange(_newAnimations);
                     animationsToCopy.AddRange(_changedAnimations);
+                    if (_includeUnchangedInCopyAll)
+                    {
+                        animationsToCopy.AddRange(_unchangedAnimations);
+                    }
                     break;
                 case CopyMode.Changed:
                     animationsToCopy.AddRange(_changedAnimations);

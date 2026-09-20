@@ -176,6 +176,49 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         }
 
         [Test]
+        public void CopyAllIncludingUnchangedReplacesSelectedClipAndPreservesGuid()
+        {
+            string sourceFolder = Path.Combine(SrcRoot, "ForceReplace").SanitizePath();
+            string destinationFolder = Path.Combine(DstRoot, "ForceReplace").SanitizePath();
+            EnsureFolder(sourceFolder);
+            EnsureFolder(destinationFolder);
+            string source = Path.Combine(sourceFolder, "ForceReplace.anim").SanitizePath();
+            string destination = Path.Combine(destinationFolder, "ForceReplace.anim")
+                .SanitizePath();
+            CreateEmptyClip(source);
+            AssetDatabase.SaveAssets();
+            ImportAssetIfExists(source);
+            Assert.IsTrue(AssetDatabase.CopyAsset(source, destination));
+            AssetDatabase.SaveAssets();
+            ImportAssetIfExists(destination);
+
+            AnimationCopierWindow window = CreateWindow();
+            window.AnimationSourcePathRelative = sourceFolder;
+            window.AnimationDestinationPathRelative = destinationFolder;
+            window.IncludeUnchangedInCopyAll = true;
+            window.AnalyzeAnimations();
+            Assert.AreEqual(1, window.UnchangedCount);
+
+            string destinationGuid = AssetDatabase.AssetPathToGUID(destination);
+            AnimationClip originalDestination = AssetDatabase.LoadAssetAtPath<AnimationClip>(
+                destination
+            );
+            float originalFrameRate = originalDestination.frameRate;
+            ModifyClip(source);
+            AssetDatabase.SaveAssets();
+            ImportAssetIfExists(source);
+
+            window.CopyAll();
+            ImportAssetIfExists(destination);
+
+            AnimationClip updatedDestination = AssetDatabase.LoadAssetAtPath<AnimationClip>(
+                destination
+            );
+            Assert.AreEqual(originalFrameRate + 1f, updatedDestination.frameRate);
+            Assert.AreEqual(destinationGuid, AssetDatabase.AssetPathToGUID(destination));
+        }
+
+        [Test]
         public void MirrorDeleteRemovesOrphansWhenNotDryRun()
         {
             string srcA = Path.Combine(SrcRoot, "A.anim").SanitizePath();
