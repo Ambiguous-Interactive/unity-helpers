@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `ProtoSchemaExporter` to write selected or discovered project contracts from Editor code without opening a window. See [Serialization](./docs/features/serialization/serialization.md#exporting-a-proto3-schema) ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Add a public sprite atlas API to scan and sync folders, generate and pack atlases, and detect config drift from code or batch mode. Matching atlases are left untouched. See [Sprite Atlas Generator](./docs/features/editor-tools/editor-tools-guide.md#sprite-atlas-generator) ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Add `DurableFile.WriteAllBytesAsync` for staged, cancellable binary saves with the same durability guarantees as synchronous byte writes. See [Durable Writes for Player Data](./docs/features/utilities/helper-utilities.md#durable-writes-for-player-data) ([#816](https://github.com/Ambiguous-Interactive/unity-helpers/issues/816)).
 - Add an Odin migration preview/apply tool for proven-equivalent `ReadOnly` and

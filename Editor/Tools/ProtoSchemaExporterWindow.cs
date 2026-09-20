@@ -139,6 +139,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         private readonly List<string> _assemblyNames = new List<string>();
         private readonly Dictionary<Type, Type> _surrogates = new Dictionary<Type, Type>();
         private readonly List<string> _lastDiagnostics = new List<string>();
+        private string _surrogateDiscoveryError;
         private HelpBox _summary;
         private ScrollView _contractList;
         private HelpBox _packageError;
@@ -321,40 +322,41 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             _assemblyNames.Clear();
             _surrogates.Clear();
 
-            HashSet<string> assemblyNames = new HashSet<string>(StringComparer.Ordinal);
-            List<Type> discovered = new List<Type>();
-            foreach (Type contract in TypeCache.GetTypesWithAttribute<WProtoContractAttribute>())
+            _surrogateDiscoveryError = null;
+            if (
+                !ProtoSchemaExporter.TryDiscoverProjectContracts(
+                    out IReadOnlyList<Type> contracts,
+                    out _surrogateDiscoveryError
+                )
+            )
             {
-                if (contract.IsGenericTypeDefinition)
-                {
-                    continue;
-                }
-
-                assemblyNames.Add(AssemblyNameOf(contract));
-                discovered.Add(contract);
+                ReportFailure(_surrogateDiscoveryError);
+                return;
             }
 
-            _contracts.AddRange(
-                discovered
-                    .OrderBy(AssemblyNameOf, StringComparer.Ordinal)
-                    .ThenBy(ContractDisplayName, StringComparer.Ordinal)
-            );
-            _assemblyNames.AddRange(assemblyNames.OrderBy(name => name, StringComparer.Ordinal));
-#if UNITY_6000_6_OR_NEWER
-            IReadOnlyList<System.Reflection.Assembly> loadedAssemblies =
-                UnityEngine.Assemblies.CurrentAssemblies.GetLoadedAssemblies();
-#else
-            IReadOnlyList<System.Reflection.Assembly> loadedAssemblies =
-                AppDomain.CurrentDomain.GetAssemblies();
-#endif
-            foreach (System.Reflection.Assembly assembly in loadedAssemblies)
+            HashSet<string> assemblyNames = new HashSet<string>(StringComparer.Ordinal);
+            foreach (Type contract in contracts)
             {
-                foreach (
-                    WProtoSurrogateAttribute surrogate in assembly.GetCustomAttributes<WProtoSurrogateAttribute>()
+                _contracts.Add(contract);
+                assemblyNames.Add(AssemblyNameOf(contract));
+            }
+
+            _assemblyNames.AddRange(assemblyNames.OrderBy(name => name, StringComparer.Ordinal));
+            _surrogateDiscoveryError = null;
+            if (
+                !ProtoSchemaExporter.TryDiscoverProjectSurrogates(
+                    out IReadOnlyDictionary<Type, Type> surrogates,
+                    out _surrogateDiscoveryError
                 )
-                {
-                    _surrogates[surrogate.RealType] = surrogate.SurrogateType;
-                }
+            )
+            {
+                ReportFailure(_surrogateDiscoveryError);
+                return;
+            }
+
+            foreach (KeyValuePair<Type, Type> surrogate in surrogates)
+            {
+                _surrogates[surrogate.Key] = surrogate.Value;
             }
         }
 
@@ -400,145 +402,58 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
         internal bool ExportSchemaToPath(string outputPath)
         {
-            _lastDiagnostics.Clear();
-
-            List<Type> contracts = SelectedContracts();
-            if (contracts.Count == 0)
+            if (!string.IsNullOrEmpty(_surrogateDiscoveryError))
             {
-                ReportFailure("No contracts selected.");
+                _lastDiagnostics.Clear();
+                ReportFailure(_surrogateDiscoveryError);
                 return false;
             }
 
-            if (!HasUsablePackageName())
-            {
-                ReportFailure(
-                    $"\"{_packageName}\" is not a proto3 package: use dot-separated identifiers, "
-                        + "or clear the field to omit the clause."
-                );
-                return false;
-            }
-
-            bool rendered = WProtoSchemaText.TryWriteSchema(
-                contracts,
-                PackageClause(),
-                _surrogates,
-                out string schema,
-                out IReadOnlyList<string> diagnostics
-            );
-            if (!rendered)
-            {
-                ReportFailure("Nothing rendered: no [WProtoContract] types among the selection.");
-                return false;
-            }
-
-            _lastDiagnostics.AddRange(diagnostics);
-            try
-            {
-                string directory = Path.GetDirectoryName(outputPath);
-                if (!string.IsNullOrEmpty(directory))
-                {
-                    Directory.CreateDirectory(directory);
-                }
-
-                File.WriteAllText(outputPath, schema, new UTF8Encoding(false));
-            }
-            catch (Exception exception)
-                when (exception is IOException
-                    || exception is UnauthorizedAccessException
-                    || exception is ArgumentException
-                    || exception is NotSupportedException
+            return ApplyExportResult(
+                ProtoSchemaExporter.Export(
+                    SelectedContracts(),
+                    outputPath,
+                    ProtoSchemaExporter.ExportLayout.SingleFile,
+                    _packageName,
+                    _surrogates
                 )
-            {
-                ReportFailure($"Could not write {outputPath}: {exception.Message}");
-                return false;
-            }
-            ReportSuccess($"Exported {contracts.Count} contracts to {outputPath}.");
-            return true;
+            );
         }
 
         internal bool ExportSchemasToDirectory(string outputDirectory)
         {
-            _lastDiagnostics.Clear();
-
-            List<Type> contracts = SelectedContracts();
-            if (contracts.Count == 0)
+            if (!string.IsNullOrEmpty(_surrogateDiscoveryError))
             {
-                ReportFailure("No contracts selected.");
+                _lastDiagnostics.Clear();
+                ReportFailure(_surrogateDiscoveryError);
                 return false;
             }
 
-            if (!HasUsablePackageName())
-            {
-                ReportFailure(
-                    $"\"{_packageName}\" is not a proto3 package: use dot-separated identifiers, "
-                        + "or clear the field to omit the clause."
-                );
-                return false;
-            }
-
-            try
-            {
-                Directory.CreateDirectory(outputDirectory);
-                HashSet<string> usedFileNames = new HashSet<string>(
-                    StringComparer.OrdinalIgnoreCase
-                );
-                int exportedFiles = 0;
-                foreach (IGrouping<string, Type> group in GroupForLayout(contracts))
-                {
-                    // Empty groups still consume names so export and overwrite confirmation resolve identical collisions.
-                    string fileName = UniqueFileName(group.Key, usedFileNames);
-                    bool rendered = WProtoSchemaText.TryWriteSchema(
-                        group,
-                        PackageClause(),
-                        _surrogates,
-                        out string schema,
-                        out IReadOnlyList<string> diagnostics
-                    );
-                    if (!rendered)
-                    {
-                        _lastDiagnostics.Add(
-                            $"{group.Key}: nothing rendered; no [WProtoContract] type in this group."
-                        );
-                        continue;
-                    }
-
-                    foreach (string diagnostic in diagnostics)
-                    {
-                        _lastDiagnostics.Add($"{group.Key}: {diagnostic}");
-                    }
-
-                    File.WriteAllText(
-                        Path.Combine(outputDirectory, fileName),
-                        schema,
-                        new UTF8Encoding(false)
-                    );
-                    exportedFiles++;
-                }
-
-                if (exportedFiles == 0)
-                {
-                    ReportFailure(
-                        "Nothing rendered: no [WProtoContract] types among the selection."
-                    );
-                    return false;
-                }
-
-                ReportSuccess(
-                    $"Exported {contracts.Count} contracts to {exportedFiles} files in "
-                        + $"{outputDirectory}."
-                );
-                return true;
-            }
-            catch (Exception exception)
-                when (exception is IOException
-                    || exception is UnauthorizedAccessException
-                    || exception is ArgumentException
-                    || exception is NotSupportedException
+            return ApplyExportResult(
+                ProtoSchemaExporter.Export(
+                    SelectedContracts(),
+                    outputDirectory,
+                    (ProtoSchemaExporter.ExportLayout)_exportLayout,
+                    _packageName,
+                    _surrogates
                 )
+            );
+        }
+
+        private bool ApplyExportResult(ProtoSchemaExporter.ExportResult result)
+        {
+            _lastDiagnostics.Clear();
+            _lastDiagnostics.AddRange(result.Diagnostics);
+            if (result.Success)
             {
-                ReportFailure($"Could not write schemas to {outputDirectory}: {exception.Message}");
-                return false;
+                ReportSuccess(result.Message);
             }
+            else
+            {
+                ReportFailure(result.Message);
+            }
+
+            return result.Success;
         }
 
         private void OnEnable()
@@ -1058,50 +973,35 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
         private bool ConfirmOverwrite(string outputPath, bool singleFile)
         {
-            if (singleFile)
+            if (
+                !ProtoSchemaExporter.TryGetOutputPaths(
+                    SelectedContracts(),
+                    outputPath,
+                    (ProtoSchemaExporter.ExportLayout)_exportLayout,
+                    _packageName,
+                    out IReadOnlyList<string> paths,
+                    out string error
+                )
+            )
             {
-                if (!File.Exists(outputPath))
-                {
-                    return true;
-                }
-
-                return EditorUtility.DisplayDialog(
-                    "Overwrite schema?",
-                    $"{outputPath} already exists. Overwrite it?",
-                    "Overwrite",
-                    "Cancel"
-                );
+                ReportFailure(error);
+                return false;
             }
 
-            HashSet<string> usedFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            int existingFileCount = GroupForLayout(SelectedContracts())
-                .Count(group =>
-                    File.Exists(Path.Combine(outputPath, UniqueFileName(group.Key, usedFileNames)))
-                );
+            int existingFileCount = paths.Count(File.Exists);
             if (existingFileCount == 0)
             {
                 return true;
             }
 
             return EditorUtility.DisplayDialog(
-                "Overwrite schemas?",
-                $"{existingFileCount} schema files already exist in {outputPath}. Overwrite them?",
+                singleFile ? "Overwrite schema?" : "Overwrite schemas?",
+                singleFile
+                    ? $"{outputPath} already exists. Overwrite it?"
+                    : $"{existingFileCount} schema files already exist in {outputPath}. Overwrite them?",
                 "Overwrite",
                 "Cancel"
             );
-        }
-
-        private IEnumerable<IGrouping<string, Type>> GroupForLayout(IEnumerable<Type> contracts)
-        {
-            switch (_exportLayout)
-            {
-                case ExportLayout.OneFilePerNamespace:
-                    return contracts.GroupBy(NamespaceGroupOf, StringComparer.Ordinal);
-                case ExportLayout.OneFilePerContract:
-                    return contracts.GroupBy(ContractDisplayName, StringComparer.Ordinal);
-                default:
-                    return contracts.GroupBy(AssemblyNameOf, StringComparer.Ordinal);
-            }
         }
 
         private string PackageClause()

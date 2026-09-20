@@ -2197,6 +2197,36 @@ base's, which is the byte layout (the schema lists them in field-number order). 
 nothing can express is skipped and reported in the export window rather than silently missing. From code, `WProtoSchemaText.TryWriteSchema(contracts, packageName, surrogates,
 out string schema, out IReadOnlyList<string> diagnostics)` renders the same text.
 
+Editor scripts can also write schemas without opening the window. `ProtoSchemaExporter.Export`
+accepts the exact contract types, destination, layout, optional package name, and optional surrogate
+map. `ExportProject` discovers concrete, directly attributed project contracts and loaded assembly
+surrogates. Both return an `ExportResult`
+with `Success`, a readable `Message`, `WrittenPaths`, and schema `Diagnostics`. A relative destination
+is resolved from the Unity project root and must stay inside it; an absolute destination may be
+outside the project. An invalid package or path is refused before any file is written.
+When `surrogates` is null, `Export` discovers the registered surrogates in loaded assemblies; pass a
+map to replace that set explicitly. A discovery failure stops the export before writing.
+
+```csharp
+using WallstopStudios.UnityHelpers.Editor.Tools;
+
+ProtoSchemaExporter.ExportResult result = ProtoSchemaExporter.Export(
+    new[] { typeof(PlayerState) },
+    "Assets/Schemas/player.proto",
+    ProtoSchemaExporter.ExportLayout.SingleFile,
+    "game.save"
+);
+if (!result.Success)
+{
+    UnityEngine.Debug.LogError(result.Message);
+}
+```
+
+The API does not show an overwrite prompt or refresh the Asset Database. Callers that need those
+Editor actions must perform them after export. File output is Tier C for Unity Undo: an error during
+a directory export may leave paths listed in `WrittenPaths`, and overwritten files cannot be restored
+through Unity Undo.
+
 ### Resolving a formatter
 
 `WProtoFormatterProvider` maps a message type to its `IWProtoFormatter<T>`. The lookup is a static

@@ -469,6 +469,33 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             }
         }
 
+        [Test]
+        public void DirectExporterMatchesTheWindowForOneSelectedContract()
+        {
+            _window.SetSelectedContractsForTest(
+                new[] { typeof(ProtoSchemaExporterSampleContract) }
+            );
+            Assert.IsTrue(_window.ExportSchemaToPath(_outputPath));
+            string windowSchema = File.ReadAllText(_outputPath);
+
+            Assert.IsTrue(
+                ProtoSchemaExporter.TryDiscoverProjectSurrogates(
+                    out IReadOnlyDictionary<Type, Type> surrogates,
+                    out string discoveryError
+                ),
+                discoveryError
+            );
+            ProtoSchemaExporter.ExportResult result = ProtoSchemaExporter.Export(
+                new[] { typeof(ProtoSchemaExporterSampleContract) },
+                _outputPath,
+                ProtoSchemaExporter.ExportLayout.SingleFile,
+                null,
+                surrogates
+            );
+            Assert.IsTrue(result.Success, result.Message);
+            Assert.AreEqual(windowSchema, File.ReadAllText(_outputPath));
+        }
+
         private string ExportToDirectory(string leafName)
         {
             string outputDirectory = Path.Combine(
