@@ -23,7 +23,6 @@ namespace WallstopStudios.UnityHelpers.Editor
             out string error
         )
         {
-            error = null;
             if (clip == null)
             {
                 error = "Animation clip is missing.";
@@ -69,6 +68,7 @@ namespace WallstopStudios.UnityHelpers.Editor
 
                 EditorUtility.SetDirty(clip);
                 AssetDatabase.SaveAssetIfDirty(clip);
+                error = null;
                 return true;
             }
             catch (Exception exception)

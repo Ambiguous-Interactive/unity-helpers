@@ -491,7 +491,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             out bool skipped
         )
         {
-            skipped = false;
             try
             {
                 TextureImporter importer = (TextureImporter)
@@ -512,6 +511,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 if (texture == null)
                 {
                     result.AddError($"Failed to load '{request.SourceAssetPath}'.");
+                    skipped = false;
                     return false;
                 }
 
@@ -522,6 +522,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 if (texture.width <= 0 || texture.height <= 0)
                 {
                     result.AddError($"Source texture has no pixels: '{request.SourceAssetPath}'.");
+                    skipped = false;
                     return false;
                 }
 
@@ -552,6 +553,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     if (bytes == null)
                     {
                         result.AddError($"Failed to encode '{request.SourceAssetPath}'.");
+                        skipped = false;
                         return false;
                     }
 
@@ -563,6 +565,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             result.AddError(
                                 $"Failed to write '{request.OutputAssetPath}': {error.Message}"
                             );
+                            skipped = false;
                             return false;
                         }
                     }
@@ -613,11 +616,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     UnityEngine.Object.DestroyImmediate(extracted);
                 }
 
+                skipped = false;
                 return true;
             }
             catch (Exception error)
             {
                 result.AddError($"Failed to extract '{request.SourceAssetPath}': {error.Message}");
+                skipped = false;
                 return false;
             }
         }
