@@ -192,6 +192,38 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         }
 
         [Test]
+        public void DirectApiKeepsOccupiedOutputAndUsesNextName()
+        {
+            string sourcePath = Path.Combine(_testRoot, "occupied.png").SanitizePath();
+            string occupiedPath = Path.Combine(_testRoot, "occupied_blurred_2.png").SanitizePath();
+            string nextPath = Path.Combine(_testRoot, "occupied_blurred_2_1.png").SanitizePath();
+            CreatePng(sourcePath, Color.magenta);
+            byte[] existingBytes = { 1, 2, 3, 4 };
+            File.WriteAllBytes(RelToFull(occupiedPath), existingBytes);
+            TrackAssetPath(occupiedPath);
+            TrackAssetPath(nextPath);
+            Texture2D source = AssetDatabase.LoadAssetAtPath<Texture2D>(sourcePath);
+            int initialFileCount = Directory.GetFiles(RelToFull(_testRoot)).Length;
+
+            bool success = ImageBlurAPI.TryWriteAsset(
+                source,
+                2,
+                out string outputPath,
+                out string error,
+                importOutput: false
+            );
+
+            Assert.IsTrue(success, error);
+            Assert.That(outputPath, Is.EqualTo(nextPath));
+            Assert.That(File.ReadAllBytes(RelToFull(occupiedPath)), Is.EqualTo(existingBytes));
+            Assert.That(File.Exists(RelToFull(nextPath)), Is.True);
+            Assert.That(
+                Directory.GetFiles(RelToFull(_testRoot)).Length,
+                Is.EqualTo(initialFileCount + 1)
+            );
+        }
+
+        [Test]
         public void InvalidRadiusRestoresImporterSettingsAndDoesNotLeakTexture()
         {
             string sourcePath = Path.Combine(_testRoot, "failure.png").SanitizePath();

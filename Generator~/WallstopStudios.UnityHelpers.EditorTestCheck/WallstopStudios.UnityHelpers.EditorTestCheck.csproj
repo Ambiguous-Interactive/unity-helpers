@@ -343,7 +343,7 @@
     />
     <!-- The UI Toolkit styles referenced by the progress-control editmode fixtures. -->
     <Compile Include="$(RepoRoot)/Styles/**/*.cs" />
-    <!-- The editor sources, with EditorCheck's seven exclusions, restated one per line so the
+    <!-- The editor sources, with EditorCheck's eight exclusions, restated one per line so the
          cascade block further down can name the file each fixture is waiting on. EditorCheck
          remains the gate that JUDGES this tree; its header carries the full reasoning. -->
     <Compile Include="$(RepoRoot)/Editor/**/*.cs" />
@@ -352,9 +352,12 @@
     <Compile Remove="$(RepoRoot)/Editor/Visuals/EnhancedImageEditor.cs" />
     <!-- PERMANENT. Binds `MatchColliderToSprite`, uGUI-dependent and already out of the Runtime set. -->
     <Compile Remove="$(RepoRoot)/Editor/CustomEditors/MatchColliderToSpriteEditor.cs" />
-    <!-- PIN-DRIVEN. `AssetDatabase.SaveAssetIfDirty`, absent from Unity3D.SDK 2021.1.14 and present
-         in 2021.3. Stood in for by EditorCheck's `Shims/AnimationEventEditorShim.cs`. -->
+    <!-- PIN-DRIVEN. Calls AnimationEventSaveAPI, excluded below for a UnityEditor pin gap.
+         Stood in for by EditorCheck's `Shims/AnimationEventEditorShim.cs`. -->
     <Compile Remove="$(RepoRoot)/Editor/AnimationEventEditor.cs" />
+    <!-- PIN-DRIVEN. `AssetDatabase.SaveAssetIfDirty`, absent from Unity3D.SDK 2021.1.14 and
+         present in 2021.3. Its public signature has a check-only shim. -->
+    <Compile Remove="$(RepoRoot)/Editor/AnimationEventSaveAPI.cs" />
     <!-- PIN-DRIVEN. Reads the GETTER of `SerializedProperty.managedReferenceValue` at three sites;
          2021.1.14 carries the setter alone, so the read is CS0154. -->
     <Compile Remove="$(RepoRoot)/Editor/CustomDrawers/SerializableDictionaryPropertyDrawer.cs" />

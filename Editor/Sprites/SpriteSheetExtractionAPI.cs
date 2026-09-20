@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using System.Text.RegularExpressions;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Utils;
 
@@ -212,6 +213,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         /// <summary>
         /// Extracts selected sprites and returns counts and errors without displaying prompts.
+        /// Existing outputs are skipped unless overwrite is requested.
         /// </summary>
         public static SpriteSheetExtractionResult Extract(
             IReadOnlyList<SpriteSheetExtractionRequest> requests,
@@ -258,8 +260,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         continue;
                     }
 
-                    if (!TryWrite(request, readability, result))
+                    if (
+                        !TryWrite(request, readability, result, overwriteExisting, out bool skipped)
+                    )
                     {
+                        if (skipped)
+                        {
+                            ++result.SkippedCount;
+                        }
+
                         continue;
                     }
 
@@ -366,6 +375,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             return result;
         }
 
+        internal static bool TryPublishNewFile(string stagedPath, string destinationPath)
+        {
+            try
+            {
+                File.Move(stagedPath, destinationPath);
+                return true;
+            }
+            catch (IOException) when (File.Exists(destinationPath))
+            {
+                return false;
+            }
+        }
+
         private static bool Validate(
             SpriteSheetExtractionRequest request,
             SpriteSheetExtractionResult result
@@ -464,9 +486,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private static bool TryWrite(
             SpriteSheetExtractionRequest request,
             Dictionary<string, bool> readability,
-            SpriteSheetExtractionResult result
+            SpriteSheetExtractionResult result,
+            bool overwriteExisting,
+            out bool skipped
         )
         {
+            skipped = false;
             try
             {
                 TextureImporter importer = (TextureImporter)
@@ -523,10 +548,65 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         pixels
                     );
                     SpriteSheetExtractor.ApplyPixelBuffer(extracted, width, height, pixels);
-                    File.WriteAllBytes(
-                        ToFullPath(request.OutputAssetPath),
-                        extracted.EncodeToPNG()
-                    );
+                    byte[] bytes = extracted.EncodeToPNG();
+                    if (bytes == null)
+                    {
+                        result.AddError($"Failed to encode '{request.SourceAssetPath}'.");
+                        return false;
+                    }
+
+                    string outputPath = ToFullPath(request.OutputAssetPath);
+                    if (overwriteExisting)
+                    {
+                        if (!DurableFile.TryWriteAllBytes(outputPath, bytes, out Exception error))
+                        {
+                            result.AddError(
+                                $"Failed to write '{request.OutputAssetPath}': {error.Message}"
+                            );
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        string stagedPath = Path.Combine(
+                            Path.GetDirectoryName(outputPath),
+                            Path.GetRandomFileName()
+                        );
+                        bool stagedOwned = false;
+                        try
+                        {
+                            using (
+                                FileStream stream = new(
+                                    stagedPath,
+                                    FileMode.CreateNew,
+                                    FileAccess.Write,
+                                    FileShare.None
+                                )
+                            )
+                            {
+                                stagedOwned = true;
+                                stream.Write(bytes, 0, bytes.Length);
+                                stream.Flush(flushToDisk: true);
+                            }
+
+                            if (TryPublishNewFile(stagedPath, outputPath))
+                            {
+                                stagedOwned = false;
+                            }
+                            else
+                            {
+                                skipped = true;
+                                return false;
+                            }
+                        }
+                        finally
+                        {
+                            if (stagedOwned)
+                            {
+                                File.Delete(stagedPath);
+                            }
+                        }
+                    }
                 }
                 finally
                 {

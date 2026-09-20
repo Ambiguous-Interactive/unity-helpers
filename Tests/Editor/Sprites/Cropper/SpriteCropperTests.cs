@@ -99,6 +99,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             CollectionAssert.Contains(directPaths, src);
             Assert.IsEmpty(multiSpritePaths);
 
+            string fullPath = RelToFull(src);
+            byte[] originalBytes = File.ReadAllBytes(fullPath);
+            string stagingPath = fullPath + DurableFile.TemporarySuffix;
+            Directory.CreateDirectory(stagingPath);
+            try
+            {
+                SpriteCropperAPI.CropResult failedResult = SpriteCropperAPI.Crop(
+                    src,
+                    new SpriteCropperAPI.CropOptions { OverwriteOriginals = true }
+                );
+                Assert.That(
+                    failedResult.Status,
+                    Is.EqualTo(SpriteCropperAPI.CropStatus.RetryableError)
+                );
+                CollectionAssert.AreEqual(originalBytes, File.ReadAllBytes(fullPath));
+            }
+            finally
+            {
+                Directory.Delete(stagingPath, recursive: true);
+            }
+
             SpriteCropperAPI.CropResult result = SpriteCropperAPI.Crop(
                 "aSsets\\" + src.Substring("Assets/".Length).Replace('/', '\\'),
                 new SpriteCropperAPI.CropOptions { OverwriteOriginals = true }

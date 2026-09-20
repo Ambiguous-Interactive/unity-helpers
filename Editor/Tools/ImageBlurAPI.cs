@@ -17,7 +17,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// <summary>
         /// Writes a blurred image beside a project texture. Temporary importer settings are
         /// restored after processing; restoration failures are reported. An output path can be
-        /// returned with an error if the file was written but a later operation failed.
+        /// returned with an error if the file was written but a later operation failed. Existing
+        /// output files are preserved and a free numbered name is chosen.
         /// </summary>
         public static bool TryWriteAsset(
             Texture2D source,
@@ -115,16 +116,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                             directory,
                             $"{fileName}_blurred_{radius}"
                         );
-                        string finalPath = newPathBase + outputExtension;
-                        string absolutePath = Path.Combine(projectRoot, finalPath);
-                        int counter = 0;
-                        while (File.Exists(absolutePath))
-                        {
-                            ++counter;
-                            finalPath = $"{newPathBase}_{counter}{outputExtension}";
-                            absolutePath = Path.Combine(projectRoot, finalPath);
-                        }
-
                         byte[] bytes = encodeJpeg
                             ? blurred.EncodeToJPG(100)
                             : blurred.EncodeToPNG();
@@ -134,9 +125,58 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                         }
                         else
                         {
-                            File.WriteAllBytes(absolutePath, bytes);
-                            producedPath = finalPath.Replace('\\', '/');
-                            wroteOutput = true;
+                            string stagedPath = Path.Combine(
+                                projectRoot,
+                                directory,
+                                Path.GetRandomFileName()
+                            );
+                            bool stagedOwned = false;
+                            try
+                            {
+                                using (
+                                    FileStream stream = new(
+                                        stagedPath,
+                                        FileMode.CreateNew,
+                                        FileAccess.Write,
+                                        FileShare.None
+                                    )
+                                )
+                                {
+                                    stagedOwned = true;
+                                    stream.Write(bytes, 0, bytes.Length);
+                                    stream.Flush(flushToDisk: true);
+                                }
+
+                                for (int counter = 0; ; ++counter)
+                                {
+                                    string finalPath =
+                                        counter == 0
+                                            ? newPathBase + outputExtension
+                                            : $"{newPathBase}_{counter}{outputExtension}";
+                                    string absolutePath = Path.Combine(projectRoot, finalPath);
+                                    if (TryPublishNewFile(stagedPath, absolutePath))
+                                    {
+                                        stagedOwned = false;
+                                        producedPath = finalPath.Replace('\\', '/');
+                                        wroteOutput = true;
+                                        break;
+                                    }
+
+                                    if (counter == int.MaxValue)
+                                    {
+                                        throw new IOException(
+                                            "No available blurred output name was found."
+                                        );
+                                    }
+                                }
+                            }
+                            finally
+                            {
+                                if (stagedOwned)
+                                {
+                                    File.Delete(stagedPath);
+                                }
+                            }
                         }
                     }
                 }
@@ -263,6 +303,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             {
                 blurred = null;
                 error = $"Could not blur texture '{source.name}': {exception.Message}";
+                return false;
+            }
+        }
+
+        internal static bool TryPublishNewFile(string stagedPath, string destinationPath)
+        {
+            try
+            {
+                File.Move(stagedPath, destinationPath);
+                return true;
+            }
+            catch (IOException) when (File.Exists(destinationPath))
+            {
                 return false;
             }
         }

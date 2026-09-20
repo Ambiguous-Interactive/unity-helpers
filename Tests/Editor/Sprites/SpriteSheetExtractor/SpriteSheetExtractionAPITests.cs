@@ -155,7 +155,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         public void ExistingOutputIsSkippedUnlessOverwriteRequested()
         {
             SpriteSheetExtractionResult first = SpriteSheetExtractionAPI.Extract(Requests());
+            byte[] firstBytes = File.ReadAllBytes(ToFullPath(Output));
             SpriteSheetExtractionResult skipped = SpriteSheetExtractionAPI.Extract(Requests());
+            Assert.That(File.ReadAllBytes(ToFullPath(Output)), Is.EqualTo(firstBytes));
             SpriteSheetExtractionRequest replacement = new(
                 Source,
                 Output,
@@ -178,6 +180,58 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             Color32 pixel = output.GetPixels32()[0];
             Assert.That(pixel.r, Is.EqualTo(0));
             Assert.That(pixel.g, Is.EqualTo(255));
+        }
+
+        [Test]
+        public void PublishSkipsOutputCreatedAfterPathSelection()
+        {
+            string stagedPath = Path.GetTempFileName();
+            string destinationPath = stagedPath + ".png";
+            byte[] stagedBytes = { 1, 2, 3 };
+            byte[] occupantBytes = { 4, 5, 6 };
+            try
+            {
+                File.WriteAllBytes(stagedPath, stagedBytes);
+                File.WriteAllBytes(destinationPath, occupantBytes);
+
+                Assert.That(
+                    SpriteSheetExtractionAPI.TryPublishNewFile(stagedPath, destinationPath),
+                    Is.False
+                );
+                Assert.That(File.ReadAllBytes(destinationPath), Is.EqualTo(occupantBytes));
+                Assert.That(File.ReadAllBytes(stagedPath), Is.EqualTo(stagedBytes));
+            }
+            finally
+            {
+                File.Delete(stagedPath);
+                File.Delete(destinationPath);
+            }
+        }
+
+        [Test]
+        public void FailedPublishRemovesStagedFileAndRestoresReadability()
+        {
+            string outputPath = ToFullPath(Output);
+            Directory.CreateDirectory(outputPath);
+            int initialFileCount = Directory.GetFiles(ToFullPath(Root)).Length;
+            try
+            {
+                SpriteSheetExtractionResult result = SpriteSheetExtractionAPI.Extract(Requests());
+
+                Assert.That(result.ExtractedCount, Is.Zero);
+                Assert.That(result.Errors, Is.Not.Empty);
+                Assert.That(
+                    Directory.GetFiles(ToFullPath(Root)).Length,
+                    Is.EqualTo(initialFileCount)
+                );
+                TextureImporter importer = AssetImporter.GetAtPath(Source) as TextureImporter;
+                Assert.IsTrue(importer != null);
+                Assert.That(importer.isReadable, Is.False);
+            }
+            finally
+            {
+                Directory.Delete(outputPath);
+            }
         }
 
         [Test]

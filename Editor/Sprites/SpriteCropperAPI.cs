@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using System.Text.RegularExpressions;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Utils;
 
@@ -552,7 +553,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     );
                     cropped.SetPixels32(0, 0, crop.CropWidth, crop.CropHeight, croppedPixels, 0);
                     cropped.Apply();
-                    File.WriteAllBytes(ToFullPath(outputPath), cropped.EncodeToPNG());
+                    if (
+                        !DurableFile.TryWriteAllBytes(
+                            ToFullPath(outputPath),
+                            cropped.EncodeToPNG(),
+                            out Exception writeError
+                        )
+                    )
+                    {
+                        return new CropResult(
+                            CropStatus.RetryableError,
+                            null,
+                            $"Failed to write cropped texture at '{outputPath}': {writeError.Message}"
+                        );
+                    }
                 }
                 finally
                 {

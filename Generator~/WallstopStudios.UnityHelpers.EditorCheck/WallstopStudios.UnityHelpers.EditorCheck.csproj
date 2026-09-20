@@ -50,7 +50,7 @@
 
     ============================ WHAT IT DOES NOT COVER ============================
 
-    SEVEN files under `Editor/` are excluded. Every one, with its reason:
+    EIGHT files under `Editor/` are excluded. Every one, with its reason:
 
       1. Editor/Visuals/EnhancedImageEditor.cs
          Binds `Visuals.UGUI.EnhancedImage` and `UnityEditor.UI.ImageEditor`. uGUI ships as a Unity
@@ -59,27 +59,27 @@
       2. Editor/CustomEditors/MatchColliderToSpriteEditor.cs
          Binds `MatchColliderToSprite`, likewise excluded from the Runtime set as uGUI-dependent.
       3. Editor/AnimationEventEditor.cs
-         `AssetDatabase.SaveAssetIfDirty` (one call site, line ~526). Absent from the 2021.1.14
+         Its save path calls AnimationEventSaveAPI, which is excluded for the same pin gap.
+         This editor type remains stood in by `Shims/AnimationEventEditorShim.cs`.
+      4. Editor/AnimationEventSaveAPI.cs
+         `AssetDatabase.SaveAssetIfDirty` (one call site). Absent from the 2021.1.14
          reference assembly; present in 2021.3, the package's real support floor, and in every
-         editor CI runs. HARNESS GAP, not a package one. STOOD IN FOR, like 4: dropping the file
-         also drops the type name, and `Editor/AnimationEventEditorViewModel.cs`, which is NOT
-         excluded, carries a `<see cref="AnimationEventEditor"/>` that a consumer's IDE resolves
-         perfectly well. `Shims/AnimationEventEditorShim.cs` declares the name and nothing else.
-      4. Editor/CustomDrawers/Utils/ValidationShared.cs
+         editor CI runs. `Shims/AnimationEventSaveAPIShim.cs` keeps the public signature checkable.
+      5. Editor/CustomDrawers/Utils/ValidationShared.cs
          Reads `SerializedProperty.managedReferenceValue`. Unity added that property's GETTER after
          2021.1 - the reference assembly carries the setter alone, so the read is CS0154 rather
          than CS1061. This one is STOOD IN FOR rather than merely dropped:
          see `Shims/ValidationSharedShim.cs`, which mirrors its signatures so the eight real files
          that only NAME it still compile - including five of the twelve Odin files this project
          exists to reach.
-      5. Editor/CustomDrawers/SerializableDictionaryPropertyDrawer.cs
+      6. Editor/CustomDrawers/SerializableDictionaryPropertyDrawer.cs
          Reads `managedReferenceValue` at three sites. Same missing getter as 4.
-      6. Editor/CustomDrawers/SerializableSetPropertyDrawer.cs
+      7. Editor/CustomDrawers/SerializableSetPropertyDrawer.cs
          CASCADE ONLY. It names `SerializableDictionaryPropertyDrawer` and
          `SerializableCollectionTweenDiagnostics`, both declared in 5. Nothing is wrong with it;
          it cannot compile without the file above.
 
-      7. Editor/Validation/Continuous/ValidationManagedReferences.cs
+      8. Editor/Validation/Continuous/ValidationManagedReferences.cs
          Reads `SerializedProperty.managedReferenceId`, available at the 2021.3 support floor.
          The 2021.1 host reference lacks it; the matching shim throws if executed, so compilation
          cannot be mistaken for managed-reference traversal evidence.
@@ -266,11 +266,12 @@
     <Compile Remove="$(RepoRoot)/Editor/Visuals/EnhancedImageEditor.cs" />
     <!-- PERMANENT. Binds `MatchColliderToSprite`, uGUI-dependent and already out of the Runtime set. -->
     <Compile Remove="$(RepoRoot)/Editor/CustomEditors/MatchColliderToSpriteEditor.cs" />
-    <!-- PIN-DRIVEN. Missing member: `AssetDatabase.SaveAssetIfDirty`, one call site. Absent from
-         Unity3D.SDK 2021.1.14, present in 2021.3 and every editor CI runs. Stood in for by
-         `Shims/AnimationEventEditorShim.cs`, which keeps the type NAME resolvable so the
-         `<see cref="AnimationEventEditor"/>` in the non-excluded view-model still binds. -->
+    <!-- PIN-DRIVEN. Calls AnimationEventSaveAPI, excluded below for a UnityEditor pin gap.
+         Stood in for by `Shims/AnimationEventEditorShim.cs`. -->
     <Compile Remove="$(RepoRoot)/Editor/AnimationEventEditor.cs" />
+    <!-- PIN-DRIVEN. `AssetDatabase.SaveAssetIfDirty` is absent from Unity3D.SDK 2021.1.14 and
+         present in the supported Unity 2021.3 floor. Its public signature has a check-only shim. -->
+    <Compile Remove="$(RepoRoot)/Editor/AnimationEventSaveAPI.cs" />
     <!-- PIN-DRIVEN. Missing member: the GETTER of `SerializedProperty.managedReferenceValue`, read
          at three sites. 2021.1.14 carries the setter alone, so the read is CS0154 rather than
          CS1061; the getter is present in 2021.3 and every editor CI runs. -->

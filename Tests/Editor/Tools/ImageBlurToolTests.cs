@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
 {
 #if UNITY_EDITOR
     using System;
+    using System.IO;
     using NUnit.Framework;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Editor.Tools;
@@ -78,6 +79,29 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 ImageBlurTool.ShouldBlurInParallel(width, height, partitionCount),
                 Is.EqualTo(expected)
             );
+        }
+
+        [Test]
+        public void PublishLeavesNewlyOccupiedNameAndStagedBytesUntouched()
+        {
+            string stagedPath = Path.GetTempFileName();
+            string destinationPath = stagedPath + ".png";
+            byte[] stagedBytes = { 1, 2, 3 };
+            byte[] occupantBytes = { 4, 5, 6 };
+            try
+            {
+                File.WriteAllBytes(stagedPath, stagedBytes);
+                File.WriteAllBytes(destinationPath, occupantBytes);
+
+                Assert.That(ImageBlurAPI.TryPublishNewFile(stagedPath, destinationPath), Is.False);
+                Assert.That(File.ReadAllBytes(destinationPath), Is.EqualTo(occupantBytes));
+                Assert.That(File.ReadAllBytes(stagedPath), Is.EqualTo(stagedBytes));
+            }
+            finally
+            {
+                File.Delete(stagedPath);
+                File.Delete(destinationPath);
+            }
         }
 
         [Test]

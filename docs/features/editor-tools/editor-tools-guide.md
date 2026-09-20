@@ -102,6 +102,8 @@ The API accepts radii from `1` through `200` and reports invalid or unreadable s
 For the same file output as the window, call `ImageBlurAPI.TryWriteAsset` with a project texture and
 radius. It temporarily makes the source readable, restores its importer,
 writes a uniquely named image beside it using the Unity project directory, and imports the result.
+An occupied output name is preserved and the next numbered name is used, including when another
+process creates the file while the blur is being written.
 This operation writes a file;
 Unity Undo cannot remove that output file.
 
@@ -137,6 +139,9 @@ Assets/Sprites/Characters/
 ```
 
 **Overwrite Originals** writes in place instead.
+Sprite Cropper stages each PNG before replacing its destination. A failed encoding or staging write
+reports an error and keeps the previous image bytes. The final swap has the
+[platform limits of `DurableFile`](../utilities/helper-utilities.md#durable-writes-for-player-data).
 
 Editor scripts can call `SpriteCropperAPI.TryFind(inputFolders, spriteNameRegex, singlePaths,
 multiPaths, out error)` with `Assets/...` folder paths. It returns project asset paths for
@@ -748,6 +753,9 @@ asset paths, a pixel rectangle, normalized pivot, and border. The output folder 
 under `Assets` or a writable local `Packages` path. The API returns extracted and skipped counts
 plus errors, and never opens a window or displays a prompt. Set `dryRun: true` to preview the count
 without changing files or importers.
+With the default `overwriteExisting: false`, an output that appears during extraction is skipped
+and left unchanged. With `overwriteExisting: true`, the encoded PNG is staged before replacing the
+existing file. Extraction removes its temporary file if publishing fails.
 
 Use `SpriteSheetExtractionAPI.Discover` with folder asset paths and an optional filename regex to
 get the same sprite texture list as the window. Its result includes warnings for invalid folders
@@ -800,6 +808,13 @@ Transparency-based grid detection requires a threshold in `[0, 1)`.
 ### Animation Event Editor
 
 `Tools > Wallstop Studios > Unity Helpers > AnimationEvent Editor`
+
+Editor scripts can save events without opening the window. Call
+`AnimationEventSaveAPI.TrySave(clip, events, frameRate, out error)` with an explicit clip and event
+array. Pass `null` for `frameRate` to keep the clip's current rate. The call records Unity Undo,
+marks the clip dirty, and saves the asset. It returns `false` with an error for invalid input or a
+failed save. Unity Undo covers clip changes; external asset save side effects may not be fully
+reversible.
 
 Putting a footstep sound on frame 4 of a run cycle in Unity's Animation window means finding the
 right time value and typing a method name from memory. This shows the sprite at each event, lists the

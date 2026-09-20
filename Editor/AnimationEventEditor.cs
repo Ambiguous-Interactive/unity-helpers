@@ -14,6 +14,7 @@ namespace WallstopStudios.UnityHelpers.Editor
     using System.Reflection;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Editor.Core.Helper;
     using WallstopStudios.UnityHelpers.Utils;
 
@@ -515,17 +516,25 @@ namespace WallstopStudios.UnityHelpers.Editor
                 return;
             }
 
-            Undo.RecordObject(clip, "Save Animation Events");
-            AnimationUtility.SetAnimationEvents(clip, _viewModel.BuildEventArray());
-
-            if (_viewModel.FrameRateChanged)
+            float? frameRate = _viewModel.FrameRateChanged ? _viewModel.FrameRate : null;
+            if (
+                !AnimationEventSaveAPI.TrySave(
+                    clip,
+                    _viewModel.BuildEventArray(),
+                    frameRate,
+                    out string error
+                )
+            )
             {
-                clip.frameRate = _viewModel.FrameRate;
+                this.LogError($"Failed to save animation events: {error}");
+                return;
+            }
+
+            if (frameRate.HasValue)
+            {
                 _viewModel.ResetFrameRateChanged();
             }
 
-            EditorUtility.SetDirty(clip);
-            AssetDatabase.SaveAssetIfDirty(clip);
             _viewModel.SnapshotBaseline();
         }
 
