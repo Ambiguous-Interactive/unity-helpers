@@ -37,7 +37,6 @@ namespace WallstopStudios.UnityHelpers.Editor
             bool searchAssetsWhenEmpty = true
         )
         {
-            error = string.Empty;
             if (destination == null)
             {
                 error = "A destination list is required.";
@@ -115,6 +114,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 {
                     destination.Add(guid);
                 }
+                error = string.Empty;
                 return true;
             }
             catch (Exception exception)
