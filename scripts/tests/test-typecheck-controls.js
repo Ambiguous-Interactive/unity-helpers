@@ -28,6 +28,7 @@ const {
   compilerControl,
   defaultJobs,
   diagnosticsIn,
+  isNuGetMigrationStartupRace,
   parseArguments
 } = require(path.join(repoRoot, "scripts", "typecheck-controls.js"));
 
@@ -125,6 +126,47 @@ runTest("diagnosticsIn reads every family the check projects can emit, and nothi
     [],
     "ordinary build chatter must not read as a diagnostic"
   );
+});
+
+runTest("only a NuGet migration startup race without diagnostics is retried", () => {
+  const race = {
+    exitCode: 1,
+    output:
+      "System.IO.IOException: 'NuGet-Migrations'. mkdir('/tmp/.dotnet/session2048') errno == EEXIST"
+  };
+  assert.equal(isNuGetMigrationStartupRace(race), true);
+  assert.equal(isNuGetMigrationStartupRace({ ...race, exitCode: 0 }), false);
+  assert.equal(
+    isNuGetMigrationStartupRace({ ...race, output: race.output + " error CS0246" }),
+    false
+  );
+  assert.equal(isNuGetMigrationStartupRace({ exitCode: 1, output: "Build FAILED." }), false);
+
+  const scriptPath = path.join(repoRoot, "scripts", "typecheck-controls.js");
+  const nodeBody = `
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const { CHECK_PROJECTS, runProject } = require(${JSON.stringify(scriptPath)});
+const directory = fs.mkdtempSync(path.join(os.tmpdir(), "typecheck-control-retry-"));
+let calls = 0;
+async function build(project, controlPath) {
+  calls++;
+  if (calls === 1) return ${JSON.stringify(race)};
+  const ids = controlPath.includes("Analyzers")
+    ? ["WPROTO001", "WUH003", "WUH013"]
+    : ["CS0246"];
+  return { exitCode: 1, output: ids.map((id) => "error " + id).join("\\n") };
+}
+runProject(CHECK_PROJECTS[0], directory, false, build).then((result) => {
+  console.log(JSON.stringify({ calls, failures: result.failures }));
+  fs.rmSync(directory, { recursive: true, force: true });
+});
+`;
+  const result = spawnSync(process.execPath, ["-e", nodeBody], { encoding: "utf8" });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), { calls: 3, failures: [] });
 });
 
 runTest("the bounded worker count is configurable and rejects invalid values", () => {

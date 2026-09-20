@@ -294,6 +294,15 @@ function diagnosticsIn(output) {
   return new Set(output.match(DIAGNOSTIC_PATTERN) ?? []);
 }
 
+function isNuGetMigrationStartupRace(attempt) {
+  return (
+    attempt.exitCode !== 0 &&
+    attempt.output.includes("'NuGet-Migrations'") &&
+    attempt.output.includes("errno == EEXIST") &&
+    diagnosticsIn(attempt.output).size === 0
+  );
+}
+
 /**
  * The verdict on one control build: null when it behaved, otherwise the sentence explaining what
  * the gate failed to say. Pure, so its own self-test can drive every branch without a compiler.
@@ -335,7 +344,10 @@ async function runProject(project, controlRoot, verbose, buildControl = build) {
     }
     const controlPath = path.join(controlRoot, `${project.id}-${control.fileName}`);
     fs.writeFileSync(controlPath, control.render(project.anchor), "utf8");
-    const attempt = await buildControl(project.project, controlPath, control.property);
+    let attempt = await buildControl(project.project, controlPath, control.property);
+    if (isNuGetMigrationStartupRace(attempt)) {
+      attempt = await buildControl(project.project, controlPath, control.property);
+    }
     const failure = classify(project, control, attempt);
     if (verbose || failure !== null) {
       messages.push(attempt.output);
@@ -458,6 +470,8 @@ module.exports = {
   compilerControl,
   defaultJobs,
   diagnosticsIn,
+  isNuGetMigrationStartupRace,
   parseArguments,
+  runProject,
   runProjectGroups
 };

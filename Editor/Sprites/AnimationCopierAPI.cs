@@ -285,17 +285,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     string destinationPath = deletingDestination ? path : destinationRoot + suffix;
                     try
                     {
-                        if (
-                            !TryProcessOne(
-                                sourcePath,
-                                destinationPath,
-                                operation,
-                                applyChanges,
-                                forceReplaceUnchanged,
-                                out bool eligible,
-                                out string itemError
-                            )
-                        )
+                        (bool succeeded, bool eligible, string itemError) = ProcessOne(
+                            sourcePath,
+                            destinationPath,
+                            operation,
+                            applyChanges,
+                            forceReplaceUnchanged
+                        );
+                        if (!succeeded)
                         {
                             failed++;
                             diagnostics.Add($"{path}: {itemError}");
@@ -349,18 +346,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             );
         }
 
-        private static bool TryProcessOne(
+        private static (bool Succeeded, bool Eligible, string Error) ProcessOne(
             string sourcePath,
             string destinationPath,
             Operation operation,
             bool applyChanges,
-            bool forceReplaceUnchanged,
-            out bool eligible,
-            out string error
+            bool forceReplaceUnchanged
         )
         {
-            eligible = false;
-            error = string.Empty;
+            bool eligible = false;
+            string error = string.Empty;
             string sourceFullPath = ToFullPath(sourcePath);
             string destinationFullPath = ToFullPath(destinationPath);
             bool sourceExists = File.Exists(sourceFullPath);
@@ -370,55 +365,55 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 if (!destinationExists)
                 {
-                    return true;
+                    return (true, eligible, error);
                 }
                 if (sourceExists)
                 {
-                    return true;
+                    return (true, eligible, error);
                 }
                 if (AssetDatabase.LoadAssetAtPath<AnimationClip>(destinationPath) == null)
                 {
                     error = "Destination is not an animation clip.";
-                    return false;
+                    return (false, eligible, error);
                 }
                 eligible = true;
                 if (applyChanges && !AssetDatabase.DeleteAsset(destinationPath))
                 {
                     error = "Could not delete the destination clip.";
-                    return false;
+                    return (false, eligible, error);
                 }
-                return true;
+                return (true, eligible, error);
             }
 
             if (!sourceExists)
             {
                 error = "Source clip does not exist.";
-                return false;
+                return (false, eligible, error);
             }
             AnimationClip sourceClip = AssetDatabase.LoadAssetAtPath<AnimationClip>(sourcePath);
             if (sourceClip == null)
             {
                 error = "Source is not an animation clip.";
-                return false;
+                return (false, eligible, error);
             }
             if (!TryClassify(sourceClip, destinationPath, out Status status, out error))
             {
-                return false;
+                return (false, eligible, error);
             }
 
             if (operation == Operation.DeleteUnchangedSource)
             {
                 if (status != Status.Unchanged)
                 {
-                    return true;
+                    return (true, eligible, error);
                 }
                 eligible = true;
                 if (applyChanges && !AssetDatabase.DeleteAsset(sourcePath))
                 {
                     error = "Could not delete the source clip.";
-                    return false;
+                    return (false, eligible, error);
                 }
-                return true;
+                return (true, eligible, error);
             }
 
             eligible = operation switch
@@ -430,30 +425,30 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             };
             if (!eligible || !applyChanges)
             {
-                return true;
+                return (true, eligible, error);
             }
             if (status == Status.New)
             {
                 if (!AssetDatabaseBatchHelper.EnsureAssetParentFolder(destinationPath))
                 {
                     error = "Could not create the destination folder.";
-                    return false;
+                    return (false, eligible, error);
                 }
                 if (!AssetDatabase.CopyAsset(sourcePath, destinationPath))
                 {
                     error = "Could not copy the source clip.";
-                    return false;
+                    return (false, eligible, error);
                 }
-                return true;
+                return (true, eligible, error);
             }
             if (!destinationExists)
             {
                 error = "Destination clip disappeared before replacement.";
-                return false;
+                return (false, eligible, error);
             }
             FileUtil.ReplaceFile(sourceFullPath, destinationFullPath);
             AssetDatabase.ImportAsset(destinationPath, ImportAssetOptions.ForceUpdate);
-            return true;
+            return (true, eligible, error);
         }
 
         private static bool TryClassify(
@@ -463,11 +458,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             out string error
         )
         {
-            status = Status.New;
-            error = string.Empty;
             string destinationFullPath = ToFullPath(destinationPath);
             if (!File.Exists(destinationFullPath))
             {
+                status = Status.New;
+                error = string.Empty;
                 return true;
             }
             AnimationClip destination = AssetDatabase.LoadAssetAtPath<AnimationClip>(
@@ -475,12 +470,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             );
             if (source == null || destination == null)
             {
+                status = Status.New;
                 error = "Source or destination file is not an animation clip.";
                 return false;
             }
             status = AnimationClipContentComparer.AreAnimationClipsContentEqual(source, destination)
                 ? Status.Unchanged
                 : Status.Changed;
+            error = string.Empty;
             return true;
         }
 
@@ -492,12 +489,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             out string error
         )
         {
-            sourceRoot = string.Empty;
-            destinationRoot = string.Empty;
-            if (
-                !TryNormalizeAssetPath(sourceFolder, out sourceRoot, out error)
-                || !TryNormalizeAssetPath(destinationFolder, out destinationRoot, out error)
-            )
+            if (!TryNormalizeAssetPath(sourceFolder, out sourceRoot, out error))
+            {
+                destinationRoot = string.Empty;
+                return false;
+            }
+            if (!TryNormalizeAssetPath(destinationFolder, out destinationRoot, out error))
             {
                 return false;
             }
@@ -537,9 +534,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             out string error
         )
         {
-            normalized = string.Empty;
             if (string.IsNullOrWhiteSpace(input))
             {
+                normalized = string.Empty;
                 error = "An Assets-relative path is required.";
                 return false;
             }
@@ -549,6 +546,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 && !slashes.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase)
             )
             {
+                normalized = string.Empty;
                 error = "Path must be under Assets.";
                 return false;
             }
@@ -560,6 +558,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 string fullPath = Path.GetFullPath(Path.Combine(projectRoot, slashes));
                 if (!IsSameOrChild(fullPath, assetsFullPath))
                 {
+                    normalized = string.Empty;
                     error = "Path escapes Assets.";
                     return false;
                 }
@@ -570,6 +569,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             catch (Exception exception)
             {
+                normalized = string.Empty;
                 error = exception.Message;
                 return false;
             }
