@@ -914,45 +914,53 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             int successCount = 0;
             int errorCount = 0;
 
-            // Deduplicate directories before creation because IsValidFolder can lag AssetDatabase changes.
-            using PooledResource<HashSet<string>> directoryPooled = Buffers<string>.HashSet.Get(
-                out HashSet<string> directoriesToCreate
-            );
-
-            foreach (AnimationFileInfo animInfo in animationsToCopy)
+            if (!_dryRun)
             {
-                string destinationAssetPath = animInfo.DestinationRelativePath;
-                string destDirectory = Path.GetDirectoryName(destinationAssetPath).SanitizePath();
+                // Deduplicate directories before creation because IsValidFolder can lag AssetDatabase changes.
+                using PooledResource<HashSet<string>> directoryPooled = Buffers<string>.HashSet.Get(
+                    out HashSet<string> directoriesToCreate
+                );
 
-                if (
-                    string.IsNullOrWhiteSpace(destDirectory)
-                    || AssetDatabase.IsValidFolder(destDirectory)
-                )
+                foreach (AnimationFileInfo animInfo in animationsToCopy)
                 {
-                    continue;
+                    string destinationAssetPath = animInfo.DestinationRelativePath;
+                    string destDirectory = Path.GetDirectoryName(destinationAssetPath)
+                        .SanitizePath();
+
+                    if (
+                        string.IsNullOrWhiteSpace(destDirectory)
+                        || AssetDatabase.IsValidFolder(destDirectory)
+                    )
+                    {
+                        continue;
+                    }
+
+                    _ = directoriesToCreate.Add(destDirectory);
                 }
 
-                _ = directoriesToCreate.Add(destDirectory);
-            }
-
-            foreach (string destDirectory in directoriesToCreate)
-            {
-                try
+                foreach (string destDirectory in directoriesToCreate)
                 {
-                    DirectoryHelper.EnsureDirectoryExists(destDirectory);
-                }
-                catch (Exception e)
-                {
-                    this.LogError(
-                        $"Failed to create destination directory '{destDirectory}'. Skipping animations targeting this path.",
-                        e
-                    );
+                    try
+                    {
+                        DirectoryHelper.EnsureDirectoryExists(destDirectory);
+                    }
+                    catch (Exception e)
+                    {
+                        this.LogError(
+                            $"Failed to create destination directory '{destDirectory}'. Skipping animations targeting this path.",
+                            e
+                        );
+                    }
                 }
             }
 
             try
             {
-                using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
+                using (
+                    _dryRun
+                        ? default(AssetDatabaseBatchScope?)
+                        : AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false)
+                )
                 {
                     for (int i = 0; i < animationsToCopy.Count; i++)
                     {

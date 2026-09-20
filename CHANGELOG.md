@@ -119,6 +119,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix Animation Copier dry runs creating destination subfolders during copy previews.
 - Fix Animation Copier's **Include Unchanged in Copy All** option so selected unchanged clips are actually replaced while preserving destination GUIDs.
 - Fix `DurableFile.TryDelete` reporting success for a directory or inaccessible target ([#817](https://github.com/Ambiguous-Interactive/unity-helpers/issues/817)).
 - Fix Editor startup errors when Unity Helpers loads saved project settings, including custom test output paths and pool purging options ([#814](https://github.com/Ambiguous-Interactive/unity-helpers/issues/814)).

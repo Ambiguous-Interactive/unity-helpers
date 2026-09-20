@@ -588,6 +588,9 @@ apart and moves only what matters.
 5. Tick **Dry Run (no changes)** and run the copy once to see what it would do.
 6. Clear it, then click **Copy New (N)** or **Copy Changed (N)**.
 
+Dry runs leave destination files and folders untouched, including subfolders that a real copy would
+create for nested source clips.
+
 Copying a changed clip preserves its GUID, so every Animator that already references it keeps
 working.
 

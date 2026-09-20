@@ -424,6 +424,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             );
         }
 
+        [Test]
+        public void DryRunCopyNewDoesNotCreateNestedDestinationDirectory()
+        {
+            string sourceFolder = Path.Combine(SrcRoot, "DryRunNestedDirectoryTest").SanitizePath();
+            string destinationFolder = Path.Combine(DstRoot, "DryRunNestedDirectoryTest")
+                .SanitizePath();
+            EnsureFolder(sourceFolder);
+            EnsureFolder(destinationFolder);
+
+            string sourceNestedFolder = Path.Combine(sourceFolder, "Nested").SanitizePath();
+            EnsureFolder(sourceNestedFolder);
+            string sourceClip = Path.Combine(sourceNestedFolder, "Clip.anim").SanitizePath();
+            CreateEmptyClip(sourceClip);
+            AssetDatabase.SaveAssets();
+            ImportAssetIfExists(sourceClip);
+
+            string destinationNestedFolder = Path.Combine(destinationFolder, "Nested")
+                .SanitizePath();
+            string destinationClip = Path.Combine(destinationNestedFolder, "Clip.anim")
+                .SanitizePath();
+            Assert.IsFalse(Directory.Exists(ToFull(destinationNestedFolder)));
+
+            AnimationCopierWindow window = CreateWindow();
+            window.AnimationSourcePathRelative = sourceFolder;
+            window.AnimationDestinationPathRelative = destinationFolder;
+            window.DryRun = true;
+            window.AnalyzeAnimations();
+            Assert.AreEqual(1, window.NewCount);
+
+            window.CopyNew();
+
+            Assert.IsFalse(Directory.Exists(ToFull(destinationNestedFolder)));
+            Assert.IsFalse(File.Exists(ToFull(destinationNestedFolder) + ".meta"));
+            Assert.IsFalse(File.Exists(ToFull(destinationClip)));
+            Assert.IsFalse(AssetDatabase.IsValidFolder(destinationNestedFolder));
+        }
+
         private void CreateEmptyClip(string relPath)
         {
             string dir = Path.GetDirectoryName(relPath).SanitizePath();
