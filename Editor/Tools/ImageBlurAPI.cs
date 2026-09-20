@@ -47,6 +47,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 return false;
             }
 
+            string projectRoot = Path.GetDirectoryName(Application.dataPath);
+            if (string.IsNullOrWhiteSpace(projectRoot))
+            {
+                outputPath = null;
+                error = "Could not determine the Unity project directory.";
+                return false;
+            }
+
             TextureImporter importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
             bool importerSettingsChanged = false;
             bool originalReadable = false;
@@ -108,11 +116,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                             $"{fileName}_blurred_{radius}"
                         );
                         string finalPath = newPathBase + outputExtension;
+                        string absolutePath = Path.Combine(projectRoot, finalPath);
                         int counter = 0;
-                        while (File.Exists(finalPath))
+                        while (File.Exists(absolutePath))
                         {
                             ++counter;
                             finalPath = $"{newPathBase}_{counter}{outputExtension}";
+                            absolutePath = Path.Combine(projectRoot, finalPath);
                         }
 
                         byte[] bytes = encodeJpeg
@@ -124,7 +134,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                         }
                         else
                         {
-                            File.WriteAllBytes(finalPath, bytes);
+                            File.WriteAllBytes(absolutePath, bytes);
                             producedPath = finalPath.Replace('\\', '/');
                             wroteOutput = true;
                         }

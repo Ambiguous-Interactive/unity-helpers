@@ -101,7 +101,8 @@ The API accepts radii from `1` through `200` and reports invalid or unreadable s
 
 For the same file output as the window, call `ImageBlurAPI.TryWriteAsset` with a project texture and
 radius. It temporarily makes the source readable, restores its importer,
-writes a uniquely named image beside it, and imports the result. This operation writes a file;
+writes a uniquely named image beside it using the Unity project directory, and imports the result.
+This operation writes a file;
 Unity Undo cannot remove that output file.
 
 > **Visual Demo**
