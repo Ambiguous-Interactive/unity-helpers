@@ -141,7 +141,8 @@ Assets/Sprites/Characters/
 Editor scripts can call `SpriteCropperAPI.TryFind(inputFolders, spriteNameRegex, singlePaths,
 multiPaths, out error)` with `Assets/...` folder paths. It returns project asset paths for
 single-sprite images and reports multi-sprite sheets separately. The window uses this same
-discovery path. `SpriteCropperAPI.Crop(assetPath, options)` crops one sprite with explicit padding,
+discovery path. Script paths may use backslashes or a differently cased `Assets` prefix; the API
+normalizes them before asset lookup. `SpriteCropperAPI.Crop(assetPath, options)` crops one sprite with explicit padding,
 destination, overwrite, readability, and platform-setting options, and returns the output path,
 status, and any error. The window uses the same crop operation for each selected sprite.
 `SpriteCropperAPI.TryBuildReplacementMap(folders, mapping, out error)` finds existing
@@ -292,7 +293,8 @@ the center of pixels above the alpha cutoff and writes it as a custom pivot.
 Editor scripts can call `SpritePivotAdjusterAPI.TryFind(folders, nameRegex, paths, out error)`
 with `Assets/...` folders, then call `SpritePivotAdjusterAPI.Run(paths, options)` to preview or
 `Run(paths, options, applyChanges: true)` to apply. The result reports changes, skips, cancellation,
-warnings, and errors. Neither call opens the window.
+warnings, and errors. These calls normalize backslashes, trailing folder slashes, and the `Assets`
+prefix casing. Neither call opens the window.
 
 Each changed importer is recorded as an `Adjust Sprite Pivot` undo step. The reimport side effect
 may require regeneration after Undo.

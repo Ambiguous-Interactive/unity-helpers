@@ -87,9 +87,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 SpritePivotAdjusterAPI.TryFind(new[] { Root }, "[", paths, out string regexError)
             );
             Assert.IsNotEmpty(regexError);
+            string alternateFolder =
+                "aSsets\\" + Root.Substring("Assets/".Length).Replace('/', '\\') + "\\";
             Assert.IsTrue(
                 SpritePivotAdjusterAPI.TryFind(
-                    new[] { Root },
+                    new[] { alternateFolder },
                     "pivot",
                     paths,
                     out string findError
@@ -99,7 +101,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             CollectionAssert.Contains(paths, path);
 
             SpritePivotAdjusterAPI.Result preview = SpritePivotAdjusterAPI.Run(
-                paths,
+                new[] { "aSsets\\" + path.Substring("Assets/".Length).Replace('/', '\\') },
                 new SpritePivotAdjusterAPI.Options { SkipUnchanged = false }
             );
             Assert.That(preview.Changed, Is.EqualTo(1));

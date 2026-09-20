@@ -84,7 +84,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             imp.SaveAndReimport();
 
             SpritePivotAdjusterAPI.Result directResult = SpritePivotAdjusterAPI.Run(
-                new[] { src },
+                new[] { "aSsets\\" + src.Substring("Assets/".Length).Replace('/', '\\') },
                 new SpritePivotAdjusterAPI.Options
                 {
                     AlphaCutoff = 0.1f,

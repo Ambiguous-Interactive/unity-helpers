@@ -84,9 +84,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
 
             List<string> directPaths = new();
             List<string> multiSpritePaths = new();
+            string alternateFolder =
+                "aSsets\\" + Root.Substring("Assets/".Length).Replace('/', '\\') + "\\";
             Assert.IsTrue(
                 SpriteCropperAPI.TryFind(
-                    new[] { Root },
+                    new[] { alternateFolder },
                     "src",
                     directPaths,
                     multiSpritePaths,
@@ -98,7 +100,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.IsEmpty(multiSpritePaths);
 
             SpriteCropperAPI.CropResult result = SpriteCropperAPI.Crop(
-                src,
+                "aSsets\\" + src.Substring("Assets/".Length).Replace('/', '\\'),
                 new SpriteCropperAPI.CropOptions { OverwriteOriginals = true }
             );
             Assert.That(
@@ -159,12 +161,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.That(tex.height, Is.EqualTo(4));
 
             Dictionary<Sprite, Sprite> replacements = new();
+            string alternateOutputFolder =
+                "aSsets\\" + outDir.Substring("Assets/".Length).Replace('/', '\\') + "\\";
             Assert.IsTrue(
                 SpriteCropperAPI.TryBuildReplacementMap(
                     new[] { Root },
                     replacements,
                     out string mappingError,
-                    outDir
+                    alternateOutputFolder
                 ),
                 mappingError
             );

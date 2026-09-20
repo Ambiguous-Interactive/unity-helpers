@@ -230,10 +230,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             );
 
             SpriteCropperAPI.CropResult directResult = SpriteCropperAPI.Crop(
-                src,
+                "aSsets\\" + src.Substring("Assets/".Length).Replace('/', '\\'),
                 new SpriteCropperAPI.CropOptions
                 {
-                    OutputFolder = Root,
+                    OutputFolder =
+                        "aSsets\\" + Root.Substring("Assets/".Length).Replace('/', '\\') + "\\",
                     OutputReadability = SpriteCropperAPI.OutputReadability.Readable,
                 }
             );

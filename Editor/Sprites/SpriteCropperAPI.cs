@@ -90,20 +90,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 foreach (string folder in inputFolders)
                 {
+                    string normalizedFolder = NormalizeAssetPath(folder);
                     if (
-                        string.IsNullOrWhiteSpace(folder)
-                        || (
-                            !string.Equals(folder, "Assets", StringComparison.Ordinal)
-                            && !folder.StartsWith("Assets/", StringComparison.Ordinal)
-                        )
-                        || !AssetDatabase.IsValidFolder(folder)
+                        string.IsNullOrEmpty(normalizedFolder)
+                        || !AssetDatabase.IsValidFolder(normalizedFolder)
                     )
                     {
                         continue;
                     }
 
                     ++validFolderCount;
-                    string absoluteFolder = ToFullPath(folder);
+                    string absoluteFolder = ToFullPath(normalizedFolder);
                     string[] files = Directory.GetFiles(
                         absoluteFolder,
                         "*.*",
@@ -175,6 +172,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             if (options == null)
             {
                 return new CropResult(CropStatus.FatalError, null, "Crop options are required.");
+            }
+
+            assetPath = NormalizeAssetPath(assetPath);
+            if (
+                string.IsNullOrEmpty(assetPath)
+                || string.Equals(assetPath, "Assets", StringComparison.Ordinal)
+            )
+            {
+                return new CropResult(
+                    CropStatus.FatalError,
+                    null,
+                    "A project sprite path is required."
+                );
             }
 
             bool sourceWasReadable = true;
@@ -270,6 +280,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             replacements.Clear();
+            if (!string.IsNullOrWhiteSpace(outputFolder))
+            {
+                string normalizedOutputFolder = NormalizeAssetPath(outputFolder);
+                if (string.IsNullOrEmpty(normalizedOutputFolder))
+                {
+                    error = $"Invalid output folder: '{outputFolder}'.";
+                    return false;
+                }
+                outputFolder = normalizedOutputFolder;
+            }
             if (
                 !string.IsNullOrWhiteSpace(outputFolder)
                 && (!IsAssetsFolder(outputFolder) || !AssetDatabase.IsValidFolder(outputFolder))
@@ -384,9 +404,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             bool sourceWasReadable
         )
         {
+            assetPath = NormalizeAssetPath(assetPath);
             if (
                 options == null
-                || string.IsNullOrWhiteSpace(assetPath)
+                || string.IsNullOrEmpty(assetPath)
                 || !assetPath.StartsWith("Assets/", StringComparison.Ordinal)
                 || options.LeftPadding < 0
                 || options.RightPadding < 0
@@ -415,9 +436,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             string outputDirectory = assetDirectory;
             if (!options.OverwriteOriginals && !string.IsNullOrWhiteSpace(options.OutputFolder))
             {
+                string normalizedOutputFolder = NormalizeAssetPath(options.OutputFolder);
                 if (
-                    !IsAssetsFolder(options.OutputFolder)
-                    || !AssetDatabase.IsValidFolder(options.OutputFolder)
+                    string.IsNullOrEmpty(normalizedOutputFolder)
+                    || !AssetDatabase.IsValidFolder(normalizedOutputFolder)
                 )
                 {
                     return new CropResult(
@@ -426,7 +448,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         $"Invalid output folder: '{options.OutputFolder}'."
                     );
                 }
-                outputDirectory = options.OutputFolder.TrimEnd('/');
+                outputDirectory = normalizedOutputFolder;
             }
 
             if (
@@ -610,6 +632,23 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         {
             return string.Equals(folder, "Assets", StringComparison.Ordinal)
                 || folder.StartsWith("Assets/", StringComparison.Ordinal);
+        }
+
+        private static string NormalizeAssetPath(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                return null;
+            }
+
+            string normalized = input.Trim().Replace('\\', '/').TrimEnd('/');
+            if (string.Equals(normalized, "Assets", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Assets";
+            }
+            return normalized.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase)
+                ? "Assets" + normalized.Substring("Assets".Length)
+                : null;
         }
 
         private static string ToFullPath(string assetPath)

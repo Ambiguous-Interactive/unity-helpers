@@ -77,20 +77,20 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 foreach (string folder in inputFolders)
                 {
+                    string normalizedFolder = NormalizeAssetPath(folder);
                     if (
-                        string.IsNullOrWhiteSpace(folder)
-                        || (
-                            !string.Equals(folder, "Assets", StringComparison.Ordinal)
-                            && !folder.StartsWith("Assets/", StringComparison.Ordinal)
-                        )
-                        || !AssetDatabase.IsValidFolder(folder)
+                        string.IsNullOrEmpty(normalizedFolder)
+                        || !AssetDatabase.IsValidFolder(normalizedFolder)
                     )
                     {
                         continue;
                     }
 
                     ++validFolderCount;
-                    string[] guids = AssetDatabase.FindAssets("t:Texture2D", new[] { folder });
+                    string[] guids = AssetDatabase.FindAssets(
+                        "t:Texture2D",
+                        new[] { normalizedFolder }
+                    );
                     foreach (string guid in guids)
                     {
                         string path = AssetDatabase.GUIDToAssetPath(guid);
@@ -168,7 +168,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                 for (int index = 0; index < assetPaths.Count; ++index)
                 {
-                    string path = assetPaths[index];
+                    string path = NormalizeAssetPath(assetPaths[index]);
                     if (string.IsNullOrWhiteSpace(path) || !processedPaths.Add(path))
                     {
                         continue;
@@ -310,6 +310,23 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             return result;
+        }
+
+        private static string NormalizeAssetPath(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                return null;
+            }
+
+            string normalized = input.Trim().Replace('\\', '/').TrimEnd('/');
+            if (string.Equals(normalized, "Assets", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Assets";
+            }
+            return normalized.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase)
+                ? "Assets" + normalized.Substring("Assets".Length)
+                : null;
         }
 
         /// <summary>
