@@ -554,7 +554,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     cropped.SetPixels32(0, 0, crop.CropWidth, crop.CropHeight, croppedPixels, 0);
                     cropped.Apply();
                     if (
-                        !DurableFile.TryWriteAllBytes(
+                        !TryWriteCroppedPng(
                             ToFullPath(outputPath),
                             cropped.EncodeToPNG(),
                             out Exception writeError
@@ -640,6 +640,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     $"Failed to crop '{assetPath}': {exception.Message}"
                 );
             }
+        }
+
+        internal static bool TryWriteCroppedPng(string path, byte[] bytes, out Exception error)
+        {
+            if (bytes == null || bytes.Length == 0)
+            {
+                error = new InvalidDataException(
+                    "The cropped texture could not be encoded as PNG."
+                );
+                return false;
+            }
+
+            return DurableFile.TryWriteAllBytes(path, bytes, out error);
         }
 
         private static bool IsAssetsFolder(string folder)

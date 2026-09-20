@@ -104,6 +104,8 @@ radius. It temporarily makes the source readable, restores its importer,
 writes a uniquely named image beside it using the Unity project directory, and imports the result.
 An occupied output name is preserved and the next numbered name is used, including when another
 process creates the file while the blur is being written.
+New output files are copied from a staged image with exclusive creation. An interrupted copy can
+leave an incomplete new file; remove it before retrying.
 This operation writes a file;
 Unity Undo cannot remove that output file.
 
@@ -437,6 +439,8 @@ you ship at and you want the bigger pixels baked into the file rather than paid 
   **Output Folder** to write copies instead.
 - PNG writes are staged before replacement. A failed write reports an error rather than leaving
   a partly written PNG.
+- A failed PNG encode reports an error and leaves the original image unchanged.
+- If PNG encoding fails, the original image remains unchanged.
 - The stock multipliers (`0.54` width, `0.245` height) grow a texture non-uniformly — a 128x128
   becomes 130x133 in one pass. Set both to the same value if you want a square scale.
 - The final size is clamped to 16384 on each axis.
@@ -755,7 +759,8 @@ plus errors, and never opens a window or displays a prompt. Set `dryRun: true` t
 without changing files or importers.
 With the default `overwriteExisting: false`, an output that appears during extraction is skipped
 and left unchanged. With `overwriteExisting: true`, the encoded PNG is staged before replacing the
-existing file. Extraction removes its temporary file if publishing fails.
+existing file. Extraction removes its temporary file if publishing fails. A failed or interrupted
+copy to a new output can leave an incomplete new file; remove it before retrying.
 
 Use `SpriteSheetExtractionAPI.Discover` with folder asset paths and an optional filename regex to
 get the same sprite texture list as the window. Its result includes warnings for invalid folders

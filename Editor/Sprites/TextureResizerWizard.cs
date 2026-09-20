@@ -344,6 +344,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                 }
 
                                 byte[] bytes = resizeSource.EncodeToPNG();
+                                if (bytes == null || bytes.Length == 0)
+                                {
+                                    ++errors;
+                                    this.LogError(
+                                        $"Failed to encode resized texture {texture.name}."
+                                    );
+                                    continue;
+                                }
 
                                 string finalAssetPath = assetPath;
                                 if (!string.IsNullOrEmpty(outputDirAssetPath))

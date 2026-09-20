@@ -67,6 +67,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         }
 
         [Test]
+        public void FailedPngEncodingPreservesExistingOutput()
+        {
+            string outputPath = RelToFull(Path.Combine(Root, "encoded.png"));
+            byte[] originalBytes = { 1, 2, 3 };
+            try
+            {
+                File.WriteAllBytes(outputPath, originalBytes);
+
+                Assert.That(
+                    SpriteCropperAPI.TryWriteCroppedPng(
+                        outputPath,
+                        null,
+                        out System.Exception nullError
+                    ),
+                    Is.False
+                );
+                Assert.That(nullError, Is.TypeOf<InvalidDataException>());
+                CollectionAssert.AreEqual(originalBytes, File.ReadAllBytes(outputPath));
+
+                Assert.That(
+                    SpriteCropperAPI.TryWriteCroppedPng(
+                        outputPath,
+                        System.Array.Empty<byte>(),
+                        out System.Exception emptyError
+                    ),
+                    Is.False
+                );
+                Assert.That(emptyError, Is.TypeOf<InvalidDataException>());
+                CollectionAssert.AreEqual(originalBytes, File.ReadAllBytes(outputPath));
+            }
+            finally
+            {
+                File.Delete(outputPath);
+            }
+        }
+
+        [Test]
         public void CropsTransparentMarginsAndPreservesPivot()
         {
             string src = Path.Combine(Root, "src.png").SanitizePath();

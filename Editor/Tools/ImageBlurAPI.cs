@@ -311,7 +311,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         {
             try
             {
-                File.Move(stagedPath, destinationPath);
+                File.Copy(stagedPath, destinationPath, overwrite: false);
+                File.Delete(stagedPath);
                 return true;
             }
             catch (IOException) when (File.Exists(destinationPath))

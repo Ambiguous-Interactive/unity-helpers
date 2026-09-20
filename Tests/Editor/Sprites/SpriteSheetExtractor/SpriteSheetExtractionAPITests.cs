@@ -6,6 +6,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
 #if UNITY_EDITOR
     using System.Collections.Generic;
     using System.IO;
+    using System.Threading;
+    using System.Threading.Tasks;
     using NUnit.Framework;
     using UnityEditor;
     using UnityEngine;
@@ -204,6 +206,47 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             finally
             {
                 File.Delete(stagedPath);
+                File.Delete(destinationPath);
+            }
+        }
+
+        [Test]
+        public void ConcurrentPublishKeepsFirstCompletedOutput()
+        {
+            string firstStage = Path.GetTempFileName();
+            string secondStage = Path.GetTempFileName();
+            string destinationPath = firstStage + ".png";
+            byte[] firstBytes = { 1, 2, 3 };
+            byte[] secondBytes = { 4, 5, 6 };
+            using ManualResetEventSlim start = new(false);
+            try
+            {
+                File.WriteAllBytes(firstStage, firstBytes);
+                File.WriteAllBytes(secondStage, secondBytes);
+
+                Task<bool> first = Task.Run(() =>
+                {
+                    start.Wait();
+                    return SpriteSheetExtractionAPI.TryPublishNewFile(firstStage, destinationPath);
+                });
+                Task<bool> second = Task.Run(() =>
+                {
+                    start.Wait();
+                    return SpriteSheetExtractionAPI.TryPublishNewFile(secondStage, destinationPath);
+                });
+                start.Set();
+                Task.WaitAll(first, second);
+
+                Assert.That(first.Result, Is.Not.EqualTo(second.Result));
+                CollectionAssert.AreEqual(
+                    first.Result ? firstBytes : secondBytes,
+                    File.ReadAllBytes(destinationPath)
+                );
+            }
+            finally
+            {
+                File.Delete(firstStage);
+                File.Delete(secondStage);
                 File.Delete(destinationPath);
             }
         }
