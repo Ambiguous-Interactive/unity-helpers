@@ -81,6 +81,55 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         }
 
         [Test]
+        public void DirectApiBlursWithoutWindowAndReturnsOwnedTexture()
+        {
+            Texture2D source = Track(new Texture2D(8, 8, TextureFormat.RGBA32, false));
+            source.SetPixel(4, 4, Color.white);
+            source.Apply();
+
+            bool success = ImageBlurAPI.TryBlur(source, 2, out Texture2D blurred, out string error);
+
+            Assert.IsTrue(success, error);
+            Assert.IsTrue(error == null);
+            Assert.IsTrue(blurred != null);
+            Track(blurred);
+            Assert.AreEqual(source.width, blurred.width);
+            Assert.AreEqual(source.height, blurred.height);
+            Assert.That(blurred.GetPixel(4, 4).r, Is.LessThan(1f));
+        }
+
+        [TestCase(0)]
+        [TestCase(201)]
+        public void DirectApiRejectsInvalidRadius(int radius)
+        {
+            Texture2D source = Track(new Texture2D(2, 2));
+
+            Assert.IsFalse(
+                ImageBlurAPI.TryBlur(source, radius, out Texture2D blurred, out string error)
+            );
+            Assert.IsTrue(blurred == null);
+            Assert.IsNotEmpty(error);
+        }
+
+        [Test]
+        public void DirectApiRejectsMissingOrUnreadableSource()
+        {
+            Assert.IsFalse(
+                ImageBlurAPI.TryBlur(null, 1, out Texture2D missing, out string missingError)
+            );
+            Assert.IsTrue(missing == null);
+            Assert.IsNotEmpty(missingError);
+
+            Texture2D source = Track(new Texture2D(2, 2));
+            source.Apply(updateMipmaps: false, makeNoLongerReadable: true);
+            Assert.IsFalse(
+                ImageBlurAPI.TryBlur(source, 1, out Texture2D blurred, out string error)
+            );
+            Assert.IsTrue(blurred == null);
+            Assert.IsNotEmpty(error);
+        }
+
+        [Test]
         public void BlurredTextureMatchesInputDimensions()
         {
             Texture2D tex = Track(new Texture2D(8, 8, TextureFormat.RGBA32, false));

@@ -6,9 +6,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
 #if UNITY_EDITOR
     using System;
     using System.IO;
+    using System.Text.RegularExpressions;
     using NUnit.Framework;
     using UnityEditor;
     using UnityEngine;
+    using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.AssetProcessors;
     using WallstopStudios.UnityHelpers.Editor.Tools;
@@ -153,7 +155,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         }
 
         [Test]
-        public void ProcessingFailureRestoresImporterSettingsAndCleansTemporaryTexture()
+        public void InvalidRadiusRestoresImporterSettingsAndDoesNotLeakTexture()
         {
             string sourcePath = Path.Combine(_testRoot, "failure.png").SanitizePath();
             CreatePng(sourcePath, Color.green);
@@ -168,13 +170,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             int temporaryTextureCount = CountTemporaryTextures();
             ImageBlurTool window = Track(ScriptableObject.CreateInstance<ImageBlurTool>());
 
-            /*
-                Negative radius fails after importer and destination changes, deterministically exercising both
-                cleanup paths.
-            */
-            Assert.Throws<OverflowException>(() =>
-                window.TryWriteBlurredTexture(source, radius: -1)
+            LogAssert.Expect(
+                LogType.Error,
+                new Regex("Failed to create blurred texture for: failure")
             );
+            Assert.IsFalse(window.TryWriteBlurredTexture(source, radius: -1));
 
             AssertImporterSettings(
                 sourcePath,

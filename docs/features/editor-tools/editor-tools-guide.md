@@ -79,6 +79,26 @@ summary for the whole batch. Small images and one-row or one-column passes avoid
 larger images retain parallel processing. The new blurred files are permanent project changes and
 are not covered by Unity's undo history.
 
+Editor scripts can blur an already readable texture without opening the window. `ImageBlurAPI.TryBlur`
+returns a new texture owned by the caller; destroy it after encoding, saving, or displaying it:
+
+```csharp
+if (ImageBlurAPI.TryBlur(source, 12, out Texture2D blurred, out string error))
+{
+    try
+    {
+        // Use blurred here.
+    }
+    finally
+    {
+        UnityEngine.Object.DestroyImmediate(blurred);
+    }
+}
+```
+
+The API accepts radii from `1` through `200` and reports invalid or unreadable sources through
+`error`. It does not change importer settings or write files.
+
 > **Visual Demo**
 >
 > ![Image Blur Tool showing before/after comparison as blur radius slider is adjusted](../../images/editor-tools/image-blur-before-after.gif)

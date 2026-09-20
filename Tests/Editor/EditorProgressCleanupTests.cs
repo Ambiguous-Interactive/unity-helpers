@@ -50,7 +50,10 @@ namespace WallstopStudios.UnityHelpers.Tests
 
                 if (windowType == typeof(SpriteSheetExtractor))
                 {
-                    ExpectError(LogType.Error, "Error during reference replacement");
+                    ExpectError(
+                        LogType.Error,
+                        "Progress callback failed: Injected processing failure"
+                    );
                     Assert.DoesNotThrow(() => operation());
                 }
                 else

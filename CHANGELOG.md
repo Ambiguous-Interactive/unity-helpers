@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `ImageBlurAPI` to blur readable textures from editor scripts without opening the window. See [Image Blur Tool](./docs/features/editor-tools/editor-tools-guide.md#image-blur-tool) ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Add `SpriteSheetExtractionAPI` to find sprite sheets and extract selected rectangles from scripts or batch mode without opening the window. See [Sprite Sheet Extractor](./docs/features/editor-tools/editor-tools-guide.md#sprite-sheet-extractor) ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Add `SpriteSheetReferenceReplacementAPI` to preview and replace sprite references in explicit project assets from scripts. See [Sprite Sheet Extractor](./docs/features/editor-tools/editor-tools-guide.md#sprite-sheet-extractor) ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Add `AnimationCopierAPI` to analyze, preview, copy, and clean up standalone animation clips from scripts or batch mode without opening its window. See [Animation Copier](./docs/features/editor-tools/editor-tools-guide.md#animation-copier) ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).

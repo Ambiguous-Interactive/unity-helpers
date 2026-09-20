@@ -88,7 +88,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             return ParallelBlurPixelThreshold <= (long)width * height && 1 < partitionCount;
         }
 
-        private static Texture2D CreateBlurredTexture(
+        internal static Texture2D CreateBlurredTexture(
             Texture2D original,
             int radius,
             bool? parallelOverride
@@ -290,10 +290,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     return false;
                 }
 
-                blurredTexture = CreateBlurredTexture(currentTexture, radius, null);
-                if (blurredTexture == null)
+                if (
+                    !ImageBlurAPI.TryBlur(
+                        currentTexture,
+                        radius,
+                        out blurredTexture,
+                        out string blurError
+                    )
+                )
                 {
-                    this.LogError($"Failed to create blurred texture for: {originalTexture.name}.");
+                    this.LogError(
+                        $"Failed to create blurred texture for: {originalTexture.name}. {blurError}"
+                    );
                     return false;
                 }
 
