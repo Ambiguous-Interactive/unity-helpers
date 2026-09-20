@@ -349,10 +349,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         /// <summary>
-        /// Deletes a file, reporting failure rather than throwing.
+        /// Deletes a file, reporting failure rather than throwing. An absent file is successful;
+        /// another process can create the path after deletion completes.
         /// </summary>
         /// <param name="path">File to delete.</param>
-        /// <returns>True when no file remains at <paramref name="path"/>.</returns>
+        /// <returns>True if <see cref="File.Delete(string)"/> completed without throwing.</returns>
         public static bool TryDelete(string path)
         {
             if (string.IsNullOrWhiteSpace(path))
