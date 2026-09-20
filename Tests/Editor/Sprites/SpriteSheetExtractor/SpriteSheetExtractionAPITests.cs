@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Editor.Sprites;
+    using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Tests.Core;
 
     [TestFixture]
@@ -281,17 +282,42 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             );
             Assert.That(canceled.Canceled, Is.True);
             Assert.That(canceled.ModifiedAssets, Is.Zero);
+            Assert.IsFalse(AssetDatabaseBatchHelper.IsCurrentlyBatching);
             Assert.That(noOp.ModifiedAssets, Is.Zero);
             Assert.That(prefab.GetComponent<SpriteRenderer>().sprite, Is.EqualTo(source));
 
+            SpriteReferenceReplacementResult callbackFailure =
+                SpriteSheetReferenceReplacementAPI.Run(
+                    mapping,
+                    new[] { Prefab },
+                    applyChanges: true,
+                    cancelRequested: (_, _) =>
+                        throw new System.InvalidOperationException("callback failure")
+                );
+            Assert.That(callbackFailure.Errors, Is.Not.Empty);
+            Assert.That(callbackFailure.ModifiedAssets, Is.Zero);
+            Assert.IsFalse(AssetDatabaseBatchHelper.IsCurrentlyBatching);
+
+            bool sawBatch = false;
             SpriteReferenceReplacementResult applied = SpriteSheetReferenceReplacementAPI.Run(
                 mapping,
                 new[] { Prefab },
-                applyChanges: true
+                applyChanges: true,
+                cancelRequested: (_, _) =>
+                {
+                    sawBatch = AssetDatabaseBatchHelper.IsCurrentlyBatching;
+                    return false;
+                }
             );
             Assert.That(applied.Errors, Is.Empty);
             Assert.That(applied.ModifiedAssets, Is.EqualTo(1));
+            Assert.IsTrue(sawBatch);
+            Assert.IsFalse(AssetDatabaseBatchHelper.IsCurrentlyBatching);
             Assert.That(prefab.GetComponent<SpriteRenderer>().sprite, Is.EqualTo(replacement));
+
+            Undo.FlushUndoRecordObjects();
+            Undo.PerformUndo();
+            Assert.That(prefab.GetComponent<SpriteRenderer>().sprite, Is.EqualTo(source));
         }
 
         [Test]

@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using System.Collections.Generic;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Editor.Utils;
     using Object = UnityEngine.Object;
 
     /// <summary>
@@ -89,41 +90,63 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
-            for (int i = 0; i < assetPaths.Count; ++i)
+            AssetDatabaseBatchScope batch = default;
+            bool batchStarted = false;
+            try
             {
-                if (cancelRequested != null)
+                if (applyChanges)
                 {
+                    batch = AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false);
+                    batchStarted = true;
+                }
+
+                for (int i = 0; i < assetPaths.Count; ++i)
+                {
+                    if (cancelRequested != null)
+                    {
+                        try
+                        {
+                            if (cancelRequested(i, assetPaths.Count))
+                            {
+                                result.Canceled = true;
+                                break;
+                            }
+                        }
+                        catch (Exception error)
+                        {
+                            result.AddError($"Progress callback failed: {error.Message}");
+                            break;
+                        }
+                    }
+
+                    string path = assetPaths[i];
+                    if (!IsCandidate(path) || !seen.Add(path))
+                    {
+                        continue;
+                    }
+
                     try
                     {
-                        if (cancelRequested(i, assetPaths.Count))
+                        if (ProcessAsset(path, replacements, applyChanges, result))
                         {
-                            result.Canceled = true;
-                            break;
+                            ++result.ModifiedAssets;
                         }
                     }
                     catch (Exception error)
                     {
-                        result.AddError($"Progress callback failed: {error.Message}");
-                        break;
+                        result.AddError($"Failed to scan '{path}': {error.Message}");
                     }
                 }
-
-                string path = assetPaths[i];
-                if (!IsCandidate(path) || !seen.Add(path))
+            }
+            catch (Exception error)
+            {
+                result.AddError($"Failed to start or finish asset batch: {error.Message}");
+            }
+            finally
+            {
+                if (batchStarted)
                 {
-                    continue;
-                }
-
-                try
-                {
-                    if (ProcessAsset(path, replacements, applyChanges, result))
-                    {
-                        ++result.ModifiedAssets;
-                    }
-                }
-                catch (Exception error)
-                {
-                    result.AddError($"Failed to scan '{path}': {error.Message}");
+                    batch.Dispose();
                 }
             }
 
@@ -222,7 +245,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                     if (objectChanged)
                     {
-                        serialized.ApplyModifiedProperties();
+                        serialized.ApplyModifiedPropertiesWithoutUndo();
                         assetModified = true;
                         EditorUtility.SetDirty(target);
                     }
