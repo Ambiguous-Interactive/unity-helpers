@@ -367,6 +367,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             string destinationFile = Path.Combine(_testDirectory, "cancel_destination.txt");
             byte[] largeContent = new byte[10 * 1024 * 1024];
             File.WriteAllBytes(sourceFile, largeContent);
+            File.WriteAllText(destinationFile, "previous contents");
 
             CancellationTokenSource cts = new();
             cts.Cancel();
@@ -383,6 +384,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             bool result = copyTask.Result;
 
             Assert.IsFalse(result);
+            Assert.AreEqual("previous contents", File.ReadAllText(destinationFile));
+            Assert.IsFalse(File.Exists(destinationFile + DurableFile.TemporarySuffix));
         }
 
         [UnityTest]

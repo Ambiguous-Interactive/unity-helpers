@@ -56,7 +56,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         /// <summary>
-        /// Asynchronously copies a file to a new path using a buffered stream.
+        /// Asynchronously copies a file and replaces the destination after the copy completes.
         /// </summary>
         /// <param name="sourcePath">Source file path.</param>
         /// <param name="destinationPath">Destination file path (overwrites).</param>
@@ -70,32 +70,15 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             CancellationToken cancellationToken = default
         )
         {
-            try
-            {
-                // Synchronous disposal preserves compatibility with Unity profiles lacking IAsyncDisposable.
-                using FileStream sourceStream = new(
-                    sourcePath,
-                    FileMode.Open,
-                    FileAccess.Read,
-                    FileShare.Read,
-                    bufferSize,
-                    useAsync: true
-                );
-                using FileStream destinationStream = new(
-                    destinationPath,
-                    FileMode.Create,
-                    FileAccess.Write,
-                    FileShare.None,
-                    bufferSize,
-                    useAsync: true
-                );
-                await sourceStream.CopyToAsync(destinationStream, bufferSize, cancellationToken);
-                return true;
-            }
-            catch
+            if (bufferSize <= 0)
             {
                 return false;
             }
+
+            Exception error = await DurableFile
+                .CopyAsync(sourcePath, destinationPath, bufferSize, cancellationToken)
+                .ConfigureAwait(false);
+            return error == null;
         }
     }
 }

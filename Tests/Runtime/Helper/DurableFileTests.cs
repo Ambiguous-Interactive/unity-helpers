@@ -421,6 +421,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [Test]
+        public void CopyClosesTheSourceWhenDestinationDirectoryCreationFails()
+        {
+            string source = WriteDirectly("source.json", "source contents");
+            string blockedDirectory = WriteDirectly("not-a-directory", "existing file");
+            string destination = Path.Combine(blockedDirectory, "destination.json");
+
+            Assert.IsFalse(DurableFile.TryCopy(source, destination, out Exception error));
+
+            Assert.IsTrue(error != null);
+            Assert.AreEqual("source contents", File.ReadAllText(source));
+            using FileStream exclusiveSource = new(
+                source,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.None
+            );
+            Assert.AreEqual("source contents".Length, exclusiveSource.Length);
+        }
+
+        [Test]
         public void DeleteReportsSuccessWhenNothingIsThere()
         {
             Assert.IsTrue(DurableFile.TryDelete(Path.Combine(_testDirectory, "absent.json")));
@@ -601,6 +621,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsTrue(copy.Result is ArgumentException);
             Assert.IsFalse(File.Exists(destination));
             Assert.IsFalse(File.Exists(destination + DurableFile.TemporarySuffix));
+        }
+
+        [UnityTest]
+        public IEnumerator CopyAsyncClosesTheSourceWhenDestinationDirectoryCreationFails()
+        {
+            string source = WriteDirectly("source.json", "source contents");
+            string blockedDirectory = WriteDirectly("not-a-directory", "existing file");
+            string destination = Path.Combine(blockedDirectory, "destination.json");
+
+            Task<Exception> copy = DurableFile.CopyAsync(source, destination).AsTask();
+            while (!copy.IsCompleted)
+            {
+                yield return null;
+            }
+
+            Assert.IsTrue(copy.Result != null);
+            Assert.AreEqual("source contents", File.ReadAllText(source));
+            using FileStream exclusiveSource = new(
+                source,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.None
+            );
+            Assert.AreEqual("source contents".Length, exclusiveSource.Length);
         }
 
         private string WriteDirectly(string fileName, string contents)

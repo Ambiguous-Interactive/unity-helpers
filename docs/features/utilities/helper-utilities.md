@@ -918,6 +918,12 @@ FileHelper.InitializePath(
 
 **Async file copy:**
 
+The destination keeps its previous contents if reading or staging fails, or if the copy is
+cancelled. A successful copy replaces it after the full source has been staged. On platforms that
+do not support file replacement, the final swap deletes the old destination before moving the
+staged file; a failed move can leave the destination absent. A temporary sibling file may remain
+after an interrupted process.
+
 <!-- doc-sample: compiles -->
 
 ```csharp
