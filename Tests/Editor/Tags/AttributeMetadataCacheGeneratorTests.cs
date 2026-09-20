@@ -224,6 +224,16 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             }
 
             AssetDatabase.SaveAssets();
+            if (_cacheFolderRemovedForTest && _cacheFolderExistedBefore)
+            {
+                string projectRoot = Path.GetDirectoryName(Application.dataPath);
+                Assert.IsTrue(AssetDatabaseBatchHelper.EnsureAssetFolder(CacheFolder));
+                File.WriteAllBytes(
+                    Path.Combine(projectRoot, CacheFolder) + ".meta",
+                    _cacheFolderMetaBackup
+                );
+                AssetDatabase.ImportAsset(CacheFolder, ImportAssetOptions.ForceSynchronousImport);
+            }
             if (_assetExistedBefore && _assetBackedUp)
             {
                 string projectRoot = Path.GetDirectoryName(Application.dataPath);
@@ -250,16 +260,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tags
             if (!_resourcesFolderExistedBefore)
             {
                 DeleteFolderIfEmpty(ResourcesFolder);
-            }
-            if (_cacheFolderRemovedForTest && _cacheFolderExistedBefore)
-            {
-                string projectRoot = Path.GetDirectoryName(Application.dataPath);
-                Assert.IsTrue(AssetDatabaseBatchHelper.EnsureAssetFolder(CacheFolder));
-                File.WriteAllBytes(
-                    Path.Combine(projectRoot, CacheFolder) + ".meta",
-                    _cacheFolderMetaBackup
-                );
-                AssetDatabase.ImportAsset(CacheFolder, ImportAssetOptions.ForceSynchronousImport);
             }
             if (!_tempFolderExistedBefore)
             {
