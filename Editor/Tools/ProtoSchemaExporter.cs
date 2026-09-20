@@ -40,8 +40,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             out string error
         )
         {
-            contracts = Array.Empty<Type>();
-            error = null;
             try
             {
                 contracts = TypeCache
@@ -50,10 +48,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     .OrderBy(type => type.Assembly.GetName().Name, StringComparer.Ordinal)
                     .ThenBy(type => DisplayName(type), StringComparer.Ordinal)
                     .ToArray();
+                error = null;
                 return true;
             }
             catch (Exception exception) when (exception is not OutOfMemoryException)
             {
+                contracts = Array.Empty<Type>();
                 error = $"Could not discover proto contracts: {exception.Message}";
                 return false;
             }
@@ -270,8 +270,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         )
         {
             Dictionary<Type, Type> surrogates = new Dictionary<Type, Type>();
-            discovered = null;
-            error = null;
 #if UNITY_6000_6_OR_NEWER
             IReadOnlyList<Assembly> assemblies =
                 UnityEngine.Assemblies.CurrentAssemblies.GetLoadedAssemblies();
@@ -294,6 +292,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 }
                 catch (Exception exception) when (exception is not OutOfMemoryException)
                 {
+                    discovered = null;
                     error =
                         $"Could not read proto surrogates from {assembly.GetName().Name}: {exception.Message}";
                     return false;
@@ -301,6 +300,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
 
             discovered = surrogates;
+            error = null;
             return true;
         }
 
@@ -341,12 +341,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             out string error
         )
         {
-            files = new List<ExportFile>();
-            error = null;
             if (contracts == null)
             {
-                error = "No contracts selected.";
-                return false;
+                return FailPlan(out files, out error, "No contracts selected.");
             }
 
             List<Type> selected = new List<Type>();
@@ -355,8 +352,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             {
                 if (contract == null || !contract.IsDefined(typeof(WProtoContractAttribute), false))
                 {
-                    error = "Every selected type must be a [WProtoContract] type.";
-                    return false;
+                    return FailPlan(
+                        out files,
+                        out error,
+                        "Every selected type must be a [WProtoContract] type."
+                    );
                 }
 
                 if (seen.Add(contract))
@@ -366,8 +366,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
             if (selected.Count == 0)
             {
-                error = "No contracts selected.";
-                return false;
+                return FailPlan(out files, out error, "No contracts selected.");
             }
 
             selected.Sort(
@@ -385,25 +384,29 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
             if (layout < ExportLayout.SingleFile || ExportLayout.OneFilePerContract < layout)
             {
-                error = "Choose a supported file layout.";
-                return false;
+                return FailPlan(out files, out error, "Choose a supported file layout.");
             }
 
             if (!IsValidPackage(packageName))
             {
-                error =
-                    $"\"{packageName}\" is not a proto3 package: use dot-separated identifiers, or clear the field to omit the clause.";
-                return false;
+                return FailPlan(
+                    out files,
+                    out error,
+                    $"\"{packageName}\" is not a proto3 package: use dot-separated identifiers, or clear the field to omit the clause."
+                );
             }
 
-            if (!TryResolvePath(destination, out string absolutePath, out error))
+            if (!TryResolvePath(destination, out string absolutePath, out string pathError))
             {
-                return false;
+                return FailPlan(out files, out error, pathError);
             }
 
+            List<ExportFile> plannedFiles = new List<ExportFile>();
             if (layout == ExportLayout.SingleFile)
             {
-                files.Add(new ExportFile(string.Empty, absolutePath, selected));
+                plannedFiles.Add(new ExportFile(string.Empty, absolutePath, selected));
+                files = plannedFiles;
+                error = null;
                 return true;
             }
 
@@ -422,7 +425,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             HashSet<string> usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (IGrouping<string, Type> group in groups)
             {
-                files.Add(
+                plannedFiles.Add(
                     new ExportFile(
                         group.Key,
                         Path.Combine(absolutePath, UniqueFileName(group.Key, usedNames)),
@@ -431,15 +434,23 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 );
             }
 
+            files = plannedFiles;
+            error = null;
             return true;
+        }
+
+        private static bool FailPlan(out List<ExportFile> files, out string error, string message)
+        {
+            files = new List<ExportFile>();
+            error = message;
+            return false;
         }
 
         private static bool TryResolvePath(string destination, out string path, out string error)
         {
-            path = null;
-            error = null;
             if (string.IsNullOrWhiteSpace(destination))
             {
+                path = null;
                 error = "Choose an output path first.";
                 return false;
             }
@@ -447,27 +458,29 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             try
             {
                 string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-                path = Path.GetFullPath(
+                string resolvedPath = Path.GetFullPath(
                     Path.IsPathRooted(destination)
                         ? destination
                         : Path.Combine(projectRoot, destination)
                 );
                 if (
                     !Path.IsPathRooted(destination)
-                    && !string.Equals(path, projectRoot, StringComparison.OrdinalIgnoreCase)
-                    && !path.StartsWith(
+                    && !string.Equals(resolvedPath, projectRoot, StringComparison.OrdinalIgnoreCase)
+                    && !resolvedPath.StartsWith(
                         projectRoot.TrimEnd(Path.DirectorySeparatorChar)
                             + Path.DirectorySeparatorChar,
                         StringComparison.OrdinalIgnoreCase
                     )
                 )
                 {
+                    path = null;
                     error = "A relative output path must stay inside the project.";
                     return false;
                 }
 
-                string root = Path.GetPathRoot(path);
-                string[] segments = path.Substring(root.Length)
+                string root = Path.GetPathRoot(resolvedPath);
+                string[] segments = resolvedPath
+                    .Substring(root.Length)
                     .Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
                 foreach (string segment in segments)
                 {
@@ -475,12 +488,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     {
                         if (InvalidFileNameCharacters.Contains(character))
                         {
+                            path = null;
                             error = "The output path contains an invalid file name.";
                             return false;
                         }
                     }
                 }
 
+                path = resolvedPath;
+                error = null;
                 return true;
             }
             catch (Exception exception)
@@ -490,6 +506,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     || exception is System.Security.SecurityException
                 )
             {
+                path = null;
                 error = $"Invalid output path: {exception.Message}";
                 return false;
             }
