@@ -155,6 +155,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
         }
 
         [Test]
+        public void DirectApiWritesAndImportsBlurredAssetWithoutWindow()
+        {
+            string sourcePath = Path.Combine(_testRoot, "direct.png").SanitizePath();
+            string expectedOutputPath = Path.Combine(_testRoot, "direct_blurred_2.png")
+                .SanitizePath();
+            CreatePng(sourcePath, Color.magenta);
+            TrackAssetPath(expectedOutputPath);
+            ConfigureImporter(
+                sourcePath,
+                isReadable: false,
+                TextureImporterCompression.CompressedHQ
+            );
+            Texture2D source = AssetDatabase.LoadAssetAtPath<Texture2D>(sourcePath);
+            Assert.IsTrue(source != null);
+            int temporaryTextureCount = CountTemporaryTextures();
+
+            bool success = ImageBlurAPI.TryWriteAsset(
+                source,
+                2,
+                out string outputPath,
+                out string error
+            );
+
+            Assert.IsTrue(success, error);
+            Assert.IsTrue(error == null);
+            Assert.That(outputPath, Is.EqualTo(expectedOutputPath));
+            Assert.IsTrue(File.Exists(RelToFull(outputPath)));
+            Assert.IsTrue(AssetDatabase.LoadAssetAtPath<Texture2D>(outputPath) != null);
+            AssertImporterSettings(
+                sourcePath,
+                isReadable: false,
+                TextureImporterCompression.CompressedHQ
+            );
+            Assert.That(CountTemporaryTextures(), Is.EqualTo(temporaryTextureCount));
+        }
+
+        [Test]
         public void InvalidRadiusRestoresImporterSettingsAndDoesNotLeakTexture()
         {
             string sourcePath = Path.Combine(_testRoot, "failure.png").SanitizePath();

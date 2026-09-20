@@ -5,7 +5,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 {
     using System;
     using System.Collections.Generic;
-    using System.IO;
     using System.Threading.Tasks;
     using UnityEditor;
     using UnityEngine;
@@ -251,113 +250,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
         internal bool TryWriteBlurredTexture(Texture2D originalTexture, int radius)
         {
-            string assetPath = AssetDatabase.GetAssetPath(originalTexture);
-            if (string.IsNullOrWhiteSpace(assetPath))
+            if (
+                !ImageBlurAPI.TryWriteAsset(
+                    originalTexture,
+                    radius,
+                    out string outputPath,
+                    out string error,
+                    importOutput: false
+                )
+            )
             {
-                this.LogError($"Texture is not a project asset: {originalTexture.name}.");
+                this.LogError($"{error}");
                 return false;
             }
 
-            TextureImporter importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
-            bool importerSettingsChanged = false;
-            bool originalReadable = false;
-            TextureImporterCompression originalCompression = default;
-            Texture2D blurredTexture = null;
-            try
-            {
-                if (importer != null)
-                {
-                    originalReadable = importer.isReadable;
-                    originalCompression = importer.textureCompression;
-                    importerSettingsChanged =
-                        !originalReadable
-                        || originalCompression != TextureImporterCompression.Uncompressed;
-                    if (importerSettingsChanged)
-                    {
-                        Undo.RecordObject(importer, "Prepare Texture for Blur");
-                        importer.isReadable = true;
-                        importer.textureCompression = TextureImporterCompression.Uncompressed;
-                        importer.SaveAndReimport();
-                    }
-                }
-
-                Texture2D currentTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
-                if (currentTexture == null || !currentTexture.isReadable)
-                {
-                    this.LogError(
-                        $"Texture is null or could not be made readable: {assetPath}. Please check 'Read/Write Enabled' in its import settings if the issue persists. Skipping."
-                    );
-                    return false;
-                }
-
-                if (
-                    !ImageBlurAPI.TryBlur(
-                        currentTexture,
-                        radius,
-                        out blurredTexture,
-                        out string blurError
-                    )
-                )
-                {
-                    this.LogError(
-                        $"Failed to create blurred texture for: {originalTexture.name}. {blurError}"
-                    );
-                    return false;
-                }
-
-                string directory = Path.GetDirectoryName(assetPath);
-                if (string.IsNullOrWhiteSpace(directory))
-                {
-                    return false;
-                }
-
-                string fileName = Path.GetFileNameWithoutExtension(assetPath);
-                string sourceExtension = Path.GetExtension(assetPath);
-                bool encodeJpeg =
-                    string.Equals(sourceExtension, ".jpg", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(sourceExtension, ".jpeg", StringComparison.OrdinalIgnoreCase);
-                string outputExtension = encodeJpeg ? sourceExtension : ".png";
-                string newPathBase = Path.Combine(directory, $"{fileName}_blurred_{radius}");
-                string finalPath = newPathBase + outputExtension;
-                int counter = 0;
-                while (File.Exists(finalPath))
-                {
-                    counter++;
-                    finalPath = $"{newPathBase}_{counter}{outputExtension}";
-                }
-
-                byte[] bytes = encodeJpeg
-                    ? blurredTexture.EncodeToJPG(100)
-                    : blurredTexture.EncodeToPNG();
-                if (bytes == null)
-                {
-                    this.LogError($"Failed to encode texture: {currentTexture.name}.");
-                    return false;
-                }
-
-                File.WriteAllBytes(finalPath, bytes);
-                this.Log($"Saved blurred image to: {finalPath}");
-                return true;
-            }
-            finally
-            {
-                if (blurredTexture != null)
-                {
-                    DestroyImmediate(blurredTexture);
-                }
-
-                if (importerSettingsChanged)
-                {
-                    TextureImporter currentImporter =
-                        AssetImporter.GetAtPath(assetPath) as TextureImporter;
-                    if (currentImporter != null)
-                    {
-                        currentImporter.isReadable = originalReadable;
-                        currentImporter.textureCompression = originalCompression;
-                        currentImporter.SaveAndReimport();
-                    }
-                }
-            }
+            this.Log($"Saved blurred image to: {outputPath}");
+            return true;
         }
 
         private void BindSerializedState()

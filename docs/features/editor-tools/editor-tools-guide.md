@@ -99,6 +99,11 @@ if (ImageBlurAPI.TryBlur(source, 12, out Texture2D blurred, out string error))
 The API accepts radii from `1` through `200` and reports invalid or unreadable sources through
 `error`. It does not change importer settings or write files.
 
+For the same file output as the window, call `ImageBlurAPI.TryWriteAsset` with a project texture and
+radius. It temporarily makes the source readable, restores its importer,
+writes a uniquely named image beside it, and imports the result. This operation writes a file;
+Unity Undo cannot remove that output file.
+
 > **Visual Demo**
 >
 > ![Image Blur Tool showing before/after comparison as blur radius slider is adjusted](../../images/editor-tools/image-blur-before-after.gif)
