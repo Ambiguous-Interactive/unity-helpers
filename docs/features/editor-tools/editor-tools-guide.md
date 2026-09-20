@@ -591,6 +591,15 @@ apart and moves only what matters.
 Dry runs leave destination files and folders untouched, including subfolders that a real copy would
 create for nested source clips.
 
+Scripts and batch jobs can use `AnimationCopierAPI.TryAnalyze` with explicit source and destination
+folders to receive source entries and destination orphans. Pass selected source paths to `Run` for
+`CopyNew`, `CopyChanged`, `CopyAll`, or `DeleteUnchangedSource`; pass selected destination paths
+for `DeleteDestinationOrphans`. Set `applyChanges: false` to preview eligible operations and
+`applyChanges: true` to perform them. The result reports processed, skipped, and failed counts,
+cancellation, and per-path diagnostics. The API makes no prompts, rechecks each selected clip before
+an operation, accepts standalone `.anim` files under distinct non-overlapping `Assets` folders,
+and never creates folders during a preview.
+
 Copying a changed clip preserves its GUID, so every Animator that already references it keeps
 working.
 
@@ -606,7 +615,8 @@ identical clip does not show up as a change.
 the redundant copies left behind in the source folder, and
 **Mirror Delete Destination Orphans (N)** deletes destination clips with no source any more. Both
 honour **Dry Run**. **Export Preview Report** writes the analysis to a file if you would rather review
-it outside the editor.
+it outside the editor. Copy, delete, and reimport operations change files on disk and cannot be
+fully reversed through Unity Undo.
 
 > **Visual Reference**
 >

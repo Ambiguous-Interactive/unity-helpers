@@ -20,9 +20,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
     public sealed class AnimationCopierWindow : EditorWindow
     {
-        // Zero tolerance uses relative float tolerance: ignore round-trip noise without hiding animation edits.
-        private const float ContentEqualityTolerance = 0f;
-
         internal static bool SuppressUserPrompts { get; set; }
 
         internal string AnimationSourcePathRelative
@@ -126,92 +123,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             GetWindow<AnimationCopierWindow>("Animation Copier");
         }
 
-        /// <summary>
-        /// Compares the content of two already-loaded animation clips to determine if they are
-        /// functionally identical. Pure (no asset I/O): operates on in-memory
-        /// <see cref="AnimationClip"/> instances, so it is unit-testable without importing assets.
-        /// </summary>
-        /// <param name="sourceClip">The source animation clip (may be null).</param>
-        /// <param name="destClip">The destination animation clip (may be null).</param>
-        /// <returns>True if the animation clips have identical content, false otherwise.</returns>
         internal static bool AreAnimationClipsContentEqual(
             AnimationClip sourceClip,
             AnimationClip destClip
         )
         {
-            if (sourceClip == null || destClip == null)
-            {
-                return false;
-            }
-
-            if (!sourceClip.frameRate.Approximately(destClip.frameRate, ContentEqualityTolerance))
-            {
-                return false;
-            }
-            if (!sourceClip.length.Approximately(destClip.length, ContentEqualityTolerance))
-            {
-                return false;
-            }
-            if (sourceClip.wrapMode != destClip.wrapMode)
-            {
-                return false;
-            }
-            if (sourceClip.isLooping != destClip.isLooping)
-            {
-                return false;
-            }
-            if (sourceClip.legacy != destClip.legacy)
-            {
-                return false;
-            }
-
-            AnimationClipSettings sourceSettings = AnimationUtility.GetAnimationClipSettings(
-                sourceClip
-            );
-            AnimationClipSettings destSettings = AnimationUtility.GetAnimationClipSettings(
-                destClip
-            );
-            if (!AreAnimationClipSettingsEqual(sourceSettings, destSettings))
-            {
-                return false;
-            }
-
-            AnimationEvent[] sourceEvents = AnimationUtility.GetAnimationEvents(sourceClip);
-            AnimationEvent[] destEvents = AnimationUtility.GetAnimationEvents(destClip);
-            if (!AreAnimationEventsEqual(sourceEvents, destEvents))
-            {
-                return false;
-            }
-
-            EditorCurveBinding[] sourceFloatBindings = AnimationUtility.GetCurveBindings(
-                sourceClip
-            );
-            EditorCurveBinding[] destFloatBindings = AnimationUtility.GetCurveBindings(destClip);
-            if (
-                !AreCurveBindingsEqual(sourceClip, destClip, sourceFloatBindings, destFloatBindings)
-            )
-            {
-                return false;
-            }
-
-            EditorCurveBinding[] sourceObjBindings =
-                AnimationUtility.GetObjectReferenceCurveBindings(sourceClip);
-            EditorCurveBinding[] destObjBindings = AnimationUtility.GetObjectReferenceCurveBindings(
-                destClip
-            );
-            if (
-                !AreObjectReferenceCurveBindingsEqual(
-                    sourceClip,
-                    destClip,
-                    sourceObjBindings,
-                    destObjBindings
-                )
-            )
-            {
-                return false;
-            }
-
-            return true;
+            return AnimationClipContentComparer.AreAnimationClipsContentEqual(sourceClip, destClip);
         }
 
         private static string GetFullPathFromRelative(string relativePath)
@@ -235,373 +152,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return (projectRoot + relativePath).SanitizePath();
             }
             return null;
-        }
-
-        private static bool AreAnimationClipSettingsEqual(
-            AnimationClipSettings a,
-            AnimationClipSettings b
-        )
-        {
-            if (a.loopTime != b.loopTime)
-            {
-                return false;
-            }
-            if (a.loopBlend != b.loopBlend)
-            {
-                return false;
-            }
-            if (!a.cycleOffset.Approximately(b.cycleOffset, ContentEqualityTolerance))
-            {
-                return false;
-            }
-            if (a.keepOriginalOrientation != b.keepOriginalOrientation)
-            {
-                return false;
-            }
-            if (a.keepOriginalPositionXZ != b.keepOriginalPositionXZ)
-            {
-                return false;
-            }
-            if (a.keepOriginalPositionY != b.keepOriginalPositionY)
-            {
-                return false;
-            }
-            if (a.heightFromFeet != b.heightFromFeet)
-            {
-                return false;
-            }
-            if (a.mirror != b.mirror)
-            {
-                return false;
-            }
-            if (!a.startTime.Approximately(b.startTime, ContentEqualityTolerance))
-            {
-                return false;
-            }
-            if (!a.stopTime.Approximately(b.stopTime, ContentEqualityTolerance))
-            {
-                return false;
-            }
-            return true;
-        }
-
-        private static bool AreAnimationEventsEqual(AnimationEvent[] a, AnimationEvent[] b)
-        {
-            if (a == null && b == null)
-            {
-                return true;
-            }
-            if (a == null || b == null)
-            {
-                return false;
-            }
-            if (a.Length != b.Length)
-            {
-                return false;
-            }
-            for (int i = 0; i < a.Length; i++)
-            {
-                AnimationEvent evtA = a[i];
-                AnimationEvent evtB = b[i];
-                if (!evtA.time.Approximately(evtB.time, ContentEqualityTolerance))
-                {
-                    return false;
-                }
-                if (!string.Equals(evtA.functionName, evtB.functionName, StringComparison.Ordinal))
-                {
-                    return false;
-                }
-                if (
-                    !evtA.floatParameter.Approximately(
-                        evtB.floatParameter,
-                        ContentEqualityTolerance
-                    )
-                )
-                {
-                    return false;
-                }
-                if (evtA.intParameter != evtB.intParameter)
-                {
-                    return false;
-                }
-                if (
-                    !string.Equals(
-                        evtA.stringParameter,
-                        evtB.stringParameter,
-                        StringComparison.Ordinal
-                    )
-                )
-                {
-                    return false;
-                }
-                // Object reference comparison: compare by path if both are assets
-                if (
-                    !AreObjectReferencesEqual(
-                        evtA.objectReferenceParameter,
-                        evtB.objectReferenceParameter
-                    )
-                )
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        private static bool AreObjectReferencesEqual(UnityEngine.Object a, UnityEngine.Object b)
-        {
-            if (a == null && b == null)
-            {
-                return true;
-            }
-            if (a == null || b == null)
-            {
-                return false;
-            }
-            // Compare by asset path for consistent comparison across copy operations
-            string pathA = AssetDatabase.GetAssetPath(a);
-            string pathB = AssetDatabase.GetAssetPath(b);
-            if (!string.IsNullOrEmpty(pathA) && !string.IsNullOrEmpty(pathB))
-            {
-                string nameA = Path.GetFileName(pathA);
-                string nameB = Path.GetFileName(pathB);
-                return string.Equals(nameA, nameB, StringComparison.Ordinal);
-            }
-            return ReferenceEquals(a, b);
-        }
-
-        private static bool AreCurveBindingsEqual(
-            AnimationClip sourceClip,
-            AnimationClip destClip,
-            EditorCurveBinding[] sourceBindings,
-            EditorCurveBinding[] destBindings
-        )
-        {
-            if (sourceBindings == null && destBindings == null)
-            {
-                return true;
-            }
-            if (sourceBindings == null || destBindings == null)
-            {
-                return false;
-            }
-            if (sourceBindings.Length != destBindings.Length)
-            {
-                return false;
-            }
-
-            Array.Sort(sourceBindings, CompareEditorCurveBinding);
-            Array.Sort(destBindings, CompareEditorCurveBinding);
-
-            for (int i = 0; i < sourceBindings.Length; i++)
-            {
-                EditorCurveBinding srcBinding = sourceBindings[i];
-                EditorCurveBinding dstBinding = destBindings[i];
-
-                if (!AreBindingsEqual(srcBinding, dstBinding))
-                {
-                    return false;
-                }
-
-                AnimationCurve srcCurve = AnimationUtility.GetEditorCurve(sourceClip, srcBinding);
-                AnimationCurve dstCurve = AnimationUtility.GetEditorCurve(destClip, dstBinding);
-
-                if (!AreAnimationCurvesEqual(srcCurve, dstCurve))
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        private static bool AreObjectReferenceCurveBindingsEqual(
-            AnimationClip sourceClip,
-            AnimationClip destClip,
-            EditorCurveBinding[] sourceBindings,
-            EditorCurveBinding[] destBindings
-        )
-        {
-            if (sourceBindings == null && destBindings == null)
-            {
-                return true;
-            }
-            if (sourceBindings == null || destBindings == null)
-            {
-                return false;
-            }
-            if (sourceBindings.Length != destBindings.Length)
-            {
-                return false;
-            }
-
-            Array.Sort(sourceBindings, CompareEditorCurveBinding);
-            Array.Sort(destBindings, CompareEditorCurveBinding);
-
-            for (int i = 0; i < sourceBindings.Length; i++)
-            {
-                EditorCurveBinding srcBinding = sourceBindings[i];
-                EditorCurveBinding dstBinding = destBindings[i];
-
-                if (!AreBindingsEqual(srcBinding, dstBinding))
-                {
-                    return false;
-                }
-
-                ObjectReferenceKeyframe[] srcKeyframes = AnimationUtility.GetObjectReferenceCurve(
-                    sourceClip,
-                    srcBinding
-                );
-                ObjectReferenceKeyframe[] dstKeyframes = AnimationUtility.GetObjectReferenceCurve(
-                    destClip,
-                    dstBinding
-                );
-
-                if (!AreObjectReferenceKeyframesEqual(srcKeyframes, dstKeyframes))
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        private static bool AreBindingsEqual(EditorCurveBinding a, EditorCurveBinding b)
-        {
-            if (!string.Equals(a.path, b.path, StringComparison.Ordinal))
-            {
-                return false;
-            }
-            if (!string.Equals(a.propertyName, b.propertyName, StringComparison.Ordinal))
-            {
-                return false;
-            }
-            if (a.type != b.type)
-            {
-                return false;
-            }
-            return true;
-        }
-
-        private static int CompareEditorCurveBinding(EditorCurveBinding a, EditorCurveBinding b)
-        {
-            int pathCompare = string.Compare(a.path, b.path, StringComparison.Ordinal);
-            if (pathCompare != 0)
-            {
-                return pathCompare;
-            }
-            int propCompare = string.Compare(
-                a.propertyName,
-                b.propertyName,
-                StringComparison.Ordinal
-            );
-            if (propCompare != 0)
-            {
-                return propCompare;
-            }
-            return string.Compare(
-                a.type?.FullName ?? "",
-                b.type?.FullName ?? "",
-                StringComparison.Ordinal
-            );
-        }
-
-        private static bool AreAnimationCurvesEqual(AnimationCurve a, AnimationCurve b)
-        {
-            if (a == null && b == null)
-            {
-                return true;
-            }
-            if (a == null || b == null)
-            {
-                return false;
-            }
-            if (a.preWrapMode != b.preWrapMode)
-            {
-                return false;
-            }
-            if (a.postWrapMode != b.postWrapMode)
-            {
-                return false;
-            }
-            if (a.length != b.length)
-            {
-                return false;
-            }
-
-            Keyframe[] keysA = a.keys;
-            Keyframe[] keysB = b.keys;
-            if (keysA.Length != keysB.Length)
-            {
-                return false;
-            }
-
-            for (int i = 0; i < keysA.Length; i++)
-            {
-                Keyframe kA = keysA[i];
-                Keyframe kB = keysB[i];
-                if (!kA.time.Approximately(kB.time, ContentEqualityTolerance))
-                {
-                    return false;
-                }
-                if (!kA.value.Approximately(kB.value, ContentEqualityTolerance))
-                {
-                    return false;
-                }
-                if (!kA.inTangent.Approximately(kB.inTangent, ContentEqualityTolerance))
-                {
-                    return false;
-                }
-                if (!kA.outTangent.Approximately(kB.outTangent, ContentEqualityTolerance))
-                {
-                    return false;
-                }
-                if (!kA.inWeight.Approximately(kB.inWeight, ContentEqualityTolerance))
-                {
-                    return false;
-                }
-                if (!kA.outWeight.Approximately(kB.outWeight, ContentEqualityTolerance))
-                {
-                    return false;
-                }
-                if (kA.weightedMode != kB.weightedMode)
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        private static bool AreObjectReferenceKeyframesEqual(
-            ObjectReferenceKeyframe[] a,
-            ObjectReferenceKeyframe[] b
-        )
-        {
-            if (a == null && b == null)
-            {
-                return true;
-            }
-            if (a == null || b == null)
-            {
-                return false;
-            }
-            if (a.Length != b.Length)
-            {
-                return false;
-            }
-
-            for (int i = 0; i < a.Length; i++)
-            {
-                ObjectReferenceKeyframe kA = a[i];
-                ObjectReferenceKeyframe kB = b[i];
-                if (!kA.time.Approximately(kB.time, ContentEqualityTolerance))
-                {
-                    return false;
-                }
-                if (!AreObjectReferencesEqual(kA.value, kB.value))
-                {
-                    return false;
-                }
-            }
-            return true;
         }
 
         private static bool Confirm(string title, string message, string ok, string cancel)
@@ -631,227 +181,110 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         internal void AnalyzeAnimations()
         {
-            if (!ArePathsValid())
+            if (!ArePathsValid() || _isAnalyzing || _isCopying || _isDeleting)
             {
-                this.LogError($"Cannot analyze: Paths are invalid.");
                 ClearAnalysisResults();
-                _analysisNeeded = false;
-                Repaint();
                 return;
             }
 
-            if (_isAnalyzing || _isCopying || _isDeleting)
-            {
-                return;
-            }
-
-            this.Log($"Starting animation analysis...");
             _isAnalyzing = true;
             ClearAnalysisResults();
             Repaint();
-
             try
             {
-                string[] sourceGuids = AssetDatabase.FindAssets(
-                    "t:AnimationClip",
-                    new[] { _animationSourcePathRelative }
-                );
-                _sourceAnimations.Clear();
-
-                if (sourceGuids != null)
-                {
-                    _sourceAnimations.Capacity = Math.Max(
-                        _sourceAnimations.Capacity,
-                        sourceGuids.Length
-                    );
-                    _newAnimations.Capacity = Math.Max(_newAnimations.Capacity, sourceGuids.Length);
-                    _changedAnimations.Capacity = Math.Max(
-                        _changedAnimations.Capacity,
-                        sourceGuids.Length
-                    );
-                    _unchangedAnimations.Capacity = Math.Max(
-                        _unchangedAnimations.Capacity,
-                        sourceGuids.Length
-                    );
-                }
-
-                if (sourceGuids != null)
-                {
-                    float total = sourceGuids.Length * 2;
-                    int current = 0;
-
-                    ShowProgress("Analyzing Animations", "Gathering source files...", 0f);
-
-                    int throttleCounter = 0;
-                    foreach (string guid in sourceGuids)
-                    {
-                        current++;
-                        string sourceRelPath = AssetDatabase.GUIDToAssetPath(guid);
-                        if (
-                            string.IsNullOrWhiteSpace(sourceRelPath)
-                            || !sourceRelPath.StartsWith(
-                                _animationSourcePathRelative,
-                                StringComparison.OrdinalIgnoreCase
-                            )
-                        )
+                List<AnimationCopierAPI.Entry> sourceEntries = new();
+                List<AnimationCopierAPI.Entry> orphanEntries = new();
+                if (
+                    !AnimationCopierAPI.TryAnalyze(
+                        _animationSourcePathRelative,
+                        _animationDestinationPathRelative,
+                        sourceEntries,
+                        orphanEntries,
+                        out string error,
+                        (path, current, total) =>
                         {
-                            continue;
-                        }
-
-                        string sourceFullPath = GetFullPathFromRelative(sourceRelPath);
-                        if (sourceFullPath == null || !File.Exists(sourceFullPath))
-                        {
-                            continue;
-                        }
-
-                        string directoryName = Path.GetDirectoryName(sourceRelPath);
-                        if (string.IsNullOrWhiteSpace(directoryName))
-                        {
-                            continue;
-                        }
-                        AnimationFileInfo fileInfo = new()
-                        {
-                            RelativePath = sourceRelPath,
-                            FullPath = sourceFullPath,
-                            FileName = Path.GetFileName(sourceRelPath),
-                            RelativeDirectory = GetRelativeSubPath(
-                                _animationSourcePathRelative,
-                                directoryName.SanitizePath()
-                            ),
-                        };
-                        fileInfo.DestinationRelativePath = Path.Combine(
-                                _animationDestinationPathRelative,
-                                fileInfo.RelativeDirectory,
-                                fileInfo.FileName
-                            )
-                            .SanitizePath();
-                        _sourceAnimations.Add(fileInfo);
-
-                        if (++throttleCounter % 10 == 0)
-                        {
-                            ShowProgress(
-                                "Analyzing Animations",
-                                $"Gathering: {fileInfo.FileName}",
-                                current / total
-                            );
-                        }
-                    }
-
-                    this.Log(
-                        $"Found {_sourceAnimations.Count} animations in source. Comparing with destination..."
-                    );
-
-                    for (int i = 0; i < _sourceAnimations.Count; i++)
-                    {
-                        AnimationFileInfo sourceInfo = _sourceAnimations[i];
-                        current++;
-                        if (i % 10 == 0 || i == _sourceAnimations.Count - 1)
-                        {
-                            ShowProgress(
-                                "Analyzing Animations",
-                                $"Comparing: {sourceInfo.FileName}",
-                                current / total
-                            );
-                        }
-
-                        string destRelPath = sourceInfo.DestinationRelativePath;
-                        string destFullPath = GetFullPathFromRelative(destRelPath);
-                        bool destExists = destFullPath != null && File.Exists(destFullPath);
-
-                        if (!destExists)
-                        {
-                            sourceInfo.Status = AnimationStatus.New;
-                            _newAnimations.Add(sourceInfo);
-                        }
-                        else
-                        {
-                            // Content comparison recognizes unchanged copied clips despite differing dependency hashes.
-                            bool contentEqual = AreAnimationClipsContentEqual(
-                                sourceInfo.RelativePath,
-                                destRelPath
-                            );
-                            if (contentEqual)
-                            {
-                                sourceInfo.Status = AnimationStatus.Unchanged;
-                                _unchangedAnimations.Add(sourceInfo);
-                            }
-                            else
-                            {
-                                sourceInfo.Status = AnimationStatus.Changed;
-                                _changedAnimations.Add(sourceInfo);
-                            }
-                        }
-                    }
-
-                    try
-                    {
-                        _destinationOrphans.Clear();
-                        HashSet<string> expectedDestPaths = new(StringComparer.OrdinalIgnoreCase);
-                        foreach (AnimationFileInfo info in _sourceAnimations)
-                        {
-                            if (!string.IsNullOrWhiteSpace(info.DestinationRelativePath))
-                            {
-                                expectedDestPaths.Add(info.DestinationRelativePath);
-                            }
-                        }
-
-                        string[] destGuids = AssetDatabase.FindAssets(
-                            "t:AnimationClip",
-                            new[] { _animationDestinationPathRelative }
-                        );
-                        int local = 0;
-                        foreach (string dGuid in destGuids)
-                        {
-                            local++;
-                            string destRelPath = AssetDatabase.GUIDToAssetPath(dGuid);
-                            if (string.IsNullOrWhiteSpace(destRelPath))
-                            {
-                                continue;
-                            }
-                            if (expectedDestPaths.Contains(destRelPath))
-                            {
-                                continue;
-                            }
-                            string destFullPath = GetFullPathFromRelative(destRelPath);
-                            AnimationFileInfo orphan = new()
-                            {
-                                RelativePath = null,
-                                FullPath = destFullPath,
-                                FileName = Path.GetFileName(destRelPath),
-                                RelativeDirectory = GetRelativeSubPath(
-                                    _animationDestinationPathRelative,
-                                    Path.GetDirectoryName(destRelPath).SanitizePath()
-                                ),
-                                Status = AnimationStatus.Unknown,
-                                DestinationRelativePath = destRelPath,
-                                Selected = true,
-                            };
-                            _destinationOrphans.Add(orphan);
-
-                            if (local % 20 == 0)
+                            if (current == 1 || current % 20 == 0 || current == total)
                             {
                                 ShowProgress(
                                     "Analyzing Animations",
-                                    $"Scanning destination: {orphan.FileName}",
-                                    current / total
+                                    $"Scanning: {Path.GetFileName(path)}",
+                                    total == 0 ? 1f : (float)current / total
                                 );
                             }
+                            return false;
                         }
-                    }
-                    catch (Exception e)
+                    )
+                )
+                {
+                    this.LogError($"Error during analysis: {error}");
+                    Info("Analysis Error", error);
+                    return;
+                }
+
+                foreach (AnimationCopierAPI.Entry entry in sourceEntries)
+                {
+                    string directory = Path.GetDirectoryName(entry.SourcePath).SanitizePath();
+                    AnimationFileInfo info = new()
                     {
-                        this.LogError($"Error while scanning destination for orphans", e);
+                        RelativePath = entry.SourcePath,
+                        FullPath = GetFullPathFromRelative(entry.SourcePath),
+                        FileName = Path.GetFileName(entry.SourcePath),
+                        RelativeDirectory = GetRelativeSubPath(
+                            _animationSourcePathRelative,
+                            directory
+                        ),
+                        DestinationRelativePath = entry.DestinationPath,
+                        Status = entry.Classification switch
+                        {
+                            AnimationCopierAPI.Status.New => AnimationStatus.New,
+                            AnimationCopierAPI.Status.Changed => AnimationStatus.Changed,
+                            AnimationCopierAPI.Status.Unchanged => AnimationStatus.Unchanged,
+                            _ => AnimationStatus.Unknown,
+                        },
+                        Selected = true,
+                    };
+                    _sourceAnimations.Add(info);
+                    switch (info.Status)
+                    {
+                        case AnimationStatus.New:
+                            _newAnimations.Add(info);
+                            break;
+                        case AnimationStatus.Changed:
+                            _changedAnimations.Add(info);
+                            break;
+                        case AnimationStatus.Unchanged:
+                            _unchangedAnimations.Add(info);
+                            break;
                     }
+                }
+
+                foreach (AnimationCopierAPI.Entry entry in orphanEntries)
+                {
+                    string directory = Path.GetDirectoryName(entry.DestinationPath).SanitizePath();
+                    _destinationOrphans.Add(
+                        new AnimationFileInfo
+                        {
+                            RelativePath = null,
+                            FullPath = GetFullPathFromRelative(entry.DestinationPath),
+                            FileName = Path.GetFileName(entry.DestinationPath),
+                            RelativeDirectory = GetRelativeSubPath(
+                                _animationDestinationPathRelative,
+                                directory
+                            ),
+                            Status = AnimationStatus.Unknown,
+                            DestinationRelativePath = entry.DestinationPath,
+                            Selected = true,
+                        }
+                    );
                 }
 
                 this.Log(
                     $"Analysis complete: {_newAnimations.Count} New, {_changedAnimations.Count} Changed, {_unchangedAnimations.Count} Unchanged, {_destinationOrphans.Count} Orphans."
                 );
             }
-            catch (Exception e)
+            catch (Exception exception)
             {
-                this.LogError($"Error during analysis", e);
-                Info("Analysis Error", $"An error occurred during analysis: {e.Message}");
+                this.LogError($"Error during analysis: {exception.Message}", exception);
                 ClearAnalysisResults();
             }
             finally
@@ -870,223 +303,90 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            using PooledResource<List<AnimationFileInfo>> pooled =
-                Buffers<AnimationFileInfo>.List.Get(out List<AnimationFileInfo> animationsToCopy);
-            switch (mode)
+            using PooledResource<List<string>> selectedLease = Buffers<string>.List.Get(
+                out List<string> selectedPaths
+            );
+            if (mode != CopyMode.Changed)
             {
-                case CopyMode.All:
-
-                    animationsToCopy.AddRange(_newAnimations);
-                    animationsToCopy.AddRange(_changedAnimations);
-                    if (_includeUnchangedInCopyAll)
+                foreach (AnimationFileInfo entry in _newAnimations)
+                {
+                    if (entry != null && entry.Selected)
                     {
-                        animationsToCopy.AddRange(_unchangedAnimations);
+                        selectedPaths.Add(entry.RelativePath);
                     }
-                    break;
-                case CopyMode.Changed:
-                    animationsToCopy.AddRange(_changedAnimations);
-                    break;
-                case CopyMode.New:
-                    animationsToCopy.AddRange(_newAnimations);
-                    break;
+                }
             }
-
-            if (animationsToCopy.Count == 0)
+            if (mode != CopyMode.New)
             {
-                this.Log($"No animations to copy for the selected mode.");
-                Info("Nothing to Copy", "There are no animations matching the selected criteria.");
-                return;
+                foreach (AnimationFileInfo entry in _changedAnimations)
+                {
+                    if (entry != null && entry.Selected)
+                    {
+                        selectedPaths.Add(entry.RelativePath);
+                    }
+                }
+            }
+            if (mode == CopyMode.All && _includeUnchangedInCopyAll)
+            {
+                foreach (AnimationFileInfo entry in _unchangedAnimations)
+                {
+                    if (entry != null && entry.Selected)
+                    {
+                        selectedPaths.Add(entry.RelativePath);
+                    }
+                }
             }
 
-            animationsToCopy.RemoveAll(info => info == null || !info.Selected);
-            if (animationsToCopy.Count == 0)
+            if (selectedPaths.Count == 0)
             {
                 Info("Nothing Selected", "No animations are selected for the operation.");
                 return;
             }
 
-            this.Log(
-                $"Starting copy operation (Mode: {mode}) for {animationsToCopy.Count} animations..."
-            );
+            AnimationCopierAPI.Operation operation = mode switch
+            {
+                CopyMode.New => AnimationCopierAPI.Operation.CopyNew,
+                CopyMode.Changed => AnimationCopierAPI.Operation.CopyChanged,
+                _ => AnimationCopierAPI.Operation.CopyAll,
+            };
             _isCopying = true;
             Repaint();
-
-            int successCount = 0;
-            int errorCount = 0;
-
-            if (!_dryRun)
-            {
-                // Deduplicate directories before creation because IsValidFolder can lag AssetDatabase changes.
-                using PooledResource<HashSet<string>> directoryPooled = Buffers<string>.HashSet.Get(
-                    out HashSet<string> directoriesToCreate
-                );
-
-                foreach (AnimationFileInfo animInfo in animationsToCopy)
-                {
-                    string destinationAssetPath = animInfo.DestinationRelativePath;
-                    string destDirectory = Path.GetDirectoryName(destinationAssetPath)
-                        .SanitizePath();
-
-                    if (
-                        string.IsNullOrWhiteSpace(destDirectory)
-                        || AssetDatabase.IsValidFolder(destDirectory)
-                    )
-                    {
-                        continue;
-                    }
-
-                    _ = directoriesToCreate.Add(destDirectory);
-                }
-
-                foreach (string destDirectory in directoriesToCreate)
-                {
-                    try
-                    {
-                        DirectoryHelper.EnsureDirectoryExists(destDirectory);
-                    }
-                    catch (Exception e)
-                    {
-                        this.LogError(
-                            $"Failed to create destination directory '{destDirectory}'. Skipping animations targeting this path.",
-                            e
-                        );
-                    }
-                }
-            }
-
             try
             {
-                using (
-                    _dryRun
-                        ? default(AssetDatabaseBatchScope?)
-                        : AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false)
-                )
+                AnimationCopierAPI.Result result = AnimationCopierAPI.Run(
+                    _animationSourcePathRelative,
+                    _animationDestinationPathRelative,
+                    selectedPaths,
+                    operation,
+                    !_dryRun,
+                    _includeUnchangedInCopyAll,
+                    (path, current, total) =>
+                        CancelableProgress(
+                            $"Copying Animations ({mode})",
+                            $"Copying: {Path.GetFileName(path)} ({current}/{total})",
+                            (float)current / total
+                        )
+                );
+                foreach (string diagnostic in result.Diagnostics)
                 {
-                    for (int i = 0; i < animationsToCopy.Count; i++)
-                    {
-                        AnimationFileInfo animInfo = animationsToCopy[i];
-                        float progress = (float)(i + 1) / animationsToCopy.Count;
-                        bool userCancelled = false;
-                        if (i == 0 || i % 10 == 0 || i == animationsToCopy.Count - 1)
-                        {
-                            userCancelled = CancelableProgress(
-                                $"Copying Animations ({mode})",
-                                $"Copying: {animInfo.FileName} ({i + 1}/{animationsToCopy.Count})",
-                                progress
-                            );
-                        }
-
-                        if (userCancelled)
-                        {
-                            this.LogWarn($"Copy operation cancelled by user.");
-                            break;
-                        }
-
-                        string sourceAssetPath = animInfo.RelativePath;
-                        string destinationAssetPath = animInfo.DestinationRelativePath;
-                        bool operationSuccessful = false;
-                        try
-                        {
-                            string destFullPath = GetFullPathFromRelative(destinationAssetPath);
-                            bool destExists =
-                                !string.IsNullOrWhiteSpace(destFullPath)
-                                && File.Exists(destFullPath);
-
-                            if (_dryRun)
-                            {
-                                operationSuccessful = true;
-                            }
-                            else if (!destExists || animInfo.Status == AnimationStatus.New)
-                            {
-                                operationSuccessful = AssetDatabase.CopyAsset(
-                                    sourceAssetPath,
-                                    destinationAssetPath
-                                );
-                            }
-                            else if (animInfo.Status == AnimationStatus.Changed)
-                            {
-                                // Preserve GUID: replace file on disk and reimport
-                                string sourceFullPath = animInfo.FullPath;
-                                if (
-                                    !string.IsNullOrWhiteSpace(sourceFullPath)
-                                    && !string.IsNullOrWhiteSpace(destFullPath)
-                                )
-                                {
-                                    FileUtil.ReplaceFile(sourceFullPath, destFullPath);
-                                    AssetDatabase.ImportAsset(
-                                        destinationAssetPath,
-                                        ImportAssetOptions.ForceUpdate
-                                    );
-                                    operationSuccessful = true;
-                                }
-                            }
-                            else
-                            {
-                                if (_includeUnchangedInCopyAll && mode == CopyMode.All)
-                                {
-                                    string sourceFullPath = animInfo.FullPath;
-                                    if (
-                                        !string.IsNullOrWhiteSpace(sourceFullPath)
-                                        && !string.IsNullOrWhiteSpace(destFullPath)
-                                    )
-                                    {
-                                        FileUtil.ReplaceFile(sourceFullPath, destFullPath);
-                                        AssetDatabase.ImportAsset(
-                                            destinationAssetPath,
-                                            ImportAssetOptions.ForceUpdate
-                                        );
-                                        operationSuccessful = true;
-                                    }
-                                }
-                                else
-                                {
-                                    operationSuccessful = true;
-                                }
-                            }
-                        }
-                        catch (Exception e)
-                        {
-                            this.LogError(
-                                $"Failed to copy/replace '{sourceAssetPath}' -> '{destinationAssetPath}'",
-                                e
-                            );
-                            operationSuccessful = false;
-                        }
-
-                        if (operationSuccessful)
-                        {
-                            successCount++;
-                        }
-                        else
-                        {
-                            errorCount++;
-                        }
-                    }
+                    this.LogError($"{diagnostic}");
                 }
-            }
-            catch (Exception e)
-            {
-                this.LogError($"An unexpected error occurred during the copy process", e);
-                errorCount = animationsToCopy.Count - successCount;
+                if (!string.IsNullOrWhiteSpace(result.Error))
+                {
+                    this.LogError($"{result.Error}");
+                }
+                this.Log(
+                    $"Copy operation finished{(_dryRun ? " (dry run)" : string.Empty)}. Mode: {mode}. Processed: {result.ProcessedCount}, Skipped: {result.SkippedCount}, Errors: {result.FailedCount}."
+                );
+                Info(
+                    "Copy Complete",
+                    $"Copy operation finished{(_dryRun ? " (dry run)" : string.Empty)}.\nMode: {mode}\nProcessed: {result.ProcessedCount}\nSkipped: {result.SkippedCount}\nErrors: {result.FailedCount}\n\nSee console log for details."
+                );
             }
             finally
             {
                 ClearProgress();
                 _isCopying = false;
-                if (!_dryRun)
-                {
-                    AssetDatabase.SaveAssets();
-                    AssetDatabaseBatchHelper.RefreshIfNotBatching();
-                }
-                this.Log(
-                    $"Copy operation finished{(_dryRun ? " (dry run)" : string.Empty)}. Mode: {mode}. Success: {successCount}, Errors: {errorCount}."
-                );
-
-                Info(
-                    "Copy Complete",
-                    $"Copy operation finished{(_dryRun ? " (dry run)" : string.Empty)}.\nMode: {mode}\nItems processed: {successCount + errorCount}\nSuccessful: {successCount}\nErrors: {errorCount}\n\nSee console log for details."
-                );
-
                 _analysisNeeded = true;
                 Repaint();
             }
@@ -1174,97 +474,66 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            using PooledResource<List<AnimationFileInfo>> toDeleteLease =
-                Buffers<AnimationFileInfo>.List.Get(out List<AnimationFileInfo> toDelete);
-            foreach (AnimationFileInfo a in _destinationOrphans)
+            using PooledResource<List<string>> selectedLease = Buffers<string>.List.Get(
+                out List<string> selectedPaths
+            );
+            foreach (AnimationFileInfo entry in _destinationOrphans)
             {
-                if (a is { Selected: true })
+                if (entry != null && entry.Selected)
                 {
-                    toDelete.Add(a);
+                    selectedPaths.Add(entry.DestinationRelativePath);
                 }
             }
-            if (toDelete.Count == 0)
+            if (selectedPaths.Count == 0)
             {
                 Info("Nothing to Delete", "No destination orphans are selected.");
                 return;
             }
-
-            bool confirm = Confirm(
-                "Confirm Mirror Delete",
-                $"Delete {toDelete.Count} destination-only animation(s) from '{_animationDestinationPathRelative}'.{(_dryRun ? "\n\nDry run is ON: no files will be changed." : string.Empty)}",
-                _dryRun ? "OK" : "Yes, Delete",
-                "Cancel"
-            );
-            if (!confirm)
+            if (
+                !Confirm(
+                    "Confirm Mirror Delete",
+                    $"Delete {selectedPaths.Count} destination-only animation(s) from '{_animationDestinationPathRelative}'.{(_dryRun ? "\n\nDry run is ON: no files will be changed." : string.Empty)}",
+                    _dryRun ? "OK" : "Yes, Delete",
+                    "Cancel"
+                )
+            )
             {
                 return;
             }
 
-            this.Log($"Starting mirror delete for {toDelete.Count} orphan animations...");
             _isDeleting = true;
             Repaint();
-
-            int success = 0;
-            int errors = 0;
             try
             {
-                using (
-                    _dryRun
-                        ? default(AssetDatabaseBatchScope?)
-                        : AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false)
-                )
+                AnimationCopierAPI.Result result = AnimationCopierAPI.Run(
+                    _animationSourcePathRelative,
+                    _animationDestinationPathRelative,
+                    selectedPaths,
+                    AnimationCopierAPI.Operation.DeleteDestinationOrphans,
+                    !_dryRun,
+                    cancelRequested: (path, current, total) =>
+                        CancelableProgress(
+                            "Mirror Deleting Destination Orphans",
+                            $"Deleting: {Path.GetFileName(path)} ({current}/{total})",
+                            (float)current / total
+                        )
+                );
+                foreach (string diagnostic in result.Diagnostics)
                 {
-                    for (int i = 0; i < toDelete.Count; i++)
-                    {
-                        AnimationFileInfo info = toDelete[i];
-                        float progress = (float)(i + 1) / toDelete.Count;
-                        bool userCancelled = false;
-                        if (i == 0 || i % 10 == 0 || i == toDelete.Count - 1)
-                        {
-                            userCancelled = CancelableProgress(
-                                "Mirror Deleting Destination Orphans",
-                                $"Deleting: {info.FileName} ({i + 1}/{toDelete.Count})",
-                                progress
-                            );
-                        }
-                        if (userCancelled)
-                        {
-                            this.LogWarn($"Mirror delete cancelled by user.");
-                            break;
-                        }
-
-                        bool ok = true;
-                        if (!_dryRun)
-                        {
-                            ok = AssetDatabase.DeleteAsset(info.DestinationRelativePath);
-                        }
-                        if (ok)
-                        {
-                            success++;
-                        }
-                        else
-                        {
-                            errors++;
-                        }
-                    }
+                    this.LogError($"{diagnostic}");
                 }
-            }
-            catch (Exception e)
-            {
-                this.LogError($"Error during mirror delete", e);
-                errors = toDelete.Count - success;
+                if (!string.IsNullOrWhiteSpace(result.Error))
+                {
+                    this.LogError($"{result.Error}");
+                }
+                this.Log(
+                    $"Mirror delete finished{(_dryRun ? " (dry run)" : string.Empty)}. Processed: {result.ProcessedCount}, Skipped: {result.SkippedCount}, Errors: {result.FailedCount}."
+                );
             }
             finally
             {
                 ClearProgress();
                 _isDeleting = false;
-                if (!_dryRun)
-                {
-                    AssetDatabaseBatchHelper.RefreshIfNotBatching();
-                }
-                this.Log(
-                    $"Mirror delete finished{(_dryRun ? " (dry run)" : string.Empty)}. Success: {success}, Errors: {errors}."
-                );
                 _analysisNeeded = true;
                 Repaint();
             }
@@ -1646,108 +915,68 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            using PooledResource<List<AnimationFileInfo>> animationsToDeleteLease =
-                Buffers<AnimationFileInfo>.List.Get(out List<AnimationFileInfo> animationsToDelete);
-            foreach (AnimationFileInfo a in _unchangedAnimations)
+            using PooledResource<List<string>> selectedLease = Buffers<string>.List.Get(
+                out List<string> selectedPaths
+            );
+            foreach (AnimationFileInfo entry in _unchangedAnimations)
             {
-                if (a is { Selected: true })
+                if (entry != null && entry.Selected)
                 {
-                    animationsToDelete.Add(a);
+                    selectedPaths.Add(entry.RelativePath);
                 }
             }
-
-            if (animationsToDelete.Count == 0)
+            if (selectedPaths.Count == 0)
             {
-                this.Log($"No unchanged source animations to delete.");
-
+                this.Log(
+                    $"No unchanged source animations to delete: {_unchangedAnimations.Count}."
+                );
+                return;
+            }
+            if (
+                !Confirm(
+                    "Confirm Delete Unchanged",
+                    $"Delete {selectedPaths.Count} unchanged source animation(s) from '{_animationSourcePathRelative}'?\n\nThese files are duplicates of the destination and will be deleted.{(_dryRun ? "\n\nDry run is ON: no files will be changed." : string.Empty)}",
+                    _dryRun ? "OK" : "Yes, Delete",
+                    "Cancel"
+                )
+            )
+            {
                 return;
             }
 
-            bool confirm = Confirm(
-                "Confirm Delete Unchanged",
-                $"Delete {animationsToDelete.Count} unchanged source animation(s) from '{_animationSourcePathRelative}'?\n\nThese files are duplicates of the destination and will be moved to Trash.{(_dryRun ? "\n\nDry run is ON: no files will be changed." : string.Empty)}",
-                _dryRun ? "OK" : "Yes, Delete",
-                "Cancel"
-            );
-            if (!confirm)
-            {
-                return;
-            }
-
-            this.Log(
-                $"Starting delete operation for {animationsToDelete.Count} unchanged source animations..."
-            );
             _isDeleting = true;
             Repaint();
-
-            int successCount = 0;
-            int errorCount = 0;
             try
             {
-                using (
-                    _dryRun
-                        ? default(AssetDatabaseBatchScope?)
-                        : AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false)
-                )
+                AnimationCopierAPI.Result result = AnimationCopierAPI.Run(
+                    _animationSourcePathRelative,
+                    _animationDestinationPathRelative,
+                    selectedPaths,
+                    AnimationCopierAPI.Operation.DeleteUnchangedSource,
+                    !_dryRun,
+                    cancelRequested: (path, current, total) =>
+                        CancelableProgress(
+                            "Deleting Source Duplicates",
+                            $"Deleting: {Path.GetFileName(path)} ({current}/{total})",
+                            (float)current / total
+                        )
+                );
+                foreach (string diagnostic in result.Diagnostics)
                 {
-                    for (int i = 0; i < animationsToDelete.Count; i++)
-                    {
-                        AnimationFileInfo animInfo = animationsToDelete[i];
-                        float progress = (float)(i + 1) / animationsToDelete.Count;
-                        bool userCancelled = false;
-                        if (i == 0 || i % 10 == 0 || i == animationsToDelete.Count - 1)
-                        {
-                            userCancelled = CancelableProgress(
-                                "Deleting Source Duplicates",
-                                $"Deleting: {animInfo.FileName} ({i + 1}/{animationsToDelete.Count})",
-                                progress
-                            );
-                        }
-
-                        if (userCancelled)
-                        {
-                            this.LogWarn($"Delete operation cancelled by user.");
-                            break;
-                        }
-
-                        bool deleteSuccessful = true;
-                        string sourceAssetPath = animInfo.RelativePath;
-                        if (!_dryRun)
-                        {
-                            deleteSuccessful = AssetDatabase.DeleteAsset(sourceAssetPath);
-                        }
-
-                        if (deleteSuccessful)
-                        {
-                            successCount++;
-                        }
-                        else
-                        {
-                            this.LogError(
-                                $"Failed to delete source duplicate: '{sourceAssetPath}'. It might have been moved or deleted already."
-                            );
-                            errorCount++;
-                        }
-                    }
+                    this.LogError($"{diagnostic}");
                 }
-            }
-            catch (Exception e)
-            {
-                this.LogError($"An unexpected error occurred during the delete process", e);
-                errorCount = animationsToDelete.Count - successCount;
+                if (!string.IsNullOrWhiteSpace(result.Error))
+                {
+                    this.LogError($"{result.Error}");
+                }
+                this.Log(
+                    $"Delete operation finished{(_dryRun ? " (dry run)" : string.Empty)}. Processed: {result.ProcessedCount}, Skipped: {result.SkippedCount}, Errors: {result.FailedCount}."
+                );
             }
             finally
             {
                 ClearProgress();
                 _isDeleting = false;
-                if (!_dryRun)
-                {
-                    AssetDatabaseBatchHelper.RefreshIfNotBatching();
-                }
-                this.Log(
-                    $"Delete operation finished{(_dryRun ? " (dry run)" : string.Empty)}. Successfully processed: {successCount}, Errors: {errorCount}."
-                );
-
                 _analysisNeeded = true;
                 Repaint();
             }
