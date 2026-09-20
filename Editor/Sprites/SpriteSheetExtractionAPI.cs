@@ -136,7 +136,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     ++result.ExtractedCount;
                 }
 
-                if (!dryRun && written.Count > 0)
+                if (!dryRun && 0 < written.Count)
                 {
                     using (AssetDatabaseBatchHelper.BeginBatch())
                     {
@@ -219,7 +219,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                 }
 
-                if (!dryRun && written.Count > 0)
+                if (!dryRun && 0 < written.Count)
                 {
                     try
                     {
@@ -288,7 +288,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         {
             bool underAssets = assetPath.StartsWith("Assets/", StringComparison.Ordinal);
             bool underPackages = assetPath.StartsWith("Packages/", StringComparison.Ordinal);
-            if ((!underAssets && !underPackages) || assetPath.IndexOf('\\') >= 0)
+            if ((!underAssets && !underPackages) || 0 <= assetPath.IndexOf('\\'))
             {
                 return false;
             }

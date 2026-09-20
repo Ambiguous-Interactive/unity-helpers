@@ -20,6 +20,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         private const string Output = Root + "/output.png";
         private const string WindowOutput = Root + "/window_000.png";
 
+        private static List<SpriteSheetExtractionRequest> Requests()
+        {
+            return new List<SpriteSheetExtractionRequest>
+            {
+                new(Source, Output, new Rect(0, 0, 1, 1), new Vector2(0.25f, 0.75f), Vector4.zero),
+            };
+        }
+
+        private static string ToFullPath(string assetPath)
+        {
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            return Path.Combine(projectRoot, assetPath);
+        }
+
         [OneTimeSetUp]
         public void OneTimeSetUp()
         {
@@ -193,20 +207,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             TextureImporter importer = AssetImporter.GetAtPath(WindowOutput) as TextureImporter;
             Assert.IsTrue(importer != null);
             Assert.That(importer.textureType, Is.EqualTo(TextureImporterType.Sprite));
-        }
-
-        private static List<SpriteSheetExtractionRequest> Requests()
-        {
-            return new List<SpriteSheetExtractionRequest>
-            {
-                new(Source, Output, new Rect(0, 0, 1, 1), new Vector2(0.25f, 0.75f), Vector4.zero),
-            };
-        }
-
-        private static string ToFullPath(string assetPath)
-        {
-            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
-            return Path.Combine(projectRoot, assetPath);
         }
     }
 #endif
