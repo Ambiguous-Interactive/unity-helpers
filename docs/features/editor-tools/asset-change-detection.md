@@ -523,6 +523,11 @@ never opened to see what it contains, so a watcher on some other type will not f
 neither will a watcher on the type of a sub-asset nested into a `.prefab`. (Nested sub-assets in
 `.asset` files are matched normally.)
 
+For other asset files, matching a sub-asset uses Unity's type index. The watcher checks the
+imported path without loading every object in the file, so unrelated imports do not deserialize
+components just to test their types. Sprite sub-assets of textures and nested ScriptableObjects
+remain discoverable.
+
 That is deliberate. Opening a prefab deserializes every component in it, which runs each one's
 `OnValidate`, so your own code runs, on every prefab, on every import, and Unity logs
 `SendMessage cannot be called during Awake, CheckConsistency, or OnValidate` for any `OnValidate`

@@ -75,6 +75,24 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsFalse(result);
         }
 
+        [TestCase(null, TestName = "InitializePath.Invalid.Null.ReturnsFalse")]
+        [TestCase("", TestName = "InitializePath.Invalid.Empty.ReturnsFalse")]
+        public void InitializePathReturnsFalseForInvalidPath(string path)
+        {
+            Assert.IsFalse(FileHelper.InitializePath(path));
+        }
+
+        [Test]
+        public void InitializePathReturnsFalseWhenParentIsAFile()
+        {
+            string parentPath = Path.Combine(_testDirectory, "occupied.txt");
+            File.WriteAllText(parentPath, "existing content");
+            string childPath = Path.Combine(parentPath, "child.txt");
+
+            Assert.IsFalse(FileHelper.InitializePath(childPath));
+            Assert.AreEqual("existing content", File.ReadAllText(parentPath));
+        }
+
         [Test]
         public void InitializePathCreatesFileWithProvidedContents()
         {

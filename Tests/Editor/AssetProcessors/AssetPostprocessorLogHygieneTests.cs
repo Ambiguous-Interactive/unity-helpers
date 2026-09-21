@@ -191,13 +191,11 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         }
 
         /// <summary>
-        /// Directly drives the sub-asset path (HasMatchingSubAsset -> LoadAllAssetsAtPath)
-        /// via ProcessChangesForTesting to ensure that code path also does not emit
-        /// SendMessage warnings when routed through the deferral helper. This
-        /// complements the prefab test above by covering the second #234 trigger site.
+        /// Drives sub-asset matching through ProcessChangesForTesting and checks that imported
+        /// textures do not emit SendMessage warnings. This complements the prefab test above.
         /// </summary>
         [Test]
-        public void SubAssetLoadDoesNotEmitSendMessageWarnings()
+        public void SubAssetMatchingDoesNotEmitSendMessageWarnings()
         {
             string texturePath = TestRoot + "/HygieneSpriteTexture.png";
             string prefabPath = TestRoot + "/HygieneSpriteConsumerPrefab.prefab";

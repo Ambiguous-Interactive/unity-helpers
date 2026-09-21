@@ -20,6 +20,19 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     /// <see cref="System.InvalidCastException"/> out of the processor, failing this fixture for a
     /// reason that has nothing to do with what it tests.
     /// </remarks>
-    internal sealed class TestSubAssetContainerAsset : ScriptableObject, ITestDetectableContract { }
+    internal sealed class TestSubAssetContainerAsset : ScriptableObject, ITestDetectableContract
+    {
+        internal static int OnValidateCount { get; private set; }
+
+        internal static void ResetOnValidateCount()
+        {
+            OnValidateCount = 0;
+        }
+
+        private void OnValidate()
+        {
+            OnValidateCount++;
+        }
+    }
 }
 #endif

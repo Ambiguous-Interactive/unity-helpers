@@ -7,7 +7,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     using System.IO;
     using System.Threading;
     using System.Threading.Tasks;
-    using UnityEngine;
 
     /// <summary>
     /// Lightweight file I/O helpers with safe default behaviors.
@@ -25,19 +24,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// <returns>True if the file was created; false if it already existed or creation failed.</returns>
         public static bool InitializePath(string path, byte[] contents = null)
         {
-            if (File.Exists(path))
-            {
-                return false;
-            }
-
-            string directory = Path.GetDirectoryName(path);
-            if (!string.IsNullOrWhiteSpace(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
             try
             {
+                string directory = Path.GetDirectoryName(path);
+                if (!string.IsNullOrWhiteSpace(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
                 using FileStream fileStream = new(
                     path,
                     FileMode.CreateNew,
@@ -48,9 +42,15 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 fileStream.Write(contents, 0, contents.Length);
                 return true;
             }
-            catch (IOException e)
+            catch (Exception exception)
+                when (exception
+                        is IOException
+                            or UnauthorizedAccessException
+                            or ArgumentException
+                            or NotSupportedException
+                            or System.Security.SecurityException
+                )
             {
-                Debug.LogError($"File {path} already exists, not creating.\n{e}");
                 return false;
             }
         }

@@ -907,14 +907,18 @@ string scriptDir = DirectoryHelper.GetCallerScriptDirectory();
 **Initialize file if missing:**
 
 ```csharp
+using System.Text;
 using WallstopStudios.UnityHelpers.Core.Helper;
 
 // Create config.json with default contents if it doesn't exist
 FileHelper.InitializePath(
     "Assets/config.json",
-    "{ \"version\": 1 }"
+    Encoding.UTF8.GetBytes("{ \"version\": 1 }")
 );
 ```
+
+`InitializePath` creates the file only when its path is free. It returns `false` for an existing
+file, an invalid path, or an I/O failure; it does not replace existing contents.
 
 **Async file copy:**
 

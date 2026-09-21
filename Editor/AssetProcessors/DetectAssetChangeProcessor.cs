@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
     using System.Globalization;
     using System.IO;
     using System.Reflection;
+    using System.Text;
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Attributes;
@@ -368,7 +369,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             foreach (AssetWatcher watcher in WatchersByAssetType.Values)
             {
                 List<string> createdPaths = CollectCreatedAssets(
-                    watcher.AssetType,
+                    watcher,
                     importedAssets,
                     movedAssets
                 );
@@ -887,19 +888,19 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
         }
 
         private static List<string> CollectCreatedAssets(
-            Type assetType,
+            AssetWatcher watcher,
             IReadOnlyList<string> importedAssets,
             IReadOnlyList<string> movedAssets
         )
         {
             List<string> buffer = new();
-            AppendCreatedAssets(assetType, importedAssets, buffer);
-            AppendCreatedAssets(assetType, movedAssets, buffer);
+            AppendCreatedAssets(watcher, importedAssets, buffer);
+            AppendCreatedAssets(watcher, movedAssets, buffer);
             return buffer;
         }
 
         private static void AppendCreatedAssets(
-            Type assetType,
+            AssetWatcher watcher,
             IReadOnlyList<string> candidatePaths,
             List<string> buffer
         )
@@ -909,6 +910,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 return;
             }
 
+            HashSet<string> matchingSubAssetGuids = null;
             for (int i = 0; i < candidatePaths.Count; i++)
             {
                 string path = candidatePaths[i];
@@ -918,14 +920,16 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 }
 
                 Type mainType = AssetDatabase.GetMainAssetTypeAtPath(path);
-                if (mainType != null && assetType.IsAssignableFrom(mainType))
+                if (mainType != null && watcher.AssetType.IsAssignableFrom(mainType))
                 {
                     buffer.Add(path);
                     continue;
                 }
 
-                // A Sprite is a sub-asset of its Texture2D, so the main asset type never matches.
-                if (mainType != null && HasMatchingSubAsset(path, assetType))
+                if (
+                    mainType != null
+                    && HasMatchingSubAsset(path, watcher, candidatePaths, ref matchingSubAssetGuids)
+                )
                 {
                     buffer.Add(path);
                     continue;
@@ -939,7 +943,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 {
                     UnityEngine.Object loadedAsset =
                         AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path);
-                    if (loadedAsset != null && assetType.IsInstanceOfType(loadedAsset))
+                    if (loadedAsset != null && watcher.AssetType.IsInstanceOfType(loadedAsset))
                     {
                         buffer.Add(path);
                     }
@@ -947,35 +951,60 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             }
         }
 
-        private static bool HasMatchingSubAsset(string path, Type assetType)
+        private static bool HasMatchingSubAsset(
+            string path,
+            AssetWatcher watcher,
+            IReadOnlyList<string> candidatePaths,
+            ref HashSet<string> matchingGuids
+        )
         {
-            // Scene files crash LoadAllAssetsAtPath (ReadObjectThreaded not allowed)
-            if (IsScenePath(path))
+            if (IsScenePath(path) || IsPrefabPath(path))
             {
                 return false;
             }
 
-            // Do not load prefabs for type queries: deserialization invokes consumer OnValidate. Nested prefab sub-assets are consequently excluded.
-            if (IsPrefabPath(path))
+            if (matchingGuids == null)
             {
-                return false;
-            }
-
-            UnityEngine.Object[] allAssets = AssetDatabase.LoadAllAssetsAtPath(path);
-            if (allAssets == null || allAssets.Length <= 1)
-            {
-                return false;
-            }
-
-            foreach (UnityEngine.Object asset in allAssets)
-            {
-                if (asset != null && assetType.IsInstanceOfType(asset))
+                matchingGuids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                HashSet<string> folders = new(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < candidatePaths.Count; i++)
                 {
-                    return true;
+                    string candidate = candidatePaths[i];
+                    if (
+                        string.IsNullOrEmpty(candidate)
+                        || IsScenePath(candidate)
+                        || IsPrefabPath(candidate)
+                    )
+                    {
+                        continue;
+                    }
+
+                    int separator = candidate.LastIndexOf('/');
+                    if (separator > 0)
+                    {
+                        folders.Add(candidate.Substring(0, separator));
+                    }
+                }
+
+                string[] searchFolders = new string[folders.Count];
+                folders.CopyTo(searchFolders);
+                if (string.IsNullOrEmpty(watcher.SubAssetSearchFilter))
+                {
+                    return false;
+                }
+
+                string[] foundGuids = AssetDatabase.FindAssets(
+                    watcher.SubAssetSearchFilter,
+                    searchFolders
+                );
+                foreach (string foundGuid in foundGuids)
+                {
+                    matchingGuids.Add(foundGuid);
                 }
             }
 
-            return false;
+            string guid = AssetDatabase.AssetPathToGUID(path);
+            return !string.IsNullOrEmpty(guid) && matchingGuids.Contains(guid);
         }
 
         private static List<string> CollectDeletedAssets(
@@ -1244,6 +1273,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             }
 
             AssetWatcher clone = new(source.AssetType, source.IncludeAssignableTypes);
+            clone.SubAssetSearchFilter = source.SubAssetSearchFilter;
             if (source.SearchPrefabs)
             {
                 clone.EnablePrefabSearch();
@@ -1317,6 +1347,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 return;
             }
 
+            StringBuilder subAssetSearchFilter = new();
             foreach (
                 Type searchType in ResolveSearchableAssetTypes(
                     watcher.AssetType,
@@ -1325,6 +1356,12 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 )
             )
             {
+                if (subAssetSearchFilter.Length > 0)
+                {
+                    subAssetSearchFilter.Append(' ');
+                }
+                subAssetSearchFilter.Append("t:");
+                subAssetSearchFilter.Append(searchType.Name);
                 string filter = $"t:{searchType.Name}";
                 string[] guids = AssetDatabase.FindAssets(filter);
                 foreach (string guidsElement in guids)
@@ -1342,6 +1379,8 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                     }
                 }
             }
+
+            watcher.SubAssetSearchFilter = subAssetSearchFilter.ToString();
 
             // Test types without matching filenames can evade Unity filters; this fallback stays in fixture folders.
             if (_includeTestAssets)
@@ -1743,6 +1782,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             internal bool SearchPrefabs { get; private set; }
             internal bool SearchSceneObjects { get; private set; }
             internal HashSet<string> KnownAssetPaths { get; }
+            internal string SubAssetSearchFilter { get; set; }
             internal List<MethodSubscription> Subscriptions { get; }
 
             internal AssetWatcher(Type assetType, bool includeAssignableTypes)
