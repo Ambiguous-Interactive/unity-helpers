@@ -387,7 +387,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             );
             settings.WatchersByAssetType.Clear();
             settings.WatchersByAssetType.Add(typeof(TestDetectableAsset), watcher);
-            for (int i = watcher.Subscriptions.Count - 1; i >= 0; i--)
+            for (int i = watcher.Subscriptions.Count - 1; 0 <= i; i--)
             {
                 if (watcher.Subscriptions[i]._declaringType != typeof(TestDetectAssetChangeHandler))
                 {

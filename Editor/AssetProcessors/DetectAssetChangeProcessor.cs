@@ -980,7 +980,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                     }
 
                     int separator = candidate.LastIndexOf('/');
-                    if (separator > 0)
+                    if (0 < separator)
                     {
                         folders.Add(candidate.Substring(0, separator));
                     }
@@ -1356,7 +1356,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 )
             )
             {
-                if (subAssetSearchFilter.Length > 0)
+                if (0 < subAssetSearchFilter.Length)
                 {
                     subAssetSearchFilter.Append(' ');
                 }

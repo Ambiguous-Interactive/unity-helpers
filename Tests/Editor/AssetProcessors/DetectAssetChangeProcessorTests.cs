@@ -1092,7 +1092,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             );
             settings.WatchersByAssetType.Clear();
             settings.WatchersByAssetType.Add(typeof(TestDetectableAsset), payloadWatcher);
-            for (int i = payloadWatcher.Subscriptions.Count - 1; i >= 0; i--)
+            for (int i = payloadWatcher.Subscriptions.Count - 1; 0 <= i; i--)
             {
                 if (payloadWatcher.Subscriptions[i]._declaringType != typeof(TestLoopingHandler))
                 {
