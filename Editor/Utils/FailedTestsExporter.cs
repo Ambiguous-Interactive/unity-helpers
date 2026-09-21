@@ -13,6 +13,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
     using UnityEditor.TestTools.TestRunner.Api;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Extension;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Settings;
 
     /// <summary>
@@ -334,7 +335,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                     }
                 }
 
-                File.WriteAllText(outputPath, builder.ToString());
+                if (
+                    !DurableFile.TryWriteAllText(
+                        outputPath,
+                        builder.ToString(),
+                        out Exception writeError
+                    )
+                )
+                {
+                    throw writeError;
+                }
                 return outputPath;
             }
             catch (Exception e)

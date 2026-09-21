@@ -46,7 +46,7 @@ When enabled, the exporter automatically:
 2. Records each individual test failure (name, message, stack trace)
 3. Exports all failures to a timestamped file when the test run completes
 
-The output file is written to the configured output directory (or the project root if none is set) with the format `failed-tests-YYYY-MM-DD-HHmmss.txt`.
+The output file is written to the configured output directory (or the project root if none is set) with the format `failed-tests-YYYY-MM-DD-HHmmss.txt`. The complete report is staged before replacing an existing file.
 
 ### Manual Export
 

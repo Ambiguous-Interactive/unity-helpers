@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Editor
     using System.Diagnostics;
     using System.IO;
     using System.Reflection;
+    using System.Text;
     using UnityEditor;
     using UnityEditorInternal;
     using UnityEngine;
@@ -1299,7 +1300,10 @@ namespace WallstopStudios.UnityHelpers.Editor
             try
             {
                 string json = JsonUtility.ToJson(_lastReport, true);
-                File.WriteAllText(savePath, json);
+                if (!DurableFile.TryWriteAllText(savePath, json, out Exception writeError))
+                {
+                    throw writeError;
+                }
                 this.Log($"Saved report to: {savePath}");
             }
             catch (Exception e)
@@ -1331,21 +1335,31 @@ namespace WallstopStudios.UnityHelpers.Editor
 
             try
             {
-                using StreamWriter sw = new(savePath);
-                sw.WriteLine("Path,Message");
+                StringBuilder report = new();
+                report.AppendLine("Path,Message");
                 foreach (ScanReport.Item item in _lastReport.items)
                 {
                     string path = item.path?.Replace('"', '\'') ?? string.Empty;
                     if (item.messages == null || item.messages.Length == 0)
                     {
-                        sw.WriteLine($"\"{path}\",\"\"");
+                        report.AppendLine($"\"{path}\",\"\"");
                         continue;
                     }
                     foreach (string m in item.messages)
                     {
                         string msg = (m ?? string.Empty).Replace('"', '\'');
-                        sw.WriteLine($"\"{path}\",\"{msg}\"");
+                        report.AppendLine($"\"{path}\",\"{msg}\"");
                     }
+                }
+                if (
+                    !DurableFile.TryWriteAllText(
+                        savePath,
+                        report.ToString(),
+                        out Exception writeError
+                    )
+                )
+                {
+                    throw writeError;
                 }
                 this.Log($"Saved report to: {savePath}");
             }

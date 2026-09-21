@@ -117,6 +117,7 @@ compiler severity: `WUH015` and `WUH016` are suppressible warnings.
 
 **Export** copies or saves the currently displayed diagnostics as JSON or Markdown. Per-row context
 menus copy an individual issue. Reports preserve diagnostic IDs, messages, paths, source lines, and compiler coverage status.
+The complete report is staged before replacing an existing file.
 Read that status with the diagnostic list: a partial report is not a build-success gate.
 CI should run the compiler with the shipped analyzers enabled and use its exit status and diagnostics.
 

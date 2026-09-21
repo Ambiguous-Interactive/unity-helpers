@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     using System.Text;
     using UnityEditor;
     using UnityEngine.UIElements;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     public sealed partial class ValidationWindow
     {
@@ -259,7 +260,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                         settings.ActiveProfile.failOn
                     )
                     : ValidationReport.ToJson(_lastCompletedRun, _suppressions);
-                File.WriteAllText(path, report);
+                if (!DurableFile.TryWriteAllText(path, report, out Exception writeError))
+                {
+                    throw writeError;
+                }
                 Say("Exported " + Path.GetFileName(path) + ".");
             }
             catch (Exception thrown)

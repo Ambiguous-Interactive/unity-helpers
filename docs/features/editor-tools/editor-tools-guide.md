@@ -682,7 +682,7 @@ identical clip does not show up as a change.
 the redundant copies left behind in the source folder, and
 **Mirror Delete Destination Orphans (N)** deletes destination clips with no source any more. Both
 honour **Dry Run**. **Export Preview Report** writes the analysis to a file if you would rather review
-it outside the editor. Copy, delete, and reimport operations change files on disk and cannot be
+it outside the editor. The complete report is staged before replacing an existing file. Copy, delete, and reimport operations change files on disk and cannot be
 fully reversed through Unity Undo.
 
 > **Visual Reference**
@@ -1063,7 +1063,7 @@ and **Deny Component Types (comma names)** flags prefabs carrying a component yo
 **Fixing and reporting:** **Fix Missing Scripts** strips dead component slots, but it stays disabled
 until you tick **Enable Auto-fix options** — the gate is deliberate, because the fix deletes data.
 **Export Report (JSON)** and **Export Report (CSV)** write the same findings to a file for a build
-step or a review.
+step or a review. The complete report is staged before replacing an existing file.
 
 Annotate the fields you actually care about so the null check stays useful:
 

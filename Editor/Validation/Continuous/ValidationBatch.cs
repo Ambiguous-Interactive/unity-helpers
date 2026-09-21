@@ -405,23 +405,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         private static bool TryWrite(string path, string contents, out string failure)
         {
-            try
+            if (DurableFile.TryWriteAllText(path, contents, out Exception writeError))
             {
-                string directory = Path.GetDirectoryName(Path.GetFullPath(path));
-                if (!string.IsNullOrEmpty(directory))
-                {
-                    Directory.CreateDirectory(directory);
-                }
-
-                File.WriteAllText(path, contents);
                 failure = null;
                 return true;
             }
-            catch (Exception exception)
-            {
-                failure = path + " could not be written: " + exception.Message;
-                return false;
-            }
+
+            failure = path + " could not be written: " + writeError.Message;
+            return false;
         }
 
         /// <summary>What a headless validation run decided.</summary>

@@ -267,6 +267,9 @@ Unity -batchmode -quit -projectPath "$PWD" \
 | `-validationFailOn`       | Lowest severity that fails the run. Defaults to `Error`.        |
 | `-validationFolder`       | Restrict the run to a folder. Repeat it for several.            |
 
+The batch report and window exports stage the complete report before replacing an existing file.
+The batch run reports a write failure.
+
 Rules are found through `TypeCache` and built with their parameterless constructor, in a stable
 order so two machines produce the same report. A rule that cannot be constructed is reported and
 skipped — one broken rule must not hide every other rule's findings — and the run still fails.

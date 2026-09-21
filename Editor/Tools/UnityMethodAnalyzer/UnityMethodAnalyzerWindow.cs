@@ -15,6 +15,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
     using UnityEditor.IMGUI.Controls;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Extension;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Editor.Utils.WButton;
@@ -1420,7 +1421,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             try
             {
                 string report = GenerateMarkdownReport();
-                File.WriteAllText(path, report);
+                if (!DurableFile.TryWriteAllText(path, report, out Exception writeError))
+                {
+                    throw writeError;
+                }
                 _statusMessage = $"Report exported to: {Path.GetFileName(path)}";
                 EditorUtility.RevealInFinder(path);
             }
@@ -1645,7 +1649,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             try
             {
                 string report = GenerateJsonReport();
-                File.WriteAllText(path, report);
+                if (!DurableFile.TryWriteAllText(path, report, out Exception writeError))
+                {
+                    throw writeError;
+                }
                 _statusMessage = $"Report exported to: {Path.GetFileName(path)}";
                 EditorUtility.RevealInFinder(path);
             }

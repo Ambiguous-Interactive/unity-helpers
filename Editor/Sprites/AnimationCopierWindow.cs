@@ -1267,7 +1267,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 if (!string.IsNullOrWhiteSpace(savePath))
                 {
                     string report = sb.ToString();
-                    File.WriteAllText(savePath, report);
+                    if (!DurableFile.TryWriteAllText(savePath, report, out Exception writeError))
+                    {
+                        throw writeError;
+                    }
                     EditorUtility.RevealInFinder(savePath);
                 }
             }
