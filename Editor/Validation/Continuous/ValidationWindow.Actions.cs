@@ -113,7 +113,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 string updated = finding.HasValue
                     ? WithSuppression(previous, finding.Value, suppress)
                     : WithoutSuppression(previous, id);
-                File.WriteAllText(DefaultSuppressionsPath, updated);
+                if (
+                    !DurableFile.TryWriteAllText(
+                        DefaultSuppressionsPath,
+                        updated,
+                        out Exception writeError
+                    )
+                )
+                {
+                    Say("Could not save suppression: " + writeError.Message);
+                    return;
+                }
                 ReloadSuppressions();
                 RefreshSettings();
                 Say(
@@ -136,7 +146,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                                 );
                                 return;
                             }
-                            File.WriteAllText(DefaultSuppressionsPath, previous);
+                            if (
+                                !DurableFile.TryWriteAllText(
+                                    DefaultSuppressionsPath,
+                                    previous,
+                                    out Exception undoError
+                                )
+                            )
+                            {
+                                Say("Could not undo suppression: " + undoError.Message);
+                                return;
+                            }
                             ReloadSuppressions();
                             RefreshSettings();
                             Say("Suppression change undone.");

@@ -25,18 +25,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     /// <remarks>
     /// <para>
     /// How it works: for each selected texture (or those discovered under provided directories), the
-    /// tool ensures readability, clones the texture, computes a size increment from
-    /// <c>pixelsPerUnit</c> and the width/height multipliers, resizes via bilinear or point, and
-    /// writes the PNG back to the original asset path. It refreshes the AssetDatabase between
-    /// passes for multi-iteration resizing.
+    /// tool computes a size increment from <c>pixelsPerUnit</c> and the width/height multipliers.
+    /// A dry run reports the target size without reading pixel data or changing importer settings.
+    /// A real run ensures readability, resizes via bilinear or point, and writes the PNG to the
+    /// original path or a selected output folder.
     /// </para>
     /// <para>
     /// Pros: fast iteration inside Unity, supports multiple discovery paths, preserves import
     /// settings, and can be run multiple times (<c>numResizes</c>) for step changes.
     /// </para>
     /// <para>
-    /// Caveats: overwrites files in-place; ensure version control. If textures are non-readable,
-    /// importer is temporarily toggled which may dirties the asset. Consider backing up.
+    /// Caveats: real runs replace original files when no output folder is selected. If textures
+    /// are non-readable, a real run temporarily changes their importer settings.
     /// </para>
     /// <example>
     /// <![CDATA[
@@ -266,21 +266,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         Texture2D working = texture;
                         try
                         {
-                            if (!originalReadable)
-                            {
-                                // Pause asset editing so SaveAndReimport completes before the texture is read.
-                                using (AssetDatabaseBatchHelper.PauseBatch())
-                                {
-                                    tImporter.isReadable = true;
-                                    tImporter.SaveAndReimport();
-
-                                    working = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
-                                }
-                            }
-
-                            int origW = working.width;
-                            int origH = working.height;
-
+                            int origW = texture.width;
+                            int origH = texture.height;
                             (int targetW, int targetH) = ComputeFinalSize(
                                 origW,
                                 origH,
@@ -293,10 +280,43 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             targetW = Mathf.Clamp(targetW, 1, 16384);
                             targetH = Mathf.Clamp(targetH, 1, 16384);
 
-                            if (targetW == working.width && targetH == working.height)
+                            if (targetW == origW && targetH == origH)
                             {
                                 ++skippedZeroDelta;
                                 continue;
+                            }
+
+                            if (
+                                scalingResizeAlgorithm != ResizeAlgorithm.Bilinear
+                                && scalingResizeAlgorithm != ResizeAlgorithm.Point
+                            )
+                            {
+                                throw new InvalidEnumArgumentException(
+                                    nameof(scalingResizeAlgorithm),
+                                    (int)scalingResizeAlgorithm,
+                                    typeof(ResizeAlgorithm)
+                                );
+                            }
+
+                            if (dryRun)
+                            {
+                                this.Log(
+                                    $"[DryRun] Would resize {texture.name} to [{targetW}x{targetH}]"
+                                );
+                                ++resized;
+                                continue;
+                            }
+
+                            if (!originalReadable)
+                            {
+                                // Pause asset editing so SaveAndReimport completes before the texture is read.
+                                using (AssetDatabaseBatchHelper.PauseBatch())
+                                {
+                                    tImporter.isReadable = true;
+                                    tImporter.SaveAndReimport();
+
+                                    working = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
+                                }
                             }
 
                             // If writing to separate folder, avoid mutating the original asset in memory.
@@ -332,15 +352,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                             (int)scalingResizeAlgorithm,
                                             typeof(ResizeAlgorithm)
                                         );
-                                }
-
-                                if (dryRun)
-                                {
-                                    this.Log(
-                                        $"[DryRun] Would resize {texture.name} to [{targetW}x{targetH}]"
-                                    );
-                                    ++resized;
-                                    continue;
                                 }
 
                                 byte[] bytes = resizeSource.EncodeToPNG();

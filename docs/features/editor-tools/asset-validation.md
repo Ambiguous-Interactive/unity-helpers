@@ -378,6 +378,8 @@ suppressed findings; opening a finding leads back to the workspace.
 identities remain intact, including decisions that the current run did not reproduce. **Restore**
 removes one identity; Settings also lists entries whose finding is absent from the current snapshot.
 The Suppressed navigation item and Show suppressed toggle let you inspect those decisions.
+Saving or undoing a suppression stages the complete file before replacement. A failure while
+staging leaves the previous decisions intact.
 
 JSON and JUnit exports use the last completed interactive run. JUnit marks suppressed findings as
 skipped and fails on the selected severity threshold, execution failures and missing coverage.

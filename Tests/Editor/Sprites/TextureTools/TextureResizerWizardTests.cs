@@ -117,19 +117,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         }
 
         [Test]
-        public void RespectsDryRunAndDoesNotModifyFile()
+        public void DryRunLeavesLoadedTextureAndFileUnchanged()
         {
             string path = Path.Combine(Root, "dry.png").SanitizePath();
             CreatePng(path, 10, 6, Color.white);
             AssetDatabaseBatchHelper.RefreshIfNotBatching();
+            TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+            Assert.IsTrue(importer != null);
+            importer.isReadable = true;
+            importer.SaveAndReimport();
+            Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            byte[] originalBytes = File.ReadAllBytes(RelToFull(path));
 
             TextureResizerWizard wizard = Track(
                 ScriptableObject.CreateInstance<TextureResizerWizard>()
             );
-            wizard.textures = new System.Collections.Generic.List<Texture2D>
-            {
-                AssetDatabase.LoadAssetAtPath<Texture2D>(path),
-            };
+            wizard.textures = new System.Collections.Generic.List<Texture2D> { texture };
             wizard.numResizes = 1;
             wizard.pixelsPerUnit = 1;
             wizard.widthMultiplier = 1f;
@@ -138,10 +141,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             wizard.scalingResizeAlgorithm = TextureResizerWizard.ResizeAlgorithm.Point;
             wizard.OnWizardCreate();
 
-            AssetDatabaseBatchHelper.RefreshIfNotBatching();
-            Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
-            Assert.That(tex.width, Is.EqualTo(10));
-            Assert.That(tex.height, Is.EqualTo(6));
+            Assert.That(texture.width, Is.EqualTo(10));
+            Assert.That(texture.height, Is.EqualTo(6));
+            Assert.That(texture.GetPixel(0, 0), Is.EqualTo(Color.white));
+            Assert.IsTrue(importer.isReadable);
+            CollectionAssert.AreEqual(originalBytes, File.ReadAllBytes(RelToFull(path)));
+
+            importer.isReadable = false;
+            importer.SaveAndReimport();
+            Texture2D nonReadableTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            wizard.textures[0] = nonReadableTexture;
+            wizard.OnWizardCreate();
+
+            Assert.IsFalse(importer.isReadable);
+            Assert.That(nonReadableTexture.width, Is.EqualTo(10));
+            Assert.That(nonReadableTexture.height, Is.EqualTo(6));
+            CollectionAssert.AreEqual(originalBytes, File.ReadAllBytes(RelToFull(path)));
         }
 
         [Test]

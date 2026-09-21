@@ -128,6 +128,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix Sentinel suppression saves and undo leaving a partial decision file if a write fails ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).
+- Fix Texture Resizer dry runs changing the loaded image and importer settings. A preview now calculates the target size without resizing or reimporting ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Fix editor report exports leaving a partial file when writing fails. Existing Prefab Checker, Animation Copier, Method Analyzer, validation, and failed-test reports stay intact until the new report is ready ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).
 - Fix `FileHelper.CopyFileAsync` erasing an existing destination when reading or staging fails, or the copy is cancelled. See [File Operations](./docs/features/utilities/helper-utilities.md#file-operations) ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).
 - Fix Texture Resizer and Analyzer Policies saves when the destination changes during a write ([#817](https://github.com/Ambiguous-Interactive/unity-helpers/issues/817)).

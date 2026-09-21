@@ -430,7 +430,8 @@ you ship at and you want the bigger pixels baked into the file rather than paid 
    `width / (Pixels Per Unit * Width Multiplier)` (and the same for height), so several small passes
    scale more gently than one large one.
 4. Tick **Dry Run** and click **Resize** — the console logs
-   `[DryRun] Would resize <name> to [WxH]` for every match.
+   `[DryRun] Would resize <name> to [WxH]` for every match. This reads texture dimensions without
+   resizing the loaded texture, reading pixel data, or changing importer settings.
 5. Clear **Dry Run** and click **Resize** for real.
 
 **Before you run it:**
