@@ -59,7 +59,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             try
             {
                 Color[] pixels = new Color[width * height];
-                for (int i = 0; i < pixels.Length; i++)
+                for (int i = 0; i < pixels.Length; ++i)
                 {
                     pixels[i] = color;
                 }

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep issue template version choices stable across local hooks and release preparation by rendering both forms from a tracked version manifest.
 - Fix asset change detection warnings caused by deserializing imported assets while checking for matching sub-assets. Sprite and nested asset watchers still receive matching paths ([#834](https://github.com/Ambiguous-Interactive/unity-helpers/issues/834)).
 - Fix `FileHelper.InitializePath` to return `false` for invalid paths and directory failures while preserving existing files. See [File Operations](./docs/features/utilities/helper-utilities.md#file-operations) ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).
 

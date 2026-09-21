@@ -31,7 +31,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
 
         private void OnValidate()
         {
-            OnValidateCount++;
+            ++OnValidateCount;
         }
     }
 }

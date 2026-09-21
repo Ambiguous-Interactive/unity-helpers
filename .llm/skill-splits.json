@@ -149,7 +149,7 @@
     },
     {
       "name": "git-hook-lifecycle-debugging",
-      "sha256": "7c20d6fd399cb3a5717b837420e5793d91874e6b3dca20d6c19ad7c825b69cb1",
+      "sha256": "6fd6fc65cbe32f7c88047472fb2ac19591a05e7ac16162c6765ffeb6538c77c9",
       "parts": ["git-hook-lifecycle-debugging-part-1.md", "git-hook-lifecycle-debugging-part-2.md"],
       "routerSha256": "72cc1016f3b6f7812d274e3781319cb7729cf2fa694d81a9f3f6a898ccacb4f6"
     },

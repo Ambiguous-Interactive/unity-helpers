@@ -178,7 +178,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public void InitializePathWithVeryLongPathCreatesFile()
         {
             string longPath = _testDirectory;
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; ++i)
             {
                 longPath = Path.Combine(longPath, $"Dir{i}");
             }
@@ -217,7 +217,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             string testFile = Path.Combine(_testDirectory, "large.txt");
             byte[] largeContents = new byte[1024 * 1024];
-            for (int i = 0; i < largeContents.Length; i++)
+            for (int i = 0; i < largeContents.Length; ++i)
             {
                 largeContents[i] = (byte)(i % 256);
             }
@@ -314,7 +314,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             string sourceFile = Path.Combine(_testDirectory, "large_source.txt");
             string destinationFile = Path.Combine(_testDirectory, "large_destination.txt");
             byte[] largeContent = new byte[5 * 1024 * 1024];
-            for (int i = 0; i < largeContent.Length; i++)
+            for (int i = 0; i < largeContent.Length; ++i)
             {
                 largeContent[i] = (byte)(i % 256);
             }

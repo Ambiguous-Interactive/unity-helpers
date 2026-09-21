@@ -54,6 +54,110 @@ function Get-RepoRoot {
   return (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
 }
 
+function Run-VersionManifestTests {
+  Write-Host ""
+  Write-Host "Issue template version manifest:" -ForegroundColor Magenta
+  Write-Host ""
+
+  $repoRoot = Get-RepoRoot
+  $manifestPath = Join-Path $repoRoot '.github/issue-template-versions.json'
+  $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+  $versions = @($manifest.versions)
+  $packageVersion = (Get-Content (Join-Path $repoRoot 'package.json') -Raw | ConvertFrom-Json).version
+
+  $uniqueVersions = [System.Collections.Generic.HashSet[string]]::new(
+    [System.StringComparer]::OrdinalIgnoreCase
+  )
+  $validVersions = $versions.Count -gt 0
+  foreach ($version in $versions) {
+    if ($version -notmatch '^\d+\.\d+\.\d+$' -or -not $uniqueVersions.Add($version)) {
+      $validVersions = $false
+    }
+  }
+  Write-TestResult -TestName 'Manifest has unique strict versions and contains the package version' `
+    -Passed ($validVersions -and $uniqueVersions.Contains($packageVersion))
+
+  foreach ($templateName in @('bug_report.yml', 'feature_request.yml')) {
+    $templatePath = Join-Path $repoRoot ".github/ISSUE_TEMPLATE/$templateName"
+    $content = Get-Content $templatePath -Raw
+    $block = [regex]::Match(
+      $content,
+      '(?s)# <!-- AUTO-UPDATED: package-versions -->(.*?)# <!-- END AUTO-UPDATED: package-versions -->'
+    )
+    $actual = @()
+    if ($block.Success) {
+      $optionMatches = [regex]::Matches($block.Groups[1].Value, '(?m)^\s*-\s*"(\d+\.\d+\.\d+)"\s*$')
+      foreach ($match in $optionMatches) {
+        $actual += $match.Groups[1].Value
+      }
+    }
+    Write-TestResult -TestName "$templateName matches the manifest in order" `
+      -Passed ($block.Success -and ($actual -join '|') -ceq ($versions -join '|'))
+  }
+}
+
+function Run-ReleaseVersionAdditionTest {
+  Write-Host ""
+  Write-Host "Release version addition:" -ForegroundColor Magenta
+  Write-Host ""
+
+  $repoRoot = Get-RepoRoot
+  $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) "issue-template-versions-$([guid]::NewGuid().ToString('N'))"
+  $tempScriptDir = Join-Path $tempRoot 'scripts'
+  $tempTemplateDir = Join-Path $tempRoot '.github/ISSUE_TEMPLATE'
+  [void](New-Item -ItemType Directory -Path $tempScriptDir -Force)
+  [void](New-Item -ItemType Directory -Path $tempTemplateDir -Force)
+
+  try {
+    Copy-Item (Join-Path $repoRoot 'scripts/sync-issue-template-versions.ps1') $tempScriptDir
+    Copy-Item (Join-Path $repoRoot 'scripts/git-staging-helpers.ps1') $tempScriptDir
+    Copy-Item (Join-Path $repoRoot '.github/issue-template-versions.json') (Join-Path $tempRoot '.github')
+    foreach ($templateName in @('bug_report.yml', 'feature_request.yml')) {
+      Copy-Item (Join-Path $repoRoot ".github/ISSUE_TEMPLATE/$templateName") $tempTemplateDir
+    }
+    [System.IO.File]::WriteAllText((Join-Path $tempRoot 'package.json'), '{"version":"9.9.9"}')
+
+    Push-Location $tempRoot
+    try {
+      & pwsh -NoProfile -File (Join-Path $tempScriptDir 'sync-issue-template-versions.ps1') -AddPackageVersion *> $null
+      $addPassed = $LASTEXITCODE -eq 0
+      $manifestPath = Join-Path $tempRoot '.github/issue-template-versions.json'
+      $addedManifest = Get-Content $manifestPath -Raw
+      $addedVersion = (ConvertFrom-Json $addedManifest).versions[0] -ceq '9.9.9'
+
+      $templateContents = @()
+      foreach ($templateName in @('bug_report.yml', 'feature_request.yml')) {
+        $templateContents += Get-Content (Join-Path $tempTemplateDir $templateName) -Raw
+      }
+      $bothUpdated = $true
+      foreach ($content in $templateContents) {
+        if ($content -notmatch '- "9\.9\.9"') {
+          $bothUpdated = $false
+        }
+      }
+
+      & pwsh -NoProfile -File (Join-Path $tempScriptDir 'sync-issue-template-versions.ps1') *> $null
+      $secondPassed = $LASTEXITCODE -eq 0
+      $unchanged = (Get-Content $manifestPath -Raw) -ceq $addedManifest
+      foreach ($templateName in @('bug_report.yml', 'feature_request.yml')) {
+        $index = if ($templateName -eq 'bug_report.yml') { 0 } else { 1 }
+        if ((Get-Content (Join-Path $tempTemplateDir $templateName) -Raw) -cne $templateContents[$index]) {
+          $unchanged = $false
+        }
+      }
+    } finally {
+      Pop-Location
+    }
+
+    Write-TestResult -TestName 'Release adds one version to the manifest and both templates' `
+      -Passed ($addPassed -and $addedVersion -and $bothUpdated)
+    Write-TestResult -TestName 'Subsequent sync preserves the same manifest and templates' `
+      -Passed ($secondPassed -and $unchanged)
+  } finally {
+    Remove-Item $tempRoot -Recurse -Force
+  }
+}
+
 # ── Version.ToString(3) Tests ──────────────────────────────────────────────
 
 function Run-VersionToStringTests {
@@ -407,6 +511,8 @@ Write-Host "Sync Issue Template Versions Tests" -ForegroundColor White
 Write-Host "========================================" -ForegroundColor White
 
 Run-VersionToStringTests
+Run-VersionManifestTests
+Run-ReleaseVersionAdditionTest
 Run-PreCommitEndOfOptionsTests
 Run-PrePushEndOfOptionsTests
 Run-WorkflowEndOfOptionsTests

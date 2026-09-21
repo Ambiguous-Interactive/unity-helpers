@@ -2,18 +2,17 @@
 .SYNOPSIS
     Syncs package versions into GitHub issue template dropdowns.
 .DESCRIPTION
-    Collects versions from package.json, CHANGELOG.md, git tags, and an
-    optional AdditionalVersions parameter.  Deduplicates, sorts descending
-    by semantic version, and writes the options list between sentinel
-    comments in bug_report.yml and feature_request.yml.
+    Reads versions from .github/issue-template-versions.json and writes the
+    sorted options between sentinel comments in both issue templates. Only
+    release preparation adds a new package version to the manifest. Local
+    tags and GitHub Releases cannot change the dropdown.
     Automatically stages modified files.
-.PARAMETER AdditionalVersions
-    Comma-separated list of additional version strings to include (e.g., from
-    GitHub Releases API in CI).
+.PARAMETER AddPackageVersion
+    Add the current package.json version to the manifest during release preparation.
 #>
 [CmdletBinding()]
 param(
-    [string]$AdditionalVersions = ''
+    [switch]$AddPackageVersion
 )
 
 $ErrorActionPreference = 'Stop'
@@ -25,7 +24,7 @@ $helpersPath = Join-Path -Path $PSScriptRoot -ChildPath 'git-staging-helpers.ps1
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $packageJsonPath = Join-Path $repoRoot 'package.json'
-$changelogPath = Join-Path $repoRoot 'CHANGELOG.md'
+$manifestPath = Join-Path $repoRoot '.github/issue-template-versions.json'
 
 $templateDir = Join-Path $repoRoot '.github' 'ISSUE_TEMPLATE'
 $templateFiles = @(
@@ -49,7 +48,7 @@ try {
     $gitAvailable = $true
 } catch {
     Write-Warning "Git is not available or not in a repository: $($_.Exception.Message)"
-    Write-Warning "Continuing without git tags and without staging."
+    Write-Warning "Continuing without staging."
 }
 
 if ($gitAvailable) {
@@ -58,84 +57,61 @@ if ($gitAvailable) {
     }
 }
 
-# ── Collect versions ────────────────────────────────────────────────────────
+# ── Read the tracked version manifest ──────────────────────────────────────
 
 $versions = [System.Collections.Generic.HashSet[string]]::new(
     [System.StringComparer]::OrdinalIgnoreCase
 )
 
-# 1. package.json
-if (Test-Path $packageJsonPath) {
-    try {
-        $packageJson = Get-Content $packageJsonPath -Raw | ConvertFrom-Json
-        $pkgVersion = $packageJson.version
-        if (-not [string]::IsNullOrWhiteSpace($pkgVersion)) {
-            $pkgVersion = $pkgVersion.Trim().TrimStart('v', 'V')
-            if ($pkgVersion -match $semverPattern) {
-                [void]$versions.Add($pkgVersion)
-                Write-Host "package.json version: $pkgVersion"
-            }
-        }
-    } catch {
-        Write-Warning "Failed to parse package.json: $($_.Exception.Message)"
-    }
-} else {
-    Write-Warning "package.json not found at: $packageJsonPath"
+if (-not (Test-Path $manifestPath)) {
+    Write-Error "Issue template version manifest not found at: $manifestPath"
+    exit 1
 }
 
-# 2. CHANGELOG.md
-if (Test-Path $changelogPath) {
-    try {
-        $changelogLines = Get-Content $changelogPath -Encoding UTF8
-        foreach ($line in $changelogLines) {
-            if ($line -match '^## \[(\d+\.\d+\.\d+)') {
-                [void]$versions.Add($Matches[1])
-            }
-        }
-        Write-Host "CHANGELOG.md: found versions from changelog entries."
-    } catch {
-        Write-Warning "Failed to read CHANGELOG.md: $($_.Exception.Message)"
-    }
-} else {
-    Write-Warning "CHANGELOG.md not found at: $changelogPath"
-}
-
-# 3. Git tags
-if ($gitAvailable) {
-    try {
-        $tags = & git tag --list 2>$null
-        if ($LASTEXITCODE -ne 0) {
-            Write-Warning "git tag --list failed with exit code $LASTEXITCODE"
-        } elseif ($tags -and $tags.Count -gt 0) {
-            foreach ($tag in $tags) {
-                $cleaned = $tag.Trim().TrimStart('v', 'V')
-                if ($cleaned -match $semverPattern) {
-                    [void]$versions.Add($cleaned)
-                }
-            }
-            Write-Host "git tags: processed $($tags.Count) tag(s)."
-        }
-    } catch {
-        Write-Warning "Failed to list git tags: $($_.Exception.Message)"
-    }
-}
-
-# 4. AdditionalVersions parameter
-if (-not [string]::IsNullOrWhiteSpace($AdditionalVersions)) {
-    foreach ($entry in $AdditionalVersions.Split(',')) {
-        $cleaned = $entry.Trim().TrimStart('v', 'V')
-        if (-not [string]::IsNullOrWhiteSpace($cleaned) -and $cleaned -match $semverPattern) {
-            [void]$versions.Add($cleaned)
+try {
+    $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+    foreach ($version in $manifest.versions) {
+        if ($version -notmatch $semverPattern -or -not $versions.Add($version)) {
+            Write-Error "Invalid or duplicate issue template version: '$version'."
+            exit 1
         }
     }
-    Write-Host "AdditionalVersions: processed parameter."
+} catch {
+    Write-Error "Failed to parse issue template version manifest: $($_.Exception.Message)"
+    exit 1
 }
-
-# ── Guard: nothing collected ────────────────────────────────────────────────
 
 if ($versions.Count -eq 0) {
-    Write-Error "No versions collected from any source. Cannot update templates."
+    Write-Error "No versions listed in $manifestPath. Cannot update templates."
     exit 1
+}
+
+if (-not (Test-Path $packageJsonPath)) {
+    Write-Error "package.json not found at: $packageJsonPath"
+    exit 1
+}
+
+try {
+    $packageJson = Get-Content $packageJsonPath -Raw | ConvertFrom-Json
+    $pkgVersion = [string]$packageJson.version
+} catch {
+    Write-Error "Failed to parse package.json: $($_.Exception.Message)"
+    exit 1
+}
+
+if ($pkgVersion -notmatch $semverPattern) {
+    Write-Error "package.json version '$pkgVersion' is not strict X.Y.Z semver."
+    exit 1
+}
+
+$manifestChanged = $false
+if (-not $versions.Contains($pkgVersion)) {
+    if (-not $AddPackageVersion) {
+        Write-Error "package.json version '$pkgVersion' is not listed in $manifestPath. Run release preparation to add it."
+        exit 1
+    }
+    [void]$versions.Add($pkgVersion)
+    $manifestChanged = $true
 }
 
 Write-Host "Total unique versions collected: $($versions.Count)"
@@ -173,6 +149,14 @@ Write-Host "Versions (sorted): $($sortedVersions -join ', ')"
 # ── Update template files ──────────────────────────────────────────────────
 
 $filesToStage = [System.Collections.Generic.List[string]]::new()
+
+if ($manifestChanged) {
+    $manifestContent = @{ versions = @($sortedVersions) } | ConvertTo-Json -Depth 2
+    $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+    [System.IO.File]::WriteAllText($manifestPath, "$manifestContent`n", $utf8NoBom)
+    [void]$filesToStage.Add($manifestPath)
+    Write-Host "Issue template version manifest: added $pkgVersion."
+}
 
 foreach ($templatePath in $templateFiles) {
     $templateName = Split-Path -Leaf $templatePath

@@ -437,7 +437,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             DetectAssetChangeProcessor.LoopWindowSecondsOverride = 5d;
 
             int iterations = DetectAssetChangeProcessor.MaxConsecutiveChangeSetsWithinWindow + 1;
-            for (int i = 0; i < iterations; i++)
+            for (int i = 0; i < iterations; ++i)
             {
                 fakeTime += 6d;
                 DetectAssetChangeProcessor.ProcessChangesForTesting(
@@ -471,7 +471,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             );
 
             int iterations = DetectAssetChangeProcessor.MaxConsecutiveChangeSetsWithinWindow;
-            for (int i = 0; i < iterations; i++)
+            for (int i = 0; i < iterations; ++i)
             {
                 DetectAssetChangeProcessor.ProcessChangesForTesting(
                     new[] { PayloadPath },

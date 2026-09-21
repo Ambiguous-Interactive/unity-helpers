@@ -75,7 +75,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 return false;
             }
 
-            for (int i = 0; i < recordedContexts.Count; i++)
+            for (int i = 0; i < recordedContexts.Count; ++i)
             {
                 AssetChangeContext context = recordedContexts[i];
                 if (context == null)
@@ -84,7 +84,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
                 }
 
                 IReadOnlyList<string> createdPaths = context.CreatedAssetPaths;
-                for (int j = 0; j < createdPaths.Count; j++)
+                for (int j = 0; j < createdPaths.Count; ++j)
                 {
                     if (
                         string.Equals(
@@ -109,7 +109,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         private static void AssertNoSendMessageErrors(EditorLogScope logScope)
         {
             IReadOnlyList<EditorLogScope.LogRecord> errors = logScope.Errors;
-            for (int i = 0; i < errors.Count; i++)
+            for (int i = 0; i < errors.Count; ++i)
             {
                 EditorLogScope.LogRecord record = errors[i];
                 Assert.IsFalse(
@@ -136,7 +136,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             try
             {
                 Color[] pixels = new Color[width * height];
-                for (int i = 0; i < pixels.Length; i++)
+                for (int i = 0; i < pixels.Length; ++i)
                 {
                     pixels[i] = color;
                 }

@@ -15,6 +15,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Settings;
+    using WallstopStudios.UnityHelpers.Utils;
 
     internal sealed class DetectAssetChangeProcessor : AssetPostprocessor
     {
@@ -334,7 +335,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
 
                     if (handled)
                     {
-                        processedBatches++;
+                        ++processedBatches;
                         if (MaxPendingChangeSetsPerCycle <= processedBatches)
                         {
                             EnterLoopProtection();
@@ -515,11 +516,12 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 )
             )
             {
+                int assetCount = createdAssetInstances.Count;
                 typedArray = Array.CreateInstance(
                     subscription._createdParameterElementType,
-                    createdAssetInstances.Count
+                    assetCount
                 );
-                for (int i = 0; i < createdAssetInstances.Count; i++)
+                for (int i = 0; i < assetCount; ++i)
                 {
                     typedArray.SetValue(createdAssetInstances[i], i);
                 }
@@ -535,11 +537,12 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             IReadOnlyList<string> createdPaths
         )
         {
-            List<UnityEngine.Object> instances = new(createdPaths.Count);
+            int pathCount = createdPaths.Count;
+            List<UnityEngine.Object> instances = new(pathCount);
             Type loadType = typeof(UnityEngine.Object).IsAssignableFrom(assetType)
                 ? assetType
                 : typeof(UnityEngine.Object);
-            for (int i = 0; i < createdPaths.Count; i++)
+            for (int i = 0; i < pathCount; ++i)
             {
                 string path = createdPaths[i];
 
@@ -582,8 +585,9 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
 
             if (deletedPathsArray == null)
             {
-                deletedPathsArray = new string[deletedPaths.Count];
-                for (int i = 0; i < deletedPaths.Count; i++)
+                int pathCount = deletedPaths.Count;
+                deletedPathsArray = new string[pathCount];
+                for (int i = 0; i < pathCount; ++i)
                 {
                     deletedPathsArray[i] = deletedPaths[i];
                 }
@@ -758,7 +762,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                     )
                 )
                 {
-                    prefabCount++;
+                    ++prefabCount;
                     yield return component;
                 }
 
@@ -785,7 +789,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                     )
                 )
                 {
-                    sceneCount++;
+                    ++sceneCount;
                     yield return component;
                 }
 
@@ -852,7 +856,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
         )
         {
             int sceneCount = UnityEngine.SceneManagement.SceneManager.sceneCount;
-            for (int sceneIndex = 0; sceneIndex < sceneCount; sceneIndex++)
+            for (int sceneIndex = 0; sceneIndex < sceneCount; ++sceneIndex)
             {
                 UnityEngine.SceneManagement.Scene scene =
                     UnityEngine.SceneManagement.SceneManager.GetSceneAt(sceneIndex);
@@ -911,43 +915,63 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             }
 
             HashSet<string> matchingSubAssetGuids = null;
-            for (int i = 0; i < candidatePaths.Count; i++)
+            PooledResource<HashSet<string>> matchingGuidLease = default;
+            int candidateCount = candidatePaths.Count;
+            try
             {
-                string path = candidatePaths[i];
-                if (ShouldSkipPath(path))
+                for (int i = 0; i < candidateCount; ++i)
                 {
-                    continue;
-                }
+                    string path = candidatePaths[i];
+                    if (ShouldSkipPath(path))
+                    {
+                        continue;
+                    }
 
-                Type mainType = AssetDatabase.GetMainAssetTypeAtPath(path);
-                if (mainType != null && watcher.AssetType.IsAssignableFrom(mainType))
-                {
-                    buffer.Add(path);
-                    continue;
-                }
-
-                if (
-                    mainType != null
-                    && HasMatchingSubAsset(path, watcher, candidatePaths, ref matchingSubAssetGuids)
-                )
-                {
-                    buffer.Add(path);
-                    continue;
-                }
-
-                // Only fixture-scoped test assets may be loaded to resolve missing metadata; production queries must use metadata.
-                if (
-                    _includeTestAssets
-                    && 0 <= path.IndexOf(TestAssetFolderMarker, StringComparison.OrdinalIgnoreCase)
-                )
-                {
-                    UnityEngine.Object loadedAsset =
-                        AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path);
-                    if (loadedAsset != null && watcher.AssetType.IsInstanceOfType(loadedAsset))
+                    Type mainType = AssetDatabase.GetMainAssetTypeAtPath(path);
+                    if (mainType != null && watcher.AssetType.IsAssignableFrom(mainType))
                     {
                         buffer.Add(path);
+                        continue;
+                    }
+
+                    if (
+                        mainType != null
+                        && HasMatchingSubAsset(
+                            path,
+                            watcher,
+                            candidatePaths,
+                            candidateCount,
+                            ref matchingSubAssetGuids,
+                            ref matchingGuidLease
+                        )
+                    )
+                    {
+                        buffer.Add(path);
+                        continue;
+                    }
+
+                    // Only fixture-scoped test assets may be loaded to resolve missing metadata; production queries must use metadata.
+                    if (
+                        _includeTestAssets
+                        && 0
+                            <= path.IndexOf(
+                                TestAssetFolderMarker,
+                                StringComparison.OrdinalIgnoreCase
+                            )
+                    )
+                    {
+                        UnityEngine.Object loadedAsset =
+                            AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(path);
+                        if (loadedAsset != null && watcher.AssetType.IsInstanceOfType(loadedAsset))
+                        {
+                            buffer.Add(path);
+                        }
                     }
                 }
+            }
+            finally
+            {
+                matchingGuidLease.Dispose();
             }
         }
 
@@ -955,7 +979,9 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             string path,
             AssetWatcher watcher,
             IReadOnlyList<string> candidatePaths,
-            ref HashSet<string> matchingGuids
+            int candidateCount,
+            ref HashSet<string> matchingGuids,
+            ref PooledResource<HashSet<string>> matchingGuidLease
         )
         {
             if (IsScenePath(path) || IsPrefabPath(path))
@@ -965,13 +991,17 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
 
             if (matchingGuids == null)
             {
-                matchingGuids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                HashSet<string> folders = new(StringComparer.OrdinalIgnoreCase);
-                for (int i = 0; i < candidatePaths.Count; i++)
+                matchingGuidLease = SetBuffers<string>
+                    .GetHashSetPool(StringComparer.OrdinalIgnoreCase)
+                    .Get(out matchingGuids);
+                using PooledResource<HashSet<string>> folderLease = SetBuffers<string>
+                    .GetHashSetPool(StringComparer.OrdinalIgnoreCase)
+                    .Get(out HashSet<string> folders);
+                for (int i = 0; i < candidateCount; ++i)
                 {
                     string candidate = candidatePaths[i];
                     if (
-                        string.IsNullOrEmpty(candidate)
+                        string.IsNullOrWhiteSpace(candidate)
                         || IsScenePath(candidate)
                         || IsPrefabPath(candidate)
                     )
@@ -984,6 +1014,11 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                     {
                         folders.Add(candidate.Substring(0, separator));
                     }
+                }
+
+                if (folders.Count == 0)
+                {
+                    return false;
                 }
 
                 string[] searchFolders = new string[folders.Count];
@@ -1030,7 +1065,8 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 return;
             }
 
-            for (int i = 0; i < candidatePaths.Count; i++)
+            int candidateCount = candidatePaths.Count;
+            for (int i = 0; i < candidateCount; ++i)
             {
                 string path = candidatePaths[i];
                 if (ShouldSkipPath(path))
@@ -1319,7 +1355,8 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
 
         private static string[] CopyPaths(IReadOnlyList<string> source)
         {
-            string[] copy = new string[source.Count];
+            int sourceCount = source.Count;
+            string[] copy = new string[sourceCount];
             if (source is string[] sourceArray)
             {
                 Array.Copy(sourceArray, copy, sourceArray.Length);
@@ -1330,7 +1367,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 sourceCollection.CopyTo(copy, 0);
                 return copy;
             }
-            for (int index = 0; index < source.Count; ++index)
+            for (int index = 0; index < sourceCount; ++index)
             {
                 copy[index] = source[index];
             }
@@ -1347,7 +1384,9 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 return;
             }
 
-            StringBuilder subAssetSearchFilter = new();
+            using PooledResource<StringBuilder> filterLease = Buffers.StringBuilder.Get(
+                out StringBuilder subAssetSearchFilter
+            );
             foreach (
                 Type searchType in ResolveSearchableAssetTypes(
                     watcher.AssetType,
@@ -1475,7 +1514,8 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 yield break;
             }
 
-            for (int i = 0; i < loadedTypes.Count; i++)
+            int loadedTypeCount = loadedTypes.Count;
+            for (int i = 0; i < loadedTypeCount; ++i)
             {
                 Type candidate = loadedTypes[i];
                 if (candidate == null)

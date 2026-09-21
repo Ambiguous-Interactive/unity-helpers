@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - "package.json"
-      - "CHANGELOG.md"
+      - ".github/issue-template-versions.json"
       - "scripts/tests/test-sync-issue-template-versions.ps1"
       - "scripts/sync-issue-template-versions.ps1"
       - ".github/workflows/sync-issue-template.yml"
@@ -36,60 +36,27 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: main
-          fetch-depth: 0 # Full history for git tags
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Test sync-issue-template-versions script
         shell: pwsh
         run: ./scripts/tests/test-sync-issue-template-versions.ps1 -VerboseOutput
 
-      - name: Fetch all tags
-        run: |
-          set -euo pipefail
-          git fetch --tags --force
-
-      - name: Collect GitHub Release versions
-        id: releases
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          API_STDERR="${RUNNER_TEMP}/gh_releases_stderr.log"
-
-          VERSIONS=$(gh release list \
-            --json tagName \
-            --limit 100 \
-            --jq '[.[].tagName] | join(",")' 2>"$API_STDERR") || VERSIONS=""
-
-          if [ -s "$API_STDERR" ]; then
-            echo "::debug::gh release list stderr: $(cat "$API_STDERR")"
-          fi
-
-          echo "versions=$VERSIONS" >> "$GITHUB_OUTPUT"
-          echo "Collected release versions: ${VERSIONS:-<none>}"
-
       - name: Run sync script
         shell: pwsh
-        env:
-          ADDITIONAL_VERSIONS: ${{ steps.releases.outputs.versions }}
-        run: |
-          & ./scripts/sync-issue-template-versions.ps1 `
-            -AdditionalVersions $env:ADDITIONAL_VERSIONS
+        run: ./scripts/sync-issue-template-versions.ps1
 
-      # NOTE: This diff check only examines .github/ISSUE_TEMPLATE/.
-      # If templateFiles in sync-issue-template-versions.ps1 is expanded to
-      # include files outside that directory, update this path accordingly.
       - name: Check for changes
         id: diff
         run: |
           set -euo pipefail
-          if git diff --quiet -- '.github/ISSUE_TEMPLATE/'; then
+          if git diff --cached --quiet -- '.github/ISSUE_TEMPLATE/' '.github/issue-template-versions.json'; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No changes detected in issue templates."
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "Changes detected in issue templates:"
-            git diff --stat -- '.github/ISSUE_TEMPLATE/'
+            git diff --cached --stat -- '.github/ISSUE_TEMPLATE/' '.github/issue-template-versions.json'
           fi
 
       - name: Commit and push
@@ -98,8 +65,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # Must match the directories containing $templateFiles in sync-issue-template-versions.ps1
-          git add .github/ISSUE_TEMPLATE/
+          git add .github/ISSUE_TEMPLATE/ .github/issue-template-versions.json
           git commit -m "chore: sync issue template package versions [skip ci]"
           git push origin main
 
@@ -107,23 +73,15 @@ jobs:
         if: always()
         env:
           CHANGED: ${{ steps.diff.outputs.changed }}
-          VERSIONS: ${{ steps.releases.outputs.versions }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
-          # Count versions (comma-separated)
-          if [ -n "$VERSIONS" ]; then
-            VERSION_COUNT=$(echo "$VERSIONS" | tr ',' '\n' | wc -l)
-          else
-            VERSION_COUNT=0
-          fi
-
           {
             echo "### Sync Issue Template Versions"
             echo ""
             echo "| Property | Value |"
             echo "|----------|-------|"
             echo "| **Templates Changed** | \`${CHANGED:-false}\` |"
-            echo "| **Release Versions Found** | \`$VERSION_COUNT\` |"
+            echo "| **Version Source** | \`.github/issue-template-versions.json\` |"
             echo "| **Trigger** | \`$EVENT_NAME\` |"
           } >> "$GITHUB_STEP_SUMMARY"

@@ -89,7 +89,7 @@ the corresponding comments/descriptions in the hook file AND in related document
 Step 0 runs two PowerShell scripts on every commit:
 
 - [sync-banner-version.ps1](../../scripts/sync-banner-version.ps1) — Syncs banner SVG + [LLM context](../context.md) from `package.json`
-- [sync-issue-template-versions.ps1](../../scripts/sync-issue-template-versions.ps1) — Syncs issue template dropdowns from `package.json`, the [CHANGELOG](../../CHANGELOG.md), and git tags
+- [sync-issue-template-versions.ps1](../../scripts/sync-issue-template-versions.ps1) — Syncs issue template dropdowns from the tracked [.github/issue-template-versions.json](../../.github/issue-template-versions.json) manifest; release preparation adds the current package version
 
 Both scripts auto-stage modified files.
 
