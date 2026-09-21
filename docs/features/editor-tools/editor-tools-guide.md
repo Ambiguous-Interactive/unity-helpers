@@ -106,6 +106,7 @@ An occupied output name is preserved and the next numbered name is used, includi
 process creates the file while the blur is being written.
 New output files are copied from a staged image with exclusive creation. An interrupted copy can
 leave an incomplete new file; remove it before retrying.
+If staging cleanup also fails, the API reports that error alongside the write failure.
 This operation writes a file;
 Unity Undo cannot remove that output file.
 
@@ -761,6 +762,7 @@ With the default `overwriteExisting: false`, an output that appears during extra
 and left unchanged. With `overwriteExisting: true`, the encoded PNG is staged before replacing the
 existing file. Extraction attempts to remove its temporary file if publishing fails. A failed or interrupted
 copy to a new output can leave an incomplete new file; remove it before retrying.
+If temporary-file cleanup fails, the result reports that error alongside the extraction failure.
 
 Use `SpriteSheetExtractionAPI.Discover` with folder asset paths and an optional filename regex to
 get the same sprite texture list as the window. Its result includes warnings for invalid folders

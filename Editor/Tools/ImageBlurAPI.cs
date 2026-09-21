@@ -21,6 +21,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// returned with an error if the file was written but a later operation failed. Existing
         /// output files are preserved and a free numbered name is chosen.
         /// </summary>
+        /// <remarks>Temporary-file cleanup failures are reported alongside write failures.</remarks>
         public static bool TryWriteAsset(
             Texture2D source,
             int radius,
@@ -175,7 +176,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                             {
                                 if (stagedOwned)
                                 {
-                                    File.Delete(stagedPath);
+                                    try
+                                    {
+                                        File.Delete(stagedPath);
+                                    }
+                                    catch (Exception cleanupError)
+                                    {
+                                        failure = AppendError(
+                                            failure,
+                                            $"Could not remove temporary blur file: {cleanupError.Message}"
+                                        );
+                                    }
                                 }
                             }
                         }
@@ -184,7 +195,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
             catch (Exception exception)
             {
-                failure = $"Failed to write blurred image for '{assetPath}': {exception.Message}";
+                failure = AppendError(
+                    failure,
+                    $"Failed to write blurred image for '{assetPath}': {exception.Message}"
+                );
             }
             finally
             {

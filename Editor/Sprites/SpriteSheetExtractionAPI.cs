@@ -215,6 +215,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// Extracts selected sprites and returns counts and errors without displaying prompts.
         /// Existing outputs are skipped unless overwrite is requested.
         /// </summary>
+        /// <remarks>Temporary-file cleanup failures are included in the result errors.</remarks>
         public static SpriteSheetExtractionResult Extract(
             IReadOnlyList<SpriteSheetExtractionRequest> requests,
             bool overwriteExisting = false,
@@ -598,7 +599,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         {
                             if (stagedOwned)
                             {
-                                File.Delete(stagedPath);
+                                try
+                                {
+                                    File.Delete(stagedPath);
+                                }
+                                catch (Exception cleanupError)
+                                {
+                                    result.AddError(
+                                        $"Failed to remove temporary extraction file '{stagedPath}': {cleanupError.Message}"
+                                    );
+                                    skipped = false;
+                                }
                             }
                         }
                     }
