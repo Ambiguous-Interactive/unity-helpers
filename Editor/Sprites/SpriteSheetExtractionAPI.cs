@@ -569,6 +569,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             Path.GetRandomFileName()
                         );
                         bool stagedOwned = false;
+                        bool outputOccupied = false;
+                        bool cleanupFailed = false;
                         try
                         {
                             using (
@@ -591,8 +593,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             }
                             else
                             {
-                                skipped = true;
-                                return false;
+                                outputOccupied = true;
                             }
                         }
                         finally
@@ -608,9 +609,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                     result.AddError(
                                         $"Failed to remove temporary extraction file '{stagedPath}': {cleanupError.Message}"
                                     );
-                                    skipped = false;
+                                    cleanupFailed = true;
                                 }
                             }
+                        }
+                        if (outputOccupied)
+                        {
+                            skipped = !cleanupFailed;
+                            return false;
                         }
                     }
                 }
