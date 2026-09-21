@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.1] - 2026-09-21
+
 ### Added
 
 - Add `AnimationEventSaveAPI` to save clip events and optional frame rates from editor scripts without opening the window. See [Animation Event Editor](./docs/features/editor-tools/editor-tools-guide.md#animation-event-editor) ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
