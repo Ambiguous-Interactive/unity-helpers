@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix `SerializableType` references to constructed generic types after their component types move between assemblies ([#845](https://github.com/Ambiguous-Interactive/unity-helpers/issues/845)).
 - Fix Texture Resizer so it rejects invalid sizing settings and colliding output names before changing source, importer, or destination files ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Fix Test Run Reporter summary claims so one run owns a marker and a stale callback cannot replace or delete a newer run ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).
 - Fix concurrent processes publishing another `DurableFile` writer's staged bytes. A competing writer now fails while the first owns the stage ([#838](https://github.com/Ambiguous-Interactive/unity-helpers/issues/838)).

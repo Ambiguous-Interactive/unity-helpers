@@ -23,7 +23,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
     /// <summary>
     /// Unity serializable wrapper for <see cref="Type"/> that survives JSON, ProtoBuf, and Unity serialization by storing normalized assembly-qualified names.
-    /// Resolves assembly moves for non-generic types when the type's full name stays the same.
+    /// Can resolve assembly moves when a type's full name stays the same.
     /// </summary>
     /// <example>
     /// <code><![CDATA[
@@ -425,6 +425,8 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             Volatile.Read(ref _descriptorByName) != null;
 
         private static readonly object SyncRoot = new();
+        private static readonly Func<AssemblyName, Assembly> PlaceholderAssemblyResolver =
+            ResolvePlaceholderAssembly;
         private static SerializableTypeDescriptor[] _descriptors;
         private static Dictionary<string, SerializableTypeDescriptor> _descriptorByName;
         private static string[] _assemblyQualifiedNames;
@@ -490,6 +492,11 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             if (direct != null)
             {
                 return direct;
+            }
+
+            if (0 <= assemblyQualifiedName.IndexOf('['))
+            {
+                return ResolveCompositeType(assemblyQualifiedName);
             }
 
             string fullName = ExtractFullName(assemblyQualifiedName);
@@ -1173,6 +1180,68 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             }
 
             return assemblyQualifiedName.Substring(0, commaIndex).Trim();
+        }
+
+        private static Type ResolveCompositeType(string assemblyQualifiedName)
+        {
+            using PooledResource<List<Assembly>> assembliesLease = Buffers<Assembly>.List.Get(
+                out List<Assembly> assemblies
+            );
+            foreach (Assembly assembly in ReflectionHelpers.GetAllLoadedAssemblies())
+            {
+                assemblies.Add(assembly);
+            }
+
+            try
+            {
+                return Type.GetType(
+                    assemblyQualifiedName,
+                    PlaceholderAssemblyResolver,
+                    (_, name, _) => ResolveUniqueLoadedType(name, assemblies),
+                    throwOnError: false,
+                    ignoreCase: false
+                );
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static Assembly ResolvePlaceholderAssembly(AssemblyName requestedAssembly)
+        {
+            return typeof(object).Assembly;
+        }
+
+        internal static Type ResolveUniqueLoadedType(string fullName, List<Assembly> assemblies)
+        {
+            if (string.IsNullOrEmpty(fullName))
+            {
+                return null;
+            }
+
+            Type resolved = null;
+            foreach (Assembly assembly in assemblies)
+            {
+                try
+                {
+                    Type candidate = assembly.GetType(fullName, throwOnError: false);
+                    if (candidate == null)
+                    {
+                        continue;
+                    }
+
+                    if (resolved != null && !ReferenceEquals(resolved, candidate))
+                    {
+                        return null;
+                    }
+
+                    resolved = candidate;
+                }
+                catch { }
+            }
+
+            return resolved;
         }
 
         private static void AppendTypeName(StringBuilder builder, Type type)

@@ -266,7 +266,7 @@ Unity-friendly wrappers for complex data:
 - **[WGuid](../serialization/serialization-types.md#wguid)** - Immutable GUID using two longs (optimized for Unity serialization)
 - **[SerializableDictionary](../serialization/serialization-types.md#serializabledictionary)** - Key/value pairs with custom drawer
 - **[SerializableSet](../serialization/serialization-types.md#serializablehashset--serializablesortedset)** - HashSet and SortedSet with duplicate detection, pagination, reordering
-- **[SerializableType](../serialization/serialization-types.md#serializabletype)** - Type references with assembly-move recovery for non-generic types
+- **[SerializableType](../serialization/serialization-types.md#serializabletype)** - Type references with assembly-move recovery
 - **[SerializableNullable](../serialization/serialization-types.md#serializablenullable)** - Nullable value types
 
 ![WGuid, dictionary, sets, types, nullables in action](../../images/inspector/serialization-overview.gif)

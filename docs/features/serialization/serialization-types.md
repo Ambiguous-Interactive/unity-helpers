@@ -593,7 +593,7 @@ public class ThresholdLogger : MonoBehaviour
 
 ## SerializableType
 
-Unity-friendly type reference that can resolve a non-generic type moved between assemblies when its full name stays the same.
+Unity-friendly type reference that can resolve types moved between assemblies when their full names stay the same.
 
 <!-- doc-sample: compiles -->
 
@@ -616,7 +616,7 @@ public class SerializableTypeExample : MonoBehaviour
 ### Why SerializableType?
 
 - **Problem:** Unity doesn't serialize `System.Type`, and stored type names can break when an assembly changes
-- **Solution:** `SerializableType` stores assembly-qualified names and searches loaded assemblies for the same full name of a non-generic type
+- **Solution:** `SerializableType` stores assembly-qualified names and searches loaded assemblies for matching full type names
 
 ---
 
@@ -726,7 +726,7 @@ bool equal = typeRef.Equals(new SerializableType(typeof(PlayerController)));
 
 ### Assembly Moves
 
-**Scenario:** You move the non-generic `PlayerController` type to another assembly without changing its namespace or name.
+**Scenario:** You move `PlayerController` to another assembly without changing its namespace or name.
 
 - **Standard Approach:** Type reference breaks, data loss
 - **SerializableType:** Searches loaded assemblies for the same full type name
@@ -738,8 +738,7 @@ bool equal = typeRef.Equals(new SerializableType(typeof(PlayerController)));
 3. If the exact match fails, it scans assemblies for the same full type name
 4. Stores the new assembly name on the next Unity serialization; JSON and Proto keep the original stored name
 
-Renaming the type or changing its namespace changes the full name and needs an explicit migration.
-Constructed generic types with stale assembly names also need an explicit migration.
+Constructed generic types can also recover when their component types have unique full names in loaded assemblies. Renaming a type or changing its namespace changes the full name and needs an explicit migration.
 
 ---
 

@@ -7,6 +7,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
+    using System.Reflection;
+    using System.Reflection.Emit;
     using System.Runtime.CompilerServices;
     using System.Text.Json;
     using NUnit.Framework;
@@ -390,6 +392,16 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 );
                 Assert.AreSame(typeof(SerializableType), moved);
                 Assert.IsFalse(SerializableTypeCatalog.IsDescriptorCacheInitializedForTesting);
+
+                string movedGeneric = typeof(List<SerializableType>).AssemblyQualifiedName.Replace(
+                    typeof(SerializableType).Assembly.FullName,
+                    "MissingAssembly"
+                );
+                Assert.AreSame(
+                    typeof(List<SerializableType>),
+                    SerializableTypeCatalog.Resolve(movedGeneric)
+                );
+                Assert.IsFalse(SerializableTypeCatalog.IsDescriptorCacheInitializedForTesting);
             }
             finally
             {
@@ -397,6 +409,195 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                     wasConfigured ? backup : null
                 );
             }
+        }
+
+        [Test]
+        public void ResolvesNestedGenericAfterArgumentAssemblyMove()
+        {
+            Type[] expectedTypes =
+            {
+                typeof(Dictionary<string, List<SerializableType[]>>),
+                typeof(List<SerializableType[][]>),
+                typeof(List<SerializableType[,]>),
+                typeof(List<CompilerGeneratedProbe>),
+            };
+
+            foreach (Type expected in expectedTypes)
+            {
+                string original = expected.AssemblyQualifiedName;
+                string argumentAssembly = expected.GetGenericArguments()[0].Assembly.FullName;
+                if (expected == typeof(Dictionary<string, List<SerializableType[]>>))
+                {
+                    argumentAssembly = typeof(SerializableType).Assembly.FullName;
+                }
+
+                string moved = original.Replace(argumentAssembly, "MissingAssembly");
+                Assert.AreNotEqual(original, moved);
+                Assert.IsTrue(Type.GetType(moved, throwOnError: false) == null);
+                Assert.AreSame(expected, SerializableTypeCatalog.Resolve(moved));
+                Assert.AreSame(expected, SerializableType.FromSerializedName(moved).Value);
+            }
+        }
+
+        [Test]
+        public void ResolvesGenericAfterOuterAssemblyMove()
+        {
+            Type expected = typeof(List<SerializableType>);
+            string original = expected.AssemblyQualifiedName;
+            string outerAssembly = expected.Assembly.FullName;
+            Assert.IsTrue(original.EndsWith(outerAssembly, StringComparison.Ordinal));
+            string moved =
+                original.Substring(0, original.Length - outerAssembly.Length) + "MissingAssembly";
+
+            Assert.IsTrue(Type.GetType(moved, throwOnError: false) == null);
+            Assert.AreSame(expected, SerializableTypeCatalog.Resolve(moved));
+        }
+
+        [Test]
+        public void GenericResolutionRejectsMissingOrMalformedArguments()
+        {
+            string original = typeof(List<SerializableType>).AssemblyQualifiedName;
+            string missing = original.Replace(typeof(SerializableType).FullName, "Missing.Type");
+            string malformed = original.Replace("]]", "]");
+
+            Assert.AreNotEqual(original, missing);
+            Assert.AreNotEqual(original, malformed);
+            Assert.IsTrue(SerializableTypeCatalog.Resolve(missing) == null);
+            Assert.IsTrue(SerializableTypeCatalog.Resolve(malformed) == null);
+        }
+
+        [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
+        public void GenericResolutionRejectsAmbiguousComponentNames()
+        {
+            const string fullName = "WallstopStudios.UnityHelpers.Tests.AmbiguousTypeComponent";
+            AssemblyBuilder firstAssembly = AssemblyBuilder.DefineDynamicAssembly(
+                new AssemblyName("SerializableTypeAmbiguityFirst"),
+                AssemblyBuilderAccess.Run
+            );
+            AssemblyBuilder secondAssembly = AssemblyBuilder.DefineDynamicAssembly(
+                new AssemblyName("SerializableTypeAmbiguitySecond"),
+                AssemblyBuilderAccess.Run
+            );
+            Type first = firstAssembly
+                .DefineDynamicModule("First")
+                .DefineType(fullName)
+                .CreateType();
+            Type second = secondAssembly
+                .DefineDynamicModule("Second")
+                .DefineType(fullName)
+                .CreateType();
+
+            Assert.AreEqual(first.FullName, second.FullName);
+            Assert.AreSame(
+                first,
+                SerializableTypeCatalog.ResolveUniqueLoadedType(
+                    fullName,
+                    new List<Assembly> { firstAssembly }
+                )
+            );
+            Assert.AreSame(
+                second,
+                SerializableTypeCatalog.ResolveUniqueLoadedType(
+                    fullName,
+                    new List<Assembly> { secondAssembly }
+                )
+            );
+            Assert.IsTrue(
+                SerializableTypeCatalog.ResolveUniqueLoadedType(
+                    fullName,
+                    new List<Assembly> { firstAssembly, secondAssembly }
+                ) == null
+            );
+        }
+
+        [Test]
+        public void SerializationPreservesResolvableStaleGenericName()
+        {
+            Type expected = typeof(List<SerializableType>);
+            string moved = expected.AssemblyQualifiedName.Replace(
+                typeof(SerializableType).Assembly.FullName,
+                "MissingAssembly"
+            );
+            SerializableType wrapper = SerializableType.FromSerializedName(moved);
+            Assert.AreSame(expected, wrapper.Value);
+
+            string json = JsonSerializer.Serialize(wrapper);
+            SerializableType fromJson = JsonSerializer.Deserialize<SerializableType>(json);
+            Assert.AreEqual(moved, fromJson.AssemblyQualifiedName);
+            Assert.AreSame(expected, fromJson.Value);
+
+            object boxed = wrapper;
+            UnityEngine.ISerializationCallbackReceiver callbacks =
+                (UnityEngine.ISerializationCallbackReceiver)boxed;
+            callbacks.OnAfterDeserialize();
+            Assert.AreSame(expected, ((SerializableType)boxed).Value);
+            callbacks.OnBeforeSerialize();
+            SerializableType fromUnity = (SerializableType)boxed;
+            Assert.AreEqual(expected.AssemblyQualifiedName, fromUnity.AssemblyQualifiedName);
+        }
+
+        [Test]
+        public void UnitySerializationNormalizesResolvedGenericAndPreservesMissingName()
+        {
+            Type expected = typeof(List<SerializableType>);
+            string moved = expected.AssemblyQualifiedName.Replace(
+                typeof(SerializableType).Assembly.FullName,
+                "MissingAssembly"
+            );
+            string fieldName = SerializableType.SerializedPropertyNames.AssemblyQualifiedName;
+            string holderName = nameof(SerializableTypeHolder.reference);
+            string movedJson = JsonSerializer.Serialize(
+                new Dictionary<string, Dictionary<string, string>>
+                {
+                    [holderName] = new Dictionary<string, string> { [fieldName] = moved },
+                }
+            );
+
+            SerializableTypeHolder movedHolder =
+                UnityEngine.JsonUtility.FromJson<SerializableTypeHolder>(movedJson);
+            using JsonDocument normalized = JsonDocument.Parse(
+                UnityEngine.JsonUtility.ToJson(movedHolder)
+            );
+            Assert.AreEqual(
+                expected.AssemblyQualifiedName,
+                normalized.RootElement.GetProperty(holderName).GetProperty(fieldName).GetString()
+            );
+
+            string missingJson = JsonSerializer.Serialize(
+                new Dictionary<string, Dictionary<string, string>>
+                {
+                    [holderName] = new Dictionary<string, string> { [fieldName] = MissingTypeName },
+                }
+            );
+            SerializableTypeHolder missingHolder =
+                UnityEngine.JsonUtility.FromJson<SerializableTypeHolder>(missingJson);
+            using JsonDocument preserved = JsonDocument.Parse(
+                UnityEngine.JsonUtility.ToJson(missingHolder)
+            );
+            Assert.AreEqual(
+                MissingTypeName,
+                preserved.RootElement.GetProperty(holderName).GetProperty(fieldName).GetString()
+            );
+        }
+
+        [Test]
+        [WallstopStudios.UnityHelpers.Tests.Core.SkipUnderIL2CPP]
+        public void ProtoSerializationPreservesResolvableStaleGenericName()
+        {
+            Type expected = typeof(List<SerializableType>);
+            string moved = expected.AssemblyQualifiedName.Replace(
+                typeof(SerializableType).Assembly.FullName,
+                "MissingAssembly"
+            );
+            SerializableType wrapper = SerializableType.FromSerializedName(moved);
+            using MemoryStream stream = new();
+            Serializer.Serialize(stream, wrapper);
+            stream.Position = 0;
+
+            SerializableType fromProto = Serializer.Deserialize<SerializableType>(stream);
+            Assert.AreEqual(moved, fromProto.AssemblyQualifiedName);
+            Assert.AreSame(expected, fromProto.Value);
         }
 
         [Test]
@@ -659,5 +860,11 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
         [CompilerGenerated]
         private sealed class CompilerGeneratedProbe { }
+
+        [Serializable]
+        private sealed class SerializableTypeHolder
+        {
+            public SerializableType reference;
+        }
     }
 }
