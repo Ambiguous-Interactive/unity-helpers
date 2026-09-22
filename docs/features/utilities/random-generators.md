@@ -279,7 +279,7 @@ different values; replay files using those calls should record their package ver
 `random.NextSubset(items, count)` draws without replacement. A zero count returns an empty
 sequence without enumerating `items`, so it also works with a lazy or unbounded source. A positive
 count requires a finite source; the method materializes sources that are not read-only lists before
-sampling them. Queues and hash sets take one direct snapshot. Other sources grow from the items
+sampling them. Queues, stacks, hash sets, and linked lists take one direct snapshot. Other sources grow from the items
 they deliver, so a collection's reported size cannot force a large allocation. Null sources and
 negative counts still raise argument exceptions.
 

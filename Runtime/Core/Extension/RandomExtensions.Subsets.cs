@@ -28,7 +28,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Allocations: Uses a pooled reservoir for the duration of enumeration.
         /// Edge Cases: count=0 returns empty without reading items. Uses Algorithm R (reservoir sampling) for uniform selection probability.
         /// A source that is not an <see cref="IReadOnlyList{T}"/> is copied into an owned array
-        /// before sampling, because sampling is deferred. Queues and sets copy directly; other
+        /// before sampling, because sampling is deferred. Queues, stacks, hash sets, and linked lists copy directly; other
         /// sources first grow a pooled list from the items they deliver.
         /// Disposing the enumerator returns the reservoir to the pool. A later enumeration draws
         /// a new sample.
@@ -82,6 +82,21 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return NextSubsetIterator(random, snapshot, count);
             }
 
+            if (items is Stack<T> stack)
+            {
+                if (stack.Count < count)
+                {
+                    throw new ArgumentException(
+                        "Count cannot exceed the number of items",
+                        nameof(count)
+                    );
+                }
+
+                T[] snapshot = new T[stack.Count];
+                stack.CopyTo(snapshot, 0);
+                return NextSubsetIterator(random, snapshot, count);
+            }
+
             if (items is HashSet<T> set)
             {
                 if (set.Count < count)
@@ -94,6 +109,21 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
 
                 T[] snapshot = new T[set.Count];
                 set.CopyTo(snapshot, 0);
+                return NextSubsetIterator(random, snapshot, count);
+            }
+
+            if (items is LinkedList<T> linkedList)
+            {
+                if (linkedList.Count < count)
+                {
+                    throw new ArgumentException(
+                        "Count cannot exceed the number of items",
+                        nameof(count)
+                    );
+                }
+
+                T[] snapshot = new T[linkedList.Count];
+                linkedList.CopyTo(snapshot, 0);
                 return NextSubsetIterator(random, snapshot, count);
             }
 

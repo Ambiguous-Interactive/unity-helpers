@@ -1153,10 +1153,35 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             SystemRandom control = new(5);
             IEnumerable<int> subset = random.NextSubset(source, 3);
 
+            int[] sourceCopy = new int[source.Count];
+            source.CopyTo(sourceCopy, 0);
+
             source.Clear();
             source.AddLast(-1);
 
-            int[] expected = control.NextSubset(new[] { 11, 22, 33, 44, 55 }, 3).ToArray();
+            int[] expected = control.NextSubset(sourceCopy, 3).ToArray();
+            CollectionAssert.AreEqual(expected, subset.ToArray());
+            Assert.AreEqual(control.Next(), random.Next());
+        }
+
+        [Test]
+        public void NextSubsetFromStackPreservesCopyOrderAndRandomStream()
+        {
+            Stack<int> source = new(new[] { 11, 22, 33, 44, 55 });
+            Assert.IsFalse(source is IReadOnlyList<int>);
+
+            SystemRandom random = new(5);
+            SystemRandom control = new(5);
+            IEnumerable<int> subset = random.NextSubset(source, 3);
+
+            int[] sourceCopy = new int[source.Count];
+            source.CopyTo(sourceCopy, 0);
+            CollectionAssert.AreEqual(source, sourceCopy);
+
+            source.Clear();
+            source.Push(-1);
+
+            int[] expected = control.NextSubset(sourceCopy, 3).ToArray();
             CollectionAssert.AreEqual(expected, subset.ToArray());
             Assert.AreEqual(control.Next(), random.Next());
         }
