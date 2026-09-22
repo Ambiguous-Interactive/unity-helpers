@@ -90,7 +90,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
 
                     string path = AssetDatabase.GetAssetPath(source);
-                    if (!string.IsNullOrEmpty(path))
+                    if (!string.IsNullOrEmpty(path) && AssetDatabase.IsValidFolder(path))
                     {
                         sourceFolders.Add(path);
                     }

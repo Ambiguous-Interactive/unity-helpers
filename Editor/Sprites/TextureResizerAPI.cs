@@ -68,15 +68,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             catch (Exception error)
             {
                 Debug.LogError($"Texture resizing failed. {error}");
-                try
-                {
-                    Utils.EditorUi.ClearProgress();
-                }
-                catch (Exception cleanupError)
-                {
-                    Debug.LogError($"Failed to clear texture resize progress. {cleanupError}");
-                }
-
                 return false;
             }
         }
@@ -99,6 +90,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return false;
             }
 
+            outputDirAssetPath = outputDirAssetPath.SanitizePath();
             if (
                 !string.IsNullOrEmpty(outputDirAssetPath)
                 && (
@@ -162,13 +154,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             continue;
                         }
 
-                        if (!AssetDatabase.IsValidFolder(path))
+                        string normalizedPath = path.SanitizePath();
+                        if (!AssetDatabase.IsValidFolder(normalizedPath))
                         {
                             Debug.LogError($"The source folder is invalid: {path}.");
                             return false;
                         }
 
-                        _ = sourcePaths.Add(path);
+                        _ = sourcePaths.Add(normalizedPath);
                     }
                 }
 

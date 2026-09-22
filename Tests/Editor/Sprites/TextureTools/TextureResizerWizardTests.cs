@@ -102,6 +102,35 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         }
 
         [Test]
+        public void WizardIgnoresNonFolderSearchObjectAndResizesSelectedTexture()
+        {
+            string path = Path.Combine(Root, "non-folder-search.png").SanitizePath();
+            CreatePng(path, 8, 4, Color.green);
+            AssetDatabaseBatchHelper.RefreshIfNotBatching();
+            Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            Assert.IsTrue(texture != null);
+
+            TextureResizerWizard wizard = Track(
+                ScriptableObject.CreateInstance<TextureResizerWizard>()
+            );
+            wizard.textures.Add(texture);
+            wizard.textureSourcePaths.Add(texture);
+            wizard.numResizes = 1;
+            wizard.pixelsPerUnit = 1;
+            wizard.widthMultiplier = 1f;
+            wizard.heightMultiplier = 1f;
+            wizard.scalingResizeAlgorithm = TextureResizerWizard.ResizeAlgorithm.Point;
+
+            wizard.OnWizardCreate();
+
+            AssetDatabaseBatchHelper.RefreshIfNotBatching();
+            Texture2D resized = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            Assert.IsTrue(resized != null);
+            Assert.That(resized.width, Is.EqualTo(16));
+            Assert.That(resized.height, Is.EqualTo(8));
+        }
+
+        [Test]
         public void DirectApiDryRunLeavesSourceAndImporterUnchanged()
         {
             string path = Path.Combine(Root, "direct-dry.png").SanitizePath();
@@ -167,6 +196,37 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 1f,
                 1f,
                 OutRoot,
+                false
+            );
+
+            Assert.IsTrue(succeeded);
+            AssetDatabaseBatchHelper.RefreshIfNotBatching();
+            Texture2D output = AssetDatabase.LoadAssetAtPath<Texture2D>(
+                Path.Combine(OutRoot, "found.png").SanitizePath()
+            );
+            Assert.IsTrue(output != null);
+            Assert.That(output.width, Is.EqualTo(16));
+            Assert.That(output.height, Is.EqualTo(8));
+            CollectionAssert.AreEqual(originalBytes, File.ReadAllBytes(RelToFull(sourcePath)));
+        }
+
+        [Test]
+        public void DirectApiNormalizesWindowsStyleAssetFolderPaths()
+        {
+            string sourcePath = Path.Combine(Root, "windows-folder", "found.png").SanitizePath();
+            CreatePng(sourcePath, 8, 4, Color.red);
+            AssetDatabaseBatchHelper.RefreshIfNotBatching();
+            byte[] originalBytes = File.ReadAllBytes(RelToFull(sourcePath));
+
+            bool succeeded = TextureResizerAPI.TryResizeTextures(
+                null,
+                new[] { Path.GetDirectoryName(sourcePath).Replace('/', '\\') },
+                1,
+                TextureResizerWizard.ResizeAlgorithm.Point,
+                1,
+                1f,
+                1f,
+                OutRoot.Replace('/', '\\'),
                 false
             );
 

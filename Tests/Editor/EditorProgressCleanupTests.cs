@@ -56,6 +56,14 @@ namespace WallstopStudios.UnityHelpers.Tests
                     );
                     Assert.DoesNotThrow(() => operation());
                 }
+                else if (windowType == typeof(TextureResizerWizard))
+                {
+                    ExpectError(
+                        LogType.Error,
+                        "Texture resizing failed.*Injected processing failure"
+                    );
+                    Assert.DoesNotThrow(() => operation());
+                }
                 else
                 {
                     InvalidOperationException actual = Assert.Throws<InvalidOperationException>(
