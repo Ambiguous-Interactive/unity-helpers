@@ -23,7 +23,7 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
 
     /// <summary>
     /// Unity serializable wrapper for <see cref="Type"/> that survives JSON, ProtoBuf, and Unity serialization by storing normalized assembly-qualified names.
-    /// Keeps inspector fields and saved data resilient to refactors by handling renames and namespace changes.
+    /// Resolves assembly moves for non-generic types when the type's full name stays the same.
     /// </summary>
     /// <example>
     /// <code><![CDATA[
@@ -492,26 +492,13 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
                 return direct;
             }
 
-            EnsureCache();
-            if (
-                _descriptorByName.TryGetValue(
-                    assemblyQualifiedName,
-                    out SerializableTypeDescriptor cachedDescriptor
-                )
-            )
-            {
-                return cachedDescriptor.Type;
-            }
-
             string fullName = ExtractFullName(assemblyQualifiedName);
             if (string.IsNullOrEmpty(fullName))
             {
                 return null;
             }
 
-            Type fallback =
-                ReflectionHelpers.TryResolveType(fullName) ?? ResolveByFullName(fullName);
-            return fallback;
+            return ReflectionHelpers.TryResolveType(fullName);
         }
 
         /// <summary>
@@ -1175,26 +1162,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         private static Type[] GetAssemblyTypes(Assembly assembly)
         {
             return ReflectionHelpers.GetTypesFromAssembly(assembly);
-        }
-
-        private static Type ResolveByFullName(string fullName)
-        {
-            IEnumerable<Assembly> assemblies = ReflectionHelpers.GetAllLoadedAssemblies();
-            foreach (Assembly assembly in assemblies)
-            {
-                if (assembly == null || assembly.IsDynamic)
-                {
-                    continue;
-                }
-
-                Type type = assembly.GetType(fullName, false);
-                if (type != null)
-                {
-                    return type;
-                }
-            }
-
-            return null;
         }
 
         private static string ExtractFullName(string assemblyQualifiedName)

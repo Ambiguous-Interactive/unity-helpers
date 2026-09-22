@@ -358,7 +358,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         }
 
         [Test]
-        public void ResolvingKnownTypeDoesNotBuildDescriptorCatalog()
+        public void ResolvingSimpleTypesDoesNotBuildDescriptorCatalog()
         {
             IReadOnlyList<string> original = SerializableTypeCatalog.GetActiveIgnorePatterns();
             bool wasConfigured = !ReferenceEquals(
@@ -379,6 +379,16 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 );
 
                 Assert.AreSame(typeof(SerializableType), resolved);
+                Assert.IsFalse(SerializableTypeCatalog.IsDescriptorCacheInitializedForTesting);
+
+                Type missing = SerializableTypeCatalog.Resolve(MissingTypeName);
+                Assert.IsTrue(missing == null);
+                Assert.IsFalse(SerializableTypeCatalog.IsDescriptorCacheInitializedForTesting);
+
+                Type moved = SerializableTypeCatalog.Resolve(
+                    $"{typeof(SerializableType).FullName}, MissingAssembly"
+                );
+                Assert.AreSame(typeof(SerializableType), moved);
                 Assert.IsFalse(SerializableTypeCatalog.IsDescriptorCacheInitializedForTesting);
             }
             finally

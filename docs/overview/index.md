@@ -382,7 +382,7 @@ Alphabetical index of all Unity Helpers features with quick links to documentati
 **SerializableNullable** - Unity-friendly nullable value wrapper
 → [Serialization Types](../features/serialization/serialization-types.md#serializablenullable)
 
-**SerializableType** - Type reference that survives refactoring
+**SerializableType** - Type reference with assembly-move recovery for non-generic types
 → [Serialization Types](../features/serialization/serialization-types.md#serializabletype)
 
 **Singletons** - Runtime and ScriptableObject singleton patterns
