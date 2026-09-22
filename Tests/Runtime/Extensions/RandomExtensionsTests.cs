@@ -1101,6 +1101,79 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
         }
 
         [Test]
+        public void NextSubsetFromKnownSizeNonListPreservesSnapshotAndRandomStream()
+        {
+            Queue<int> source = new(new[] { 11, 22, 33, 44, 55 });
+            Assert.IsFalse(source is IReadOnlyList<int>);
+
+            SystemRandom random = new(5);
+            SystemRandom control = new(5);
+            IEnumerable<int> subset = random.NextSubset(source, 3);
+
+            source.Clear();
+            source.Enqueue(-1);
+
+            int[] expected = control.NextSubset(new[] { 11, 22, 33, 44, 55 }, 3).ToArray();
+            CollectionAssert.AreEqual(expected, subset.ToArray());
+            Assert.AreEqual(control.Next(), random.Next());
+        }
+
+        [Test]
+        public void NextSubsetFromKnownSizeNonListRejectsOversizedCount()
+        {
+            Queue<int> source = new(new[] { 11, 22 });
+            SystemRandom random = new(5);
+
+            Assert.Throws<ArgumentException>(() => random.NextSubset(source, 3));
+        }
+
+        [Test]
+        public void NextSubsetFromHashSetPreservesCopyOrderAndRandomStream()
+        {
+            HashSet<int> source = new() { 11, 22, 33, 44, 55 };
+            SystemRandom random = new(5);
+            SystemRandom control = new(5);
+
+            IEnumerable<int> subset = random.NextSubset(source, 3);
+            int[] sourceCopy = new int[source.Count];
+            source.CopyTo(sourceCopy);
+            int[] expected = control.NextSubset(sourceCopy, 3).ToArray();
+
+            CollectionAssert.AreEqual(expected, subset.ToArray());
+            Assert.AreEqual(control.Next(), random.Next());
+        }
+
+        [Test]
+        public void NextSubsetFromLinkedListPreservesSnapshotAndRandomStream()
+        {
+            LinkedList<int> source = new(new[] { 11, 22, 33, 44, 55 });
+            Assert.IsFalse(source is IReadOnlyList<int>);
+
+            SystemRandom random = new(5);
+            SystemRandom control = new(5);
+            IEnumerable<int> subset = random.NextSubset(source, 3);
+
+            source.Clear();
+            source.AddLast(-1);
+
+            int[] expected = control.NextSubset(new[] { 11, 22, 33, 44, 55 }, 3).ToArray();
+            CollectionAssert.AreEqual(expected, subset.ToArray());
+            Assert.AreEqual(control.Next(), random.Next());
+        }
+
+        [Test]
+        public void NextSubsetIgnoresUntrustedCollectionCount()
+        {
+            SystemRandom random = new(5);
+            IEnumerable<int> subset = random.NextSubset(new InflatedCountCollection(), 2);
+
+            int[] result = subset.ToArray();
+
+            Assert.AreEqual(2, result.Length);
+            CollectionAssert.IsSubsetOf(result, new[] { 11, 22, 33 });
+        }
+
+        [Test]
         public void NextSubsetNegativeCountThrows()
         {
             SystemRandom rng = new(5);
@@ -1329,6 +1402,49 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
 
             Bounds flat = new(new Vector3(1f, 2f, 3f), new Vector3(4f, 0f, 4f));
             Assert.AreEqual(flat.center, rng.NextVector3InBounds(flat));
+        }
+
+        private sealed class InflatedCountCollection : ICollection<int>
+        {
+            public int Count => int.MaxValue;
+            public bool IsReadOnly => true;
+
+            public IEnumerator<int> GetEnumerator()
+            {
+                yield return 11;
+                yield return 22;
+                yield return 33;
+            }
+
+            public void CopyTo(int[] array, int arrayIndex)
+            {
+                throw new InvalidOperationException();
+            }
+
+            public void Add(int item)
+            {
+                throw new NotSupportedException();
+            }
+
+            public void Clear()
+            {
+                throw new NotSupportedException();
+            }
+
+            public bool Contains(int item)
+            {
+                return item == 11 || item == 22 || item == 33;
+            }
+
+            public bool Remove(int item)
+            {
+                throw new NotSupportedException();
+            }
+
+            System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+            {
+                return GetEnumerator();
+            }
         }
     }
 }
