@@ -438,6 +438,43 @@ you ship at and you want the bigger pixels baked into the file rather than paid 
    resizing the loaded texture, reading pixel data, or changing importer settings.
 5. Clear **Dry Run** and click **Resize** for real.
 
+Editor scripts can call `TextureResizerAPI.TryResizeTextures` with selected textures, source
+asset-folder paths, sizing settings, an optional output asset-folder path, and a dry-run flag. The
+call does not open a window or ask for input. It returns `false` for invalid settings, a destination
+collision, a failed resize, a failed importer restore, or cancellation. Pass `null` for the output
+folder to overwrite the source PNGs; an empty string is invalid. For example, this Editor script
+previews one asset folder:
+
+<!-- doc-sample: compiles-editor -->
+
+```csharp
+using WallstopStudios.UnityHelpers.Editor.Sprites;
+
+public static class TextureResizeExample
+{
+    public static bool Preview()
+    {
+        return TextureResizerAPI.TryResizeTextures(
+            null,
+            new[] { "Assets/Art/Sprites" },
+            1,
+            TextureResizerWizard.ResizeAlgorithm.Point,
+            100,
+            1f,
+            1f,
+            "Assets/Art/Resized",
+            true
+        );
+    }
+}
+```
+
+Invalid source or output folders are rejected before any texture changes. Overwrite mode accepts
+only textures under `Assets/`; package textures can be copied into an explicit `Assets/` output
+folder. The dry run reports target sizes without changing files or importer settings. A real run
+writes PNG files, so Unity Undo cannot fully reverse it. A failed or canceled run may leave earlier
+textures resized.
+
 **Before you run it:**
 
 - Only `.png` files are processed; anything else is counted as skipped.

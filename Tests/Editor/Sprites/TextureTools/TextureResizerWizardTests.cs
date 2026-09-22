@@ -4,7 +4,9 @@
 namespace WallstopStudios.UnityHelpers.Tests.Sprites
 {
 #if UNITY_EDITOR
+    using System.Collections;
     using System.IO;
+    using System.Collections.Generic;
     using System.Text.RegularExpressions;
     using NUnit.Framework;
     using UnityEditor;
@@ -24,6 +26,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
     {
         private const string Root = "Assets/Temp/TextureResizerWizardTests";
         private const string OutRoot = "Assets/Temp/TextureResizerWizardTests/Out";
+        private const string PackageTexturePath =
+            "Packages/com.wallstop-studios.unity-helpers/docs/images/editor-tools/texture-resizer.png";
 
         private static string RelToFull(string rel)
         {
@@ -98,6 +102,212 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         }
 
         [Test]
+        public void DirectApiDryRunLeavesSourceAndImporterUnchanged()
+        {
+            string path = Path.Combine(Root, "direct-dry.png").SanitizePath();
+            CreatePng(path, 10, 6, Color.white);
+            AssetDatabaseBatchHelper.RefreshIfNotBatching();
+            Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+            Assert.IsTrue(texture != null);
+            Assert.IsTrue(importer != null);
+            byte[] originalBytes = File.ReadAllBytes(RelToFull(path));
+            bool originalReadable = importer.isReadable;
+            List<Texture2D> selected = new() { texture };
+
+            bool succeeded = TextureResizerAPI.TryResizeTextures(
+                selected,
+                null,
+                1,
+                TextureResizerWizard.ResizeAlgorithm.Point,
+                1,
+                1f,
+                1f,
+                null,
+                true
+            );
+
+            Assert.IsTrue(succeeded);
+            Assert.That(selected, Has.Count.EqualTo(1));
+            Assert.That(selected[0], Is.SameAs(texture));
+            Assert.That(texture.width, Is.EqualTo(10));
+            Assert.That(texture.height, Is.EqualTo(6));
+            Assert.That(importer.isReadable, Is.EqualTo(originalReadable));
+            CollectionAssert.AreEqual(originalBytes, File.ReadAllBytes(RelToFull(path)));
+
+            succeeded = TextureResizerAPI.TryResizeTextures(
+                new InflatedTextureCollection(texture),
+                null,
+                1,
+                TextureResizerWizard.ResizeAlgorithm.Point,
+                1,
+                1f,
+                1f,
+                null,
+                true
+            );
+            Assert.IsTrue(succeeded);
+            CollectionAssert.AreEqual(originalBytes, File.ReadAllBytes(RelToFull(path)));
+        }
+
+        [Test]
+        public void DirectApiFindsFolderTexturesAndWritesToOutputFolder()
+        {
+            string sourcePath = Path.Combine(Root, "direct-folder", "found.png").SanitizePath();
+            CreatePng(sourcePath, 8, 4, Color.red);
+            AssetDatabaseBatchHelper.RefreshIfNotBatching();
+            byte[] originalBytes = File.ReadAllBytes(RelToFull(sourcePath));
+
+            bool succeeded = TextureResizerAPI.TryResizeTextures(
+                null,
+                new[] { Path.GetDirectoryName(sourcePath).SanitizePath() },
+                1,
+                TextureResizerWizard.ResizeAlgorithm.Point,
+                1,
+                1f,
+                1f,
+                OutRoot,
+                false
+            );
+
+            Assert.IsTrue(succeeded);
+            AssetDatabaseBatchHelper.RefreshIfNotBatching();
+            Texture2D output = AssetDatabase.LoadAssetAtPath<Texture2D>(
+                Path.Combine(OutRoot, "found.png").SanitizePath()
+            );
+            Assert.IsTrue(output != null);
+            Assert.That(output.width, Is.EqualTo(16));
+            Assert.That(output.height, Is.EqualTo(8));
+            CollectionAssert.AreEqual(originalBytes, File.ReadAllBytes(RelToFull(sourcePath)));
+        }
+
+        [Test]
+        public void DirectApiRejectsInvalidOutputFolderBeforeWriting()
+        {
+            string sourcePath = Path.Combine(Root, "direct-invalid-output.png").SanitizePath();
+            CreatePng(sourcePath, 8, 4, Color.blue);
+            AssetDatabaseBatchHelper.RefreshIfNotBatching();
+            byte[] originalBytes = File.ReadAllBytes(RelToFull(sourcePath));
+            Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(sourcePath);
+
+            LogAssert.Expect(LogType.Error, new Regex("The output folder is invalid"));
+            bool succeeded = TextureResizerAPI.TryResizeTextures(
+                new[] { texture },
+                null,
+                1,
+                TextureResizerWizard.ResizeAlgorithm.Point,
+                1,
+                1f,
+                1f,
+                Path.Combine(Root, "missing").SanitizePath(),
+                false
+            );
+
+            Assert.IsFalse(succeeded);
+            CollectionAssert.AreEqual(originalBytes, File.ReadAllBytes(RelToFull(sourcePath)));
+
+            foreach (string invalidOutput in new[] { string.Empty, " " })
+            {
+                LogAssert.Expect(LogType.Error, new Regex("The output folder is invalid"));
+                succeeded = TextureResizerAPI.TryResizeTextures(
+                    new[] { texture },
+                    null,
+                    1,
+                    TextureResizerWizard.ResizeAlgorithm.Point,
+                    1,
+                    1f,
+                    1f,
+                    invalidOutput,
+                    false
+                );
+                Assert.IsFalse(succeeded);
+                CollectionAssert.AreEqual(originalBytes, File.ReadAllBytes(RelToFull(sourcePath)));
+            }
+        }
+
+        [Test]
+        public void DirectApiRejectsInvalidSourceFolderBeforeWriting()
+        {
+            string sourcePath = Path.Combine(Root, "direct-invalid-source.png").SanitizePath();
+            CreatePng(sourcePath, 8, 4, Color.blue);
+            AssetDatabaseBatchHelper.RefreshIfNotBatching();
+            byte[] originalBytes = File.ReadAllBytes(RelToFull(sourcePath));
+            Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(sourcePath);
+
+            LogAssert.Expect(LogType.Error, new Regex("The source folder is invalid"));
+            bool succeeded = TextureResizerAPI.TryResizeTextures(
+                new[] { texture },
+                new[] { Path.Combine(Root, "missing").SanitizePath() },
+                1,
+                TextureResizerWizard.ResizeAlgorithm.Point,
+                1,
+                1f,
+                1f,
+                null,
+                false
+            );
+
+            Assert.IsFalse(succeeded);
+            CollectionAssert.AreEqual(originalBytes, File.ReadAllBytes(RelToFull(sourcePath)));
+        }
+
+        [Test]
+        public void DirectApiRejectsPackageOverwriteBeforeChangingAssetTextures()
+        {
+            string sourcePath = Path.Combine(Root, "direct-package-guard.png").SanitizePath();
+            CreatePng(sourcePath, 8, 4, Color.green);
+            AssetDatabaseBatchHelper.RefreshIfNotBatching();
+            byte[] originalBytes = File.ReadAllBytes(RelToFull(sourcePath));
+            Texture2D sourceTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(sourcePath);
+            Texture2D packageTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(PackageTexturePath);
+            Assert.IsTrue(
+                packageTexture != null,
+                "Package texture must be imported for this guard test"
+            );
+
+            LogAssert.Expect(LogType.Error, new Regex("Cannot overwrite a texture outside Assets"));
+            bool succeeded = TextureResizerAPI.TryResizeTextures(
+                new[] { sourceTexture, packageTexture },
+                null,
+                1,
+                TextureResizerWizard.ResizeAlgorithm.Point,
+                1,
+                1f,
+                1f,
+                null,
+                false
+            );
+
+            Assert.IsFalse(succeeded);
+            CollectionAssert.AreEqual(originalBytes, File.ReadAllBytes(RelToFull(sourcePath)));
+        }
+
+        [Test]
+        public void DirectApiCapsVeryLargePassCountDuringDryRun()
+        {
+            string sourcePath = Path.Combine(Root, "many-passes.png").SanitizePath();
+            CreatePng(sourcePath, 2, 2, Color.green);
+            AssetDatabaseBatchHelper.RefreshIfNotBatching();
+            byte[] originalBytes = File.ReadAllBytes(RelToFull(sourcePath));
+            Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(sourcePath);
+
+            bool succeeded = TextureResizerAPI.TryResizeTextures(
+                new[] { texture },
+                null,
+                int.MaxValue,
+                TextureResizerWizard.ResizeAlgorithm.Point,
+                1,
+                1f,
+                1f,
+                null,
+                true
+            );
+
+            Assert.IsTrue(succeeded);
+            CollectionAssert.AreEqual(originalBytes, File.ReadAllBytes(RelToFull(sourcePath)));
+        }
+
+        [Test]
         public void DoesNothingWhenNumResizesIsZero()
         {
             string path = Path.Combine(Root, "nochange.png").SanitizePath();
@@ -116,6 +326,20 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
             Assert.That(tex.width, Is.EqualTo(w0), "Width should remain unchanged");
             Assert.That(tex.height, Is.EqualTo(h0), "Height should remain unchanged");
+
+            LogAssert.Expect(LogType.Error, new Regex("Resize settings produce an invalid"));
+            bool succeeded = TextureResizerAPI.TryResizeTextures(
+                new[] { tex },
+                null,
+                0,
+                TextureResizerWizard.ResizeAlgorithm.Point,
+                1,
+                1f,
+                1f,
+                null,
+                true
+            );
+            Assert.IsFalse(succeeded);
         }
 
         [Test]
@@ -323,6 +547,40 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             t.Apply();
             byte[] data = t.EncodeToPNG();
             File.WriteAllBytes(RelToFull(relPath), data);
+        }
+
+        private sealed class InflatedTextureCollection
+            : ICollection<Texture2D>,
+                IReadOnlyCollection<Texture2D>
+        {
+            public int Count => 100000;
+
+            public bool IsReadOnly => true;
+
+            private readonly Texture2D texture;
+
+            public InflatedTextureCollection(Texture2D texture)
+            {
+                this.texture = texture;
+            }
+
+            public void Add(Texture2D item) => throw new System.NotSupportedException();
+
+            public void Clear() => throw new System.NotSupportedException();
+
+            public bool Contains(Texture2D item) => item == texture;
+
+            public void CopyTo(Texture2D[] array, int arrayIndex) =>
+                throw new System.NotSupportedException();
+
+            public IEnumerator<Texture2D> GetEnumerator()
+            {
+                yield return texture;
+            }
+
+            public bool Remove(Texture2D item) => throw new System.NotSupportedException();
+
+            IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
         }
     }
 #endif
