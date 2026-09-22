@@ -90,8 +90,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             out int height
         )
         {
-            width = startWidth;
-            height = startHeight;
             if (
                 startWidth <= 0
                 || startHeight <= 0
@@ -105,28 +103,41 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 || float.IsInfinity(heightMultiplier)
             )
             {
+                width = startWidth;
+                height = startHeight;
                 return false;
             }
 
+            int candidateWidth = startWidth;
+            int candidateHeight = startHeight;
             for (int i = 0; i < passes; ++i)
             {
-                double extraWidth = Math.Round(width / (pixelsPerUnit * widthMultiplier));
-                double extraHeight = Math.Round(height / (pixelsPerUnit * heightMultiplier));
+                double extraWidth = Math.Round(candidateWidth / (pixelsPerUnit * widthMultiplier));
+                double extraHeight = Math.Round(
+                    candidateHeight / (pixelsPerUnit * heightMultiplier)
+                );
 
                 if (extraWidth == 0d && extraHeight == 0d)
                 {
                     break;
                 }
 
-                if (int.MaxValue - width < extraWidth || int.MaxValue - height < extraHeight)
+                if (
+                    int.MaxValue - candidateWidth < extraWidth
+                    || int.MaxValue - candidateHeight < extraHeight
+                )
                 {
+                    width = candidateWidth;
+                    height = candidateHeight;
                     return false;
                 }
 
-                width += (int)extraWidth;
-                height += (int)extraHeight;
+                candidateWidth += (int)extraWidth;
+                candidateHeight += (int)extraHeight;
             }
 
+            width = candidateWidth;
+            height = candidateHeight;
             return true;
         }
 

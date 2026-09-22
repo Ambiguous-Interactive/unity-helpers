@@ -125,9 +125,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             string competingSummaryPath = null
         )
         {
-            owner = string.Empty;
             if (string.IsNullOrEmpty(summaryPath))
             {
+                owner = string.Empty;
                 return false;
             }
 
@@ -149,6 +149,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     )
                 )
                 {
+                    owner = string.Empty;
                     return false;
                 }
 
@@ -160,6 +161,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 );
                 if (!DurableFile.TryWriteAllText(summaryPath, marker, out _))
                 {
+                    owner = string.Empty;
                     return false;
                 }
 
@@ -168,6 +170,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
             catch (Exception)
             {
+                owner = string.Empty;
                 return false;
             }
         }
@@ -275,9 +278,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// <returns><c>true</c> when the first line is a running marker with an owner.</returns>
         internal static bool TryReadOwner(string summaryPath, out string owner)
         {
-            owner = string.Empty;
             if (string.IsNullOrEmpty(summaryPath))
             {
+                owner = string.Empty;
                 return false;
             }
 
@@ -285,11 +288,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             {
                 foreach (string line in File.ReadLines(summaryPath))
                 {
-                    return TestRunSummaryFormatter.IsRunningLine(line)
-                        && TestRunSummaryFormatter.TryParseOwner(line, out owner);
+                    string parsedOwner = string.Empty;
+                    bool success =
+                        TestRunSummaryFormatter.IsRunningLine(line)
+                        && TestRunSummaryFormatter.TryParseOwner(line, out parsedOwner);
+                    owner = success ? parsedOwner : string.Empty;
+                    return success;
                 }
             }
             catch (Exception) { }
+            owner = string.Empty;
             return false;
         }
 
