@@ -55,6 +55,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
 
             return process.ExitCode;
         }
+
+        private static void WriteStagingOwnershipProbe(string scriptPath)
+        {
+            File.WriteAllText(
+                scriptPath,
+                "param([string]$Path)\n"
+                    + "try {\n"
+                    + "  $stream = [System.IO.FileStream]::new(($Path + '.lock'), [System.IO.FileMode]::OpenOrCreate, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::Read)\n"
+                    + "  $stream.WriteByte(88)\n"
+                    + "  $stream.Dispose()\n"
+                    + "  exit 0\n"
+                    + "} catch {\n"
+                    + "  exit 23\n"
+                    + "}\n"
+            );
+        }
 #endif
 
         [SetUp]
@@ -521,22 +537,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.AreEqual(23, childExitCode, "The second process must not acquire staging.");
             Assert.AreEqual("writer A document", File.ReadAllText(path));
             Assert.IsFalse(File.Exists(path + DurableFile.TemporarySuffix));
-        }
-
-        private static void WriteStagingOwnershipProbe(string scriptPath)
-        {
-            File.WriteAllText(
-                scriptPath,
-                "param([string]$Path)\n"
-                    + "try {\n"
-                    + "  $stream = [System.IO.FileStream]::new(($Path + '.lock'), [System.IO.FileMode]::OpenOrCreate, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::Read)\n"
-                    + "  $stream.WriteByte(88)\n"
-                    + "  $stream.Dispose()\n"
-                    + "  exit 0\n"
-                    + "} catch {\n"
-                    + "  exit 23\n"
-                    + "}\n"
-            );
         }
 #endif
 

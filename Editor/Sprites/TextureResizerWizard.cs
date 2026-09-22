@@ -48,6 +48,37 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     /// </example>
     public sealed class TextureResizerWizard : ScriptableWizard
     {
+        public List<Texture2D> textures = new();
+
+        [FormerlySerializedAs("animationSources")]
+        [Tooltip(
+            "Drag a folder from Unity here to apply the configuration to all textures under it. No textures are modified if no directories are provided."
+        )]
+        public List<Object> textureSourcePaths = new();
+
+        public int numResizes = 1;
+
+        [Tooltip("Resize algorithm to use for scaling.")]
+        public ResizeAlgorithm scalingResizeAlgorithm = ResizeAlgorithm.Bilinear;
+
+        public int pixelsPerUnit = 100;
+        public float widthMultiplier = 0.54f;
+        public float heightMultiplier = 0.245f;
+
+        [Tooltip("If true, only simulates the operation without writing files.")]
+        public bool dryRun;
+
+        [Tooltip(
+            "Optional output folder (Unity project relative). If set, resized PNGs are written here instead of overwriting originals."
+        )]
+        public DefaultAsset outputFolder;
+
+        [MenuItem("Tools/Wallstop Studios/Unity Helpers/Texture Resizer")]
+        public static void ResizeTextures()
+        {
+            _ = DisplayWizard<TextureResizerWizard>("Texture Resizer", "Resize");
+        }
+
         private static bool TryComputeFinalSize(
             int startWidth,
             int startHeight,
@@ -97,37 +128,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             return true;
-        }
-
-        public List<Texture2D> textures = new();
-
-        [FormerlySerializedAs("animationSources")]
-        [Tooltip(
-            "Drag a folder from Unity here to apply the configuration to all textures under it. No textures are modified if no directories are provided."
-        )]
-        public List<Object> textureSourcePaths = new();
-
-        public int numResizes = 1;
-
-        [Tooltip("Resize algorithm to use for scaling.")]
-        public ResizeAlgorithm scalingResizeAlgorithm = ResizeAlgorithm.Bilinear;
-
-        public int pixelsPerUnit = 100;
-        public float widthMultiplier = 0.54f;
-        public float heightMultiplier = 0.245f;
-
-        [Tooltip("If true, only simulates the operation without writing files.")]
-        public bool dryRun;
-
-        [Tooltip(
-            "Optional output folder (Unity project relative). If set, resized PNGs are written here instead of overwriting originals."
-        )]
-        public DefaultAsset outputFolder;
-
-        [MenuItem("Tools/Wallstop Studios/Unity Helpers/Texture Resizer")]
-        public static void ResizeTextures()
-        {
-            _ = DisplayWizard<TextureResizerWizard>("Texture Resizer", "Resize");
         }
 
         private static string ToFullPath(string assetPath)
