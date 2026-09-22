@@ -31,6 +31,20 @@ public void GetItems(List<Item> result)
 }
 ```
 
+The same ownership rule applies to callback payloads. A handler may keep an `IReadOnlyList<T>`
+property after the callback returns. Pool the list used to collect results, then copy into a
+durable array only when building a callback payload that can escape. Reuse that array for other
+callbacks of the same payload kind in the same batch. Keep a context's snapshot separate from a
+mutable array passed to a different callback signature, so one handler cannot change another
+handler's retained context. Never put a pooled list or array into a context that consumers may
+retain.
+
+Move cheap refusal checks ahead of leases and exact-size arrays. For example, check that an asset
+search filter is present before collecting folders for `AssetDatabase.FindAssets`. Reuse a batch's
+folder array across watchers when they search the same paths, while keeping each watcher's
+type-specific result separate. Unity APIs that receive `string[]` need the exact folder count;
+a variable-size array pool may return a larger array with stale trailing entries.
+
 ---
 
 ## StringBuilder Pooling

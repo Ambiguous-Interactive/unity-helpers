@@ -367,18 +367,25 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             }
 
             bool handledChange = false;
+            string[] importedSearchFolders = null;
+            string[] movedSearchFolders = null;
             foreach (AssetWatcher watcher in WatchersByAssetType.Values)
             {
-                List<string> createdPaths = CollectCreatedAssets(
+                using PooledResource<List<string>> createdPathsLease = Buffers<string>.List.Get(
+                    out List<string> createdPaths
+                );
+                using PooledResource<List<string>> deletedPathsLease = Buffers<string>.List.Get(
+                    out List<string> deletedPaths
+                );
+                CollectCreatedAssets(
                     watcher,
                     importedAssets,
-                    movedAssets
+                    movedAssets,
+                    createdPaths,
+                    ref importedSearchFolders,
+                    ref movedSearchFolders
                 );
-                List<string> deletedPaths = CollectDeletedAssets(
-                    watcher,
-                    deletedAssets,
-                    movedFromAssetPaths
-                );
+                CollectDeletedAssets(watcher, deletedAssets, movedFromAssetPaths, deletedPaths);
 
                 AssetChangeFlags triggeredFlags = AssetChangeFlags.None;
                 if (0 < createdPaths.Count)
@@ -398,29 +405,44 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
 
                 handledChange = true;
                 List<UnityEngine.Object> createdAssetInstances = null;
+                PooledResource<List<UnityEngine.Object>> createdAssetInstancesLease = default;
                 Dictionary<Type, Array> createdAssetArrays = null;
+                PooledResource<Dictionary<Type, Array>> createdAssetArraysLease = default;
+                string[] createdPathsArray = null;
+                string[] deletedPathsContextArray = null;
                 string[] deletedPathsArray = null;
-
-                foreach (MethodSubscription subscription in watcher.Subscriptions)
+                try
                 {
-                    AssetChangeFlags relevant = subscription._flags & triggeredFlags;
-                    if (relevant == AssetChangeFlags.None)
+                    foreach (MethodSubscription subscription in watcher.Subscriptions)
                     {
-                        continue;
+                        AssetChangeFlags relevant = subscription._flags & triggeredFlags;
+                        if (relevant == AssetChangeFlags.None)
+                        {
+                            continue;
+                        }
+
+                        object[] args = BuildInvocationArguments(
+                            subscription,
+                            watcher.AssetType,
+                            relevant,
+                            createdPaths,
+                            deletedPaths,
+                            ref createdAssetInstances,
+                            ref createdAssetInstancesLease,
+                            ref createdAssetArrays,
+                            ref createdAssetArraysLease,
+                            ref createdPathsArray,
+                            ref deletedPathsContextArray,
+                            ref deletedPathsArray
+                        );
+
+                        InvokeSubscription(subscription, args);
                     }
-
-                    object[] args = BuildInvocationArguments(
-                        subscription,
-                        watcher.AssetType,
-                        relevant,
-                        createdPaths,
-                        deletedPaths,
-                        ref createdAssetInstances,
-                        ref createdAssetArrays,
-                        ref deletedPathsArray
-                    );
-
-                    InvokeSubscription(subscription, args);
+                }
+                finally
+                {
+                    createdAssetArraysLease.Dispose();
+                    createdAssetInstancesLease.Dispose();
                 }
 
                 if (0 < createdPaths.Count)
@@ -450,7 +472,11 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             IReadOnlyList<string> createdPaths,
             IReadOnlyList<string> deletedPaths,
             ref List<UnityEngine.Object> createdAssetInstances,
+            ref PooledResource<List<UnityEngine.Object>> createdAssetInstancesLease,
             ref Dictionary<Type, Array> createdAssetArrays,
+            ref PooledResource<Dictionary<Type, Array>> createdAssetArraysLease,
+            ref string[] createdPathsArray,
+            ref string[] deletedPathsContextArray,
             ref string[] deletedPathsArray
         )
         {
@@ -465,10 +491,10 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                             assetType,
                             relevantFlags,
                             relevantFlags.HasFlagNoAlloc(AssetChangeFlags.Created)
-                                ? createdPaths
+                                ? GetPathsArgument(createdPaths, ref createdPathsArray)
                                 : Array.Empty<string>(),
                             relevantFlags.HasFlagNoAlloc(AssetChangeFlags.Deleted)
-                                ? deletedPaths
+                                ? GetPathsArgument(deletedPaths, ref deletedPathsContextArray)
                                 : Array.Empty<string>()
                         ),
                     };
@@ -479,13 +505,15 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                             assetType,
                             createdPaths,
                             ref createdAssetInstances,
-                            ref createdAssetArrays
+                            ref createdAssetInstancesLease,
+                            ref createdAssetArrays,
+                            ref createdAssetArraysLease
                         )
                         : Array.CreateInstance(subscription._createdParameterElementType, 0);
                     string[] deletedArgument = relevantFlags.HasFlagNoAlloc(
                         AssetChangeFlags.Deleted
                     )
-                        ? GetDeletedPathsArgument(deletedPaths, ref deletedPathsArray)
+                        ? GetPathsArgument(deletedPaths, ref deletedPathsArray)
                         : Array.Empty<string>();
                     return new object[] { createdArgument, deletedArgument };
                 default:
@@ -498,7 +526,9 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             Type assetType,
             IReadOnlyList<string> createdPaths,
             ref List<UnityEngine.Object> createdAssetInstances,
-            ref Dictionary<Type, Array> createdAssetArrays
+            ref PooledResource<List<UnityEngine.Object>> createdAssetInstancesLease,
+            ref Dictionary<Type, Array> createdAssetArrays,
+            ref PooledResource<Dictionary<Type, Array>> createdAssetArraysLease
         )
         {
             if (createdPaths == null || createdPaths.Count == 0)
@@ -506,8 +536,20 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 return Array.CreateInstance(subscription._createdParameterElementType, 0);
             }
 
-            createdAssetInstances ??= LoadCreatedAssetInstances(assetType, createdPaths);
-            createdAssetArrays ??= new Dictionary<Type, Array>();
+            if (createdAssetInstances == null)
+            {
+                createdAssetInstancesLease = Buffers<UnityEngine.Object>.GetList(
+                    createdPaths.Count,
+                    out createdAssetInstances
+                );
+                LoadCreatedAssetInstances(assetType, createdPaths, createdAssetInstances);
+            }
+            if (createdAssetArrays == null)
+            {
+                createdAssetArraysLease = DictionaryBuffer<Type, Array>.Dictionary.Get(
+                    out createdAssetArrays
+                );
+            }
 
             if (
                 !createdAssetArrays.TryGetValue(
@@ -532,13 +574,13 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             return typedArray;
         }
 
-        private static List<UnityEngine.Object> LoadCreatedAssetInstances(
+        private static void LoadCreatedAssetInstances(
             Type assetType,
-            IReadOnlyList<string> createdPaths
+            IReadOnlyList<string> createdPaths,
+            List<UnityEngine.Object> instances
         )
         {
             int pathCount = createdPaths.Count;
-            List<UnityEngine.Object> instances = new(pathCount);
             Type loadType = typeof(UnityEngine.Object).IsAssignableFrom(assetType)
                 ? assetType
                 : typeof(UnityEngine.Object);
@@ -569,31 +611,29 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                     }
                 }
             }
-
-            return instances;
         }
 
-        private static string[] GetDeletedPathsArgument(
-            IReadOnlyList<string> deletedPaths,
-            ref string[] deletedPathsArray
+        private static string[] GetPathsArgument(
+            IReadOnlyList<string> paths,
+            ref string[] pathsArray
         )
         {
-            if (deletedPaths == null || deletedPaths.Count == 0)
+            if (paths == null || paths.Count == 0)
             {
                 return Array.Empty<string>();
             }
 
-            if (deletedPathsArray == null)
+            if (pathsArray == null)
             {
-                int pathCount = deletedPaths.Count;
-                deletedPathsArray = new string[pathCount];
+                int pathCount = paths.Count;
+                pathsArray = new string[pathCount];
                 for (int i = 0; i < pathCount; ++i)
                 {
-                    deletedPathsArray[i] = deletedPaths[i];
+                    pathsArray[i] = paths[i];
                 }
             }
 
-            return deletedPathsArray;
+            return pathsArray;
         }
 
         private static void InvokeSubscription(MethodSubscription subscription, object[] args)
@@ -654,8 +694,12 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             bool searchSceneObjects = false
         )
         {
-            HashSet<string> yieldedPaths = new(StringComparer.OrdinalIgnoreCase);
-            HashSet<long> yieldedInstanceIds = new();
+            using PooledResource<HashSet<string>> pathsLease = SetBuffers<string>
+                .GetHashSetPool(StringComparer.OrdinalIgnoreCase)
+                .Get(out HashSet<string> yieldedPaths);
+            using PooledResource<HashSet<long>> instanceIdsLease = Buffers<long>.HashSet.Get(
+                out HashSet<long> yieldedInstanceIds
+            );
 
             // Component handlers require explicit prefab or scene search flags; primary asset searches would bypass them.
             bool isComponentType = typeof(Component).IsAssignableFrom(declaringType);
@@ -757,7 +801,6 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 foreach (
                     UnityEngine.Object component in EnumeratePrefabComponents(
                         declaringType,
-                        yieldedPaths,
                         yieldedInstanceIds
                     )
                 )
@@ -809,7 +852,6 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
 
         private static IEnumerable<UnityEngine.Object> EnumeratePrefabComponents(
             Type declaringType,
-            HashSet<string> yieldedPaths,
             HashSet<long> yieldedInstanceIds
         )
         {
@@ -818,11 +860,6 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             {
                 string path = AssetDatabase.GUIDToAssetPath(prefabGuidsElement);
                 if (ShouldSkipPath(path))
-                {
-                    continue;
-                }
-
-                if (yieldedPaths.Contains(path))
                 {
                     continue;
                 }
@@ -891,22 +928,24 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             }
         }
 
-        private static List<string> CollectCreatedAssets(
+        private static void CollectCreatedAssets(
             AssetWatcher watcher,
             IReadOnlyList<string> importedAssets,
-            IReadOnlyList<string> movedAssets
+            IReadOnlyList<string> movedAssets,
+            List<string> buffer,
+            ref string[] importedSearchFolders,
+            ref string[] movedSearchFolders
         )
         {
-            List<string> buffer = new();
-            AppendCreatedAssets(watcher, importedAssets, buffer);
-            AppendCreatedAssets(watcher, movedAssets, buffer);
-            return buffer;
+            AppendCreatedAssets(watcher, importedAssets, buffer, ref importedSearchFolders);
+            AppendCreatedAssets(watcher, movedAssets, buffer, ref movedSearchFolders);
         }
 
         private static void AppendCreatedAssets(
             AssetWatcher watcher,
             IReadOnlyList<string> candidatePaths,
-            List<string> buffer
+            List<string> buffer,
+            ref string[] searchFolders
         )
         {
             if (candidatePaths == null)
@@ -941,6 +980,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                             watcher,
                             candidatePaths,
                             candidateCount,
+                            ref searchFolders,
                             ref matchingSubAssetGuids,
                             ref matchingGuidLease
                         )
@@ -980,6 +1020,7 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             AssetWatcher watcher,
             IReadOnlyList<string> candidatePaths,
             int candidateCount,
+            ref string[] searchFolders,
             ref HashSet<string> matchingGuids,
             ref PooledResource<HashSet<string>> matchingGuidLease
         )
@@ -989,45 +1030,22 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
                 return false;
             }
 
+            if (string.IsNullOrEmpty(watcher.SubAssetSearchFilter))
+            {
+                return false;
+            }
+
+            searchFolders ??= CollectSearchFolders(candidatePaths, candidateCount);
+            if (searchFolders.Length == 0)
+            {
+                return false;
+            }
+
             if (matchingGuids == null)
             {
                 matchingGuidLease = SetBuffers<string>
                     .GetHashSetPool(StringComparer.OrdinalIgnoreCase)
                     .Get(out matchingGuids);
-                using PooledResource<HashSet<string>> folderLease = SetBuffers<string>
-                    .GetHashSetPool(StringComparer.OrdinalIgnoreCase)
-                    .Get(out HashSet<string> folders);
-                for (int i = 0; i < candidateCount; ++i)
-                {
-                    string candidate = candidatePaths[i];
-                    if (
-                        string.IsNullOrWhiteSpace(candidate)
-                        || IsScenePath(candidate)
-                        || IsPrefabPath(candidate)
-                    )
-                    {
-                        continue;
-                    }
-
-                    int separator = candidate.LastIndexOf('/');
-                    if (0 < separator)
-                    {
-                        folders.Add(candidate.Substring(0, separator));
-                    }
-                }
-
-                if (folders.Count == 0)
-                {
-                    return false;
-                }
-
-                string[] searchFolders = new string[folders.Count];
-                folders.CopyTo(searchFolders);
-                if (string.IsNullOrEmpty(watcher.SubAssetSearchFilter))
-                {
-                    return false;
-                }
-
                 string[] foundGuids = AssetDatabase.FindAssets(
                     watcher.SubAssetSearchFilter,
                     searchFolders
@@ -1042,16 +1060,52 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
             return !string.IsNullOrEmpty(guid) && matchingGuids.Contains(guid);
         }
 
-        private static List<string> CollectDeletedAssets(
-            AssetWatcher watcher,
-            IReadOnlyList<string> deletedAssets,
-            IReadOnlyList<string> movedFromAssetPaths
+        private static string[] CollectSearchFolders(
+            IReadOnlyList<string> candidatePaths,
+            int candidateCount
         )
         {
-            List<string> buffer = new();
+            using PooledResource<HashSet<string>> folderLease = SetBuffers<string>
+                .GetHashSetPool(StringComparer.OrdinalIgnoreCase)
+                .Get(out HashSet<string> folders);
+            for (int i = 0; i < candidateCount; ++i)
+            {
+                string candidate = candidatePaths[i];
+                if (
+                    string.IsNullOrWhiteSpace(candidate)
+                    || IsScenePath(candidate)
+                    || IsPrefabPath(candidate)
+                )
+                {
+                    continue;
+                }
+
+                int separator = candidate.LastIndexOf('/');
+                if (0 < separator)
+                {
+                    folders.Add(candidate.Substring(0, separator));
+                }
+            }
+
+            if (folders.Count == 0)
+            {
+                return Array.Empty<string>();
+            }
+
+            string[] searchFolders = new string[folders.Count];
+            folders.CopyTo(searchFolders);
+            return searchFolders;
+        }
+
+        private static void CollectDeletedAssets(
+            AssetWatcher watcher,
+            IReadOnlyList<string> deletedAssets,
+            IReadOnlyList<string> movedFromAssetPaths,
+            List<string> buffer
+        )
+        {
             AppendDeletedAssets(watcher, deletedAssets, buffer);
             AppendDeletedAssets(watcher, movedFromAssetPaths, buffer);
-            return buffer;
         }
 
         private static void AppendDeletedAssets(

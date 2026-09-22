@@ -165,6 +165,66 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
         }
 
         [Test]
+        public void CreatedPathsRemainStableAfterLaterChangeBatch()
+        {
+            CreatePayloadAssetAt(PayloadPath);
+            CreatePayloadAssetAt(AlternatePayloadPath);
+            ClearTestState();
+
+            DetectAssetChangeProcessor.ProcessChangesForTesting(
+                new[] { PayloadPath },
+                null,
+                null,
+                null
+            );
+
+            Assert.AreEqual(1, TestDetectAssetChangeHandler.RecordedContexts.Count);
+            AssetChangeContext firstContext = TestDetectAssetChangeHandler.RecordedContexts[0];
+            CollectionAssert.AreEqual(new[] { PayloadPath }, firstContext.CreatedAssetPaths);
+
+            DetectAssetChangeProcessor.ProcessChangesForTesting(
+                new[] { AlternatePayloadPath },
+                null,
+                null,
+                null
+            );
+
+            Assert.AreEqual(2, TestDetectAssetChangeHandler.RecordedContexts.Count);
+            CollectionAssert.AreEqual(new[] { PayloadPath }, firstContext.CreatedAssetPaths);
+            CollectionAssert.AreEqual(
+                new[] { AlternatePayloadPath },
+                TestDetectAssetChangeHandler.RecordedContexts[1].CreatedAssetPaths
+            );
+        }
+
+        [Test]
+        public void DeletedContextPathsAreIndependentFromDetailedHandlerArray()
+        {
+            CreatePayloadAssetAt(PayloadPath);
+            ClearTestState();
+            DetectAssetChangeProcessor.ProcessChangesForTesting(
+                new[] { PayloadPath },
+                null,
+                null,
+                null
+            );
+            ClearTestState();
+
+            DetectAssetChangeProcessor.ProcessChangesForTesting(
+                null,
+                new[] { PayloadPath },
+                null,
+                null
+            );
+
+            Assert.AreEqual(1, TestDetectAssetChangeHandler.RecordedContexts.Count);
+            Assert.AreEqual(1, TestDetailedSignatureHandler.LastDeletedPaths.Length);
+            AssetChangeContext context = TestDetectAssetChangeHandler.RecordedContexts[0];
+            TestDetailedSignatureHandler.LastDeletedPaths[0] = AlternatePayloadPath;
+            CollectionAssert.AreEqual(new[] { PayloadPath }, context.DeletedAssetPaths);
+        }
+
+        [Test]
         public void InheritedHandlerOverrideIsRegistered()
         {
             Assert.IsTrue(
