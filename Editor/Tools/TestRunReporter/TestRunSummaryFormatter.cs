@@ -55,6 +55,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         internal const string ModeKey = "mode";
 
         /// <summary>
+        ///     The key naming the run that owns an in-flight marker.
+        /// </summary>
+        internal const string OwnerKey = "owner";
+
+        /// <summary>
         ///     The key naming an assembly or a test case.
         /// </summary>
         internal const string NameKey = "name";
@@ -122,8 +127,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// </summary>
         /// <param name="mode">The test mode the run covers.</param>
         /// <param name="startedUtc">When the run was started.</param>
+        /// <param name="owner">The unique run ownership token.</param>
         /// <returns>A single terminated line.</returns>
-        internal static string FormatRunningMarker(TestMode mode, DateTime startedUtc)
+        internal static string FormatRunningMarker(TestMode mode, DateTime startedUtc, string owner)
         {
             StringBuilder builder = new(96);
             builder.Append(SummaryPrefix);
@@ -131,6 +137,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             builder.Append(RunningToken);
             AppendField(builder, StartedKey, FormatTimestamp(startedUtc));
             AppendField(builder, ModeKey, mode.ToString());
+            AppendField(builder, OwnerKey, owner);
             builder.Append(LineSeparator);
             return builder.ToString();
         }
@@ -280,6 +287,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal,
                 out startedUtc
             );
+        }
+
+        /// <summary>
+        ///     Reads the <see cref="OwnerKey"/> token out of a summary line.
+        /// </summary>
+        /// <param name="line">A single line, without its terminator.</param>
+        /// <param name="owner">The ownership token, empty when none was present.</param>
+        /// <returns><c>true</c> when the line carried a non-empty ownership token.</returns>
+        internal static bool TryParseOwner(string line, out string owner)
+        {
+            return TryGetField(line, OwnerKey, out owner) && !string.IsNullOrEmpty(owner);
         }
 
         /// <summary>

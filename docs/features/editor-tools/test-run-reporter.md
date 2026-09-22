@@ -186,10 +186,11 @@ for line in lines:
 
 ### A run already in flight is refused
 
-The summary file is itself the lock. Starting a run claims a file by writing the running marker; a
-second invocation, of either mode, sees that marker and refuses with a warning in the console naming
-the file that is held. Two concurrent runs writing one file is the failure this prevents, and the
-Test Runner runs one suite at a time regardless.
+Starting a run takes one shared cross-mode claim, checks both summary files, writes a unique
+`owner=` token into the selected mode's running marker, and then releases the claim. A second
+invocation, of either mode, sees that marker and refuses with a warning in the console naming the
+file that is held. Finishing or discarding a run requires the same owner token, so a late callback
+from an older run cannot replace or delete a newer marker.
 
 The menu items are deliberately **not** greyed out while a run is in flight. A validate function
 that disables them would make a bridge's `ExecuteMenuItem` do nothing silently; a clickable item that
@@ -215,12 +216,12 @@ Entering play mode reloads the domain, which destroys every managed object inclu
 `ICallbacks`. If nothing re-registered them, `RunFinished` would never arrive and the summary would
 never be finished.
 
-Nothing is carried across the reload in memory. The summary file **is** the state: an
-`[InitializeOnLoadMethod]` runs on every domain load, checks whether either summary file still holds
-the running marker, and re-registers the Test Runner callbacks only when one does. When the run
-finishes, the callback finds whichever file holds the marker and finishes that one, so it does not
-need to remember which mode it started either. A run this reporter did not start holds no file, and
-is ignored.
+The summary file carries the durable marker while Unity's editor-session state carries the matching
+owner token across domain reloads. An `[InitializeOnLoadMethod]` checks both before re-registering
+the Test Runner callbacks. An editor restart clears the session token, so a stale marker cannot
+consume an unrelated later test run. A second `RunStarted` callback also invalidates ownership after
+a cancelled or lost run. When the owned run finishes, its callback only replaces the marker whose
+token matches. A run this reporter did not start is ignored.
 
 ### Assembly build times are reported, staleness is not judged
 

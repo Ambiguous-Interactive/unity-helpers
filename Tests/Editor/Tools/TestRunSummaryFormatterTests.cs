@@ -134,7 +134,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         [TestCase(TestMode.PlayMode, TestName = "Mode.PlayMode")]
         public void RunningMarkerNamesTheModeAndTheStartTime(TestMode mode)
         {
-            string marker = TestRunSummaryFormatter.FormatRunningMarker(mode, StartedUtc);
+            string marker = TestRunSummaryFormatter.FormatRunningMarker(
+                mode,
+                StartedUtc,
+                "owner-token"
+            );
 
             Assert.IsTrue(
                 marker.EndsWith(TestRunSummaryFormatter.LineSeparator, StringComparison.Ordinal),
@@ -142,15 +146,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             );
 
             string line = FirstLineOf(marker);
-            Assert.AreEqual("SUMMARY running started=2026-09-02T10:00:00.000Z mode=" + mode, line);
+            Assert.AreEqual(
+                "SUMMARY running started=2026-09-02T10:00:00.000Z mode="
+                    + mode
+                    + " owner=owner-token",
+                line
+            );
             Assert.IsTrue(TestRunSummaryFormatter.IsRunningLine(line));
+            Assert.IsTrue(TestRunSummaryFormatter.TryParseOwner(line, out string owner));
+            Assert.AreEqual("owner-token", owner);
         }
 
         [Test]
         public void RunningMarkerStartTimeRoundTrips()
         {
             string line = FirstLineOf(
-                TestRunSummaryFormatter.FormatRunningMarker(TestMode.EditMode, StartedUtc)
+                TestRunSummaryFormatter.FormatRunningMarker(
+                    TestMode.EditMode,
+                    StartedUtc,
+                    "owner-token"
+                )
             );
 
             Assert.IsTrue(
@@ -327,7 +342,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         public void TryGetFieldReportsAnAbsentKey()
         {
             string line = FirstLineOf(
-                TestRunSummaryFormatter.FormatRunningMarker(TestMode.EditMode, StartedUtc)
+                TestRunSummaryFormatter.FormatRunningMarker(
+                    TestMode.EditMode,
+                    StartedUtc,
+                    "owner-token"
+                )
             );
 
             Assert.IsFalse(
@@ -606,7 +625,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             DateTime local = StartedUtc.ToLocalTime();
 
             string line = FirstLineOf(
-                TestRunSummaryFormatter.FormatRunningMarker(TestMode.EditMode, local)
+                TestRunSummaryFormatter.FormatRunningMarker(TestMode.EditMode, local, "owner-token")
             );
 
             StringAssert.Contains("started=2026-09-02T10:00:00.000Z", line);

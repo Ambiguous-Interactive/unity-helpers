@@ -15,6 +15,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Tests.Core;
+#if UNITY_EDITOR
+    using System.Diagnostics;
+#endif
 
     [TestFixture]
     [NUnit.Framework.Category("Integration")]
@@ -29,6 +32,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             Directory.CreateDirectory(path + DurableFile.TemporarySuffix);
         }
+
+#if UNITY_EDITOR
+        private static int TryOverwriteStagingInAnotherProcess(
+            string scriptPath,
+            string stagingPath
+        )
+        {
+            ProcessStartInfo startInfo = new()
+            {
+                FileName = "pwsh",
+                Arguments = $"-NoProfile -NonInteractive -File \"{scriptPath}\" \"{stagingPath}\"",
+                CreateNoWindow = true,
+                UseShellExecute = false,
+            };
+            using Process process = Process.Start(startInfo);
+            if (process == null || !process.WaitForExit(10_000))
+            {
+                process?.Kill();
+                return -1;
+            }
+
+            return process.ExitCode;
+        }
+#endif
 
         [SetUp]
         public override void BaseSetUp()
@@ -435,14 +462,83 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             string path = Path.Combine(_testDirectory, "save.json");
             Directory.CreateDirectory(path);
+#if UNITY_EDITOR
+            string scriptPath = Path.Combine(_testDirectory, "probe-failed-write-staging.ps1");
+            WriteStagingOwnershipProbe(scriptPath);
+            int childExitCode = -1;
+            DurableFile.BeforeStagedCleanupForTests = temporaryPath =>
+            {
+                childExitCode = TryOverwriteStagingInAnotherProcess(scriptPath, temporaryPath);
+            };
+#endif
 
-            Assert.IsFalse(
-                DurableFile.TryWriteAllText(path, "the new document", out Exception error)
-            );
+            try
+            {
+                Assert.IsFalse(
+                    DurableFile.TryWriteAllText(path, "the new document", out Exception error)
+                );
 
-            Assert.IsTrue(error != null);
+                Assert.IsTrue(error != null);
+            }
+            finally
+            {
+#if UNITY_EDITOR
+                DurableFile.BeforeStagedCleanupForTests = null;
+#endif
+            }
+
+#if UNITY_EDITOR
+            Assert.AreEqual(23, childExitCode, "Cleanup must retain staging ownership.");
+#endif
             Assert.IsFalse(File.Exists(path + DurableFile.TemporarySuffix));
         }
+
+#if UNITY_EDITOR
+        [Test]
+        public void AnotherProcessCannotReplaceStagingBeforeItIsPublished()
+        {
+            string path = WriteDirectly("cross-process.json", "previous document");
+            string scriptPath = Path.Combine(_testDirectory, "overwrite-staging.ps1");
+            WriteStagingOwnershipProbe(scriptPath);
+            int childExitCode = -1;
+            DurableFile.BeforeStagedSwapForTests = temporaryPath =>
+            {
+                childExitCode = TryOverwriteStagingInAnotherProcess(scriptPath, temporaryPath);
+            };
+
+            try
+            {
+                Assert.IsTrue(
+                    DurableFile.TryWriteAllText(path, "writer A document", out Exception error),
+                    error?.ToString()
+                );
+            }
+            finally
+            {
+                DurableFile.BeforeStagedSwapForTests = null;
+            }
+
+            Assert.AreEqual(23, childExitCode, "The second process must not acquire staging.");
+            Assert.AreEqual("writer A document", File.ReadAllText(path));
+            Assert.IsFalse(File.Exists(path + DurableFile.TemporarySuffix));
+        }
+
+        private static void WriteStagingOwnershipProbe(string scriptPath)
+        {
+            File.WriteAllText(
+                scriptPath,
+                "param([string]$Path)\n"
+                    + "try {\n"
+                    + "  $stream = [System.IO.FileStream]::new(($Path + '.lock'), [System.IO.FileMode]::OpenOrCreate, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::Read)\n"
+                    + "  $stream.WriteByte(88)\n"
+                    + "  $stream.Dispose()\n"
+                    + "  exit 0\n"
+                    + "} catch {\n"
+                    + "  exit 23\n"
+                    + "}\n"
+            );
+        }
+#endif
 
         [Test]
         public void CopyFromAMissingSourceLeavesTheDestinationIntact()

@@ -29,9 +29,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     /// It is <b>not</b> full crash safety — .NET cannot flush a <i>directory</i>, so a filesystem
     /// may still reorder the rename behind the data write. On platforms without
     /// <c>File.Replace</c>, the delete-then-move fallback briefly exposes an absent destination
-    /// and can lose it if the move fails. This type does <b>not</b> coordinate with other processes;
-    /// concurrent processes can collide on the shared staging path. Do not describe consumers of
-    /// this type as crash-safe or cross-process safe.
+    /// and can lose it if the move fails. A second process using this type cannot take ownership of
+    /// the same staging path while a write is active; its operation reports failure instead. This is
+    /// ownership isolation, not a cross-process transaction or a multi-file lock. Do not describe
+    /// consumers of this type as crash-safe.
     /// </para>
     /// <para>
     /// Where the format allows a log of records, <see cref="TryAppendAllText"/> is strictly stronger
@@ -56,12 +57,18 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         // FileMode.Append does not provide atomic append; bounded per-path gates prevent writer overlap.
         private const int GateCount = 32;
+        private const string OwnershipSuffix = ".lock";
 
         private static readonly SemaphoreSlim[] Gates = CreateGates();
 
         private static readonly UTF8Encoding Utf8NoByteOrderMark = new(
             encoderShouldEmitUTF8Identifier: false
         );
+
+#if UNITY_EDITOR
+        internal static Action<string> BeforeStagedSwapForTests { get; set; }
+        internal static Action<string> BeforeStagedCleanupForTests { get; set; }
+#endif
 
         /// <summary>
         /// Replaces a file's entire contents, staging and flushing before the swap.
@@ -341,6 +348,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 string temporaryPath = destinationPath + TemporarySuffix;
                 FileStream source;
+                FileStream ownership = null;
                 FileStream staging;
                 try
                 {
@@ -355,11 +363,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
                 try
                 {
+                    ownership = OpenStagingOwnership(temporaryPath);
                     staging = OpenStagingStream(temporaryPath, useAsync: false);
                 }
                 catch (Exception e)
                 {
-                    source.Dispose();
+                    ReleaseFileStream(source);
+                    ReleaseStagingOwnership(ownership);
                     error = e;
                     return false;
                 }
@@ -367,21 +377,34 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 try
                 {
                     using (source)
-                    using (staging)
                     {
-                        source.CopyTo(staging, DefaultBufferSize);
-                        staging.Flush(flushToDisk: true);
+                        using (staging)
+                        {
+                            source.CopyTo(staging, DefaultBufferSize);
+                            staging.Flush(flushToDisk: true);
+                        }
+
+#if UNITY_EDITOR
+                        BeforeStagedSwapForTests?.Invoke(temporaryPath);
+#endif
+                        Swap(temporaryPath, destinationPath);
                     }
 
-                    Swap(temporaryPath, destinationPath);
                     error = null;
                     return true;
                 }
                 catch (Exception e)
                 {
+#if UNITY_EDITOR
+                    BeforeStagedCleanupForTests?.Invoke(temporaryPath);
+#endif
                     DiscardStagedFile(temporaryPath);
                     error = e;
                     return false;
+                }
+                finally
+                {
+                    ReleaseStagingOwnership(ownership);
                 }
             }
         }
@@ -460,6 +483,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             {
                 string temporaryPath = destinationPath + TemporarySuffix;
                 FileStream source;
+                FileStream ownership = null;
                 FileStream staging;
                 try
                 {
@@ -473,33 +497,48 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
                 try
                 {
+                    ownership = OpenStagingOwnership(temporaryPath);
                     staging = OpenStagingStream(temporaryPath, useAsync: true);
                 }
                 catch (Exception e)
                 {
-                    source.Dispose();
+                    ReleaseFileStream(source);
+                    ReleaseStagingOwnership(ownership);
                     return e;
                 }
 
                 try
                 {
                     using (source)
-                    using (staging)
                     {
-                        await source
-                            .CopyToAsync(staging, bufferSize, cancellationToken)
-                            .ConfigureAwait(false);
+                        using (staging)
+                        {
+                            await source
+                                .CopyToAsync(staging, bufferSize, cancellationToken)
+                                .ConfigureAwait(false);
 
-                        staging.Flush(flushToDisk: true);
+                            staging.Flush(flushToDisk: true);
+                        }
+
+#if UNITY_EDITOR
+                        BeforeStagedSwapForTests?.Invoke(temporaryPath);
+#endif
+                        Swap(temporaryPath, destinationPath);
                     }
 
-                    Swap(temporaryPath, destinationPath);
                     return null;
                 }
                 catch (Exception e)
                 {
+#if UNITY_EDITOR
+                    BeforeStagedCleanupForTests?.Invoke(temporaryPath);
+#endif
                     DiscardStagedFile(temporaryPath);
                     return e;
+                }
+                finally
+                {
+                    ReleaseStagingOwnership(ownership);
                 }
             }
         }
@@ -529,6 +568,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             using (gate)
             {
                 string temporaryPath = path + TemporarySuffix;
+                FileStream ownership = null;
                 FileStream staging;
                 byte[] bytes;
                 try
@@ -541,10 +581,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                                 : Utf8NoByteOrderMark.GetBytes(textContents)
                         );
                     EnsureDirectory(path);
+                    ownership = OpenStagingOwnership(temporaryPath);
                     staging = OpenStagingStream(temporaryPath, useAsync: true);
                 }
                 catch (Exception e)
                 {
+                    ReleaseStagingOwnership(ownership);
                     return e;
                 }
 
@@ -558,13 +600,24 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         staging.Flush(flushToDisk: true);
                     }
 
+#if UNITY_EDITOR
+                    BeforeStagedSwapForTests?.Invoke(temporaryPath);
+#endif
                     Swap(temporaryPath, path);
+
                     return null;
                 }
                 catch (Exception e)
                 {
+#if UNITY_EDITOR
+                    BeforeStagedCleanupForTests?.Invoke(temporaryPath);
+#endif
                     DiscardStagedFile(temporaryPath);
                     return e;
+                }
+                finally
+                {
+                    ReleaseStagingOwnership(ownership);
                 }
             }
         }
@@ -572,14 +625,17 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private static bool TryWriteStagedBytes(string path, byte[] contents, out Exception error)
         {
             string temporaryPath = path + TemporarySuffix;
+            FileStream ownership = null;
             FileStream staging;
             try
             {
                 EnsureDirectory(path);
+                ownership = OpenStagingOwnership(temporaryPath);
                 staging = OpenStagingStream(temporaryPath, useAsync: false);
             }
             catch (Exception e)
             {
+                ReleaseStagingOwnership(ownership);
                 error = e;
                 return false;
             }
@@ -592,15 +648,26 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     staging.Flush(flushToDisk: true);
                 }
 
+#if UNITY_EDITOR
+                BeforeStagedSwapForTests?.Invoke(temporaryPath);
+#endif
                 Swap(temporaryPath, path);
+
                 error = null;
                 return true;
             }
             catch (Exception e)
             {
+#if UNITY_EDITOR
+                BeforeStagedCleanupForTests?.Invoke(temporaryPath);
+#endif
                 DiscardStagedFile(temporaryPath);
                 error = e;
                 return false;
+            }
+            finally
+            {
+                ReleaseStagingOwnership(ownership);
             }
         }
 
@@ -704,6 +771,35 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 DefaultBufferSize,
                 useAsync
             );
+        }
+
+        private static FileStream OpenStagingOwnership(string temporaryPath)
+        {
+            return new FileStream(
+                temporaryPath + OwnershipSuffix,
+                FileMode.OpenOrCreate,
+                FileAccess.ReadWrite,
+                FileShare.Read,
+                bufferSize: 1,
+                FileOptions.DeleteOnClose
+            );
+        }
+
+        private static void ReleaseStagingOwnership(FileStream ownership)
+        {
+            ReleaseFileStream(ownership);
+        }
+
+        private static void ReleaseFileStream(FileStream stream)
+        {
+            try
+            {
+                stream?.Dispose();
+            }
+            catch (Exception)
+            {
+                // A close failure must not escape a Try API or mask its original file error.
+            }
         }
 
         private static FileStream OpenAppendStream(string path, bool useAsync)

@@ -443,6 +443,9 @@ you ship at and you want the bigger pixels baked into the file rather than paid 
 - Only `.png` files are processed; anything else is counted as skipped.
 - With **Output Folder** empty this **overwrites the originals in place** and there is no undo. Set
   **Output Folder** to write copies instead.
+- Invalid sizing settings and output-name collisions are rejected before any source, importer, or
+  destination file changes. Texture names are compared without regard to case because Unity asset
+  paths must remain portable across project platforms.
 - PNG writes are staged before replacement. A failed write reports an error rather than leaving
   a partly written PNG.
 - A failed PNG encode reports an error and leaves the original image unchanged.

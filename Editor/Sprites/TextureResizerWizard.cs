@@ -8,7 +8,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using System.Collections.Generic;
     using System.ComponentModel;
     using System.IO;
-    using System.Linq;
     using UnityEditor;
     using UnityEngine;
     using UnityEngine.Serialization;
@@ -49,32 +48,55 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     /// </example>
     public sealed class TextureResizerWizard : ScriptableWizard
     {
-        private static (int width, int height) ComputeFinalSize(
+        private static bool TryComputeFinalSize(
             int startWidth,
             int startHeight,
             int passes,
             int pixelsPerUnit,
             float widthMultiplier,
-            float heightMultiplier
+            float heightMultiplier,
+            out int width,
+            out int height
         )
         {
-            int w = startWidth;
-            int h = startHeight;
+            width = startWidth;
+            height = startHeight;
+            if (
+                startWidth <= 0
+                || startHeight <= 0
+                || passes <= 0
+                || pixelsPerUnit <= 0
+                || widthMultiplier <= 0f
+                || heightMultiplier <= 0f
+                || float.IsNaN(widthMultiplier)
+                || float.IsNaN(heightMultiplier)
+                || float.IsInfinity(widthMultiplier)
+                || float.IsInfinity(heightMultiplier)
+            )
+            {
+                return false;
+            }
+
             for (int i = 0; i < passes; ++i)
             {
-                int extraWidth = (int)Math.Round(w / (pixelsPerUnit * widthMultiplier));
-                int extraHeight = (int)Math.Round(h / (pixelsPerUnit * heightMultiplier));
+                double extraWidth = Math.Round(width / (pixelsPerUnit * widthMultiplier));
+                double extraHeight = Math.Round(height / (pixelsPerUnit * heightMultiplier));
 
-                if (extraWidth == 0 && extraHeight == 0)
+                if (extraWidth == 0d && extraHeight == 0d)
                 {
                     break;
                 }
 
-                w += extraWidth;
-                h += extraHeight;
+                if (int.MaxValue - width < extraWidth || int.MaxValue - height < extraHeight)
+                {
+                    return false;
+                }
+
+                width += (int)extraWidth;
+                height += (int)extraHeight;
             }
 
-            return (w, h);
+            return true;
         }
 
         public List<Texture2D> textures = new();
@@ -158,12 +180,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                 if (0 < sourcePaths.Count)
                 {
-                    foreach (
-                        string guid in AssetDatabase.FindAssets(
-                            "t:texture2D",
-                            sourcePaths.ToArray()
-                        )
-                    )
+                    string[] sourceFolders = new string[sourcePaths.Count];
+                    sourcePaths.CopyTo(sourceFolders);
+                    foreach (string guid in AssetDatabase.FindAssets("t:texture2D", sourceFolders))
                     {
                         string path = AssetDatabase.GUIDToAssetPath(guid);
                         if (string.IsNullOrEmpty(path))
@@ -217,6 +236,74 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             string outputDirAssetPath =
                 outputFolder != null ? AssetDatabase.GetAssetPath(outputFolder) : null;
 
+            if (
+                scalingResizeAlgorithm != ResizeAlgorithm.Bilinear
+                && scalingResizeAlgorithm != ResizeAlgorithm.Point
+            )
+            {
+                this.LogError($"The resize algorithm is invalid: {scalingResizeAlgorithm}.");
+                return;
+            }
+
+            using PooledResource<HashSet<string>> destinationPathsResource = SetBuffers<string>
+                .GetHashSetPool(StringComparer.OrdinalIgnoreCase)
+                .Get(out HashSet<string> destinationPaths);
+            foreach (Texture2D texture in textures)
+            {
+                if (texture == null)
+                {
+                    continue;
+                }
+
+                string assetPath = AssetDatabase.GetAssetPath(texture);
+                if (
+                    string.IsNullOrEmpty(assetPath)
+                    || !string.Equals(
+                        Path.GetExtension(assetPath),
+                        ".png",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
+                {
+                    continue;
+                }
+
+                if (
+                    !TryComputeFinalSize(
+                        texture.width,
+                        texture.height,
+                        numResizes,
+                        pixelsPerUnit,
+                        widthMultiplier,
+                        heightMultiplier,
+                        out _,
+                        out _
+                    )
+                )
+                {
+                    this.LogError($"Resize settings produce an invalid texture size.");
+                    return;
+                }
+
+                if (string.IsNullOrEmpty(outputDirAssetPath))
+                {
+                    continue;
+                }
+
+                string destinationPath = Path.Combine(
+                        outputDirAssetPath,
+                        Path.GetFileName(assetPath)
+                    )
+                    .SanitizePath();
+                if (!destinationPaths.Add(destinationPath))
+                {
+                    this.LogError(
+                        $"Multiple textures would write to the same output: {destinationPath}."
+                    );
+                    return;
+                }
+            }
+
             try
             {
                 using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
@@ -224,6 +311,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     for (int idx = 0; idx < textures.Count; ++idx)
                     {
                         Texture2D texture = textures[idx];
+                        if (texture == null)
+                        {
+                            continue;
+                        }
+
                         string assetPath = AssetDatabase.GetAssetPath(texture);
                         if (string.IsNullOrEmpty(assetPath))
                         {
@@ -268,14 +360,25 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         {
                             int origW = texture.width;
                             int origH = texture.height;
-                            (int targetW, int targetH) = ComputeFinalSize(
-                                origW,
-                                origH,
-                                numResizes,
-                                pixelsPerUnit,
-                                widthMultiplier,
-                                heightMultiplier
-                            );
+                            if (
+                                !TryComputeFinalSize(
+                                    origW,
+                                    origH,
+                                    numResizes,
+                                    pixelsPerUnit,
+                                    widthMultiplier,
+                                    heightMultiplier,
+                                    out int targetW,
+                                    out int targetH
+                                )
+                            )
+                            {
+                                ++errors;
+                                this.LogError(
+                                    $"Resize settings produce an invalid size for {texture.name}."
+                                );
+                                continue;
+                            }
 
                             targetW = Mathf.Clamp(targetW, 1, 16384);
                             targetH = Mathf.Clamp(targetH, 1, 16384);
@@ -284,18 +387,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             {
                                 ++skippedZeroDelta;
                                 continue;
-                            }
-
-                            if (
-                                scalingResizeAlgorithm != ResizeAlgorithm.Bilinear
-                                && scalingResizeAlgorithm != ResizeAlgorithm.Point
-                            )
-                            {
-                                throw new InvalidEnumArgumentException(
-                                    nameof(scalingResizeAlgorithm),
-                                    (int)scalingResizeAlgorithm,
-                                    typeof(ResizeAlgorithm)
-                                );
                             }
 
                             if (dryRun)

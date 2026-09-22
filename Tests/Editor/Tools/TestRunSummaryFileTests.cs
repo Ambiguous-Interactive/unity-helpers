@@ -5,9 +5,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
 {
     using System;
     using System.IO;
+    using System.Threading;
+    using System.Threading.Tasks;
     using NUnit.Framework;
     using UnityEditor.TestTools.TestRunner.Api;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Tools;
     using WallstopStudios.UnityHelpers.Tests.Core;
 
@@ -37,6 +40,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         [TearDown]
         public override void TearDown()
         {
+            TestRunSummaryFile.AfterBeginClaimForTests = null;
             if (Directory.Exists(_workingDirectory))
             {
                 Directory.Delete(_workingDirectory, true);
@@ -99,12 +103,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         public void BeginRunWritesTheRunningMarkerBeforeAnythingElse()
         {
             Assert.IsTrue(
-                TestRunSummaryFile.TryBeginRun(_summaryPath, TestMode.EditMode, StartedUtc)
+                TestRunSummaryFile.TryBeginRun(
+                    _summaryPath,
+                    TestMode.EditMode,
+                    StartedUtc,
+                    out string owner
+                )
             );
 
             Assert.IsTrue(File.Exists(_summaryPath));
             Assert.AreEqual(
-                "SUMMARY running started=2026-09-02T10:00:00.000Z mode=EditMode",
+                "SUMMARY running started=2026-09-02T10:00:00.000Z mode=EditMode owner=" + owner,
                 File.ReadAllLines(_summaryPath)[0]
             );
             Assert.IsTrue(TestRunSummaryFile.IsMarkedRunning(_summaryPath));
@@ -113,21 +122,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         [Test]
         public void BeginRunRefusesWhileARunAlreadyHoldsTheFile()
         {
-            Assert.IsTrue(
-                TestRunSummaryFile.TryBeginRun(_summaryPath, TestMode.EditMode, StartedUtc)
-            );
+            string owner = BeginRun(TestMode.EditMode, StartedUtc);
 
             Assert.IsFalse(
                 TestRunSummaryFile.TryBeginRun(
                     _summaryPath,
                     TestMode.EditMode,
-                    StartedUtc.AddMinutes(5)
+                    StartedUtc.AddMinutes(5),
+                    out string refusedOwner
                 ),
                 "A second run must not be allowed to write over a summary still in flight."
             );
+            Assert.AreEqual(string.Empty, refusedOwner);
 
             Assert.AreEqual(
-                "SUMMARY running started=2026-09-02T10:00:00.000Z mode=EditMode",
+                "SUMMARY running started=2026-09-02T10:00:00.000Z mode=EditMode owner=" + owner,
                 File.ReadAllLines(_summaryPath)[0],
                 "The refused run must leave the first run's marker untouched."
             );
@@ -136,12 +145,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         [Test]
         public void BeginRunSucceedsAgainOnceTheRunHasFinished()
         {
-            Assert.IsTrue(
-                TestRunSummaryFile.TryBeginRun(_summaryPath, TestMode.EditMode, StartedUtc)
-            );
+            string owner = BeginRun(TestMode.EditMode, StartedUtc);
             Assert.IsTrue(
                 TestRunSummaryFile.TryFinishRun(
                     _summaryPath,
+                    owner,
                     TestMode.EditMode,
                     FinishedUtc,
                     new TestRunResultNode()
@@ -153,7 +161,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                 TestRunSummaryFile.TryBeginRun(
                     _summaryPath,
                     TestMode.EditMode,
-                    FinishedUtc.AddMinutes(1)
+                    FinishedUtc.AddMinutes(1),
+                    out _
                 )
             );
         }
@@ -164,16 +173,74 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             string nestedPath = Path.Combine(_workingDirectory, "made", "up", "summary.txt");
 
             Assert.IsTrue(
-                TestRunSummaryFile.TryBeginRun(nestedPath, TestMode.PlayMode, StartedUtc)
+                TestRunSummaryFile.TryBeginRun(nestedPath, TestMode.PlayMode, StartedUtc, out _)
             );
 
             Assert.IsTrue(File.Exists(nestedPath));
         }
 
         [Test]
+        public void ConcurrentCrossModeBeginRunCallsProduceOneOwner()
+        {
+            string competingPath = Path.Combine(_workingDirectory, "playmode-summary.txt");
+            using ManualResetEventSlim claimAcquired = new(false);
+            using ManualResetEventSlim releaseClaim = new(false);
+            string firstOwner = string.Empty;
+            string secondOwner = string.Empty;
+            TestRunSummaryFile.AfterBeginClaimForTests = () =>
+            {
+                claimAcquired.Set();
+                releaseClaim.Wait(10_000);
+            };
+            Task<bool> first = Task.Run(() =>
+            {
+                return TestRunSummaryFile.TryBeginRun(
+                    _summaryPath,
+                    TestMode.EditMode,
+                    StartedUtc,
+                    out firstOwner,
+                    competingPath
+                );
+            });
+            Assert.IsTrue(
+                claimAcquired.Wait(10_000),
+                "The first caller must hold the shared claim."
+            );
+            Task<bool> second = Task.Run(() =>
+            {
+                return TestRunSummaryFile.TryBeginRun(
+                    competingPath,
+                    TestMode.PlayMode,
+                    StartedUtc.AddSeconds(1),
+                    out secondOwner,
+                    _summaryPath
+                );
+            });
+
+            try
+            {
+                Assert.IsTrue(second.Wait(10_000));
+                Assert.IsFalse(second.Result);
+            }
+            finally
+            {
+                releaseClaim.Set();
+                Assert.IsTrue(first.Wait(10_000));
+                TestRunSummaryFile.AfterBeginClaimForTests = null;
+            }
+
+            Assert.IsTrue(first.Result);
+            Assert.IsNotEmpty(firstOwner);
+            Assert.AreEqual(string.Empty, secondOwner);
+            Assert.IsTrue(TestRunSummaryFile.TryReadOwner(_summaryPath, out string storedOwner));
+            Assert.AreEqual(firstOwner, storedOwner);
+            Assert.IsFalse(File.Exists(competingPath));
+        }
+
+        [Test]
         public void FinishRunReplacesTheMarkerWithTheFullSummary()
         {
-            TestRunSummaryFile.TryBeginRun(_summaryPath, TestMode.EditMode, StartedUtc);
+            string owner = BeginRun(TestMode.EditMode, StartedUtc);
 
             TestRunResultNode root = new();
             TestRunResultNode assembly = new() { fullName = "Some.Tests.dll" };
@@ -192,7 +259,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             );
 
             Assert.IsTrue(
-                TestRunSummaryFile.TryFinishRun(_summaryPath, TestMode.EditMode, FinishedUtc, root)
+                TestRunSummaryFile.TryFinishRun(
+                    _summaryPath,
+                    owner,
+                    TestMode.EditMode,
+                    FinishedUtc,
+                    root
+                )
             );
 
             string[] lines = File.ReadAllLines(_summaryPath);
@@ -211,24 +284,75 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         }
 
         [Test]
-        public void FinishRunWithoutAMarkerReportsNoElapsedTime()
+        public void FailedFinishLeavesTheRunningMarkerIntact()
         {
-            Assert.IsTrue(
+            string owner = BeginRun(TestMode.EditMode, StartedUtc);
+            string marker = File.ReadAllText(_summaryPath);
+            Directory.CreateDirectory(_summaryPath + DurableFile.TemporarySuffix);
+
+            Assert.IsFalse(
                 TestRunSummaryFile.TryFinishRun(
                     _summaryPath,
-                    TestMode.PlayMode,
+                    owner,
+                    TestMode.EditMode,
                     FinishedUtc,
                     new TestRunResultNode()
                 )
             );
 
-            StringAssert.Contains("seconds=0.000", File.ReadAllLines(_summaryPath)[0]);
+            Assert.AreEqual(marker, File.ReadAllText(_summaryPath));
+            Assert.IsTrue(TestRunSummaryFile.IsMarkedRunning(_summaryPath));
+        }
+
+        [Test]
+        public void StaleOwnerCannotFinishOrDiscardANewerRun()
+        {
+            string firstOwner = BeginRun(TestMode.EditMode, StartedUtc);
+            Assert.IsTrue(
+                TestRunSummaryFile.TryFinishRun(
+                    _summaryPath,
+                    firstOwner,
+                    TestMode.EditMode,
+                    FinishedUtc,
+                    new TestRunResultNode()
+                )
+            );
+            string secondOwner = BeginRun(TestMode.EditMode, FinishedUtc.AddMinutes(1));
+            string secondMarker = File.ReadAllText(_summaryPath);
+
+            Assert.IsFalse(
+                TestRunSummaryFile.TryFinishRun(
+                    _summaryPath,
+                    firstOwner,
+                    TestMode.EditMode,
+                    FinishedUtc.AddMinutes(2),
+                    new TestRunResultNode()
+                )
+            );
+            Assert.IsFalse(TestRunSummaryFile.TryDiscardRun(_summaryPath, firstOwner));
+            Assert.AreEqual(secondMarker, File.ReadAllText(_summaryPath));
+            Assert.IsTrue(TestRunSummaryFile.TryDiscardRun(_summaryPath, secondOwner));
+        }
+
+        [Test]
+        public void FinishRunWithoutAMarkerIsRefused()
+        {
+            Assert.IsFalse(
+                TestRunSummaryFile.TryFinishRun(
+                    _summaryPath,
+                    "missing-owner",
+                    TestMode.PlayMode,
+                    FinishedUtc,
+                    new TestRunResultNode()
+                )
+            );
+            Assert.IsFalse(File.Exists(_summaryPath));
         }
 
         [Test]
         public void ReadStartedUtcRecoversTheMarkerTimestamp()
         {
-            TestRunSummaryFile.TryBeginRun(_summaryPath, TestMode.PlayMode, StartedUtc);
+            BeginRun(TestMode.PlayMode, StartedUtc);
 
             Assert.IsTrue(TestRunSummaryFile.TryReadStartedUtc(_summaryPath, out DateTime started));
             Assert.AreEqual(StartedUtc, started);
@@ -237,21 +361,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         [Test]
         public void DiscardRunReleasesTheFileForTheNextRun()
         {
-            TestRunSummaryFile.TryBeginRun(_summaryPath, TestMode.EditMode, StartedUtc);
+            string owner = BeginRun(TestMode.EditMode, StartedUtc);
 
-            Assert.IsTrue(TestRunSummaryFile.TryDiscardRun(_summaryPath));
+            Assert.IsTrue(TestRunSummaryFile.TryDiscardRun(_summaryPath, owner));
 
             Assert.IsFalse(File.Exists(_summaryPath));
             Assert.IsFalse(TestRunSummaryFile.IsMarkedRunning(_summaryPath));
             Assert.IsTrue(
-                TestRunSummaryFile.TryBeginRun(_summaryPath, TestMode.EditMode, FinishedUtc)
+                TestRunSummaryFile.TryBeginRun(_summaryPath, TestMode.EditMode, FinishedUtc, out _)
             );
         }
 
         [Test]
-        public void DiscardRunOnAMissingFileIsNotAFailure()
+        public void DiscardRunOnAMissingFileIsRefused()
         {
-            Assert.IsTrue(TestRunSummaryFile.TryDiscardRun(_summaryPath));
+            Assert.IsFalse(TestRunSummaryFile.TryDiscardRun(_summaryPath, "missing-owner"));
         }
 
         [Test]
@@ -282,17 +406,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         public void EveryEntryPointRefusesAnAbsentPath(string path)
         {
             Assert.IsFalse(TestRunSummaryFile.IsMarkedRunning(path));
-            Assert.IsFalse(TestRunSummaryFile.TryBeginRun(path, TestMode.EditMode, StartedUtc));
+            Assert.IsFalse(
+                TestRunSummaryFile.TryBeginRun(
+                    path,
+                    TestMode.EditMode,
+                    StartedUtc,
+                    out string owner
+                )
+            );
+            Assert.AreEqual(string.Empty, owner);
             Assert.IsFalse(
                 TestRunSummaryFile.TryFinishRun(
                     path,
+                    "owner",
                     TestMode.EditMode,
                     FinishedUtc,
                     new TestRunResultNode()
                 )
             );
             Assert.IsFalse(TestRunSummaryFile.TryReadStartedUtc(path, out _));
-            Assert.IsFalse(TestRunSummaryFile.TryDiscardRun(path));
+            Assert.IsFalse(TestRunSummaryFile.TryReadOwner(path, out _));
+            Assert.IsFalse(TestRunSummaryFile.TryDiscardRun(path, "owner"));
         }
 
         [Test]
@@ -301,6 +435,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             File.WriteAllText(_summaryPath, "SUMMARY running started=nonsense mode=EditMode\n");
 
             Assert.IsFalse(TestRunSummaryFile.TryReadStartedUtc(_summaryPath, out _));
+        }
+
+        private string BeginRun(TestMode mode, DateTime startedUtc)
+        {
+            Assert.IsTrue(
+                TestRunSummaryFile.TryBeginRun(_summaryPath, mode, startedUtc, out string owner)
+            );
+            Assert.IsNotEmpty(owner);
+            return owner;
         }
     }
 }

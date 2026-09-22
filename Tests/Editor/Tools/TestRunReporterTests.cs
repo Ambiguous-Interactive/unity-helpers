@@ -24,6 +24,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         public override void BaseSetUp()
         {
             base.BaseSetUp();
+            TestRunReporter.ClearRunSessionForTests();
             _hadSavedContent = false;
             _savedContent = string.Empty;
             if (!TestRunSummaryFile.TryGetSummaryPath(TestMode.PlayMode, out _playModePath))
@@ -44,6 +45,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         [TearDown]
         public override void TearDown()
         {
+            TestRunReporter.ClearRunSessionForTests();
             if (!string.IsNullOrEmpty(_playModePath))
             {
                 if (_hadSavedContent)
@@ -76,14 +78,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
             );
 
             Assert.IsTrue(
-                TestRunSummaryFile.TryBeginRun(_playModePath, TestMode.PlayMode, StartedUtc)
+                TestRunSummaryFile.TryBeginRun(
+                    _playModePath,
+                    TestMode.PlayMode,
+                    StartedUtc,
+                    out string owner
+                )
             );
             Assert.IsTrue(
                 TestRunReporter.IsAnyRunInFlight(),
                 "A summary file holding the running marker is what survives the domain reload."
             );
 
-            Assert.IsTrue(TestRunSummaryFile.TryDiscardRun(_playModePath));
+            Assert.IsTrue(TestRunSummaryFile.TryDiscardRun(_playModePath, owner));
             Assert.IsFalse(TestRunReporter.IsAnyRunInFlight());
         }
 
@@ -114,13 +121,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                 "Registering with no run in flight would leave callbacks listening for a run that "
                     + "nothing here claimed."
             );
+
+            Assert.IsTrue(
+                TestRunSummaryFile.TryBeginRun(
+                    _playModePath,
+                    TestMode.PlayMode,
+                    StartedUtc,
+                    out string staleOwner
+                )
+            );
+            Assert.IsFalse(
+                TestRunReporter.TryRegisterForRunInFlight(),
+                "A marker without matching editor-session ownership belongs to a lost run."
+            );
+            Assert.IsTrue(TestRunSummaryFile.TryDiscardRun(_playModePath, staleOwner));
         }
 
         [Test]
         public void StartRunIsRefusedWhileAnotherModeHoldsItsSummaryFile()
         {
             Assert.IsTrue(
-                TestRunSummaryFile.TryBeginRun(_playModePath, TestMode.PlayMode, StartedUtc)
+                TestRunSummaryFile.TryBeginRun(_playModePath, TestMode.PlayMode, StartedUtc, out _)
             );
 
             Assert.IsFalse(

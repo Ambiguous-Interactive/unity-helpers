@@ -5,9 +5,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
 {
 #if UNITY_EDITOR
     using System.IO;
+    using System.Text.RegularExpressions;
     using NUnit.Framework;
     using UnityEditor;
     using UnityEngine;
+    using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.AssetProcessors;
     using WallstopStudios.UnityHelpers.Editor.Sprites;
@@ -193,6 +195,27 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.IsTrue(outTex != null, "Expected resized texture in output folder");
             Assert.That(outTex.width, Is.EqualTo(16));
             Assert.That(outTex.height, Is.EqualTo(8));
+
+            string collidingPath = Path.Combine(Root, "nested", "out.png").SanitizePath();
+            CreatePng(collidingPath, 12, 6, Color.blue);
+            AssetDatabaseBatchHelper.RefreshIfNotBatching();
+            byte[] originalBytes = File.ReadAllBytes(RelToFull(path));
+            byte[] collidingBytes = File.ReadAllBytes(RelToFull(collidingPath));
+            byte[] outputBytes = File.ReadAllBytes(RelToFull(outPath));
+            wizard.textures = new System.Collections.Generic.List<Texture2D>
+            {
+                AssetDatabase.LoadAssetAtPath<Texture2D>(path),
+                AssetDatabase.LoadAssetAtPath<Texture2D>(collidingPath),
+            };
+            LogAssert.Expect(
+                LogType.Error,
+                new Regex("Multiple textures would write to the same output")
+            );
+            wizard.OnWizardCreate();
+
+            CollectionAssert.AreEqual(originalBytes, File.ReadAllBytes(RelToFull(path)));
+            CollectionAssert.AreEqual(collidingBytes, File.ReadAllBytes(RelToFull(collidingPath)));
+            CollectionAssert.AreEqual(outputBytes, File.ReadAllBytes(RelToFull(outPath)));
         }
 
         [Test]
@@ -223,7 +246,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         }
 
         [Test]
-        public void RestoresImporterReadabilityAfterRun()
+        public void InvalidSettingsAreRefusedAndReadabilityIsRestoredAfterRun()
         {
             string path = Path.Combine(Root, "restore.png").SanitizePath();
             CreatePng(path, 8, 8, Color.red);
@@ -233,6 +256,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.IsTrue(importer != null);
             importer.isReadable = false;
             importer.SaveAndReimport();
+            byte[] originalBytes = File.ReadAllBytes(RelToFull(path));
 
             TextureResizerWizard wizard = Track(
                 ScriptableObject.CreateInstance<TextureResizerWizard>()
@@ -242,10 +266,40 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 AssetDatabase.LoadAssetAtPath<Texture2D>(path),
             };
             wizard.numResizes = 1;
+            wizard.scalingResizeAlgorithm = TextureResizerWizard.ResizeAlgorithm.Point;
+            (int pixelsPerUnit, float widthMultiplier, float heightMultiplier)[] invalidSettings =
+            {
+                (0, 1f, 1f),
+                (-1, 1f, 1f),
+                (1, 0f, 1f),
+                (1, -1f, 1f),
+                (1, 1f, 0f),
+                (1, 1f, -1f),
+                (1, float.NaN, 1f),
+                (1, float.PositiveInfinity, 1f),
+                (1, float.Epsilon, 1f),
+            };
+            foreach (
+                (
+                    int currentPixelsPerUnit,
+                    float currentWidthMultiplier,
+                    float currentHeightMultiplier
+                ) in invalidSettings
+            )
+            {
+                wizard.pixelsPerUnit = currentPixelsPerUnit;
+                wizard.widthMultiplier = currentWidthMultiplier;
+                wizard.heightMultiplier = currentHeightMultiplier;
+                LogAssert.Expect(LogType.Error, new Regex("Resize settings produce an invalid"));
+                wizard.OnWizardCreate();
+            }
+
+            CollectionAssert.AreEqual(originalBytes, File.ReadAllBytes(RelToFull(path)));
+            Assert.IsFalse(importer.isReadable);
+
             wizard.pixelsPerUnit = 1000;
             wizard.widthMultiplier = 1000f;
             wizard.heightMultiplier = 1000f;
-            wizard.scalingResizeAlgorithm = TextureResizerWizard.ResizeAlgorithm.Point;
             wizard.OnWizardCreate();
 
             AssetDatabaseBatchHelper.RefreshIfNotBatching();

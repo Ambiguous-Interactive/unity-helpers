@@ -24,9 +24,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             "Tools/Wallstop Studios/Unity Helpers/Run PlayMode Tests With Summary";
         private const string LogPrefix = "[TestRunReporter] ";
         private const string CompiledAssemblyExtension = ".dll";
+        private const string OwnerSessionKey = nameof(TestRunReporter) + "." + nameof(_owner);
+        private const string RunStartedSessionKey =
+            nameof(TestRunReporter) + "." + nameof(_runStarted);
 
         private static TestRunReporter _instance;
         private static TestRunnerApi _api;
+        private static string _owner;
+        private static bool _runStarted;
 
         /// <summary>
         ///     Reports whether either mode's summary file is currently held by a run in flight.
@@ -34,7 +39,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// <returns><c>true</c> when a run holds a summary file.</returns>
         internal static bool IsAnyRunInFlight()
         {
-            return TryFindRunInFlight(out TestMode _, out string _);
+            return TryFindRunInFlight(out TestMode _, out string _, out string _);
         }
 
         /// <summary>
@@ -51,7 +56,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 return false;
             }
 
-            if (TryFindRunInFlight(out TestMode runningMode, out string runningPath))
+            if (TryFindRunInFlight(out TestMode runningMode, out string runningPath, out string _))
             {
                 Debug.LogWarning(
                     $"{LogPrefix}Refusing to start {mode}: a {runningMode} run still holds {runningPath}. Delete that file to recover a run that was cancelled or lost."
@@ -59,15 +64,41 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 return false;
             }
 
-            if (!TestRunSummaryFile.TryBeginRun(summaryPath, mode, DateTime.UtcNow))
+            TestMode competingMode =
+                mode == TestMode.EditMode ? TestMode.PlayMode : TestMode.EditMode;
+            if (
+                !TestRunSummaryFile.TryGetSummaryPath(
+                    competingMode,
+                    out string competingSummaryPath
+                )
+            )
+            {
+                Debug.LogError(
+                    $"{LogPrefix}No competing summary file is defined for test mode {competingMode}."
+                );
+                return false;
+            }
+
+            if (
+                !TestRunSummaryFile.TryBeginRun(
+                    summaryPath,
+                    mode,
+                    DateTime.UtcNow,
+                    out string owner,
+                    competingSummaryPath
+                )
+            )
             {
                 Debug.LogError($"{LogPrefix}Could not write the running marker to {summaryPath}.");
                 return false;
             }
 
+            SetActiveOwner(owner);
+
             if (!TryEnsureRegistered())
             {
-                TestRunSummaryFile.TryDiscardRun(summaryPath);
+                TestRunSummaryFile.TryDiscardRun(summaryPath, owner);
+                ClearActiveOwner();
                 return false;
             }
 
@@ -77,7 +108,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             }
             catch (Exception exception)
             {
-                TestRunSummaryFile.TryDiscardRun(summaryPath);
+                TestRunSummaryFile.TryDiscardRun(summaryPath, owner);
+                ClearActiveOwner();
                 Debug.LogError($"{LogPrefix}The Test Runner refused a {mode} run: {exception}");
                 return false;
             }
@@ -92,12 +124,25 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// <returns><c>true</c> when a run is in flight and callbacks are registered for it.</returns>
         internal static bool TryRegisterForRunInFlight()
         {
-            if (!IsAnyRunInFlight())
+            if (!TryFindRunInFlight(out TestMode _, out string _, out string owner))
             {
                 return false;
             }
 
+            string sessionOwner = SessionState.GetString(OwnerSessionKey, string.Empty);
+            if (!string.Equals(owner, sessionOwner, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            _owner = owner;
+            _runStarted = SessionState.GetBool(RunStartedSessionKey, defaultValue: false);
             return TryEnsureRegistered();
+        }
+
+        internal static void ClearRunSessionForTests()
+        {
+            ClearActiveOwner();
         }
 
         // Re-register synchronously after reload so early RunFinished events are captured even when delayCall never runs.
@@ -127,28 +172,38 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             TryRegisterForRunInFlight();
         }
 
-        private static bool TryFindRunInFlight(out TestMode mode, out string summaryPath)
+        private static bool TryFindRunInFlight(
+            out TestMode mode,
+            out string summaryPath,
+            out string owner
+        )
         {
-            if (TryFindRunInFlight(TestMode.EditMode, out summaryPath))
+            if (TryFindRunInFlight(TestMode.EditMode, out summaryPath, out owner))
             {
                 mode = TestMode.EditMode;
                 return true;
             }
 
-            if (TryFindRunInFlight(TestMode.PlayMode, out summaryPath))
+            if (TryFindRunInFlight(TestMode.PlayMode, out summaryPath, out owner))
             {
                 mode = TestMode.PlayMode;
                 return true;
             }
 
             mode = TestMode.EditMode;
+            owner = string.Empty;
             return false;
         }
 
-        private static bool TryFindRunInFlight(TestMode mode, out string summaryPath)
+        private static bool TryFindRunInFlight(
+            TestMode mode,
+            out string summaryPath,
+            out string owner
+        )
         {
+            owner = string.Empty;
             return TestRunSummaryFile.TryGetSummaryPath(mode, out summaryPath)
-                && TestRunSummaryFile.IsMarkedRunning(summaryPath);
+                && TestRunSummaryFile.TryReadOwner(summaryPath, out owner);
         }
 
         private static bool TryEnsureRegistered()
@@ -175,6 +230,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 Debug.LogError($"{LogPrefix}Could not register Test Runner callbacks: {exception}");
                 return false;
             }
+        }
+
+        private static void SetActiveOwner(string owner)
+        {
+            _owner = owner;
+            _runStarted = false;
+            SessionState.SetString(OwnerSessionKey, owner);
+            SessionState.SetBool(RunStartedSessionKey, value: false);
+        }
+
+        private static void ClearActiveOwner()
+        {
+            _owner = string.Empty;
+            _runStarted = false;
+            SessionState.EraseString(OwnerSessionKey);
+            SessionState.EraseBool(RunStartedSessionKey);
         }
 
         private static TestRunResultNode BuildNode(ITestResultAdaptor result, int depth)
@@ -297,7 +368,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         ///     the menu item that started it.
         /// </summary>
         /// <param name="testsToRun">The test tree that will be executed.</param>
-        void ICallbacks.RunStarted(ITestAdaptor testsToRun) { }
+        void ICallbacks.RunStarted(ITestAdaptor testsToRun)
+        {
+            if (string.IsNullOrEmpty(_owner))
+            {
+                return;
+            }
+
+            if (_runStarted)
+            {
+                ClearActiveOwner();
+                return;
+            }
+
+            _runStarted = true;
+            SessionState.SetBool(RunStartedSessionKey, value: true);
+        }
 
         /// <summary>
         ///     Called by the Test Runner when an individual test begins. No action is taken.
@@ -320,7 +406,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         void ICallbacks.RunFinished(ITestResultAdaptor result)
         {
             DateTime finishedUtc = DateTime.UtcNow;
-            if (!TryFindRunInFlight(out TestMode mode, out string summaryPath))
+            if (string.IsNullOrEmpty(_owner) || !_runStarted)
+            {
+                return;
+            }
+
+            if (!TryFindRunInFlight(out TestMode mode, out string summaryPath, out string owner))
+            {
+                return;
+            }
+
+            if (!string.Equals(owner, _owner, StringComparison.Ordinal))
             {
                 return;
             }
@@ -328,12 +424,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
             TestRunResultNode root = BuildNode(result, 0);
             PopulateAssemblyBuildTimes(root);
 
-            if (!TestRunSummaryFile.TryFinishRun(summaryPath, mode, finishedUtc, root))
+            if (!TestRunSummaryFile.TryFinishRun(summaryPath, _owner, mode, finishedUtc, root))
             {
                 Debug.LogError($"{LogPrefix}Could not write the {mode} summary to {summaryPath}.");
                 return;
             }
 
+            ClearActiveOwner();
             Debug.Log($"{LogPrefix}Wrote the {mode} summary to {summaryPath}.");
         }
     }

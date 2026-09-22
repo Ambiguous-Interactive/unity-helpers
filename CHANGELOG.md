@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix Texture Resizer so it rejects invalid sizing settings and colliding output names before changing source, importer, or destination files ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
+- Fix Test Run Reporter summary claims so one run owns a marker and a stale callback cannot replace or delete a newer run ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).
+- Fix concurrent processes publishing another `DurableFile` writer's staged bytes. A competing writer now fails while the first owns the stage ([#838](https://github.com/Ambiguous-Interactive/unity-helpers/issues/838)).
 - Stage subtype manifests, exported proto schemas, and sprite or animation configs before replacement so failed staging leaves the previous file intact ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).
 - Stage original asset bytes before stale-key repair rollback and prefab validation undo, so failed staging does not truncate the asset ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).
 - Keep issue template version choices stable across local hooks and release preparation by rendering both forms from a tracked version manifest.
