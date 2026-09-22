@@ -562,6 +562,8 @@ and callback work if imports remain slow.
 
 If a callback repeatedly creates more matching asset changes, the watcher enters loop protection and skips additional batches until it is reset. After fixing the callback or clearing the bad state, editor tools can resume dispatch without a domain reload:
 
+<!-- doc-sample: compiles-editor -->
+
 ```csharp
 using WallstopStudios.UnityHelpers.Editor.AssetProcessors;
 

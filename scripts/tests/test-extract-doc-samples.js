@@ -28,6 +28,60 @@ const { spawnSync } = require("child_process");
 const repoRoot = path.resolve(__dirname, "..", "..");
 const scriptPath = path.join(repoRoot, "scripts", "extract-doc-samples.js");
 
+if (process.argv.includes("--editor-compiler-control")) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "doc-samples-editor-control-"));
+  const editor = path.join(root, "editor");
+  fs.mkdirSync(editor);
+  fs.writeFileSync(
+    path.join(editor, "EditorControl.cs"),
+    [
+      "namespace WallstopStudios.UnityHelpers.DocSamples.EditorControl",
+      "{",
+      "    internal static class EditorControl",
+      "    {",
+      "        internal static readonly System.Type Anchor = typeof(WallstopStudios.UnityHelpers.Editor.Settings.UnityHelpersSettings);",
+      "        internal static object Missing() => UnityEditor.Compilation.CompilationPipeline.DefinitelyMissingDocSampleEditorMember();",
+      "    }",
+      "}",
+      ""
+    ].join("\n"),
+    "utf8"
+  );
+  let result;
+  try {
+    result = spawnSync(
+      "dotnet",
+      [
+        "build",
+        "Generator~/WallstopStudios.UnityHelpers.DocSamplesCheck/WallstopStudios.UnityHelpers.DocSamplesCheck.csproj",
+        "--no-restore",
+        "--nologo",
+        "-v",
+        "quiet",
+        "-p:DocSamplesEditor=true",
+        "-p:BuildProjectReferences=false",
+        `-p:DocSamplesDir=${root}`
+      ],
+      { cwd: repoRoot, encoding: "utf8", timeout: 30000 }
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+  const output = `${result.stdout || ""}\n${result.stderr || ""}`;
+  const errors = [...output.matchAll(/error (CS\d+):/g)].map((match) => match[1]);
+  if (
+    result.status !== 1 ||
+    errors.length === 0 ||
+    errors.some((error) => error !== "CS0117") ||
+    !output.includes("DefinitelyMissingDocSampleEditorMember")
+  ) {
+    console.error(`[doc-samples] Editor compiler control failed: ${output}`);
+    process.exit(1);
+  }
+  console.log("[doc-samples] Editor compiler control reported CS0117 as expected.");
+  process.exit(0);
+}
+
 let passed = 0;
 let failed = 0;
 const failures = [];
@@ -49,9 +103,10 @@ function runTest(name, body) {
  * Writes a fixture documentation tree and runs the extractor over it.
  *
  * @param {string} markdown The single documentation page's contents.
- * @returns {{status: number, stdout: string, stderr: string, files: string[]}} What happened.
+ * @param {boolean} requireBoth Whether both compile legs must have subjects.
+ * @returns {{status: number, stdout: string, stderr: string, files: string[], editorFiles: string[]}} What happened.
  */
-function extract(markdown) {
+function extract(markdown, requireBoth = false) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "doc-samples-"));
   const docs = path.join(root, "docs");
   fs.mkdirSync(docs, { recursive: true });
@@ -61,14 +116,35 @@ function extract(markdown) {
   const result = spawnSync(process.execPath, [scriptPath], {
     cwd: repoRoot,
     encoding: "utf8",
-    env: { ...process.env, DOC_SAMPLES_ROOT: root, DOC_SAMPLES_OUT: out }
+    env: {
+      ...process.env,
+      DOC_SAMPLES_ROOT: root,
+      DOC_SAMPLES_OUT: out,
+      DOC_SAMPLES_REQUIRE_BOTH: requireBoth ? "1" : "0"
+    }
   });
 
   const files = fs.existsSync(out)
-    ? fs.readdirSync(out).map((name) => fs.readFileSync(path.join(out, name), "utf8"))
+    ? fs
+        .readdirSync(out)
+        .filter((name) => name.endsWith(".cs"))
+        .map((name) => fs.readFileSync(path.join(out, name), "utf8"))
+    : [];
+  const editorOut = path.join(out, "editor");
+  const editorFiles = fs.existsSync(editorOut)
+    ? fs
+        .readdirSync(editorOut)
+        .filter((name) => name.endsWith(".cs"))
+        .map((name) => fs.readFileSync(path.join(editorOut, name), "utf8"))
     : [];
   fs.rmSync(root, { recursive: true, force: true });
-  return { status: result.status, stdout: result.stdout, stderr: result.stderr, files };
+  return {
+    status: result.status,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    files,
+    editorFiles
+  };
 }
 
 const TYPE_SAMPLE = [
@@ -100,6 +176,61 @@ runTest("a marked type sample is extracted into its own namespace", () => {
     /Samples compiled: 1\b/.test(result.stdout),
     `the checked count has to be reported: ${result.stdout}`
   );
+});
+
+runTest("a namespace sample stays at compilation-unit scope", () => {
+  const result = extract(
+    [
+      "<!-- doc-sample: compiles -->",
+      "```csharp",
+      "namespace MyGame.Editor",
+      "{",
+      "    public sealed class EditorExample { }",
+      "}",
+      "```",
+      ""
+    ].join("\n")
+  );
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.ok(result.files[0].includes("namespace MyGame.Editor"));
+  assert.ok(!result.files[0].includes("class DocSample : UnityEngine.MonoBehaviour"));
+});
+
+runTest("an Editor-only sample is excluded from the runtime sample set", () => {
+  const result = extract(
+    [
+      "<!-- doc-sample: compiles-editor -->",
+      "```csharp",
+      "UnityEditor.AssetDatabase.Refresh();",
+      "```",
+      ""
+    ].join("\n")
+  );
+  assert.strictEqual(result.status, 0, result.stderr);
+  assert.strictEqual(result.files.length, 0);
+  assert.strictEqual(result.editorFiles.length, 1);
+  assert.ok(result.editorFiles[0].includes("UnityEditor.AssetDatabase.Refresh"));
+});
+
+runTest("RED: a runtime-only corpus cannot pass both compile legs", () => {
+  const result = extract(TYPE_SAMPLE, true);
+  assert.strictEqual(result.status, 1);
+  assert.ok(result.stderr.includes("Editor-only corpus checked nothing"));
+});
+
+runTest("RED: an Editor-only corpus cannot pass both compile legs", () => {
+  const result = extract(
+    [
+      "<!-- doc-sample: compiles-editor -->",
+      "```csharp",
+      "UnityEditor.AssetDatabase.Refresh();",
+      "```",
+      ""
+    ].join("\n"),
+    true
+  );
+  assert.strictEqual(result.status, 1);
+  assert.ok(result.stderr.includes("runtime compile leg checked nothing"));
 });
 
 runTest("an unmarked sample is counted but not extracted", () => {
@@ -428,6 +559,23 @@ runTest("the repository's own corpus is not empty", () => {
   assert.ok(
     300 <= Number(match[1]),
     `the corpus shrank to ${match[1]} samples; a gate that checks a handful is not the gate #611 asked for`
+  );
+  const extracted = path.join(repoRoot, "artifacts", "doc-samples");
+  const samples = [
+    ...fs.readdirSync(extracted).filter((name) => name.endsWith(".cs")),
+    ...fs
+      .readdirSync(path.join(extracted, "editor"))
+      .filter((name) => name.endsWith(".cs"))
+      .map((name) => path.join("editor", name))
+  ];
+  const editorSamples = samples.filter((name) =>
+    /\busing\s+UnityEditor\s*;|\busing\s+WallstopStudios\.UnityHelpers\.Editor\b|\bUnityEditor\./.test(
+      fs.readFileSync(path.join(extracted, name), "utf8")
+    )
+  );
+  assert.ok(
+    12 <= editorSamples.length,
+    `the checked Editor API sample corpus shrank to ${editorSamples.length}`
   );
 });
 

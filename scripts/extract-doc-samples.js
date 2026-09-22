@@ -13,11 +13,13 @@
  * `Type.Member` reported `Serializer.ProtoDeserialize` as missing 17 times, because it cannot see a
  * generic method, an extension method, or an overload set, and a gate that cries wolf is one people
  * stop reading. So resolution is left to Roslyn: this script emits samples as compilation units and
- * `WallstopStudios.UnityHelpers.DocSamplesCheck` compiles them against the real `Runtime/**`.
+ * `WallstopStudios.UnityHelpers.DocSamplesCheck` compiles them against the real `Runtime/**` and
+ * `Editor/**` API surfaces.
  *
- * WHICH BLOCKS, AND WHY A MARKER. Measured over the whole tree: of 749 non-empty C# blocks, 319
- * compile standing alone and 430 do not. The rest are continuations -- a subtype whose base was
- * declared in the block above, an inspector attribute on a field of a class the prose has already
+ * WHICH BLOCKS, AND WHY A MARKER. The original survey, before Editor samples were added, found
+ * 749 non-empty C# blocks: 319 compiled standing alone and 430 did not. The rest are
+ * continuations -- a subtype whose base was declared in the block above, an inspector attribute
+ * on a field of a class the prose has already
  * introduced, a snippet naming the `player` the reader is expected to supply -- and they are
  * correct documentation. A gate that failed two blocks in three would be switched off inside a
  * week, so a sample opts IN by saying it stands alone:
@@ -27,6 +29,8 @@
  *     [WProtoContract]
  *     public partial class Player { [WProtoMember(1)] public int Level; }
  *     ```
+ * An Editor-only sample uses `<!-- doc-sample: compiles-editor -->`; the ordinary marker is
+ * compiled once for runtime and again for Editor, preserving both preprocessor branches.
  *
  * The marker is an HTML comment on its own line before the fence, invisible in rendered Markdown.
  * The checked COUNT is printed on every run, beside the total the tree holds, so a corpus that
@@ -41,12 +45,12 @@
  * members reported `int i = -1;` as `CS1519`. Measured over `docs/`, 78 blocks compile only in a
  * namespace, 17 only as members and 67 only inside a method body, so all three are load-bearing.
  *
- * WHAT IS LEFT, AND WHY, measured rather than guessed
- * ([#615](https://github.com/Ambiguous-Interactive/unity-helpers/issues/615)). Of the 430 blocks
+ * WHAT THE ORIGINAL SURVEY LEFT OUT, measured rather than guessed
+ * ([#615](https://github.com/Ambiguous-Interactive/unity-helpers/issues/615)). Of those 430 blocks
  * that do not compile: 49 carry an elision, so nothing can compile them; 68 fail structurally --
  * a fragment, a signature with no body, pseudo-code; and 313 fail only because a name does not
  * resolve. Those 313 split by what is missing: 34 name NUnit, 20 name Odin, 12 name `UnityEditor`,
- * one names uGUI, and **246 name something the reader is expected to supply** -- the `player` in
+ * one names uGUI, and **246 named something the reader is expected to supply** -- the `player` in
  * `player.Health`.
  *
  * A PER-PAGE PREAMBLE -- one marked block per page declaring the vocabulary its snippets share --
@@ -70,6 +74,8 @@ const REPO_ROOT = path.resolve(__dirname, "..");
 const SCAN_ROOT = process.env.DOC_SAMPLES_ROOT
   ? path.resolve(process.env.DOC_SAMPLES_ROOT)
   : REPO_ROOT;
+const REQUIRE_BOTH_CORPORA =
+  SCAN_ROOT === REPO_ROOT || process.env.DOC_SAMPLES_REQUIRE_BOTH === "1";
 const OUTPUT_DIR = process.env.DOC_SAMPLES_OUT
   ? path.resolve(process.env.DOC_SAMPLES_OUT)
   : path.join(REPO_ROOT, "artifacts", "doc-samples");
@@ -78,12 +84,14 @@ const OUTPUT_DIR = process.env.DOC_SAMPLES_OUT
 const DOC_ROOTS = ["docs"];
 
 const COMPILES_MARKER = "<!-- doc-sample: compiles -->";
+const EDITOR_COMPILES_MARKER = "<!-- doc-sample: compiles-editor -->";
 const FENCE = /^```(csharp|cs)\s*$/;
 const CLOSING_FENCE = /^```\s*$/;
 const USING_LINE = /^\s*using\s+[A-Za-z0-9_.<>, ]+\s*;\s*$/;
 const ASSEMBLY_ATTRIBUTE = /^\s*\[assembly\s*:/m;
 /** A type declaration at brace depth zero, which decides which scope a block's item goes in. */
 const TYPE_KEYWORD = /(^|[^A-Za-z0-9_])(class|struct|interface|enum|record)\s+[A-Za-z_]/;
+const NAMESPACE_DECLARATION = /^\s*namespace\s+[A-Za-z_][A-Za-z0-9_.]*\s*\{/;
 
 /**
  * Separates a block's `using` directives from the rest of it.
@@ -192,7 +200,7 @@ function samplesIn(file, text, skipped, problems) {
   const lines = text.replace(/\r\n/g, "\n").split("\n");
   const found = [];
   for (let index = 0; index < lines.length; index++) {
-    if (lines[index].trim() === COMPILES_MARKER) {
+    if (lines[index].trim() === COMPILES_MARKER || lines[index].trim() === EDITOR_COMPILES_MARKER) {
       let next = index + 1;
       while (next < lines.length && lines[next].trim().length === 0) {
         next++;
@@ -202,7 +210,7 @@ function samplesIn(file, text, skipped, problems) {
         // A marker that claims nothing is worse than no marker: it reads as a considered decision
         // and adds no block to the corpus at all.
         problems.push(
-          `${file}:${index + 1}: the ${COMPILES_MARKER} marker is not followed by a \`\`\`csharp fence, so it adds nothing to the checked corpus.`
+          `${file}:${index + 1}: the ${lines[index].trim()} marker is not followed by a \`\`\`csharp fence, so it adds nothing to the checked corpus.`
         );
       }
 
@@ -236,7 +244,10 @@ function samplesIn(file, text, skipped, problems) {
       continue;
     }
 
-    if (!(0 <= marker && lines[marker].trim() === COMPILES_MARKER)) {
+    if (!(
+      0 <= marker &&
+      (lines[marker].trim() === COMPILES_MARKER || lines[marker].trim() === EDITOR_COMPILES_MARKER)
+    )) {
       /*
        * Counted by the SAME sort that decides the wrapper, so the report says how much of the
        * corpus is reachable rather than only how much of it is claimed. Reading the shape off the
@@ -259,19 +270,24 @@ function samplesIn(file, text, skipped, problems) {
     // to compile it contradicts that claim and is reported rather than swallowed.
     if (ELISIONS.some((elision) => joined.includes(elision))) {
       problems.push(
-        `${file}:${start}: a sample marked ${COMPILES_MARKER} contains an elision, so it cannot compile. Remove the marker or the elision.`
+        `${file}:${start}: a sample marked ${lines[marker].trim()} contains an elision, so it cannot compile. Remove the marker or the elision.`
       );
       continue;
     }
 
     if (ASSEMBLY_ATTRIBUTE.test(joined)) {
       problems.push(
-        `${file}:${start}: a sample marked ${COMPILES_MARKER} may not carry an [assembly: ...] attribute; each sample is wrapped in its own namespace.`
+        `${file}:${start}: a sample marked ${lines[marker].trim()} may not carry an [assembly: ...] attribute; each sample is wrapped in its own namespace.`
       );
       continue;
     }
 
-    found.push({ file, line: start, body });
+    found.push({
+      file,
+      line: start,
+      body,
+      editorOnly: lines[marker].trim() === EDITOR_COMPILES_MARKER
+    });
   }
 
   return found;
@@ -448,7 +464,7 @@ function kindOf(item) {
 
   const withoutAttributes = item.replace(/^(\s*\[[^\]]*\]\s*\n?)+/, "");
   const head = withoutAttributes.split("{")[0];
-  if (TYPE_KEYWORD.test(head)) {
+  if (TYPE_KEYWORD.test(head) || NAMESPACE_DECLARATION.test(item)) {
     return "type";
   }
 
@@ -619,13 +635,25 @@ function main() {
 
   fs.rmSync(OUTPUT_DIR, { recursive: true, force: true });
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+  fs.mkdirSync(path.join(OUTPUT_DIR, "editor"), { recursive: true });
+  let runtimeCount = 0;
+  let editorOnlyCount = 0;
   for (const sample of samples) {
     const suffix = suffixFor(sample);
-    fs.writeFileSync(path.join(OUTPUT_DIR, `${suffix}.cs`), render(sample, suffix), "utf8");
+    const directory = sample.editorOnly ? path.join(OUTPUT_DIR, "editor") : OUTPUT_DIR;
+    if (sample.editorOnly) {
+      editorOnlyCount++;
+    } else {
+      runtimeCount++;
+    }
+    fs.writeFileSync(path.join(directory, `${suffix}.cs`), render(sample, suffix), "utf8");
   }
 
   console.log(`[doc-samples] Markdown files scanned: ${scanned}`);
   console.log(`[doc-samples] Samples compiled: ${samples.length}`);
+  console.log(
+    `[doc-samples] Runtime samples: ${runtimeCount}; Editor-only samples: ${editorOnlyCount}`
+  );
   console.log(
     `[doc-samples] Unmarked: ${skipped.declaration} declaration-shaped, ${skipped.member} member-shaped, ${skipped.usage} statement-shaped, ${skipped.empty} empty`
   );
@@ -645,6 +673,18 @@ function main() {
     // shrank to nothing looks exactly like a corpus that passed, which is the shape #556 refuses.
     console.error(
       `[doc-samples] ERROR no documentation sample carries the ${COMPILES_MARKER} marker, so this gate checked nothing.`
+    );
+    process.exitCode = 1;
+  }
+  if (REQUIRE_BOTH_CORPORA && runtimeCount === 0) {
+    console.error(
+      `[doc-samples] ERROR no documentation sample carries the ${COMPILES_MARKER} marker, so the runtime compile leg checked nothing.`
+    );
+    process.exitCode = 1;
+  }
+  if (REQUIRE_BOTH_CORPORA && editorOnlyCount === 0) {
+    console.error(
+      `[doc-samples] ERROR no documentation sample carries the ${EDITOR_COMPILES_MARKER} marker, so the Editor-only corpus checked nothing.`
     );
     process.exitCode = 1;
   }

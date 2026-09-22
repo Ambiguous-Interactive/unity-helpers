@@ -1716,7 +1716,9 @@ into a player -- gets `WPROTO041` as an **error**, and `WProtoSubtypeTagBuildGat
 `IPreprocessBuildWithReport`, refuses the build outright and names the types.
 
 **Commit the manifest.** It is the wire contract, exactly as a `[WProtoMember]` number is, and it has
-to survive a clean checkout and a different machine. Three rules make add / remove / re-add safe, and
+to survive a clean checkout and a different machine. If staging fails, the previous manifest stays
+intact; on platforms without `File.Replace`, a failed fallback swap can still lose it. Three rules
+make add / remove / re-add safe, and
 the tool enforces all three:
 
 - **A number is never reassigned.** An entry already in the file keeps its number even when a smaller
@@ -2206,6 +2208,10 @@ is resolved from the Unity project root and must stay inside it; an absolute des
 outside the project. An invalid package or path is refused before any file is written.
 When `surrogates` is null, `Export` discovers the registered surrogates in loaded assemblies; pass a
 map to replace that set explicitly. A discovery failure stops the export before writing.
+Each schema file is staged before replacement, so a staging failure leaves the previous file intact.
+On platforms without `File.Replace`, a failed fallback swap can still lose the previous file.
+In a multi-file export, earlier files may already have been replaced when a later write fails;
+`WrittenPaths` names those completed files.
 
 ```csharp
 using WallstopStudios.UnityHelpers.Editor.Tools;

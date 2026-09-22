@@ -15,28 +15,23 @@
     cannot see a generic method, an extension method, or an overload set. Roslyn can, so resolution
     is left to it. `scripts/extract-doc-samples.js` writes the marked samples into
     `artifacts/doc-samples`, one namespace each, and this project compiles them against the real
-    `Runtime/**`: the same sources TypeCheck judges, referenced as its output rather than
-    recompiled.
+    `Runtime/**` and `Editor/**`: the same sources TypeCheck and EditorCheck judge, referenced as
+    their outputs rather than recompiled. The runtime leg preserves player-branch sample coverage;
+    the editor leg includes all runtime samples plus the editor-only ones.
 
     WHAT IT DOES NOT COVER, deliberately:
 
-      1. Unmarked samples: 430 of the tree's 749 non-empty C# blocks. A gate demanding that every
-         fragment compile would fail on almost all of them, because most reference types the reader
-         is expected to supply. The marker is opt-in and the marked COUNT is reported on every run,
-         so a corpus that stops being scanned is visible rather than silent. 246 of those 430 name
+      1. Unmarked samples: the original survey found 430 of 749 non-empty C# blocks. A gate
+         demanding that every fragment compile would fail on almost all of them, because most
+         reference types the reader is expected to supply. The marker is opt-in and the marked
+         COUNT is reported on every run, so a corpus that stops being scanned is visible rather
+         than silent. In that survey, 246 name
          a local the reader supplies; a per-page preamble would convert them and was priced and
          declined, because 81% of its declarations would serve exactly one block
          (https://github.com/Ambiguous-Interactive/unity-helpers/issues/615).
-      1b. NUnit, blocking 34 blocks, and Odin, blocking 20. Referencing either here would widen
+      2. The original survey found 34 NUnit and 20 Odin blocks. Referencing either here would widen
          this project's dependency surface for one page each, and Odin is paid software with no
          NuGet package at all.
-      2. `Editor/**`, blocking 12 blocks. EditorCheck's seven exclusions were read before this was
-         left out, and they turn out to cost almost nothing here: TWO are permanent (uGUI, which
-         has no NuGet package on either side), FIVE are driven by the `Unity3D.SDK` 2021.1.14 pin,
-         and two of those five are stood in for by shims that keep the type NAME resolvable. So
-         only five names under `Editor/` are actually unreachable, and `docs/` mentions ONE of them
-         (`SerializableDictionaryPropertyDrawer`, in prose rather than in a sample). The blocker is
-         therefore the editor reference itself, not the exclusion list.
       3. The shipped analyzers. This gate answers "do these names resolve", which is #611's subject.
          Loading the generator here would additionally emit formatters for any `[WProtoContract]` a
          sample declares, which is a different question with a different failure mode.
@@ -53,6 +48,10 @@
     <IsPackable>false</IsPackable>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <AssemblyName>WallstopStudios.UnityHelpers.DocSamplesCheck</AssemblyName>
+    <UnityEditorReferenceAssemblyVersion>2021.1.14.1</UnityEditorReferenceAssemblyVersion>
+    <DocSamplesEditor Condition="'$(DocSamplesEditor)' == ''">false</DocSamplesEditor>
+    <DefineConstants Condition="'$(DocSamplesEditor)' == 'true'"
+      >$(DefineConstants);UNITY_EDITOR</DefineConstants>
     <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)/../..'))</RepoRoot>
     <DocSamplesDir Condition="'$(DocSamplesDir)' == ''"
       >$(RepoRoot)/artifacts/doc-samples</DocSamplesDir>
@@ -66,14 +65,31 @@
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference
+      Include="Unity3D.SDK"
+      Version="$(UnityEditorReferenceAssemblyVersion)"
+      GeneratePathProperty="true"
+      ExcludeAssets="all"
+      NoWarn="NU1701"
+      Condition="'$(DocSamplesEditor)' == 'true'"
+    />
     <CompilerVisibleProperty Include="WProtoDisableModuleInitializer" />
   </ItemGroup>
   <ItemGroup>
-    <!-- The package's runtime API surface, built once by TypeCheck rather than recompiled here.
-         A divergence between the two would be a bug in one of them. -->
-    <ProjectReference Include="../WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj" />
+    <ProjectReference
+      Include="../WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj"
+      Condition="'$(DocSamplesEditor)' != 'true'"
+    />
+    <ProjectReference
+      Include="../WallstopStudios.UnityHelpers.EditorCheck/WallstopStudios.UnityHelpers.EditorCheck.csproj"
+      Condition="'$(DocSamplesEditor)' == 'true'"
+    />
   </ItemGroup>
   <ItemGroup>
+    <Reference Include="UnityEditor" Condition="'$(DocSamplesEditor)' == 'true'">
+      <HintPath>$(PkgUnity3D_SDK)/lib/UnityEditor.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="protobuf-net">
       <HintPath>$(RepoRoot)/Runtime/Protobuf-Net/protobuf-net.dll</HintPath>
     </Reference>
@@ -90,5 +106,6 @@
   <ItemGroup>
     <!-- Written by `scripts/extract-doc-samples.js`, which refuses a run that produced none. -->
     <Compile Include="$(DocSamplesDir)/*.cs" />
+    <Compile Include="$(DocSamplesDir)/editor/*.cs" Condition="'$(DocSamplesEditor)' == 'true'" />
   </ItemGroup>
 </Project>

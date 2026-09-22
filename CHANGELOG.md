@@ -9,8 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add an encoding-aware `DurableFile.TryWriteAllText` overload that preserves the encoding's byte order mark for staged writes.
+
 ### Fixed
 
+- Stage subtype manifests, exported proto schemas, and sprite or animation configs before replacement so failed staging leaves the previous file intact ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).
+- Stage original asset bytes before stale-key repair rollback and prefab validation undo, so failed staging does not truncate the asset ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).
 - Keep issue template version choices stable across local hooks and release preparation by rendering both forms from a tracked version manifest.
 - Fix asset change detection warnings caused by deserializing imported assets while checking for matching sub-assets. Sprite and nested asset watchers still receive matching paths ([#834](https://github.com/Ambiguous-Interactive/unity-helpers/issues/834)).
 - Fix `FileHelper.InitializePath` to return `false` for invalid paths and directory failures while preserving existing files. See [File Operations](./docs/features/utilities/helper-utilities.md#file-operations) ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).

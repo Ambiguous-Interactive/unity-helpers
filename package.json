@@ -135,7 +135,8 @@
     "lint:code-samples": "node ./scripts/extract-code-samples.js --extract-only",
     "lint:doc-identifiers": "node ./scripts/lint-doc-identifiers.js",
     "lint:code-samples:verbose": "node ./scripts/extract-code-samples.js --verbose --extract-only",
-    "lint:doc-samples": "node scripts/extract-doc-samples.js && dotnet build \"Generator~/WallstopStudios.UnityHelpers.DocSamplesCheck/WallstopStudios.UnityHelpers.DocSamplesCheck.csproj\" --nologo -v minimal",
+    "lint:doc-samples": "node scripts/extract-doc-samples.js && dotnet build \"Generator~/WallstopStudios.UnityHelpers.DocSamplesCheck/WallstopStudios.UnityHelpers.DocSamplesCheck.csproj\" --nologo -v minimal && dotnet build \"Generator~/WallstopStudios.UnityHelpers.DocSamplesCheck/WallstopStudios.UnityHelpers.DocSamplesCheck.csproj\" --nologo -v minimal -p:DocSamplesEditor=true && node scripts/tests/test-extract-doc-samples.js --editor-compiler-control",
+    "lint:doc-samples:reuse-checks": "node scripts/extract-doc-samples.js && dotnet build \"Generator~/WallstopStudios.UnityHelpers.DocSamplesCheck/WallstopStudios.UnityHelpers.DocSamplesCheck.csproj\" --nologo -v minimal -p:BuildProjectReferences=false && dotnet build \"Generator~/WallstopStudios.UnityHelpers.DocSamplesCheck/WallstopStudios.UnityHelpers.DocSamplesCheck.csproj\" --nologo -v minimal -p:DocSamplesEditor=true -p:BuildProjectReferences=false && node scripts/tests/test-extract-doc-samples.js --editor-compiler-control",
     "lint:spelling": "node ./scripts/run-node-bin.js cspell --no-progress --show-suggestions",
     "lint:spelling:verbose": "node ./scripts/run-node-bin.js cspell --show-suggestions",
     "lint:spelling:config": "node scripts/lint-cspell-config.js",
@@ -262,7 +263,7 @@
     "test:lint-comment-block-form": "node scripts/tests/test-lint-comment-block-form.js",
     "lint:comment-block-form:fix": "pwsh -NoProfile -File scripts/lint-comment-block-form.ps1 -Fix",
     "test:out-parameters": "node scripts/tests/test-out-parameter-discipline.js",
-    "typecheck:unity": "npm run typecheck:unity:default && npm run typecheck:unity:legacy && npm run typecheck:unity:odin && npm run typecheck:unity:singlethreaded && npm run typecheck:editor && npm run typecheck:tests && npm run typecheck:editor-tests && npm run typecheck:integrations && npm run typecheck:random-quality && npm run lint:doc-samples",
+    "typecheck:unity": "npm run typecheck:unity:legacy && npm run typecheck:unity:odin && npm run typecheck:unity:singlethreaded && npm run typecheck:unity:default && npm run typecheck:editor && npm run typecheck:tests && npm run typecheck:editor-tests && npm run typecheck:integrations && npm run typecheck:random-quality && npm run lint:doc-samples:reuse-checks",
     "typecheck:unity:clean": "node scripts/typecheck-clean.js",
     "typecheck:controls": "node scripts/typecheck-controls.js",
     "test:typecheck-controls": "node scripts/tests/test-typecheck-controls.js",
@@ -270,7 +271,7 @@
     "typecheck:unity:legacy": "dotnet build \"Generator~/WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj\" --nologo -v minimal -p:WallstopProto=false",
     "typecheck:unity:odin": "dotnet build \"Generator~/WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj\" --nologo -v minimal -p:WallstopOdin=true",
     "typecheck:unity:singlethreaded": "dotnet build \"Generator~/WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj\" --nologo -v minimal -p:WallstopSingleThreaded=true",
-    "typecheck:editor": "npm run typecheck:editor:default && npm run typecheck:editor:legacy && npm run typecheck:editor:odin && npm run typecheck:editor:singlethreaded",
+    "typecheck:editor": "npm run typecheck:editor:legacy && npm run typecheck:editor:odin && npm run typecheck:editor:singlethreaded && npm run typecheck:editor:default",
     "typecheck:editor:default": "dotnet build \"Generator~/WallstopStudios.UnityHelpers.EditorCheck/WallstopStudios.UnityHelpers.EditorCheck.csproj\" --nologo -v minimal",
     "typecheck:editor:legacy": "dotnet build \"Generator~/WallstopStudios.UnityHelpers.EditorCheck/WallstopStudios.UnityHelpers.EditorCheck.csproj\" --nologo -v minimal -p:WallstopProto=false",
     "typecheck:editor:odin": "dotnet build \"Generator~/WallstopStudios.UnityHelpers.EditorCheck/WallstopStudios.UnityHelpers.EditorCheck.csproj\" --nologo -v minimal -p:WallstopOdin=true",
@@ -367,9 +368,9 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "1.30.0",
-    "cspell": "10.3.0",
+    "cspell": "10.3.3",
     "markdownlint-cli": "0.49.1",
-    "prettier": "3.9.6",
+    "prettier": "3.9.8",
     "smol-toml": "1.8.0"
   }
 }

@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
     using System.Text;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>Writes proto3 schemas for selected contracts without showing editor prompts.</summary>
@@ -200,11 +201,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                         Directory.CreateDirectory(parent);
                     }
 
-                    File.WriteAllText(
-                        renderedFile.Path,
-                        renderedFile.Schema,
-                        new UTF8Encoding(false)
-                    );
+                    if (
+                        !DurableFile.TryWriteAllText(
+                            renderedFile.Path,
+                            renderedFile.Schema,
+                            out Exception writeError
+                        )
+                    )
+                    {
+                        throw new IOException(writeError.Message, writeError);
+                    }
                     writtenPaths.Add(renderedFile.Path);
                 }
             }

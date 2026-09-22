@@ -79,6 +79,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                 "message ProtoSchemaExporterSecondSampleContract",
                 File.ReadAllText(_outputPath)
             );
+
+            byte[] original = File.ReadAllBytes(_outputPath);
+            Directory.CreateDirectory(_outputPath + ".tmp");
+            ProtoSchemaExporter.ExportResult blocked = ProtoSchemaExporter.Export(
+                new[] { typeof(ProtoSchemaExporterSecondSampleContract) },
+                _outputPath,
+                ProtoSchemaExporter.ExportLayout.SingleFile,
+                "mygame.save"
+            );
+
+            Assert.IsFalse(blocked.Success);
+            Assert.IsEmpty(blocked.WrittenPaths);
+            CollectionAssert.AreEqual(original, File.ReadAllBytes(_outputPath));
         }
 
         [TestCase("1bad", "valid.proto")]

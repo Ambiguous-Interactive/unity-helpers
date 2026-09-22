@@ -645,7 +645,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                 AnimationCreatorConfig config = CreateConfigFromCurrentState();
                 string json = Serializer.JsonStringify(config, pretty: true);
-                File.WriteAllText(fullConfigPath, json, Encoding.UTF8);
+                if (
+                    !DurableFile.TryWriteAllText(
+                        fullConfigPath,
+                        json,
+                        Encoding.UTF8,
+                        out Exception writeError
+                    )
+                )
+                {
+                    throw new IOException("Failed to replace animation config.", writeError);
+                }
 
                 _loadedConfigs[folderPath] = config;
                 this.Log($"Saved animation creator config to '{configPath}'.");

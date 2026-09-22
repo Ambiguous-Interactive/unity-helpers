@@ -121,6 +121,8 @@ per-asset text figures are one whole-corpus scan with one warm index build subtr
 
 ## Write a rule
 
+<!-- doc-sample: compiles-editor -->
+
 ```csharp
 namespace MyGame.Editor
 {
@@ -364,7 +366,9 @@ data is retained conservatively and can require a fresh scan after reload, as ca
 
 Scene component removal uses Unity's ordinary **Edit > Undo** history. Other supported fixes expose
 a targeted toast **Undo**, which refuses restoration when the affected asset has since changed or
-been replaced. Importer and prefab restoration performs a new import; it does not reverse unrelated
+been replaced. Prefab undo stages the previous bytes before replacement, so a staging failure leaves
+the current prefab intact. On platforms without `File.Replace`, a failed fallback swap can still
+lose it. Importer and prefab restoration performs a new import; it does not reverse unrelated
 side effects caused by other import processors. A mixed batch's toast excludes scene removals and
 says to use Edit > Undo for those changes.
 

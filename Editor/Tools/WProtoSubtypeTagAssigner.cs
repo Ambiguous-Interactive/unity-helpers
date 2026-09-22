@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
     using System.Text;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
@@ -791,15 +792,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
         /// <returns><c>null</c> on success, or the failure to report.</returns>
         private static string Write(string path, string rendered)
         {
-            try
+            if (DurableFile.TryWriteAllText(path, rendered, out Exception error))
             {
-                File.WriteAllText(path, rendered, new UTF8Encoding(false));
                 return null;
             }
-            catch (Exception error)
-            {
-                return "Could not write '" + path + "': " + error.Message;
-            }
+
+            return "Could not write '" + path + "': " + error.Message;
         }
 
         /// <summary>

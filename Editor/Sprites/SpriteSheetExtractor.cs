@@ -2803,7 +2803,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 };
 
                 string json = Serializer.JsonStringify(config, pretty: true);
-                File.WriteAllText(fullConfigPath, json, Encoding.UTF8);
+                if (
+                    !DurableFile.TryWriteAllText(
+                        fullConfigPath,
+                        json,
+                        Encoding.UTF8,
+                        out Exception writeError
+                    )
+                )
+                {
+                    throw new IOException("Failed to replace sprite sheet config.", writeError);
+                }
 
                 entry._loadedConfig = config;
                 entry._configLoaded = true;

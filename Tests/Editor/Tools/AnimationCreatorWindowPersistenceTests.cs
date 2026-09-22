@@ -7,9 +7,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
     using System;
     using System.Collections.Generic;
     using System.IO;
+    using System.Text.RegularExpressions;
     using NUnit.Framework;
     using UnityEditor;
     using UnityEngine;
+    using UnityEngine.TestTools;
     using WallstopStudios.UnityHelpers.Core.Animation;
     using WallstopStudios.UnityHelpers.Editor.Sprites;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -207,6 +209,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             string configPath = AnimationCreatorConfig.GetConfigPath(_tempFolder);
             string fullPath = Path.GetFullPath(configPath);
             Assert.IsTrue(File.Exists(fullPath));
+
+            byte[] original = File.ReadAllBytes(fullPath);
+            Directory.CreateDirectory(fullPath + ".tmp");
+            _window.spriteNameRegex = "^Replacement_.*$";
+            LogAssert.Expect(LogType.Error, new Regex("Failed to save config"));
+            Assert.IsFalse(_window.SaveConfig(_tempFolder));
+            CollectionAssert.AreEqual(original, File.ReadAllBytes(fullPath));
         }
 
         [Test]
