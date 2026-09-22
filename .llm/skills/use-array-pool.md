@@ -140,6 +140,15 @@ for (int i = 0; i < buffer.Length; i++)  // May iterate past valid data!
 
 ## Pattern Examples
 
+### APIs That Consume the Whole Array
+
+When an API reads the entire physical array and accepts no logical length (for example,
+`AssetDatabase.FindAssets` with `searchInFolders`), do not pass a possibly oversized
+`SystemArrayPool<T>` rental. Do not switch to `WallstopArrayPool<T>.Get(collection.Count)` for
+an unbounded count: each distinct exact size retains a pool bucket. Use an exact owned array
+unless the possible sizes form a small, fixed set. Measure small, infrequent editor calls before
+adding pooling; rent/return can cost more than the allocation.
+
 ### Fixed-Size Buffer
 
 ```csharp
