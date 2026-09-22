@@ -396,7 +396,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 1,
                 1f,
                 1f,
-                null,
+                "Assets/Temp/TextureResizerWizardTests/MissingOutput",
                 true
             );
             Assert.IsFalse(succeeded);

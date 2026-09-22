@@ -471,7 +471,7 @@ public static class TextureResizeExample
 
 Invalid source or output folders are rejected before any texture changes. Overwrite mode accepts
 only textures under `Assets/`; package textures can be copied into an explicit `Assets/` output
-folder. The dry run reports target sizes without changing files or importer settings. A real run
+folder. Textures are processed in natural name order, so `Sprite2` precedes `Sprite10`. The dry run reports target sizes without changing files or importer settings. A real run
 writes PNG files, so Unity Undo cannot fully reverse it. A failed or canceled run may leave earlier
 textures resized.
 

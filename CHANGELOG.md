@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add `TextureResizerAPI.TryResizeTextures` so editor scripts can resize or preview PNGs from explicit textures and asset folders without opening the window ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
+- Add `TextureResizerAPI.TryResizeTextures` so editor scripts can resize or preview PNGs from explicit textures and asset folders without opening the window. Textures process in natural name order ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Add an encoding-aware `DurableFile.TryWriteAllText` overload that preserves the encoding's byte order mark for staged writes.
 
 ### Fixed

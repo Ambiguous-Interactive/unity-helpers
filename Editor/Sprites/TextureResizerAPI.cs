@@ -84,28 +84,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             bool dryRun
         )
         {
-            if (outputDirAssetPath != null && string.IsNullOrWhiteSpace(outputDirAssetPath))
-            {
-                Debug.LogError("The output folder is invalid.");
-                return false;
-            }
-
-            outputDirAssetPath = outputDirAssetPath.SanitizePath();
-            if (
-                !string.IsNullOrEmpty(outputDirAssetPath)
-                && (
-                    !AssetDatabase.IsValidFolder(outputDirAssetPath)
-                    || !(
-                        string.Equals(outputDirAssetPath, "Assets", StringComparison.Ordinal)
-                        || outputDirAssetPath.StartsWith("Assets/", StringComparison.Ordinal)
-                    )
-                )
-            )
-            {
-                Debug.LogError($"The output folder is invalid: {outputDirAssetPath}.");
-                return false;
-            }
-
             if (
                 numResizes <= 0
                 || pixelsPerUnit <= 0
@@ -130,6 +108,23 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return false;
             }
 
+            if (outputDirAssetPath != null)
+            {
+                outputDirAssetPath = outputDirAssetPath.SanitizePath();
+                if (
+                    string.IsNullOrWhiteSpace(outputDirAssetPath)
+                    || !(
+                        string.Equals(outputDirAssetPath, "Assets", StringComparison.Ordinal)
+                        || outputDirAssetPath.StartsWith("Assets/", StringComparison.Ordinal)
+                    )
+                    || !AssetDatabase.IsValidFolder(outputDirAssetPath)
+                )
+                {
+                    Debug.LogError($"The output folder is invalid: {outputDirAssetPath}.");
+                    return false;
+                }
+            }
+
             using PooledResource<List<Texture2D>> texturesResource = Buffers<Texture2D>.List.Get(
                 out List<Texture2D> textures
             );
@@ -144,44 +139,42 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             using PooledResource<HashSet<string>> sourcePathsResource = Buffers<string>.HashSet.Get(
                 out HashSet<string> sourcePaths
             );
+            if (sourceFolderAssetPaths != null)
             {
-                if (sourceFolderAssetPaths != null)
+                foreach (string path in sourceFolderAssetPaths)
                 {
-                    foreach (string path in sourceFolderAssetPaths)
+                    if (string.IsNullOrEmpty(path))
                     {
-                        if (string.IsNullOrEmpty(path))
-                        {
-                            continue;
-                        }
-
-                        string normalizedPath = path.SanitizePath();
-                        if (!AssetDatabase.IsValidFolder(normalizedPath))
-                        {
-                            Debug.LogError($"The source folder is invalid: {path}.");
-                            return false;
-                        }
-
-                        _ = sourcePaths.Add(normalizedPath);
+                        continue;
                     }
-                }
 
-                if (0 < sourcePaths.Count)
-                {
-                    string[] sourceFolders = new string[sourcePaths.Count];
-                    sourcePaths.CopyTo(sourceFolders);
-                    foreach (string guid in AssetDatabase.FindAssets("t:texture2D", sourceFolders))
+                    string normalizedPath = path.SanitizePath();
+                    if (!AssetDatabase.IsValidFolder(normalizedPath))
                     {
-                        string path = AssetDatabase.GUIDToAssetPath(guid);
-                        if (string.IsNullOrEmpty(path))
-                        {
-                            continue;
-                        }
+                        Debug.LogError($"The source folder is invalid: {path}.");
+                        return false;
+                    }
 
-                        Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
-                        if (texture != null)
-                        {
-                            textures.Add(texture);
-                        }
+                    _ = sourcePaths.Add(normalizedPath);
+                }
+            }
+
+            if (0 < sourcePaths.Count)
+            {
+                string[] sourceFolders = new string[sourcePaths.Count];
+                sourcePaths.CopyTo(sourceFolders);
+                foreach (string guid in AssetDatabase.FindAssets("t:texture2D", sourceFolders))
+                {
+                    string path = AssetDatabase.GUIDToAssetPath(guid);
+                    if (string.IsNullOrEmpty(path))
+                    {
+                        continue;
+                    }
+
+                    Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+                    if (texture != null)
+                    {
+                        textures.Add(texture);
                     }
                 }
             }
@@ -204,7 +197,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            ordered.Sort(static (a, b) => string.Compare(a.name, b.name, StringComparison.Ordinal));
+            ordered.Sort(UnityObjectNameComparer<Texture2D>.Instance);
             textures.Clear();
             textures.AddRange(ordered);
 
@@ -270,7 +263,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     return false;
                 }
 
-                if (string.IsNullOrEmpty(outputDirAssetPath))
+                if (outputDirAssetPath == null)
                 {
                     continue;
                 }
@@ -400,7 +393,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                             // If writing to separate folder, avoid mutating the original asset in memory.
                             Texture2D resizeSource = working;
                             Texture2D scratch = null;
-                            bool useScratch = !string.IsNullOrEmpty(outputDirAssetPath);
+                            bool useScratch = outputDirAssetPath != null;
                             if (useScratch)
                             {
                                 scratch = new Texture2D(
@@ -440,12 +433,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                 }
 
                                 string finalAssetPath = assetPath;
-                                if (!string.IsNullOrEmpty(outputDirAssetPath))
+                                if (outputDirAssetPath != null)
                                 {
                                     string fileName = Path.GetFileName(assetPath);
                                     finalAssetPath = Path.Combine(outputDirAssetPath, fileName)
                                         .SanitizePath();
-                                    EnsureDirectory(finalAssetPath);
                                 }
 
                                 string fullDest = ToFullPath(finalAssetPath);
@@ -602,27 +594,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 Application.dataPath.Length - "Assets".Length
             );
             return Path.Combine(projectRoot, assetPath).SanitizePath();
-        }
-
-        private static void EnsureDirectory(string assetPath)
-        {
-            // Adopt existing filesystem folders through AssetDatabase to avoid numbered duplicate directories.
-            if (AssetDatabaseBatchHelper.EnsureAssetParentFolder(assetPath))
-            {
-                return;
-            }
-
-            // Outside Assets, ensure the physical output directory exists even when registration is unavailable.
-            string dirAsset = Path.GetDirectoryName(assetPath)?.SanitizePath();
-            if (string.IsNullOrEmpty(dirAsset))
-            {
-                return;
-            }
-            string fullDir = ToFullPath(dirAsset);
-            if (!Directory.Exists(fullDir))
-            {
-                _ = Directory.CreateDirectory(fullDir);
-            }
         }
     }
 #endif
