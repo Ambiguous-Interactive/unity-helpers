@@ -772,6 +772,37 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
             return MatchesConfiguredIgnorePattern(type);
         }
 
+        internal static Type ResolveUniqueLoadedType(string fullName, List<Assembly> assemblies)
+        {
+            if (string.IsNullOrEmpty(fullName))
+            {
+                return null;
+            }
+
+            Type resolved = null;
+            foreach (Assembly assembly in assemblies)
+            {
+                try
+                {
+                    Type candidate = assembly.GetType(fullName, throwOnError: false);
+                    if (candidate == null)
+                    {
+                        continue;
+                    }
+
+                    if (resolved != null && !ReferenceEquals(resolved, candidate))
+                    {
+                        return null;
+                    }
+
+                    resolved = candidate;
+                }
+                catch { }
+            }
+
+            return resolved;
+        }
+
         private static Regex[] GetActiveIgnoreRegexes()
         {
             Regex[] configured = _configuredIgnoreRegexes;
@@ -1211,37 +1242,6 @@ namespace WallstopStudios.UnityHelpers.Core.DataStructure.Adapters
         private static Assembly ResolvePlaceholderAssembly(AssemblyName requestedAssembly)
         {
             return typeof(object).Assembly;
-        }
-
-        internal static Type ResolveUniqueLoadedType(string fullName, List<Assembly> assemblies)
-        {
-            if (string.IsNullOrEmpty(fullName))
-            {
-                return null;
-            }
-
-            Type resolved = null;
-            foreach (Assembly assembly in assemblies)
-            {
-                try
-                {
-                    Type candidate = assembly.GetType(fullName, throwOnError: false);
-                    if (candidate == null)
-                    {
-                        continue;
-                    }
-
-                    if (resolved != null && !ReferenceEquals(resolved, candidate))
-                    {
-                        return null;
-                    }
-
-                    resolved = candidate;
-                }
-                catch { }
-            }
-
-            return resolved;
         }
 
         private static void AppendTypeName(StringBuilder builder, Type type)
