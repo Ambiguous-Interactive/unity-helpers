@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     using System.IO;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using Object = UnityEngine.Object;
 
     /// <summary>
@@ -235,16 +236,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// </remarks>
         private static bool Restore(string assetPath, string filePath, byte[] original)
         {
-            try
-            {
-                File.WriteAllBytes(filePath, original);
-            }
-            catch (Exception exception)
+            if (!DurableFile.TryWriteAllBytes(filePath, original, out Exception writeError))
             {
                 Debug.LogError(
-                    $"[Unity Helpers] Could not undo the rewrite of {assetPath}: {exception}. "
-                        + $"The file at {filePath} holds the rewritten bytes, not the original. "
-                        + "Restore it from source control before saving the project."
+                    $"[Unity Helpers] Could not undo the rewrite of {assetPath}: {writeError}. "
+                        + $"Inspect {filePath} and restore the original bytes from source control "
+                        + "before saving the project."
                 );
                 return false;
             }

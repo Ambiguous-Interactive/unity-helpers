@@ -188,7 +188,9 @@ So the repair rewrites **one asset at a time**, compares the non-null object cou
 and undoes any rewrite that lowers it — or that throws — by writing the original bytes back and
 re-importing. Refusals are printed, and each one says which of the five things happened: the file
 could not be read, the rewrite lost objects, the rewrite threw, the undo itself failed, or nothing
-changed. Commit or stash first.
+changed. The original bytes are staged before replacement, so a staging failure does not truncate
+the asset. On platforms without `File.Replace`, a failed fallback swap can still lose it. Commit or
+stash first.
 
 The rewrite is covered, not just the refusals: a fixture authors a plain asset, an asset whose
 content lives in sub-objects, and a prefab, leaves a key no field claims in each, repairs them, and

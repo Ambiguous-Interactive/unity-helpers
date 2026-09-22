@@ -113,6 +113,7 @@ In editor code, you can create layers directly from AnimationClips:
 ```csharp
 #if UNITY_EDITOR
 using UnityEditor;
+using WallstopStudios.UnityHelpers.Visuals;
 
 AnimationClip walkClip = AssetDatabase.LoadAssetAtPath<AnimationClip>("Assets/Animations/Walk.anim");
 AnimatedSpriteLayer layer = new AnimatedSpriteLayer(

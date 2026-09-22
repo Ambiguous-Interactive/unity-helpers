@@ -31,10 +31,11 @@ int value = random.Next();  // Wrong: Method is NextInt()
 ### A sample that stands alone says so, and a compiler checks it
 
 `npm run lint:doc-samples` extracts every `csharp` block carrying an opt-in marker and compiles it
-against the real `Runtime/**`, so a sample naming a type or a member that does not exist fails a
-gate rather than reading as correct forever
+against the real `Runtime/**` and `Editor/**` API surfaces, so a sample naming a type or a member
+that does not exist fails a gate rather than reading as correct forever
 ([#611](https://github.com/Ambiguous-Interactive/unity-helpers/issues/611)). It runs inside
-`npm run typecheck:unity`.
+`npm run typecheck:unity`, which reuses the Runtime and Editor check assemblies it built earlier.
+Running `npm run lint:doc-samples` alone builds both assemblies first.
 
 ````markdown
 <!-- doc-sample: compiles -->
@@ -49,12 +50,15 @@ public partial class Player
 ```
 ````
 
+Use `<!-- doc-sample: compiles-editor -->` for a standalone Editor-only block. The ordinary
+marker compiles in both runtime and Editor contexts, so conditional branches stay checked.
+
 Mark a sample when it stands alone. Two shapes work: a block declaring a type of its own, and a
 block that is a set of MEMBERS, which is wrapped in a `MonoBehaviour` because that is what its prose
 says it decorates. Leave a continuation unmarked -- a subtype whose base was declared in the block
 above, an example that uses a type the reader supplies -- because it cannot compile on its own and
-saying it can is the only way this gate lies. **Measured: 103 of the tree's 280 declaration-shaped
-blocks stand alone**, which is why the marker is opt-in rather than an opt-out.
+saying it can is the only way this gate lies. **The original survey found 103 of 280
+declaration-shaped blocks stood alone**, which is why the marker is opt-in rather than an opt-out.
 
 A marked block that carries an elision (`...`), or an `[assembly: ...]` attribute, is a
 contradiction of the claim and is reported by name. The checked count is printed on every run and

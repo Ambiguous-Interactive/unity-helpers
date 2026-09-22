@@ -504,8 +504,6 @@ Helpers.SmartDestroy(gameObject);
 
 ### Prefab Utilities
 
-<!-- doc-sample: compiles -->
-
 ```csharp
 using WallstopStudios.UnityHelpers.Core.Helper;
 

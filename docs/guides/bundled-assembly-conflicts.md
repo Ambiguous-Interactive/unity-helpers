@@ -39,12 +39,16 @@ touches those options fails with `CS0012`.
 
 Ask Unity which file won each name, from any editor script:
 
+<!-- doc-sample: compiles-editor -->
+
 ```csharp
 string winner = UnityEditor.Compilation.CompilationPipeline
     .GetPrecompiledAssemblyPathFromAssemblyName("System.Text.Encodings.Web.dll");
 ```
 
 If that path is not the one you expect, count how many assemblies actually reference it:
+
+<!-- doc-sample: compiles-editor -->
 
 ```csharp
 UnityEditor.Compilation.Assembly[] assemblies = UnityEditor.Compilation.CompilationPipeline

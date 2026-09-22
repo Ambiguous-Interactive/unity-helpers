@@ -223,6 +223,8 @@ reimport entirely when nothing would differ.
 
 The same logic is public, so a build step or a custom importer can use it directly:
 
+<!-- doc-sample: compiles-editor -->
+
 ```csharp
 using UnityEditor;
 using UnityEngine;
@@ -347,6 +349,8 @@ of the team gets the same rules; **Load Profiles Asset** reads one back. There i
 `Assets > Create` entry for that asset — the button is how you make one.
 
 #### Applying sprite settings from a script
+
+<!-- doc-sample: compiles-editor -->
 
 ```csharp
 using System.Collections.Generic;
@@ -626,7 +630,8 @@ after the batch.
   you a starting shape. Use `Curve` for an attack that snaps and then holds.
 - **Preview** plays a clip entry before you create anything.
 - **Configuration Persistence** saves the whole window state to `.animation-creator.json` in a source
-  folder, so the next person to import that folder gets your settings.
+  folder, so the next person to import that folder gets your settings. A staging failure keeps the
+  previous config; on platforms without `File.Replace`, a failed fallback swap can still lose it.
 
 > **Visual Demo**
 >
@@ -775,6 +780,8 @@ sprites and explicit asset paths. It previews matching references by default; pa
 Unity records object changes for Undo, but saved asset edits should still be protected by version
 control.
 
+<!-- doc-sample: compiles-editor -->
+
 ```csharp
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Editor.Sprites;
@@ -803,7 +810,9 @@ Transparency-based grid detection requires a threshold in `[0, 1)`.
 - **Dry Run** turns the extract button into `Dry Run: Preview N Sprite(s)` and writes nothing.
 - Per-sheet settings override the global ones; **Apply Global to All** pushes yours down, and
   **Save Config** writes a `<texture>.spritesheet.json` beside the sheet so a re-extraction is
-  reproducible. A `Config Stale` badge appears when the texture has changed since.
+  reproducible. A staging failure keeps the previous config; on platforms without `File.Replace`, a
+  failed fallback swap can still lose it. A `Config Stale` badge appears when the texture has changed
+  since.
 - **Preserve Import Settings** (on by default) copies the source's importer settings to each output.
 - Preview and extracted output reuse dynamically sized pixel buffers instead of retaining one
   permanent pool bucket for every sprite size.
@@ -1864,6 +1873,8 @@ right now". A window's `OnEnable` runs during a command-line test session too, s
 consumes fixtures or writes logs should be gated on it — together with `Application.isBatchMode`
 and [`Helpers.IsRunningInContinuousIntegration`](../utilities/helper-utilities.md#cicd-detection),
 the other two legs of the same question:
+
+<!-- doc-sample: compiles-editor -->
 
 ```csharp
 using UnityEditor;

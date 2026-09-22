@@ -58,6 +58,8 @@ edges. Zero is a valid threshold. No clip, sprite, or asset is modified.
 Place this code in an editor assembly. Use the result in your own authored
 constant or validation test; there is no runtime dependency on this helper.
 
+<!-- doc-sample: compiles-editor -->
+
 ```csharp
 namespace MyGame.Editor
 {

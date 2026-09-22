@@ -652,8 +652,6 @@ public sealed class AudioSettingsTests : CommonTestBase
 
 For tests that need controlled data:
 
-<!-- doc-sample: compiles -->
-
 ```csharp
 #if UNITY_EDITOR
 [Test]

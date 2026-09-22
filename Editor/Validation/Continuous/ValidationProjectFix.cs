@@ -13,6 +13,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     using UnityEditor.SceneManagement;
     using UnityEngine;
     using UnityEngine.SceneManagement;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using Object = UnityEngine.Object;
 
     internal static class ValidationProjectFix
@@ -218,7 +219,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                         throw new InvalidOperationException(
                             "The prefab changed since this fix; undo would overwrite those edits."
                         );
-                    File.WriteAllBytes(finding.AssetPath, previousBytes);
+                    if (
+                        !DurableFile.TryWriteAllBytes(
+                            finding.AssetPath,
+                            previousBytes,
+                            out Exception writeError
+                        )
+                    )
+                        throw new IOException("Could not restore the previous prefab.", writeError);
                     AssetDatabase.ImportAsset(finding.AssetPath);
                 };
             }

@@ -467,12 +467,14 @@ create the asset manually:
 
 ### Method 3: Via API (Editor Script)
 
+<!-- doc-sample: compiles-editor -->
+
 ```csharp
 #if UNITY_EDITOR
 using WallstopStudios.UnityHelpers.Editor.Settings;
 
-UnityHelpersSettings settings = UnityHelpersSettings.Instance;
-// Settings asset is now created
+UnityHelpersSettings settings = UnityHelpersSettings.instance;
+// Settings are now loaded or initialized
 #endif
 ```
 
