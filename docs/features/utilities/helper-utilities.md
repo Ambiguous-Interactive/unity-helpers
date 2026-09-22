@@ -960,9 +960,13 @@ using WallstopStudios.UnityHelpers.Core.Helper;
 if (!DurableFile.TryWriteAllText(savePath, json, out Exception error))
 {
     Debug.LogError($"Could not save: {error}");
-    // The previous save is still on disk and still readable.
+    // A failed staging write leaves the previous save intact.
 }
 ```
+
+The text overload writes UTF-8 without a byte order mark by default. Pass an `Encoding` when the
+file format requires its preamble; `TryWriteAllText(path, text, Encoding.UTF8, out error)` writes the
+UTF-8 byte order mark before the text.
 
 For binary saves, `TryWriteAllBytes` and `WriteAllBytesAsync` accept the serialized `byte[]` directly.
 They use the same staging and flush guarantees as text writes, without encoding or copying the payload.
@@ -995,7 +999,7 @@ guarantee without changing any code.
 
 **What it promises:**
 
-- A reader sees either the complete previous contents or the complete new ones, never a partial file.
+- On platforms with `File.Replace`, a reader sees either complete old or complete new contents.
 - The data is forced out of the page cache before the swap makes it live.
 - Concurrent writes to the same path from your game are serialized.
 
@@ -1003,8 +1007,10 @@ guarantee without changing any code.
 
 - It is **not** full crash safety. .NET cannot flush a directory, so a filesystem may still reorder the
   rename behind the data write.
-- It does not coordinate with other processes. A second process writing the same file at the same time is
-  reported as a failure rather than allowed to corrupt the document.
+- On platforms without `File.Replace`, the delete-then-move fallback briefly exposes an absent file and
+  can lose the old file if the move fails.
+- It does not coordinate with other processes. Concurrent writers can collide on the shared `.tmp`
+  path; see [#838](https://github.com/Ambiguous-Interactive/unity-helpers/issues/838).
 
 A leftover `.tmp` sibling (`DurableFile.TemporarySuffix`) is what an interrupted write leaves behind; it is
 safe to ignore or delete.

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add an encoding-aware `DurableFile.TryWriteAllText` overload that preserves the encoding's byte order mark for staged writes.
+
 ### Fixed
 
 - Stage subtype manifests, exported proto schemas, and sprite or animation configs before replacement so failed staging leaves the previous file intact ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).

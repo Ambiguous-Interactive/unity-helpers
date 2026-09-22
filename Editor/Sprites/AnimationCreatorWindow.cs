@@ -645,15 +645,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
                 AnimationCreatorConfig config = CreateConfigFromCurrentState();
                 string json = Serializer.JsonStringify(config, pretty: true);
-                byte[] preamble = Encoding.UTF8.GetPreamble();
-                byte[] encoded = Encoding.UTF8.GetBytes(json);
-                byte[] contents = new byte[preamble.Length + encoded.Length];
-                Buffer.BlockCopy(preamble, 0, contents, 0, preamble.Length);
-                Buffer.BlockCopy(encoded, 0, contents, preamble.Length, encoded.Length);
                 if (
-                    !DurableFile.TryWriteAllBytes(
+                    !DurableFile.TryWriteAllText(
                         fullConfigPath,
-                        contents,
+                        json,
+                        Encoding.UTF8,
                         out Exception writeError
                     )
                 )

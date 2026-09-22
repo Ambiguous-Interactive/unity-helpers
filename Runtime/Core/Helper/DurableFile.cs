@@ -23,14 +23,15 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     /// </para>
     /// <para>
     /// <b>Scope — what this does and does not promise.</b>
-    /// It <b>does</b> eliminate the torn-file window: a reader observes either the complete previous
-    /// contents or the complete new ones. It <b>does</b> force the data out of the page cache before
-    /// the swap. It <b>does</b> serialize concurrent operations on the same path within this
-    /// process. It is <b>not</b> full crash safety — .NET cannot flush a <i>directory</i>, so a
-    /// filesystem may still reorder the rename behind the data write. It does <b>not</b> coordinate
-    /// with other processes: a second process writing the same file concurrently is reported as a
-    /// failure rather than allowed to corrupt the document. Do not describe consumers of this type
-    /// as crash-safe.
+    /// It <b>does</b> stage and flush new contents before replacement. Where <c>File.Replace</c>
+    /// is supported, a reader observes either the complete previous contents or the complete new
+    /// ones. It <b>does</b> serialize concurrent operations on the same path within this process.
+    /// It is <b>not</b> full crash safety — .NET cannot flush a <i>directory</i>, so a filesystem
+    /// may still reorder the rename behind the data write. On platforms without
+    /// <c>File.Replace</c>, the delete-then-move fallback briefly exposes an absent destination
+    /// and can lose it if the move fails. This type does <b>not</b> coordinate with other processes;
+    /// concurrent processes can collide on the shared staging path. Do not describe consumers of
+    /// this type as crash-safe or cross-process safe.
     /// </para>
     /// <para>
     /// Where the format allows a log of records, <see cref="TryAppendAllText"/> is strictly stronger
@@ -93,10 +94,64 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         }
 
         /// <summary>
+        /// Replaces a file's text using the requested encoding, including its byte order mark.
+        /// </summary>
+        /// <remarks>
+        /// Carries the same durability limits as <see cref="TryWriteAllText(string, string, out Exception)"/>.
+        /// Use the overload without an encoding for UTF-8 without a byte order mark.
+        /// </remarks>
+        /// <param name="path">Destination file path. Missing directories are created.</param>
+        /// <param name="contents">Text to write. Null is treated as empty.</param>
+        /// <param name="encoding">Encoding whose preamble and text bytes are written.</param>
+        /// <param name="error">The failure when this returns false; null otherwise.</param>
+        /// <returns>True when the destination holds the encoded contents.</returns>
+        public static bool TryWriteAllText(
+            string path,
+            string contents,
+            Encoding encoding,
+            out Exception error
+        )
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                error = new ArgumentException("A destination path is required.", nameof(path));
+                return false;
+            }
+
+            if (encoding == null)
+            {
+                error = new ArgumentNullException(nameof(encoding));
+                return false;
+            }
+
+            try
+            {
+                string text = contents ?? string.Empty;
+                byte[] preamble = encoding.GetPreamble();
+                int textByteCount = encoding.GetByteCount(text);
+                byte[] bytes = new byte[checked(preamble.Length + textByteCount)];
+                Buffer.BlockCopy(preamble, 0, bytes, 0, preamble.Length);
+                int written = encoding.GetBytes(text, 0, text.Length, bytes, preamble.Length);
+                if (written != textByteCount)
+                {
+                    error = new InvalidOperationException("The encoding changed its byte count.");
+                    return false;
+                }
+
+                return TryWriteAllBytes(path, bytes, out error);
+            }
+            catch (Exception e)
+            {
+                error = e;
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Replaces a file's bytes, staging and flushing before the swap.
         /// </summary>
         /// <remarks>
-        /// Carries the same durability guarantees as <see cref="TryWriteAllText"/>.
+        /// Carries the same durability guarantees as <see cref="TryWriteAllText(string, string, out Exception)"/>.
         /// The array is written directly; do not modify it until this call returns.
         /// </remarks>
         /// <param name="path">Destination file path. Missing directories are created.</param>

@@ -146,6 +146,55 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.AreEqual(contents, File.ReadAllText(path));
         }
 
+        [TestCase(true)]
+        [TestCase(false)]
+        public void EncodedWritePreservesPreambleAndPreviousBytesOnStagingFailure(bool emitBom)
+        {
+            string path = Path.Combine(_testDirectory, "encoded.json");
+            Encoding encoding = new UTF8Encoding(emitBom);
+            const string contents = "{\"name\":\"ファイル\"}";
+
+            Assert.IsTrue(
+                DurableFile.TryWriteAllText(path, contents, encoding, out Exception writeError)
+            );
+            Assert.IsTrue(writeError == null);
+            byte[] expectedPreamble = encoding.GetPreamble();
+            byte[] expectedContents = encoding.GetBytes(contents);
+            byte[] actual = File.ReadAllBytes(path);
+            Assert.AreEqual(expectedPreamble.Length + expectedContents.Length, actual.Length);
+            for (int i = 0; i < expectedPreamble.Length; ++i)
+            {
+                Assert.AreEqual(expectedPreamble[i], actual[i]);
+            }
+            for (int i = 0; i < expectedContents.Length; ++i)
+            {
+                Assert.AreEqual(expectedContents[i], actual[expectedPreamble.Length + i]);
+            }
+
+            BlockStaging(path);
+            Assert.IsFalse(
+                DurableFile.TryWriteAllText(path, "replacement", encoding, out Exception error)
+            );
+            Assert.IsTrue(error != null);
+            CollectionAssert.AreEqual(actual, File.ReadAllBytes(path));
+
+            Directory.Delete(path + DurableFile.TemporarySuffix);
+            Assert.IsTrue(DurableFile.TryWriteAllText(path, null, encoding, out error));
+            Assert.IsTrue(error == null);
+            CollectionAssert.AreEqual(expectedPreamble, File.ReadAllBytes(path));
+        }
+
+        [Test]
+        public void EncodedWriteRejectsNullEncodingWithoutChangingTheFile()
+        {
+            string path = WriteDirectly("encoded.json", "previous");
+
+            Assert.IsFalse(DurableFile.TryWriteAllText(path, "new", null, out Exception error));
+
+            Assert.IsInstanceOf<ArgumentNullException>(error);
+            Assert.AreEqual("previous", File.ReadAllText(path));
+        }
+
         [Test]
         public void WriteTreatsNullContentsAsEmpty()
         {
