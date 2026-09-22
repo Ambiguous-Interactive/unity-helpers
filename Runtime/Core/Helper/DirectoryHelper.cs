@@ -376,11 +376,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             string packageJsonPath = Path.Combine(packageRootPath, "package.json");
-            if (!File.Exists(packageJsonPath))
-            {
-                return string.Empty;
-            }
-
             try
             {
                 string json = File.ReadAllText(packageJsonPath);

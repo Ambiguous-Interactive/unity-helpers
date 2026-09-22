@@ -2642,11 +2642,6 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
         {
             try
             {
-                if (!File.Exists(path))
-                {
-                    value = default;
-                    return false;
-                }
                 string json = File.ReadAllText(path);
                 value = JsonDeserialize<T>(json);
                 return true;
