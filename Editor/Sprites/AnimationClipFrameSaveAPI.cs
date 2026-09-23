@@ -31,7 +31,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             out string error
         )
         {
-            usedFallbackBinding = false;
             if (
                 clip == null
                 || !EditorUtility.IsPersistent(clip)
@@ -41,11 +40,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     .EndsWith(".anim", StringComparison.OrdinalIgnoreCase)
             )
             {
+                usedFallbackBinding = false;
                 error = "An editable standalone .anim clip asset is required.";
                 return false;
             }
             if (frames == null || frames.Count == 0)
             {
+                usedFallbackBinding = false;
                 error = "At least one sprite frame is required.";
                 return false;
             }
@@ -56,6 +57,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 || float.IsInfinity((frames.Count - 1) / framesPerSecond)
             )
             {
+                usedFallbackBinding = false;
                 error = "A finite, positive frame rate with finite key times is required.";
                 return false;
             }
@@ -102,6 +104,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
                 if (!foundBinding)
                 {
+                    usedFallbackBinding = false;
                     error = "The clip has no SpriteRenderer sprite curve.";
                     return false;
                 }
@@ -112,6 +115,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     Sprite frame = frames[index];
                     if (frame == null)
                     {
+                        usedFallbackBinding = false;
                         error = "Sprite frames cannot contain null entries.";
                         return false;
                     }
@@ -137,19 +141,21 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
                 catch (Exception exception)
                 {
+                    string failure = exception.Message;
                     try
                     {
                         AnimationUtility.SetObjectReferenceCurve(clip, selectedBinding, original);
                         clip.frameRate = originalFrameRate;
                         EditorUtility.SetDirty(clip);
                         AssetDatabase.SaveAssets();
-                        error = exception.Message;
                     }
                     catch (Exception rollbackException)
                     {
-                        error =
+                        failure =
                             $"{exception.Message} Restoration also failed: {rollbackException.Message}";
                     }
+                    usedFallbackBinding = false;
+                    error = failure;
                     return false;
                 }
 
@@ -159,6 +165,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
             catch (Exception exception)
             {
+                usedFallbackBinding = false;
                 error = exception.Message;
                 return false;
             }
