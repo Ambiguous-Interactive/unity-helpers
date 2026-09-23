@@ -100,87 +100,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
-        internal static bool TryCompareExchangeAllText(
-            string path,
-            bool expectedExists,
-            string expectedContents,
-            string replacementContents,
-            out bool exchanged,
-            out Exception error
-        )
-        {
-            exchanged = false;
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                error = new ArgumentException("A destination path is required.", nameof(path));
-                return false;
-            }
-
-            using (EnterGate(path))
-            {
-                string temporaryPath = path + TemporarySuffix;
-                FileStream ownership = null;
-                FileStream staging = null;
-                bool ownsStaging = false;
-                try
-                {
-                    EnsureDirectory(path);
-                    ownership = OpenStagingOwnership(temporaryPath);
-                    bool exists;
-                    string current;
-                    try
-                    {
-                        current = File.ReadAllText(path);
-                        exists = true;
-                    }
-                    catch (FileNotFoundException)
-                    {
-                        current = string.Empty;
-                        exists = false;
-                    }
-
-                    if (
-                        exists != expectedExists
-                        || !string.Equals(current, expectedContents, StringComparison.Ordinal)
-                    )
-                    {
-                        error = null;
-                        return true;
-                    }
-
-                    staging = OpenStagingStream(temporaryPath, useAsync: false);
-                    ownsStaging = true;
-                    byte[] bytes = Utf8NoByteOrderMark.GetBytes(
-                        replacementContents ?? string.Empty
-                    );
-                    staging.Write(bytes, 0, bytes.Length);
-                    staging.Flush(flushToDisk: true);
-                    staging.Dispose();
-                    staging = null;
-#if UNITY_EDITOR
-                    BeforeStagedSwapForTests?.Invoke(temporaryPath);
-#endif
-                    Swap(temporaryPath, path);
-                    ownsStaging = false;
-                    exchanged = true;
-                    error = null;
-                    return true;
-                }
-                catch (Exception failure)
-                {
-                    error = failure;
-                    return false;
-                }
-                finally
-                {
-                    ReleaseFileStream(staging);
-                    if (ownsStaging)
-                        DiscardStagedFile(temporaryPath);
-                    ReleaseStagingOwnership(ownership);
-                }
-            }
-        }
-
         /// <summary>
         /// Replaces a file's text using the requested encoding, including its byte order mark.
         /// </summary>
@@ -528,6 +447,87 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             catch (Exception)
             {
                 return false;
+            }
+        }
+
+        internal static bool TryCompareExchangeAllText(
+            string path,
+            bool expectedExists,
+            string expectedContents,
+            string replacementContents,
+            out bool exchanged,
+            out Exception error
+        )
+        {
+            exchanged = false;
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                error = new ArgumentException("A destination path is required.", nameof(path));
+                return false;
+            }
+
+            using (EnterGate(path))
+            {
+                string temporaryPath = path + TemporarySuffix;
+                FileStream ownership = null;
+                FileStream staging = null;
+                bool ownsStaging = false;
+                try
+                {
+                    EnsureDirectory(path);
+                    ownership = OpenStagingOwnership(temporaryPath);
+                    bool exists;
+                    string current;
+                    try
+                    {
+                        current = File.ReadAllText(path);
+                        exists = true;
+                    }
+                    catch (FileNotFoundException)
+                    {
+                        current = string.Empty;
+                        exists = false;
+                    }
+
+                    if (
+                        exists != expectedExists
+                        || !string.Equals(current, expectedContents, StringComparison.Ordinal)
+                    )
+                    {
+                        error = null;
+                        return true;
+                    }
+
+                    staging = OpenStagingStream(temporaryPath, useAsync: false);
+                    ownsStaging = true;
+                    byte[] bytes = Utf8NoByteOrderMark.GetBytes(
+                        replacementContents ?? string.Empty
+                    );
+                    staging.Write(bytes, 0, bytes.Length);
+                    staging.Flush(flushToDisk: true);
+                    staging.Dispose();
+                    staging = null;
+#if UNITY_EDITOR
+                    BeforeStagedSwapForTests?.Invoke(temporaryPath);
+#endif
+                    Swap(temporaryPath, path);
+                    ownsStaging = false;
+                    exchanged = true;
+                    error = null;
+                    return true;
+                }
+                catch (Exception failure)
+                {
+                    error = failure;
+                    return false;
+                }
+                finally
+                {
+                    ReleaseFileStream(staging);
+                    if (ownsStaging)
+                        DiscardStagedFile(temporaryPath);
+                    ReleaseStagingOwnership(ownership);
+                }
             }
         }
 
