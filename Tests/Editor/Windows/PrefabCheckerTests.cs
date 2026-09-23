@@ -224,6 +224,68 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         }
 
         [Test]
+        public void RunChecksLogsComponentFindingOnceAtOriginalSeverity()
+        {
+            ExecuteWithImmediateImport(() =>
+            {
+                string folder = Path.Combine(Root, "InteractiveLogging").SanitizePath();
+                EnsureFolder(folder);
+                string prefabPath = Path.Combine(folder, "MissingAssignment.prefab").SanitizePath();
+                GameObject source = Track(new GameObject("MissingAssignment"));
+                source.AddComponent<AssignmentComponent>();
+                source.SetActive(false);
+                PrefabUtility.SaveAsPrefabAsset(source, prefabPath);
+                TrackAssetPath(prefabPath);
+                AssetDatabaseBatchHelper.RefreshIfNotBatching();
+
+                PrefabChecker checker = Track(ScriptableObject.CreateInstance<PrefabChecker>());
+                checker._assetPaths = new List<string> { folder };
+                int errors = 0;
+                int warnings = 0;
+                int rootWarnings = 0;
+                void CountFinding(string condition, string stackTrace, LogType type)
+                {
+                    if (
+                        type == LogType.Warning
+                        && condition.Contains("Prefab root GameObject is disabled.")
+                    )
+                    {
+                        rootWarnings++;
+                    }
+                    if (!condition.Contains(nameof(AssignmentComponent.requiredObject)))
+                    {
+                        return;
+                    }
+                    if (type == LogType.Error)
+                    {
+                        errors++;
+                    }
+                    else if (type == LogType.Warning)
+                    {
+                        warnings++;
+                    }
+                }
+
+                bool previousIgnore = LogAssert.ignoreFailingMessages;
+                try
+                {
+                    LogAssert.ignoreFailingMessages = true;
+                    Application.logMessageReceived += CountFinding;
+                    checker.RunChecksImproved();
+                }
+                finally
+                {
+                    Application.logMessageReceived -= CountFinding;
+                    LogAssert.ignoreFailingMessages = previousIgnore;
+                }
+
+                Assert.AreEqual(1, errors);
+                Assert.AreEqual(0, warnings);
+                Assert.AreEqual(1, rootWarnings);
+            });
+        }
+
+        [Test]
         public void RunChecksAcceptsAssetsRoot()
         {
             // ExecuteWithImmediateImport pauses batch mode so AssetDatabase.IsValidFolder sees our folders

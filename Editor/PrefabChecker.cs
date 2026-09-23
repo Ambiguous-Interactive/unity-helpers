@@ -625,10 +625,14 @@ namespace WallstopStudios.UnityHelpers.Editor
                     using PooledResource<List<string>> resultLease = Buffers<string>.List.Get(
                         out List<string> messages
                     );
+                    using PooledResource<List<string>> prefabWarningLease =
+                        Buffers<string>.List.Get(out List<string> prefabWarnings);
 
                     if (options.CheckDisabledRootGameObjects && !prefab.activeSelf)
                     {
-                        messages.Add("Prefab root GameObject is disabled.");
+                        const string finding = "Prefab root GameObject is disabled.";
+                        messages.Add(finding);
+                        prefabWarnings.Add(finding);
                         issuesForThisPrefab++;
                     }
 
@@ -658,7 +662,10 @@ namespace WallstopStudios.UnityHelpers.Editor
                                 interactive
                             );
                             string ownerName = owner ? owner.name : "[[Unknown GameObject]]";
-                            messages.Add($"Detected missing script on GameObject '{ownerName}'.");
+                            string finding =
+                                $"Detected missing script on GameObject '{ownerName}'.";
+                            messages.Add(finding);
+                            prefabWarnings.Add(finding);
                             issuesForThisPrefab++;
                             continue;
                         }
@@ -742,9 +749,10 @@ namespace WallstopStudios.UnityHelpers.Editor
                             && script is Behaviour { enabled: false }
                         )
                         {
-                            messages.Add(
-                                $"Component '{script.GetType().Name}' on GameObject '{ownerGameObject.name}' is disabled."
-                            );
+                            string finding =
+                                $"Component '{script.GetType().Name}' on GameObject '{ownerGameObject.name}' is disabled.";
+                            messages.Add(finding);
+                            prefabWarnings.Add(finding);
                             issuesForThisPrefab++;
                         }
                     }
@@ -753,15 +761,15 @@ namespace WallstopStudios.UnityHelpers.Editor
                     {
                         if (interactive)
                         {
-                            int toLog = Mathf.Min(100, messages.Count);
+                            int toLog = Mathf.Min(100, prefabWarnings.Count);
                             for (int m = 0; m < toLog; m++)
                             {
-                                prefab.LogWarn($"{messages[m]}");
+                                prefab.LogWarn($"{prefabWarnings[m]}");
                             }
 
-                            if (toLog < messages.Count)
+                            if (toLog < prefabWarnings.Count)
                             {
-                                prefab.LogWarn($"... and {messages.Count - toLog} more.");
+                                prefab.LogWarn($"... and {prefabWarnings.Count - toLog} more.");
                             }
 
                             window.LogWarn(
