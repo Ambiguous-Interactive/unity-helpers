@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     using System.Linq;
     using NUnit.Framework;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Tests.Core.TestTypes;
@@ -16,6 +17,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
     [NUnit.Framework.Category("Fast")]
     public sealed class ReflectionHelpersTypeScanningTests : CommonTestBase
     {
+        private static IEnumerable<TestCaseData> GetMovedGenericCases()
+        {
+            yield return new TestCaseData(typeof(List<SerializableType>)).SetName(
+                "MovedGeneric.List.Recovers"
+            );
+            yield return new TestCaseData(
+                typeof(Dictionary<string, List<SerializableType[]>>)
+            ).SetName("MovedGeneric.NestedArray.Recovers");
+            yield return new TestCaseData(typeof(List<SerializableType>[])).SetName(
+                "MovedGeneric.OuterArray.Recovers"
+            );
+        }
+
         [Test]
         public void GetAllLoadedTypesIncludesTestAssemblyType()
         {
@@ -50,6 +64,69 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Type t = ReflectionHelpers.TryResolveType(fullName);
             Assert.IsTrue(t != null, "Resolution by full name returned null.");
             Assert.AreEqual(typeof(PrewarmTesterComponent), t);
+        }
+
+        [Test]
+        [TestCase(typeof(int), TestName = "TypeName.Int32.PreservesRuntimeName")]
+        [TestCase(typeof(List<>), TestName = "TypeName.OpenGeneric.PreservesRuntimeName")]
+        [TestCase(typeof(List<int>), TestName = "TypeName.ClosedGeneric.PreservesRuntimeName")]
+        public void AssemblyQualifiedNameMatchesRuntimeForCommonTypes(Type type)
+        {
+            Assert.AreEqual(
+                type.AssemblyQualifiedName,
+                ReflectionHelpers.GetAssemblyQualifiedName(type)
+            );
+        }
+
+        [Test]
+        public void AssemblyQualifiedNameReturnsNullForNullType()
+        {
+            Assert.IsTrue(ReflectionHelpers.GetAssemblyQualifiedName(null) == null);
+        }
+
+        [Test]
+        [SkipUnderIL2CPP("The non-SZ array runtime-name oracle requires Mono reflection.")]
+        public void AssemblyQualifiedNamePreservesNonZeroBoundArrayArgument()
+        {
+            Type array = typeof(SerializableType).MakeArrayType(1);
+            Type expected = typeof(List<>).MakeGenericType(array);
+            string runtimeName = expected.AssemblyQualifiedName;
+
+            Assert.AreSame(expected, Type.GetType(runtimeName, throwOnError: false));
+            Assert.AreEqual(runtimeName, AssemblyQualifiedTypeNameBuilder.Build(expected));
+            Assert.AreEqual(runtimeName, ReflectionHelpers.GetAssemblyQualifiedName(expected));
+        }
+
+        [Test]
+        [TestCaseSource(nameof(GetMovedGenericCases))]
+        public void TryResolveTypeRecoversMovedGenericArgument(Type expected)
+        {
+            string original = AssemblyQualifiedTypeNameBuilder.Build(expected);
+            Assert.AreSame(expected, Type.GetType(original, throwOnError: false));
+            Assert.AreEqual(original, ReflectionHelpers.GetAssemblyQualifiedName(expected));
+            string moved = original.Replace(
+                typeof(SerializableType).Assembly.FullName,
+                "MissingAssembly"
+            );
+            Assert.IsTrue(Type.GetType(moved, throwOnError: false) == null);
+
+            int cachedNamesBefore = ReflectionHelpers.ResolvedTypeCacheCountForTesting;
+            Assert.AreSame(expected, ReflectionHelpers.TryResolveType(moved));
+            Assert.AreSame(expected, ReflectionHelpers.TryResolveType(moved));
+            Assert.AreEqual(cachedNamesBefore, ReflectionHelpers.ResolvedTypeCacheCountForTesting);
+        }
+
+        [Test]
+        public void TryResolveTypeRejectsMissingGenericArgument()
+        {
+            string original = AssemblyQualifiedTypeNameBuilder.Build(
+                typeof(List<SerializableType>)
+            );
+            string missing = original.Replace(typeof(SerializableType).FullName, "Missing.Type");
+            string malformed = original.Replace("]]", "]");
+
+            Assert.IsTrue(ReflectionHelpers.TryResolveType(missing) == null);
+            Assert.IsTrue(ReflectionHelpers.TryResolveType(malformed) == null);
         }
 
         /// <summary>

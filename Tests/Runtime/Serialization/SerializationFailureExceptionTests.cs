@@ -4,10 +4,13 @@
 namespace WallstopStudios.UnityHelpers.Tests.Serialization
 {
     using System;
+    using System.Collections.Generic;
     using System.IO;
     using System.Runtime.Serialization.Formatters.Binary;
     using NUnit.Framework;
+    using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
     using WallstopStudios.UnityHelpers.Core.Serialization;
+    using WallstopStudios.UnityHelpers.Tests.Core;
 
     /// <summary>
     /// Unit tests for the <see cref="SerializationFailureException"/> hierarchy itself:
@@ -36,6 +39,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Serialization
             Assert.AreEqual("null", ex.InputDescriptor);
             Assert.AreEqual("data is null.", ex.Reason);
             Assert.IsTrue(ex.InnerException == null);
+        }
+
+        [Test]
+        public void ExceptionTypeMetadataRecoversMovedGenericArgument()
+        {
+            Type expected = typeof(List<SerializableType>);
+            string original = AssemblyQualifiedTypeNameBuilder.Build(expected);
+            string moved = original.Replace(
+                typeof(SerializableType).Assembly.FullName,
+                "MissingAssembly"
+            );
+
+            Assert.IsTrue(Type.GetType(moved, throwOnError: false) == null);
+            Assert.AreSame(expected, SerializationFailureException.ResolveTypeOrNull(moved));
+            Assert.IsTrue(
+                SerializationFailureException.ResolveTypeOrNull(
+                    moved.Replace(typeof(SerializableType).FullName, "Missing.Type")
+                ) == null
+            );
         }
 
         [Test]

@@ -7,6 +7,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
     using System.Collections.Generic;
     using System.Threading;
     using NUnit.Framework;
+    using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
+    using WallstopStudios.UnityHelpers.Tests.Core;
     using WallstopStudios.UnityHelpers.Utils;
 #if !SINGLE_THREADED
     using System.Threading.Tasks;
@@ -2143,6 +2145,41 @@ namespace WallstopStudios.UnityHelpers.Tests.Runtime.Pool
         {
             Type resolved = PoolTypeResolver.ResolveType(typeName);
             Assert.AreEqual(expectedType, resolved);
+        }
+
+        [Test]
+        public void PoolTypeConfigurationRecoversMovedGenericArgument()
+        {
+            Type expected = typeof(Dictionary<string, List<SerializableType[]>>);
+            string original = AssemblyQualifiedTypeNameBuilder.Build(expected);
+            Assert.AreSame(expected, Type.GetType(original, throwOnError: false));
+            string moved = original.Replace(
+                typeof(SerializableType).Assembly.FullName,
+                "MissingAssembly"
+            );
+            Assert.IsTrue(Type.GetType(moved, throwOnError: false) == null);
+            PoolTypeConfiguration configuration = new() { TypeName = moved };
+            PoolTypeConfiguration fromType = new(expected);
+
+            PoolTypeResolver.ClearCache();
+            try
+            {
+                Assert.AreSame(expected, PoolTypeResolver.ResolveType(moved));
+                Assert.AreSame(expected, configuration.ResolvedType);
+                Assert.AreSame(expected, configuration.ResolvedType);
+                Assert.AreEqual(original, fromType.TypeName);
+                Assert.IsTrue(
+                    PoolTypeResolver.ResolveType(
+                        moved.Replace(typeof(SerializableType).FullName, "Missing.Type")
+                    ) == null
+                );
+                Assert.IsTrue(PoolTypeResolver.ResolveType(moved.Replace("]]", "]")) == null);
+                Assert.AreEqual(0, PoolTypeResolver.CachedTypeNameCountForTesting);
+            }
+            finally
+            {
+                PoolTypeResolver.ClearCache();
+            }
         }
 
         [Test]

@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
     using System.Diagnostics.CodeAnalysis;
     using System.Runtime.CompilerServices;
     using System.Runtime.Serialization;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>
     /// Identifies the wire format involved in a serialization failure.
@@ -318,14 +319,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
                 ? "empty"
                 : "empty " + parameterName;
 
-        private static Type ResolveTypeOrNull(string assemblyQualifiedName)
+        internal static Type ResolveTypeOrNull(string assemblyQualifiedName)
         {
             if (string.IsNullOrEmpty(assemblyQualifiedName))
             {
                 return null;
             }
 
-            return Type.GetType(assemblyQualifiedName, throwOnError: false);
+            return ReflectionHelpers.TryResolveType(assemblyQualifiedName);
         }
 
         /// <inheritdoc />
@@ -336,8 +337,14 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization
             info.AddValue(nameof(Format), (int)Format);
             info.AddValue(nameof(Operation), (int)Operation);
             // Persist assembly-qualified type names because raw Type serialization is unavailable on AOT.
-            info.AddValue(nameof(DeclaredType), DeclaredType?.AssemblyQualifiedName);
-            info.AddValue(nameof(ResolvedType), ResolvedType?.AssemblyQualifiedName);
+            info.AddValue(
+                nameof(DeclaredType),
+                ReflectionHelpers.GetAssemblyQualifiedName(DeclaredType)
+            );
+            info.AddValue(
+                nameof(ResolvedType),
+                ReflectionHelpers.GetAssemblyQualifiedName(ResolvedType)
+            );
             info.AddValue(nameof(InputDescriptor), InputDescriptor);
             info.AddValue(nameof(Stage), (int)Stage);
             info.AddValue(nameof(Reason), Reason);

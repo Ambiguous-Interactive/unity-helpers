@@ -942,6 +942,10 @@ System.Text.Json can require extra care under AOT (e.g., IL2CPP):
 - If you rely on many custom converters, ensure they are referenced by code so the linker doesn't strip them. The UnityHelpers converters are referenced via options by default.
 - Avoid deserializing `System.Type` from untrusted input (see `TypeConverter`); this is intended for trusted configs/tools.
 
+JSON `Type` values can recover a stored constructed generic name after an assembly move when each
+component type still has one matching full name in loaded assemblies. Missing or ambiguous
+components resolve to null. Saving the recovered value writes its current assembly-qualified name.
+
 ### Generic containers get their converters generated
 
 A `JsonConverterFactory` builds the converter for a generic type reflectively:

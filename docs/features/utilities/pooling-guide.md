@@ -492,6 +492,10 @@ still uses it.
 `PoolTypeResolver` uses the same shared cache for simplified type-name parsing. Set
 `PoolTypeResolver.MaxCachedTypeNames` to tune its live default-512 bound; lowering it evicts
 least-recently-used spellings immediately, and 0 or less removes the bound.
+Stored constructed generic names also resolve after a component assembly moves if each component
+still has one matching full name in loaded assemblies. Missing or ambiguous components do not
+resolve. Direct names, built-in aliases, and simplified names such as `List<int>` keep their
+existing syntax.
 
 ### Pooling IDisposable Objects
 

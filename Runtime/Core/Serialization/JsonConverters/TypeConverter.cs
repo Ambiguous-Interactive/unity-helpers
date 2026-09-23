@@ -7,6 +7,9 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
     using System.Text.Json;
     using System.Text.Json.Serialization;
 
+    /// <summary>
+    /// Converts trusted JSON type names and recovers unique component assembly moves.
+    /// </summary>
     public sealed class TypeConverter : JsonConverter<Type>
     {
         public static readonly TypeConverter Instance = new();
@@ -27,7 +30,7 @@ namespace WallstopStudios.UnityHelpers.Core.Serialization.JsonConverters
 
         public override void Write(Utf8JsonWriter writer, Type value, JsonSerializerOptions options)
         {
-            writer.WriteStringValue(value?.AssemblyQualifiedName);
+            writer.WriteStringValue(Helper.ReflectionHelpers.GetAssemblyQualifiedName(value));
         }
     }
 }

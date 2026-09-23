@@ -10,64 +10,18 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
     using System.Reflection;
     using System.Reflection.Emit;
     using System.Runtime.CompilerServices;
-    using System.Text;
     using System.Text.Json;
     using NUnit.Framework;
     using ProtoBuf;
     using WallstopStudios.UnityHelpers.Core.DataStructure.Adapters;
+    using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Tests.Core;
 
     [TestFixture]
     [NUnit.Framework.Category("Fast")]
     public sealed class SerializableTypeTests
     {
         private const string MissingTypeName = "Missing.Type, MissingAssembly";
-
-        private static string BuildAssemblyQualifiedName(Type type)
-        {
-            StringBuilder builder = new();
-            AppendTypeName(builder, type);
-            builder.Append(", ").Append(type.Assembly.FullName);
-            return builder.ToString();
-        }
-
-        private static void AppendTypeName(StringBuilder builder, Type type)
-        {
-            if (type.IsArray)
-            {
-                AppendTypeName(builder, type.GetElementType());
-                builder.Append('[');
-                for (int rank = 1; rank < type.GetArrayRank(); rank++)
-                {
-                    builder.Append(',');
-                }
-
-                builder.Append(']');
-                return;
-            }
-
-            if (type.IsGenericType && !type.IsGenericTypeDefinition)
-            {
-                builder.Append(type.GetGenericTypeDefinition().FullName).Append('[');
-                Type[] arguments = type.GetGenericArguments();
-                for (int index = 0; index < arguments.Length; index++)
-                {
-                    if (0 < index)
-                    {
-                        builder.Append(',');
-                    }
-
-                    builder
-                        .Append('[')
-                        .Append(BuildAssemblyQualifiedName(arguments[index]))
-                        .Append(']');
-                }
-
-                builder.Append(']');
-                return;
-            }
-
-            builder.Append(type.FullName);
-        }
 
         /// <summary>
         /// The filter cache is keyed by what a user types and each entry is a filtered slice of
@@ -441,7 +395,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 Assert.AreSame(typeof(SerializableType), moved);
                 Assert.IsFalse(SerializableTypeCatalog.IsDescriptorCacheInitializedForTesting);
 
-                string movedGeneric = BuildAssemblyQualifiedName(typeof(List<SerializableType>))
+                string movedGeneric = AssemblyQualifiedTypeNameBuilder
+                    .Build(typeof(List<SerializableType>))
                     .Replace(typeof(SerializableType).Assembly.FullName, "MissingAssembly");
                 Assert.AreSame(
                     typeof(List<SerializableType>),
@@ -470,8 +425,12 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
 
             foreach (Type expected in expectedTypes)
             {
-                string original = BuildAssemblyQualifiedName(expected);
+                string original = AssemblyQualifiedTypeNameBuilder.Build(expected);
                 Assert.AreSame(expected, Type.GetType(original, throwOnError: false));
+                Assert.AreEqual(
+                    original,
+                    SerializableType.FromType(expected).AssemblyQualifiedName
+                );
                 string argumentAssembly = expected.GetGenericArguments()[0].Assembly.FullName;
                 if (expected == typeof(Dictionary<string, List<SerializableType[]>>))
                 {
@@ -490,7 +449,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void ResolvesGenericAfterOuterAssemblyMove()
         {
             Type expected = typeof(List<SerializableType>);
-            string original = BuildAssemblyQualifiedName(expected);
+            string original = AssemblyQualifiedTypeNameBuilder.Build(expected);
             string outerAssembly = expected.Assembly.FullName;
             Assert.IsTrue(original.EndsWith(outerAssembly, StringComparison.Ordinal));
             string moved =
@@ -503,7 +462,9 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         [Test]
         public void GenericResolutionRejectsMissingOrMalformedArguments()
         {
-            string original = BuildAssemblyQualifiedName(typeof(List<SerializableType>));
+            string original = AssemblyQualifiedTypeNameBuilder.Build(
+                typeof(List<SerializableType>)
+            );
             string missing = original.Replace(typeof(SerializableType).FullName, "Missing.Type");
             string malformed = original.Replace("]]", "]");
 
@@ -538,20 +499,20 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreEqual(first.FullName, second.FullName);
             Assert.AreSame(
                 first,
-                SerializableTypeCatalog.ResolveUniqueLoadedType(
+                ReflectionHelpers.ResolveUniqueLoadedType(
                     fullName,
                     new List<Assembly> { firstAssembly }
                 )
             );
             Assert.AreSame(
                 second,
-                SerializableTypeCatalog.ResolveUniqueLoadedType(
+                ReflectionHelpers.ResolveUniqueLoadedType(
                     fullName,
                     new List<Assembly> { secondAssembly }
                 )
             );
             Assert.IsTrue(
-                SerializableTypeCatalog.ResolveUniqueLoadedType(
+                ReflectionHelpers.ResolveUniqueLoadedType(
                     fullName,
                     new List<Assembly> { firstAssembly, secondAssembly }
                 ) == null
@@ -562,7 +523,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void SerializationPreservesResolvableStaleGenericName()
         {
             Type expected = typeof(List<SerializableType>);
-            string moved = BuildAssemblyQualifiedName(expected)
+            string moved = AssemblyQualifiedTypeNameBuilder
+                .Build(expected)
                 .Replace(typeof(SerializableType).Assembly.FullName, "MissingAssembly");
             SerializableType wrapper = SerializableType.FromSerializedName(moved);
             Assert.AreSame(expected, wrapper.Value);
@@ -579,14 +541,18 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
             Assert.AreSame(expected, ((SerializableType)boxed).Value);
             callbacks.OnBeforeSerialize();
             SerializableType fromUnity = (SerializableType)boxed;
-            Assert.AreEqual(BuildAssemblyQualifiedName(expected), fromUnity.AssemblyQualifiedName);
+            Assert.AreEqual(
+                AssemblyQualifiedTypeNameBuilder.Build(expected),
+                fromUnity.AssemblyQualifiedName
+            );
         }
 
         [Test]
         public void UnitySerializationNormalizesResolvedGenericAndPreservesMissingName()
         {
             Type expected = typeof(List<SerializableType>);
-            string moved = BuildAssemblyQualifiedName(expected)
+            string moved = AssemblyQualifiedTypeNameBuilder
+                .Build(expected)
                 .Replace(typeof(SerializableType).Assembly.FullName, "MissingAssembly");
             string fieldName = SerializableType.SerializedPropertyNames.AssemblyQualifiedName;
             string holderName = nameof(SerializableTypeHolder.reference);
@@ -603,7 +569,7 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
                 UnityEngine.JsonUtility.ToJson(movedHolder)
             );
             Assert.AreEqual(
-                BuildAssemblyQualifiedName(expected),
+                AssemblyQualifiedTypeNameBuilder.Build(expected),
                 normalized.RootElement.GetProperty(holderName).GetProperty(fieldName).GetString()
             );
 
@@ -629,7 +595,8 @@ namespace WallstopStudios.UnityHelpers.Tests.DataStructures
         public void ProtoSerializationPreservesResolvableStaleGenericName()
         {
             Type expected = typeof(List<SerializableType>);
-            string moved = BuildAssemblyQualifiedName(expected)
+            string moved = AssemblyQualifiedTypeNameBuilder
+                .Build(expected)
                 .Replace(typeof(SerializableType).Assembly.FullName, "MissingAssembly");
             SerializableType wrapper = SerializableType.FromSerializedName(moved);
             using MemoryStream stream = new();

@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Utils
     using System;
     using UnityEngine;
     using UnityEngine.Serialization;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>
     /// Serializable per-type configuration for pool purging behavior.
@@ -125,7 +126,8 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// </summary>
         /// <remarks>
         /// Uses <see cref="PoolTypeResolver"/> for type resolution, which supports
-        /// simplified generic syntax like <c>List&lt;int&gt;</c> and open generics like <c>List&lt;&gt;</c>.
+        /// simplified generic syntax like <c>List&lt;int&gt;</c>, open generics like <c>List&lt;&gt;</c>,
+        /// and unique component assembly moves in stored constructed generic names.
         /// </remarks>
         public Type ResolvedType
         {
@@ -308,7 +310,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// <param name="type">The type to configure.</param>
         public PoolTypeConfiguration(Type type)
         {
-            TypeName = type?.AssemblyQualifiedName ?? string.Empty;
+            TypeName = ReflectionHelpers.GetAssemblyQualifiedName(type) ?? string.Empty;
         }
 
         /// <summary>

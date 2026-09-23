@@ -13,6 +13,8 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
     using System.Linq;
     using System.Reflection;
     using System.Runtime.CompilerServices;
+    using System.Text;
+    using WallstopStudios.UnityHelpers.Utils;
 #if UNITY_EDITOR
     using UnityEditor;
 #endif
@@ -26,8 +28,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         private const string IndexerPropertyName = "Item";
 
         /// <summary>
-        /// Attempts to resolve a type by name using Type.GetType first, then scans loaded assemblies.
-        /// Returns null if not found.
+        /// Resolves a type by exact name, then by a unique loaded type when a composite name moved assemblies.
         /// </summary>
         /// <param name="typeName">The type name to resolve.</param>
         /// <returns>The resolved type, or <c>null</c> when no loaded assembly declares it.</returns>
@@ -39,6 +40,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// name resolvable, and a cached failure would outlive it.
         /// </remarks>
         internal static int ResolvedTypeCacheCountForTesting => TypeResolutionCache.Count;
+
+        private static readonly Func<AssemblyName, Assembly> PlaceholderAssemblyResolver =
+            ResolvePlaceholderAssembly;
 
         /// <summary>
         /// Returns all loaded types across accessible assemblies, swallowing reflection errors.
@@ -138,9 +142,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             if (resolved != null)
             {
                 TypeResolutionCache[typeName] = resolved;
+                return resolved;
             }
 
-            return resolved;
+            return 0 <= typeName.IndexOf('[') ? ResolveCompositeType(typeName) : null;
         }
 
         /// <summary>
@@ -587,6 +592,143 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 #endif
             method = resolved;
             return resolved != null;
+        }
+
+        internal static Type ResolveUniqueLoadedType(string fullName, List<Assembly> assemblies)
+        {
+            if (string.IsNullOrEmpty(fullName))
+            {
+                return null;
+            }
+
+            Type resolved = null;
+            foreach (Assembly assembly in assemblies)
+            {
+                try
+                {
+                    Type candidate = assembly.GetType(fullName, throwOnError: false);
+                    if (candidate == null)
+                    {
+                        continue;
+                    }
+
+                    if (resolved != null && !ReferenceEquals(resolved, candidate))
+                    {
+                        return null;
+                    }
+
+                    resolved = candidate;
+                }
+                catch { }
+            }
+
+            return resolved;
+        }
+
+        internal static string GetAssemblyQualifiedName(Type type)
+        {
+            if (type == null)
+            {
+                return null;
+            }
+
+            Type elementType = type;
+            while (elementType.IsArray)
+            {
+                elementType = elementType.GetElementType();
+            }
+
+            if (
+                !elementType.IsGenericType
+                || elementType.IsGenericTypeDefinition
+                || elementType.ContainsGenericParameters
+            )
+            {
+                return type.AssemblyQualifiedName;
+            }
+
+            using PooledResource<StringBuilder> builderLease = Buffers.StringBuilder.Get(
+                out StringBuilder builder
+            );
+            AppendAssemblyQualifiedTypeName(builder, type);
+            builder.Append(", ").Append(type.Assembly.FullName);
+            return builder.ToString();
+        }
+
+        private static void AppendAssemblyQualifiedTypeName(StringBuilder builder, Type type)
+        {
+            if (type.IsArray)
+            {
+                AppendAssemblyQualifiedTypeName(builder, type.GetElementType());
+                builder.Append('[');
+                int arrayRank = type.GetArrayRank();
+                if (arrayRank == 1 && !type.IsSZArray)
+                {
+                    builder.Append('*');
+                }
+
+                for (int rank = 1; rank < arrayRank; rank++)
+                {
+                    builder.Append(',');
+                }
+
+                builder.Append(']');
+                return;
+            }
+
+            if (type.IsGenericType && !type.IsGenericTypeDefinition)
+            {
+                builder.Append(type.GetGenericTypeDefinition().FullName).Append('[');
+                Type[] arguments = type.GetGenericArguments();
+                for (int index = 0; index < arguments.Length; index++)
+                {
+                    if (0 < index)
+                    {
+                        builder.Append(',');
+                    }
+
+                    Type argument = arguments[index];
+                    builder.Append('[');
+                    AppendAssemblyQualifiedTypeName(builder, argument);
+                    builder.Append(", ").Append(argument.Assembly.FullName).Append(']');
+                }
+
+                builder.Append(']');
+                return;
+            }
+
+            builder.Append(type.FullName);
+        }
+
+        private static Type ResolveCompositeType(string typeName)
+        {
+            using PooledResource<List<Assembly>> assembliesLease = Buffers<Assembly>.List.Get(
+                out List<Assembly> assemblies
+            );
+            foreach (Assembly assembly in GetAllLoadedAssemblies())
+            {
+                assemblies.Add(assembly);
+            }
+
+            try
+            {
+                return Type.GetType(
+                    typeName,
+                    PlaceholderAssemblyResolver,
+                    (_, name, _) => ResolveUniqueLoadedType(name, assemblies),
+                    throwOnError: false,
+                    ignoreCase: false
+                );
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static Assembly ResolvePlaceholderAssembly(AssemblyName requestedAssembly)
+        {
+            return typeof(object).Assembly;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
