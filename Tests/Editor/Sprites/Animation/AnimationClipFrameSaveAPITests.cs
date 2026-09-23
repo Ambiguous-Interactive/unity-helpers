@@ -10,6 +10,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
     using UnityEditor;
     using UnityEditor.UIElements;
     using UnityEngine;
+    using UnityEngine.Rendering;
+    using UnityEngine.TestTools;
     using UnityEngine.UIElements;
     using WallstopStudios.UnityHelpers.Editor.Sprites;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -23,6 +25,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         private const string ClipPath = Root + "/Clip.anim";
         private const string FirstSpritePath = Root + "/First.png";
         private const string SecondSpritePath = Root + "/Second.png";
+        private const string NoGraphicsDeviceLog =
+            "No graphic device is available to initialize the view.";
 
         private static readonly EditorCurveBinding PreferredBinding = EditorCurveBinding.PPtrCurve(
             "Preferred",
@@ -65,6 +69,38 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             );
             Assert.AreEqual(expectedGuid, actualGuid);
             Assert.AreEqual(expectedLocalId, actualLocalId);
+        }
+
+        private static void ShowWindow(AnimationViewerWindow window)
+        {
+            string unexpectedError = null;
+            void RecordError(string message, string stackTrace, LogType type)
+            {
+                if (
+                    type is LogType.Error or LogType.Exception or LogType.Assert
+                    && (
+                        SystemInfo.graphicsDeviceType != GraphicsDeviceType.Null
+                        || !string.Equals(message, NoGraphicsDeviceLog, StringComparison.Ordinal)
+                    )
+                )
+                {
+                    unexpectedError = message;
+                }
+            }
+
+            bool previousIgnore = LogAssert.ignoreFailingMessages;
+            try
+            {
+                Application.logMessageReceived += RecordError;
+                LogAssert.ignoreFailingMessages = true;
+                window.Show();
+            }
+            finally
+            {
+                LogAssert.ignoreFailingMessages = previousIgnore;
+                Application.logMessageReceived -= RecordError;
+            }
+            Assert.IsTrue(unexpectedError == null, unexpectedError);
         }
 
         [SetUp]
@@ -339,7 +375,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             AnimationViewerWindow window = Track(
                 ScriptableObject.CreateInstance<AnimationViewerWindow>()
             );
-            window.Show();
+            ShowWindow(window);
             ObjectField clipField = window.rootVisualElement.Q<ObjectField>(
                 "addAnimationClipField"
             );
