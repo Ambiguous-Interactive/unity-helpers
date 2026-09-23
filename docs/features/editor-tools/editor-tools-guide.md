@@ -1108,8 +1108,34 @@ with clickable links.
 
 Everything except **Empty String Fields** is logged as an error; empty strings are warnings.
 
+Editor scripts can scan without opening the window. Pass project-relative folder paths and explicit
+options to `PrefabChecker.ScanFolders`; the returned result includes counts, any input error, and
+findings grouped by prefab path. This call shows no dialogs, records no folder history, and makes no
+asset changes. It uses the same default checks as the window; set the options you need before the
+call. The window still logs findings and can export its last report.
+
+```csharp
+using WallstopStudios.UnityHelpers.Editor;
+
+PrefabChecker.ScanOptions options = new PrefabChecker.ScanOptions
+{
+    CheckDisabledComponents = true,
+};
+PrefabChecker.ScanResult result = PrefabChecker.ScanFolders(
+    new[] { "Assets/Prefabs" },
+    options
+);
+if (result.Error == null)
+{
+    foreach (PrefabChecker.ScanReport.Item item in result.Report.items)
+    {
+        UnityEngine.Debug.Log($"{item.path}: {string.Join("; ", item.messages)}");
+    }
+}
+```
+
 **Narrowing a run:** **Include Labels (comma)** and **Exclude Labels (comma)** filter by asset label,
-and **Deny Component Types (comma names)** flags prefabs carrying a component you have banned
+and **Deny Component Types (comma names)** skips those component types during checks
 (a debug-only behaviour, say).
 
 **Fixing and reporting:** **Fix Missing Scripts** strips dead component slots, but it stays disabled

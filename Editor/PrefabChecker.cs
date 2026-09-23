@@ -65,6 +65,12 @@ namespace WallstopStudios.UnityHelpers.Editor
             GetWindow<PrefabChecker>("Prefab Check");
         }
 
+        /// <summary>Scans prefab folders with explicit settings and returns the findings.</summary>
+        public static ScanResult ScanFolders(IEnumerable<string> folders, ScanOptions options)
+        {
+            return RunChecks(folders, options ?? new ScanOptions(), null);
+        }
+
         private static Func<GUIContent, bool, float?, bool, bool> SetupDrawRightAlignedToggle()
         {
             return (label, value, overrideToggleX, isNested) =>
@@ -224,7 +230,12 @@ namespace WallstopStudios.UnityHelpers.Editor
             );
         }
 
-        private static int ValidateNoNullsInLists(Object component, GameObject context)
+        private static int ValidateNoNullsInLists(
+            Object component,
+            GameObject context,
+            List<string> messages,
+            bool interactive
+        )
         {
             int issueCount = 0;
             Type componentType = component.GetType();
@@ -264,9 +275,14 @@ namespace WallstopStudios.UnityHelpers.Editor
                 {
                     if (list.GetType() != typeof(Transform) && unityObject == null)
                     {
-                        unityObject.LogError(
-                            $"Field '{field.Name}' ({field.FieldType.Name}) on component '{componentType.Name}' has a null enumerable."
-                        );
+                        string message =
+                            $"Field '{field.Name}' ({field.FieldType.Name}) on component '{componentType.Name}' has a null enumerable.";
+                        messages.Add(message);
+                        if (interactive)
+                        {
+                            context.LogError($"{message}");
+                        }
+                        issueCount++;
                     }
                     continue;
                 }
@@ -274,9 +290,13 @@ namespace WallstopStudios.UnityHelpers.Editor
                 {
                     if (element == null || (element is Object unityObj && !unityObj))
                     {
-                        context.LogError(
-                            $"Field '{field.Name}' ({field.FieldType.Name}) on component '{componentType.Name}' has a null or missing element at index {index}."
-                        );
+                        string message =
+                            $"Field '{field.Name}' ({field.FieldType.Name}) on component '{componentType.Name}' has a null or missing element at index {index}.";
+                        messages.Add(message);
+                        if (interactive)
+                        {
+                            context.LogError($"{message}");
+                        }
                         issueCount++;
                     }
                     index++;
@@ -288,7 +308,9 @@ namespace WallstopStudios.UnityHelpers.Editor
         private static int ValidateRequiredComponentsFast(
             Component component,
             GameObject context,
-            HashSet<Type> presentTypes
+            HashSet<Type> presentTypes,
+            List<string> messages,
+            bool interactive
         )
         {
             int issueCount = 0;
@@ -311,9 +333,13 @@ namespace WallstopStudios.UnityHelpers.Editor
                     && !presentTypes.Contains(requiredComponent.m_Type0)
                 )
                 {
-                    context.LogError(
-                        $"Component '{componentType.Name}' requires component '{requiredComponent.m_Type0.Name}', but it is missing."
-                    );
+                    string message =
+                        $"Component '{componentType.Name}' requires component '{requiredComponent.m_Type0.Name}', but it is missing.";
+                    messages.Add(message);
+                    if (interactive)
+                    {
+                        context.LogError($"{message}");
+                    }
                     issueCount++;
                 }
                 if (
@@ -321,9 +347,13 @@ namespace WallstopStudios.UnityHelpers.Editor
                     && !presentTypes.Contains(requiredComponent.m_Type1)
                 )
                 {
-                    context.LogError(
-                        $"Component '{componentType.Name}' requires component '{requiredComponent.m_Type1.Name}', but it is missing."
-                    );
+                    string message =
+                        $"Component '{componentType.Name}' requires component '{requiredComponent.m_Type1.Name}', but it is missing.";
+                    messages.Add(message);
+                    if (interactive)
+                    {
+                        context.LogError($"{message}");
+                    }
                     issueCount++;
                 }
                 if (
@@ -331,16 +361,25 @@ namespace WallstopStudios.UnityHelpers.Editor
                     && !presentTypes.Contains(requiredComponent.m_Type2)
                 )
                 {
-                    context.LogError(
-                        $"Component '{componentType.Name}' requires component '{requiredComponent.m_Type2.Name}', but it is missing."
-                    );
+                    string message =
+                        $"Component '{componentType.Name}' requires component '{requiredComponent.m_Type2.Name}', but it is missing.";
+                    messages.Add(message);
+                    if (interactive)
+                    {
+                        context.LogError($"{message}");
+                    }
                     issueCount++;
                 }
             }
             return issueCount;
         }
 
-        private static int ValidateEmptyStrings(Object component, GameObject context)
+        private static int ValidateEmptyStrings(
+            Object component,
+            GameObject context,
+            List<string> messages,
+            bool interactive
+        )
         {
             int issueCount = 0;
             Type componentType = component.GetType();
@@ -366,9 +405,13 @@ namespace WallstopStudios.UnityHelpers.Editor
                 object fieldValue = field.GetValue(component);
                 if (fieldValue is string stringValue && string.IsNullOrEmpty(stringValue))
                 {
-                    context.LogWarn(
-                        $"String field '{field.Name}' on component '{componentType.Name}' is null or empty."
-                    );
+                    string message =
+                        $"String field '{field.Name}' on component '{componentType.Name}' is null or empty.";
+                    messages.Add(message);
+                    if (interactive)
+                    {
+                        context.LogWarn($"{message}");
+                    }
                     issueCount++;
                 }
             }
@@ -377,7 +420,8 @@ namespace WallstopStudios.UnityHelpers.Editor
 
         private static GameObject FindOwnerOfMissingScriptBounded(
             GameObject prefabRoot,
-            List<MonoBehaviour> buffer
+            List<MonoBehaviour> buffer,
+            bool interactive
         )
         {
             using PooledResource<List<Transform>> transformBufferResource =
@@ -385,9 +429,12 @@ namespace WallstopStudios.UnityHelpers.Editor
             prefabRoot.GetComponentsInChildren(true, transforms);
             if (MaxTransformScanForMissingOwner < transforms.Count)
             {
-                prefabRoot.LogWarn(
-                    $"Hierarchy too large to locate owner of missing script (>{MaxTransformScanForMissingOwner}). Reporting at prefab root."
-                );
+                if (interactive)
+                {
+                    prefabRoot.LogWarn(
+                        $"Hierarchy too large to locate owner of missing script (>{MaxTransformScanForMissingOwner}). Reporting at prefab root."
+                    );
+                }
                 return prefabRoot;
             }
             return FindOwnerOfMissingScript(prefabRoot, buffer);
@@ -411,64 +458,33 @@ namespace WallstopStudios.UnityHelpers.Editor
             catch { }
         }
 
-        internal bool TryAddFolderFromAbsolute(string absolutePath)
+        private static ScanResult RunChecks(
+            IEnumerable<string> folders,
+            ScanOptions options,
+            PrefabChecker window
+        )
         {
-            if (string.IsNullOrWhiteSpace(absolutePath))
+            bool interactive = window != null;
+            ScanResult result = new();
+            if (folders == null)
             {
-                return false;
-            }
-
-            if (!TryGetUnityFolderFromAbsolute(absolutePath, out string relativePath))
-            {
-                this.LogError(
-                    $"Selected folder must be inside the Unity project's Assets folder. Selected path: {absolutePath}"
-                );
-                return false;
-            }
-
-            return AddAssetFolder(relativePath);
-        }
-
-        internal bool AddAssetFolder(string relativePath)
-        {
-            if (string.IsNullOrWhiteSpace(relativePath))
-            {
-                return false;
-            }
-
-            if (
-                relativePath.Equals("Assets", StringComparison.Ordinal)
-                || AssetDatabase.IsValidFolder(relativePath)
-            )
-            {
-                if (!_assetPaths.Contains(relativePath))
+                result.Error = "No asset paths specified. Add folders containing prefabs.";
+                if (interactive)
                 {
-                    _assetPaths.Add(relativePath);
-                    TryRecordHistory(relativePath);
-                    return true;
+                    window.LogError($"{result.Error}");
                 }
-
-                this.LogWarn($"Folder '{relativePath}' is already in the list.");
-                return false;
-            }
-
-            this.LogWarn($"Selected path '{relativePath}' is not a valid Unity folder.");
-            return false;
-        }
-
-        internal void RunChecksImproved()
-        {
-            if (_assetPaths is not { Count: > 0 })
-            {
-                this.LogError($"No asset paths specified. Add folders containing prefabs.");
-                return;
+                return result;
             }
 
             using PooledResource<List<string>> validPathBuffer = Buffers<string>.List.Get(
                 out List<string> validPaths
             );
-            foreach (string assetPath in _assetPaths)
+            using PooledResource<List<string>> requestedPathBuffer = Buffers<string>.List.Get(
+                out List<string> requestedPaths
+            );
+            foreach (string assetPath in folders)
             {
+                requestedPaths.Add(assetPath);
                 if (
                     !string.IsNullOrEmpty(assetPath)
                     && (
@@ -481,18 +497,34 @@ namespace WallstopStudios.UnityHelpers.Editor
                 }
             }
 
-            if (validPaths.Count == 0)
+            if (requestedPaths.Count == 0)
             {
-                this.LogError(
-                    $"None of the specified paths are valid folders: {string.Join(", ", _assetPaths)}"
-                );
-                return;
+                result.Error = "No asset paths specified. Add folders containing prefabs.";
+                if (interactive)
+                {
+                    window.LogError($"{result.Error}");
+                }
+                return result;
             }
 
-            this.Log($"Starting prefab check for folders: {string.Join(", ", validPaths)}");
-            foreach (string p in validPaths)
+            if (validPaths.Count == 0)
             {
-                TryRecordHistory(p);
+                result.Error =
+                    $"None of the specified paths are valid folders: {string.Join(", ", requestedPaths)}";
+                if (interactive)
+                {
+                    window.LogError($"{result.Error}");
+                }
+                return result;
+            }
+
+            if (interactive)
+            {
+                window.Log($"Starting prefab check for folders: {string.Join(", ", validPaths)}");
+                foreach (string path in validPaths)
+                {
+                    TryRecordHistory(path);
+                }
             }
 
             // FindAssets consumes the whole array; oversized pooled arrays contain null paths that Unity rejects.
@@ -504,7 +536,7 @@ namespace WallstopStudios.UnityHelpers.Editor
             using PooledResource<HashSet<string>> includeSetLease = Buffers<string>.HashSet.Get(
                 out HashSet<string> includeSet
             );
-            foreach (string label in _includeLabels)
+            foreach (string label in options.IncludeLabels ?? Array.Empty<string>())
             {
                 if (!string.IsNullOrWhiteSpace(label))
                 {
@@ -515,7 +547,7 @@ namespace WallstopStudios.UnityHelpers.Editor
             using PooledResource<HashSet<string>> excludeSetLease = Buffers<string>.HashSet.Get(
                 out HashSet<string> excludeSet
             );
-            foreach (string label in _excludeLabels)
+            foreach (string label in options.ExcludeLabels ?? Array.Empty<string>())
             {
                 if (!string.IsNullOrWhiteSpace(label))
                 {
@@ -526,21 +558,22 @@ namespace WallstopStudios.UnityHelpers.Editor
                 out Stopwatch stopwatch
             );
             int skippedByLabel = 0;
-            _lastReport = new ScanReport(validPaths);
+            result.Report = new ScanReport(validPaths);
 
             try
             {
                 for (int idx = 0; idx < guids.Length; idx++)
                 {
                     if (
-                        EditorUi.CancelableProgress(
+                        interactive
+                        && EditorUi.CancelableProgress(
                             "Prefab Checker",
                             $"Scanning prefabs... {idx + 1}/{guids.Length}",
                             (float)(idx + 1) / Mathf.Max(1, guids.Length)
                         )
                     )
                     {
-                        this.LogWarn($"Prefab scan canceled by user.");
+                        window.LogWarn($"Prefab scan canceled by user.");
                         break;
                     }
 
@@ -593,7 +626,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                         out List<string> messages
                     );
 
-                    if (_checkDisabledRootGameObjects && !prefab.activeSelf)
+                    if (options.CheckDisabledRootGameObjects && !prefab.activeSelf)
                     {
                         messages.Add("Prefab root GameObject is disabled.");
                         issuesForThisPrefab++;
@@ -617,11 +650,12 @@ namespace WallstopStudios.UnityHelpers.Editor
 
                     foreach (MonoBehaviour script in componentBuffer)
                     {
-                        if (_checkMissingScripts && !script)
+                        if (options.CheckMissingScripts && !script)
                         {
                             GameObject owner = FindOwnerOfMissingScriptBounded(
                                 prefab,
-                                componentBuffer
+                                componentBuffer,
+                                interactive
                             );
                             string ownerName = owner ? owner.name : "[[Unknown GameObject]]";
                             messages.Add($"Detected missing script on GameObject '{ownerName}'.");
@@ -635,11 +669,11 @@ namespace WallstopStudios.UnityHelpers.Editor
 
                         GameObject ownerGameObject = script.gameObject;
                         bool denied = false;
-                        if (!string.IsNullOrWhiteSpace(_componentTypeDenyListCsv))
+                        if (!string.IsNullOrWhiteSpace(options.ComponentTypeDenyListCsv))
                         {
                             string typeName = script.GetType().Name;
                             string fullName = script.GetType().FullName;
-                            string[] tokens = _componentTypeDenyListCsv.Split(',');
+                            string[] tokens = options.ComponentTypeDenyListCsv.Split(',');
                             foreach (string token in tokens)
                             {
                                 string t = token.Trim();
@@ -661,34 +695,52 @@ namespace WallstopStudios.UnityHelpers.Editor
                         {
                             continue;
                         }
-                        if (_checkNullElementsInLists)
+                        if (options.CheckNullElementsInLists)
                         {
-                            issuesForThisPrefab += ValidateNoNullsInLists(script, ownerGameObject);
+                            issuesForThisPrefab += ValidateNoNullsInLists(
+                                script,
+                                ownerGameObject,
+                                messages,
+                                interactive
+                            );
                         }
 
-                        if (_checkMissingRequiredComponents)
+                        if (options.CheckMissingRequiredComponents)
                         {
                             HashSet<Type> present = GetOrBuildTypeSet(ownerGameObject);
                             issuesForThisPrefab += ValidateRequiredComponentsFast(
                                 script,
                                 ownerGameObject,
-                                present
+                                present,
+                                messages,
+                                interactive
                             );
                         }
-                        if (_checkEmptyStringFields)
+                        if (options.CheckEmptyStringFields)
                         {
-                            issuesForThisPrefab += ValidateEmptyStrings(script, ownerGameObject);
+                            issuesForThisPrefab += ValidateEmptyStrings(
+                                script,
+                                ownerGameObject,
+                                messages,
+                                interactive
+                            );
                         }
 
-                        if (_checkNullObjectReferences)
+                        if (options.CheckNullObjectReferences)
                         {
                             issuesForThisPrefab += ValidateNullObjectReferences(
                                 script,
-                                ownerGameObject
+                                ownerGameObject,
+                                options.OnlyCheckNullObjectsWithAttribute,
+                                messages,
+                                interactive
                             );
                         }
 
-                        if (_checkDisabledComponents && script is Behaviour { enabled: false })
+                        if (
+                            options.CheckDisabledComponents
+                            && script is Behaviour { enabled: false }
+                        )
                         {
                             messages.Add(
                                 $"Component '{script.GetType().Name}' on GameObject '{ownerGameObject.name}' is disabled."
@@ -699,21 +751,24 @@ namespace WallstopStudios.UnityHelpers.Editor
 
                     if (0 < issuesForThisPrefab)
                     {
-                        int toLog = Mathf.Min(100, messages.Count);
-                        for (int m = 0; m < toLog; m++)
+                        if (interactive)
                         {
-                            prefab.LogWarn($"{messages[m]}");
-                        }
+                            int toLog = Mathf.Min(100, messages.Count);
+                            for (int m = 0; m < toLog; m++)
+                            {
+                                prefab.LogWarn($"{messages[m]}");
+                            }
 
-                        if (toLog < messages.Count)
-                        {
-                            prefab.LogWarn($"... and {messages.Count - toLog} more.");
-                        }
+                            if (toLog < messages.Count)
+                            {
+                                prefab.LogWarn($"... and {messages.Count - toLog} more.");
+                            }
 
-                        this.LogWarn(
-                            $"Prefab '{prefab.name}' at path '{path}' has {issuesForThisPrefab} potential issues."
-                        );
-                        _lastReport.Add(path, messages);
+                            window.LogWarn(
+                                $"Prefab '{prefab.name}' at path '{path}' has {issuesForThisPrefab} potential issues."
+                            );
+                        }
+                        result.Report.Add(path, messages);
                         totalIssuesFound += issuesForThisPrefab;
                     }
 
@@ -748,27 +803,164 @@ namespace WallstopStudios.UnityHelpers.Editor
                     }
                 }
 
-                if (0 < totalIssuesFound)
+                result.PrefabsChecked = totalPrefabsChecked;
+                result.IssuesFound = totalIssuesFound;
+                result.SkippedByLabel = skippedByLabel;
+                if (interactive && 0 < totalIssuesFound)
                 {
-                    this.LogError(
+                    window.LogError(
                         $"Prefab check complete. Found {totalIssuesFound} potential issues across {totalPrefabsChecked} prefabs."
                     );
                 }
-                else
+                else if (interactive)
                 {
-                    this.Log(
+                    window.Log(
                         $"Prefab check complete. No issues found in {totalPrefabsChecked} prefabs."
                     );
                 }
             }
             finally
             {
-                EditorUi.ClearProgress();
+                if (interactive)
+                {
+                    EditorUi.ClearProgress();
+                }
             }
             stopwatch.Stop();
-            this.Log(
-                $"Scanned {totalPrefabsChecked} prefabs in {stopwatch.ElapsedMilliseconds} ms. Skipped {skippedByLabel} by label."
+            if (interactive)
+            {
+                window.Log(
+                    $"Scanned {totalPrefabsChecked} prefabs in {stopwatch.ElapsedMilliseconds} ms. Skipped {skippedByLabel} by label."
+                );
+            }
+            return result;
+        }
+
+        private static int ValidateNullObjectReferences(
+            Object component,
+            GameObject context,
+            bool onlyWithAttribute,
+            List<string> messages,
+            bool interactive
+        )
+        {
+            int issueCount = 0;
+            Type componentType = component.GetType();
+
+            List<FieldInfo> objFields = ObjectFieldsByType.GetOrAdd(
+                componentType,
+                static type =>
+                {
+                    IEnumerable<FieldInfo> baseFields = GetFieldsToCheck(type, FieldsByType);
+                    List<FieldInfo> res = new();
+                    foreach (FieldInfo f in baseFields)
+                    {
+                        if (f != null && typeof(Object).IsAssignableFrom(f.FieldType))
+                        {
+                            res.Add(f);
+                        }
+                    }
+                    return res;
+                }
             );
+            foreach (FieldInfo field in objFields)
+            {
+                bool hasValidateAttribute = field.IsAttributeDefined<ValidateAssignmentAttribute>(
+                    out _,
+                    inherit: false
+                );
+
+                if (onlyWithAttribute && !hasValidateAttribute)
+                {
+                    continue;
+                }
+
+                object fieldValue = field.GetValue(component);
+
+                if (fieldValue != null && (fieldValue is not Object unityObj || unityObj))
+                {
+                    continue;
+                }
+
+                string attributeMarker = hasValidateAttribute ? " (has [ValidateAssignment])" : "";
+                string message =
+                    $"Object reference field '{field.Name}'{attributeMarker} on component '{componentType.Name}' is null or missing.";
+                messages.Add(message);
+                if (interactive)
+                {
+                    context.LogError($"{message}");
+                }
+                issueCount++;
+            }
+            return issueCount;
+        }
+
+        internal bool TryAddFolderFromAbsolute(string absolutePath)
+        {
+            if (string.IsNullOrWhiteSpace(absolutePath))
+            {
+                return false;
+            }
+
+            if (!TryGetUnityFolderFromAbsolute(absolutePath, out string relativePath))
+            {
+                this.LogError(
+                    $"Selected folder must be inside the Unity project's Assets folder. Selected path: {absolutePath}"
+                );
+                return false;
+            }
+
+            return AddAssetFolder(relativePath);
+        }
+
+        internal bool AddAssetFolder(string relativePath)
+        {
+            if (string.IsNullOrWhiteSpace(relativePath))
+            {
+                return false;
+            }
+
+            if (
+                relativePath.Equals("Assets", StringComparison.Ordinal)
+                || AssetDatabase.IsValidFolder(relativePath)
+            )
+            {
+                if (!_assetPaths.Contains(relativePath))
+                {
+                    _assetPaths.Add(relativePath);
+                    TryRecordHistory(relativePath);
+                    return true;
+                }
+
+                this.LogWarn($"Folder '{relativePath}' is already in the list.");
+                return false;
+            }
+
+            this.LogWarn($"Selected path '{relativePath}' is not a valid Unity folder.");
+            return false;
+        }
+
+        internal void RunChecksImproved()
+        {
+            ScanOptions options = new()
+            {
+                CheckMissingScripts = _checkMissingScripts,
+                CheckNullElementsInLists = _checkNullElementsInLists,
+                CheckMissingRequiredComponents = _checkMissingRequiredComponents,
+                CheckEmptyStringFields = _checkEmptyStringFields,
+                CheckNullObjectReferences = _checkNullObjectReferences,
+                OnlyCheckNullObjectsWithAttribute = _onlyCheckNullObjectsWithAttribute,
+                CheckDisabledRootGameObjects = _checkDisabledRootGameObjects,
+                CheckDisabledComponents = _checkDisabledComponents,
+                IncludeLabels = _includeLabels,
+                ExcludeLabels = _excludeLabels,
+                ComponentTypeDenyListCsv = _componentTypeDenyListCsv,
+            };
+            ScanResult result = RunChecks(_assetPaths, options, this);
+            if (result.Error == null)
+            {
+                _lastReport = result.Report;
+            }
         }
 
         private void OnEnable()
@@ -1002,55 +1194,6 @@ namespace WallstopStudios.UnityHelpers.Editor
             }
 
             _ = TryAddFolderFromAbsolute(absolutePath);
-        }
-
-        private int ValidateNullObjectReferences(Object component, GameObject context)
-        {
-            int issueCount = 0;
-            Type componentType = component.GetType();
-
-            List<FieldInfo> objFields = ObjectFieldsByType.GetOrAdd(
-                componentType,
-                static type =>
-                {
-                    IEnumerable<FieldInfo> baseFields = GetFieldsToCheck(type, FieldsByType);
-                    List<FieldInfo> res = new();
-                    foreach (FieldInfo f in baseFields)
-                    {
-                        if (f != null && typeof(Object).IsAssignableFrom(f.FieldType))
-                        {
-                            res.Add(f);
-                        }
-                    }
-                    return res;
-                }
-            );
-            foreach (FieldInfo field in objFields)
-            {
-                bool hasValidateAttribute = field.IsAttributeDefined<ValidateAssignmentAttribute>(
-                    out _,
-                    inherit: false
-                );
-
-                if (_onlyCheckNullObjectsWithAttribute && !hasValidateAttribute)
-                {
-                    continue;
-                }
-
-                object fieldValue = field.GetValue(component);
-
-                if (fieldValue != null && (fieldValue is not Object unityObj || unityObj))
-                {
-                    continue;
-                }
-
-                string attributeMarker = hasValidateAttribute ? " (has [ValidateAssignment])" : "";
-                context.LogError(
-                    $"Object reference field '{field.Name}'{attributeMarker} on component '{componentType.Name}' is null or missing."
-                );
-                issueCount++;
-            }
-            return issueCount;
         }
 
         private void SetupReorderableList()
@@ -1369,12 +1512,73 @@ namespace WallstopStudios.UnityHelpers.Editor
             }
         }
 
-        [Serializable]
-        internal sealed class ScanReport
+        /// <summary>Options for a scripted prefab scan.</summary>
+        public sealed class ScanOptions
         {
+            /// <summary>Checks for missing scripts.</summary>
+            public bool CheckMissingScripts = true;
+
+            /// <summary>Checks for null collection elements.</summary>
+            public bool CheckNullElementsInLists = true;
+
+            /// <summary>Checks required components.</summary>
+            public bool CheckMissingRequiredComponents = true;
+
+            /// <summary>Checks empty string fields.</summary>
+            public bool CheckEmptyStringFields;
+
+            /// <summary>Checks null object references.</summary>
+            public bool CheckNullObjectReferences = true;
+
+            /// <summary>Limits null reference checks to annotated fields.</summary>
+            public bool OnlyCheckNullObjectsWithAttribute = true;
+
+            /// <summary>Checks disabled prefab roots.</summary>
+            public bool CheckDisabledRootGameObjects = true;
+
+            /// <summary>Checks disabled components.</summary>
+            public bool CheckDisabledComponents;
+
+            /// <summary>Labels that prefabs must have.</summary>
+            public IEnumerable<string> IncludeLabels = Array.Empty<string>();
+
+            /// <summary>Labels that exclude prefabs.</summary>
+            public IEnumerable<string> ExcludeLabels = Array.Empty<string>();
+
+            /// <summary>Comma-separated component types to skip.</summary>
+            public string ComponentTypeDenyListCsv = string.Empty;
+        }
+
+        /// <summary>Counts and findings from a prefab scan.</summary>
+        public sealed class ScanResult
+        {
+            /// <summary>Findings grouped by prefab path.</summary>
+            public ScanReport Report = new(Array.Empty<string>());
+
+            /// <summary>Number of prefabs checked after label filters.</summary>
+            public int PrefabsChecked;
+
+            /// <summary>Number of issues found.</summary>
+            public int IssuesFound;
+
+            /// <summary>Number of prefabs excluded by labels.</summary>
+            public int SkippedByLabel;
+
+            /// <summary>Validation error, or null when the scan ran.</summary>
+            public string Error;
+        }
+
+        /// <summary>Prefab findings and scanned folders.</summary>
+        [Serializable]
+        public sealed class ScanReport
+        {
+            /// <summary>Folders scanned.</summary>
             public readonly string[] folders;
+
+            /// <summary>Prefabs with findings.</summary>
             public readonly List<Item> items = new();
 
+            /// <summary>Copies the supplied folders into a report.</summary>
             public ScanReport(IEnumerable<string> folders)
             {
                 if (folders == null)
@@ -1394,6 +1598,7 @@ namespace WallstopStudios.UnityHelpers.Editor
                 this.folders = list.ToArray();
             }
 
+            /// <summary>Adds a prefab and copies its findings.</summary>
             public void Add(string path, List<string> messages)
             {
                 string[] arr = messages is { Count: > 0 }
@@ -1403,9 +1608,12 @@ namespace WallstopStudios.UnityHelpers.Editor
             }
 
             [Serializable]
-            internal sealed class Item
+            public sealed class Item
             {
+                /// <summary>Prefab asset path.</summary>
                 public string path;
+
+                /// <summary>Finding messages.</summary>
                 public string[] messages;
             }
         }

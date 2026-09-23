@@ -15,6 +15,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
     using WallstopStudios.UnityHelpers.Editor;
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Tests.Core;
+    using WallstopStudios.UnityHelpers.Tests.Core.TestTypes;
 
     [TestFixture]
     [NUnit.Framework.Category("Slow")]
@@ -64,6 +65,162 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
             Assert.IsTrue(rel != null, "Relative path should not be null for valid data path");
             Assert.IsNotEmpty(rel);
             Assert.AreEqual("Assets", rel, "Root Assets conversion should be exactly 'Assets'.");
+        }
+
+        [Test]
+        public void ScanFoldersWithNullInputReturnsErrorWithoutLogging()
+        {
+            int windowsBefore = Resources.FindObjectsOfTypeAll<PrefabChecker>().Length;
+            PrefabChecker.ScanResult result = PrefabChecker.ScanFolders(null, null);
+
+            Assert.IsNotEmpty(result.Error);
+            Assert.AreEqual(0, result.PrefabsChecked);
+            Assert.AreEqual(0, result.IssuesFound);
+            Assert.IsEmpty(result.Report.items);
+            Assert.AreEqual(windowsBefore, Resources.FindObjectsOfTypeAll<PrefabChecker>().Length);
+        }
+
+        [Test]
+        public void ScanFoldersWithEmptyInputReturnsNoPathsError()
+        {
+            PrefabChecker.ScanResult result = PrefabChecker.ScanFolders(
+                System.Array.Empty<string>(),
+                new PrefabChecker.ScanOptions()
+            );
+
+            StringAssert.Contains("No asset paths specified", result.Error);
+            Assert.AreEqual(0, result.PrefabsChecked);
+            Assert.AreEqual(0, result.IssuesFound);
+        }
+
+        [Test]
+        public void ScanFoldersReportsDisabledRootAndHonorsExplicitOptions()
+        {
+            ExecuteWithImmediateImport(() =>
+            {
+                string folder = Path.Combine(Root, "ScriptedScan").SanitizePath();
+                EnsureFolder(folder);
+                string prefabPath = Path.Combine(folder, "DisabledRoot.prefab").SanitizePath();
+                GameObject source = Track(new GameObject("DisabledRoot"));
+                source.SetActive(false);
+                PrefabUtility.SaveAsPrefabAsset(source, prefabPath);
+                TrackAssetPath(prefabPath);
+                AssetDatabaseBatchHelper.RefreshIfNotBatching();
+
+                PrefabChecker.ScanOptions options = new();
+                int progressCalls = 0;
+                int clearCalls = 0;
+                System.Func<bool> previousProgress = EditorUi.ProgressForTesting;
+                System.Action previousClear = EditorUi.ProgressClearedForTesting;
+                PrefabChecker.ScanResult found;
+                try
+                {
+                    EditorUi.ProgressForTesting = () =>
+                    {
+                        progressCalls++;
+                        return false;
+                    };
+                    EditorUi.ProgressClearedForTesting = () => clearCalls++;
+                    found = PrefabChecker.ScanFolders(new[] { folder }, options);
+                }
+                finally
+                {
+                    EditorUi.ProgressForTesting = previousProgress;
+                    EditorUi.ProgressClearedForTesting = previousClear;
+                }
+
+                Assert.AreEqual(0, progressCalls);
+                Assert.AreEqual(0, clearCalls);
+
+                Assert.IsTrue(found.Error == null);
+                Assert.AreEqual(1, found.PrefabsChecked);
+                Assert.AreEqual(1, found.IssuesFound);
+                Assert.AreEqual(1, found.Report.items.Count);
+                Assert.AreEqual(prefabPath, found.Report.items[0].path);
+                StringAssert.Contains("disabled", found.Report.items[0].messages[0]);
+
+                options.CheckDisabledRootGameObjects = false;
+                PrefabChecker.ScanResult disabled = PrefabChecker.ScanFolders(
+                    new[] { folder },
+                    options
+                );
+                Assert.AreEqual(1, disabled.PrefabsChecked);
+                Assert.AreEqual(0, disabled.IssuesFound);
+                Assert.IsEmpty(disabled.Report.items);
+            });
+        }
+
+        [Test]
+        public void ScanFoldersReportsComponentFindingAndAppliesLabelFilters()
+        {
+            ExecuteWithImmediateImport(() =>
+            {
+                string folder = Path.Combine(Root, "LabeledScan").SanitizePath();
+                EnsureFolder(folder);
+                string prefabPath = Path.Combine(folder, "MissingAssignment.prefab").SanitizePath();
+                GameObject source = Track(new GameObject("MissingAssignment"));
+                source.AddComponent<AssignmentComponent>();
+                GameObject prefab = PrefabUtility.SaveAsPrefabAsset(source, prefabPath);
+                TrackAssetPath(prefabPath);
+                AssetDatabase.SetLabels(prefab, new[] { "ScanMe" });
+                AssetDatabaseBatchHelper.RefreshIfNotBatching();
+
+                PrefabChecker.ScanOptions options = new() { IncludeLabels = new[] { "ScanMe" } };
+                int loggedErrors = 0;
+                void CountError(string condition, string stackTrace, LogType type)
+                {
+                    if (
+                        type == LogType.Error
+                        || type == LogType.Exception
+                        || type == LogType.Assert
+                    )
+                    {
+                        loggedErrors++;
+                    }
+                }
+
+                PrefabChecker.ScanResult found;
+                try
+                {
+                    Application.logMessageReceived += CountError;
+                    found = PrefabChecker.ScanFolders(new[] { folder }, options);
+                }
+                finally
+                {
+                    Application.logMessageReceived -= CountError;
+                }
+
+                Assert.AreEqual(0, loggedErrors);
+                Assert.IsTrue(found.Error == null);
+                Assert.AreEqual(1, found.PrefabsChecked);
+                Assert.AreEqual(1, found.IssuesFound);
+                Assert.AreEqual(1, found.Report.items.Count);
+                Assert.AreEqual(prefabPath, found.Report.items[0].path);
+                StringAssert.Contains(
+                    nameof(AssignmentComponent.requiredObject),
+                    found.Report.items[0].messages[0]
+                );
+
+                options.ExcludeLabels = new[] { "ScanMe" };
+                PrefabChecker.ScanResult excluded = PrefabChecker.ScanFolders(
+                    new[] { folder },
+                    options
+                );
+                Assert.AreEqual(0, excluded.PrefabsChecked);
+                Assert.AreEqual(1, excluded.SkippedByLabel);
+                Assert.AreEqual(0, excluded.IssuesFound);
+                Assert.IsEmpty(excluded.Report.items);
+
+                options.ExcludeLabels = System.Array.Empty<string>();
+                options.IncludeLabels = new[] { "OtherLabel" };
+                PrefabChecker.ScanResult notIncluded = PrefabChecker.ScanFolders(
+                    new[] { folder },
+                    options
+                );
+                Assert.AreEqual(0, notIncluded.PrefabsChecked);
+                Assert.AreEqual(1, notIncluded.SkippedByLabel);
+                Assert.AreEqual(0, notIncluded.IssuesFound);
+            });
         }
 
         [Test]
