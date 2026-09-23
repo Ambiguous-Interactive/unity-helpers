@@ -6,7 +6,7 @@ A practical guide for migrating from Odin Inspector to Unity Helpers. Examples a
 
 ## Safe Source Migration Tool
 
-Use **Tools > Wallstop Studios > Odin Migration** to preview or apply conservative source edits
+Use **Tools > Wallstop Studios > Unity Helpers > Odin Migration** to preview or apply conservative source edits
 under `Assets`. The selected-script commands accept selected `.cs` files and selected folders; the
 Assets commands scan all scripts under `Assets`. Generated scripts are skipped.
 

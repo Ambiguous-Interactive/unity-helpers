@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix Odin Migration menu placement under **Tools > Wallstop Studios > Unity Helpers** ([#849](https://github.com/Ambiguous-Interactive/unity-helpers/issues/849)).
 - Fix JSON `Type` values and pool type settings to recover constructed generics after unique component assembly moves ([#846](https://github.com/Ambiguous-Interactive/unity-helpers/issues/846)).
 - Fix `SerializableType` references to constructed generic types after their component types move between assemblies ([#845](https://github.com/Ambiguous-Interactive/unity-helpers/issues/845)).
 - Fix Texture Resizer so it rejects invalid sizing settings and colliding output names before changing source, importer, or destination files ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).

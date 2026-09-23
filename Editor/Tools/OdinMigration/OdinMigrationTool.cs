@@ -13,7 +13,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
 
     internal static class OdinMigrationTool
     {
-        private const string MenuRoot = "Tools/Wallstop Studios/Odin Migration/";
+        private const string MenuRoot = "Tools/Wallstop Studios/Unity Helpers/Odin Migration/";
 
         private static string ProjectRoot => Directory.GetParent(Application.dataPath).FullName;
 
