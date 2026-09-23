@@ -1446,90 +1446,28 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             AnimationClip clipToSave = _activeEditorLayer.SourceClip;
-            string bindingPath = _activeEditorLayer.BindingPath;
-
-            EditorCurveBinding spriteBinding = default;
-            bool bindingFound = false;
-            EditorCurveBinding[] allBindings = AnimationUtility.GetObjectReferenceCurveBindings(
-                clipToSave
-            );
-
-            foreach (EditorCurveBinding b in allBindings)
-            {
-                if (
-                    b.type == typeof(SpriteRenderer)
-                    && string.Equals(
-                        b.propertyName,
-                        UnityExtensions.SpriteBindingProperty,
-                        StringComparison.Ordinal
-                    )
-                    && (
-                        string.IsNullOrWhiteSpace(bindingPath)
-                        || string.Equals(b.path, bindingPath, StringComparison.Ordinal)
-                    )
+            if (
+                !AnimationClipFrameSaveAPI.TrySaveFrames(
+                    clipToSave,
+                    _activeEditorLayer.Sprites,
+                    _currentPreviewFps,
+                    _activeEditorLayer.BindingPath,
+                    out bool usedFallbackBinding,
+                    out string error
                 )
-                {
-                    spriteBinding = b;
-                    bindingFound = true;
-                    break;
-                }
-            }
-
-            if (!bindingFound)
+            )
             {
-                foreach (EditorCurveBinding b in allBindings)
-                {
-                    if (
-                        b.type == typeof(SpriteRenderer)
-                        && string.Equals(
-                            b.propertyName,
-                            UnityExtensions.SpriteBindingProperty,
-                            StringComparison.Ordinal
-                        )
-                    )
-                    {
-                        spriteBinding = b;
-                        bindingFound = true;
-                        this.LogWarn(
-                            $"Saving to first available m_Sprite binding on '{clipToSave.name}' as specific path '{bindingPath}' was not found or empty."
-                        );
-                        break;
-                    }
-                }
-            }
-
-            if (!bindingFound)
-            {
-                this.LogError(
-                    $"Cannot save '{clipToSave.name}': No SpriteRenderer m_Sprite binding found (Path Hint: '{bindingPath}'). Clip might be empty or not a sprite animation."
-                );
+                this.LogError($"Cannot save '{clipToSave.name}': {error}");
                 return;
             }
-
-            List<Sprite> spritesToSave = _activeEditorLayer.Sprites;
-            ObjectReferenceKeyframe[] newKeyframes = new ObjectReferenceKeyframe[
-                spritesToSave.Count
-            ];
-            float timePerFrame = 0 < _currentPreviewFps ? 1.0f / _currentPreviewFps : 0f;
-
-            for (int i = 0; i < spritesToSave.Count; i++)
+            if (usedFallbackBinding)
             {
-                newKeyframes[i] = new ObjectReferenceKeyframe
-                {
-                    time = i * timePerFrame,
-                    value = spritesToSave[i],
-                };
+                this.LogWarn(
+                    $"Saved to the first available sprite binding on '{clipToSave.name}'."
+                );
             }
-
-            Undo.RecordObject(clipToSave, "Modify Animation Clip Frames");
-            AnimationUtility.SetObjectReferenceCurve(clipToSave, spriteBinding, newKeyframes);
-            clipToSave.frameRate = _currentPreviewFps;
-
-            EditorUtility.SetDirty(clipToSave);
-            AssetDatabase.SaveAssets();
-
             this.Log(
-                $"Animation clip '{clipToSave.name}' saved with {spritesToSave.Count} frames at {_currentPreviewFps} FPS."
+                $"Animation clip '{clipToSave.name}' saved with {_activeEditorLayer.Sprites.Count} frames at {_currentPreviewFps} FPS."
             );
         }
 
@@ -1557,18 +1495,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 SourceClip = clip;
                 Sprites = new List<Sprite>();
-                if (clip != null)
-                {
-                    foreach (Sprite s in clip.GetSpritesFromClip())
-                    {
-                        if (s != null)
-                        {
-                            Sprites.Add(s);
-                        }
-                    }
-                }
                 OriginalClipFps =
-                    0 < clip.frameRate ? clip.frameRate : AnimatedSpriteLayer.FrameRate;
+                    clip != null && 0 < clip.frameRate
+                        ? clip.frameRate
+                        : AnimatedSpriteLayer.FrameRate;
 
                 BindingPath = string.Empty;
                 if (SourceClip != null)
@@ -1589,6 +1519,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         )
                         {
                             BindingPath = binding.path;
+                            ObjectReferenceKeyframe[] keyframes =
+                                AnimationUtility.GetObjectReferenceCurve(SourceClip, binding);
+                            foreach (ObjectReferenceKeyframe keyframe in keyframes)
+                            {
+                                if (keyframe.value is Sprite sprite && sprite != null)
+                                {
+                                    Sprites.Add(sprite);
+                                }
+                            }
                             break;
                         }
                     }

@@ -596,6 +596,26 @@ next to it.
 match. That is usually what you want after changing the speed of a walk cycle, but it means you cannot save a
 reorder while leaving the original timing alone.
 
+Editor scripts can update an existing clip without opening the window:
+
+```csharp
+bool saved = AnimationClipFrameSaveAPI.TrySaveFrames(
+    clip,
+    new[] { idle0, idle1, idle2 },
+    12f,
+    "Character",
+    out bool usedFallbackBinding,
+    out string error
+);
+```
+
+The preferred path selects a `SpriteRenderer` sprite curve; an empty string selects a curve on the
+root object. If the path is absent, the method uses the first sprite curve and sets
+`usedFallbackBinding`. Pass `null` to select the first curve without a path preference. The method
+requires a standalone `.anim` asset, rejects invalid frames or FPS before editing, preserves other
+curves, events, and clip settings, records Undo, and saves the clip asset. Undo restores the clip in
+memory; the asset write itself is not fully reversible through Unity Undo.
+
 This is an editor for frame _order_ and _speed_. Adding or removing frames is
 [Animation Creator](#animation-creator)'s job; the `X` next to a loaded clip closes it in this window
 rather than deleting anything. One clip previews at a time.

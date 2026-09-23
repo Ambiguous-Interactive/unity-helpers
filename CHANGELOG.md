@@ -11,12 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `AnimationClipFrameSaveAPI.TrySaveFrames` so editor scripts can save sprite frames and FPS to an existing clip without opening the window. See [Sprite Animation Editor](./docs/features/editor-tools/editor-tools-guide.md#sprite-animation-editor-animation-viewer-window) ([#851](https://github.com/Ambiguous-Interactive/unity-helpers/issues/851)).
 - Add `PrefabChecker.ScanFolders` so editor scripts can inspect prefab findings from explicit folders and options without opening the window ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Add `TextureResizerAPI.TryResizeTextures` so editor scripts can resize or preview PNGs from explicit textures and asset folders without opening the window. Textures process in natural name order ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Add an encoding-aware `DurableFile.TryWriteAllText` overload that preserves the encoding's byte order mark for staged writes.
 
 ### Fixed
 
+- Fix Sprite Animation Editor saves for clips with multiple sprite bindings so frames from other bindings are not written into the selected curve ([#851](https://github.com/Ambiguous-Interactive/unity-helpers/issues/851)).
 - Fix Odin Migration menu placement under **Tools > Wallstop Studios > Unity Helpers** ([#849](https://github.com/Ambiguous-Interactive/unity-helpers/issues/849)).
 - Fix JSON `Type` values and pool type settings to recover constructed generics after unique component assembly moves ([#846](https://github.com/Ambiguous-Interactive/unity-helpers/issues/846)).
 - Fix `SerializableType` references to constructed generic types after their component types move between assemblies ([#845](https://github.com/Ambiguous-Interactive/unity-helpers/issues/845)).
