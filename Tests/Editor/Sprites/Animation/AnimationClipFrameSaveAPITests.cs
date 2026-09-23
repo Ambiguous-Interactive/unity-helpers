@@ -47,6 +47,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             }
         }
 
+        private static void AssertSameAsset(UnityEngine.Object expected, UnityEngine.Object actual)
+        {
+            Assert.IsTrue(
+                AssetDatabase.TryGetGUIDAndLocalFileIdentifier(
+                    expected,
+                    out string expectedGuid,
+                    out long expectedLocalId
+                )
+            );
+            Assert.IsTrue(
+                AssetDatabase.TryGetGUIDAndLocalFileIdentifier(
+                    actual,
+                    out string actualGuid,
+                    out long actualLocalId
+                )
+            );
+            Assert.AreEqual(expectedGuid, actualGuid);
+            Assert.AreEqual(expectedLocalId, actualLocalId);
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -88,15 +108,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 PreferredBinding
             );
             Assert.AreEqual(2, preferred.Length);
-            Assert.AreSame(second, preferred[0].value);
-            Assert.AreSame(first, preferred[1].value);
+            AssertSameAsset(second, preferred[0].value);
+            AssertSameAsset(first, preferred[1].value);
             Assert.AreEqual(0.05f, preferred[1].time, 0.0001f);
             ObjectReferenceKeyframe[] other = AnimationUtility.GetObjectReferenceCurve(
                 reloaded,
                 OtherBinding
             );
             Assert.AreEqual(1, other.Length);
-            Assert.AreSame(first, other[0].value);
+            AssertSameAsset(first, other[0].value);
             Assert.AreEqual(1, AnimationUtility.GetAnimationEvents(reloaded).Length);
             Assert.IsTrue(AnimationUtility.GetAnimationClipSettings(reloaded).loopTime);
         }
@@ -124,7 +144,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 clip,
                 bindings[0]
             );
-            Assert.AreSame(second, chosen[0].value);
+            AssertSameAsset(second, chosen[0].value);
         }
 
         [Test]
@@ -244,7 +264,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 PreferredBinding
             );
             Assert.AreEqual(1, restored.Length);
-            Assert.AreSame(first, restored[0].value);
+            AssertSameAsset(first, restored[0].value);
         }
 
         [Test]
@@ -350,11 +370,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 PreferredBinding
             );
             Assert.AreEqual(2, saved.Length);
-            Assert.AreSame(second, saved[0].value);
-            Assert.AreSame(first, saved[1].value);
+            AssertSameAsset(second, saved[0].value);
+            AssertSameAsset(first, saved[1].value);
             AssetDatabase.ImportAsset(ClipPath, ImportAssetOptions.ForceSynchronousImport);
             AnimationClip reloaded = AssetDatabase.LoadAssetAtPath<AnimationClip>(ClipPath);
-            Assert.AreSame(
+            AssertSameAsset(
                 second,
                 AnimationUtility.GetObjectReferenceCurve(reloaded, PreferredBinding)[0].value
             );
