@@ -379,9 +379,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         }
 
         [Test]
-        public void IsMarkedRunningIsFalseForAMissingFile()
+        public void SummaryReadersReturnFalseForAMissingFile()
         {
             Assert.IsFalse(TestRunSummaryFile.IsMarkedRunning(_summaryPath));
+            Assert.IsFalse(
+                TestRunSummaryFile.TryReadStartedUtc(_summaryPath, out DateTime started)
+            );
+            Assert.AreEqual(default(DateTime), started);
         }
 
         [Test]

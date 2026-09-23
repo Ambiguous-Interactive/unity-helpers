@@ -34,6 +34,13 @@ bash scripts/unity/run-tests.sh --mode all              # Run all tests
 npm run typecheck:controls                              # Prove the five type-check gates can fail
 ```
 
+For a warm edit loop after the first successful restore, run
+`dotnet build Generator~/WallstopStudios.UnityHelpers.TypeCheck/WallstopStudios.UnityHelpers.TypeCheck.csproj --no-restore --nologo -v quiet`.
+This checks the default runtime branch; run `npm run typecheck:unity` before push for all variants.
+Re-run restore when project files, imported props, lock files, SDK versions, or package references
+change. On 2026-09-23, the warm default check took 1.97 seconds without restore versus 2.90 seconds
+through the npm command on this host.
+
 See [unity-devcontainer-testing](../skills/unity-devcontainer-testing.md) for full details.
 
 ---

@@ -249,12 +249,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
             try
             {
-                if (!File.Exists(summaryPath))
-                {
-                    startedUtc = default;
-                    return false;
-                }
-
                 foreach (string line in File.ReadLines(summaryPath))
                 {
                     return TestRunSummaryFormatter.TryParseStartedUtc(line, out startedUtc);
