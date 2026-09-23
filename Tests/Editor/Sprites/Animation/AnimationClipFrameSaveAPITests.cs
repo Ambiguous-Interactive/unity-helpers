@@ -35,6 +35,18 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             "m_Sprite"
         );
 
+        private static void TestEvent() { }
+
+        private static void Submit(Button button)
+        {
+            Assert.IsTrue(button.panel != null);
+            using (NavigationSubmitEvent submit = NavigationSubmitEvent.GetPooled())
+            {
+                submit.target = button;
+                button.SendEvent(submit);
+            }
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -347,18 +359,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 AnimationUtility.GetObjectReferenceCurve(reloaded, PreferredBinding)[0].value
             );
             window.Close();
-        }
-
-        private static void TestEvent() { }
-
-        private static void Submit(Button button)
-        {
-            Assert.IsTrue(button.panel != null);
-            using (NavigationSubmitEvent submit = NavigationSubmitEvent.GetPooled())
-            {
-                submit.target = button;
-                button.SendEvent(submit);
-            }
         }
 
         private Sprite CreateSprite(string assetPath)
