@@ -58,20 +58,34 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             bool createdAsset = false;
             try
             {
-                if (
-                    string.IsNullOrWhiteSpace(outputFolder)
+                string normalizedFolder = outputFolder?.Replace('\\', '/').TrimEnd('/');
+                bool underAssets =
+                    string.Equals(normalizedFolder, "Assets", StringComparison.OrdinalIgnoreCase)
                     || (
-                        !string.Equals(outputFolder, "Assets", StringComparison.Ordinal)
-                        && !outputFolder
-                            .Replace('\\', '/')
-                            .StartsWith("Assets/", StringComparison.Ordinal)
-                    )
-                    || 0 <= outputFolder.IndexOf("..", StringComparison.Ordinal)
+                        normalizedFolder != null
+                        && normalizedFolder.StartsWith(
+                            "Assets/",
+                            StringComparison.OrdinalIgnoreCase
+                        )
+                    );
+                bool underPackages =
+                    normalizedFolder != null
+                    && normalizedFolder.StartsWith("Packages/", StringComparison.Ordinal)
+                    && AssetDatabase.IsValidFolder(normalizedFolder);
+                if (
+                    string.IsNullOrWhiteSpace(normalizedFolder)
+                    || (!underAssets && !underPackages)
+                    || 0 <= normalizedFolder.IndexOf("..", StringComparison.Ordinal)
                 )
                 {
+                    error =
+                        "An output folder under Assets or an existing Packages folder is required.";
                     assetPath = null;
-                    error = "An output folder under Assets is required.";
                     return false;
+                }
+                if (underAssets)
+                {
+                    normalizedFolder = "Assets" + normalizedFolder.Substring("Assets".Length);
                 }
                 if (
                     string.IsNullOrWhiteSpace(name)
@@ -154,7 +168,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                 }
 
-                string normalizedFolder = outputFolder.Replace('\\', '/').TrimEnd('/');
                 string candidatePath = $"{normalizedFolder}/{name}.anim";
                 plannedAssetPath = AssetDatabase.IsValidFolder(normalizedFolder)
                     ? AssetDatabase.GenerateUniqueAssetPath(candidatePath)

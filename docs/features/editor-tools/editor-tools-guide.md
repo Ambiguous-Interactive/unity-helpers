@@ -792,7 +792,8 @@ always 60, which is what lets fractional timings land cleanly.
 
 Editor scripts can call `SpriteSheetAnimationAPI.TryCreate(outputFolder, name, frames,
 defaultFrameRate, frameRateCurve, loop, cycleOffset, dryRun, out assetPath, out error)` with ordered
-sprite frames and an `Assets/` output folder. It generates a unique `.anim` name. Set `dryRun: true`
+sprite frames and an `Assets/` output folder or an existing `Packages/` folder. It generates a
+unique `.anim` name and normalizes the `Assets` prefix casing. Set `dryRun: true`
 to preview the path without creating folders or assets. A successful creation saves the asset;
 Unity Undo cannot reverse the file write. For several clips, pass `saveAssets: false` and call
 `AssetDatabase.SaveAssets()` once after the batch. If saving fails after creation, the call returns

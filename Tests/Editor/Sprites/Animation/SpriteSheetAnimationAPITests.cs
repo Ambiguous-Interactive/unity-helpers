@@ -19,6 +19,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
     {
         private const string Root = "Assets/Temp/SpriteSheetAnimationAPITests";
         private const string SpritePath = Root + "/Sprite.png";
+        private const string PackageFolder =
+            "Packages/com.wallstop-studios.unity-helpers/Tests/Editor/Sprites/Animation";
 
         [SetUp]
         public override void BaseSetUp()
@@ -150,6 +152,65 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         }
 
         [Test]
+        public void CreatesInExistingPackageFolder()
+        {
+            Assert.IsTrue(AssetDatabase.IsValidFolder(PackageFolder));
+            Sprite sprite = CreateSprite();
+            string assetPath = null;
+            try
+            {
+                Assert.IsTrue(
+                    SpriteSheetAnimationAPI.TryCreate(
+                        PackageFolder,
+                        "PackageClip",
+                        new[] { sprite },
+                        12f,
+                        null,
+                        false,
+                        0f,
+                        false,
+                        out assetPath,
+                        out string error
+                    ),
+                    error
+                );
+                Assert.IsTrue(assetPath.StartsWith(PackageFolder + "/", StringComparison.Ordinal));
+                Assert.IsTrue(AssetDatabase.LoadAssetAtPath<AnimationClip>(assetPath) != null);
+            }
+            finally
+            {
+                if (!string.IsNullOrWhiteSpace(assetPath))
+                {
+                    AssetDatabase.DeleteAsset(assetPath);
+                }
+            }
+        }
+
+        [Test]
+        public void NormalizesAssetsPrefixCasing()
+        {
+            Sprite sprite = CreateSprite();
+            Assert.IsTrue(
+                SpriteSheetAnimationAPI.TryCreate(
+                    "aSsEtS" + Root.Substring("Assets".Length),
+                    "CaseClip",
+                    new[] { sprite },
+                    12f,
+                    null,
+                    false,
+                    0f,
+                    false,
+                    out string assetPath,
+                    out string error
+                ),
+                error
+            );
+            TrackAssetPath(assetPath);
+            Assert.IsTrue(assetPath.StartsWith(Root + "/", StringComparison.Ordinal));
+            Assert.IsTrue(AssetDatabase.LoadAssetAtPath<AnimationClip>(assetPath) != null);
+        }
+
+        [Test]
         public void InvalidInputsDoNotCreateAssets()
         {
             Sprite sprite = CreateSprite();
@@ -163,6 +224,34 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                     false,
                     0f,
                     false,
+                    out _,
+                    out _
+                )
+            );
+            Assert.IsFalse(
+                SpriteSheetAnimationAPI.TryCreate(
+                    "Packages/com.wallstop-studios.unity-helpers/../Outside",
+                    "Walk",
+                    new[] { sprite },
+                    12f,
+                    null,
+                    false,
+                    0f,
+                    true,
+                    out _,
+                    out _
+                )
+            );
+            Assert.IsFalse(
+                SpriteSheetAnimationAPI.TryCreate(
+                    "Library",
+                    "Walk",
+                    new[] { sprite },
+                    12f,
+                    null,
+                    false,
+                    0f,
+                    true,
                     out _,
                     out _
                 )
