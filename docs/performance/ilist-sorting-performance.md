@@ -39,7 +39,10 @@ reconstructed into contiguous ascending piles, then merged bottom-up, one adjace
 an ordered-boundary shortcut emits a single copy when two neighboring piles already read as one
 sorted run, and a reverse-disjoint shortcut block-swaps the pair when every element of the right
 pile precedes every element of the left one. Upstream alignment is still
-in progress; the pairwise-merge adaptation's
+in progress. For lists of at least 4,096 items, a full direction-change scan and eight distributed
+16-item dual-patience probes identify sustained disorder. When at least six probes favor direct
+sorting, `JesseSort` routes the input to the package's `IpnSort` implementation. This whole-array
+route is a conservative C# adaptation; it is not upstream's phase-local pipeline. The adaptation's
 [current measurements](https://github.com/Ambiguous-Interactive/unity-helpers/issues/747)
 are available in the tracking issue. The historical Jesse columns below measure the previous C#
 port, and the tracking issue also holds the superseded numbers for the intermediate k-way merge

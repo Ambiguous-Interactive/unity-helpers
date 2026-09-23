@@ -330,6 +330,35 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             );
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void JesseSortRoutesSustainedDisorderWithBoundedProbeCost(bool useList)
+        {
+            const int count = 8192;
+            int[] input = new int[count];
+            for (int index = 0; index < count; ++index)
+            {
+                input[index] = index;
+            }
+            uint state = 747;
+            for (int index = count - 1; 0 < index; --index)
+            {
+                state = unchecked(state * 1664525 + 1013904223);
+                int swap = (int)(state % (uint)(index + 1));
+                (input[index], input[swap]) = (input[swap], input[index]);
+            }
+
+            int[] direct = (int[])input.Clone();
+            JesseCountingComparer directComparer = new();
+            direct.IpnSort(directComparer);
+            IList<int> subject = useList ? new List<int>(input) : input;
+            JesseCountingComparer comparer = new();
+            subject.JesseSort(comparer);
+
+            CollectionAssert.AreEqual(direct, subject);
+            Assert.That(comparer.Comparisons, Is.LessThan(directComparer.Comparisons + count * 2));
+        }
+
         [Test]
         public void EveryDeclaredAlgorithmCarriesAStabilityPromise()
         {

@@ -20,7 +20,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// Implementation reference: JesseSort by Jesse Lew, https://github.com/lewj85/jessesort.
         /// This adaptation records pile assignments, reconstructs contiguous ascending piles, then
         /// merges adjacent pile pairs bottom-up with ordered-boundary and reverse-disjoint shortcuts.
-        /// It does not implement the upstream live-phase routing pipeline. See docs/performance/ilist-sorting-performance.md.
+        /// A conservative high-entropy route uses IpnSort for large random-looking inputs. It does
+        /// not implement the upstream live-phase routing pipeline. See docs/performance/ilist-sorting-performance.md.
         /// </remarks>
         public static void JesseSort<T, TComparer>(this IList<T> list, TComparer comparer)
             where TComparer : IComparer<T>
@@ -68,6 +69,12 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 {
                     System.Array.Reverse(array, 0, count);
                 }
+                return;
+            }
+
+            if (ShouldRouteJesseToDirect(array, count, comparer))
+            {
+                IpnSortCore(array, count, comparer);
                 return;
             }
 
@@ -170,6 +177,121 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             {
                 System.Array.Copy(source, 0, array, 0, count);
             }
+        }
+
+        private static bool ShouldRouteJesseToDirect<T, TComparer>(
+            T[] array,
+            int count,
+            TComparer comparer
+        )
+            where TComparer : IComparer<T>
+        {
+            const int minimumLength = 4096;
+            const int sampleLength = 16;
+            const int sampleCount = 8;
+            const int requiredDirectSamples = 6;
+            if (count < minimumLength)
+            {
+                return false;
+            }
+
+            int direction = 0;
+            int directionChanges = 0;
+            for (int index = 1; index < count; ++index)
+            {
+                int comparison = comparer.Compare(array[index - 1], array[index]);
+                int nextDirection =
+                    comparison < 0 ? 1
+                    : comparison == 0 ? 0
+                    : -1;
+                if (nextDirection == 0)
+                {
+                    continue;
+                }
+                if (direction != 0 && direction != nextDirection)
+                {
+                    ++directionChanges;
+                }
+                direction = nextDirection;
+            }
+            if (directionChanges < count / 4)
+            {
+                return false;
+            }
+
+            int directSamples = 0;
+            for (int sample = 0; sample < sampleCount; ++sample)
+            {
+                int start = (int)((long)(count - sampleLength) * sample / (sampleCount - 1));
+                if (IsDirectJesseSample(array, start, comparer))
+                {
+                    ++directSamples;
+                }
+            }
+            return requiredDirectSamples <= directSamples;
+        }
+
+        private static bool IsDirectJesseSample<T, TComparer>(
+            T[] array,
+            int start,
+            TComparer comparer
+        )
+            where TComparer : IComparer<T>
+        {
+            const int sampleLength = 16;
+            const int patienceTailThreshold = 4;
+            System.Span<int> ascendingTails = stackalloc int[sampleLength];
+            System.Span<int> descendingTails = stackalloc int[sampleLength];
+            int ascendingCount = 0;
+            int descendingCount = 0;
+            bool descending = comparer.Compare(array[start + 1], array[start]) < 0;
+            for (int offset = 0; offset < sampleLength; ++offset)
+            {
+                int index = start + offset;
+                if (0 < offset)
+                {
+                    int comparison = comparer.Compare(array[index - 1], array[index]);
+                    if (comparison < 0)
+                    {
+                        descending = false;
+                    }
+                    else if (0 < comparison)
+                    {
+                        descending = true;
+                    }
+                }
+
+                System.Span<int> tails = descending ? descendingTails : ascendingTails;
+                int tailCount = descending ? descendingCount : ascendingCount;
+                int left = 0;
+                int right = tailCount;
+                while (left < right)
+                {
+                    int middle = left + ((right - left) >> 1);
+                    int comparison = comparer.Compare(array[index], array[tails[middle]]);
+                    if (descending ? 0 < comparison : comparison < 0)
+                    {
+                        left = middle + 1;
+                    }
+                    else
+                    {
+                        right = middle;
+                    }
+                }
+                if (left == tailCount)
+                {
+                    if (descending)
+                    {
+                        ++descendingCount;
+                    }
+                    else
+                    {
+                        ++ascendingCount;
+                    }
+                }
+                tails[left] = index;
+            }
+            return patienceTailThreshold < ascendingCount + descendingCount;
         }
 
         private static int CollectJesseRuns(
