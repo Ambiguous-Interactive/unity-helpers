@@ -95,7 +95,7 @@
     },
     {
       "name": "debug-il2cpp",
-      "sha256": "4ed38a5b99a02961c5d23d08fb765d7b67196d9116caf3e66ef468bc28d1fd0c",
+      "sha256": "c786068d248f14d453c7d776aa28a6cd417300a7c6bc77c49ba7fdba571fdf3b",
       "parts": ["debug-il2cpp-part-1.md", "debug-il2cpp-part-2.md"],
       "routerSha256": "64b4987f47dde9c8f66c590943e2fb4e6754bd6af2f04e9cbfbe3ffd4e1f5f4c"
     },

@@ -55,6 +55,13 @@ Enable "Script Debugging" in Build Settings for:
 4. **Verify all reflection usage** — Ensure `[Preserve]` is applied
 5. **Test with high stripping** — Catches missing preservations
 
+When testing type-name migration in an IL2CPP player, avoid constructing deep generic-array
+fixtures by reading `AssemblyQualifiedName` from the closed type. Unity 6000.6 can crash in
+`il2cpp::vm::AppendAssemblyNameIfNeeded` / `RuntimeType.getFullName` before the code under test
+runs. Build the fixture's canonical name from generic definitions and component assembly names,
+then verify it with `Type.GetType` in the player before applying the simulated migration. A missing
+NUnit result file or "unexpected log" can be a player crash, not an assertion failure.
+
 ### Quick IL2CPP Test
 
 ```csharp
