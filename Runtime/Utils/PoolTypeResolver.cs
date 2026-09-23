@@ -569,35 +569,36 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private static Type ResolveTypeInternal(string typeName, out bool cacheResult)
         {
-            cacheResult = true;
             Type directResolve = TryGetType(typeName);
             if (directResolve != null)
             {
+                cacheResult = true;
                 return directResolve;
             }
 
             if (BuiltInTypeAliases.TryGetValue(typeName, out Type aliasType))
             {
+                cacheResult = true;
                 return aliasType;
             }
 
             if (typeName.Contains("<"))
             {
-                return ParseSimplifiedGeneric(typeName);
+                Type simplified = ParseSimplifiedGeneric(typeName);
+                cacheResult = true;
+                return simplified;
             }
 
             if (0 <= typeName.IndexOf('['))
             {
+                Type composite = ReflectionHelpers.TryResolveType(typeName);
                 cacheResult = false;
-                return ReflectionHelpers.TryResolveType(typeName);
+                return composite;
             }
 
-            if (typeName.Contains("`"))
-            {
-                return ResolveBySearchingAssemblies(typeName);
-            }
-
-            return ResolveBySearchingAssemblies(typeName);
+            Type searched = ResolveBySearchingAssemblies(typeName);
+            cacheResult = true;
+            return searched;
         }
 
         private static Type ParseSimplifiedGeneric(string typeName)
