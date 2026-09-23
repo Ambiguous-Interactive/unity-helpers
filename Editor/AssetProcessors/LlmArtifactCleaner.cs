@@ -12,12 +12,12 @@ namespace WallstopStudios.UnityHelpers.Editor.AssetProcessors
         private const string PackagePathPrefix = "Packages/com.wallstop-studios.unity-helpers/";
         private const string LlmPrefix = "_llm_";
 
-        internal static Action<string> DeleteAssetAction = DeleteAssetThroughDatabase;
-
         internal static int PendingDeletionCountForTesting
         {
             get { return PendingDeletions.Count; }
         }
+
+        internal static Action<string> DeleteAssetAction = DeleteAssetThroughDatabase;
 
         private static readonly string[] BlockedSegments = { LlmPrefix };
         private static readonly HashSet<string> PendingDeletions = new(
