@@ -592,6 +592,8 @@ next to it.
 4. Set **Preview FPS** and click **Apply Preview FPS** to see the new speed.
 5. Click **Save Active Clip**.
 
+The **Preview FPS** field works in Unity 2021.3 and later supported editors.
+
 **Before you save:** saving writes the preview FPS onto the clip and re-spaces every keyframe to
 match. That is usually what you want after changing the speed of a walk cycle, but it means you cannot save a
 reorder while leaving the original timing alone.

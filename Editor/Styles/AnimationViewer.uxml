@@ -12,7 +12,7 @@
             <!-- FPS and Save Toolbar -->
             <ui:VisualElement name="fps-toolbar" style="flex-direction: row;">
                 <ui:Label text="Preview FPS:" style="margin-right: 5px; align-self: center;" />
-                <ui:FloatField name="fpsField" value="12.0" style="width: 50px; margin-right: 10px;" />
+                <uie:FloatField name="fpsField" value="12.0" style="width: 50px; margin-right: 10px;" />
                 <ui:Button text="Apply Preview FPS" name="applyFpsButton" /> <!-- Name updated to match C# -->
                 <ui:Button text="Save Active Clip" name="saveClipButton" style="margin-left: auto;" />
             </ui:VisualElement>

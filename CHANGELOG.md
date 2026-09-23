@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix the Sprite Animation Editor's Preview FPS field on Unity 2021.3 so its window opens correctly ([#851](https://github.com/Ambiguous-Interactive/unity-helpers/issues/851)).
 - Fix Sprite Animation Editor saves for clips with multiple sprite bindings so frames from other bindings are not written into the selected curve ([#851](https://github.com/Ambiguous-Interactive/unity-helpers/issues/851)).
 - Fix Odin Migration menu placement under **Tools > Wallstop Studios > Unity Helpers** ([#849](https://github.com/Ambiguous-Interactive/unity-helpers/issues/849)).
 - Fix JSON `Type` values and pool type settings to recover constructed generics after unique component assembly moves ([#846](https://github.com/Ambiguous-Interactive/unity-helpers/issues/846)).
