@@ -615,7 +615,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return;
             }
 
-            string assetFolder = $"Assets/Resources/{folder}".Replace("\\", "/").TrimEnd('/');
+            string assetFolder = $"Assets/Resources/{folder}".SanitizePath().TrimEnd('/');
             if (!AssetDatabase.IsValidFolder(assetFolder))
             {
                 return;
@@ -672,7 +672,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 return null;
             }
 
-            string sanitized = loadPath.Replace("\\", "/").Trim('/');
+            string sanitized = loadPath.SanitizePath().Trim('/');
             if (string.IsNullOrEmpty(sanitized))
             {
                 return null;
