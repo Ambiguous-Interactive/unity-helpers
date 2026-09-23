@@ -459,10 +459,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             out Exception error
         )
         {
-            exchanged = false;
             if (string.IsNullOrWhiteSpace(path))
             {
                 error = new ArgumentException("A destination path is required.", nameof(path));
+                exchanged = false;
                 return false;
             }
 
@@ -495,6 +495,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                     )
                     {
                         error = null;
+                        exchanged = false;
                         return true;
                     }
 
@@ -512,13 +513,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 #endif
                     Swap(temporaryPath, path);
                     ownsStaging = false;
-                    exchanged = true;
                     error = null;
+                    exchanged = true;
                     return true;
                 }
                 catch (Exception failure)
                 {
                     error = failure;
+                    exchanged = false;
                     return false;
                 }
                 finally
