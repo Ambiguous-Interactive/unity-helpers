@@ -31,45 +31,64 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             out string error
         )
         {
-            if (
-                clip == null
-                || !EditorUtility.IsPersistent(clip)
-                || !AssetDatabase.IsMainAsset(clip)
-                || !AssetDatabase
-                    .GetAssetPath(clip)
-                    .EndsWith(".anim", StringComparison.OrdinalIgnoreCase)
-            )
-            {
-                usedFallbackBinding = false;
-                error = "An editable standalone .anim clip asset is required.";
-                return false;
-            }
-            if (frames == null || frames.Count == 0)
-            {
-                usedFallbackBinding = false;
-                error = "At least one sprite frame is required.";
-                return false;
-            }
-            if (
-                framesPerSecond <= 0f
-                || float.IsNaN(framesPerSecond)
-                || float.IsInfinity(framesPerSecond)
-                || float.IsInfinity((frames.Count - 1) / framesPerSecond)
-            )
-            {
-                usedFallbackBinding = false;
-                error = "A finite, positive frame rate with finite key times is required.";
-                return false;
-            }
-
             try
             {
+                if (clip == null)
+                {
+                    usedFallbackBinding = false;
+                    error = "An editable standalone .anim clip asset is required.";
+                    return false;
+                }
+                if (frames == null)
+                {
+                    usedFallbackBinding = false;
+                    error = "At least one sprite frame is required.";
+                    return false;
+                }
+                int frameCount = frames.Count;
+                if (frameCount <= 0)
+                {
+                    usedFallbackBinding = false;
+                    error = "At least one sprite frame is required.";
+                    return false;
+                }
+                if (
+                    framesPerSecond <= 0f
+                    || float.IsNaN(framesPerSecond)
+                    || float.IsInfinity(framesPerSecond)
+                    || float.IsInfinity((frameCount - 1) / framesPerSecond)
+                )
+                {
+                    usedFallbackBinding = false;
+                    error = "A finite, positive frame rate with finite key times is required.";
+                    return false;
+                }
+                for (int index = 0; index < frameCount; index++)
+                {
+                    if (frames[index] == null)
+                    {
+                        usedFallbackBinding = false;
+                        error = "Sprite frames cannot contain null entries.";
+                        return false;
+                    }
+                }
+                if (
+                    !EditorUtility.IsPersistent(clip)
+                    || !AssetDatabase.IsMainAsset(clip)
+                    || !AssetDatabase
+                        .GetAssetPath(clip)
+                        .EndsWith(".anim", StringComparison.OrdinalIgnoreCase)
+                )
+                {
+                    usedFallbackBinding = false;
+                    error = "An editable standalone .anim clip asset is required.";
+                    return false;
+                }
+
                 EditorCurveBinding[] bindings = AnimationUtility.GetObjectReferenceCurveBindings(
                     clip
                 );
-                EditorCurveBinding selectedBinding = default;
-                bool foundBinding = false;
-                bool preferredBindingFound = false;
+                EditorCurveBinding? selectedBinding = null;
                 foreach (EditorCurveBinding candidate in bindings)
                 {
                     if (
@@ -83,10 +102,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     {
                         continue;
                     }
-                    if (!foundBinding)
+                    if (!selectedBinding.HasValue)
                     {
                         selectedBinding = candidate;
-                        foundBinding = true;
                     }
                     if (
                         preferredBindingPath != null
@@ -98,19 +116,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     )
                     {
                         selectedBinding = candidate;
-                        preferredBindingFound = true;
                         break;
                     }
                 }
-                if (!foundBinding)
+                if (!selectedBinding.HasValue)
                 {
                     usedFallbackBinding = false;
                     error = "The clip has no SpriteRenderer sprite curve.";
                     return false;
                 }
 
-                ObjectReferenceKeyframe[] replacement = new ObjectReferenceKeyframe[frames.Count];
-                for (int index = 0; index < frames.Count; index++)
+                ObjectReferenceKeyframe[] replacement = new ObjectReferenceKeyframe[frameCount];
+                for (int index = 0; index < frameCount; index++)
                 {
                     Sprite frame = frames[index];
                     if (frame == null)
@@ -126,15 +143,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     };
                 }
 
+                EditorCurveBinding binding = selectedBinding.Value;
                 ObjectReferenceKeyframe[] original = AnimationUtility.GetObjectReferenceCurve(
                     clip,
-                    selectedBinding
+                    binding
                 );
                 float originalFrameRate = clip.frameRate;
                 Undo.RecordObject(clip, "Modify Animation Clip Frames");
                 try
                 {
-                    AnimationUtility.SetObjectReferenceCurve(clip, selectedBinding, replacement);
+                    AnimationUtility.SetObjectReferenceCurve(clip, binding, replacement);
                     clip.frameRate = framesPerSecond;
                     EditorUtility.SetDirty(clip);
                     AssetDatabase.SaveAssets();
@@ -144,7 +162,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     string failure = exception.Message;
                     try
                     {
-                        AnimationUtility.SetObjectReferenceCurve(clip, selectedBinding, original);
+                        AnimationUtility.SetObjectReferenceCurve(clip, binding, original);
                         clip.frameRate = originalFrameRate;
                         EditorUtility.SetDirty(clip);
                         AssetDatabase.SaveAssets();
@@ -159,7 +177,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     return false;
                 }
 
-                usedFallbackBinding = preferredBindingPath != null && !preferredBindingFound;
+                usedFallbackBinding =
+                    preferredBindingPath != null
+                    && !string.Equals(binding.path, preferredBindingPath, StringComparison.Ordinal);
                 error = null;
                 return true;
             }
