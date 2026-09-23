@@ -129,8 +129,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return resolved;
             }
 
-            // Assembly.GetType can attempt to construct array metadata from a composite name;
-            // IL2CPP may crash on stale array arguments before the unique-component fallback runs.
+            // Bypass Assembly.GetType for composites: IL2CPP can crash on stale array metadata.
             if (0 <= typeName.IndexOf('['))
             {
                 return ResolveCompositeType(typeName);
