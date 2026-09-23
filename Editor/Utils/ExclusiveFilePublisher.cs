@@ -6,59 +6,105 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 #if UNITY_EDITOR
     using System;
     using System.IO;
+    using System.Runtime.InteropServices;
 
     /// <summary>
     /// Publishes a staged editor file without replacing a concurrently created destination.
     /// </summary>
     internal static class ExclusiveFilePublisher
     {
+        private const int UnixNameAlreadyExists = 17;
+
+        internal static Action SimulatePostPublishCleanupFailureForTests;
+
         /// <summary>
-        /// Returns false only when another file already occupies the destination. Copy failures
-        /// throw so callers report an error rather than silently skipping a partial output.
+        /// Returns false when another entry occupies the destination. Publish failures throw;
+        /// cleanup failures return a warning after the output is already published.
         /// </summary>
-        internal static bool TryPublishNewFile(string stagedPath, string destinationPath)
+        internal static bool TryPublishNewFile(
+            string stagedPath,
+            string destinationPath,
+            out Exception cleanupWarning
+        )
         {
-            using (
-                FileStream source = new(stagedPath, FileMode.Open, FileAccess.Read, FileShare.Read)
-            )
+            Exception warning = null;
+            bool removeStagedFile = true;
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                FileStream destination;
                 try
                 {
-                    destination = new FileStream(
-                        destinationPath,
-                        FileMode.CreateNew,
-                        FileAccess.Write,
-                        FileShare.None
-                    );
+                    File.Move(stagedPath, destinationPath);
+                    removeStagedFile = false;
                 }
                 catch (IOException) when (File.Exists(destinationPath))
                 {
+                    cleanupWarning = null;
                     return false;
                 }
-
-                using (destination)
+            }
+            else
+            {
+                bool linked;
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 {
-                    source.CopyTo(destination);
-                    destination.Flush(flushToDisk: true);
+                    linked = CreateHardLinkMac(stagedPath, destinationPath) == 0;
+                }
+                else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                {
+                    linked = CreateHardLinkLinux(stagedPath, destinationPath) == 0;
+                }
+                else
+                {
+                    throw new PlatformNotSupportedException(
+                        "Exclusive file publication needs hard links."
+                    );
+                }
+
+                if (!linked)
+                {
+                    int nativeError = Marshal.GetLastWin32Error();
+                    if (nativeError == UnixNameAlreadyExists)
+                    {
+                        cleanupWarning = null;
+                        return false;
+                    }
+
+                    throw new IOException(
+                        $"Could not publish '{destinationPath}' with a hard link (OS error {nativeError}). Check that the output filesystem supports hard links and allows writing."
+                    );
                 }
             }
 
-            try
+            if (removeStagedFile)
             {
-                File.Delete(stagedPath);
-            }
-            catch (IOException)
-            {
-                // The output is complete even if the temporary file remains.
-            }
-            catch (UnauthorizedAccessException)
-            {
-                // The output is complete even if the temporary file remains.
+                try
+                {
+                    SimulatePostPublishCleanupFailureForTests?.Invoke();
+                    File.Delete(stagedPath);
+                }
+                catch (Exception cleanupError)
+                {
+                    warning = new IOException(
+                        $"Published '{destinationPath}' but could not remove staged file '{stagedPath}'.",
+                        cleanupError
+                    );
+                }
             }
 
+            cleanupWarning = warning;
             return true;
         }
+
+        [DllImport("libc", EntryPoint = "link", ExactSpelling = true, SetLastError = true)]
+        private static extern int CreateHardLinkLinux(string stagedPath, string destinationPath);
+
+        [DllImport(
+            "libSystem.B.dylib",
+            EntryPoint = "link",
+            ExactSpelling = true,
+            SetLastError = true
+        )]
+        private static extern int CreateHardLinkMac(string stagedPath, string destinationPath);
     }
 #endif
 }

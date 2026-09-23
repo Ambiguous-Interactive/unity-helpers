@@ -19,6 +19,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     /// </summary>
     public static class AnimationCreatorAPI
     {
+        internal static Action SaveAssetsForTesting;
+
         private static readonly char[] InvalidNameCharacters =
         {
             '/',
@@ -132,6 +134,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         /// <summary>
         /// Creates a uniquely named clip beside the first naturally sorted valid sprite.
         /// </summary>
+        /// <remarks>
+        /// If saving fails after creation, the created asset path remains in <c>assetPath</c>.
+        /// </remarks>
         public static bool TryCreateAsset(
             AnimationData data,
             out string assetPath,
@@ -222,6 +227,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             string finalPath = null;
+            bool createdAsset = false;
             try
             {
                 finalPath = AssetDatabase.GenerateUniqueAssetPath(
@@ -236,9 +242,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     assetPath = null;
                     return false;
                 }
+                createdAsset = true;
                 if (saveAssets)
                 {
-                    AssetDatabase.SaveAssets();
+                    if (SaveAssetsForTesting != null)
+                    {
+                        SaveAssetsForTesting();
+                    }
+                    else
+                    {
+                        AssetDatabase.SaveAssets();
+                    }
                 }
                 error = null;
                 assetPath = finalPath;
@@ -250,8 +264,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 {
                     UnityEngine.Object.DestroyImmediate(clip);
                 }
-                error = exception.Message;
-                assetPath = null;
+                error = createdAsset
+                    ? $"Animation asset was created at '{finalPath}', but saving failed: {exception.Message}"
+                    : exception.Message;
+                assetPath = createdAsset ? finalPath : null;
                 return false;
             }
         }

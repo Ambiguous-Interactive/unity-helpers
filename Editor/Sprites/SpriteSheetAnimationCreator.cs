@@ -1410,12 +1410,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 return;
             }
-
-            if (!Directory.Exists(animationsFolder))
-            {
-                Directory.CreateDirectory(animationsFolder);
-            }
-
             if (!animationsFolder.StartsWith("Assets", StringComparison.OrdinalIgnoreCase))
             {
                 animationsFolder = DirectoryHelper.AbsoluteToUnityRelativePath(animationsFolder);
@@ -1429,105 +1423,52 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     this.LogWarn($"Skipping animation '{definition.Name}' as it has no sprites.");
                     continue;
                 }
-
-                AnimationClip clip = new() { frameRate = 60 };
-
-                EditorCurveBinding spriteBinding = new()
+                string animationName = SpriteSheetAnimationAPI.SanitizeName(definition.Name);
+                float defaultFrameRate = definition.DefaultFrameRate;
+                if (
+                    defaultFrameRate <= 0f
+                    || float.IsNaN(defaultFrameRate)
+                    || float.IsInfinity(defaultFrameRate)
+                )
                 {
-                    type = typeof(SpriteRenderer),
-                    path = "",
-                    propertyName = UnityExtensions.SpriteBindingProperty,
-                };
-
-                ObjectReferenceKeyframe[] keyframes = new ObjectReferenceKeyframe[
-                    definition.SpritesToAnimate.Count
-                ];
-                float currentTime = 0f;
-                AnimationCurve curve = definition.FrameRateCurve;
-                if (curve == null || curve.keys.Length == 0)
-                {
-                    this.LogWarn(
-                        $"Animation '{definition.Name}' has an invalid FrameRateCurve. Falling back to DefaultFrameRate."
-                    );
-                    curve = AnimationCurve.Constant(0, 1, definition.DefaultFrameRate);
+                    defaultFrameRate = 1f;
                 }
-
-                if (curve.keys.Length == 0)
+                if (
+                    SpriteSheetAnimationAPI.TryCreate(
+                        animationsFolder,
+                        animationName,
+                        definition.SpritesToAnimate,
+                        defaultFrameRate,
+                        definition.FrameRateCurve,
+                        definition.loop,
+                        definition.cycleOffset,
+                        false,
+                        out _,
+                        out string error,
+                        saveAssets: false
+                    )
+                )
                 {
-                    curve.AddKey(0, definition.DefaultFrameRate);
+                    createdCount++;
                 }
-
-                float curveDuration = curve.keys.LastOrDefault().time;
-                if (curveDuration <= 0)
+                else
                 {
-                    curveDuration = 1f;
+                    this.LogWarn($"Skipping animation '{animationName}': {error}");
                 }
-
-                for (int i = 0; i < definition.SpritesToAnimate.Count; ++i)
-                {
-                    keyframes[i] = new ObjectReferenceKeyframe
-                    {
-                        time = currentTime,
-                        value = definition.SpritesToAnimate[i],
-                    };
-
-                    if (i < definition.SpritesToAnimate.Count - 1)
-                    {
-                        float normalizedTimeForCurve =
-                            1 < definition.SpritesToAnimate.Count
-                                ? (float)i / (definition.SpritesToAnimate.Count - 1)
-                                : 0;
-                        float timeForCurveEval = normalizedTimeForCurve * curveDuration;
-
-                        float fps = curve.Evaluate(timeForCurveEval);
-                        if (fps <= 0)
-                        {
-                            fps = definition.DefaultFrameRate;
-                        }
-
-                        if (fps <= 0)
-                        {
-                            fps = 1;
-                        }
-
-                        currentTime += 1.0f / fps;
-                    }
-                }
-
-                AnimationUtility.SetObjectReferenceCurve(clip, spriteBinding, keyframes);
-
-                AnimationClipSettings settings = AnimationUtility.GetAnimationClipSettings(clip);
-                settings.loopTime = definition.loop;
-                settings.cycleOffset = definition.cycleOffset;
-                AnimationUtility.SetAnimationClipSettings(clip, settings);
-
-                string animName = string.IsNullOrEmpty(definition.Name)
-                    ? "UnnamedAnim"
-                    : definition.Name;
-
-                animName = Path.GetInvalidFileNameChars()
-                    .Aggregate(animName, (current, character) => current.Replace(character, '_'));
-                string assetPath = Path.Combine(animationsFolder, $"{animName}.anim");
-                assetPath = AssetDatabase.GenerateUniqueAssetPath(assetPath);
-
-                AssetDatabaseBatchHelper.EnsureAssetParentFolder(assetPath);
-                AssetDatabase.CreateAsset(clip, assetPath);
-                createdCount++;
             }
 
             if (0 < createdCount)
             {
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
-                Utils.EditorUi.Info(
-                    "Success",
-                    $"{createdCount} animation(s) created in:\n{animationsFolder}"
-                );
             }
-            else
-            {
-                Utils.EditorUi.Info("Finished", "No valid animations were generated.");
-            }
+
+            Utils.EditorUi.Info(
+                0 < createdCount ? "Success" : "Finished",
+                0 < createdCount
+                    ? $"{createdCount} animation(s) created in:\n{animationsFolder}"
+                    : "No valid animations were generated."
+            );
         }
 
         private void OnRootDragPerform(DragPerformEvent evt)

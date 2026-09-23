@@ -104,9 +104,11 @@ radius. It temporarily makes the source readable, restores its importer,
 writes a uniquely named image beside it using the Unity project directory, and imports the result.
 An occupied output name is preserved and the next numbered name is used, including when another
 process creates the file while the blur is being written.
-New output files are copied from a staged image with exclusive creation. An interrupted copy can
-leave an incomplete new file; remove it before retrying.
-If staging cleanup also fails, the API reports that error alongside the write failure.
+New output files are published from a complete staged image in the same directory. A failed
+publication leaves the staged file for cleanup and does not expose a partial output. On Linux and
+macOS, the output filesystem must support hard links; otherwise the API reports an error.
+On Linux and macOS, if staged-file cleanup fails after publication, the API still imports the
+output and returns its path, but returns `false` with the cleanup error.
 This operation writes a file;
 Unity Undo cannot remove that output file.
 
@@ -680,6 +682,8 @@ sort the remaining sprites, and save a uniquely named `.anim` beside the first s
 sprite must already be an asset under `Assets`. When creating several clips inside an
 `AssetDatabaseBatchHelper` scope, pass `saveAssets: false` and call `AssetDatabase.SaveAssets()`
 after the batch.
+If saving fails after asset creation, `TryCreateAsset` returns `false` with the created path so the
+caller can inspect or remove it.
 
 **Also worth knowing:**
 
@@ -786,6 +790,14 @@ clip.
 frame. The curve changes how far apart keyframes are placed; the generated clip's own frame rate is
 always 60, which is what lets fractional timings land cleanly.
 
+Editor scripts can call `SpriteSheetAnimationAPI.TryCreate(outputFolder, name, frames,
+defaultFrameRate, frameRateCurve, loop, cycleOffset, dryRun, out assetPath, out error)` with ordered
+sprite frames and an `Assets/` output folder. It generates a unique `.anim` name. Set `dryRun: true`
+to preview the path without creating folders or assets. A successful creation saves the asset;
+Unity Undo cannot reverse the file write. For several clips, pass `saveAssets: false` and call
+`AssetDatabase.SaveAssets()` once after the batch. If saving fails after creation, the call returns
+`false` and retains the created asset path in `assetPath` so the caller can inspect or remove it.
+
 The texture must already be sliced (`Sprite Mode: Multiple`) — this window reads Unity's sprites, it
 does not slice for you.
 
@@ -828,9 +840,12 @@ plus errors, and never opens a window or displays a prompt. Set `dryRun: true` t
 without changing files or importers.
 With the default `overwriteExisting: false`, an output that appears during extraction is skipped
 and left unchanged. With `overwriteExisting: true`, the encoded PNG is staged before replacing the
-existing file. Extraction attempts to remove its temporary file if publishing fails. A failed or interrupted
-copy to a new output can leave an incomplete new file; remove it before retrying.
+existing file. New outputs are published from a complete staged image in the same directory.
+Extraction attempts to remove its temporary file if publishing fails; a failed publication does not
+expose a partial new output. On Linux and macOS, the output filesystem must support hard links.
 If temporary-file cleanup fails, the result reports that error alongside the extraction failure.
+On Linux and macOS, if cleanup fails after publication, the result still counts and imports the
+output and includes the cleanup error in `Errors`.
 
 Use `SpriteSheetExtractionAPI.Discover` with folder asset paths and an optional filename regex to
 get the same sprite texture list as the window. Its result includes warnings for invalid folders

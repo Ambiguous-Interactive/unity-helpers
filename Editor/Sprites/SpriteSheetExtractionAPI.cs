@@ -376,9 +376,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             return result;
         }
 
-        internal static bool TryPublishNewFile(string stagedPath, string destinationPath)
+        internal static bool TryPublishNewFile(
+            string stagedPath,
+            string destinationPath,
+            out Exception cleanupWarning
+        )
         {
-            return ExclusiveFilePublisher.TryPublishNewFile(stagedPath, destinationPath);
+            return ExclusiveFilePublisher.TryPublishNewFile(
+                stagedPath,
+                destinationPath,
+                out cleanupWarning
+            );
         }
 
         private static bool Validate(
@@ -587,9 +595,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                                 stream.Flush(flushToDisk: true);
                             }
 
-                            if (TryPublishNewFile(stagedPath, outputPath))
+                            if (
+                                TryPublishNewFile(
+                                    stagedPath,
+                                    outputPath,
+                                    out Exception publishCleanupWarning
+                                )
+                            )
                             {
-                                stagedOwned = false;
+                                stagedOwned = publishCleanupWarning != null;
+                                if (publishCleanupWarning != null)
+                                {
+                                    result.AddError(publishCleanupWarning.Message);
+                                }
                             }
                             else
                             {

@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
 #if UNITY_EDITOR
     using System;
     using System.IO;
+    using System.Runtime.InteropServices;
     using System.Text.RegularExpressions;
     using NUnit.Framework;
     using UnityEditor;
@@ -14,6 +15,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.AssetProcessors;
     using WallstopStudios.UnityHelpers.Editor.Tools;
+    using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Tests.AssetProcessors;
     using WallstopStudios.UnityHelpers.Tests.Core;
 
@@ -189,6 +191,45 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 TextureImporterCompression.CompressedHQ
             );
             Assert.That(CountTemporaryTextures(), Is.EqualTo(temporaryTextureCount));
+        }
+
+        [Test]
+        public void DirectApiReportsCleanupFailureAfterImportingPublishedOutput()
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                Assert.Ignore("Windows moves the staged file and has no post-publish cleanup.");
+            }
+
+            string sourcePath = Path.Combine(_testRoot, "cleanup-warning.png").SanitizePath();
+            string expectedOutputPath = Path.Combine(_testRoot, "cleanup-warning_blurred_2.png")
+                .SanitizePath();
+            CreatePng(sourcePath, Color.magenta);
+            TrackAssetPath(expectedOutputPath);
+            Texture2D source = AssetDatabase.LoadAssetAtPath<Texture2D>(sourcePath);
+            Assert.That(source, Is.Not.Null);
+
+            ExclusiveFilePublisher.SimulatePostPublishCleanupFailureForTests = () =>
+                throw new IOException("Simulated staged cleanup failure.");
+            try
+            {
+                bool success = ImageBlurAPI.TryWriteAsset(
+                    source,
+                    2,
+                    out string outputPath,
+                    out string error
+                );
+
+                Assert.That(success, Is.False);
+                Assert.That(outputPath, Is.EqualTo(expectedOutputPath));
+                StringAssert.Contains("Published", error);
+                Assert.That(File.Exists(RelToFull(outputPath)), Is.True);
+                Assert.That(AssetDatabase.LoadAssetAtPath<Texture2D>(outputPath), Is.Not.Null);
+            }
+            finally
+            {
+                ExclusiveFilePublisher.SimulatePostPublishCleanupFailureForTests = null;
+            }
         }
 
         [Test]

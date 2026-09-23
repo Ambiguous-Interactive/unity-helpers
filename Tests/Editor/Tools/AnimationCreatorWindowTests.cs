@@ -1294,6 +1294,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 );
                 Assert.AreEqual(1, keyframes.Length);
                 Assert.AreSame(sprite, keyframes[0].value);
+
+                try
+                {
+                    AnimationCreatorAPI.SaveAssetsForTesting = () =>
+                        throw new IOException("save failed");
+                    Assert.IsFalse(
+                        AnimationCreatorAPI.TryCreateAsset(
+                            data,
+                            out string createdButUnsavedPath,
+                            out string saveError
+                        )
+                    );
+                    Assert.IsNotEmpty(createdButUnsavedPath);
+                    StringAssert.Contains("save failed", saveError);
+                    Assert.IsTrue(
+                        AssetDatabase.LoadAssetAtPath<AnimationClip>(createdButUnsavedPath) != null
+                    );
+                }
+                finally
+                {
+                    AnimationCreatorAPI.SaveAssetsForTesting = null;
+                }
             }
             finally
             {

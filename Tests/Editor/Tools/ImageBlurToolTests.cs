@@ -93,7 +93,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 File.WriteAllBytes(stagedPath, stagedBytes);
                 File.WriteAllBytes(destinationPath, occupantBytes);
 
-                Assert.That(ImageBlurAPI.TryPublishNewFile(stagedPath, destinationPath), Is.False);
+                Assert.That(
+                    ImageBlurAPI.TryPublishNewFile(stagedPath, destinationPath, out _),
+                    Is.False
+                );
                 Assert.That(File.ReadAllBytes(destinationPath), Is.EqualTo(occupantBytes));
                 Assert.That(File.ReadAllBytes(stagedPath), Is.EqualTo(stagedBytes));
             }
@@ -101,6 +104,61 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             {
                 File.Delete(stagedPath);
                 File.Delete(destinationPath);
+            }
+        }
+
+        [Test]
+        public void PublishPreservesCompletedStagedBytesAndTimestamp()
+        {
+            string stagedPath = Path.GetTempFileName();
+            string destinationPath = stagedPath + ".png";
+            DateTime stagedWriteTime = new(2020, 1, 2, 3, 4, 5, DateTimeKind.Utc);
+            byte[] stagedBytes = { 1, 2, 3, 4 };
+            try
+            {
+                File.WriteAllBytes(stagedPath, stagedBytes);
+                File.SetLastWriteTimeUtc(stagedPath, stagedWriteTime);
+
+                Assert.That(
+                    ImageBlurAPI.TryPublishNewFile(
+                        stagedPath,
+                        destinationPath,
+                        out Exception warning
+                    ),
+                    Is.True
+                );
+                Assert.That(warning, Is.Null);
+                Assert.That(File.Exists(stagedPath), Is.False);
+                Assert.That(File.ReadAllBytes(destinationPath), Is.EqualTo(stagedBytes));
+                Assert.That(File.GetLastWriteTimeUtc(destinationPath), Is.EqualTo(stagedWriteTime));
+            }
+            finally
+            {
+                File.Delete(stagedPath);
+                File.Delete(destinationPath);
+            }
+        }
+
+        [Test]
+        public void PublishFailureKeepsStagedFileForCallerCleanup()
+        {
+            string stagedPath = Path.GetTempFileName();
+            string destinationPath = Path.Combine(stagedPath + ".missing", "output.png");
+            byte[] stagedBytes = { 1, 2, 3, 4 };
+            try
+            {
+                File.WriteAllBytes(stagedPath, stagedBytes);
+
+                Assert.That(
+                    () => ImageBlurAPI.TryPublishNewFile(stagedPath, destinationPath, out _),
+                    Throws.InstanceOf<IOException>()
+                );
+                Assert.That(File.ReadAllBytes(stagedPath), Is.EqualTo(stagedBytes));
+                Assert.That(File.Exists(destinationPath), Is.False);
+            }
+            finally
+            {
+                File.Delete(stagedPath);
             }
         }
 
