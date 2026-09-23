@@ -26,6 +26,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         private const string SecondSpritePath = Root + "/Second.png";
         private const string NoGraphicsDeviceLog =
             "No graphic device is available to initialize the view.";
+        private const string NoGraphicsDeviceWindowLog =
+            "No graphic device is available to show the window.";
 
         private static readonly EditorCurveBinding PreferredBinding = EditorCurveBinding.PPtrCurve(
             "Preferred",
@@ -78,6 +80,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 if (
                     type is LogType.Error or LogType.Exception or LogType.Assert
                     && !string.Equals(message, NoGraphicsDeviceLog, StringComparison.Ordinal)
+                    && !string.Equals(message, NoGraphicsDeviceWindowLog, StringComparison.Ordinal)
                 )
                 {
                     unexpectedError = message;
