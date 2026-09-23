@@ -52,6 +52,10 @@ npm run lint:csharp-naming
 npm run lint:spelling    # 🚨 MANDATORY — cspell lints C# comments/XML-doc/log-strings
 ```
 
+When adding or changing a method with an `out` parameter, run `npm run test:out-parameters`.
+Assign each `out` value exactly once, immediately before each return path; an initializer at the
+top of the method fails the repository's out-parameter discipline contract.
+
 Also verify license headers on new or modified files — see [license-headers](../skills/license-headers.md).
 
 ### Documentation Changes

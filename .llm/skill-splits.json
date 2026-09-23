@@ -586,7 +586,7 @@
     },
     {
       "name": "validate-before-commit",
-      "sha256": "1df1f25626e861e97b6c504112e4f59aecb3aa86e0f19324abe39260f3a48629",
+      "sha256": "499c898a3b7ab036d9ceb61cd17aff9919061171adf1885f2df3d50cf30c0952",
       "parts": [
         "validate-before-commit-part-1.md",
         "validate-before-commit-part-2.md",
