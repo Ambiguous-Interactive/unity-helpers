@@ -122,11 +122,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
             byte[] original;
             try
             {
-                if (!File.Exists(filePath))
-                {
-                    return StaleSerializedKeyRepairOutcome.RefusedUnreadable;
-                }
-
                 original = File.ReadAllBytes(filePath);
             }
             catch (Exception)

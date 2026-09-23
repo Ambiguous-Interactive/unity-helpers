@@ -315,6 +315,30 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
         }
 
         [Test]
+        public void MissingSheetConfigClearsLoadedState()
+        {
+            SpriteSheetExtractor window = Track(
+                ScriptableObject.CreateInstance<SpriteSheetExtractor>()
+            );
+            SpriteSheetExtractor.SpriteSheetEntry entry = new()
+            {
+                _assetPath = Root + "/missing-config.png",
+                _configLoaded = true,
+                _configStale = true,
+                _loadedConfig = new SpriteSheetConfig(),
+            };
+            Assert.That(
+                File.Exists(ToFullPath(SpriteSheetConfig.GetConfigPath(entry._assetPath))),
+                Is.False
+            );
+
+            Assert.That(window.LoadConfig(entry), Is.False);
+            Assert.That(entry._configLoaded, Is.False);
+            Assert.That(entry._configStale, Is.False);
+            Assert.That(entry._loadedConfig, Is.Null);
+        }
+
+        [Test]
         public void DiscoveryAndWindowFindSameSpriteTexture()
         {
             SpriteSheetDiscoveryResult discovery = SpriteSheetExtractionAPI.Discover(

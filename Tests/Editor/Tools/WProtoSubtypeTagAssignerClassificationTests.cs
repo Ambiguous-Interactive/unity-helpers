@@ -81,6 +81,28 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
         }
 
         [Test]
+        public void AnOccupiedManifestPathIsUnreadableWithoutThrowing()
+        {
+            string root = Path.Combine(
+                Path.GetTempPath(),
+                nameof(WProtoSubtypeTagAssignerClassificationTests),
+                Guid.NewGuid().ToString("N")
+            );
+            string path = Path.Combine(root, WProtoSubtypeTagAssigner.ManifestFileName);
+            Assert.IsTrue(WProtoSubtypeTagAssigner.ReadIfPresent(path) == null);
+
+            Directory.CreateDirectory(path);
+            try
+            {
+                Assert.AreEqual(string.Empty, WProtoSubtypeTagAssigner.ReadIfPresent(path));
+            }
+            finally
+            {
+                Directory.Delete(root, true);
+            }
+        }
+
+        [Test]
         public void NativeSiblingOwnersRefuseAssignmentAndThePlayerBuildGate()
         {
             string token = Environment.GetEnvironmentVariable(OwnerTokenVariable);

@@ -90,11 +90,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
             try
             {
-                if (!File.Exists(summaryPath))
-                {
-                    return false;
-                }
-
                 foreach (string line in File.ReadLines(summaryPath))
                 {
                     return TestRunSummaryFormatter.IsRunningLine(line);

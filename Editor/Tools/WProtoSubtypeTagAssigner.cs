@@ -324,6 +324,31 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 );
         }
 
+        internal static string ReadIfPresent(string path)
+        {
+            try
+            {
+                return File.ReadAllText(path);
+            }
+            catch (FileNotFoundException)
+            {
+                return null;
+            }
+            catch (DirectoryNotFoundException)
+            {
+                return null;
+            }
+            catch (IOException)
+            {
+                // If the existing file cannot be read, rewrite it and let any write failure surface.
+                return string.Empty;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return string.Empty;
+            }
+        }
+
         /// <summary>
         /// Whether a base already names this subtype in a <c>[WProtoInclude]</c>.
         /// </summary>
@@ -764,24 +789,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
             paths.Sort(StringComparer.Ordinal);
             return paths;
-        }
-
-        private static string ReadIfPresent(string path)
-        {
-            if (!File.Exists(path))
-            {
-                return null;
-            }
-
-            try
-            {
-                return File.ReadAllText(path);
-            }
-            catch (IOException)
-            {
-                // If the existing file cannot be read, rewrite it and let any write failure surface.
-                return string.Empty;
-            }
         }
 
         /// <summary>

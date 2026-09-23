@@ -2846,7 +2846,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 string configPath = SpriteSheetConfig.GetConfigPath(entry._assetPath);
                 string fullConfigPath = Path.GetFullPath(configPath);
 
-                if (!File.Exists(fullConfigPath))
+                string json;
+                try
+                {
+                    json = File.ReadAllText(fullConfigPath, Encoding.UTF8);
+                }
+                catch (IOException exception)
+                    when (exception is FileNotFoundException
+                        || exception is DirectoryNotFoundException
+                    )
                 {
                     entry._configLoaded = false;
                     entry._configStale = false;
@@ -2854,7 +2862,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     return false;
                 }
 
-                string json = File.ReadAllText(fullConfigPath, Encoding.UTF8);
                 SpriteSheetConfig config = Serializer.JsonDeserialize<SpriteSheetConfig>(json);
 
                 if (config == null)

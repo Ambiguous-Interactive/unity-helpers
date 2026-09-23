@@ -714,12 +714,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 string configPath = AnimationCreatorConfig.GetConfigPath(folderPath);
                 string fullConfigPath = Path.GetFullPath(configPath);
-
-                if (!File.Exists(fullConfigPath))
-                {
-                    return false;
-                }
-
                 string json = File.ReadAllText(fullConfigPath, Encoding.UTF8);
                 AnimationCreatorConfig config = Serializer.JsonDeserialize<AnimationCreatorConfig>(
                     json
@@ -734,6 +728,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 ApplyConfigToCurrentState(config);
                 this.Log($"Loaded animation creator config from '{configPath}'.");
                 return true;
+            }
+            catch (FileNotFoundException)
+            {
+                return false;
+            }
+            catch (DirectoryNotFoundException)
+            {
+                return false;
             }
             catch (Exception e)
             {

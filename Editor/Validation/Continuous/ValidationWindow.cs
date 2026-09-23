@@ -104,7 +104,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         {
             try
             {
-                return File.Exists(path) ? File.ReadAllText(path) : string.Empty;
+                return File.ReadAllText(path);
             }
             catch (IOException)
             {
