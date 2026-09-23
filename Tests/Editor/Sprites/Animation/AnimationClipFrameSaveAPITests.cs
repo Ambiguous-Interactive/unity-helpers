@@ -72,36 +72,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.AreEqual(expectedLocalId, actualLocalId);
         }
 
-        private static void ShowWindow(AnimationViewerWindow window)
-        {
-            string unexpectedError = null;
-            void RecordError(string message, string stackTrace, LogType type)
-            {
-                if (
-                    type is LogType.Error or LogType.Exception or LogType.Assert
-                    && !string.Equals(message, NoGraphicsDeviceLog, StringComparison.Ordinal)
-                    && !string.Equals(message, NoGraphicsDeviceWindowLog, StringComparison.Ordinal)
-                )
-                {
-                    unexpectedError = message;
-                }
-            }
-
-            bool previousIgnore = LogAssert.ignoreFailingMessages;
-            try
-            {
-                Application.logMessageReceived += RecordError;
-                LogAssert.ignoreFailingMessages = true;
-                window.Show();
-            }
-            finally
-            {
-                LogAssert.ignoreFailingMessages = previousIgnore;
-                Application.logMessageReceived -= RecordError;
-            }
-            Assert.IsTrue(unexpectedError == null, unexpectedError);
-        }
-
         [SetUp]
         public override void BaseSetUp()
         {
@@ -374,7 +344,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             AnimationViewerWindow window = Track(
                 ScriptableObject.CreateInstance<AnimationViewerWindow>()
             );
-            ShowWindow(window);
+            using WindowGraphicsLogScope graphicsLogs = new();
+            window.Show();
             ObjectField clipField = window.rootVisualElement.Q<ObjectField>(
                 "addAnimationClipField"
             );
@@ -458,6 +429,38 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             TrackAssetPath(ClipPath);
             AssetDatabase.SaveAssets();
             return clip;
+        }
+
+        private sealed class WindowGraphicsLogScope : IDisposable
+        {
+            private readonly bool _previousIgnore;
+            private string _unexpectedError;
+
+            public WindowGraphicsLogScope()
+            {
+                _previousIgnore = LogAssert.ignoreFailingMessages;
+                Application.logMessageReceived += RecordError;
+                LogAssert.ignoreFailingMessages = true;
+            }
+
+            public void Dispose()
+            {
+                LogAssert.ignoreFailingMessages = _previousIgnore;
+                Application.logMessageReceived -= RecordError;
+                Assert.IsTrue(_unexpectedError == null, _unexpectedError);
+            }
+
+            private void RecordError(string message, string stackTrace, LogType type)
+            {
+                if (
+                    type is LogType.Error or LogType.Exception or LogType.Assert
+                    && !string.Equals(message, NoGraphicsDeviceLog, StringComparison.Ordinal)
+                    && !string.Equals(message, NoGraphicsDeviceWindowLog, StringComparison.Ordinal)
+                )
+                {
+                    _unexpectedError = message;
+                }
+            }
         }
     }
 #endif
