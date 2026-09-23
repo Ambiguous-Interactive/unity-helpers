@@ -123,29 +123,34 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 resolved = null;
             }
 
-            if (resolved == null)
-            {
-                foreach (Assembly asm in GetAllLoadedAssemblies())
-                {
-                    try
-                    {
-                        resolved = asm.GetType(typeName, throwOnError: false, ignoreCase: false);
-                        if (resolved != null)
-                        {
-                            break;
-                        }
-                    }
-                    catch { }
-                }
-            }
-
             if (resolved != null)
             {
                 TypeResolutionCache[typeName] = resolved;
                 return resolved;
             }
 
-            return 0 <= typeName.IndexOf('[') ? ResolveCompositeType(typeName) : null;
+            // Assembly.GetType can attempt to construct array metadata from a composite name;
+            // IL2CPP may crash on stale array arguments before the unique-component fallback runs.
+            if (0 <= typeName.IndexOf('['))
+            {
+                return ResolveCompositeType(typeName);
+            }
+
+            foreach (Assembly asm in GetAllLoadedAssemblies())
+            {
+                try
+                {
+                    resolved = asm.GetType(typeName, throwOnError: false, ignoreCase: false);
+                    if (resolved != null)
+                    {
+                        TypeResolutionCache[typeName] = resolved;
+                        return resolved;
+                    }
+                }
+                catch { }
+            }
+
+            return null;
         }
 
         /// <summary>
