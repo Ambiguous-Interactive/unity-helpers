@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix competing Sentinel suppression edits and Undo so a stale action reports a conflict instead of replacing another action's decisions ([#817](https://github.com/Ambiguous-Interactive/unity-helpers/issues/817)).
 - Fix animation creation APIs to return the created asset path when saving fails after Unity creates the clip ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Fix Image Blur and Sprite Sheet Extractor new image publication so readers see complete outputs and competing publishers preserve the first file ([#827](https://github.com/Ambiguous-Interactive/unity-helpers/issues/827)).
 - Fix the Sprite Animation Editor's Preview FPS field on Unity 2021.3 so its window opens correctly ([#851](https://github.com/Ambiguous-Interactive/unity-helpers/issues/851)).

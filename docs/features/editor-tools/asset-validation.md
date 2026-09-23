@@ -383,7 +383,11 @@ identities remain intact, including decisions that the current run did not repro
 removes one identity; Settings also lists entries whose finding is absent from the current snapshot.
 The Suppressed navigation item and Show suppressed toggle let you inspect those decisions.
 Saving or undoing a suppression stages the complete file before replacement. A failure while
-staging leaves the previous decisions intact.
+staging leaves the previous decisions intact. Competing Sentinel actions compare the file while
+holding the writer lock, so a stale action reports a conflict and keeps the newer decisions. Undo
+also refuses to replace a newer Sentinel edit. Reload the workspace and repeat the action against
+the current decisions. A simultaneous action can report write contention and can be retried.
+Direct writes outside Sentinel do not use this lock.
 
 JSON and JUnit exports use the last completed interactive run. JUnit marks suppressed findings as
 skipped and fails on the selected severity threshold, execution failures and missing coverage.

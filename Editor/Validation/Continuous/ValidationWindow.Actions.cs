@@ -107,21 +107,47 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         {
             try
             {
-                string previous = File.Exists(DefaultSuppressionsPath)
-                    ? File.ReadAllText(DefaultSuppressionsPath)
-                    : string.Empty;
+                bool previousExists;
+                string previous;
+                try
+                {
+                    previous = File.ReadAllText(DefaultSuppressionsPath);
+                    previousExists = true;
+                }
+                catch (FileNotFoundException)
+                {
+                    previous = string.Empty;
+                    previousExists = false;
+                }
                 string updated = finding.HasValue
                     ? WithSuppression(previous, finding.Value, suppress)
                     : WithoutSuppression(previous, id);
+                if (string.Equals(previous, updated, StringComparison.Ordinal))
+                {
+                    ReloadSuppressions();
+                    RefreshSettings();
+                    Say("Suppression is already up to date.");
+                    return;
+                }
                 if (
-                    !DurableFile.TryWriteAllText(
+                    !DurableFile.TryCompareExchangeAllText(
                         DefaultSuppressionsPath,
+                        previousExists,
+                        previous,
                         updated,
+                        out bool exchanged,
                         out Exception writeError
                     )
                 )
                 {
                     Say("Could not save suppression: " + writeError.Message);
+                    return;
+                }
+                if (!exchanged)
+                {
+                    Say(
+                        "The suppression file changed since this action. Reload it before editing again."
+                    );
                     return;
                 }
                 ReloadSuppressions();
@@ -133,28 +159,24 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                         try
                         {
                             if (
-                                !File.Exists(DefaultSuppressionsPath)
-                                || !string.Equals(
-                                    File.ReadAllText(DefaultSuppressionsPath),
-                                    updated,
-                                    System.StringComparison.Ordinal
-                                )
-                            )
-                            {
-                                Say(
-                                    "The suppression file changed since this action. Reload it before editing again."
-                                );
-                                return;
-                            }
-                            if (
-                                !DurableFile.TryWriteAllText(
+                                !DurableFile.TryCompareExchangeAllText(
                                     DefaultSuppressionsPath,
+                                    true,
+                                    updated,
                                     previous,
+                                    out bool undone,
                                     out Exception undoError
                                 )
                             )
                             {
                                 Say("Could not undo suppression: " + undoError.Message);
+                                return;
+                            }
+                            if (!undone)
+                            {
+                                Say(
+                                    "The suppression file changed since this action. Reload it before editing again."
+                                );
                                 return;
                             }
                             ReloadSuppressions();

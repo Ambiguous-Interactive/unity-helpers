@@ -3,10 +3,15 @@
 
 namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 {
+    using System;
     using System.Collections.Generic;
+    using System.IO;
+    using System.Threading;
+    using System.Threading.Tasks;
     using System.Xml;
     using NUnit.Framework;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Validation.Continuous;
     using WallstopStudios.UnityHelpers.Tests.Core;
     using Object = UnityEngine.Object;
@@ -62,6 +67,107 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 new[] { "unknown|other|field" },
                 ValidationSuppressions.Parse(restored).Ids
             );
+        }
+
+        [Test]
+        public void SuppressionCompareExchangePreservesBothWritersAndRefusesStaleUndo()
+        {
+            string path = Path.Combine(
+                Application.temporaryCachePath,
+                nameof(SuppressionCompareExchangePreservesBothWritersAndRefusesStaleUndo)
+                    + Guid.NewGuid().ToString("N")
+            );
+            ValidationFinding first = Finding(ValidationSeverity.Error);
+            ValidationFinding second = new ValidationFinding(
+                "other rule",
+                ValidationSeverity.Error,
+                null,
+                "other guid",
+                "Assets/Other.asset",
+                "other field",
+                "Other message"
+            );
+            using ManualResetEventSlim firstRead = new ManualResetEventSlim(false);
+            using ManualResetEventSlim secondSaved = new ManualResetEventSlim(false);
+            try
+            {
+                Task<(bool applied, bool exchanged, Exception error)> staleWriter = Task.Run(() =>
+                {
+                    string snapshot = string.Empty;
+                    firstRead.Set();
+                    if (!secondSaved.Wait(TimeSpan.FromSeconds(10)))
+                        return (false, false, new TimeoutException());
+                    bool applied = DurableFile.TryCompareExchangeAllText(
+                        path,
+                        false,
+                        snapshot,
+                        ValidationWindow.WithSuppression(snapshot, first, true),
+                        out bool exchanged,
+                        out Exception error
+                    );
+                    return (applied, exchanged, error);
+                });
+                Assert.IsTrue(firstRead.Wait(TimeSpan.FromSeconds(10)));
+                string secondSnapshot = string.Empty;
+                string secondText = ValidationWindow.WithSuppression(secondSnapshot, second, true);
+                Assert.IsTrue(
+                    DurableFile.TryCompareExchangeAllText(
+                        path,
+                        false,
+                        secondSnapshot,
+                        secondText,
+                        out bool secondExchanged,
+                        out Exception secondError
+                    ),
+                    secondError?.ToString()
+                );
+                Assert.IsTrue(secondExchanged);
+                secondSaved.Set();
+                Assert.IsTrue(staleWriter.Wait(TimeSpan.FromSeconds(10)));
+                (bool applied, bool exchanged, Exception error) stale = staleWriter.Result;
+                Assert.IsTrue(stale.applied, stale.error?.ToString());
+                Assert.IsFalse(stale.exchanged);
+                Assert.AreEqual(secondText, File.ReadAllText(path));
+
+                string latest = File.ReadAllText(path);
+                string combined = ValidationWindow.WithSuppression(latest, first, true);
+                Assert.IsTrue(
+                    DurableFile.TryCompareExchangeAllText(
+                        path,
+                        true,
+                        latest,
+                        combined,
+                        out bool retried,
+                        out Exception retryError
+                    ),
+                    retryError?.ToString()
+                );
+                Assert.IsTrue(retried);
+                ValidationSuppressions parsed = ValidationSuppressions.Parse(
+                    File.ReadAllText(path)
+                );
+                Assert.IsTrue(parsed.IsSuppressed(in first));
+                Assert.IsTrue(parsed.IsSuppressed(in second));
+
+                Assert.IsTrue(
+                    DurableFile.TryCompareExchangeAllText(
+                        path,
+                        true,
+                        secondText,
+                        string.Empty,
+                        out bool undone,
+                        out Exception undoError
+                    ),
+                    undoError?.ToString()
+                );
+                Assert.IsFalse(undone);
+                Assert.AreEqual(combined, File.ReadAllText(path));
+            }
+            finally
+            {
+                secondSaved.Set();
+                File.Delete(path);
+            }
         }
 
         [Test]
