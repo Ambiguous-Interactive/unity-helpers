@@ -23,6 +23,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
     public sealed class PrefabCheckerTests : BatchedEditorTestBase
     {
         private const string Root = "Assets/Temp/PrefabCheckerTests";
+        private const string ApiRoot = "Assets/Temp/PrefabCheckerApiTests";
 
         private static readonly Regex NoAssetPathsErrorPattern = new(
             @"\[PrefabChecker\].*No asset paths specified",
@@ -98,7 +99,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         {
             ExecuteWithImmediateImport(() =>
             {
-                string folder = Path.Combine(Root, "ScriptedScan").SanitizePath();
+                string folder = Path.Combine(ApiRoot, "ScriptedScan").SanitizePath();
                 EnsureFolder(folder);
                 string prefabPath = Path.Combine(folder, "DisabledRoot.prefab").SanitizePath();
                 GameObject source = Track(new GameObject("DisabledRoot"));
@@ -155,7 +156,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         {
             ExecuteWithImmediateImport(() =>
             {
-                string folder = Path.Combine(Root, "LabeledScan").SanitizePath();
+                string folder = Path.Combine(ApiRoot, "LabeledScan").SanitizePath();
                 EnsureFolder(folder);
                 string prefabPath = Path.Combine(folder, "MissingAssignment.prefab").SanitizePath();
                 GameObject source = Track(new GameObject("MissingAssignment"));
@@ -228,7 +229,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Windows
         {
             ExecuteWithImmediateImport(() =>
             {
-                string folder = Path.Combine(Root, "InteractiveLogging").SanitizePath();
+                string folder = Path.Combine(ApiRoot, "InteractiveLogging").SanitizePath();
                 EnsureFolder(folder);
                 string prefabPath = Path.Combine(folder, "MissingAssignment.prefab").SanitizePath();
                 GameObject source = Track(new GameObject("MissingAssignment"));
