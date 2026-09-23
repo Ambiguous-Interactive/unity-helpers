@@ -195,6 +195,20 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 return false;
             }
 
+            int directSamples = 0;
+            for (int sample = 0; sample < sampleCount; ++sample)
+            {
+                int start = (int)((long)(count - sampleLength) * sample / (sampleCount - 1));
+                if (IsDirectJesseSample(array, start, comparer))
+                {
+                    ++directSamples;
+                }
+                if (directSamples + sampleCount - sample - 1 < requiredDirectSamples)
+                {
+                    return false;
+                }
+            }
+
             int direction = 0;
             int directionChanges = 0;
             for (int index = 1; index < count; ++index)
@@ -214,21 +228,7 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
                 }
                 direction = nextDirection;
             }
-            if (directionChanges < count / 4)
-            {
-                return false;
-            }
-
-            int directSamples = 0;
-            for (int sample = 0; sample < sampleCount; ++sample)
-            {
-                int start = (int)((long)(count - sampleLength) * sample / (sampleCount - 1));
-                if (IsDirectJesseSample(array, start, comparer))
-                {
-                    ++directSamples;
-                }
-            }
-            return requiredDirectSamples <= directSamples;
+            return count / 4 <= directionChanges;
         }
 
         private static bool IsDirectJesseSample<T, TComparer>(
