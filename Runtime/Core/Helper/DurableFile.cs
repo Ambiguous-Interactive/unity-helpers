@@ -85,12 +85,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return false;
             }
 
+            string temporaryPath = path + TemporarySuffix;
             using (EnterGate(path))
             {
                 try
                 {
                     byte[] bytes = Utf8NoByteOrderMark.GetBytes(contents ?? string.Empty);
-                    return TryWriteStagedBytes(path, bytes, out error);
+                    return TryWriteStagedBytes(path, temporaryPath, bytes, out error);
                 }
                 catch (Exception e)
                 {
@@ -178,9 +179,15 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return false;
             }
 
+            string temporaryPath = path + TemporarySuffix;
             using (EnterGate(path))
             {
-                return TryWriteStagedBytes(path, contents ?? Array.Empty<byte>(), out error);
+                return TryWriteStagedBytes(
+                    path,
+                    temporaryPath,
+                    contents ?? Array.Empty<byte>(),
+                    out error
+                );
             }
         }
 
@@ -344,9 +351,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return false;
             }
 
+            string temporaryPath = destinationPath + TemporarySuffix;
             using (EnterGate(destinationPath))
             {
-                string temporaryPath = destinationPath + TemporarySuffix;
                 FileStream source;
                 FileStream ownership = null;
                 FileStream staging;
@@ -466,9 +473,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return false;
             }
 
+            string temporaryPath = path + TemporarySuffix;
             using (EnterGate(path))
             {
-                string temporaryPath = path + TemporarySuffix;
                 FileStream ownership = null;
                 FileStream staging = null;
                 bool ownsStaging = false;
@@ -551,6 +558,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return invalid;
             }
 
+            string temporaryPath = destinationPath + TemporarySuffix;
             SemaphoreLease gate;
             try
             {
@@ -564,7 +572,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             using (gate)
             {
-                string temporaryPath = destinationPath + TemporarySuffix;
                 FileStream source;
                 FileStream ownership = null;
                 FileStream staging;
@@ -638,6 +645,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 return new ArgumentException("A destination path is required.", nameof(path));
             }
 
+            string temporaryPath = path + TemporarySuffix;
             SemaphoreLease gate;
             try
             {
@@ -650,7 +658,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             using (gate)
             {
-                string temporaryPath = path + TemporarySuffix;
                 FileStream ownership = null;
                 FileStream staging;
                 byte[] bytes;
@@ -705,9 +712,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
-        private static bool TryWriteStagedBytes(string path, byte[] contents, out Exception error)
+        private static bool TryWriteStagedBytes(
+            string path,
+            string temporaryPath,
+            byte[] contents,
+            out Exception error
+        )
         {
-            string temporaryPath = path + TemporarySuffix;
             FileStream ownership = null;
             FileStream staging;
             try
