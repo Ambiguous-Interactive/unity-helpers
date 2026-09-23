@@ -13,6 +13,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
     using UnityEditor.UIElements;
     using UnityEngine;
     using UnityEngine.UIElements;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
@@ -261,15 +262,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
         private static bool IsInsideProject(string absolutePath, string projectRoot)
         {
-            string normalized = absolutePath.Replace('\\', '/');
-            string root = projectRoot.Replace('\\', '/').TrimEnd('/');
+            string normalized = absolutePath.SanitizePath();
+            string root = projectRoot.SanitizePath().TrimEnd('/');
             return normalized.StartsWith(root + "/", StringComparison.OrdinalIgnoreCase);
         }
 
         private static string ToProjectPath(string absolutePath, string projectRoot)
         {
-            string normalized = absolutePath.Replace('\\', '/');
-            string root = projectRoot.Replace('\\', '/').TrimEnd('/');
+            string normalized = absolutePath.SanitizePath();
+            string root = projectRoot.SanitizePath().TrimEnd('/');
             return normalized.Substring(root.Length + 1);
         }
 

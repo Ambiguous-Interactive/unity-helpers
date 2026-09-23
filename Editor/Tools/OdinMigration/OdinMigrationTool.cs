@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
     using System.Text;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using Object = UnityEngine.Object;
 
     internal static class OdinMigrationTool
@@ -464,7 +465,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.OdinMigration
                 )
             )
             {
-                string path = fullPath.Substring(ProjectRoot.Length + 1).Replace('\\', '/');
+                string path = fullPath.Substring(ProjectRoot.Length + 1).SanitizePath();
                 if (
                     path.StartsWith("Assets/", StringComparison.Ordinal)
                     && (

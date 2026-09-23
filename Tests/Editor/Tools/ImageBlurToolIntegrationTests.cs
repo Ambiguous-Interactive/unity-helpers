@@ -209,9 +209,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
             Texture2D source = AssetDatabase.LoadAssetAtPath<Texture2D>(sourcePath);
             Assert.That(source, Is.Not.Null);
 
-            ExclusiveFilePublisher.SimulatePostPublishCleanupFailureForTests = () =>
-                throw new IOException("Simulated staged cleanup failure.");
-            try
+            RestorableGlobal<Action<string>> deleteStagedFile = new(
+                () => ExclusiveFilePublisher.DeleteStagedFile,
+                action => ExclusiveFilePublisher.DeleteStagedFile = action
+            );
+            using (
+                deleteStagedFile.Borrow(_ =>
+                    throw new IOException("Simulated staged cleanup failure.")
+                )
+            )
             {
                 bool success = ImageBlurAPI.TryWriteAsset(
                     source,
@@ -225,10 +231,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 StringAssert.Contains("Published", error);
                 Assert.That(File.Exists(RelToFull(outputPath)), Is.True);
                 Assert.That(AssetDatabase.LoadAssetAtPath<Texture2D>(outputPath), Is.Not.Null);
-            }
-            finally
-            {
-                ExclusiveFilePublisher.SimulatePostPublishCleanupFailureForTests = null;
             }
         }
 

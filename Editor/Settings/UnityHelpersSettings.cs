@@ -1843,7 +1843,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
                 return DefaultFailedTestsOutputDirectory;
             }
 
-            directory = directory.Replace('\\', '/').TrimEnd('/');
+            directory = directory.SanitizePath().TrimEnd('/');
 
             if (Path.IsPathRooted(directory) || directory.Contains(".."))
             {
@@ -2320,8 +2320,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Settings
 
                 if (!string.IsNullOrEmpty(selectedPath))
                 {
-                    selectedPath = selectedPath.Replace('\\', '/');
-                    projectRoot = projectRoot.Replace('\\', '/');
+                    selectedPath = selectedPath.SanitizePath();
+                    projectRoot = projectRoot.SanitizePath();
 
                     if (!projectRoot.EndsWith("/"))
                     {

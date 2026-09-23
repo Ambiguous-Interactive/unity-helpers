@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     using System.Collections.Generic;
     using System.Globalization;
     using System.IO;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>
     /// Reads a committed <c>.unity</c>, <c>.prefab</c> or <c>.asset</c> as the sequence of documents
@@ -91,7 +92,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                             continue;
                         }
 
-                        matches.Add(path.Replace('\\', '/'));
+                        matches.Add(path.SanitizePath());
                         break;
                     }
                 }
@@ -398,7 +399,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 return false;
             }
 
-            string normalized = path.Replace('\\', '/');
+            string normalized = path.SanitizePath();
             for (int index = 0; index < prefixes.Count; ++index)
             {
                 string prefix = prefixes[index];

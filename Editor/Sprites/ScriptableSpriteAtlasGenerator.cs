@@ -343,7 +343,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            for (int i = 0; i < source.Count; ++i)
+            int sourceCount = source.Count;
+            for (int i = 0; i < sourceCount; ++i)
             {
                 string value = source[i];
                 if (!string.IsNullOrWhiteSpace(value))
@@ -363,7 +364,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            for (int i = 0; i < source.Count; ++i)
+            int sourceCount = source.Count;
+            for (int i = 0; i < sourceCount; ++i)
             {
                 string prefix = source[i];
                 if (string.IsNullOrWhiteSpace(prefix))
@@ -391,11 +393,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return false;
             }
 
+            int configuredLabelCount = configuredLabels.Count;
             switch (selectionMode)
             {
                 case LabelSelectionMode.All:
                 {
-                    for (int i = 0; i < configuredLabels.Count; ++i)
+                    for (int i = 0; i < configuredLabelCount; ++i)
                     {
                         if (!AssetLabelsContain(assetLabels, configuredLabels[i]))
                         {
@@ -406,7 +409,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
                 case LabelSelectionMode.AnyOf:
                 {
-                    for (int i = 0; i < configuredLabels.Count; ++i)
+                    for (int i = 0; i < configuredLabelCount; ++i)
                     {
                         if (AssetLabelsContain(assetLabels, configuredLabels[i]))
                         {
@@ -427,7 +430,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return false;
             }
 
-            for (int i = 0; i < assetLabels.Count; ++i)
+            int assetLabelCount = assetLabels.Count;
+            for (int i = 0; i < assetLabelCount; ++i)
             {
                 if (string.Equals(assetLabels[i], label, StringComparison.Ordinal))
                 {
@@ -837,12 +841,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return false;
             }
 
+            int includeLabelCount = includeLabels.Count;
             switch (entry.labelSelectionMode)
             {
                 case LabelSelectionMode.All:
                 {
                     string query = "t:Texture2D";
-                    for (int i = 0; i < includeLabels.Count; ++i)
+                    for (int i = 0; i < includeLabelCount; ++i)
                     {
                         string label = includeLabels[i];
                         if (!string.IsNullOrWhiteSpace(label))
@@ -866,7 +871,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         )
                     )
                     {
-                        for (int i = 0; i < includeLabels.Count; ++i)
+                        for (int i = 0; i < includeLabelCount; ++i)
                         {
                             string label = includeLabels[i];
                             if (string.IsNullOrWhiteSpace(label))
@@ -917,7 +922,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return false;
             }
 
-            for (int i = 0; i < patterns.Count; ++i)
+            int patternCount = patterns.Count;
+            for (int i = 0; i < patternCount; ++i)
             {
                 string pattern = patterns[i];
                 if (string.IsNullOrWhiteSpace(pattern))

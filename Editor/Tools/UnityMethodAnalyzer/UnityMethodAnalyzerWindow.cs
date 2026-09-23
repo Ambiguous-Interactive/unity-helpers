@@ -249,15 +249,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 return null;
             }
 
-            string normalizedPath = fullPath.Replace('\\', '/');
+            string normalizedPath = fullPath.SanitizePath();
 
-            string dataPath = Application.dataPath.Replace('\\', '/');
+            string dataPath = Application.dataPath.SanitizePath();
             if (normalizedPath.StartsWith(dataPath, StringComparison.OrdinalIgnoreCase))
             {
                 return "Assets" + normalizedPath.Substring(dataPath.Length);
             }
 
-            string projectRoot = Path.GetDirectoryName(Application.dataPath)?.Replace('\\', '/');
+            string projectRoot = Path.GetDirectoryName(Application.dataPath)?.SanitizePath();
             string packagesPath = projectRoot + "/Packages";
 
             if (normalizedPath.StartsWith(packagesPath, StringComparison.OrdinalIgnoreCase))

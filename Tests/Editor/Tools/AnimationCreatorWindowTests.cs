@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Animation;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Sprites;
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -1295,10 +1296,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 Assert.AreEqual(1, keyframes.Length);
                 Assert.AreSame(sprite, keyframes[0].value);
 
-                try
+                RestorableGlobal<Action> saveAssets = new(
+                    () => AnimationCreatorAPI.SaveAssetsAction,
+                    action => AnimationCreatorAPI.SaveAssetsAction = action
+                );
+                using (saveAssets.Borrow(() => throw new IOException("save failed")))
                 {
-                    AnimationCreatorAPI.SaveAssetsForTesting = () =>
-                        throw new IOException("save failed");
                     Assert.IsFalse(
                         AnimationCreatorAPI.TryCreateAsset(
                             data,
@@ -1311,10 +1314,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                     Assert.IsTrue(
                         AssetDatabase.LoadAssetAtPath<AnimationClip>(createdButUnsavedPath) != null
                     );
-                }
-                finally
-                {
-                    AnimationCreatorAPI.SaveAssetsForTesting = null;
                 }
             }
             finally

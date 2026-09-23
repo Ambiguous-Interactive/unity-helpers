@@ -1080,7 +1080,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 relative = relative.Substring(0, relative.Length - ".asset".Length);
             }
 
-            return relative.Replace("\\", "/");
+            return relative.SanitizePath();
         }
 
         private static string GetResourcesFolderFromLoadPath(string loadPath)
@@ -1096,7 +1096,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 return string.Empty;
             }
 
-            return directory.Replace("\\", "/");
+            return directory.SanitizePath();
         }
 
         private static string CombinePaths(string left, string right)

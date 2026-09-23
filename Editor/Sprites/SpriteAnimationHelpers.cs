@@ -132,9 +132,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             IReadOnlyList<SpriteAnimationKeyframe> frames = SpriteKeyframesOf(clip, bindingPath);
+            int frameCount = frames.Count;
             Dictionary<string, float> previousEdges = new(StringComparer.Ordinal);
             int lastMovingFrame = -1;
-            for (int index = 0; index < frames.Count; index++)
+            for (int index = 0; index < frameCount; index++)
             {
                 SpriteAnimationKeyframe frame = frames[index];
                 if (frame.Sprite == null)

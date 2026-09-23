@@ -111,7 +111,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     {
                         string assetPath = absoluteFile
                             .Substring(projectRoot.Length + 1)
-                            .Replace('\\', '/');
+                            .SanitizePath();
                         if (
                             !seen.Add(assetPath)
                             || !SpriteFileExtensions.HasAny(assetPath, ImageFileExtensions)
@@ -310,7 +310,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 foreach (string sourcePath in sourcePaths)
                 {
-                    string directory = Path.GetDirectoryName(sourcePath)?.Replace('\\', '/');
+                    string directory = Path.GetDirectoryName(sourcePath)?.SanitizePath();
                     if (string.IsNullOrWhiteSpace(directory))
                     {
                         continue;
@@ -428,7 +428,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 );
             }
 
-            string assetDirectory = Path.GetDirectoryName(assetPath)?.Replace('\\', '/');
+            string assetDirectory = Path.GetDirectoryName(assetPath)?.SanitizePath();
             if (string.IsNullOrWhiteSpace(assetDirectory))
             {
                 return new CropResult(CropStatus.FatalError, null, "The sprite has no directory.");
@@ -668,7 +668,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return null;
             }
 
-            string normalized = input.Trim().Replace('\\', '/').TrimEnd('/');
+            string normalized = input.Trim().SanitizePath().TrimEnd('/');
             if (string.Equals(normalized, "Assets", StringComparison.OrdinalIgnoreCase))
             {
                 return "Assets";

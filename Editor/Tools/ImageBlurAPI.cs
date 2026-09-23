@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
     using System.IO;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Utils;
 
     /// <summary>
@@ -165,7 +166,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                                     )
                                     {
                                         stagedOwned = publishCleanupWarning != null;
-                                        producedPath = finalPath.Replace('\\', '/');
+                                        producedPath = finalPath.SanitizePath();
                                         wroteOutput = true;
                                         if (publishCleanupWarning != null)
                                         {

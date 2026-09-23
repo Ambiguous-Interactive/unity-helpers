@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Animation;
     using WallstopStudios.UnityHelpers.Core.Extension;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Utils;
 
@@ -19,7 +20,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     /// </summary>
     public static class AnimationCreatorAPI
     {
-        internal static Action SaveAssetsForTesting;
+        internal static Action SaveAssetsAction = AssetDatabase.SaveAssets;
 
         private static readonly char[] InvalidNameCharacters =
         {
@@ -54,7 +55,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     return false;
                 }
 
-                for (int index = 0; index < frames.Count; index++)
+                int frameCount = frames.Count;
+                for (int index = 0; index < frameCount; index++)
                 {
                     if (frames[index] == null)
                     {
@@ -71,14 +73,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         ? data.framesPerSecond
                         : AnimationData.DefaultFramesPerSecond;
                 createdClip = new AnimationClip { frameRate = baseFrameRate };
-                ObjectReferenceKeyframe[] keyframes = new ObjectReferenceKeyframe[frames.Count];
+                ObjectReferenceKeyframe[] keyframes = new ObjectReferenceKeyframe[frameCount];
                 float currentTime = 0f;
 
-                for (int index = 0; index < frames.Count; index++)
+                for (int index = 0; index < frameCount; index++)
                 {
                     keyframes[index].time = currentTime;
                     keyframes[index].value = frames[index];
-                    if (index == frames.Count - 1)
+                    if (index == frameCount - 1)
                     {
                         continue;
                     }
@@ -90,7 +92,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     )
                     {
                         float normalizedPosition =
-                            1 < frames.Count ? (float)index / (frames.Count - 1) : 0f;
+                            1 < frameCount ? (float)index / (frameCount - 1) : 0f;
                         fps = data.framesPerSecondCurve.Evaluate(normalizedPosition);
                         if (fps <= 0 || float.IsNaN(fps) || float.IsInfinity(fps))
                         {
@@ -212,7 +214,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return false;
             }
 
-            string directory = Path.GetDirectoryName(firstFramePath)?.Replace('\\', '/');
+            string directory = Path.GetDirectoryName(firstFramePath).SanitizePath();
             if (string.IsNullOrWhiteSpace(directory))
             {
                 error = "The first sprite has no project asset directory.";
@@ -245,14 +247,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 createdAsset = true;
                 if (saveAssets)
                 {
-                    if (SaveAssetsForTesting != null)
-                    {
-                        SaveAssetsForTesting();
-                    }
-                    else
-                    {
-                        AssetDatabase.SaveAssets();
-                    }
+                    SaveAssetsAction();
                 }
                 error = null;
                 assetPath = finalPath;

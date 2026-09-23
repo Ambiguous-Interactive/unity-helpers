@@ -625,7 +625,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
                 relative = relative.Substring(0, relative.Length - ".asset".Length);
             }
 
-            return relative.Replace("\\", "/");
+            return relative.SanitizePath();
         }
 
         private static string GetResourcesFolderFromLoadPath(string loadPath)

@@ -3702,7 +3702,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     requests.Add(
                         new SpriteSheetExtractionRequest(
                             entry._assetPath,
-                            Path.Combine(outputPath, $"{prefix}_{i:D3}.png").Replace('\\', '/'),
+                            Path.Combine(outputPath, $"{prefix}_{i:D3}.png").SanitizePath(),
                             sprite._rect,
                             GetEffectivePivot(entry, sprite),
                             sprite._border

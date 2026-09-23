@@ -667,7 +667,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                     return null;
                 }
 
-                return beside.Replace('\\', '/');
+                return beside.SanitizePath();
             }
 
             string predefined = WProtoSubtypeTagManifestFile.DirectoryForPredefinedAssembly(
@@ -765,7 +765,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                             )
                         )
                         {
-                            paths.Add(path.Replace('\\', '/'));
+                            paths.Add(path.SanitizePath());
                         }
                     }
                 }
@@ -784,7 +784,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 }
 
                 string parent = Path.GetDirectoryName(current);
-                current = string.IsNullOrEmpty(parent) ? null : parent.Replace('\\', '/');
+                current = string.IsNullOrEmpty(parent) ? null : parent.SanitizePath();
             }
 
             paths.Sort(StringComparer.Ordinal);

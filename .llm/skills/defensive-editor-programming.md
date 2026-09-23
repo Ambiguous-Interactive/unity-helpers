@@ -77,6 +77,17 @@ each tool's cancellation and partial-result behavior. Test thrown processing and
 the internal `EditorUi` callbacks, restoring both callbacks in `finally`
 ([#648](https://github.com/Ambiguous-Interactive/unity-helpers/issues/648)).
 
+### Asset Paths and Replaceable Operations
+
+Use `PathHelper.SanitizePath()` or the `SanitizePath()` extension for slash normalization.
+Keep additional trimming or path validation where the caller needs it; do not repeat
+`Replace('\\', '/')` in Editor tools. For a file or `AssetDatabase` operation that tests need
+to replace, initialize an internal action to the real operation and call the action on every
+path. Avoid a separate production/test branch or a test-only failure hook in the
+operation itself. In tests, borrow the action with `RestorableGlobal<Action>` (or
+`RestorableGlobal<Action<T>>`) in a `using` scope so the previous delegate is restored
+even when an assertion fails.
+
 ### Code Samples
 
 Dispose owned `SerializedObject` and `SerializedProperty` instances before destroying their target.

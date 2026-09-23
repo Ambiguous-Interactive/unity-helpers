@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
     using NUnit.Framework;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.AssetProcessors;
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -396,14 +397,13 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             string assetPath = PackagePrefix + "_llm_duplicate.txt";
             int deleteCount = 0;
 
-            LlmArtifactCleaner.SetDeleteAssetOverrideForTesting(_ => deleteCount++);
-            try
+            RestorableGlobal<Action<string>> deleteAsset = new(
+                () => LlmArtifactCleaner.DeleteAssetAction,
+                action => LlmArtifactCleaner.DeleteAssetAction = action
+            );
+            using (deleteAsset.Borrow(_ => deleteCount++))
             {
                 LlmArtifactCleaner.DeleteBlockedAssets(new[] { assetPath, assetPath, assetPath });
-            }
-            finally
-            {
-                LlmArtifactCleaner.ResetForTesting();
             }
 
             Assert.AreEqual(1, deleteCount, "Duplicate paths should be deleted only once.");
@@ -422,23 +422,23 @@ namespace WallstopStudios.UnityHelpers.Tests.AssetProcessors
             List<string> deletedPaths = new();
             bool queuedSecondPath = false;
 
-            LlmArtifactCleaner.SetDeleteAssetOverrideForTesting(assetPath =>
-            {
-                deletedPaths.Add(assetPath);
-                if (!queuedSecondPath)
+            RestorableGlobal<Action<string>> deleteAsset = new(
+                () => LlmArtifactCleaner.DeleteAssetAction,
+                action => LlmArtifactCleaner.DeleteAssetAction = action
+            );
+            using (
+                deleteAsset.Borrow(assetPath =>
                 {
-                    queuedSecondPath = true;
-                    LlmArtifactCleaner.DeleteBlockedAssets(new[] { secondPath, secondPath });
-                }
-            });
-
-            try
+                    deletedPaths.Add(assetPath);
+                    if (!queuedSecondPath)
+                    {
+                        queuedSecondPath = true;
+                        LlmArtifactCleaner.DeleteBlockedAssets(new[] { secondPath, secondPath });
+                    }
+                })
+            )
             {
                 LlmArtifactCleaner.DeleteBlockedAssets(new[] { firstPath });
-            }
-            finally
-            {
-                LlmArtifactCleaner.ResetForTesting();
             }
 
             CollectionAssert.AreEquivalent(

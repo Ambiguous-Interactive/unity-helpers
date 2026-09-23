@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Extension;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Utils;
 
     /// <summary>
@@ -16,7 +17,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     /// </summary>
     public static class SpriteSheetAnimationAPI
     {
-        internal static Action SaveAssetsForTesting;
+        internal static Action SaveAssetsAction = AssetDatabase.SaveAssets;
 
         private static readonly char[] InvalidNameCharacters =
         {
@@ -58,7 +59,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             bool createdAsset = false;
             try
             {
-                string normalizedFolder = outputFolder?.Replace('\\', '/').TrimEnd('/');
+                string normalizedFolder = outputFolder.SanitizePath()?.TrimEnd('/');
                 bool underAssets =
                     string.Equals(normalizedFolder, "Assets", StringComparison.OrdinalIgnoreCase)
                     || (
@@ -117,7 +118,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     error = "A finite, positive frame rate and finite cycle offset are required.";
                     return false;
                 }
-                for (int index = 0; index < frames.Count; index++)
+                int frameCount = frames.Count;
+                for (int index = 0; index < frameCount; index++)
                 {
                     if (frames[index] == null)
                     {
@@ -127,7 +129,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     }
                 }
 
-                float[] frameTimes = new float[frames.Count];
+                float[] frameTimes = new float[frameCount];
                 float currentTime = 0f;
                 float curveDuration = 1f;
                 if (frameRateCurve != null && 0 < frameRateCurve.length)
@@ -138,17 +140,17 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         curveDuration = lastTime;
                     }
                 }
-                for (int index = 0; index < frames.Count; index++)
+                for (int index = 0; index < frameCount; index++)
                 {
                     frameTimes[index] = currentTime;
-                    if (index == frames.Count - 1)
+                    if (index == frameCount - 1)
                     {
                         continue;
                     }
                     float fps = defaultFrameRate;
                     if (frameRateCurve != null && 0 < frameRateCurve.length)
                     {
-                        float position = (float)index / (frames.Count - 1) * curveDuration;
+                        float position = (float)index / (frameCount - 1) * curveDuration;
                         float evaluated = frameRateCurve.Evaluate(position);
                         if (
                             0f < evaluated
@@ -182,8 +184,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 AnimationClip clip = new() { frameRate = 60f };
                 try
                 {
-                    ObjectReferenceKeyframe[] keyframes = new ObjectReferenceKeyframe[frames.Count];
-                    for (int index = 0; index < frames.Count; index++)
+                    ObjectReferenceKeyframe[] keyframes = new ObjectReferenceKeyframe[frameCount];
+                    for (int index = 0; index < frameCount; index++)
                     {
                         keyframes[index] = new ObjectReferenceKeyframe
                         {
@@ -219,14 +221,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     createdAsset = true;
                     if (saveAssets)
                     {
-                        if (SaveAssetsForTesting != null)
-                        {
-                            SaveAssetsForTesting();
-                        }
-                        else
-                        {
-                            AssetDatabase.SaveAssets();
-                        }
+                        SaveAssetsAction();
                     }
                     assetPath = plannedAssetPath;
                     error = null;

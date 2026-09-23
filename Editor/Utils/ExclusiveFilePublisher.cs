@@ -15,7 +15,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
     {
         private const int UnixNameAlreadyExists = 17;
 
-        internal static Action SimulatePostPublishCleanupFailureForTests;
+        internal static Action<string> DeleteStagedFile = File.Delete;
 
         /// <summary>
         /// Returns false when another entry occupies the destination. Publish failures throw;
@@ -79,8 +79,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             {
                 try
                 {
-                    SimulatePostPublishCleanupFailureForTests?.Invoke();
-                    File.Delete(stagedPath);
+                    DeleteStagedFile(stagedPath);
                 }
                 catch (Exception cleanupError)
                 {

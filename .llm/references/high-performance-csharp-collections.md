@@ -65,6 +65,11 @@ A counting loop is the right shape in exactly four cases:
 4. **The body mutates the collection or writes back through the indexer.** `foreach` throws on the
    first and cannot do the second for a struct element.
 
+When a counting loop reads an `IReadOnlyList<T>` or `IList<T>` that remains stable during the
+walk, read `Count` once before the loop and reuse that value for the bound, array sizing, and
+progress callbacks. This avoids repeated interface dispatch and keeps those values consistent.
+Keep a live `Count` only when the loop intentionally responds to collection size changes.
+
 `WUH013` remains **off by default for consumers**; all five package check projects opt in through
 `Generator~/CheckProjects.ruleset` ([#671](https://github.com/Ambiguous-Interactive/unity-helpers/issues/671)).
 Direct writes, replacement and list mutation are excluded. Indirect callback mutation needs a

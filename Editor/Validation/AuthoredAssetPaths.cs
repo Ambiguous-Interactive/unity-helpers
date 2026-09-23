@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
     using System.Collections.Generic;
     using System.IO;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>Turns a Unity asset path into a path the filesystem can be asked about.</summary>
     /// <remarks>
@@ -58,8 +59,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
                 return filePath;
             }
 
-            string normalizedRoot = projectRoot.Replace('\\', '/').TrimEnd('/') + "/";
-            string normalized = filePath.Replace('\\', '/');
+            string normalizedRoot = projectRoot.SanitizePath().TrimEnd('/') + "/";
+            string normalized = filePath.SanitizePath();
             return normalized.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase)
                 ? normalized.Substring(normalizedRoot.Length)
                 : normalized;

@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     using System.Collections.Generic;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>Persists validation profiles and authored rules with the project.</summary>
     [FilePath(
@@ -113,7 +114,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 
         internal static string CategoryFor(string path)
         {
-            string normalized = (path ?? string.Empty).Replace('\\', '/');
+            string normalized = (path ?? string.Empty).SanitizePath();
             if (normalized.IndexOf("/BuildProfiles/", StringComparison.OrdinalIgnoreCase) != -1)
             {
                 return "Build Profiles";

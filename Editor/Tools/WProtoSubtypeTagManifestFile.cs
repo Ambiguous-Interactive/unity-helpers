@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
     using System;
     using System.Collections.Generic;
     using System.Reflection;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization.WallstopProto;
 
     /// <summary>
@@ -245,7 +246,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
                 return null;
             }
 
-            string[] segments = directory.Replace('\\', '/').Trim('/').Split('/');
+            string[] segments = directory.SanitizePath().Trim('/').Split('/');
             if (
                 segments.Length == 0
                 || !string.Equals(segments[0], AssetsRoot, StringComparison.Ordinal)
@@ -602,7 +603,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools
 
         private static string Normalize(string path)
         {
-            return path.Replace('\\', '/').TrimEnd('/');
+            return path.SanitizePath().TrimEnd('/');
         }
 
         private static bool Claims(string ownerDirectory, string targetDirectory)

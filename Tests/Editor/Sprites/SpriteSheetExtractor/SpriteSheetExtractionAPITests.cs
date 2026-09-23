@@ -13,6 +13,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
     using NUnit.Framework;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Sprites;
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -313,9 +314,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
             }
 
             int initialFileCount = CountNonMetaFiles();
-            ExclusiveFilePublisher.SimulatePostPublishCleanupFailureForTests = () =>
-                throw new IOException("Simulated staged cleanup failure.");
-            try
+            RestorableGlobal<Action<string>> deleteStagedFile = new(
+                () => ExclusiveFilePublisher.DeleteStagedFile,
+                action => ExclusiveFilePublisher.DeleteStagedFile = action
+            );
+            using (
+                deleteStagedFile.Borrow(_ =>
+                    throw new IOException("Simulated staged cleanup failure.")
+                )
+            )
             {
                 SpriteSheetExtractionResult result = SpriteSheetExtractionAPI.Extract(Requests());
 
@@ -326,10 +333,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Sprites
                 Assert.That(File.Exists(ToFullPath(Output)), Is.True);
                 Assert.That(AssetDatabase.LoadAssetAtPath<Texture2D>(Output), Is.Not.Null);
                 Assert.That(CountNonMetaFiles(), Is.EqualTo(initialFileCount + 1));
-            }
-            finally
-            {
-                ExclusiveFilePublisher.SimulatePostPublishCleanupFailureForTests = null;
             }
         }
 

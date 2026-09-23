@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
     using NUnit.Framework;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Sprites;
     using WallstopStudios.UnityHelpers.Tests.Core;
 
@@ -318,10 +319,12 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         public void SaveFailureReportsCreatedAssetPath()
         {
             Sprite sprite = CreateSprite();
-            try
+            RestorableGlobal<Action> saveAssets = new(
+                () => SpriteSheetAnimationAPI.SaveAssetsAction,
+                action => SpriteSheetAnimationAPI.SaveAssetsAction = action
+            );
+            using (saveAssets.Borrow(() => throw new IOException("save failed")))
             {
-                SpriteSheetAnimationAPI.SaveAssetsForTesting = () =>
-                    throw new IOException("save failed");
                 Assert.IsFalse(
                     SpriteSheetAnimationAPI.TryCreate(
                         Root,
@@ -340,10 +343,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 TrackAssetPath(assetPath);
                 StringAssert.Contains("save failed", error);
                 Assert.IsTrue(AssetDatabase.LoadAssetAtPath<AnimationClip>(assetPath) != null);
-            }
-            finally
-            {
-                SpriteSheetAnimationAPI.SaveAssetsForTesting = null;
             }
         }
 

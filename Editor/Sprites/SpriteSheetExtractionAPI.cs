@@ -157,7 +157,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
 
             HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
-            for (int i = 0; i < folderAssetPaths.Count; ++i)
+            int folderCount = folderAssetPaths.Count;
+            for (int i = 0; i < folderCount; ++i)
             {
                 string folder = folderAssetPaths[i];
                 if (string.IsNullOrWhiteSpace(folder) || !AssetDatabase.IsValidFolder(folder))
@@ -407,7 +408,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 )
                 || !request.OutputAssetPath.EndsWith(".png", StringComparison.OrdinalIgnoreCase)
                 || !AssetDatabase.IsValidFolder(
-                    Path.GetDirectoryName(request.OutputAssetPath)?.Replace('\\', '/')
+                    Path.GetDirectoryName(request.OutputAssetPath)?.SanitizePath()
                 )
             )
             {

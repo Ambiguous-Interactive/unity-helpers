@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using System.IO;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Utils;
 
     /// <summary>
@@ -554,7 +555,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 error = "An Assets-relative path is required.";
                 return false;
             }
-            string slashes = input.Trim().Replace('\\', '/').TrimEnd('/');
+            string slashes = input.Trim().SanitizePath().TrimEnd('/');
             if (
                 !string.Equals(slashes, "Assets", StringComparison.OrdinalIgnoreCase)
                 && !slashes.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase)
@@ -576,8 +577,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                     error = "Path escapes Assets.";
                     return false;
                 }
-                normalized =
-                    "Assets" + fullPath.Substring(assetsFullPath.Length).Replace('\\', '/');
+                normalized = "Assets" + fullPath.Substring(assetsFullPath.Length).SanitizePath();
                 error = string.Empty;
                 return true;
             }

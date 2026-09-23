@@ -10,6 +10,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using System.Text.RegularExpressions;
     using UnityEditor;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Utils;
 
     /// <summary>
@@ -330,7 +331,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return null;
             }
 
-            string normalized = input.Trim().Replace('\\', '/').TrimEnd('/');
+            string normalized = input.Trim().SanitizePath().TrimEnd('/');
             if (string.Equals(normalized, "Assets", StringComparison.OrdinalIgnoreCase))
             {
                 return "Assets";
