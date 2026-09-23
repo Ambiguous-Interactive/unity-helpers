@@ -138,32 +138,65 @@ function Get-IndexEolIssues {
         if ($scope.Count -eq 0) { return $issues }
     }
 
-    $records = ((& git -C $repoRoot ls-files --eol -z) -join '') -split "`0"
-    foreach ($record in $records) {
-        if ([string]::IsNullOrEmpty($record)) { continue }
-        $tabIndex = $record.IndexOf("`t")
-        if ($tabIndex -lt 0) { continue }
-
-        $path = $record.Substring($tabIndex + 1)
-        if ($scope -and -not $scope.Contains($path)) { continue }
-
-        $fields = $record.Substring(0, $tabIndex)
-        if ($fields -notmatch '(?:^|\s)i/(?<eol>\S+)') { continue }
-        # Index classifications: lf, crlf, mixed, none, -text. Only CR bytes in
-        # a blob git converts on checkout renormalize back on comparison.
-        $indexEol = $Matches['eol']
-        if ($indexEol -ne 'crlf' -and $indexEol -ne 'mixed') { continue }
-
-        # `-text` (and `binary`, the macro that turns `text` off) tells git to
-        # copy bytes through untouched, so CR bytes there round-trip cleanly.
-        # That is the supported escape hatch for content whose CRs are content.
-        if ($fields -notmatch 'attr/(?<attributes>.*)$') { continue }
-        $attributes = $Matches['attributes']
-        if ($attributes -match '(?:^|\s)-text(?:\s|$)') { continue }
-        if ($attributes -notmatch '(?:^|\s)text(?:=\S+)?(?:\s|$)') { continue }
-
-        $issues.Add("$path (committed blob is $indexEol; git stores text blobs as LF)") | Out-Null
+    $pathspecs = @()
+    if ($scope) {
+        $pathspecs = [string[]]@($scope | ForEach-Object { ":(literal)$_" })
+        [Array]::Sort($pathspecs, [System.StringComparer]::Ordinal)
     }
+
+    $chunkSize = 64
+    # Windows limits the complete command line to 32,767 characters. Leave room
+    # for git, the repository path, quoting, and PowerShell's argument handling.
+    $chunkCharacterBudget = 16000
+    $offset = 0
+    do {
+        $arguments = @('-C', $repoRoot, 'ls-files', '--eol', '-z')
+        if ($scope) {
+            $next = $offset
+            $chunkCharacters = 0
+            while ($next -lt $pathspecs.Count -and ($next - $offset) -lt $chunkSize) {
+                $pathCharacters = $pathspecs[$next].Length + 3
+                if ($next -gt $offset -and ($chunkCharacters + $pathCharacters) -gt $chunkCharacterBudget) {
+                    break
+                }
+                $chunkCharacters += $pathCharacters
+                $next++
+            }
+            $arguments += '--'
+            $arguments += $pathspecs[$offset..($next - 1)]
+        }
+
+        $records = ((& git @arguments) -join '') -split "`0"
+        if ($LASTEXITCODE -ne 0) {
+            throw 'git ls-files --eol failed while checking index blobs.'
+        }
+        foreach ($record in $records) {
+            if ([string]::IsNullOrEmpty($record)) { continue }
+            $tabIndex = $record.IndexOf("`t")
+            if ($tabIndex -lt 0) { continue }
+
+            $path = $record.Substring($tabIndex + 1)
+            if ($scope -and -not $scope.Contains($path)) { continue }
+
+            $fields = $record.Substring(0, $tabIndex)
+            if ($fields -notmatch '(?:^|\s)i/(?<eol>\S+)') { continue }
+            # Index classifications: lf, crlf, mixed, none, -text. Only CR bytes in
+            # a blob git converts on checkout renormalize back on comparison.
+            $indexEol = $Matches['eol']
+            if ($indexEol -ne 'crlf' -and $indexEol -ne 'mixed') { continue }
+
+            # `-text` (and `binary`, the macro that turns `text` off) tells git to
+            # copy bytes through untouched, so CR bytes there round-trip cleanly.
+            # That is the supported escape hatch for content whose CRs are content.
+            if ($fields -notmatch 'attr/(?<attributes>.*)$') { continue }
+            $attributes = $Matches['attributes']
+            if ($attributes -match '(?:^|\s)-text(?:\s|$)') { continue }
+            if ($attributes -notmatch '(?:^|\s)text(?:=\S+)?(?:\s|$)') { continue }
+
+            $issues.Add("$path (committed blob is $indexEol; git stores text blobs as LF)") | Out-Null
+        }
+        if ($scope) { $offset = $next }
+    } while ($scope -and $offset -lt $pathspecs.Count)
 
     return $issues
 }

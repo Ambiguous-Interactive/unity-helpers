@@ -313,17 +313,46 @@ Write-Host "`nTest group: Path scoping" -ForegroundColor Magenta
 
 $repo = New-TestRepo
 try {
-  Add-UnfilteredFile -RepoDir $repo -RelativePath 'scripts/polluted.ps1' -Bytes (Get-Bytes "Write-Host 'a'`r`n")
+  Add-UnfilteredFile -RepoDir $repo -RelativePath 'scripts/polluted [1].ps1' -Bytes (Get-Bytes "Write-Host 'a'`r`n")
   Add-NormalizedFile -RepoDir $repo -RelativePath 'scripts/clean.ps1' -Content "Write-Host 'b'`r`n"
 
-  $inScope = Invoke-Checker -RepoDir $repo -Paths @('scripts/polluted.ps1')
-  Write-TestResult 'PathScope_IncludesPollutedPath' ($inScope.ExitCode -eq 3) "Expected exit 3, got $($inScope.ExitCode): $($inScope.Output)"
+  $inScope = Invoke-Checker -RepoDir $repo -Paths @('scripts/polluted [1].ps1')
+  Write-TestResult 'PathScope_IncludesLiteralPollutedPath' ($inScope.ExitCode -eq 3 -and $inScope.Output -match 'scripts/polluted \[1\]\.ps1 \(committed blob is crlf') "Expected literal path finding, got $($inScope.ExitCode): $($inScope.Output)"
 
   $outOfScope = Invoke-Checker -RepoDir $repo -Paths @('scripts/clean.ps1')
   Write-TestResult 'PathScope_ExcludesUnrelatedPath' ($outOfScope.ExitCode -eq 0) "Expected exit 0, got $($outOfScope.ExitCode): $($outOfScope.Output)"
 
-  $absolute = Invoke-Checker -RepoDir $repo -Paths @((Join-Path $repo 'scripts/polluted.ps1'))
+  $absolute = Invoke-Checker -RepoDir $repo -Paths @((Join-Path $repo 'scripts/polluted [1].ps1'))
   Write-TestResult 'PathScope_AcceptsAbsolutePath' ($absolute.ExitCode -eq 3) "Expected exit 3, got $($absolute.ExitCode): $($absolute.Output)"
+} finally {
+  Remove-TestRepo $repo
+}
+
+$repo = New-TestRepo
+try {
+  $scopePaths = @(
+    for ($index = 0; $index -lt 65; $index++) {
+      'scripts/chunk-{0:D3}.ps1' -f $index
+    }
+  )
+  foreach ($path in $scopePaths) {
+    [System.IO.File]::WriteAllText((Join-Path $repo $path), "Write-Host 'clean'`r`n")
+  }
+  & git -C $repo add -- scripts 2>&1 | Out-Null
+
+  $firstDirty = $scopePaths[0]
+  $lastDirty = $scopePaths[64]
+  $outsideDirty = 'scripts/outside.ps1'
+  Add-UnfilteredFile -RepoDir $repo -RelativePath $firstDirty -Bytes (Get-Bytes "Write-Host 'first'`r`n")
+  Add-UnfilteredFile -RepoDir $repo -RelativePath $lastDirty -Bytes (Get-Bytes "Write-Host 'last'`r`n")
+  Add-UnfilteredFile -RepoDir $repo -RelativePath $outsideDirty -Bytes (Get-Bytes "Write-Host 'outside'`r`n")
+
+  $chunked = Invoke-Checker -RepoDir $repo -Paths $scopePaths
+  $firstFinding = [regex]::Escape($firstDirty) + ' \(committed blob is crlf'
+  $lastFinding = [regex]::Escape($lastDirty) + ' \(committed blob is crlf'
+  Write-TestResult 'PathScope_65Paths_FindsFirstChunk' ($chunked.ExitCode -eq 3 -and $chunked.Output -match $firstFinding) "Expected first-chunk finding, got $($chunked.ExitCode): $($chunked.Output)"
+  Write-TestResult 'PathScope_65Paths_FindsLastChunk' ($chunked.Output -match $lastFinding) "Expected last-chunk finding: $($chunked.Output)"
+  Write-TestResult 'PathScope_65Paths_ExcludesOutside' ($chunked.Output -match 'Unnormalized committed blobs: 2' -and $chunked.Output -notmatch 'scripts/outside\.ps1') "Expected only two scoped findings: $($chunked.Output)"
 } finally {
   Remove-TestRepo $repo
 }
