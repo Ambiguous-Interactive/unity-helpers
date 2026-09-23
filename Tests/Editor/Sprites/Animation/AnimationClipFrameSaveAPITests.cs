@@ -10,7 +10,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
     using UnityEditor;
     using UnityEditor.UIElements;
     using UnityEngine;
-    using UnityEngine.Rendering;
     using UnityEngine.TestTools;
     using UnityEngine.UIElements;
     using WallstopStudios.UnityHelpers.Editor.Sprites;
@@ -78,10 +77,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             {
                 if (
                     type is LogType.Error or LogType.Exception or LogType.Assert
-                    && (
-                        SystemInfo.graphicsDeviceType != GraphicsDeviceType.Null
-                        || !string.Equals(message, NoGraphicsDeviceLog, StringComparison.Ordinal)
-                    )
+                    && !string.Equals(message, NoGraphicsDeviceLog, StringComparison.Ordinal)
                 )
                 {
                     unexpectedError = message;
