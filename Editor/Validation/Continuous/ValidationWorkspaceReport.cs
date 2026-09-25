@@ -9,6 +9,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     using System.IO;
     using System.Text;
     using System.Xml;
+    using WallstopStudios.UnityHelpers.Utils;
 
     internal static class ValidationWorkspaceReport
     {
@@ -38,7 +39,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     failures++;
                 }
 
-                StringBuilder text = new StringBuilder();
+                using PooledResource<StringBuilder> textLease = Buffers.StringBuilder.Get(
+                    out StringBuilder text
+                );
                 using (
                     XmlWriter writer = XmlWriter.Create(
                         text,
@@ -72,7 +75,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             }
             bool incomplete = !run.IsComplete || run.IsCancelled || run.TotalCount == 0;
             int errors = run.Failures.Count + (incomplete ? 1 : 0);
-            StringBuilder report = new StringBuilder();
+            using PooledResource<StringBuilder> reportLease = Buffers.StringBuilder.Get(
+                out StringBuilder report
+            );
             using (
                 XmlWriter writer = XmlWriter.Create(
                     report,

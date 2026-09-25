@@ -7,9 +7,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Text;
     using System.Text.Json.Serialization;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization;
+    using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>Writes Unity Method Analyzer reports to explicit paths.</summary>
     public static class UnityMethodAnalyzerReportExportAPI
@@ -38,7 +40,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             string coverageStatus
         )
         {
-            System.Text.StringBuilder sb = new();
+            using PooledResource<StringBuilder> builderLease = Buffers.StringBuilder.Get(
+                out StringBuilder sb
+            );
 
             sb.AppendLine("# Unity Method Analysis Report");
             sb.AppendLine();

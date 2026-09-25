@@ -213,11 +213,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         }
 
         [Test]
-        public void SuppressionCompareExchangePreservesBothWritersAndRefusesStaleUndo()
+        public void SuppressionCompareThenReplacePreservesBothWritersAndRejectsObservedStaleUndo()
         {
             string path = Path.Combine(
                 Application.temporaryCachePath,
-                nameof(SuppressionCompareExchangePreservesBothWritersAndRefusesStaleUndo)
+                nameof(SuppressionCompareThenReplacePreservesBothWritersAndRejectsObservedStaleUndo)
                     + Guid.NewGuid().ToString("N")
             );
             ValidationFinding first = Finding(ValidationSeverity.Error);
@@ -240,7 +240,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                     firstRead.Set();
                     if (!secondSaved.Wait(TimeSpan.FromSeconds(10)))
                         return (false, false, new TimeoutException());
-                    bool applied = DurableFile.TryCompareExchangeAllText(
+                    bool applied = DurableFile.TryCompareThenReplaceAllText(
                         path,
                         false,
                         snapshot,
@@ -254,7 +254,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 string secondSnapshot = string.Empty;
                 string secondText = ValidationWindow.WithSuppression(secondSnapshot, second, true);
                 Assert.IsTrue(
-                    DurableFile.TryCompareExchangeAllText(
+                    DurableFile.TryCompareThenReplaceAllText(
                         path,
                         false,
                         secondSnapshot,
@@ -275,7 +275,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 string latest = File.ReadAllText(path);
                 string combined = ValidationWindow.WithSuppression(latest, first, true);
                 Assert.IsTrue(
-                    DurableFile.TryCompareExchangeAllText(
+                    DurableFile.TryCompareThenReplaceAllText(
                         path,
                         true,
                         latest,
@@ -293,7 +293,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 Assert.IsTrue(parsed.IsSuppressed(in second));
 
                 Assert.IsTrue(
-                    DurableFile.TryCompareExchangeAllText(
+                    DurableFile.TryCompareThenReplaceAllText(
                         path,
                         true,
                         secondText,

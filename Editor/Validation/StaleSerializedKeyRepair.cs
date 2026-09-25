@@ -247,7 +247,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         )
         {
             if (
-                !DurableFile.TryCompareExchangeBytes(
+                !DurableFile.TryCompareThenReplaceBytes(
                     filePath,
                     rewritten,
                     original,

@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
+    using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
     using UnityEditor;
@@ -17,6 +18,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Editor.Utils.WButton;
+    using WallstopStudios.UnityHelpers.Utils;
     using Object = UnityEngine.Object;
 #if !UNITY_2021 && !UNITY_2022 && !UNITY_2023
     using UnityMethodAnalyzerTreeViewState = UnityEditor.IMGUI.Controls.TreeViewState<int>;
@@ -1573,7 +1575,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
         private string GenerateIssueMarkdown(AnalyzerIssue issue)
         {
-            System.Text.StringBuilder sb = new();
+            using PooledResource<StringBuilder> builderLease = Buffers.StringBuilder.Get(
+                out StringBuilder sb
+            );
 
             string severityEmoji = issue.Severity switch
             {

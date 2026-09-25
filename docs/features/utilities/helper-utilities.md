@@ -1012,6 +1012,10 @@ guarantee without changing any code.
 - On platforms without `File.Replace`, the delete-then-move fallback briefly exposes an absent file and
   can lose the old file if the move fails.
 - The ownership applies to one destination at a time. It is not a transaction across several files.
+- An internal compare-then-replace operation checks a file before staging its replacement, but
+  unrelated writers can edit the destination between that check and the swap. It does not provide
+  atomic content compare-and-swap against external tools. See [#863](https://github.com/Ambiguous-Interactive/unity-helpers/issues/863)
+  for the stronger contract under investigation.
 
 A leftover `.tmp` sibling (`DurableFile.TemporarySuffix`) is what an interrupted write leaves behind; it is
 safe to ignore or delete.

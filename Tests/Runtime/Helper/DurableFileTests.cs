@@ -151,14 +151,14 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [Test]
-        public void CompareExchangeBytesWritesOnlyWhenExpectedBytesStillMatch()
+        public void CompareThenReplaceBytesWritesOnMatchAndRejectsObservedMismatch()
         {
             string path = WriteDirectly("compare.bin", "original");
             byte[] original = File.ReadAllBytes(path);
             byte[] replacement = { 0, 255, 0, 42 };
 
             Assert.IsTrue(
-                DurableFile.TryCompareExchangeBytes(
+                DurableFile.TryCompareThenReplaceBytes(
                     path,
                     original,
                     replacement,
@@ -170,7 +170,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             CollectionAssert.AreEqual(replacement, File.ReadAllBytes(path));
 
             Assert.IsFalse(
-                DurableFile.TryCompareExchangeBytes(
+                DurableFile.TryCompareThenReplaceBytes(
                     path,
                     original,
                     new byte[] { 1 },
@@ -182,11 +182,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [Test]
-        public void CompareExchangeBytesRejectsMissingAndInvalidInputsWithoutCreatingAFile()
+        public void CompareThenReplaceBytesRejectsMissingAndInvalidInputsWithoutCreatingAFile()
         {
             string path = Path.Combine(_testDirectory, "missing.bin");
             Assert.IsFalse(
-                DurableFile.TryCompareExchangeBytes(
+                DurableFile.TryCompareThenReplaceBytes(
                     path,
                     Array.Empty<byte>(),
                     new byte[] { 1 },
@@ -197,7 +197,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.IsFalse(File.Exists(path));
 
             Assert.IsFalse(
-                DurableFile.TryCompareExchangeBytes(
+                DurableFile.TryCompareThenReplaceBytes(
                     path,
                     null,
                     new byte[] { 1 },
@@ -598,7 +598,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [Test]
-        public void CompareExchangeOwnsStagingFromBeforeComparisonThroughSwap()
+        public void CompareThenReplaceOwnsStagingFromBeforeComparisonThroughSwap()
         {
             string path = WriteDirectly("compare-cross-process.bin", "expected");
             string scriptPath = Path.Combine(_testDirectory, "compare-staging-probe.ps1");
@@ -617,7 +617,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             try
             {
                 Assert.IsTrue(
-                    DurableFile.TryCompareExchangeBytes(
+                    DurableFile.TryCompareThenReplaceBytes(
                         path,
                         Encoding.UTF8.GetBytes("expected"),
                         Encoding.UTF8.GetBytes("replacement"),

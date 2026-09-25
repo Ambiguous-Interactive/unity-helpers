@@ -215,7 +215,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 return () =>
                 {
                     if (
-                        !DurableFile.TryCompareExchangeBytes(
+                        !DurableFile.TryCompareThenReplaceBytes(
                             finding.AssetPath,
                             written,
                             previousBytes,

@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     using System;
     using System.Collections.Generic;
     using System.Text;
+    using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
     /// The findings a project has decided not to be told about again, read from a committed file.
@@ -110,7 +111,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// </remarks>
         public static string Render(IReadOnlyList<ValidationFinding> findings)
         {
-            StringBuilder builder = new StringBuilder();
+            using PooledResource<StringBuilder> builderLease = Buffers.StringBuilder.Get(
+                out StringBuilder builder
+            );
             builder.Append("# Validation suppressions.\n");
             builder.Append("# One finding identity per line: rule|assetGuid|discriminator.\n");
             builder.Append("# Delete a line to be told about that finding again. A line that\n");

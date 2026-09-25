@@ -458,7 +458,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
-        internal static bool TryCompareExchangeBytes(
+        /// <summary>Compares current bytes, then stages and replaces the file.</summary>
+        /// <remarks>
+        /// The staging-file ownership spans the read, staging write, and replacement, so cooperating
+        /// staged-replacement DurableFile writers cannot change the destination during this operation.
+        /// A writer that does not acquire that ownership can change it after the read and before replacement.
+        /// </remarks>
+        internal static bool TryCompareThenReplaceBytes(
             string path,
             byte[] expected,
             byte[] replacement,
@@ -531,7 +537,13 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
-        internal static bool TryCompareExchangeAllText(
+        /// <summary>Compares current text, then stages and replaces the file.</summary>
+        /// <remarks>
+        /// The staging-file ownership spans the read, staging write, and replacement, so cooperating
+        /// staged-replacement DurableFile writers cannot change the destination during this operation.
+        /// A writer that does not acquire that ownership can change it after the read and before replacement.
+        /// </remarks>
+        internal static bool TryCompareThenReplaceAllText(
             string path,
             bool expectedExists,
             string expectedContents,
@@ -859,20 +871,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
         private static bool BytesEqual(byte[] first, byte[] second)
         {
-            if (first.Length != second.Length)
-            {
-                return false;
-            }
-
-            for (int index = 0; index < first.Length; index++)
-            {
-                if (first[index] != second[index])
-                {
-                    return false;
-                }
-            }
-
-            return true;
+            return first.AsSpan().SequenceEqual(second);
         }
 
         private static SemaphoreSlim[] CreateGates()
