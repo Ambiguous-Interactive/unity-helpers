@@ -221,6 +221,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
             Assert.That(second == null, Is.False);
 
             metadata.enabled = true;
+            Assert.That(metadata.CurrentMaterial, Is.SameAs(second));
             metadata.PopMaterial(renderer);
             yield return null;
             Assert.That(second == null, Is.True);

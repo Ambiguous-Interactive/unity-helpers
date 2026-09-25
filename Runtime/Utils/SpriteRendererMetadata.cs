@@ -207,9 +207,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             Material current = CurrentMaterial;
             if (!ReferenceEquals(_spriteRenderer.sharedMaterial, current))
             {
-                _spriteRenderer.material = current;
-                Material instanced = _spriteRenderer.material;
-                TrackMaterialCopy(current, instanced);
+                Material instanced = ApplyMaterial(current);
                 Component currentComponent = _materialStack[^1].component;
                 _materialStack[^1] = (currentComponent, instanced);
             }
@@ -228,9 +226,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 #endif
 
             RemoveMaterial(component);
-            _spriteRenderer.material = CurrentMaterial;
-            Material instanced = _spriteRenderer.material;
-            TrackMaterialCopy(CurrentMaterial, instanced);
+            Material instanced = ApplyMaterial(CurrentMaterial);
             Component currentComponent = _materialStack[^1].component;
             _materialStack[^1] = (currentComponent, instanced);
             ReleaseUnusedMaterials();
@@ -261,11 +257,23 @@ namespace WallstopStudios.UnityHelpers.Utils
         private Material InternalPushMaterial(Component component, Material material)
         {
             RemoveMaterial(component);
+            Material instanced = ApplyMaterial(material);
+            _materialStack.Add((component, instanced));
+            ReleaseUnusedMaterials();
+            return instanced;
+        }
+
+        private Material ApplyMaterial(Material material)
+        {
+            if (IsOwnedMaterial(material))
+            {
+                _spriteRenderer.sharedMaterial = material;
+                return material;
+            }
+
             _spriteRenderer.material = material;
             Material instanced = _spriteRenderer.material;
             TrackMaterialCopy(material, instanced);
-            _materialStack.Add((component, instanced));
-            ReleaseUnusedMaterials();
             return instanced;
         }
 
