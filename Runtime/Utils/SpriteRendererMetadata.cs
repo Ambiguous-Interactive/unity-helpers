@@ -203,17 +203,19 @@ namespace WallstopStudios.UnityHelpers.Utils
 #endif
 
             RemoveMaterial(component);
-            Material instanced = material;
-            if (_materialStack.Count <= 1)
+            _materialStack.Insert(1, (component, material));
+            Material current = CurrentMaterial;
+            if (!ReferenceEquals(_spriteRenderer.sharedMaterial, current))
             {
-                _spriteRenderer.material = material;
-                instanced = _spriteRenderer.material;
-                TrackMaterialCopy(material, instanced);
+                _spriteRenderer.material = current;
+                Material instanced = _spriteRenderer.material;
+                TrackMaterialCopy(current, instanced);
+                Component currentComponent = _materialStack[^1].component;
+                _materialStack[^1] = (currentComponent, instanced);
             }
 
-            _materialStack.Insert(1, (component, instanced));
             ReleaseUnusedMaterials();
-            return instanced;
+            return _materialStack[1].material;
         }
 
         public void PopMaterial(Component component)

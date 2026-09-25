@@ -272,6 +272,25 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         }
 
         [UnityTest]
+        public IEnumerator PushingTopClaimToBackRestoresPreviousTop()
+        {
+            SpriteRendererMetadata metadata = CreateMetadata();
+            SpriteRenderer renderer = metadata.GetComponent<SpriteRenderer>();
+            Material firstSource = CreateMaterial();
+            Material secondSource = CreateMaterial();
+            Material replacementSource = CreateMaterial();
+            Material firstCopy = metadata.PushMaterial(renderer, firstSource);
+            Material secondCopy = metadata.PushMaterial(metadata.transform, secondSource);
+
+            Material queued = metadata.PushBackMaterial(metadata.transform, replacementSource);
+            Assert.That(queued, Is.SameAs(replacementSource));
+            Assert.That(metadata.CurrentMaterial, Is.SameAs(firstCopy));
+            Assert.That(renderer.sharedMaterial, Is.SameAs(firstCopy));
+            yield return null;
+            Assert.That(secondCopy == null, Is.True);
+        }
+
+        [UnityTest]
         public IEnumerator CannotSelfPushColor()
         {
             SpriteRendererMetadata metadata = CreateMetadata();

@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fix `SpriteRendererMetadata` so material copies it creates are released after replacement, pop, or destruction while caller materials stay intact ([#855](https://github.com/Ambiguous-Interactive/unity-helpers/issues/855)).
+- Fix `SpriteRendererMetadata` so material copies are released after replacement, pop, or destruction, and moving the top material to the back restores the prior top ([#855](https://github.com/Ambiguous-Interactive/unity-helpers/issues/855)).
 - Fix Sprite Cropper padding so borderless sprites stay borderless and larger outputs retain their full resolution ([#857](https://github.com/Ambiguous-Interactive/unity-helpers/issues/857)).
 - Fix competing Sentinel suppression edits and Undo so a stale action reports a conflict instead of replacing another action's decisions ([#817](https://github.com/Ambiguous-Interactive/unity-helpers/issues/817)).
 - Fix animation creation APIs to return the created asset path when saving fails after Unity creates the clip ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
