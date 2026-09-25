@@ -197,6 +197,16 @@ Build Finished, Result: Success.
 Assert-That 'successful standalone build with exit 255 continues to player verification' (Test-BenignStandaloneBuildExit -ExitCode 255 -LogPath $buildLog)
 Assert-That 'normal standalone build exit remains accepted' (Test-BenignStandaloneBuildExit -ExitCode 0 -LogPath $buildLog)
 Assert-That 'deliberate failure exit 1 remains rejected' (-not (Test-BenignStandaloneBuildExit -ExitCode 1 -LogPath $buildLog))
+Set-Content -LiteralPath $buildLog -Value @'
+Build Finished, Result: Success.
+##utp:{"type":"PlayerBuildInfo","version":2}
+'@
+Assert-That 'type-first player build marker without success field is accepted' (Test-BenignStandaloneBuildExit -ExitCode 255 -LogPath $buildLog)
+Set-Content -LiteralPath $buildLog -Value @'
+Build Finished, Result: Success.
+##utp:{"type":"PlayerBuildInfo","success":false}
+'@
+Assert-That 'explicit failed player build marker remains rejected' (-not (Test-BenignStandaloneBuildExit -ExitCode 255 -LogPath $buildLog))
 Set-Content -LiteralPath $buildLog -Value 'Build Finished, Result: Failed.'
 Assert-That 'exit 255 without success markers remains rejected' (-not (Test-BenignStandaloneBuildExit -ExitCode 255 -LogPath $buildLog))
 Remove-Item -LiteralPath $buildLog -Force

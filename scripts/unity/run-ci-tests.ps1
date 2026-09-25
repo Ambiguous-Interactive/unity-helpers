@@ -3066,8 +3066,25 @@ function Test-BenignStandaloneBuildExit {
 
     try {
         $buildLog = Get-Content -LiteralPath $LogPath -Raw
-        return ($buildLog -match '(?m)^Build Finished, Result: Success\.\s*$' -and
-            $buildLog -match '(?m)^##utp:\{"success":true,"type":"PlayerBuildInfo"')
+        if ($buildLog -notmatch '(?m)^Build Finished, Result: Success\.\r?$') {
+            return $false
+        }
+        foreach ($marker in [regex]::Matches($buildLog, '(?m)^##utp:(\{[^\r\n]*\})\r?$')) {
+            try {
+                $playerInfo = $marker.Groups[1].Value | ConvertFrom-Json -ErrorAction Stop
+            } catch {
+                continue
+            }
+            $typeProperty = $playerInfo.PSObject.Properties['type']
+            if ($null -eq $typeProperty -or $typeProperty.Value -ne 'PlayerBuildInfo') {
+                continue
+            }
+            $successProperty = $playerInfo.PSObject.Properties['success']
+            if ($null -eq $successProperty -or $successProperty.Value -eq $true) {
+                return $true
+            }
+        }
+        return $false
     } catch {
         return $false
     }
