@@ -13,7 +13,10 @@
    - Editor-only code → `Editor/` folder tree
    - Tests → `Tests/Runtime/` or `Tests/Editor/` (mirror source structure)
 
-2. **One file per MonoBehaviour/ScriptableObject**:
+2. **One file per named class**: Put each new class in its own `.cs` file. The current
+   file-naming gate enforces this only for Unity object types; [#865](https://github.com/Ambiguous-Interactive/unity-helpers/issues/865)
+   tracks broader enforcement and existing nested-class migration.
+3. **One file per MonoBehaviour/ScriptableObject**:
    - Each class deriving from `MonoBehaviour` or `ScriptableObject` MUST have its own dedicated `.cs` file
    - This applies to **ALL code**: production (`Runtime/`, `Editor/`) AND tests (`Tests/`)
    - ❌ Multiple MonoBehaviours/ScriptableObjects in the same file

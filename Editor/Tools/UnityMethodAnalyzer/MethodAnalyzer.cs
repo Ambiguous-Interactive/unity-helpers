@@ -178,7 +178,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             foreach (CompilerMessage message in messages)
             {
                 if (
-                    string.IsNullOrEmpty(message.file)
+                    string.IsNullOrWhiteSpace(message.file)
                     || !TryCreateIssue(message, out AnalyzerIssue issue)
                 )
                 {

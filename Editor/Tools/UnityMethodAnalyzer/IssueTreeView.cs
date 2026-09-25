@@ -263,7 +263,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                     lineNumber = issueItem.Issue.LineNumber;
                 }
 
-                if (!string.IsNullOrEmpty(filePath))
+                if (!string.IsNullOrWhiteSpace(filePath))
                 {
                     OnOpenFile?.Invoke(filePath, lineNumber);
                 }
@@ -284,7 +284,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
                 GenericMenu menu = new();
 
-                if (!string.IsNullOrEmpty(filePath))
+                if (!string.IsNullOrWhiteSpace(filePath))
                 {
                     menu.AddItem(
                         new GUIContent("Open File"),
@@ -309,7 +309,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
                 if (issue != null)
                 {
-                    if (!string.IsNullOrEmpty(filePath))
+                    if (!string.IsNullOrWhiteSpace(filePath))
                     {
                         menu.AddSeparator("");
                     }

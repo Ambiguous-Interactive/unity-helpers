@@ -16,7 +16,7 @@ It no longer guesses declarations or inheritance from source text.
 Recompilation is asynchronous and may reload the editor domain. Captured reports survive that
 reload within the editor session. Refreshing a report does not compile scripts or walk directories.
 The directory list filters files already included in Unity's compilation; files outside the
-project's compiled assemblies are not analyzed.
+project's compiled assemblies are not analyzed. Empty or whitespace-only source paths are ignored.
 
 The status reports how many current editor assemblies have captured results. **No captured
 compilation, partial coverage, compilation in progress, and compiler errors are explicit states.**
@@ -120,6 +120,7 @@ menus copy an individual issue. Reports preserve diagnostic IDs, messages, paths
 Editor scripts can call `UnityMethodAnalyzerReportExportAPI.TryExportMarkdown` or `TryExportJson`
 with an explicit output path, `IReadOnlyList<AnalyzerIssue>`, and coverage status. Both return
 `false` with an error message for invalid input or failed writes and do not open a save dialog.
+Whitespace-only output paths are invalid.
 The complete report is staged before replacing an existing file.
 Read that status with the diagnostic list: a partial report is not a build-success gate.
 CI should run the compiler with the shipped analyzers enabled and use its exit status and diagnostics.

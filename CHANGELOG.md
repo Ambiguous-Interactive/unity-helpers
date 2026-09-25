@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Ignore whitespace-only file paths in Unity Method Analyzer source selection, compiler messages, navigation, and report export ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix `SpriteRendererMetadata` so material copies are released after replacement, pop, or destruction, and moving the top material to the back restores the prior top ([#855](https://github.com/Ambiguous-Interactive/unity-helpers/issues/855)).
 - Fix Sprite Cropper padding so borderless sprites stay borderless and larger outputs retain their full resolution ([#857](https://github.com/Ambiguous-Interactive/unity-helpers/issues/857)).
 - Fix competing Sentinel suppression edits and Undo so a stale action reports a conflict instead of replacing another action's decisions ([#817](https://github.com/Ambiguous-Interactive/unity-helpers/issues/817)).

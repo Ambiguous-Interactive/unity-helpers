@@ -8,7 +8,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
     using System.Collections.Generic;
     using System.Linq;
     using System.Text;
-    using System.Text.Json.Serialization;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Utils;
@@ -22,7 +21,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             IReadOnlyList<AnalyzerIssue> issues,
             string coverageStatus,
             out string error
-        ) => TryExport(path, issues, coverageStatus, false, out error);
+        )
+        {
+            return TryExport(path, issues, coverageStatus, false, out error);
+        }
 
         /// <summary>Writes a JSON report from explicit findings and coverage status.</summary>
         public static bool TryExportJson(
@@ -30,10 +32,15 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             IReadOnlyList<AnalyzerIssue> issues,
             string coverageStatus,
             out string error
-        ) => TryExport(path, issues, coverageStatus, true, out error);
+        )
+        {
+            return TryExport(path, issues, coverageStatus, true, out error);
+        }
 
-        internal static string RenderIssueJson(AnalyzerIssue issue) =>
-            Serializer.JsonStringify(new IssueJsonModel(issue), pretty: true);
+        internal static string RenderIssueJson(AnalyzerIssue issue)
+        {
+            return Serializer.JsonStringify(new IssueJsonModel(issue), pretty: true);
+        }
 
         internal static string RenderMarkdown(
             IReadOnlyList<AnalyzerIssue> issues,
@@ -117,16 +124,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                     sb.AppendLine($"**Description:** {issue.Description}");
                     sb.AppendLine();
 
-                    if (!string.IsNullOrEmpty(issue.BaseClassName))
+                    if (!string.IsNullOrWhiteSpace(issue.BaseClassName))
                     {
                         sb.AppendLine($"**Base Class:** `{issue.BaseClassName}`");
-                        if (!string.IsNullOrEmpty(issue.BaseMethodSignature))
+                        if (!string.IsNullOrWhiteSpace(issue.BaseMethodSignature))
                         {
                             sb.AppendLine($"**Base Method:** `{issue.BaseMethodSignature}`");
                         }
                     }
 
-                    if (!string.IsNullOrEmpty(issue.DerivedMethodSignature))
+                    if (!string.IsNullOrWhiteSpace(issue.DerivedMethodSignature))
                     {
                         sb.AppendLine($"**Derived Method:** `{issue.DerivedMethodSignature}`");
                     }
@@ -224,120 +231,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             {
                 error = exception.Message;
                 return false;
-            }
-        }
-
-        private sealed class AnalysisReportJsonModel
-        {
-            [JsonPropertyName("generatedAt")]
-            public string GeneratedAt { get; set; }
-
-            [JsonPropertyName("coverageStatus")]
-            public string CoverageStatus { get; set; }
-
-            [JsonPropertyName("totalIssues")]
-            public int TotalIssues { get; set; }
-
-            [JsonPropertyName("summary")]
-            public SummaryJsonModel Summary { get; set; }
-
-            [JsonPropertyName("issues")]
-            public List<IssueJsonModel> Issues { get; set; }
-        }
-
-        private sealed class SummaryJsonModel
-        {
-            [JsonPropertyName("bySeverity")]
-            public SeveritySummaryJsonModel BySeverity { get; set; }
-
-            [JsonPropertyName("byCategory")]
-            public CategorySummaryJsonModel ByCategory { get; set; }
-        }
-
-        private sealed class SeveritySummaryJsonModel
-        {
-            [JsonPropertyName("critical")]
-            public int Critical { get; set; }
-
-            [JsonPropertyName("high")]
-            public int High { get; set; }
-
-            [JsonPropertyName("medium")]
-            public int Medium { get; set; }
-
-            [JsonPropertyName("low")]
-            public int Low { get; set; }
-
-            [JsonPropertyName("info")]
-            public int Info { get; set; }
-        }
-
-        private sealed class CategorySummaryJsonModel
-        {
-            [JsonPropertyName("unityLifecycle")]
-            public int UnityLifecycle { get; set; }
-
-            [JsonPropertyName("unityInheritance")]
-            public int UnityInheritance { get; set; }
-
-            [JsonPropertyName("generalInheritance")]
-            public int GeneralInheritance { get; set; }
-        }
-
-        private sealed class IssueJsonModel
-        {
-            [JsonPropertyName("filePath")]
-            public string FilePath { get; set; }
-
-            [JsonPropertyName("lineNumber")]
-            public int LineNumber { get; set; }
-
-            [JsonPropertyName("className")]
-            public string ClassName { get; set; }
-
-            [JsonPropertyName("methodName")]
-            public string MethodName { get; set; }
-
-            [JsonPropertyName("issueType")]
-            public string IssueType { get; set; }
-
-            [JsonPropertyName("severity")]
-            public string Severity { get; set; }
-
-            [JsonPropertyName("category")]
-            public string Category { get; set; }
-
-            [JsonPropertyName("description")]
-            public string Description { get; set; }
-
-            [JsonPropertyName("recommendedFix")]
-            public string RecommendedFix { get; set; }
-
-            [JsonPropertyName("baseClassName")]
-            public string BaseClassName { get; set; }
-
-            [JsonPropertyName("baseMethodSignature")]
-            public string BaseMethodSignature { get; set; }
-
-            [JsonPropertyName("derivedMethodSignature")]
-            public string DerivedMethodSignature { get; set; }
-
-            public IssueJsonModel() { }
-
-            public IssueJsonModel(AnalyzerIssue issue)
-            {
-                FilePath = issue.FilePath;
-                LineNumber = issue.LineNumber;
-                ClassName = issue.ClassName;
-                MethodName = issue.MethodName;
-                IssueType = issue.IssueType;
-                Severity = issue.Severity.ToString();
-                Category = issue.Category.ToString();
-                Description = issue.Description;
-                RecommendedFix = issue.RecommendedFix;
-                BaseClassName = issue.BaseClassName;
-                BaseMethodSignature = issue.BaseMethodSignature;
-                DerivedMethodSignature = issue.DerivedMethodSignature;
             }
         }
     }

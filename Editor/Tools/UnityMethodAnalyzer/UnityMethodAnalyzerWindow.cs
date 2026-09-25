@@ -244,7 +244,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
         private static string ConvertToAssetPath(string fullPath)
         {
-            if (string.IsNullOrEmpty(fullPath))
+            if (string.IsNullOrWhiteSpace(fullPath))
             {
                 return null;
             }
@@ -418,7 +418,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             {
                 foreach (string sourcePath in _sourcePaths)
                 {
-                    if (string.IsNullOrEmpty(sourcePath))
+                    if (string.IsNullOrWhiteSpace(sourcePath))
                     {
                         continue;
                     }
@@ -629,7 +629,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             if (GUILayout.Button("+", GUILayout.Width(25)))
             {
                 string browsePath =
-                    0 < _sourcePaths?.Count && !string.IsNullOrEmpty(_sourcePaths[^1])
+                    0 < _sourcePaths?.Count && !string.IsNullOrWhiteSpace(_sourcePaths[^1])
                         ? _sourcePaths[^1]
                         : GetProjectRoot();
 
@@ -639,7 +639,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                     ""
                 );
 
-                if (!string.IsNullOrEmpty(selectedPath))
+                if (!string.IsNullOrWhiteSpace(selectedPath))
                 {
                     _sourcePaths ??= new List<string>();
                     if (!_sourcePaths.Contains(selectedPath))
@@ -677,7 +677,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                     string displayPath = _sourcePaths[i];
                     string projectRoot = GetProjectRoot();
                     if (
-                        !string.IsNullOrEmpty(displayPath)
+                        !string.IsNullOrWhiteSpace(displayPath)
                         && displayPath.StartsWith(projectRoot, StringComparison.OrdinalIgnoreCase)
                     )
                     {
@@ -688,7 +688,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                     }
 
                     bool pathExists =
-                        !string.IsNullOrEmpty(_sourcePaths[i]) && Directory.Exists(_sourcePaths[i]);
+                        !string.IsNullOrWhiteSpace(_sourcePaths[i])
+                        && Directory.Exists(_sourcePaths[i]);
                     GUIStyle pathStyle = pathExists
                         ? EditorStyles.label
                         : new GUIStyle(EditorStyles.label)
@@ -708,7 +709,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                     if (GUILayout.Button("...", GUILayout.Width(30)))
                     {
                         string browsePath =
-                            !string.IsNullOrEmpty(_sourcePaths[i])
+                            !string.IsNullOrWhiteSpace(_sourcePaths[i])
                             && Directory.Exists(_sourcePaths[i])
                                 ? _sourcePaths[i]
                                 : GetProjectRoot();
@@ -719,7 +720,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                             ""
                         );
 
-                        if (!string.IsNullOrEmpty(selectedPath))
+                        if (!string.IsNullOrWhiteSpace(selectedPath))
                         {
                             _sourcePaths[i] = selectedPath;
                         }
@@ -753,7 +754,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
             bool hasValidPaths =
                 _sourcePaths != null
-                && _sourcePaths.Any(p => !string.IsNullOrEmpty(p) && Directory.Exists(p));
+                && _sourcePaths.Any(p => !string.IsNullOrWhiteSpace(p) && Directory.Exists(p));
 
             bool analyzeEnabled = !_isAnalyzing && hasValidPaths;
             Color analyzeColor = analyzeEnabled ? AnalyzeButtonColor : DisabledButtonColor;
@@ -1228,7 +1229,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 GUILayout.Label("Recommended Fix:", EditorStyles.boldLabel);
                 EditorGUILayout.HelpBox(_selectedIssue.RecommendedFix, MessageType.Info);
 
-                if (!string.IsNullOrEmpty(_selectedIssue.BaseClassName))
+                if (!string.IsNullOrWhiteSpace(_selectedIssue.BaseClassName))
                 {
                     GUILayout.Space(10);
                     GUILayout.Label("Inheritance Details:", EditorStyles.boldLabel);
@@ -1239,7 +1240,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                     GUILayout.FlexibleSpace();
                     GUILayout.EndHorizontal();
 
-                    if (!string.IsNullOrEmpty(_selectedIssue.BaseMethodSignature))
+                    if (!string.IsNullOrWhiteSpace(_selectedIssue.BaseMethodSignature))
                     {
                         GUILayout.BeginHorizontal();
                         GUILayout.Label("Base Method:", GUILayout.Width(100));
@@ -1248,7 +1249,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                         GUILayout.EndHorizontal();
                     }
 
-                    if (!string.IsNullOrEmpty(_selectedIssue.DerivedMethodSignature))
+                    if (!string.IsNullOrWhiteSpace(_selectedIssue.DerivedMethodSignature))
                     {
                         GUILayout.BeginHorizontal();
                         GUILayout.Label("Derived Method:", GUILayout.Width(100));
@@ -1446,7 +1447,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 defaultName,
                 "md"
             );
-            if (!string.IsNullOrEmpty(path))
+            if (!string.IsNullOrWhiteSpace(path))
             {
                 ExportReportToPath(path, false);
             }
@@ -1564,14 +1565,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 defaultName,
                 "json"
             );
-            if (!string.IsNullOrEmpty(path))
+            if (!string.IsNullOrWhiteSpace(path))
             {
                 ExportReportToPath(path, true);
             }
         }
 
-        private string GenerateIssueJson(AnalyzerIssue issue) =>
-            UnityMethodAnalyzerReportExportAPI.RenderIssueJson(issue);
+        private string GenerateIssueJson(AnalyzerIssue issue)
+        {
+            return UnityMethodAnalyzerReportExportAPI.RenderIssueJson(issue);
+        }
 
         private string GenerateIssueMarkdown(AnalyzerIssue issue)
         {
@@ -1602,16 +1605,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             sb.AppendLine($"**Description:** {issue.Description}");
             sb.AppendLine();
 
-            if (!string.IsNullOrEmpty(issue.BaseClassName))
+            if (!string.IsNullOrWhiteSpace(issue.BaseClassName))
             {
                 sb.AppendLine($"**Base Class:** `{issue.BaseClassName}`");
-                if (!string.IsNullOrEmpty(issue.BaseMethodSignature))
+                if (!string.IsNullOrWhiteSpace(issue.BaseMethodSignature))
                 {
                     sb.AppendLine($"**Base Method:** `{issue.BaseMethodSignature}`");
                 }
             }
 
-            if (!string.IsNullOrEmpty(issue.DerivedMethodSignature))
+            if (!string.IsNullOrWhiteSpace(issue.DerivedMethodSignature))
             {
                 sb.AppendLine($"**Derived Method:** `{issue.DerivedMethodSignature}`");
             }
