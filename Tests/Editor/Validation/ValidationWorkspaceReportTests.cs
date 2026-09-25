@@ -51,6 +51,149 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             return run;
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ExportReportWritesRequestedFormatWithoutWindow(bool junit)
+        {
+            string path = Path.Combine(
+                Application.temporaryCachePath,
+                nameof(ExportReportWritesRequestedFormatWithoutWindow)
+                    + Guid.NewGuid().ToString("N")
+                    + (junit ? ".xml" : ".json")
+            );
+            try
+            {
+                ValidationRun run = Run(Finding(ValidationSeverity.Error));
+                bool exported = junit
+                    ? ValidationReportExportAPI.TryExportJUnit(
+                        path,
+                        run,
+                        ValidationSuppressions.Empty,
+                        ValidationSeverity.Error,
+                        out string error
+                    )
+                    : ValidationReportExportAPI.TryExportJson(
+                        path,
+                        run,
+                        ValidationSuppressions.Empty,
+                        out error
+                    );
+
+                Assert.IsTrue(exported, error);
+                string contents = File.ReadAllText(path);
+                if (junit)
+                {
+                    XmlDocument document = new XmlDocument();
+                    document.LoadXml(contents);
+                    Assert.AreEqual("testsuite", document.DocumentElement.Name);
+                    Assert.AreEqual("1", document.DocumentElement.GetAttribute("failures"));
+                }
+                else
+                {
+                    StringAssert.Contains("\"schemaVersion\"", contents);
+                    StringAssert.Contains("Message <tag>", contents);
+                }
+            }
+            finally
+            {
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                }
+            }
+        }
+
+        [Test]
+        public void ExportReportRejectsMissingRunWithoutChangingExistingFile()
+        {
+            string path = Path.Combine(
+                Application.temporaryCachePath,
+                nameof(ExportReportRejectsMissingRunWithoutChangingExistingFile)
+                    + Guid.NewGuid().ToString("N")
+            );
+            try
+            {
+                File.WriteAllText(path, "existing report");
+                Assert.IsFalse(
+                    ValidationReportExportAPI.TryExportJson(
+                        path,
+                        null,
+                        ValidationSuppressions.Empty,
+                        out string error
+                    )
+                );
+                StringAssert.Contains("validation run", error);
+                Assert.AreEqual("existing report", File.ReadAllText(path));
+            }
+            finally
+            {
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                }
+            }
+        }
+
+        [Test]
+        public void ExportJUnitPreservesCancelledCoverage()
+        {
+            string path = Path.Combine(
+                Application.temporaryCachePath,
+                nameof(ExportJUnitPreservesCancelledCoverage) + Guid.NewGuid().ToString("N")
+            );
+            try
+            {
+                ValidationRun run = Run(Finding(ValidationSeverity.Error));
+                run.Cancel();
+                Assert.IsTrue(
+                    ValidationReportExportAPI.TryExportJUnit(
+                        path,
+                        run,
+                        ValidationSuppressions.Empty,
+                        ValidationSeverity.Error,
+                        out string error
+                    ),
+                    error
+                );
+                XmlDocument document = new XmlDocument();
+                document.Load(path);
+                Assert.AreEqual("1", document.DocumentElement.GetAttribute("errors"));
+            }
+            finally
+            {
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                }
+            }
+        }
+
+        [Test]
+        public void ExportReportRejectsEmptyAndInvalidPaths()
+        {
+            ValidationRun run = Run(Finding(ValidationSeverity.Error));
+            Assert.IsFalse(
+                ValidationReportExportAPI.TryExportJson(
+                    " ",
+                    run,
+                    ValidationSuppressions.Empty,
+                    out string emptyPathError
+                )
+            );
+            StringAssert.Contains("path", emptyPathError);
+
+            Assert.IsFalse(
+                ValidationReportExportAPI.TryExportJUnit(
+                    "\0",
+                    run,
+                    ValidationSuppressions.Empty,
+                    ValidationSeverity.Error,
+                    out string invalidPathError
+                )
+            );
+            Assert.IsNotEmpty(invalidPathError);
+        }
+
         [Test]
         public void SuppressingPreservesUnobservedEntriesAndComments()
         {

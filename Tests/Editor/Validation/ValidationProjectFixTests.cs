@@ -189,6 +189,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         }
 
         [Test]
+        public void PrefabUndoRefusesEditsMadeAfterTheFix()
+        {
+            string path = Prefab();
+            ValidationWorkspaceSettings.RuleDefinition rule = Rule();
+            Action undo = ValidationProjectFix.Apply(rule, Scan(path, rule)[0]);
+            File.AppendAllText(path, "\n# later edit\n");
+            byte[] editedBytes = File.ReadAllBytes(path);
+
+            Assert.Throws<InvalidOperationException>(() => undo());
+            CollectionAssert.AreEqual(editedBytes, File.ReadAllBytes(path));
+        }
+
+        [Test]
         public void BulkFixCanRemoveTwoAudioSourcesOnTheSameObject()
         {
             GameObject root = Track(new GameObject("Audio"));

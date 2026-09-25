@@ -68,6 +68,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 #if UNITY_EDITOR
         internal static Action<string> BeforeStagedSwapForTests { get; set; }
         internal static Action<string> BeforeStagedCleanupForTests { get; set; }
+        internal static Action<string> BeforeCompareReadForTests { get; set; }
 #endif
 
         /// <summary>
@@ -457,6 +458,79 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
+        internal static bool TryCompareExchangeBytes(
+            string path,
+            byte[] expected,
+            byte[] replacement,
+            out Exception error
+        )
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                error = new ArgumentException("A destination path is required.", nameof(path));
+                return false;
+            }
+
+            if (expected == null || replacement == null)
+            {
+                error = new ArgumentNullException(
+                    expected == null ? nameof(expected) : nameof(replacement)
+                );
+                return false;
+            }
+
+            using (EnterGate(path))
+            {
+                string temporaryPath = path + TemporarySuffix;
+                FileStream ownership = null;
+                FileStream staging = null;
+                bool ownsStaging = false;
+                try
+                {
+                    ownership = OpenStagingOwnership(temporaryPath);
+#if UNITY_EDITOR
+                    BeforeCompareReadForTests?.Invoke(temporaryPath);
+#endif
+                    byte[] current = File.ReadAllBytes(path);
+                    if (!BytesEqual(current, expected))
+                    {
+                        error = new InvalidOperationException(
+                            "The file changed since it was read."
+                        );
+                        return false;
+                    }
+
+                    staging = OpenStagingStream(temporaryPath, useAsync: false);
+                    ownsStaging = true;
+                    staging.Write(replacement, 0, replacement.Length);
+                    staging.Flush(flushToDisk: true);
+                    staging.Dispose();
+                    staging = null;
+#if UNITY_EDITOR
+                    BeforeStagedSwapForTests?.Invoke(temporaryPath);
+#endif
+                    Swap(temporaryPath, path);
+                    ownsStaging = false;
+                    error = null;
+                    return true;
+                }
+                catch (Exception e)
+                {
+                    error = e;
+                    return false;
+                }
+                finally
+                {
+                    ReleaseFileStream(staging);
+                    if (ownsStaging)
+                    {
+                        DiscardStagedFile(temporaryPath);
+                    }
+                    ReleaseStagingOwnership(ownership);
+                }
+            }
+        }
+
         internal static bool TryCompareExchangeAllText(
             string path,
             bool expectedExists,
@@ -781,6 +855,24 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
 
             return null;
+        }
+
+        private static bool BytesEqual(byte[] first, byte[] second)
+        {
+            if (first.Length != second.Length)
+            {
+                return false;
+            }
+
+            for (int index = 0; index < first.Length; index++)
+            {
+                if (first[index] != second[index])
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private static SemaphoreSlim[] CreateGates()

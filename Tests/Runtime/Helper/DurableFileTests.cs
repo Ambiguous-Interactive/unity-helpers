@@ -151,6 +151,64 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [Test]
+        public void CompareExchangeBytesWritesOnlyWhenExpectedBytesStillMatch()
+        {
+            string path = WriteDirectly("compare.bin", "original");
+            byte[] original = File.ReadAllBytes(path);
+            byte[] replacement = { 0, 255, 0, 42 };
+
+            Assert.IsTrue(
+                DurableFile.TryCompareExchangeBytes(
+                    path,
+                    original,
+                    replacement,
+                    out Exception successError
+                ),
+                successError?.ToString()
+            );
+            Assert.IsTrue(successError == null);
+            CollectionAssert.AreEqual(replacement, File.ReadAllBytes(path));
+
+            Assert.IsFalse(
+                DurableFile.TryCompareExchangeBytes(
+                    path,
+                    original,
+                    new byte[] { 1 },
+                    out Exception mismatchError
+                )
+            );
+            Assert.IsInstanceOf<InvalidOperationException>(mismatchError);
+            CollectionAssert.AreEqual(replacement, File.ReadAllBytes(path));
+        }
+
+        [Test]
+        public void CompareExchangeBytesRejectsMissingAndInvalidInputsWithoutCreatingAFile()
+        {
+            string path = Path.Combine(_testDirectory, "missing.bin");
+            Assert.IsFalse(
+                DurableFile.TryCompareExchangeBytes(
+                    path,
+                    Array.Empty<byte>(),
+                    new byte[] { 1 },
+                    out Exception missingError
+                )
+            );
+            Assert.IsInstanceOf<FileNotFoundException>(missingError);
+            Assert.IsFalse(File.Exists(path));
+
+            Assert.IsFalse(
+                DurableFile.TryCompareExchangeBytes(
+                    path,
+                    null,
+                    new byte[] { 1 },
+                    out Exception invalidError
+                )
+            );
+            Assert.IsInstanceOf<ArgumentNullException>(invalidError);
+            Assert.IsFalse(File.Exists(path));
+        }
+
+        [Test]
         public void WriteLeavesNoStagedFileBehind()
         {
             string path = Path.Combine(_testDirectory, "save.json");
@@ -537,6 +595,54 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
             Assert.AreEqual(23, childExitCode, "The second process must not acquire staging.");
             Assert.AreEqual("writer A document", File.ReadAllText(path));
             Assert.IsFalse(File.Exists(path + DurableFile.TemporarySuffix));
+        }
+
+        [Test]
+        public void CompareExchangeOwnsStagingFromBeforeComparisonThroughSwap()
+        {
+            string path = WriteDirectly("compare-cross-process.bin", "expected");
+            string scriptPath = Path.Combine(_testDirectory, "compare-staging-probe.ps1");
+            WriteStagingOwnershipProbe(scriptPath);
+            int beforeReadExitCode = -1;
+            int beforeSwapExitCode = -1;
+            DurableFile.BeforeCompareReadForTests = temporaryPath =>
+            {
+                beforeReadExitCode = TryOverwriteStagingInAnotherProcess(scriptPath, temporaryPath);
+            };
+            DurableFile.BeforeStagedSwapForTests = temporaryPath =>
+            {
+                beforeSwapExitCode = TryOverwriteStagingInAnotherProcess(scriptPath, temporaryPath);
+            };
+
+            try
+            {
+                Assert.IsTrue(
+                    DurableFile.TryCompareExchangeBytes(
+                        path,
+                        Encoding.UTF8.GetBytes("expected"),
+                        Encoding.UTF8.GetBytes("replacement"),
+                        out Exception error
+                    ),
+                    error?.ToString()
+                );
+            }
+            finally
+            {
+                DurableFile.BeforeCompareReadForTests = null;
+                DurableFile.BeforeStagedSwapForTests = null;
+            }
+
+            Assert.AreEqual(
+                23,
+                beforeReadExitCode,
+                "A second writer acquired staging before compare."
+            );
+            Assert.AreEqual(
+                23,
+                beforeSwapExitCode,
+                "A second writer acquired staging before swap."
+            );
+            Assert.AreEqual("replacement", File.ReadAllText(path));
         }
 #endif
 

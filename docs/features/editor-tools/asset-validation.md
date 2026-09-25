@@ -365,10 +365,13 @@ Reloading unchanged ordinary persistent references preserves eligibility. Manage
 data is retained conservatively and can require a fresh scan after reload, as can unsaved references.
 
 Scene component removal uses Unity's ordinary **Edit > Undo** history. Other supported fixes expose
-a targeted toast **Undo**, which refuses restoration when the affected asset has since changed or
-been replaced. Prefab undo stages the previous bytes before replacement, so a staging failure leaves
-the current prefab intact. On platforms without `File.Replace`, a failed fallback swap can still
-lose it. Importer and prefab restoration performs a new import; it does not reverse unrelated
+a targeted toast **Undo**. Importer fixes check asset identity and the setting they wrote; prefab
+undo checks the file's exact saved bytes before restoring it. A byte-identical replacement at the
+same prefab path cannot be distinguished by that check. Prefab undo stages the previous bytes before
+replacement, so a staging failure leaves the current prefab intact. The byte comparison and
+replacement share a lock with cooperating `DurableFile` writers; other tools can still edit the prefab
+while Undo runs. On platforms without `File.Replace`, a failed fallback swap can still lose it.
+Importer and prefab restoration perform a new import; they do not reverse unrelated
 side effects caused by other import processors. A mixed batch's toast excludes scene removals and
 says to use Edit > Undo for those changes.
 
@@ -393,6 +396,13 @@ JSON and JUnit exports use the last completed interactive run. JUnit marks suppr
 skipped and fails on the selected severity threshold, execution failures and missing coverage.
 Changing configuration requires a new completed run before exporting. The optional build gate runs
 validation before a player build and stops the build on blocking findings or incomplete coverage.
+
+Editor scripts can write reports without opening the workspace by calling
+`ValidationReportExportAPI.TryExportJson(path, run, suppressions, out error)` or
+`ValidationReportExportAPI.TryExportJUnit(path, run, suppressions, threshold, out error)`. Both require
+a `ValidationRun` and return an error without writing for invalid input. Cancelled and incomplete
+runs retain their coverage status in the report. A successful export replaces the target file through a staged write. File replacement is outside
+Unity Undo and cannot be reversed from the editor history.
 
 ## Turning Sentinel off
 

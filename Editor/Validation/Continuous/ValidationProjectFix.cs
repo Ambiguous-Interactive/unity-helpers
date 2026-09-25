@@ -214,19 +214,18 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 byte[] written = File.ReadAllBytes(finding.AssetPath);
                 return () =>
                 {
-                    byte[] current = File.ReadAllBytes(finding.AssetPath);
-                    if (!Equal(current, written))
-                        throw new InvalidOperationException(
-                            "The prefab changed since this fix; undo would overwrite those edits."
-                        );
                     if (
-                        !DurableFile.TryWriteAllBytes(
+                        !DurableFile.TryCompareExchangeBytes(
                             finding.AssetPath,
+                            written,
                             previousBytes,
                             out Exception writeError
                         )
                     )
-                        throw new IOException("Could not restore the previous prefab.", writeError);
+                        throw new InvalidOperationException(
+                            "Could not restore the previous prefab; it may have changed since this fix.",
+                            writeError
+                        );
                     AssetDatabase.ImportAsset(finding.AssetPath);
                 };
             }
@@ -281,16 +280,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     "The object no longer matches this rule. Validate again."
                 );
             return source;
-        }
-
-        private static bool Equal(byte[] first, byte[] second)
-        {
-            if (first.Length != second.Length)
-                return false;
-            for (int index = 0; index < first.Length; index++)
-                if (first[index] != second[index])
-                    return false;
-            return true;
         }
 
         private static Action Rename(

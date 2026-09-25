@@ -189,8 +189,11 @@ and undoes any rewrite that lowers it — or that throws — by writing the orig
 re-importing. Refusals are printed, and each one says which of the five things happened: the file
 could not be read, the rewrite lost objects, the rewrite threw, the undo itself failed, or nothing
 changed. The original bytes are staged before replacement, so a staging failure does not truncate
-the asset. On platforms without `File.Replace`, a failed fallback swap can still lose it. Commit or
-stash first.
+the asset. If the file changes after the rewrite snapshot, rollback refuses to replace it and
+reports that manual recovery is needed. The comparison and replacement share a lock with cooperating
+`DurableFile` writers; edits by other tools can still race with that lock, and an edit made before
+the snapshot cannot be distinguished from the rewrite. On platforms without `File.Replace`, a failed
+fallback swap can still lose the asset. Commit or stash first.
 
 The rewrite is covered, not just the refusals: a fixture authors a plain asset, an asset whose
 content lives in sub-objects, and a prefab, leaves a key no field claims in each, repairs them, and

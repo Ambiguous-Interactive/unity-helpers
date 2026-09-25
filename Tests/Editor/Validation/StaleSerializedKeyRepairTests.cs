@@ -357,9 +357,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                         return held;
                     }
 
-                    DamageInPlace(assetPath);
                     return held - 1;
-                }
+                },
+                assetPath => DamageInPlace(assetPath)
             );
 
             Assert.AreEqual(2, counts, "The rewrite was never counted on both sides of itself.");
@@ -383,6 +383,52 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 "The bytes came back and the editor kept the damaged object, so the next save writes "
                     + "the damage straight back out. That is the half a restored file alone misses."
             );
+        }
+
+        [Test]
+        public void AnEditAfterRewriteIsPreservedWhenRollbackIsNeeded()
+        {
+            string filePath = AuthoredAssetPaths.ToFileSystemPath(_lostSubObjects);
+            byte[] original = File.ReadAllBytes(filePath);
+            byte[] edited = null;
+            LogAssert.Expect(
+                LogType.Error,
+                new Regex(Regex.Escape($"Could not undo the rewrite of {_lostSubObjects}"))
+            );
+
+            try
+            {
+                int counts = 0;
+                StaleSerializedKeyRepairOutcome outcome = StaleSerializedKeyRepair.RepairAsset(
+                    _lostSubObjects,
+                    assetPath =>
+                    {
+                        int held = NonNullObjectCount(assetPath);
+                        ++counts;
+                        if (counts < 2)
+                        {
+                            return held;
+                        }
+
+                        File.AppendAllText(filePath, "\n# concurrent edit\n");
+                        edited = File.ReadAllBytes(filePath);
+                        return held - 1;
+                    },
+                    assetPath => DamageInPlace(assetPath)
+                );
+
+                Assert.AreEqual(2, counts);
+                Assert.AreEqual(StaleSerializedKeyRepairOutcome.RefusedUndoFailed, outcome);
+                CollectionAssert.AreEqual(edited, File.ReadAllBytes(filePath));
+            }
+            finally
+            {
+                File.WriteAllBytes(filePath, original);
+                AssetDatabase.ImportAsset(
+                    _lostSubObjects,
+                    ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport
+                );
+            }
         }
 
         /// <summary>
@@ -516,11 +562,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             LogAssert.Expect(
                 LogType.Error,
                 new Regex(
-                    "(?![\\s\\S]*being put back)"
+                    "(?![\\s\\S]*(being put back|Nothing was repaired))"
                         + Regex.Escape(
                             $"Rewriting {_rewriteUndoFailed} threw: {typeof(InvalidOperationException).FullName}: {RewriteFailureMessage}"
                         )
-                        + "[\\s\\S]*Nothing was repaired\\."
                 )
             );
             LogAssert.Expect(

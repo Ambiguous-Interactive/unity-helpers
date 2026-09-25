@@ -295,18 +295,25 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
             try
             {
                 ValidationWorkspaceSettings settings = ValidationWorkspaceSettings.instance;
-                string report = junit
-                    ? ValidationWorkspaceReport.ToJUnit(
+                bool exported = junit
+                    ? ValidationReportExportAPI.TryExportJUnit(
+                        path,
                         _lastCompletedRun,
                         _suppressions,
-                        settings.ActiveProfile.failOn
+                        settings.ActiveProfile.failOn,
+                        out string error
                     )
-                    : ValidationReport.ToJson(_lastCompletedRun, _suppressions);
-                if (!DurableFile.TryWriteAllText(path, report, out Exception writeError))
-                {
-                    throw writeError;
-                }
-                Say("Exported " + Path.GetFileName(path) + ".");
+                    : ValidationReportExportAPI.TryExportJson(
+                        path,
+                        _lastCompletedRun,
+                        _suppressions,
+                        out error
+                    );
+                Say(
+                    exported
+                        ? "Exported " + Path.GetFileName(path) + "."
+                        : "Export failed: " + error
+                );
             }
             catch (Exception thrown)
             {
