@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 {
     using System.Collections.Generic;
     using Core.Attributes;
+    using Core.Helper;
     using UnityEngine;
 
     /// <summary>
@@ -74,23 +75,6 @@ namespace WallstopStudios.UnityHelpers.Utils
             }
 
             return false;
-        }
-
-        private static void DestroyOwnedMaterial(Material material)
-        {
-            if (material == null)
-            {
-                return;
-            }
-
-            if (Application.isPlaying)
-            {
-                Destroy(material);
-            }
-            else
-            {
-                DestroyImmediate(material);
-            }
         }
 
         public void PushColor(Component component, Color color, bool force = false)
@@ -384,7 +368,7 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             foreach (Material material in _ownedMaterials)
             {
-                DestroyOwnedMaterial(material);
+                material.Destroy();
             }
             _ownedMaterials.Clear();
         }
@@ -433,7 +417,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 }
 
                 _ownedMaterials.RemoveAt(i);
-                DestroyOwnedMaterial(material);
+                material.Destroy();
             }
         }
 
