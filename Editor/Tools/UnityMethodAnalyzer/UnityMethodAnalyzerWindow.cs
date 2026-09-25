@@ -548,6 +548,40 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             _infoCount = infoCount;
         }
 
+        internal void ExportReportToPath(string path, bool json)
+        {
+            string error;
+            bool exported = json
+                ? UnityMethodAnalyzerReportExportAPI.TryExportJson(
+                    path,
+                    _analyzer?.Issues,
+                    _analyzer?.Status,
+                    out error
+                )
+                : UnityMethodAnalyzerReportExportAPI.TryExportMarkdown(
+                    path,
+                    _analyzer?.Issues,
+                    _analyzer?.Status,
+                    out error
+                );
+            if (!exported)
+            {
+                _statusMessage = "Export failed";
+                this.LogError($"Export failed: {error}", new IOException(error));
+                return;
+            }
+            try
+            {
+                _statusMessage = $"Report exported to: {Path.GetFileName(path)}";
+                EditorUtility.RevealInFinder(path);
+            }
+            catch (Exception exception)
+            {
+                _statusMessage = "Report exported, but could not reveal the file";
+                this.LogError($"Could not reveal exported report: {path}", exception);
+            }
+        }
+
         private void OnEnable()
         {
             Initialize();
@@ -1531,40 +1565,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             if (!string.IsNullOrEmpty(path))
             {
                 ExportReportToPath(path, true);
-            }
-        }
-
-        internal void ExportReportToPath(string path, bool json)
-        {
-            string error;
-            bool exported = json
-                ? UnityMethodAnalyzerReportExportAPI.TryExportJson(
-                    path,
-                    _analyzer?.Issues,
-                    _analyzer?.Status,
-                    out error
-                )
-                : UnityMethodAnalyzerReportExportAPI.TryExportMarkdown(
-                    path,
-                    _analyzer?.Issues,
-                    _analyzer?.Status,
-                    out error
-                );
-            if (!exported)
-            {
-                _statusMessage = "Export failed";
-                this.LogError($"Export failed: {error}", new IOException(error));
-                return;
-            }
-            try
-            {
-                _statusMessage = $"Report exported to: {Path.GetFileName(path)}";
-                EditorUtility.RevealInFinder(path);
-            }
-            catch (Exception exception)
-            {
-                _statusMessage = "Report exported, but could not reveal the file";
-                this.LogError($"Could not reveal exported report: {path}", exception);
             }
         }
 
