@@ -203,6 +203,75 @@ namespace WallstopStudios.UnityHelpers.Tests.Utils
         }
 
         [UnityTest]
+        public IEnumerator ReplacedAndPoppedMaterialCopiesAreDestroyed()
+        {
+            SpriteRendererMetadata metadata = CreateMetadata();
+            SpriteRenderer renderer = metadata.GetComponent<SpriteRenderer>();
+            Material source = CreateMaterial();
+            Material first = metadata.PushMaterial(renderer, source);
+            Material second = metadata.PushMaterial(renderer, source);
+            Assert.That(first, Is.Not.SameAs(second));
+
+            yield return null;
+            Assert.That(first == null, Is.True);
+            Assert.That(second == null, Is.False);
+
+            metadata.enabled = false;
+            yield return null;
+            Assert.That(second == null, Is.False);
+
+            metadata.enabled = true;
+            metadata.PopMaterial(renderer);
+            yield return null;
+            Assert.That(second == null, Is.True);
+            Assert.That(source == null, Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator DestroyingMetadataDestroysItsOriginalMaterialCopy()
+        {
+            GameObject owner = Track(new GameObject("Material owner", typeof(SpriteRenderer)));
+            SpriteRenderer renderer = owner.GetComponent<SpriteRenderer>();
+            Material source = CreateMaterial();
+            renderer.sharedMaterial = source;
+            SpriteRendererMetadata metadata = owner.AddComponent<SpriteRendererMetadata>();
+            Material original = metadata.OriginalMaterial;
+            Assert.That(original == null, Is.False);
+
+            Object.Destroy(metadata); // UNH-SUPPRESS: The destruction callback is the test subject.
+            yield return null;
+
+            Assert.That(original == null, Is.True);
+            Assert.That(renderer.sharedMaterial, Is.SameAs(source));
+        }
+
+        [UnityTest]
+        public IEnumerator PushedBackSourceIsReleasedOnlyAfterItsCopyIsPopped()
+        {
+            SpriteRendererMetadata metadata = CreateMetadata();
+            SpriteRenderer renderer = metadata.GetComponent<SpriteRenderer>();
+            Material foregroundSource = CreateMaterial();
+            Material backgroundSource = CreateMaterial();
+            Material foregroundCopy = metadata.PushMaterial(renderer, foregroundSource);
+            Assert.That(
+                metadata.PushBackMaterial(metadata.transform, backgroundSource),
+                Is.SameAs(backgroundSource)
+            );
+
+            metadata.PopMaterial(renderer);
+            Material backgroundCopy = metadata.CurrentMaterial;
+            Assert.That(backgroundCopy, Is.Not.SameAs(backgroundSource));
+            yield return null;
+            Assert.That(foregroundCopy == null, Is.True);
+            Assert.That(backgroundCopy == null, Is.False);
+
+            metadata.PopMaterial(metadata.transform);
+            yield return null;
+            Assert.That(backgroundCopy == null, Is.True);
+            Assert.That(backgroundSource == null, Is.False);
+        }
+
+        [UnityTest]
         public IEnumerator CannotSelfPushColor()
         {
             SpriteRendererMetadata metadata = CreateMetadata();

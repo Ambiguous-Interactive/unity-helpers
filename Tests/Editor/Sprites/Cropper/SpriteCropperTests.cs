@@ -183,6 +183,63 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.That(pivot.y, Is.InRange(0.49f, 0.51f));
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void PaddingPreservesBorderAndOutputResolution(bool hasBorder)
+        {
+            string path = Path.Combine(Root, hasBorder ? "bordered.png" : "borderless.png")
+                .SanitizePath();
+            CreatePngWithOpaqueRect(path, 64, 64, 0, 0, 64, 64, Color.white);
+            AssetDatabaseBatchHelper.RefreshIfNotBatching();
+
+            TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+            Assert.That(importer, Is.Not.Null);
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.isReadable = true;
+            importer.maxTextureSize = 128;
+            TextureImporterSettings settings = new();
+            importer.ReadTextureSettings(settings);
+            settings.spriteBorder = hasBorder ? new Vector4(4, 5, 6, 7) : Vector4.zero;
+            importer.SetTextureSettings(settings);
+            TextureImporterPlatformSettings platform = importer.GetDefaultPlatformTextureSettings();
+            platform.maxTextureSize = 128;
+            importer.SetPlatformTextureSettings(platform);
+            importer.SaveAndReimport();
+
+            SpriteCropperAPI.CropResult result = SpriteCropperAPI.Crop(
+                path,
+                new SpriteCropperAPI.CropOptions
+                {
+                    LeftPadding = 64,
+                    RightPadding = 64,
+                    TopPadding = 64,
+                    BottomPadding = 64,
+                    OverwriteOriginals = true,
+                }
+            );
+            Assert.That(
+                result.Status,
+                Is.EqualTo(SpriteCropperAPI.CropStatus.Success),
+                result.Error
+            );
+
+            importer = AssetImporter.GetAtPath(path) as TextureImporter;
+            importer.ReadTextureSettings(settings);
+            Assert.That(
+                settings.spriteBorder,
+                Is.EqualTo(hasBorder ? new Vector4(68, 69, 70, 71) : Vector4.zero)
+            );
+            Assert.That(importer.maxTextureSize, Is.GreaterThanOrEqualTo(192));
+            Assert.That(
+                importer.GetDefaultPlatformTextureSettings().maxTextureSize,
+                Is.GreaterThanOrEqualTo(192)
+            );
+            Texture2D output = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            Assert.That(output.width, Is.EqualTo(192));
+            Assert.That(output.height, Is.EqualTo(192));
+        }
+
         [Test]
         public void WritesToOutputDirectoryWhenNotOverwriting()
         {

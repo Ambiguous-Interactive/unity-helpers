@@ -127,6 +127,8 @@ Unity Undo cannot remove that output file.
 Art tools export the whole canvas, so a 40-pixel-tall character often ships inside a 256x256 texture
 that is mostly transparency. Sprite Cropper trims each texture to its alpha bounds, moves the pivot
 so the sprite does not shift in the scene, and shrinks the 9-slice border by the same amount.
+Padding a sprite that has no 9-slice border keeps that border at zero. When padding grows the
+output beyond the source import size limit, the output limit grows to fit the new image.
 
 1. Drop `Assets/Sprites/Characters` into **Input directories**.
 2. Leave **Sprite Name Regex** at `.*`, or narrow it (`^player_`) to crop one character.

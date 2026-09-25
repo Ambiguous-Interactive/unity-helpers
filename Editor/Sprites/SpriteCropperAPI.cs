@@ -586,14 +586,32 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
 
                 Vector4 border = sourceSettings.spriteBorder;
-                border.x = Mathf.Max(0, border.x - crop.VisibleMinX);
-                border.y = Mathf.Max(0, border.y - crop.VisibleMinY);
-                border.z = Mathf.Max(0, border.z - (width - 1 - crop.VisibleMaxX));
-                border.w = Mathf.Max(0, border.w - (height - 1 - crop.VisibleMaxY));
+                if (border != Vector4.zero)
+                {
+                    border.x = Mathf.Clamp(border.x - crop.VisibleMinX, 0, crop.CropWidth);
+                    border.y = Mathf.Clamp(border.y - crop.VisibleMinY, 0, crop.CropHeight);
+                    border.z = Mathf.Clamp(
+                        border.z - (width - 1 - crop.VisibleMaxX),
+                        0,
+                        crop.CropWidth
+                    );
+                    border.w = Mathf.Clamp(
+                        border.w - (height - 1 - crop.VisibleMaxY),
+                        0,
+                        crop.CropHeight
+                    );
+                }
                 sourceSettings.spritePivot = crop.NewPivot;
                 sourceSettings.spriteAlignment = (int)SpriteAlignment.Custom;
                 sourceSettings.spriteBorder = border;
                 outputImporter.SetTextureSettings(sourceSettings);
+                int outputMaxTextureSize = Mathf.NextPowerOfTwo(
+                    Mathf.Max(crop.CropWidth, crop.CropHeight)
+                );
+                outputImporter.maxTextureSize = Mathf.Max(
+                    outputImporter.maxTextureSize,
+                    outputMaxTextureSize
+                );
                 outputImporter.spriteImportMode = SpriteImportMode.Single;
                 outputImporter.spritePivot = crop.NewPivot;
                 outputImporter.textureType = sourceType;
@@ -606,6 +624,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 {
                     try
                     {
+                        defaultPlatform.maxTextureSize = Mathf.Max(
+                            defaultPlatform.maxTextureSize,
+                            outputMaxTextureSize
+                        );
                         outputImporter.SetPlatformTextureSettings(defaultPlatform);
                     }
                     catch (Exception exception)

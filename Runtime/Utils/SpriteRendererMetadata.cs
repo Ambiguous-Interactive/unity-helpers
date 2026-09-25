@@ -50,12 +50,48 @@ namespace WallstopStudios.UnityHelpers.Utils
 
         private readonly List<(Component component, Color color)> _colorStackCache = new();
         private readonly List<(Component component, Material material)> _materialStackCache = new();
+        private readonly List<Material> _ownedMaterials = new();
 
         [SiblingComponent]
         [SerializeField]
         private SpriteRenderer _spriteRenderer;
 
         private bool _enabled;
+        private bool _restoringMaterials;
+        private Material _originalSharedMaterial;
+
+        private static bool IsMaterialInStack(
+            List<(Component component, Material material)> stack,
+            Material material
+        )
+        {
+            foreach ((Component component, Material material) entry in stack)
+            {
+                if (ReferenceEquals(entry.material, material))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static void DestroyOwnedMaterial(Material material)
+        {
+            if (material == null)
+            {
+                return;
+            }
+
+            if (Application.isPlaying)
+            {
+                Destroy(material);
+            }
+            else
+            {
+                DestroyImmediate(material);
+            }
+        }
 
         public void PushColor(Component component, Color color, bool force = false)
         {
@@ -117,6 +153,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// <param name="material">Material to use.</param>
         /// <param name="force">If true, overrides the enabled check.</param>
         /// <returns>The instanced material, if possible.</returns>
+        /// <remarks>The metadata owns any material copy returned by this method.</remarks>
         public Material PushMaterial(Component component, Material material, bool force = false)
         {
             if (component == this)
@@ -145,6 +182,7 @@ namespace WallstopStudios.UnityHelpers.Utils
         /// <param name="material">Material to use.</param>
         /// <param name="force">If true, overrides the enabled check.</param>
         /// <returns>The instanced material, if possible.</returns>
+        /// <remarks>The metadata owns any material copy returned by this method.</remarks>
         public Material PushBackMaterial(Component component, Material material, bool force = false)
         {
             if (component == this)
@@ -170,9 +208,11 @@ namespace WallstopStudios.UnityHelpers.Utils
             {
                 _spriteRenderer.material = material;
                 instanced = _spriteRenderer.material;
+                TrackMaterialCopy(material, instanced);
             }
 
             _materialStack.Insert(1, (component, instanced));
+            ReleaseUnusedMaterials();
             return instanced;
         }
 
@@ -188,8 +228,10 @@ namespace WallstopStudios.UnityHelpers.Utils
             RemoveMaterial(component);
             _spriteRenderer.material = CurrentMaterial;
             Material instanced = _spriteRenderer.material;
+            TrackMaterialCopy(CurrentMaterial, instanced);
             Component currentComponent = _materialStack[^1].component;
             _materialStack[^1] = (currentComponent, instanced);
+            ReleaseUnusedMaterials();
         }
 
         public bool TryGetMaterial(Component component, out Material material)
@@ -219,7 +261,9 @@ namespace WallstopStudios.UnityHelpers.Utils
             RemoveMaterial(component);
             _spriteRenderer.material = material;
             Material instanced = _spriteRenderer.material;
+            TrackMaterialCopy(material, instanced);
             _materialStack.Add((component, instanced));
+            ReleaseUnusedMaterials();
             return instanced;
         }
 
@@ -232,7 +276,10 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             InternalPushColor(this, _spriteRenderer.color);
             _colorStackCache.AddRange(_colorStack);
-            _ = InternalPushMaterial(this, _spriteRenderer.material);
+            _originalSharedMaterial = _spriteRenderer.sharedMaterial;
+            Material originalMaterial = _spriteRenderer.material;
+            TrackMaterialCopy(_originalSharedMaterial, originalMaterial);
+            _ = InternalPushMaterial(this, originalMaterial);
             _materialStackCache.AddRange(_materialStack);
         }
 
@@ -262,6 +309,7 @@ namespace WallstopStudios.UnityHelpers.Utils
                 PushColor(entry.component, entry.color, force: true);
             }
 
+            _restoringMaterials = true;
             _materialStack.Clear();
             if (0 < _materialStackCache.Count)
             {
@@ -279,6 +327,8 @@ namespace WallstopStudios.UnityHelpers.Utils
                 (Component component, Material material) entry = materialBuffer[i];
                 PushMaterial(entry.component, entry.material, force: true);
             }
+            _restoringMaterials = false;
+            ReleaseUnusedMaterials();
         }
 
         private void OnDisable()
@@ -303,6 +353,7 @@ namespace WallstopStudios.UnityHelpers.Utils
             );
             materialBuffer.AddRange(_materialStack);
 
+            _restoringMaterials = true;
             for (int i = materialBuffer.Count - 1; 1 <= i; --i)
             {
                 PopMaterial(materialBuffer[i].component);
@@ -310,6 +361,70 @@ namespace WallstopStudios.UnityHelpers.Utils
 
             _materialStackCache.Clear();
             _materialStackCache.AddRange(materialBuffer);
+            _restoringMaterials = false;
+            ReleaseUnusedMaterials();
+        }
+
+        private void OnDestroy()
+        {
+            if (_spriteRenderer != null && IsOwnedMaterial(_spriteRenderer.sharedMaterial))
+            {
+                _spriteRenderer.sharedMaterial = _originalSharedMaterial;
+            }
+
+            foreach (Material material in _ownedMaterials)
+            {
+                DestroyOwnedMaterial(material);
+            }
+            _ownedMaterials.Clear();
+        }
+
+        private void TrackMaterialCopy(Material source, Material instance)
+        {
+            if (instance == null || ReferenceEquals(source, instance) || IsOwnedMaterial(instance))
+            {
+                return;
+            }
+
+            _ownedMaterials.Add(instance);
+        }
+
+        private bool IsOwnedMaterial(Material material)
+        {
+            foreach (Material owned in _ownedMaterials)
+            {
+                if (ReferenceEquals(owned, material))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private void ReleaseUnusedMaterials()
+        {
+            if (_restoringMaterials)
+            {
+                return;
+            }
+
+            Material current = _spriteRenderer != null ? _spriteRenderer.sharedMaterial : null;
+            for (int i = _ownedMaterials.Count - 1; 0 <= i; --i)
+            {
+                Material material = _ownedMaterials[i];
+                if (
+                    ReferenceEquals(material, current)
+                    || IsMaterialInStack(_materialStack, material)
+                    || IsMaterialInStack(_materialStackCache, material)
+                )
+                {
+                    continue;
+                }
+
+                _ownedMaterials.RemoveAt(i);
+                DestroyOwnedMaterial(material);
+            }
         }
 
         private void RemoveColor(Component component)
