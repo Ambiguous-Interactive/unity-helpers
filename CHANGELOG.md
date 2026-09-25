@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `UnityMethodAnalyzerReportExportAPI` so editor scripts can save Markdown and JSON findings with compiler coverage status without opening the window ([#861](https://github.com/Ambiguous-Interactive/unity-helpers/issues/861)).
 - Add `ValidationReportExportAPI` so editor scripts can write Sentinel JSON and JUnit reports from a validation run without opening the workspace ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Add `SpriteSheetAnimationAPI.TryCreate` so editor scripts can preview or create sprite sheet animation clips from ordered frames without opening the window ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Add `AnimationClipFrameSaveAPI.TrySaveFrames` so editor scripts can save sprite frames and FPS to an existing clip without opening the window. See [Sprite Animation Editor](./docs/features/editor-tools/editor-tools-guide.md#sprite-animation-editor-animation-viewer-window) ([#851](https://github.com/Ambiguous-Interactive/unity-helpers/issues/851)).

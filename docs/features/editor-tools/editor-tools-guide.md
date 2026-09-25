@@ -1252,8 +1252,10 @@ cleanly, and Unity calls only one of them. Roslyn reports that family of mistake
 | A shadowed lifecycle method | Base and derived both declare `private void Start()`                           |
 | A static lifecycle method   | `static void Awake()`, which Unity never calls                                 |
 
-Results group by file, severity or category, and export as JSON or Markdown. The status identifies
-missing coverage or compiler errors; an empty partial report is not a passing CI gate.
+Results group by file, severity or category, and export as JSON or Markdown. Editor scripts can use
+`UnityMethodAnalyzerReportExportAPI.TryExportMarkdown` or `TryExportJson` with explicit findings,
+coverage status, and output path. The status identifies missing coverage or compiler errors; an
+empty partial report is not a passing CI gate.
 
 Silence a deliberate case — a test fixture that exists precisely to be wrong — with
 `[SuppressAnalyzer]`:

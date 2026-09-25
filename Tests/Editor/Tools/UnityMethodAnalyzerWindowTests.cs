@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
     using System.Collections;
     using System.Collections.Generic;
     using System.IO;
+    using System.Text.RegularExpressions;
     using System.Threading;
     using System.Threading.Tasks;
     using NUnit.Framework;
@@ -80,6 +81,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Tools
                 "The initial status should explain how compiler diagnostics are captured."
             );
             Assert.IsTrue(cts == null, "CancellationTokenSource should be null on init");
+        }
+
+        [Test]
+        public void FailedExportReportsErrorAndPreservesExistingFile()
+        {
+            UnityMethodAnalyzerWindow window = CreateWindow();
+            string path = Path.Combine(_tempDir, "report.json");
+            File.WriteAllText(path, "Previous report");
+            Directory.CreateDirectory(path + ".tmp");
+
+            LogAssert.Expect(LogType.Error, new Regex("Export failed"));
+            window.ExportReportToPath(path, true);
+
+            Assert.That(window._statusMessage, Is.EqualTo("Export failed"));
+            Assert.That(File.ReadAllText(path), Is.EqualTo("Previous report"));
         }
 
         [Test]

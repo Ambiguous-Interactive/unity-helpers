@@ -117,6 +117,9 @@ compiler severity: `WUH015` and `WUH016` are suppressible warnings.
 
 **Export** copies or saves the currently displayed diagnostics as JSON or Markdown. Per-row context
 menus copy an individual issue. Reports preserve diagnostic IDs, messages, paths, source lines, and compiler coverage status.
+Editor scripts can call `UnityMethodAnalyzerReportExportAPI.TryExportMarkdown` or `TryExportJson`
+with an explicit output path, `IReadOnlyList<AnalyzerIssue>`, and coverage status. Both return
+`false` with an error message for invalid input or failed writes and do not open a save dialog.
 The complete report is staged before replacing an existing file.
 Read that status with the diagnostic list: a partial report is not a build-success gate.
 CI should run the compiler with the shipped analyzers enabled and use its exit status and diagnostics.
@@ -124,8 +127,9 @@ CI should run the compiler with the shipped analyzers enabled and use its exit s
 ## Running it from a script
 
 `MethodAnalyzer.Refresh(rootPath, directories)` filters the captured compiler snapshot. `Issues`
-contains the report and `Status` describes compiler coverage. `AnalyzeAsync` remains available as a
-cancellable snapshot read; it does not initiate compilation.
+contains the report and `Status` describes compiler coverage. Pass both to the export API to write
+a report without opening the window. `AnalyzeAsync` remains available as a cancellable snapshot
+read; it does not initiate compilation.
 
 The old synchronous `Analyze` method is deprecated and delegates to `Refresh`. Its old
 arbitrary-directory source parsing is retired. `Classes` is also deprecated and returns no symbol

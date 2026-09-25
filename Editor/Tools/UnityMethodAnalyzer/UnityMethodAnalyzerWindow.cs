@@ -8,7 +8,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
-    using System.Text.Json.Serialization;
     using System.Threading;
     using System.Threading.Tasks;
     using UnityEditor;
@@ -16,7 +15,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Extension;
     using WallstopStudios.UnityHelpers.Core.Helper;
-    using WallstopStudios.UnityHelpers.Core.Serialization;
     using WallstopStudios.UnityHelpers.Editor.Utils;
     using WallstopStudios.UnityHelpers.Editor.Utils.WButton;
     using Object = UnityEngine.Object;
@@ -1412,126 +1410,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 defaultName,
                 "md"
             );
-
-            if (string.IsNullOrEmpty(path))
+            if (!string.IsNullOrEmpty(path))
             {
-                return;
+                ExportReportToPath(path, false);
             }
-
-            try
-            {
-                string report = GenerateMarkdownReport();
-                if (!DurableFile.TryWriteAllText(path, report, out Exception writeError))
-                {
-                    throw writeError;
-                }
-                _statusMessage = $"Report exported to: {Path.GetFileName(path)}";
-                EditorUtility.RevealInFinder(path);
-            }
-            catch (Exception e)
-            {
-                _statusMessage = $"Export failed";
-                this.LogError($"Export failed", e);
-            }
-        }
-
-        private string GenerateMarkdownReport()
-        {
-            System.Text.StringBuilder sb = new();
-            IReadOnlyList<AnalyzerIssue> issues = _analyzer.Issues;
-
-            sb.AppendLine("# Unity Method Analysis Report");
-            sb.AppendLine();
-            sb.AppendLine($"**Generated:** {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-            sb.AppendLine($"**Compiler coverage:** {_analyzer.Status}");
-            sb.AppendLine();
-            sb.AppendLine($"**Total Issues Found:** {issues.Count}");
-            sb.AppendLine();
-
-            sb.AppendLine("## Summary by Severity");
-            sb.AppendLine();
-            sb.AppendLine("| Severity | Count |");
-            sb.AppendLine("|----------|-------|");
-            sb.AppendLine($"| 🔴 Critical | {_criticalCount} |");
-            sb.AppendLine($"| 🟠 High | {_highCount} |");
-            sb.AppendLine($"| 🟡 Medium | {_mediumCount} |");
-            sb.AppendLine($"| 🟢 Low | {_lowCount} |");
-            sb.AppendLine($"| 🔵 Info | {_infoCount} |");
-            sb.AppendLine();
-
-            sb.AppendLine("## Summary by Category");
-            sb.AppendLine();
-            sb.AppendLine("| Category | Count |");
-            sb.AppendLine("|----------|-------|");
-            sb.AppendLine(
-                $"| 🎮 Unity Lifecycle | {issues.Count(i => i.Category == IssueCategory.UnityLifecycle)} |"
-            );
-            sb.AppendLine(
-                $"| 🔷 Unity Inheritance | {issues.Count(i => i.Category == IssueCategory.UnityInheritance)} |"
-            );
-            sb.AppendLine(
-                $"| 📦 General Inheritance | {issues.Count(i => i.Category == IssueCategory.GeneralInheritance)} |"
-            );
-            sb.AppendLine();
-
-            sb.AppendLine("## Detailed Issues");
-            sb.AppendLine();
-
-            IOrderedEnumerable<IGrouping<string, AnalyzerIssue>> issuesByFile = issues
-                .OrderBy(i => (int)i.Severity)
-                .ThenBy(i => i.FilePath)
-                .GroupBy(i => i.FilePath)
-                .OrderBy(g => g.Key);
-
-            foreach (IGrouping<string, AnalyzerIssue> fileGroup in issuesByFile)
-            {
-                sb.AppendLine($"### `{fileGroup.Key}`");
-                sb.AppendLine();
-
-                foreach (AnalyzerIssue issue in fileGroup.OrderBy(i => i.LineNumber))
-                {
-                    string severityEmoji = issue.Severity switch
-                    {
-                        IssueSeverity.Critical => "🔴",
-                        IssueSeverity.High => "🟠",
-                        IssueSeverity.Medium => "🟡",
-                        IssueSeverity.Low => "🟢",
-                        IssueSeverity.Info => "🔵",
-                        _ => "⚪",
-                    };
-
-                    sb.AppendLine(
-                        $"#### {severityEmoji} Line {issue.LineNumber}: `{issue.ClassName}.{issue.MethodName}` - {issue.IssueType}"
-                    );
-                    sb.AppendLine();
-                    sb.AppendLine($"**Category:** {issue.Category}");
-                    sb.AppendLine();
-                    sb.AppendLine($"**Description:** {issue.Description}");
-                    sb.AppendLine();
-
-                    if (!string.IsNullOrEmpty(issue.BaseClassName))
-                    {
-                        sb.AppendLine($"**Base Class:** `{issue.BaseClassName}`");
-                        if (!string.IsNullOrEmpty(issue.BaseMethodSignature))
-                        {
-                            sb.AppendLine($"**Base Method:** `{issue.BaseMethodSignature}`");
-                        }
-                    }
-
-                    if (!string.IsNullOrEmpty(issue.DerivedMethodSignature))
-                    {
-                        sb.AppendLine($"**Derived Method:** `{issue.DerivedMethodSignature}`");
-                    }
-
-                    sb.AppendLine();
-                    sb.AppendLine($"**Recommended Fix:** {issue.RecommendedFix}");
-                    sb.AppendLine();
-                    sb.AppendLine("---");
-                    sb.AppendLine();
-                }
-            }
-
-            return sb.ToString();
         }
 
         private void ShowExportMenu()
@@ -1599,7 +1481,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
             try
             {
-                string json = GenerateJsonReport();
+                string json = UnityMethodAnalyzerReportExportAPI.RenderJson(
+                    _analyzer.Issues,
+                    _analyzer.Status
+                );
                 GUIUtility.systemCopyBuffer = json;
                 _statusMessage = $"Copied {_analyzer.Issues.Count} issues to clipboard as JSON";
             }
@@ -1620,7 +1505,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
 
             try
             {
-                string markdown = GenerateMarkdownReport();
+                string markdown = UnityMethodAnalyzerReportExportAPI.RenderMarkdown(
+                    _analyzer.Issues,
+                    _analyzer.Status
+                );
                 GUIUtility.systemCopyBuffer = markdown;
                 _statusMessage = $"Copied {_analyzer.Issues.Count} issues to clipboard as Markdown";
             }
@@ -1640,34 +1528,48 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
                 defaultName,
                 "json"
             );
-
-            if (string.IsNullOrEmpty(path))
+            if (!string.IsNullOrEmpty(path))
             {
+                ExportReportToPath(path, true);
+            }
+        }
+
+        internal void ExportReportToPath(string path, bool json)
+        {
+            string error;
+            bool exported = json
+                ? UnityMethodAnalyzerReportExportAPI.TryExportJson(
+                    path,
+                    _analyzer?.Issues,
+                    _analyzer?.Status,
+                    out error
+                )
+                : UnityMethodAnalyzerReportExportAPI.TryExportMarkdown(
+                    path,
+                    _analyzer?.Issues,
+                    _analyzer?.Status,
+                    out error
+                );
+            if (!exported)
+            {
+                _statusMessage = "Export failed";
+                this.LogError($"Export failed: {error}", new IOException(error));
                 return;
             }
-
             try
             {
-                string report = GenerateJsonReport();
-                if (!DurableFile.TryWriteAllText(path, report, out Exception writeError))
-                {
-                    throw writeError;
-                }
                 _statusMessage = $"Report exported to: {Path.GetFileName(path)}";
                 EditorUtility.RevealInFinder(path);
             }
-            catch (Exception e)
+            catch (Exception exception)
             {
-                _statusMessage = $"Export failed";
-                this.LogError($"Export failed", e);
+                _statusMessage = "Report exported, but could not reveal the file";
+                this.LogError($"Could not reveal exported report: {path}", exception);
             }
         }
 
-        private string GenerateIssueJson(AnalyzerIssue issue)
-        {
-            IssueJsonModel model = new(issue);
-            return Serializer.JsonStringify(model, pretty: true);
-        }
+        private string GenerateIssueJson(AnalyzerIssue issue) =>
+            UnityMethodAnalyzerReportExportAPI.RenderIssueJson(issue);
 
         private string GenerateIssueMarkdown(AnalyzerIssue issue)
         {
@@ -1714,158 +1616,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Tools.UnityMethodAnalyzer
             sb.AppendLine($"**Recommended Fix:** {issue.RecommendedFix}");
 
             return sb.ToString();
-        }
-
-        private string GenerateJsonReport()
-        {
-            IReadOnlyList<AnalyzerIssue> issues = _analyzer.Issues;
-
-            AnalysisReportJsonModel report = new()
-            {
-                GeneratedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
-                CoverageStatus = _analyzer.Status,
-                TotalIssues = issues.Count,
-                Summary = new SummaryJsonModel
-                {
-                    BySeverity = new SeveritySummaryJsonModel
-                    {
-                        Critical = _criticalCount,
-                        High = _highCount,
-                        Medium = _mediumCount,
-                        Low = _lowCount,
-                        Info = _infoCount,
-                    },
-                    ByCategory = new CategorySummaryJsonModel
-                    {
-                        UnityLifecycle = issues.Count(i =>
-                            i.Category == IssueCategory.UnityLifecycle
-                        ),
-                        UnityInheritance = issues.Count(i =>
-                            i.Category == IssueCategory.UnityInheritance
-                        ),
-                        GeneralInheritance = issues.Count(i =>
-                            i.Category == IssueCategory.GeneralInheritance
-                        ),
-                    },
-                },
-                Issues = issues.Select(i => new IssueJsonModel(i)).ToList(),
-            };
-
-            return Serializer.JsonStringify(report, pretty: true);
-        }
-
-        private sealed class AnalysisReportJsonModel
-        {
-            [JsonPropertyName("generatedAt")]
-            public string GeneratedAt { get; set; }
-
-            [JsonPropertyName("coverageStatus")]
-            public string CoverageStatus { get; set; }
-
-            [JsonPropertyName("totalIssues")]
-            public int TotalIssues { get; set; }
-
-            [JsonPropertyName("summary")]
-            public SummaryJsonModel Summary { get; set; }
-
-            [JsonPropertyName("issues")]
-            public List<IssueJsonModel> Issues { get; set; }
-        }
-
-        private sealed class SummaryJsonModel
-        {
-            [JsonPropertyName("bySeverity")]
-            public SeveritySummaryJsonModel BySeverity { get; set; }
-
-            [JsonPropertyName("byCategory")]
-            public CategorySummaryJsonModel ByCategory { get; set; }
-        }
-
-        private sealed class SeveritySummaryJsonModel
-        {
-            [JsonPropertyName("critical")]
-            public int Critical { get; set; }
-
-            [JsonPropertyName("high")]
-            public int High { get; set; }
-
-            [JsonPropertyName("medium")]
-            public int Medium { get; set; }
-
-            [JsonPropertyName("low")]
-            public int Low { get; set; }
-
-            [JsonPropertyName("info")]
-            public int Info { get; set; }
-        }
-
-        private sealed class CategorySummaryJsonModel
-        {
-            [JsonPropertyName("unityLifecycle")]
-            public int UnityLifecycle { get; set; }
-
-            [JsonPropertyName("unityInheritance")]
-            public int UnityInheritance { get; set; }
-
-            [JsonPropertyName("generalInheritance")]
-            public int GeneralInheritance { get; set; }
-        }
-
-        private sealed class IssueJsonModel
-        {
-            [JsonPropertyName("filePath")]
-            public string FilePath { get; set; }
-
-            [JsonPropertyName("lineNumber")]
-            public int LineNumber { get; set; }
-
-            [JsonPropertyName("className")]
-            public string ClassName { get; set; }
-
-            [JsonPropertyName("methodName")]
-            public string MethodName { get; set; }
-
-            [JsonPropertyName("issueType")]
-            public string IssueType { get; set; }
-
-            [JsonPropertyName("severity")]
-            public string Severity { get; set; }
-
-            [JsonPropertyName("category")]
-            public string Category { get; set; }
-
-            [JsonPropertyName("description")]
-            public string Description { get; set; }
-
-            [JsonPropertyName("recommendedFix")]
-            public string RecommendedFix { get; set; }
-
-            [JsonPropertyName("baseClassName")]
-            public string BaseClassName { get; set; }
-
-            [JsonPropertyName("baseMethodSignature")]
-            public string BaseMethodSignature { get; set; }
-
-            [JsonPropertyName("derivedMethodSignature")]
-            public string DerivedMethodSignature { get; set; }
-
-            public IssueJsonModel() { }
-
-            public IssueJsonModel(AnalyzerIssue issue)
-            {
-                FilePath = issue.FilePath;
-                LineNumber = issue.LineNumber;
-                ClassName = issue.ClassName;
-                MethodName = issue.MethodName;
-                IssueType = issue.IssueType;
-                Severity = issue.Severity.ToString();
-                Category = issue.Category.ToString();
-                Description = issue.Description;
-                RecommendedFix = issue.RecommendedFix;
-                BaseClassName = issue.BaseClassName;
-                BaseMethodSignature = issue.BaseMethodSignature;
-                DerivedMethodSignature = issue.DerivedMethodSignature;
-            }
         }
     }
 #endif
