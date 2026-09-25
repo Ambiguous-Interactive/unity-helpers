@@ -3051,6 +3051,28 @@ function Get-NativeExitCodeDescription {
     return $hex
 }
 
+function Test-BenignStandaloneBuildExit {
+    param(
+        [Parameter(Mandatory = $true)][int]$ExitCode,
+        [Parameter(Mandatory = $true)][string]$LogPath
+    )
+
+    if ($ExitCode -eq 0 -or (Test-NativeCrashExitCode -ExitCode $ExitCode)) {
+        return $true
+    }
+    if ($ExitCode -ne 255 -or -not (Test-Path -LiteralPath $LogPath -PathType Leaf)) {
+        return $false
+    }
+
+    try {
+        $buildLog = Get-Content -LiteralPath $LogPath -Raw
+        return ($buildLog -match '(?m)^Build Finished, Result: Success\.\s*$' -and
+            $buildLog -match '(?m)^##utp:\{"success":true,"type":"PlayerBuildInfo"')
+    } catch {
+        return $false
+    }
+}
+
 function Get-UnityCrashSignature {
     # Best-effort: scan a captured Unity log for the signature of a BACKGROUND-thread
     # crash that fired DURING shutdown, AFTER the batch work completed. Returns a
@@ -4244,17 +4266,14 @@ try {
             -BuildStartedUtc $standaloneBuildStartedUtc `
             -RequireGameAssembly:($StandaloneScriptingBackend -eq 'IL2CPP')
 
-        # A small positive build exit (e.g. 1/2/3 = Unity RunError) means Unity
-        # DELIBERATELY reported a build/run failure; the early-staged player exe is not
-        # proof of success. Only a watchdog tree-kill or a NATIVE crash code (a
-        # background-thread shutdown race AFTER a complete build) is a benign non-zero
-        # exit. Fold a non-benign non-zero exit into the build problem so it fails fast
-        # with full diagnostics instead of running a broken/incomplete player.
+        # Positive exits normally report deliberate failures. Unity can also exit
+        # 255 after a complete build during post-build shutdown; accept that code
+        # only with a fresh player and both durable build-success log markers.
+        # The player run and NUnit results still determine the test outcome.
         if ([string]::IsNullOrWhiteSpace($standaloneBuildProblem) -and
             -not $buildResult.TimedOut -and
-            $buildResult.ExitCode -ne 0 -and
-            -not (Test-NativeCrashExitCode -ExitCode $buildResult.ExitCode)) {
-            $standaloneBuildProblem = "build exited $($buildResult.ExitCode) / $(Get-NativeExitCodeDescription -ExitCode $buildResult.ExitCode) (Unity RunError / deliberate build failure, not a benign post-work shutdown crash)"
+            -not (Test-BenignStandaloneBuildExit -ExitCode $buildResult.ExitCode -LogPath $logPath)) {
+            $standaloneBuildProblem = "build exited $($buildResult.ExitCode) / $(Get-NativeExitCodeDescription -ExitCode $buildResult.ExitCode) without verified build success"
         }
 
         if (-not [string]::IsNullOrWhiteSpace($standaloneBuildProblem)) {

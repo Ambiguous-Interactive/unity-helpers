@@ -66,7 +66,10 @@ if ($errs -and $errs.Count -gt 0) {
 foreach ($name in @(
     'ConvertTo-ProcessArgumentLine',
     'Set-CompletionGraceDeadline',
-    'Invoke-ProcessWithTreeKillTimeout'
+    'Invoke-ProcessWithTreeKillTimeout',
+    'ConvertTo-UnsignedExitHex',
+    'Test-NativeCrashExitCode',
+    'Test-BenignStandaloneBuildExit'
 )) {
     $fn = $ast.FindAll(
         {
@@ -181,6 +184,23 @@ $r = Invoke-Watchdog -ChildCommand 'Write-Host "Test run completed. Exiting with
 Assert-That "stall guard is suspended after the completion sentinel (grace owns the kill, not stall)" (-not $r.Stalled)
 Assert-That "sentinel+hang with stall enabled still reports the parsed exit code 0" ($r.ExitCode -eq 0)
 Assert-That "sentinel+hang with stall enabled is NOT treated as a timeout" (-not $r.TimedOut)
+
+# A complete player build can exit 255 during Unity's post-build shutdown. Its
+# fresh output and both durable success markers permit the player run; a partial
+# or genuinely failed build must still stop before running a stale executable.
+$script:NativeExitCodeDescriptions = [ordered]@{}
+$buildLog = Join-Path $tmp 'uh-standalone-build-outcome.log'
+Set-Content -LiteralPath $buildLog -Value @'
+Build Finished, Result: Success.
+##utp:{"success":true,"type":"PlayerBuildInfo","version":2}
+'@
+Assert-That 'successful standalone build with exit 255 continues to player verification' (Test-BenignStandaloneBuildExit -ExitCode 255 -LogPath $buildLog)
+Assert-That 'normal standalone build exit remains accepted' (Test-BenignStandaloneBuildExit -ExitCode 0 -LogPath $buildLog)
+Assert-That 'deliberate failure exit 1 remains rejected' (-not (Test-BenignStandaloneBuildExit -ExitCode 1 -LogPath $buildLog))
+Set-Content -LiteralPath $buildLog -Value 'Build Finished, Result: Failed.'
+Assert-That 'exit 255 without success markers remains rejected' (-not (Test-BenignStandaloneBuildExit -ExitCode 255 -LogPath $buildLog))
+Remove-Item -LiteralPath $buildLog -Force
+Assert-That 'exit 255 without a build log remains rejected' (-not (Test-BenignStandaloneBuildExit -ExitCode 255 -LogPath $buildLog))
 
 Write-Host ""
 Write-Host "Process-watchdog tests: $passed passed, $failed failed."
