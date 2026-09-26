@@ -3,6 +3,9 @@
 ## Agent-Specific Rules
 
 - Keep changes minimal and focused; respect folder boundaries (Runtime vs Editor)
+- Treat every failed test or CI job as unresolved until its cause is classified and fixed. A
+  passing rerun only adds evidence; follow [investigate-test-failures](../skills/investigate-test-failures.md)
+  before calling a branch or PR green.
 - Keep the working plan under 150 lines and actionable; follow [maintain-plan](../skills/maintain-plan.md).
 - Follow `.editorconfig` formatting rules strictly
 - NEVER pipe output to `/dev/null`; NEVER hard-code machine-specific absolute paths
@@ -84,13 +87,24 @@
 
 CI runs the repository aggregates. Repeating them after each edit wastes the session.
 
-- **The edit loop is `npm run agent:preflight` (2.9 s) plus the targeted check for what you touched.**
-  Run the aggregate ONCE, before the push, not after each commit. **It inspects only CHANGED files,
+- **Use the smallest targeted check during each edit loop, then run `npm run agent:preflight` once
+  before the push.** Format each changed file immediately. A changed Markdown file formats in about
+  0.2 s with `node scripts/run-prettier.js --write -- <file>`; the full changed-file preflight took
+  32 s with eight spell-checkable files on 2026-09-26. A warm default runtime typecheck took 9 s
+  on that same mixed-change tree. These are local observations, not CI timing claims. Use the
+  relevant focused test or compile gate while editing, and keep all final gates. **Preflight inspects only CHANGED files,
   so after you commit it prints "No changed files detected. Nothing to validate." and exits 0 --
   "looked at nothing", not "passed".** Session 236 read that as a pass and pushed a violation CI
   caught. And an aggregate run BEFORE your last edit is not an aggregate run: session 247 moved a
   test after `lint:repo` and reddened `xml-doc-summaries`, which no changed-file check covers.
 - **Prefer the cheap instrument that answers the question** -- a `rg` for the shape, one `--only <id>`, one `dotnet test --filter` -- and say which you used.
+- After adding or moving a C# member, run `node scripts/run-repo-lint.js --only nested-type-placement`.
+  Changed-file preflight does not run this whole-tree ordering rule; a new internal method before
+  later public methods passed preflight and failed Repo Lint in PR #868.
+- After adding or changing a method with `out` parameters, run
+  `node scripts/run-contract-tests.js --include-hook-regressions --only out-parameters`.
+  Assign each `out` value immediately before its return; changed-file preflight does not run this
+  contract, which caught two separated assignments in PR #868.
 - **Never start a second repository aggregate, whole-tree linter, or build while one is live.**
   Runner-managed workers inside one command are expected. First poll or stop any live external
   validation/build process, including children left by an interrupted tool call.

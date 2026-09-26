@@ -6,15 +6,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
 #if UNITY_EDITOR
     using System;
     using System.IO;
-    using System.Runtime.InteropServices;
+    using WallstopStudios.UnityHelpers.Core.Helper;
 
     /// <summary>
     /// Publishes a staged editor file without replacing a concurrently created destination.
     /// </summary>
     internal static class ExclusiveFilePublisher
     {
-        private const int UnixNameAlreadyExists = 17;
-
         internal static Action<string> DeleteStagedFile = File.Delete;
 
         /// <summary>
@@ -28,51 +26,16 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         )
         {
             Exception warning = null;
-            bool removeStagedFile = true;
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            if (
+                !DurableFile.TryPublishStagedFileWithoutOverwrite(
+                    stagedPath,
+                    destinationPath,
+                    out bool removeStagedFile
+                )
+            )
             {
-                try
-                {
-                    File.Move(stagedPath, destinationPath);
-                    removeStagedFile = false;
-                }
-                catch (IOException) when (File.Exists(destinationPath))
-                {
-                    cleanupWarning = null;
-                    return false;
-                }
-            }
-            else
-            {
-                bool linked;
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                {
-                    linked = CreateHardLinkMac(stagedPath, destinationPath) == 0;
-                }
-                else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-                {
-                    linked = CreateHardLinkLinux(stagedPath, destinationPath) == 0;
-                }
-                else
-                {
-                    throw new PlatformNotSupportedException(
-                        "Exclusive file publication needs hard links."
-                    );
-                }
-
-                if (!linked)
-                {
-                    int nativeError = Marshal.GetLastWin32Error();
-                    if (nativeError == UnixNameAlreadyExists)
-                    {
-                        cleanupWarning = null;
-                        return false;
-                    }
-
-                    throw new IOException(
-                        $"Could not publish '{destinationPath}' with a hard link (OS error {nativeError}). Check that the output filesystem supports hard links and allows writing."
-                    );
-                }
+                cleanupWarning = null;
+                return false;
             }
 
             if (removeStagedFile)
@@ -93,17 +56,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
             cleanupWarning = warning;
             return true;
         }
-
-        [DllImport("libc", EntryPoint = "link", ExactSpelling = true, SetLastError = true)]
-        private static extern int CreateHardLinkLinux(string stagedPath, string destinationPath);
-
-        [DllImport(
-            "libSystem.B.dylib",
-            EntryPoint = "link",
-            ExactSpelling = true,
-            SetLastError = true
-        )]
-        private static extern int CreateHardLinkMac(string stagedPath, string destinationPath);
     }
 #endif
 }

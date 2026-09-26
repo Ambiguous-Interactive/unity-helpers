@@ -209,6 +209,133 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [Test]
+        public void CreateAllBytesPublishesCompleteContentsWithoutAStagedFile()
+        {
+            string path = Path.Combine(_testDirectory, "nested", "created.bin");
+            byte[] contents = { 0, 255, 17, 42 };
+
+            Assert.IsTrue(DurableFile.TryCreateAllBytes(path, contents, out Exception error));
+
+            Assert.IsTrue(error == null);
+            CollectionAssert.AreEqual(contents, File.ReadAllBytes(path));
+            Assert.IsEmpty(Directory.GetFiles(Path.GetDirectoryName(path), "*.create.*.tmp"));
+        }
+
+        [Test]
+        public void CreateAllBytesRejectsAnExistingDestinationWithoutChangingIt()
+        {
+            string path = WriteDirectly("occupied.bin", "another writer");
+
+            Assert.IsFalse(
+                DurableFile.TryCreateAllBytes(path, new byte[] { 1, 2, 3 }, out Exception error)
+            );
+
+            Assert.IsInstanceOf<IOException>(error);
+            Assert.AreEqual("another writer", File.ReadAllText(path));
+            string stagedPath = (string)error.Data[DurableFile.PreservedStagingPathDataKey];
+            Assert.IsTrue(File.Exists(stagedPath));
+            CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, File.ReadAllBytes(stagedPath));
+        }
+
+        [Test]
+        public void CreateAllBytesRejectsADestinationCreatedAfterStaging()
+        {
+            string path = Path.Combine(_testDirectory, "late-collision.bin");
+
+            Assert.IsFalse(
+                DurableFile.TryCreateAllBytes(
+                    path,
+                    new byte[] { 1, 2, 3 },
+                    out Exception error,
+                    _ => File.WriteAllText(path, "later writer")
+                )
+            );
+
+            Assert.IsInstanceOf<IOException>(error);
+            Assert.AreEqual("later writer", File.ReadAllText(path));
+            string stagedPath = (string)error.Data[DurableFile.PreservedStagingPathDataKey];
+            Assert.IsTrue(File.Exists(stagedPath));
+            CollectionAssert.AreEqual(new byte[] { 1, 2, 3 }, File.ReadAllBytes(stagedPath));
+        }
+
+        [Test]
+        public void CreateAllBytesRejectsReplacedStagingContentsAndPreservesDestination()
+        {
+            string path = Path.Combine(_testDirectory, "replaced-staging.bin");
+            byte[] replacement = { 9, 8, 7 };
+
+            Assert.IsFalse(
+                DurableFile.TryCreateAllBytes(
+                    path,
+                    new byte[] { 1, 2, 3 },
+                    out Exception error,
+                    _ =>
+                    {
+                        string[] stagedPaths = Directory.GetFiles(_testDirectory, "*.create.*.tmp");
+                        Assert.AreEqual(1, stagedPaths.Length);
+                        File.Delete(stagedPaths[0]);
+                        File.WriteAllBytes(stagedPaths[0], replacement);
+                    }
+                )
+            );
+
+            Assert.IsInstanceOf<IOException>(error);
+            StringAssert.Contains("inspect it before retrying", error.Message);
+            CollectionAssert.AreEqual(replacement, File.ReadAllBytes(path));
+        }
+
+        [Test]
+        public void CreateAllBytesRejectsInvalidInputsWithoutCreatingFiles()
+        {
+            string path = Path.Combine(_testDirectory, "invalid.bin");
+
+            Assert.IsFalse(
+                DurableFile.TryCreateAllBytes(null, new byte[] { 1 }, out Exception pathError)
+            );
+            Assert.IsInstanceOf<ArgumentException>(pathError);
+            Assert.IsFalse(DurableFile.TryCreateAllBytes(path, null, out Exception contentsError));
+            Assert.IsInstanceOf<ArgumentNullException>(contentsError);
+            Assert.IsFalse(File.Exists(path));
+        }
+
+        [Test]
+        public void PublishStagedFileRejectsOccupiedDestinationWithoutChangingEitherFile()
+        {
+            string stagedPath = WriteDirectly("publish-staged.bin", "staged bytes");
+            string destinationPath = WriteDirectly("publish-destination.bin", "later writer");
+
+            Assert.IsFalse(
+                DurableFile.TryPublishStagedFileWithoutOverwrite(
+                    stagedPath,
+                    destinationPath,
+                    out bool leavesStaged
+                )
+            );
+
+            Assert.IsTrue(leavesStaged);
+            Assert.AreEqual("staged bytes", File.ReadAllText(stagedPath));
+            Assert.AreEqual("later writer", File.ReadAllText(destinationPath));
+        }
+
+        [Test]
+        public void PublishStagedFileCreatesDestinationAndReportsStagedNameOwnership()
+        {
+            string stagedPath = WriteDirectly("publish-source.bin", "staged bytes");
+            string destinationPath = Path.Combine(_testDirectory, "publish-target.bin");
+
+            Assert.IsTrue(
+                DurableFile.TryPublishStagedFileWithoutOverwrite(
+                    stagedPath,
+                    destinationPath,
+                    out bool leavesStaged
+                )
+            );
+
+            Assert.AreEqual("staged bytes", File.ReadAllText(destinationPath));
+            Assert.AreEqual(leavesStaged, File.Exists(stagedPath));
+        }
+
+        [Test]
         public void WriteLeavesNoStagedFileBehind()
         {
             string path = Path.Combine(_testDirectory, "save.json");

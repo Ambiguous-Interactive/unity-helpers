@@ -352,6 +352,47 @@ filtering, in one pass.
 of the team gets the same rules; **Load Profiles Asset** reads one back. There is no
 `Assets > Create` entry for that asset — the button is how you make one.
 
+Editor scripts can save and load the same profile assets without opening the window:
+
+<!-- doc-sample: compiles-editor -->
+
+```csharp
+using System.Collections.Generic;
+using UnityEngine;
+using WallstopStudios.UnityHelpers.Editor.Sprites;
+
+public static class SpriteProfilePersistenceExample
+{
+    public static List<SpriteSettings> SaveAndLoad()
+    {
+        List<SpriteSettings> profiles = new() { new SpriteSettings { name = "World" } };
+        if (!SpriteSettingsApplierAPI.TrySaveProfiles(
+                "Assets/Settings/SpriteProfiles.asset", profiles, false, out string error))
+        {
+            Debug.LogError(error);
+            return profiles;
+        }
+        if (SpriteSettingsApplierAPI.TryLoadProfiles(
+                "Assets/Settings/SpriteProfiles.asset", out List<SpriteSettings> loaded, out error))
+        {
+            return loaded;
+        }
+        Debug.LogError(error);
+        return profiles;
+    }
+}
+```
+
+The path must be a `.asset` file in an existing folder under `Assets`. Saving refuses an occupied
+path unless `overwriteExisting` is `true`, and never replaces an asset of another type. Saved and
+loaded profiles are separate copies. A new save stages its asset and refuses a destination that
+becomes occupied before the move. Overwrite refuses a file whose bytes changed before replacement.
+Noncooperating external writers can still race with replacement or staging cleanup (tracked in #863). Asset
+file writes and reimports cannot be fully reversed by Unity Undo; use version control to recover an
+earlier saved asset. A failed save leaves its staged asset in place because another writer may have
+changed it; check the reported path before retrying or removing it. If restoring an absent file
+fails, the error also identifies the staged restore bytes for inspection.
+
 #### Applying sprite settings from a script
 
 <!-- doc-sample: compiles-editor -->

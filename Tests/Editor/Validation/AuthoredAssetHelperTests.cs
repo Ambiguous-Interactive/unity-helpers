@@ -117,6 +117,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 
         [TestCase(null)]
         [TestCase("")]
+        [TestCase("   ")]
+        [TestCase("\t")]
         public void AnAbsentPathResolvesToItself(string assetPath)
         {
             Assert.AreEqual(assetPath, AuthoredAssetPaths.ToFileSystemPath(assetPath));
@@ -197,6 +199,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             );
             Assert.IsFalse(text.IsObjectReference);
             Assert.IsTrue(AuthoredRequirementValidator.IsEmptyValue(text, string.Empty));
+            Assert.IsFalse(AuthoredRequirementValidator.IsEmptyValue(text, "   "));
             Assert.IsFalse(AuthoredRequirementValidator.IsEmptyValue(text, "filled"));
         }
 

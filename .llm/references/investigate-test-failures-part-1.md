@@ -25,6 +25,16 @@
 | Assume "it works on my machine"                | Reproduce and fix environment-specific issues        |
 | Blame external factors (timing, resources)     | Design tests to be deterministic and isolated        |
 
+### A Passing Rerun Does Not Resolve a Failure
+
+Never label a failed test or CI job "transient" or close its investigation because a rerun passes.
+The first failure remains evidence of a bug in production code, the test, or its runner. Preserve
+the original log, identify the failing operation, and classify its cause. A rerun may narrow the
+cause; it is not the fix. If a child process crashes before the assertion runs, investigate the
+test harness and process boundary as a test failure. Change or isolate the failing mechanism,
+then verify both the intended assertion and the failure mode the fix removes. Do not add an
+automatic retry that turns an unexplained crash into a green check.
+
 ---
 
 ## Investigation Process

@@ -16,6 +16,8 @@
 
 ### [What This Means](../references/investigate-test-failures-part-1.md#what-this-means)
 
+### [A Passing Rerun Does Not Resolve a Failure](../references/investigate-test-failures-part-1.md#a-passing-rerun-does-not-resolve-a-failure)
+
 ## Investigation Process
 
 [Read section](../references/investigate-test-failures-part-1.md#investigation-process)

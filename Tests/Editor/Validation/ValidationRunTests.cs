@@ -96,6 +96,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 default,
                 new ValidationTarget(null, "Assets/NoGuid.asset", null),
                 new ValidationTarget(FirstGuid, null, null),
+                new ValidationTarget("   ", "Assets/NoGuid.asset", null),
+                new ValidationTarget(FirstGuid, "   ", null),
                 new ValidationTarget(FirstGuid, "Assets/Real.asset", typeof(ScriptableObject)),
             };
 
@@ -108,6 +110,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assert.AreEqual(1, run.TotalCount);
             Assert.IsTrue(run.Step(1000.0));
             Assert.AreEqual(1, counted.AppliesToCalls);
+        }
+
+        [TestCase(null)]
+        [TestCase("")]
+        [TestCase("   ")]
+        public void MissingTargetPathDisplaysItsGuid(string assetPath)
+        {
+            ValidationTarget target = new ValidationTarget(FirstGuid, assetPath, null);
+
+            Assert.IsFalse(target.IsValid());
+            Assert.AreEqual(FirstGuid, target.ToString());
         }
 
         [Test]

@@ -132,7 +132,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 builder.Append('\n');
                 builder.Append("# ");
                 builder.Append(
-                    string.IsNullOrEmpty(finding.AssetPath) ? "(no path)" : finding.AssetPath
+                    string.IsNullOrWhiteSpace(finding.AssetPath) ? "(no path)" : finding.AssetPath
                 );
                 builder.Append(" -- ");
                 builder.Append(Single(finding.Message));
@@ -156,7 +156,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// <returns>The message with newlines replaced by spaces.</returns>
         private static string Single(string message)
         {
-            if (string.IsNullOrEmpty(message))
+            if (string.IsNullOrWhiteSpace(message))
             {
                 return "(no message)";
             }

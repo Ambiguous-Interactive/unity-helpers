@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 {
     using System;
     using System.IO;
+    using System.Runtime.InteropServices;
     using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
@@ -53,6 +54,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </remarks>
         public const string TemporarySuffix = ".tmp";
 
+        internal const string PreservedStagingPathDataKey = nameof(PreservedStagingPathDataKey);
+
+        private const int UnixNameAlreadyExists = 17;
         private const int DefaultBufferSize = 4096;
 
         // FileMode.Append does not provide atomic append; bounded per-path gates prevent writer overlap.
@@ -458,6 +462,174 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
+        /// <summary>Creates a file from flushed bytes only while its destination is absent.</summary>
+        /// <remarks>
+        /// Unix publication requires a filesystem that supports hard links. On Unix the staged
+        /// name is removed after publication and verification; if that cleanup fails, the
+        /// destination remains in place and this method reports a failure for inspection.
+        /// A noncooperating writer can replace the staged name before cleanup, so that cleanup
+        /// does not provide exclusive ownership against external writers.
+        /// </remarks>
+        /// <param name="path">Destination file path. Missing directories are created.</param>
+        /// <param name="contents">Bytes to write.</param>
+        /// <param name="error">
+        /// The failure when this returns false; null otherwise. If staged bytes could not be
+        /// published, <see cref="PreservedStagingPathDataKey"/> identifies their path in Data.
+        /// </param>
+        /// <param name="beforeMove">Optional action invoked just before publication.</param>
+        /// <returns>True when the new file was published without replacing another file.</returns>
+        internal static bool TryCreateAllBytes(
+            string path,
+            byte[] contents,
+            out Exception error,
+            Action<string> beforeMove = null
+        )
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                error = new ArgumentException("A destination path is required.", nameof(path));
+                return false;
+            }
+
+            if (contents == null)
+            {
+                error = new ArgumentNullException(nameof(contents));
+                return false;
+            }
+
+            using (EnterGate(path))
+            {
+                string temporaryPath =
+                    path + ".create." + Guid.NewGuid().ToString("N") + TemporarySuffix;
+                bool ownsTemporary = false;
+                bool moved = false;
+                try
+                {
+                    EnsureDirectory(path);
+                    using (
+                        FileStream staging = new(
+                            temporaryPath,
+                            FileMode.CreateNew,
+                            FileAccess.Write,
+                            FileShare.None,
+                            DefaultBufferSize,
+                            useAsync: false
+                        )
+                    )
+                    {
+                        ownsTemporary = true;
+                        staging.Write(contents, 0, contents.Length);
+                        staging.Flush(flushToDisk: true);
+                    }
+
+                    beforeMove?.Invoke(path);
+                    if (
+                        !TryPublishStagedFileWithoutOverwrite(
+                            temporaryPath,
+                            path,
+                            out bool leavesStaged
+                        )
+                    )
+                    {
+                        throw new IOException($"A file already exists at {path}.");
+                    }
+                    ownsTemporary = leavesStaged;
+                    moved = true;
+                    if (!File.ReadAllBytes(path).AsSpan().SequenceEqual(contents))
+                    {
+                        throw new IOException(
+                            $"Created file at {path}, but its contents differ; inspect it before retrying."
+                        );
+                    }
+                    if (leavesStaged)
+                    {
+                        File.Delete(temporaryPath);
+                        ownsTemporary = false;
+                    }
+                    error = null;
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    Exception failure = moved
+                        ? new IOException(
+                            $"Created file at {path}, but could not verify its contents; inspect it before retrying.",
+                            exception
+                        )
+                        : exception;
+                    if (ownsTemporary)
+                    {
+                        failure.Data[PreservedStagingPathDataKey] = temporaryPath;
+                    }
+                    error = failure;
+                    return false;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Publishes a staged file only if the destination has no directory entry.
+        /// </summary>
+        /// <remarks>
+        /// A successful Unix hard link leaves the staged name behind for the caller to remove.
+        /// Windows moves the staged name. On collision the staged name remains on every platform.
+        /// </remarks>
+        /// <returns>True if published, false if the destination was already occupied.</returns>
+        internal static bool TryPublishStagedFileWithoutOverwrite(
+            string stagedPath,
+            string destinationPath,
+            out bool leavesStaged
+        )
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                try
+                {
+                    File.Move(stagedPath, destinationPath);
+                    leavesStaged = false;
+                    return true;
+                }
+                catch (IOException) when (File.Exists(destinationPath))
+                {
+                    leavesStaged = true;
+                    return false;
+                }
+            }
+
+            int result;
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                result = CreateHardLinkMac(stagedPath, destinationPath);
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                result = CreateHardLinkLinux(stagedPath, destinationPath);
+            }
+            else
+            {
+                throw new PlatformNotSupportedException(
+                    "Exclusive file publication needs hard links."
+                );
+            }
+
+            if (result == 0)
+            {
+                leavesStaged = true;
+                return true;
+            }
+
+            int nativeError = Marshal.GetLastWin32Error();
+            if (nativeError == UnixNameAlreadyExists)
+            {
+                leavesStaged = true;
+                return false;
+            }
+
+            throw new IOException(
+                $"Could not publish '{destinationPath}' with a hard link (OS error {nativeError}). Check that the output filesystem supports hard links and allows writing."
+            );
+        }
+
         /// <summary>Compares current bytes, then stages and replaces the file.</summary>
         /// <remarks>
         /// The staging-file ownership spans the read, staging write, and replacement, so cooperating
@@ -718,6 +890,17 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
             }
         }
+
+        [DllImport("libc", EntryPoint = "link", ExactSpelling = true, SetLastError = true)]
+        private static extern int CreateHardLinkLinux(string stagedPath, string destinationPath);
+
+        [DllImport(
+            "libSystem.B.dylib",
+            EntryPoint = "link",
+            ExactSpelling = true,
+            SetLastError = true
+        )]
+        private static extern int CreateHardLinkMac(string stagedPath, string destinationPath);
 
         private static async ValueTask<Exception> WriteStagedAsync(
             string path,

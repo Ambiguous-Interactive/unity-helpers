@@ -28,7 +28,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// <returns>An absolute path, or the input when it is already absolute or unresolvable.</returns>
         internal static string ToFileSystemPath(string assetPath)
         {
-            if (string.IsNullOrEmpty(assetPath) || Path.IsPathRooted(assetPath))
+            if (string.IsNullOrWhiteSpace(assetPath) || Path.IsPathRooted(assetPath))
             {
                 return assetPath;
             }
@@ -48,7 +48,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation
         /// </remarks>
         internal static string ToAssetPath(string filePath)
         {
-            if (string.IsNullOrEmpty(filePath))
+            if (string.IsNullOrWhiteSpace(filePath))
             {
                 return filePath;
             }

@@ -11,6 +11,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using UnityEditor;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Helper;
+    using WallstopStudios.UnityHelpers.Core.Serialization;
 
     /// <summary>
     /// Public API to apply SpriteSettings profiles to assets. Mirrors the window logic
@@ -18,6 +19,70 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     /// </summary>
     public static class SpriteSettingsApplierAPI
     {
+        internal static Func<string, bool> DeleteProfileAssetAction = AssetDatabase.DeleteAsset;
+        internal static Action<UnityEngine.Object, string> CreateProfileAssetAction =
+            AssetDatabase.CreateAsset;
+        internal static Action<string> BeforeAbsentRestoreMoveForTests;
+        internal static Action SaveProfileAssetsAction = AssetDatabase.SaveAssets;
+        internal static Func<string, string, string> MoveProfileAssetAction =
+            AssetDatabase.MoveAsset;
+        internal static Action<string, ImportAssetOptions> ImportProfileAssetAction =
+            AssetDatabase.ImportAsset;
+        internal static Func<string, SpriteSettingsProfileCollection> LoadProfileAssetAction =
+            AssetDatabase.LoadAssetAtPath<SpriteSettingsProfileCollection>;
+
+        /// <summary>Saves independent copies of profiles to a project asset.</summary>
+        /// <param name="assetPath">A path under Assets ending in .asset whose parent folder exists.</param>
+        /// <param name="profiles">Profiles to save.</param>
+        /// <param name="overwriteExisting">Whether an existing profile collection may be replaced.</param>
+        /// <param name="error">The failure reason, or null on success.</param>
+        /// <returns>Whether the profiles were saved.</returns>
+        /// <remarks>
+        /// Asset file writes and reimports cannot be fully reversed by Unity Undo. An overwrite
+        /// refuses a file changed before comparison; noncooperating external writers can still
+        /// race with the replacement itself.
+        /// </remarks>
+        public static bool TrySaveProfiles(
+            string assetPath,
+            IReadOnlyList<SpriteSettings> profiles,
+            bool overwriteExisting,
+            out string error
+        )
+        {
+            try
+            {
+                return TrySaveProfilesCore(assetPath, profiles, overwriteExisting, out error);
+            }
+            catch (Exception exception)
+            {
+                error = $"Could not save profiles: {exception.Message}";
+                return false;
+            }
+        }
+
+        /// <summary>Loads independent profile copies from a project asset.</summary>
+        /// <param name="assetPath">The project asset path to load.</param>
+        /// <param name="profiles">The loaded copies, or null on failure.</param>
+        /// <param name="error">The failure reason, or null on success.</param>
+        /// <returns>Whether profiles were loaded.</returns>
+        public static bool TryLoadProfiles(
+            string assetPath,
+            out List<SpriteSettings> profiles,
+            out string error
+        )
+        {
+            try
+            {
+                return TryLoadProfilesCore(assetPath, out profiles, out error);
+            }
+            catch (Exception exception)
+            {
+                error = $"Could not load profiles: {exception.Message}";
+                profiles = null;
+                return false;
+            }
+        }
+
         public static List<PreparedProfile> PrepareProfiles(List<SpriteSettings> profiles)
         {
             List<PreparedProfile> result = new(profiles?.Count ?? 0);
@@ -502,6 +567,415 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 changed |= current.FilterMode != spriteData.filterMode;
             }
             return changed;
+        }
+
+        private static bool TrySaveProfilesCore(
+            string assetPath,
+            IReadOnlyList<SpriteSettings> profiles,
+            bool overwriteExisting,
+            out string error
+        )
+        {
+            if (!TryValidateProfilePath(assetPath, out string path, out error))
+            {
+                return false;
+            }
+            if (profiles == null)
+            {
+                error = "Profiles cannot be null.";
+                return false;
+            }
+
+            string fullPath = ProfileFullPath(path);
+            bool fileExists = File.Exists(fullPath);
+            UnityEngine.Object mainAsset = AssetDatabase.LoadMainAssetAtPath(path);
+            SpriteSettingsProfileCollection existing = null;
+            if (fileExists || mainAsset != null)
+            {
+                existing = mainAsset as SpriteSettingsProfileCollection;
+                if (existing == null)
+                {
+                    error = $"An asset of another type already exists at {path}.";
+                    return false;
+                }
+                if (!overwriteExisting)
+                {
+                    error =
+                        $"A profiles asset already exists at {path}; set overwriteExisting to replace it.";
+                    return false;
+                }
+            }
+
+            List<SpriteSettings> copies = new(profiles.Count);
+            foreach (SpriteSettings profile in profiles)
+            {
+                if (profile == null)
+                {
+                    error = "Profiles cannot contain null entries.";
+                    return false;
+                }
+                try
+                {
+                    SpriteSettings copy = CloneProfile(profile);
+                    if (copy == null)
+                    {
+                        error = "Could not clone a profile.";
+                        return false;
+                    }
+                    copies.Add(copy);
+                }
+                catch (Exception exception)
+                {
+                    error = $"Could not clone a profile: {exception.Message}";
+                    return false;
+                }
+            }
+
+            int expectedProfilesCount = copies.Count;
+            string expectedProfilesJson;
+            try
+            {
+                expectedProfilesJson = Serializer.JsonStringify(copies);
+            }
+            catch (Exception exception)
+            {
+                error = $"Could not serialize profiles for verification: {exception.Message}";
+                return false;
+            }
+
+            string writePath = Path.ChangeExtension(path, $".staging.{Guid.NewGuid():N}.asset");
+            byte[] previousBytes = existing == null ? null : File.ReadAllBytes(fullPath);
+            byte[] stagedBytes = null;
+            bool replacementAttempted = false;
+            bool replacementSucceeded = false;
+            bool moveCommitted = false;
+            string ownedGuid = null;
+            SpriteSettingsProfileCollection target = null;
+            try
+            {
+                target = ScriptableObject.CreateInstance<SpriteSettingsProfileCollection>();
+                target.profiles = copies;
+                target.name =
+                    existing != null ? existing.name : Path.GetFileNameWithoutExtension(path);
+                CreateProfileAssetAction(target, writePath);
+                ownedGuid = AssetDatabase.AssetPathToGUID(writePath);
+                if (string.IsNullOrEmpty(ownedGuid))
+                {
+                    throw new IOException($"Could not identify profiles asset at {writePath}.");
+                }
+                SaveProfileAssetsAction();
+                if (LoadProfileAssetAction(writePath) == null)
+                {
+                    throw new IOException($"Could not create profiles asset at {writePath}.");
+                }
+                if (existing == null)
+                {
+                    string moveError;
+                    try
+                    {
+                        moveError = MoveProfileAssetAction(writePath, path);
+                    }
+                    catch (Exception moveException)
+                    {
+                        moveError = moveException.Message;
+                    }
+                    bool moved = string.Equals(
+                        AssetDatabase.AssetPathToGUID(path),
+                        ownedGuid,
+                        StringComparison.Ordinal
+                    );
+                    if (!moved)
+                    {
+                        throw new IOException(
+                            $"Could not move profiles asset to {path}: {moveError ?? "destination did not receive the asset"}"
+                        );
+                    }
+                    moveCommitted = true;
+                    ImportProfileAssetAction(path, ImportAssetOptions.ForceSynchronousImport);
+                    SpriteSettingsProfileCollection committed = LoadProfileAssetAction(path);
+                    if (
+                        !ProfilesMatchExpected(
+                            committed,
+                            expectedProfilesCount,
+                            expectedProfilesJson
+                        )
+                    )
+                    {
+                        throw new IOException(
+                            $"Profiles asset moved to {path} but could not be verified; inspect the destination."
+                        );
+                    }
+                    error = null;
+                    return true;
+                }
+                else
+                {
+                    stagedBytes = File.ReadAllBytes(ProfileFullPath(writePath));
+                    if (!TryDeleteProfileAsset(writePath, out string cleanupError))
+                    {
+                        throw new IOException(cleanupError);
+                    }
+                    replacementAttempted = true;
+                    if (
+                        !DurableFile.TryCompareThenReplaceBytes(
+                            fullPath,
+                            previousBytes,
+                            stagedBytes,
+                            out Exception writeError
+                        )
+                    )
+                    {
+                        throw new IOException(
+                            $"Could not overwrite profiles asset: {writeError.Message}"
+                        );
+                    }
+                    replacementSucceeded = true;
+                }
+                ImportProfileAssetAction(path, ImportAssetOptions.ForceSynchronousImport);
+                if (
+                    !ProfilesMatchExpected(
+                        LoadProfileAssetAction(path),
+                        expectedProfilesCount,
+                        expectedProfilesJson
+                    )
+                )
+                {
+                    throw new IOException($"Profiles asset at {path} could not be verified.");
+                }
+                error = null;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                string failure = $"Could not save profiles: {exception.Message}";
+                if (moveCommitted)
+                {
+                    failure += $" Inspect the destination at {path} before retrying.";
+                }
+                if (replacementSucceeded || (replacementAttempted && !File.Exists(fullPath)))
+                {
+                    try
+                    {
+                        bool restored = replacementSucceeded
+                            ? DurableFile.TryCompareThenReplaceBytes(
+                                fullPath,
+                                stagedBytes,
+                                previousBytes,
+                                out Exception restoreError
+                            )
+                            : TryRestoreAbsentProfileBytes(
+                                fullPath,
+                                previousBytes,
+                                out restoreError
+                            );
+                        if (!restored)
+                        {
+                            failure +=
+                                $" Could not restore the prior asset: {restoreError.Message}";
+                            if (
+                                restoreError.Data[DurableFile.PreservedStagingPathDataKey]
+                                is string preservedPath
+                            )
+                            {
+                                failure += $" Inspect restore staging file at {preservedPath}.";
+                            }
+                        }
+                        else
+                        {
+                            AssetDatabase.ImportAsset(
+                                path,
+                                ImportAssetOptions.ForceSynchronousImport
+                            );
+                        }
+                    }
+                    catch (Exception restoreException)
+                    {
+                        failure +=
+                            $" Could not restore the prior asset: {restoreException.Message}";
+                    }
+                }
+                try
+                {
+                    if (
+                        File.Exists(ProfileFullPath(writePath))
+                        || AssetDatabase.LoadMainAssetAtPath(writePath) != null
+                    )
+                    {
+                        failure +=
+                            $" Partial profiles asset at {writePath} may have changed; inspect it before removal.";
+                    }
+                }
+                catch (Exception cleanupException)
+                {
+                    failure += $" Could not inspect partial asset: {cleanupException.Message}";
+                }
+                try
+                {
+                    if (target != null && !AssetDatabase.Contains(target))
+                    {
+                        UnityEngine.Object.DestroyImmediate(target);
+                    }
+                }
+                catch (Exception destroyException)
+                {
+                    failure +=
+                        $" Could not release temporary profile object: {destroyException.Message}";
+                }
+                error = failure;
+                return false;
+            }
+        }
+
+        private static bool ProfilesMatchExpected(
+            SpriteSettingsProfileCollection committed,
+            int expectedCount,
+            string expectedJson
+        )
+        {
+            return committed != null
+                && committed.profiles != null
+                && committed.profiles.Count == expectedCount
+                && string.Equals(
+                    Serializer.JsonStringify(committed.profiles),
+                    expectedJson,
+                    StringComparison.Ordinal
+                );
+        }
+
+        private static bool TryRestoreAbsentProfileBytes(
+            string fullPath,
+            byte[] bytes,
+            out Exception error
+        )
+        {
+            return DurableFile.TryCreateAllBytes(
+                fullPath,
+                bytes,
+                out error,
+                BeforeAbsentRestoreMoveForTests
+            );
+        }
+
+        private static bool TryDeleteProfileAsset(string assetPath, out string error)
+        {
+            bool deleted = DeleteProfileAssetAction(assetPath);
+            string fullPath = ProfileFullPath(assetPath);
+            if (
+                !deleted
+                || File.Exists(fullPath)
+                || AssetDatabase.LoadMainAssetAtPath(assetPath) != null
+            )
+            {
+                error = $"Could not remove partial profiles asset at {assetPath}.";
+                return false;
+            }
+            error = null;
+            return true;
+        }
+
+        private static string ProfileFullPath(string assetPath)
+        {
+            return Path.Combine(Path.GetDirectoryName(Application.dataPath), assetPath);
+        }
+
+        private static bool TryLoadProfilesCore(
+            string assetPath,
+            out List<SpriteSettings> profiles,
+            out string error
+        )
+        {
+            if (!TryValidateProfilePath(assetPath, out string path, out error))
+            {
+                profiles = null;
+                return false;
+            }
+            UnityEngine.Object mainAsset = AssetDatabase.LoadMainAssetAtPath(path);
+            SpriteSettingsProfileCollection asset = mainAsset as SpriteSettingsProfileCollection;
+            if (asset == null)
+            {
+                string fullPath = ProfileFullPath(path);
+                error =
+                    File.Exists(fullPath) || mainAsset != null
+                        ? $"Asset at {path} is not a SpriteSettingsProfileCollection."
+                        : $"No profiles asset exists at {path}.";
+                profiles = null;
+                return false;
+            }
+            if (asset.profiles == null)
+            {
+                error = $"Profiles asset at {path} contains no profile list.";
+                profiles = null;
+                return false;
+            }
+            List<SpriteSettings> copies = new(asset.profiles.Count);
+            try
+            {
+                foreach (SpriteSettings profile in asset.profiles)
+                {
+                    if (profile == null)
+                    {
+                        error = $"Profiles asset at {path} contains a null profile.";
+                        profiles = null;
+                        return false;
+                    }
+                    SpriteSettings copy = CloneProfile(profile);
+                    if (copy == null)
+                    {
+                        error = $"Could not clone a profile from {path}.";
+                        profiles = null;
+                        return false;
+                    }
+                    copies.Add(copy);
+                }
+            }
+            catch (Exception exception)
+            {
+                error = $"Could not clone loaded profiles: {exception.Message}";
+                profiles = null;
+                return false;
+            }
+            profiles = copies;
+            error = null;
+            return true;
+        }
+
+        private static SpriteSettings CloneProfile(SpriteSettings profile)
+        {
+            return Serializer.JsonDeserialize<SpriteSettings>(Serializer.JsonStringify(profile));
+        }
+
+        private static bool TryValidateProfilePath(
+            string assetPath,
+            out string path,
+            out string error
+        )
+        {
+            if (string.IsNullOrWhiteSpace(assetPath))
+            {
+                path = null;
+                error = "An asset path is required.";
+                return false;
+            }
+            string candidate = assetPath.SanitizePath();
+            if (
+                !candidate.StartsWith("Assets/", StringComparison.Ordinal)
+                || !string.Equals(
+                    Path.GetExtension(candidate),
+                    ".asset",
+                    StringComparison.OrdinalIgnoreCase
+                )
+                || candidate.Contains("/../")
+                || candidate.Contains("/./")
+                || !AssetDatabase.IsValidFolder(Path.GetDirectoryName(candidate).SanitizePath())
+            )
+            {
+                path = null;
+                error = $"Expected an .asset path in an existing folder under Assets: {assetPath}.";
+                return false;
+            }
+            path = candidate;
+            error = null;
+            return true;
         }
 
         private static string SanitizePath(string p)
