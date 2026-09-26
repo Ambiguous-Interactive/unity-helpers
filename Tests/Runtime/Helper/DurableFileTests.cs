@@ -299,6 +299,43 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [Test]
+        public void PublishStagedFileRejectsOccupiedDestinationWithoutChangingEitherFile()
+        {
+            string stagedPath = WriteDirectly("publish-staged.bin", "staged bytes");
+            string destinationPath = WriteDirectly("publish-destination.bin", "later writer");
+
+            Assert.IsFalse(
+                DurableFile.TryPublishStagedFileWithoutOverwrite(
+                    stagedPath,
+                    destinationPath,
+                    out bool leavesStaged
+                )
+            );
+
+            Assert.IsTrue(leavesStaged);
+            Assert.AreEqual("staged bytes", File.ReadAllText(stagedPath));
+            Assert.AreEqual("later writer", File.ReadAllText(destinationPath));
+        }
+
+        [Test]
+        public void PublishStagedFileCreatesDestinationAndReportsStagedNameOwnership()
+        {
+            string stagedPath = WriteDirectly("publish-source.bin", "staged bytes");
+            string destinationPath = Path.Combine(_testDirectory, "publish-target.bin");
+
+            Assert.IsTrue(
+                DurableFile.TryPublishStagedFileWithoutOverwrite(
+                    stagedPath,
+                    destinationPath,
+                    out bool leavesStaged
+                )
+            );
+
+            Assert.AreEqual("staged bytes", File.ReadAllText(destinationPath));
+            Assert.AreEqual(leavesStaged, File.Exists(stagedPath));
+        }
+
+        [Test]
         public void WriteLeavesNoStagedFileBehind()
         {
             string path = Path.Combine(_testDirectory, "save.json");

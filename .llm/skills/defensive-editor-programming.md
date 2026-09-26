@@ -96,7 +96,8 @@ an uncertain staged asset, report its path, and require inspection. Successful s
 through `AssetDatabase.DeleteAsset` is still a path operation; do not promise protection from
 noncooperating external writers (see [#863](https://github.com/Ambiguous-Interactive/unity-helpers/issues/863)).
 Reuse `DurableFile` for byte writes; a restore to an absent path needs its no-clobber create
-operation.
+operation. `File.Move(source, destination)` can replace an occupied destination on Unix; use the
+shared exclusive publisher for cross-platform no-clobber publication.
 
 ### Code Samples
 
