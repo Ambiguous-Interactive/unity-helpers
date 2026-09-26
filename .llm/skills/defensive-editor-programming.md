@@ -88,6 +88,16 @@ operation itself. In tests, borrow the action with `RestorableGlobal<Action>` (o
 `RestorableGlobal<Action<T>>`) in a `using` scope so the previous delegate is restored
 even when an assertion fails.
 
+Check destination occupancy and type before cloning or serializing input for an asset write.
+Use the cheapest reliable check first, while retaining checks needed to detect Unity assets
+without a visible file. Never use a path, GUID, or content comparison to justify automatic
+failure cleanup: another writer can replace the asset between the check and deletion. Preserve
+an uncertain staged asset, report its path, and require inspection. Successful staging cleanup
+through `AssetDatabase.DeleteAsset` is still a path operation; do not promise protection from
+noncooperating external writers (see [#863](https://github.com/Ambiguous-Interactive/unity-helpers/issues/863)).
+Reuse `DurableFile` for byte writes; a restore to an absent path needs its no-clobber create
+operation.
+
 ### Code Samples
 
 Dispose owned `SerializedObject` and `SerializedProperty` instances before destroying their target.

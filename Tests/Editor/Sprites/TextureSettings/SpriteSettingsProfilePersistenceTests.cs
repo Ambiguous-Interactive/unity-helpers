@@ -262,6 +262,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.IsFalse(
                 SpriteSettingsApplierAPI.TrySaveProfiles(ProfilePath, second, false, out error)
             );
+            Assert.IsFalse(
+                SpriteSettingsApplierAPI.TrySaveProfiles(
+                    ProfilePath,
+                    new List<SpriteSettings> { null },
+                    false,
+                    out string earlyError
+                )
+            );
+            StringAssert.Contains("already exists", earlyError);
             string originalGuid = AssetDatabase.AssetPathToGUID(ProfilePath);
             Assert.IsNotEmpty(error);
             Assert.IsTrue(
@@ -368,7 +377,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         }
 
         [Test]
-        public void FailedNewSaveReportsPartialAssetWhenCleanupFails()
+        public void FailedNewSavePreservesStagedAssetWithoutCallingDelete()
         {
             RestorableGlobal<Func<string, SpriteSettingsProfileCollection>> load = new(
                 () => SpriteSettingsApplierAPI.LoadProfileAssetAction,
@@ -378,8 +387,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 () => SpriteSettingsApplierAPI.DeleteProfileAssetAction,
                 action => SpriteSettingsApplierAPI.DeleteProfileAssetAction = action
             );
+            int deleteCalls = 0;
             using (load.Borrow(_ => null))
-            using (delete.Borrow(_ => false))
+            using (
+                delete.Borrow(_ =>
+                {
+                    deleteCalls++;
+                    return true;
+                })
+            )
             {
                 Assert.IsFalse(
                     SpriteSettingsApplierAPI.TrySaveProfiles(
@@ -390,10 +406,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                     )
                 );
                 StringAssert.Contains("Could not create profiles asset", error);
-                StringAssert.Contains("Could not remove partial profiles asset", error);
+                StringAssert.Contains("inspect it before removal", error);
                 Assert.AreEqual(1, StagedAssetFiles().Length);
                 Assert.IsTrue(AssetDatabase.LoadMainAssetAtPath(ProfilePath) == null);
             }
+            Assert.AreEqual(0, deleteCalls);
         }
 
         [Test]
@@ -431,7 +448,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         }
 
         [Test]
-        public void FailedTypedReloadCleansNewAndStagedAssets()
+        public void FailedTypedReloadPreservesStagedAssets()
         {
             RestorableGlobal<Func<string, SpriteSettingsProfileCollection>> load = new(
                 () => SpriteSettingsApplierAPI.LoadProfileAssetAction,
@@ -473,7 +490,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 );
                 StringAssert.Contains("Could not create profiles asset", error);
             }
-            Assert.AreEqual(0, StagedAssetFiles().Length);
+            Assert.AreEqual(2, StagedAssetFiles().Length);
             Assert.IsTrue(
                 SpriteSettingsApplierAPI.TryLoadProfiles(
                     ProfilePath,
@@ -550,7 +567,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 StringAssert.Contains("Could not move profiles asset", error);
             }
             Assert.IsTrue(AssetDatabase.LoadMainAssetAtPath(ProfilePath) is Texture2D);
-            Assert.AreEqual(0, StagedAssetFiles().Length);
+            Assert.AreEqual(1, StagedAssetFiles().Length);
         }
 
         [Test]
@@ -945,6 +962,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 );
             }
             StringAssert.Contains("Could not restore the prior asset", error);
+            StringAssert.Contains("Inspect restore staging file at", error);
             CollectionAssert.AreEqual(laterBytes, File.ReadAllBytes(fullPath));
             File.WriteAllBytes(fullPath, originalBytes);
             AssetDatabase.ImportAsset(ProfilePath, ImportAssetOptions.ForceSynchronousImport);

@@ -586,6 +586,26 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return false;
             }
 
+            string fullPath = ProfileFullPath(path);
+            bool fileExists = File.Exists(fullPath);
+            UnityEngine.Object mainAsset = AssetDatabase.LoadMainAssetAtPath(path);
+            SpriteSettingsProfileCollection existing = null;
+            if (fileExists || mainAsset != null)
+            {
+                existing = mainAsset as SpriteSettingsProfileCollection;
+                if (existing == null)
+                {
+                    error = $"An asset of another type already exists at {path}.";
+                    return false;
+                }
+                if (!overwriteExisting)
+                {
+                    error =
+                        $"A profiles asset already exists at {path}; set overwriteExisting to replace it.";
+                    return false;
+                }
+            }
+
             List<SpriteSettings> copies = new(profiles.Count);
             foreach (SpriteSettings profile in profiles)
             {
@@ -623,35 +643,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return false;
             }
 
-            string fullPath = ProfileFullPath(path);
-            UnityEngine.Object mainAsset = AssetDatabase.LoadMainAssetAtPath(path);
-            bool occupied = File.Exists(fullPath) || mainAsset != null;
-            SpriteSettingsProfileCollection existing = null;
-            if (occupied)
-            {
-                existing = mainAsset as SpriteSettingsProfileCollection;
-                if (existing == null)
-                {
-                    error = $"An asset of another type already exists at {path}.";
-                    return false;
-                }
-                if (!overwriteExisting)
-                {
-                    error =
-                        $"A profiles asset already exists at {path}; set overwriteExisting to replace it.";
-                    return false;
-                }
-            }
-
             string writePath = Path.ChangeExtension(path, $".staging.{Guid.NewGuid():N}.asset");
             byte[] previousBytes = existing == null ? null : File.ReadAllBytes(fullPath);
             byte[] stagedBytes = null;
             bool replacementAttempted = false;
             bool replacementSucceeded = false;
-            bool creationReturned = false;
             bool moveCommitted = false;
             string ownedGuid = null;
-            byte[] ownedBytes = null;
             SpriteSettingsProfileCollection target = null;
             try
             {
@@ -660,14 +658,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 target.name =
                     existing != null ? existing.name : Path.GetFileNameWithoutExtension(path);
                 CreateProfileAssetAction(target, writePath);
-                creationReturned = true;
                 ownedGuid = AssetDatabase.AssetPathToGUID(writePath);
                 if (string.IsNullOrEmpty(ownedGuid))
                 {
                     throw new IOException($"Could not identify profiles asset at {writePath}.");
                 }
                 SaveProfileAssetsAction();
-                ownedBytes = File.ReadAllBytes(ProfileFullPath(writePath));
                 if (LoadProfileAssetAction(writePath) == null)
                 {
                     throw new IOException($"Could not create profiles asset at {writePath}.");
@@ -776,6 +772,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                         {
                             failure +=
                                 $" Could not restore the prior asset: {restoreError.Message}";
+                            if (
+                                restoreError.Data[DurableFile.PreservedStagingPathDataKey]
+                                is string preservedPath
+                            )
+                            {
+                                failure += $" Inspect restore staging file at {preservedPath}.";
+                            }
                         }
                         else
                         {
@@ -794,24 +797,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 try
                 {
                     if (
-                        creationReturned
-                        && !TryRemoveOwnedProfileAsset(
-                            writePath,
-                            ownedGuid,
-                            ownedBytes,
-                            target,
-                            out string cleanupError
-                        )
-                    )
-                    {
-                        failure += $" {cleanupError}";
-                    }
-                    if (
-                        !creationReturned
-                        && (
-                            File.Exists(ProfileFullPath(writePath))
-                            || AssetDatabase.LoadMainAssetAtPath(writePath) != null
-                        )
+                        File.Exists(ProfileFullPath(writePath))
+                        || AssetDatabase.LoadMainAssetAtPath(writePath) != null
                     )
                     {
                         failure +=
@@ -820,7 +807,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
                 catch (Exception cleanupException)
                 {
-                    failure += $" Could not remove partial asset: {cleanupException.Message}";
+                    failure += $" Could not inspect partial asset: {cleanupException.Message}";
                 }
                 try
                 {
@@ -861,99 +848,12 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             out Exception error
         )
         {
-            string restorePath = fullPath + $".restore.{Guid.NewGuid():N}";
-            Exception failure = null;
-            try
-            {
-                using (
-                    FileStream stream = new(
-                        restorePath,
-                        FileMode.CreateNew,
-                        FileAccess.Write,
-                        FileShare.None
-                    )
-                )
-                {
-                    stream.Write(bytes, 0, bytes.Length);
-                    stream.Flush(flushToDisk: true);
-                }
-                BeforeAbsentRestoreMoveForTests?.Invoke(fullPath);
-                File.Move(restorePath, fullPath);
-            }
-            catch (Exception exception)
-            {
-                failure = exception;
-            }
-            try
-            {
-                File.Delete(restorePath);
-            }
-            catch (Exception cleanupException)
-            {
-                failure ??= cleanupException;
-            }
-            error = failure;
-            return failure == null;
-        }
-
-        private static bool TryRemoveOwnedProfileAsset(
-            string stagingPath,
-            string ownedGuid,
-            byte[] ownedBytes,
-            SpriteSettingsProfileCollection target,
-            out string error
-        )
-        {
-            if (target == null)
-            {
-                error = null;
-                return true;
-            }
-            string candidate = null;
-            if (
-                !string.IsNullOrEmpty(ownedGuid)
-                && string.Equals(
-                    AssetDatabase.AssetPathToGUID(stagingPath),
-                    ownedGuid,
-                    StringComparison.Ordinal
-                )
-            )
-            {
-                candidate = stagingPath;
-            }
-            if (candidate == null)
-            {
-                string objectPath = AssetDatabase.GetAssetPath(target);
-                if (
-                    string.Equals(objectPath, stagingPath, StringComparison.Ordinal)
-                    && AssetDatabase.LoadMainAssetAtPath(objectPath) == target
-                )
-                {
-                    candidate = objectPath;
-                }
-            }
-            if (candidate == null)
-            {
-                error = null;
-                return true;
-            }
-            string fullPath = ProfileFullPath(candidate);
-            if (ownedBytes == null)
-            {
-                error =
-                    $"Could not verify partial profiles asset at {candidate}; inspect it before removal.";
-                return false;
-            }
-            if (
-                File.Exists(fullPath)
-                && !File.ReadAllBytes(fullPath).AsSpan().SequenceEqual(ownedBytes)
-            )
-            {
-                error =
-                    $"Could not remove partial profiles asset at {candidate}: contents changed.";
-                return false;
-            }
-            return TryDeleteProfileAsset(candidate, out error);
+            return DurableFile.TryCreateAllBytes(
+                fullPath,
+                bytes,
+                out error,
+                BeforeAbsentRestoreMoveForTests
+            );
         }
 
         private static bool TryDeleteProfileAsset(string assetPath, out string error)
