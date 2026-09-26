@@ -101,6 +101,10 @@ CI runs the repository aggregates. Repeating them after each edit wastes the ses
 - After adding or moving a C# member, run `node scripts/run-repo-lint.js --only nested-type-placement`.
   Changed-file preflight does not run this whole-tree ordering rule; a new internal method before
   later public methods passed preflight and failed Repo Lint in PR #868.
+- After adding or changing a method with `out` parameters, run
+  `node scripts/run-contract-tests.js --include-hook-regressions --only out-parameters`.
+  Assign each `out` value immediately before its return; changed-file preflight does not run this
+  contract, which caught two separated assignments in PR #868.
 - **Never start a second repository aggregate, whole-tree linter, or build while one is live.**
   Runner-managed workers inside one command are expected. First poll or stop any live external
   validation/build process, including children left by an interrupted tool call.

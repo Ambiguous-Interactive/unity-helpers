@@ -551,7 +551,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
                 catch (Exception exception)
                 {
-                    error = moved
+                    Exception failure = moved
                         ? new IOException(
                             $"Created file at {path}, but could not verify its contents; inspect it before retrying.",
                             exception
@@ -559,8 +559,9 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         : exception;
                     if (ownsTemporary)
                     {
-                        error.Data[PreservedStagingPathDataKey] = temporaryPath;
+                        failure.Data[PreservedStagingPathDataKey] = temporaryPath;
                     }
+                    error = failure;
                     return false;
                 }
             }
@@ -580,7 +581,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             out bool leavesStaged
         )
         {
-            leavesStaged = true;
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 try
@@ -591,6 +591,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 }
                 catch (IOException) when (File.Exists(destinationPath))
                 {
+                    leavesStaged = true;
                     return false;
                 }
             }
@@ -613,12 +614,14 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
             if (result == 0)
             {
+                leavesStaged = true;
                 return true;
             }
 
             int nativeError = Marshal.GetLastWin32Error();
             if (nativeError == UnixNameAlreadyExists)
             {
+                leavesStaged = true;
                 return false;
             }
 
