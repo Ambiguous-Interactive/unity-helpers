@@ -3,6 +3,9 @@
 ## Agent-Specific Rules
 
 - Keep changes minimal and focused; respect folder boundaries (Runtime vs Editor)
+- Treat every failed test or CI job as unresolved until its cause is classified and fixed. A
+  passing rerun only adds evidence; follow [investigate-test-failures](../skills/investigate-test-failures.md)
+  before calling a branch or PR green.
 - Keep the working plan under 150 lines and actionable; follow [maintain-plan](../skills/maintain-plan.md).
 - Follow `.editorconfig` formatting rules strictly
 - NEVER pipe output to `/dev/null`; NEVER hard-code machine-specific absolute paths

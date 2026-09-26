@@ -230,13 +230,13 @@
     },
     {
       "name": "investigate-test-failures",
-      "sha256": "762c0146bd66911ba1c0bc30cb26855bea6b9e4c0a5803f4be19f6eba491d120",
+      "sha256": "89457bee32f041be19f79ff86440df4fed79e8d49fe8c7e60c36cb90d9252343",
       "parts": [
         "investigate-test-failures-part-1.md",
         "investigate-test-failures-part-2.md",
         "investigate-test-failures-part-3.md"
       ],
-      "routerSha256": "eff573165a81c50e5819be693142b947ba79afff687feea76a306826a44056b9"
+      "routerSha256": "52f341ea81929800f88416387214bdcb07f71c921b6310a79c3199bb51369d46"
     },
     {
       "name": "linq-elimination-patterns",
