@@ -194,90 +194,6 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             }
         }
 
-        /// <summary>Creates a file from flushed bytes only while its destination is absent.</summary>
-        /// <param name="path">Destination file path. Missing directories are created.</param>
-        /// <param name="contents">Bytes to write.</param>
-        /// <param name="error">
-        /// The failure when this returns false; null otherwise. If staged bytes could not be
-        /// published, <see cref="PreservedStagingPathDataKey"/> identifies their path in Data.
-        /// </param>
-        /// <param name="beforeMove">Optional action invoked just before publication.</param>
-        /// <returns>True when the new file was published without replacing another file.</returns>
-        internal static bool TryCreateAllBytes(
-            string path,
-            byte[] contents,
-            out Exception error,
-            Action<string> beforeMove = null
-        )
-        {
-            if (string.IsNullOrWhiteSpace(path))
-            {
-                error = new ArgumentException("A destination path is required.", nameof(path));
-                return false;
-            }
-
-            if (contents == null)
-            {
-                error = new ArgumentNullException(nameof(contents));
-                return false;
-            }
-
-            using (EnterGate(path))
-            {
-                string temporaryPath =
-                    path + ".create." + Guid.NewGuid().ToString("N") + TemporarySuffix;
-                bool ownsTemporary = false;
-                bool moved = false;
-                try
-                {
-                    EnsureDirectory(path);
-                    using (
-                        FileStream staging = new(
-                            temporaryPath,
-                            FileMode.CreateNew,
-                            FileAccess.Write,
-                            FileShare.None,
-                            DefaultBufferSize,
-                            useAsync: false
-                        )
-                    )
-                    {
-                        ownsTemporary = true;
-                        staging.Write(contents, 0, contents.Length);
-                        staging.Flush(flushToDisk: true);
-                    }
-
-                    beforeMove?.Invoke(path);
-                    File.Move(temporaryPath, path);
-                    ownsTemporary = false;
-                    moved = true;
-                    if (!File.ReadAllBytes(path).AsSpan().SequenceEqual(contents))
-                    {
-                        throw new IOException(
-                            $"Created file at {path}, but its contents differ; inspect it before retrying."
-                        );
-                    }
-                    error = null;
-                    return true;
-                }
-                catch (Exception exception)
-                {
-                    if (ownsTemporary)
-                    {
-                        exception.Data[PreservedStagingPathDataKey] = temporaryPath;
-                    }
-
-                    error = moved
-                        ? new IOException(
-                            $"Created file at {path}, but could not verify its contents; inspect it before retrying.",
-                            exception
-                        )
-                        : exception;
-                    return false;
-                }
-            }
-        }
-
         /// <summary>
         /// Asynchronously replaces a file's entire contents, staging and flushing before the swap.
         /// </summary>
@@ -541,6 +457,90 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             catch (Exception)
             {
                 return false;
+            }
+        }
+
+        /// <summary>Creates a file from flushed bytes only while its destination is absent.</summary>
+        /// <param name="path">Destination file path. Missing directories are created.</param>
+        /// <param name="contents">Bytes to write.</param>
+        /// <param name="error">
+        /// The failure when this returns false; null otherwise. If staged bytes could not be
+        /// published, <see cref="PreservedStagingPathDataKey"/> identifies their path in Data.
+        /// </param>
+        /// <param name="beforeMove">Optional action invoked just before publication.</param>
+        /// <returns>True when the new file was published without replacing another file.</returns>
+        internal static bool TryCreateAllBytes(
+            string path,
+            byte[] contents,
+            out Exception error,
+            Action<string> beforeMove = null
+        )
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                error = new ArgumentException("A destination path is required.", nameof(path));
+                return false;
+            }
+
+            if (contents == null)
+            {
+                error = new ArgumentNullException(nameof(contents));
+                return false;
+            }
+
+            using (EnterGate(path))
+            {
+                string temporaryPath =
+                    path + ".create." + Guid.NewGuid().ToString("N") + TemporarySuffix;
+                bool ownsTemporary = false;
+                bool moved = false;
+                try
+                {
+                    EnsureDirectory(path);
+                    using (
+                        FileStream staging = new(
+                            temporaryPath,
+                            FileMode.CreateNew,
+                            FileAccess.Write,
+                            FileShare.None,
+                            DefaultBufferSize,
+                            useAsync: false
+                        )
+                    )
+                    {
+                        ownsTemporary = true;
+                        staging.Write(contents, 0, contents.Length);
+                        staging.Flush(flushToDisk: true);
+                    }
+
+                    beforeMove?.Invoke(path);
+                    File.Move(temporaryPath, path);
+                    ownsTemporary = false;
+                    moved = true;
+                    if (!File.ReadAllBytes(path).AsSpan().SequenceEqual(contents))
+                    {
+                        throw new IOException(
+                            $"Created file at {path}, but its contents differ; inspect it before retrying."
+                        );
+                    }
+                    error = null;
+                    return true;
+                }
+                catch (Exception exception)
+                {
+                    if (ownsTemporary)
+                    {
+                        exception.Data[PreservedStagingPathDataKey] = temporaryPath;
+                    }
+
+                    error = moved
+                        ? new IOException(
+                            $"Created file at {path}, but could not verify its contents; inspect it before retrying.",
+                            exception
+                        )
+                        : exception;
+                    return false;
+                }
             }
         }
 

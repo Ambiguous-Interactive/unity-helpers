@@ -98,6 +98,9 @@ CI runs the repository aggregates. Repeating them after each edit wastes the ses
   caught. And an aggregate run BEFORE your last edit is not an aggregate run: session 247 moved a
   test after `lint:repo` and reddened `xml-doc-summaries`, which no changed-file check covers.
 - **Prefer the cheap instrument that answers the question** -- a `rg` for the shape, one `--only <id>`, one `dotnet test --filter` -- and say which you used.
+- After adding or moving a C# member, run `node scripts/run-repo-lint.js --only nested-type-placement`.
+  Changed-file preflight does not run this whole-tree ordering rule; a new internal method before
+  later public methods passed preflight and failed Repo Lint in PR #868.
 - **Never start a second repository aggregate, whole-tree linter, or build while one is live.**
   Runner-managed workers inside one command are expected. First poll or stop any live external
   validation/build process, including children left by an interrupted tool call.
