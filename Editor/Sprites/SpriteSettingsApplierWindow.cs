@@ -364,6 +364,29 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             _spritesThatWillChange = -1;
         }
 
+        internal bool TrySaveProfilesAssetAtPath(string path, out string error)
+        {
+            return SpriteSettingsApplierAPI.TrySaveProfiles(path, spriteSettings, true, out error);
+        }
+
+        internal bool TryLoadProfilesAssetAtPath(string path, out string error)
+        {
+            if (
+                !SpriteSettingsApplierAPI.TryLoadProfiles(
+                    path,
+                    out List<SpriteSettings> profiles,
+                    out error
+                )
+            )
+            {
+                return false;
+            }
+            Undo.RecordObject(this, "Load Sprite Settings Profiles");
+            spriteSettings = profiles;
+            EditorUtility.SetDirty(this);
+            return true;
+        }
+
         private void BindSerializedState()
         {
             ReleaseSerializedState();
@@ -507,21 +530,14 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            SpriteSettingsProfileCollection asset =
-                CreateInstance<SpriteSettingsProfileCollection>();
-            asset.profiles = new List<SpriteSettings>(spriteSettings.Count);
-            foreach (
-                WallstopStudios.UnityHelpers.Editor.Sprites.SpriteSettings spriteSettingsElement in spriteSettings
-            )
+            if (TrySaveProfilesAssetAtPath(path, out string error))
             {
-                string json = JsonUtility.ToJson(spriteSettingsElement);
-                asset.profiles.Add(JsonUtility.FromJson<SpriteSettings>(json));
+                this.Log($"Saved profiles to {path}");
             }
-            AssetDatabaseBatchHelper.EnsureAssetParentFolder(path);
-            AssetDatabase.CreateAsset(asset, path);
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
-            this.Log($"Saved profiles to {path}");
+            else
+            {
+                this.LogWarn($"{error}");
+            }
         }
 
         private void LoadProfilesAsset()
@@ -547,21 +563,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 projectRelative = path.Substring(idx + 1);
             }
 
-            SpriteSettingsProfileCollection asset =
-                AssetDatabase.LoadAssetAtPath<SpriteSettingsProfileCollection>(projectRelative);
-            if (asset == null)
+            if (!TryLoadProfilesAssetAtPath(projectRelative, out string error))
             {
-                this.LogWarn($"Could not load profiles asset at: {projectRelative}");
+                this.LogWarn($"{error}");
                 return;
-            }
-
-            spriteSettings = new List<SpriteSettings>(asset.profiles.Count);
-            foreach (
-                WallstopStudios.UnityHelpers.Editor.Sprites.SpriteSettings profilesElement in asset.profiles
-            )
-            {
-                string json = JsonUtility.ToJson(profilesElement);
-                spriteSettings.Add(JsonUtility.FromJson<SpriteSettings>(json));
             }
             this.Log($"Loaded {spriteSettings.Count} profiles from {projectRelative}");
         }
