@@ -84,8 +84,12 @@
 
 CI runs the repository aggregates. Repeating them after each edit wastes the session.
 
-- **The edit loop is `npm run agent:preflight` (2.9 s) plus the targeted check for what you touched.**
-  Run the aggregate ONCE, before the push, not after each commit. **It inspects only CHANGED files,
+- **Use the smallest targeted check during each edit loop, then run `npm run agent:preflight` once
+  before the push.** Format each changed file immediately. A changed Markdown file formats in about
+  0.2 s with `node scripts/run-prettier.js --write -- <file>`; the full changed-file preflight took
+  32 s with eight spell-checkable files on 2026-09-26. A warm default runtime typecheck took 9 s
+  on that same mixed-change tree. These are local observations, not CI timing claims. Use the
+  relevant focused test or compile gate while editing, and keep all final gates. **Preflight inspects only CHANGED files,
   so after you commit it prints "No changed files detected. Nothing to validate." and exits 0 --
   "looked at nothing", not "passed".** Session 236 read that as a pass and pushed a violation CI
   caught. And an aggregate run BEFORE your last edit is not an aggregate run: session 247 moved a

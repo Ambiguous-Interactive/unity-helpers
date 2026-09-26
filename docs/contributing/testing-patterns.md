@@ -2,6 +2,20 @@
 
 This guide documents patterns for testing states that "should never happen" but could occur in production. These tests catch edge cases that defensive programming must handle gracefully.
 
+## Test-only hooks and production listeners
+
+The `ForTests` and `TestHooks` members in `Runtime/` and `Editor/` serve different test needs. Keep them internal unless a production caller needs a defined contract.
+
+| Hook group                    | Examples                                                                             | Current purpose                                                                | Decision                                                                                                    |
+| ----------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| Scheduling callbacks          | `DurableFile.BeforeStagedSwapForTests`, `TestRunSummaryFile.AfterBeginClaimForTests` | Hold a file operation at a specific point to prove ownership and race behavior | Keep internal. No production listener needs the staging path or a callback inside the claim or writer lock. |
+| Editor action probes          | `ManualRecompile.AssetsRefreshedForTests`, `CompilationRequestedForTests`            | Observe ordering and avoid a real compilation request during a test            | Keep internal. A listener could throw or request compilation again during the action.                       |
+| State inspection and reset    | Drawer cache and layout `TestHooks`, singleton retry resets, visual cache accessors  | Check eviction, layout, and lifecycle behavior without changing a public API   | Keep internal. These expose implementation state rather than a stable product event.                        |
+| Direct algorithm entry points | `ImageBlurTool.BlurredForTests`, `LayeredImage.ComposeSpriteOntoBufferForTests`      | Exercise a pure operation without a window or frame loop                       | Keep internal until a production caller needs the operation itself.                                         |
+| Test-assembly-only rebuild    | `AttributeMetadataCache.ForceRebuildForTests`                                        | Reset relational metadata after a test changes inputs                          | Keep behind `UNITY_INCLUDE_TESTS`; it is not present in normal player builds.                               |
+
+No current `Runtime/` or `Editor/` caller subscribes to the scheduling callbacks or editor action probes. The existing tests set and clear those callbacks around their assertions. In particular, the `DurableFile` callbacks run under its per-path gate and expose temporary file paths. A public listener would need an explicit subscription lifetime, callback thread, ordering, exception policy, reentrancy policy, and path disclosure policy before it could be safe to use. No such listener is proposed now, so the existing deterministic tests and hot paths remain unchanged.
+
 ## Why Test "Impossible" States
 
 Production code encounters situations that seem impossible during development:
