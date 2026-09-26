@@ -22,6 +22,136 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         private const string Root = "Assets/Temp/SpriteSettingsProfilePersistenceTests";
         private const string ProfilePath = Root + "/Profiles.asset";
 
+        private static string[] StagedAssetFiles()
+        {
+            string rootPath = Path.Combine(Path.GetDirectoryName(Application.dataPath), Root);
+            return Directory.GetFiles(rootPath, "Profiles.staging.*.asset");
+        }
+
+        private static void AssertProfileValues(SpriteSettings expected, SpriteSettings actual)
+        {
+            Assert.AreEqual(expected.matchBy, actual.matchBy, nameof(SpriteSettings.matchBy));
+            Assert.AreEqual(
+                expected.matchPattern,
+                actual.matchPattern,
+                nameof(SpriteSettings.matchPattern)
+            );
+            Assert.AreEqual(expected.priority, actual.priority, nameof(SpriteSettings.priority));
+            Assert.AreEqual(
+                expected.applyPixelsPerUnit,
+                actual.applyPixelsPerUnit,
+                nameof(SpriteSettings.applyPixelsPerUnit)
+            );
+            Assert.AreEqual(
+                expected.pixelsPerUnit,
+                actual.pixelsPerUnit,
+                nameof(SpriteSettings.pixelsPerUnit)
+            );
+            Assert.AreEqual(
+                expected.applyPivot,
+                actual.applyPivot,
+                nameof(SpriteSettings.applyPivot)
+            );
+            Assert.AreEqual(expected.pivot, actual.pivot, nameof(SpriteSettings.pivot));
+            Assert.AreEqual(
+                expected.applySpriteMode,
+                actual.applySpriteMode,
+                nameof(SpriteSettings.applySpriteMode)
+            );
+            Assert.AreEqual(
+                expected.spriteMode,
+                actual.spriteMode,
+                nameof(SpriteSettings.spriteMode)
+            );
+            Assert.AreEqual(
+                expected.applyGenerateMipMaps,
+                actual.applyGenerateMipMaps,
+                nameof(SpriteSettings.applyGenerateMipMaps)
+            );
+            Assert.AreEqual(
+                expected.generateMipMaps,
+                actual.generateMipMaps,
+                nameof(SpriteSettings.generateMipMaps)
+            );
+            Assert.AreEqual(
+                expected.applyAlphaIsTransparency,
+                actual.applyAlphaIsTransparency,
+                nameof(SpriteSettings.applyAlphaIsTransparency)
+            );
+            Assert.AreEqual(
+                expected.alphaIsTransparency,
+                actual.alphaIsTransparency,
+                nameof(SpriteSettings.alphaIsTransparency)
+            );
+            Assert.AreEqual(
+                expected.applyReadWriteEnabled,
+                actual.applyReadWriteEnabled,
+                nameof(SpriteSettings.applyReadWriteEnabled)
+            );
+            Assert.AreEqual(
+                expected.readWriteEnabled,
+                actual.readWriteEnabled,
+                nameof(SpriteSettings.readWriteEnabled)
+            );
+            Assert.AreEqual(
+                expected.applyExtrudeEdges,
+                actual.applyExtrudeEdges,
+                nameof(SpriteSettings.applyExtrudeEdges)
+            );
+            Assert.AreEqual(
+                expected.extrudeEdges,
+                actual.extrudeEdges,
+                nameof(SpriteSettings.extrudeEdges)
+            );
+            Assert.AreEqual(
+                expected.applyWrapMode,
+                actual.applyWrapMode,
+                nameof(SpriteSettings.applyWrapMode)
+            );
+            Assert.AreEqual(expected.wrapMode, actual.wrapMode, nameof(SpriteSettings.wrapMode));
+            Assert.AreEqual(
+                expected.applyFilterMode,
+                actual.applyFilterMode,
+                nameof(SpriteSettings.applyFilterMode)
+            );
+            Assert.AreEqual(
+                expected.filterMode,
+                actual.filterMode,
+                nameof(SpriteSettings.filterMode)
+            );
+            Assert.AreEqual(
+                expected.applyCrunchCompression,
+                actual.applyCrunchCompression,
+                nameof(SpriteSettings.applyCrunchCompression)
+            );
+            Assert.AreEqual(
+                expected.useCrunchCompression,
+                actual.useCrunchCompression,
+                nameof(SpriteSettings.useCrunchCompression)
+            );
+            Assert.AreEqual(
+                expected.applyCompression,
+                actual.applyCompression,
+                nameof(SpriteSettings.applyCompression)
+            );
+            Assert.AreEqual(
+                expected.compressionLevel,
+                actual.compressionLevel,
+                nameof(SpriteSettings.compressionLevel)
+            );
+            Assert.AreEqual(expected.name, actual.name, nameof(SpriteSettings.name));
+            Assert.AreEqual(
+                expected.applyTextureType,
+                actual.applyTextureType,
+                nameof(SpriteSettings.applyTextureType)
+            );
+            Assert.AreEqual(
+                expected.textureType,
+                actual.textureType,
+                nameof(SpriteSettings.textureType)
+            );
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -32,8 +162,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [TearDown]
         public override void TearDown()
         {
-            AssetDatabase.DeleteAsset(Root + "/Profiles.staging.asset");
-            AssetDatabase.DeleteAsset(ProfilePath);
+            AssetDatabase.DeleteAsset(Root);
             base.TearDown();
         }
 
@@ -50,8 +179,26 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 pixelsPerUnit = 16,
                 applyPivot = true,
                 pivot = new Vector2(0.2f, 0.8f),
+                applySpriteMode = true,
+                spriteMode = SpriteImportMode.Multiple,
+                applyGenerateMipMaps = true,
+                generateMipMaps = true,
+                applyAlphaIsTransparency = false,
+                alphaIsTransparency = false,
+                applyReadWriteEnabled = false,
+                readWriteEnabled = false,
+                applyExtrudeEdges = true,
+                extrudeEdges = 9,
+                applyWrapMode = true,
+                wrapMode = TextureWrapMode.Repeat,
                 applyFilterMode = true,
-                filterMode = FilterMode.Point,
+                filterMode = FilterMode.Trilinear,
+                applyCrunchCompression = true,
+                useCrunchCompression = true,
+                applyCompression = true,
+                compressionLevel = TextureImporterCompression.Uncompressed,
+                applyTextureType = true,
+                textureType = TextureImporterType.Default,
             };
             List<SpriteSettings> input = new() { source };
 
@@ -64,7 +211,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 ),
                 error
             );
+            SpriteSettingsProfileCollection saved =
+                AssetDatabase.LoadAssetAtPath<SpriteSettingsProfileCollection>(ProfilePath);
+            Assert.IsTrue(saved != null);
+            AssertProfileValues(source, saved.profiles[0]);
+            Assert.AreNotSame(source, saved.profiles[0]);
             source.pixelsPerUnit = 999;
+            Assert.AreEqual(16, saved.profiles[0].pixelsPerUnit);
             AssetDatabase.ImportAsset(ProfilePath, ImportAssetOptions.ForceSynchronousImport);
             Assert.IsTrue(
                 SpriteSettingsApplierAPI.TryLoadProfiles(
@@ -75,14 +228,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 error
             );
             Assert.AreEqual(1, loaded.Count);
-            Assert.AreEqual("World", loaded[0].name);
-            Assert.AreEqual(SpriteSettings.MatchMode.PathContains, loaded[0].matchBy);
-            Assert.AreEqual("Sprites/World", loaded[0].matchPattern);
-            Assert.AreEqual(7, loaded[0].priority);
-            Assert.IsTrue(loaded[0].applyPixelsPerUnit);
-            Assert.AreEqual(16, loaded[0].pixelsPerUnit);
-            Assert.AreEqual(new Vector2(0.2f, 0.8f), loaded[0].pivot);
-            Assert.AreEqual(FilterMode.Point, loaded[0].filterMode);
+            source.pixelsPerUnit = 16;
+            AssertProfileValues(source, loaded[0]);
             Assert.AreNotSame(source, loaded[0]);
 
             loaded[0].pixelsPerUnit = 42;
@@ -223,15 +370,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void FailedNewSaveReportsPartialAssetWhenCleanupFails()
         {
-            RestorableGlobal<Action> save = new(
-                () => SpriteSettingsApplierAPI.SaveProfileAssetsAction,
-                action => SpriteSettingsApplierAPI.SaveProfileAssetsAction = action
+            RestorableGlobal<Func<string, SpriteSettingsProfileCollection>> load = new(
+                () => SpriteSettingsApplierAPI.LoadProfileAssetAction,
+                action => SpriteSettingsApplierAPI.LoadProfileAssetAction = action
             );
             RestorableGlobal<Func<string, bool>> delete = new(
                 () => SpriteSettingsApplierAPI.DeleteProfileAssetAction,
                 action => SpriteSettingsApplierAPI.DeleteProfileAssetAction = action
             );
-            using (save.Borrow(() => throw new IOException("forced save failure")))
+            using (load.Borrow(_ => null))
             using (delete.Borrow(_ => false))
             {
                 Assert.IsFalse(
@@ -242,10 +389,45 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                         out string error
                     )
                 );
-                StringAssert.Contains("forced save failure", error);
+                StringAssert.Contains("Could not create profiles asset", error);
                 StringAssert.Contains("Could not remove partial profiles asset", error);
-                Assert.IsTrue(AssetDatabase.LoadMainAssetAtPath(ProfilePath) != null);
+                Assert.AreEqual(1, StagedAssetFiles().Length);
+                Assert.IsTrue(AssetDatabase.LoadMainAssetAtPath(ProfilePath) == null);
             }
+        }
+
+        [Test]
+        public void AFailedSavePreservesStagedBytesWithoutAnOwnershipSnapshot()
+        {
+            byte[] laterBytes = { 8, 7, 6, 5 };
+            RestorableGlobal<Action> save = new(
+                () => SpriteSettingsApplierAPI.SaveProfileAssetsAction,
+                action => SpriteSettingsApplierAPI.SaveProfileAssetsAction = action
+            );
+            using (
+                save.Borrow(() =>
+                {
+                    AssetDatabase.SaveAssets();
+                    File.WriteAllBytes(StagedAssetFiles()[0], laterBytes);
+                    throw new IOException("forced post-save failure");
+                })
+            )
+            {
+                Assert.IsFalse(
+                    SpriteSettingsApplierAPI.TrySaveProfiles(
+                        ProfilePath,
+                        new List<SpriteSettings> { new SpriteSettings() },
+                        false,
+                        out string error
+                    )
+                );
+                StringAssert.Contains("forced post-save failure", error);
+                StringAssert.Contains("inspect it before removal", error);
+            }
+            string[] staged = StagedAssetFiles();
+            Assert.AreEqual(1, staged.Length);
+            CollectionAssert.AreEqual(laterBytes, File.ReadAllBytes(staged[0]));
+            Assert.IsTrue(AssetDatabase.LoadMainAssetAtPath(ProfilePath) == null);
         }
 
         [Test]
@@ -291,9 +473,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 );
                 StringAssert.Contains("Could not create profiles asset", error);
             }
-            Assert.IsTrue(
-                AssetDatabase.LoadMainAssetAtPath(Root + "/Profiles.staging.asset") == null
-            );
+            Assert.AreEqual(0, StagedAssetFiles().Length);
             Assert.IsTrue(
                 SpriteSettingsApplierAPI.TryLoadProfiles(
                     ProfilePath,
@@ -318,7 +498,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 ),
                 error
             );
-            string stagingPath = Root + "/Profiles.staging.asset";
             RestorableGlobal<Func<string, bool>> delete = new(
                 () => SpriteSettingsApplierAPI.DeleteProfileAssetAction,
                 action => SpriteSettingsApplierAPI.DeleteProfileAssetAction = action
@@ -328,10 +507,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 Assert.IsFalse(
                     SpriteSettingsApplierAPI.TrySaveProfiles(ProfilePath, first, true, out error)
                 );
-                StringAssert.Contains(stagingPath, error);
-                Assert.IsTrue(AssetDatabase.LoadMainAssetAtPath(stagingPath) != null);
+                StringAssert.Contains("Profiles.staging.", error);
+                Assert.AreEqual(1, StagedAssetFiles().Length);
             }
-            AssetDatabase.DeleteAsset(stagingPath);
             Assert.IsTrue(
                 SpriteSettingsApplierAPI.TryLoadProfiles(
                     ProfilePath,
@@ -341,6 +519,436 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 error
             );
             Assert.AreEqual("First", loaded[0].name);
+        }
+
+        [Test]
+        public void ANewSavePreservesALateCollisionAtTheDestination()
+        {
+            RestorableGlobal<Func<string, string, string>> move = new(
+                () => SpriteSettingsApplierAPI.MoveProfileAssetAction,
+                action => SpriteSettingsApplierAPI.MoveProfileAssetAction = action
+            );
+            using (
+                move.Borrow(
+                    (stagingPath, destinationPath) =>
+                    {
+                        Texture2D collision = new(1, 1);
+                        AssetDatabase.CreateAsset(collision, destinationPath);
+                        return AssetDatabase.MoveAsset(stagingPath, destinationPath);
+                    }
+                )
+            )
+            {
+                Assert.IsFalse(
+                    SpriteSettingsApplierAPI.TrySaveProfiles(
+                        ProfilePath,
+                        new List<SpriteSettings> { new SpriteSettings() },
+                        false,
+                        out string error
+                    )
+                );
+                StringAssert.Contains("Could not move profiles asset", error);
+            }
+            Assert.IsTrue(AssetDatabase.LoadMainAssetAtPath(ProfilePath) is Texture2D);
+            Assert.AreEqual(0, StagedAssetFiles().Length);
+        }
+
+        [Test]
+        public void AnOverwriteRejectsAChangedSnapshotWithoutRestoringIt()
+        {
+            List<SpriteSettings> first = new() { new SpriteSettings { name = "First" } };
+            Assert.IsTrue(
+                SpriteSettingsApplierAPI.TrySaveProfiles(
+                    ProfilePath,
+                    first,
+                    false,
+                    out string error
+                ),
+                error
+            );
+            string fullPath = Path.Combine(
+                Path.GetDirectoryName(Application.dataPath),
+                ProfilePath
+            );
+            byte[] originalBytes = File.ReadAllBytes(fullPath);
+            byte[] changedBytes = { 1, 2, 3, 4 };
+            RestorableGlobal<Action> save = new(
+                () => SpriteSettingsApplierAPI.SaveProfileAssetsAction,
+                action => SpriteSettingsApplierAPI.SaveProfileAssetsAction = action
+            );
+            using (
+                save.Borrow(() =>
+                {
+                    AssetDatabase.SaveAssets();
+                    File.WriteAllBytes(fullPath, changedBytes);
+                })
+            )
+            {
+                Assert.IsFalse(
+                    SpriteSettingsApplierAPI.TrySaveProfiles(ProfilePath, first, true, out error)
+                );
+            }
+            StringAssert.Contains("changed since it was read", error);
+            CollectionAssert.AreEqual(changedBytes, File.ReadAllBytes(fullPath));
+            File.WriteAllBytes(fullPath, originalBytes);
+            AssetDatabase.ImportAsset(ProfilePath, ImportAssetOptions.ForceSynchronousImport);
+            Assert.AreEqual(0, StagedAssetFiles().Length);
+        }
+
+        [Test]
+        public void AFailedPostSwapLoadPreservesALaterWriterInsteadOfRollingItBack()
+        {
+            List<SpriteSettings> first = new() { new SpriteSettings { name = "First" } };
+            Assert.IsTrue(
+                SpriteSettingsApplierAPI.TrySaveProfiles(
+                    ProfilePath,
+                    first,
+                    false,
+                    out string error
+                ),
+                error
+            );
+            string fullPath = Path.Combine(
+                Path.GetDirectoryName(Application.dataPath),
+                ProfilePath
+            );
+            byte[] originalBytes = File.ReadAllBytes(fullPath);
+            byte[] laterBytes = { 5, 6, 7, 8 };
+            RestorableGlobal<Func<string, SpriteSettingsProfileCollection>> load = new(
+                () => SpriteSettingsApplierAPI.LoadProfileAssetAction,
+                action => SpriteSettingsApplierAPI.LoadProfileAssetAction = action
+            );
+            using (
+                load.Borrow(path =>
+                {
+                    if (string.Equals(path, ProfilePath, StringComparison.Ordinal))
+                    {
+                        File.WriteAllBytes(fullPath, laterBytes);
+                        return null;
+                    }
+                    return AssetDatabase.LoadAssetAtPath<SpriteSettingsProfileCollection>(path);
+                })
+            )
+            {
+                Assert.IsFalse(
+                    SpriteSettingsApplierAPI.TrySaveProfiles(ProfilePath, first, true, out error)
+                );
+            }
+            StringAssert.Contains("Could not restore the prior asset", error);
+            CollectionAssert.AreEqual(laterBytes, File.ReadAllBytes(fullPath));
+            File.WriteAllBytes(fullPath, originalBytes);
+            AssetDatabase.ImportAsset(ProfilePath, ImportAssetOptions.ForceSynchronousImport);
+            Assert.AreEqual(0, StagedAssetFiles().Length);
+        }
+
+        [Test]
+        public void FailedOverwriteDoesNotDeleteAReusedStagingPath()
+        {
+            List<SpriteSettings> first = new() { new SpriteSettings { name = "First" } };
+            Assert.IsTrue(
+                SpriteSettingsApplierAPI.TrySaveProfiles(
+                    ProfilePath,
+                    first,
+                    false,
+                    out string error
+                ),
+                error
+            );
+            string stagingPath = null;
+            RestorableGlobal<Func<string, SpriteSettingsProfileCollection>> load = new(
+                () => SpriteSettingsApplierAPI.LoadProfileAssetAction,
+                action => SpriteSettingsApplierAPI.LoadProfileAssetAction = action
+            );
+            RestorableGlobal<Action<string>> compare = new(
+                () => DurableFile.BeforeCompareReadForTests,
+                action => DurableFile.BeforeCompareReadForTests = action
+            );
+            using (
+                load.Borrow(path =>
+                {
+                    if (!string.Equals(path, ProfilePath, StringComparison.Ordinal))
+                    {
+                        stagingPath = path;
+                    }
+                    return AssetDatabase.LoadAssetAtPath<SpriteSettingsProfileCollection>(path);
+                })
+            )
+            using (
+                compare.Borrow(_ =>
+                {
+                    Assert.IsTrue(stagingPath != null);
+                    Texture2D replacement = new(1, 1);
+                    AssetDatabase.CreateAsset(replacement, stagingPath);
+                    throw new IOException("forced compare failure");
+                })
+            )
+            {
+                Assert.IsFalse(
+                    SpriteSettingsApplierAPI.TrySaveProfiles(ProfilePath, first, true, out error)
+                );
+            }
+            StringAssert.Contains("forced compare failure", error);
+            Assert.IsTrue(AssetDatabase.LoadMainAssetAtPath(stagingPath) is Texture2D);
+            Assert.AreEqual(
+                "First",
+                AssetDatabase
+                    .LoadAssetAtPath<SpriteSettingsProfileCollection>(ProfilePath)
+                    .profiles[0]
+                    .name
+            );
+        }
+
+        [Test]
+        public void AFailedCreateAfterWritingPreservesItsUnverifiedStagedAsset()
+        {
+            RestorableGlobal<Action<UnityEngine.Object, string>> create = new(
+                () => SpriteSettingsApplierAPI.CreateProfileAssetAction,
+                action => SpriteSettingsApplierAPI.CreateProfileAssetAction = action
+            );
+            using (
+                create.Borrow(
+                    (asset, path) =>
+                    {
+                        AssetDatabase.CreateAsset(asset, path);
+                        throw new IOException("forced post-create failure");
+                    }
+                )
+            )
+            {
+                Assert.IsFalse(
+                    SpriteSettingsApplierAPI.TrySaveProfiles(
+                        ProfilePath,
+                        new List<SpriteSettings> { new SpriteSettings() },
+                        false,
+                        out string error
+                    )
+                );
+                StringAssert.Contains("forced post-create failure", error);
+                StringAssert.Contains("inspect it before removal", error);
+            }
+            Assert.IsTrue(AssetDatabase.LoadMainAssetAtPath(ProfilePath) == null);
+            Assert.AreEqual(1, StagedAssetFiles().Length);
+        }
+
+        [Test]
+        public void AFailedImportAfterMoveIdentifiesTheCommittedDestination()
+        {
+            RestorableGlobal<Action<string, ImportAssetOptions>> import = new(
+                () => SpriteSettingsApplierAPI.ImportProfileAssetAction,
+                action => SpriteSettingsApplierAPI.ImportProfileAssetAction = action
+            );
+            using (import.Borrow((_, _) => throw new IOException("forced import failure")))
+            {
+                Assert.IsFalse(
+                    SpriteSettingsApplierAPI.TrySaveProfiles(
+                        ProfilePath,
+                        new List<SpriteSettings> { new SpriteSettings() },
+                        false,
+                        out string error
+                    )
+                );
+                StringAssert.Contains("forced import failure", error);
+                StringAssert.Contains("Inspect the destination", error);
+                StringAssert.Contains(ProfilePath, error);
+            }
+            Assert.IsTrue(
+                AssetDatabase.LoadMainAssetAtPath(ProfilePath) is SpriteSettingsProfileCollection
+            );
+            Assert.AreEqual(0, StagedAssetFiles().Length);
+        }
+
+        [Test]
+        public void AnOverwriteDoesNotReportSuccessAfterALaterValidWrite()
+        {
+            Assert.IsTrue(
+                SpriteSettingsApplierAPI.TrySaveProfiles(
+                    ProfilePath,
+                    new List<SpriteSettings> { new SpriteSettings { name = "First" } },
+                    false,
+                    out string error
+                ),
+                error
+            );
+            string laterPath = Root + "/Later.asset";
+            SpriteSettingsProfileCollection later = Track(
+                ScriptableObject.CreateInstance<SpriteSettingsProfileCollection>()
+            );
+            later.profiles = new List<SpriteSettings> { new SpriteSettings { name = "Later" } };
+            AssetDatabase.CreateAsset(later, laterPath);
+            AssetDatabase.SaveAssets();
+            byte[] laterBytes = File.ReadAllBytes(
+                Path.Combine(Path.GetDirectoryName(Application.dataPath), laterPath)
+            );
+            AssetDatabase.DeleteAsset(laterPath);
+            string fullPath = Path.Combine(
+                Path.GetDirectoryName(Application.dataPath),
+                ProfilePath
+            );
+            RestorableGlobal<Func<string, SpriteSettingsProfileCollection>> load = new(
+                () => SpriteSettingsApplierAPI.LoadProfileAssetAction,
+                action => SpriteSettingsApplierAPI.LoadProfileAssetAction = action
+            );
+            using (
+                load.Borrow(path =>
+                {
+                    if (string.Equals(path, ProfilePath, StringComparison.Ordinal))
+                    {
+                        File.WriteAllBytes(fullPath, laterBytes);
+                        AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+                    }
+                    return AssetDatabase.LoadAssetAtPath<SpriteSettingsProfileCollection>(path);
+                })
+            )
+            {
+                Assert.IsFalse(
+                    SpriteSettingsApplierAPI.TrySaveProfiles(
+                        ProfilePath,
+                        new List<SpriteSettings> { new SpriteSettings { name = "Second" } },
+                        true,
+                        out error
+                    )
+                );
+            }
+            StringAssert.Contains("could not be verified", error);
+            StringAssert.Contains("Could not restore the prior asset", error);
+            SpriteSettingsProfileCollection persisted =
+                AssetDatabase.LoadAssetAtPath<SpriteSettingsProfileCollection>(ProfilePath);
+            Assert.AreEqual("Later", persisted.profiles[0].name);
+            Assert.AreEqual(0, StagedAssetFiles().Length);
+        }
+
+        [Test]
+        public void AMoveThatReportsAnErrorAfterCompletionStillProducesAValidAsset()
+        {
+            string failureError = null;
+            RestorableGlobal<Func<string, string, string>> move = new(
+                () => SpriteSettingsApplierAPI.MoveProfileAssetAction,
+                action => SpriteSettingsApplierAPI.MoveProfileAssetAction = action
+            );
+            using (
+                move.Borrow(
+                    (stagingPath, destinationPath) =>
+                    {
+                        string moveError = AssetDatabase.MoveAsset(stagingPath, destinationPath);
+                        Assert.IsEmpty(moveError);
+                        throw new IOException("forced post-move failure");
+                    }
+                )
+            )
+            {
+                Assert.IsTrue(
+                    SpriteSettingsApplierAPI.TrySaveProfiles(
+                        ProfilePath,
+                        new List<SpriteSettings> { new SpriteSettings() },
+                        false,
+                        out failureError
+                    )
+                );
+                Assert.IsTrue(failureError == null);
+            }
+            Assert.IsTrue(
+                AssetDatabase.LoadMainAssetAtPath(ProfilePath) is SpriteSettingsProfileCollection,
+                failureError
+            );
+            Assert.AreEqual(0, StagedAssetFiles().Length);
+        }
+
+        [Test]
+        public void ANewSaveNeverRemovesBytesWrittenAfterItsMove()
+        {
+            string laterPath = Root + "/Later.asset";
+            SpriteSettingsProfileCollection later = Track(
+                ScriptableObject.CreateInstance<SpriteSettingsProfileCollection>()
+            );
+            later.profiles = new List<SpriteSettings> { new SpriteSettings { name = "Later" } };
+            AssetDatabase.CreateAsset(later, laterPath);
+            AssetDatabase.SaveAssets();
+            byte[] laterBytes = File.ReadAllBytes(
+                Path.Combine(Path.GetDirectoryName(Application.dataPath), laterPath)
+            );
+            AssetDatabase.DeleteAsset(laterPath);
+            string fullPath = Path.Combine(
+                Path.GetDirectoryName(Application.dataPath),
+                ProfilePath
+            );
+            RestorableGlobal<Func<string, string, string>> move = new(
+                () => SpriteSettingsApplierAPI.MoveProfileAssetAction,
+                action => SpriteSettingsApplierAPI.MoveProfileAssetAction = action
+            );
+            using (
+                move.Borrow(
+                    (stagingPath, destinationPath) =>
+                    {
+                        string moveError = AssetDatabase.MoveAsset(stagingPath, destinationPath);
+                        Assert.IsEmpty(moveError);
+                        File.WriteAllBytes(fullPath, laterBytes);
+                        return moveError;
+                    }
+                )
+            )
+            {
+                Assert.IsFalse(
+                    SpriteSettingsApplierAPI.TrySaveProfiles(
+                        ProfilePath,
+                        new List<SpriteSettings> { new SpriteSettings() },
+                        false,
+                        out string error
+                    )
+                );
+                StringAssert.Contains("inspect the destination", error);
+            }
+            SpriteSettingsProfileCollection persisted =
+                AssetDatabase.LoadAssetAtPath<SpriteSettingsProfileCollection>(ProfilePath);
+            Assert.IsTrue(persisted != null);
+            Assert.AreEqual("Later", persisted.profiles[0].name);
+            Assert.AreEqual(0, StagedAssetFiles().Length);
+        }
+
+        [Test]
+        public void AnAbsentDestinationRecoveryPreservesALateCollision()
+        {
+            List<SpriteSettings> first = new() { new SpriteSettings { name = "First" } };
+            Assert.IsTrue(
+                SpriteSettingsApplierAPI.TrySaveProfiles(
+                    ProfilePath,
+                    first,
+                    false,
+                    out string error
+                ),
+                error
+            );
+            string fullPath = Path.Combine(
+                Path.GetDirectoryName(Application.dataPath),
+                ProfilePath
+            );
+            byte[] originalBytes = File.ReadAllBytes(fullPath);
+            byte[] laterBytes = { 6, 7, 8, 9 };
+            RestorableGlobal<Action<string>> swap = new(
+                () => DurableFile.BeforeStagedSwapForTests,
+                action => DurableFile.BeforeStagedSwapForTests = action
+            );
+            RestorableGlobal<Action<string>> restore = new(
+                () => SpriteSettingsApplierAPI.BeforeAbsentRestoreMoveForTests,
+                action => SpriteSettingsApplierAPI.BeforeAbsentRestoreMoveForTests = action
+            );
+            using (
+                swap.Borrow(_ =>
+                {
+                    File.Delete(fullPath);
+                    throw new IOException("forced replacement failure");
+                })
+            )
+            using (restore.Borrow(_ => File.WriteAllBytes(fullPath, laterBytes)))
+            {
+                Assert.IsFalse(
+                    SpriteSettingsApplierAPI.TrySaveProfiles(ProfilePath, first, true, out error)
+                );
+            }
+            StringAssert.Contains("Could not restore the prior asset", error);
+            CollectionAssert.AreEqual(laterBytes, File.ReadAllBytes(fullPath));
+            File.WriteAllBytes(fullPath, originalBytes);
+            AssetDatabase.ImportAsset(ProfilePath, ImportAssetOptions.ForceSynchronousImport);
+            Assert.AreEqual(0, StagedAssetFiles().Length);
         }
 
         [Test]
