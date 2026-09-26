@@ -228,6 +228,9 @@ reimport.
 | A run always makes progress        | `Step` processes at least one asset whatever budget you pass, so no budget can produce a run that never ends.                 |
 | Nothing throws at you              | Null rules and unusable targets are dropped; a loader that throws is recorded and the rule still runs with a `null` asset.    |
 
+A target needs a GUID and an asset path with non-whitespace text. A blank path displays its GUID in
+diagnostics, and a target with either field blank is skipped by the run.
+
 ## Findings are stable across runs
 
 `ValidationFinding.Id` is the rule, the asset's GUID, and the rule's own discriminator — never the

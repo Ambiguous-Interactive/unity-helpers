@@ -47,10 +47,10 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         }
 
         /// <summary>Reports whether this target names an asset at all.</summary>
-        /// <returns><c>true</c> when both the GUID and the path are present.</returns>
+        /// <returns><c>true</c> when both the GUID and the path contain non-whitespace text.</returns>
         public bool IsValid()
         {
-            return !string.IsNullOrEmpty(AssetGuid) && !string.IsNullOrEmpty(AssetPath);
+            return !string.IsNullOrWhiteSpace(AssetGuid) && !string.IsNullOrWhiteSpace(AssetPath);
         }
 
         /// <summary>Reports whether two targets name the same asset.</summary>
@@ -76,7 +76,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// <inheritdoc />
         public override string ToString()
         {
-            return string.IsNullOrEmpty(AssetPath) ? AssetGuid : AssetPath;
+            return string.IsNullOrWhiteSpace(AssetPath) ? AssetGuid : AssetPath;
         }
     }
 #endif

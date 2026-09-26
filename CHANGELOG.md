@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `SpriteSettingsApplierAPI.TrySaveProfiles` and `TryLoadProfiles` so editor scripts can persist sprite settings without opening the window, with explicit overwrite and independent profile copies ([#862](https://github.com/Ambiguous-Interactive/unity-helpers/issues/862)).
 - Add `UnityMethodAnalyzerReportExportAPI` so editor scripts can save Markdown and JSON findings with compiler coverage status without opening the window ([#861](https://github.com/Ambiguous-Interactive/unity-helpers/issues/861)).
 - Add `ValidationReportExportAPI` so editor scripts can write Sentinel JSON and JUnit reports from a validation run without opening the workspace ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Add `SpriteSheetAnimationAPI.TryCreate` so editor scripts can preview or create sprite sheet animation clips from ordered frames without opening the window ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
@@ -21,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix Sentinel validation runs so targets with whitespace-only GUIDs or asset paths are skipped ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Ignore whitespace-only file paths in Unity Method Analyzer source selection, compiler messages, navigation, and report export ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix `SpriteRendererMetadata` so material copies are released after replacement, pop, or destruction, and moving the top material to the back restores the prior top ([#855](https://github.com/Ambiguous-Interactive/unity-helpers/issues/855)).
 - Fix Sprite Cropper padding so borderless sprites stay borderless and larger outputs retain their full resolution ([#857](https://github.com/Ambiguous-Interactive/unity-helpers/issues/857)).

@@ -209,7 +209,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
         /// <inheritdoc />
         public override string ToString()
         {
-            string where = string.IsNullOrEmpty(AssetPath) ? AssetGuid : AssetPath;
+            string where = string.IsNullOrWhiteSpace(AssetPath) ? AssetGuid : AssetPath;
             return string.IsNullOrEmpty(Discriminator)
                 ? $"[{Severity}] {RuleId}: {where} -- {Message}"
                 : $"[{Severity}] {RuleId}: {where} ({Discriminator}) -- {Message}";

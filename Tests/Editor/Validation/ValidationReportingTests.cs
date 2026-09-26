@@ -46,13 +46,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             return document;
         }
 
-        private static string[] Ids(List<IValidationRule> rules)
+        private static string[] PackageRuleIds(List<IValidationRule> rules)
         {
             List<string> ids = new List<string>();
             foreach (
                 WallstopStudios.UnityHelpers.Editor.Validation.Continuous.IValidationRule rulesElement in rules
             )
             {
+                if (rulesElement.GetType().Assembly != typeof(ValidationBatch).Assembly)
+                {
+                    continue;
+                }
                 ids.Add(rulesElement.RuleId);
             }
 
@@ -183,6 +187,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             Assert.IsFalse(suppressions.IsSuppressed(Finding("Other", FirstGuid, "field")));
             Assert.IsFalse(suppressions.IsSuppressed(Finding("Rule", SecondGuid, "field")));
             Assert.IsFalse(suppressions.IsSuppressed(Finding("Rule", FirstGuid, "otherField")));
+            Assert.IsFalse(suppressions.IsSuppressed(Finding("Rule", FirstGuid, " ")));
         }
 
         /// <summary>
@@ -202,6 +207,17 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
             StringAssert.Contains("Assets/Audio/Theme.wav", rendered);
             StringAssert.Contains("not streaming", rendered);
             Assert.AreEqual(1, ValidationSuppressions.Parse(rendered).Count);
+        }
+
+        [Test]
+        public void ARenderedFileNamesBlankPathAndMessageForAReviewer()
+        {
+            ValidationFinding finding = Finding("Rule", FirstGuid, null, "   ", " \n ");
+
+            string rendered = ValidationSuppressions.Render(new[] { finding });
+
+            StringAssert.Contains("# (no path) -- (no message)", rendered);
+            StringAssert.Contains(FirstGuid, finding.ToString());
         }
 
         /// <summary>
@@ -523,7 +539,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         public void ATestDoubleIsNotAProjectRule()
         {
             // Production discovery must exclude test doubles, including those that throw.
-            List<IValidationRule> shipped = ValidationBatch.DiscoverRules(null);
+            List<IValidationRule> shipped = ValidationBatch.DiscoverRules(null, false);
+            List<IValidationRule> project = ValidationBatch.DiscoverRules(null);
             List<IValidationRule> everything = ValidationBatch.DiscoverRules(null, true);
 
             Assert.IsTrue(
@@ -534,7 +551,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                     + "nothing"
             );
             Assert.IsFalse(
-                shipped.Exists(rule =>
+                project.Exists(rule =>
                     string.Equals(rule.RuleId, "Tests.Throwing", StringComparison.Ordinal)
                 ),
                 "a rule declared in an assembly that references NUnit is a test double, and running "
@@ -548,9 +565,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                     ValidationRuleIds.AnimationKeyframeEmpty,
                     ValidationRuleIds.ScriptFileNameMismatch,
                 },
-                Ids(shipped),
-                "these are the rules a consumer's window shows; adding one to the package without "
-                    + "naming it here is how a rule ships unmeasured"
+                PackageRuleIds(shipped),
+                "these are the package rules; adding one without naming it here is how a rule "
+                    + "ships unmeasured"
             );
         }
 
