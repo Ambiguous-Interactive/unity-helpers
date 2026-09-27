@@ -62,7 +62,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
                 scriptPath,
                 "param([string]$Path)\n"
                     + "try {\n"
-                    + "  $stream = [System.IO.FileStream]::new(($Path + '.lock'), [System.IO.FileMode]::OpenOrCreate, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::Read)\n"
+                    + $"  $stream = [System.IO.FileStream]::new(($Path + '{DurableFile.OwnershipSuffix}'), [System.IO.FileMode]::OpenOrCreate, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::Read)\n"
                     + "  $stream.WriteByte(88)\n"
                     + "  $stream.Dispose()\n"
                     + "  exit 0\n"
@@ -563,6 +563,90 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [Test]
+        public void AppendsRespectStagedWriterOwnership()
+        {
+            string path = WriteDirectly("owned-ledger.log", "original\n");
+            string ownershipPath = path + DurableFile.TemporarySuffix + DurableFile.OwnershipSuffix;
+
+            using (
+                FileStream ownership = new(
+                    ownershipPath,
+                    FileMode.OpenOrCreate,
+                    FileAccess.ReadWrite,
+                    FileShare.Read,
+                    bufferSize: 1,
+                    FileOptions.DeleteOnClose
+                )
+            )
+            {
+                Assert.IsFalse(
+                    DurableFile.TryAppendAllText(path, "sync\n", out Exception appendError)
+                );
+                Assert.IsTrue(appendError != null);
+                Exception asyncError = DurableFile
+                    .AppendAllTextAsync(path, "async\n")
+                    .AsTask()
+                    .GetAwaiter()
+                    .GetResult();
+                Assert.IsTrue(asyncError != null);
+                Assert.AreEqual("original\n", File.ReadAllText(path));
+            }
+
+            Assert.IsTrue(DurableFile.TryAppendAllText(path, "sync\n", out Exception retryError));
+            Assert.IsTrue(retryError == null);
+            Assert.IsTrue(
+                DurableFile.AppendAllTextAsync(path, "async\n").AsTask().GetAwaiter().GetResult()
+                    == null
+            );
+            Assert.AreEqual("original\nsync\nasync\n", File.ReadAllText(path));
+        }
+
+        [Test]
+        public void CreateAndDeleteRespectStagedWriterOwnership()
+        {
+            string existingPath = WriteDirectly("owned-delete.txt", "original");
+            string missingPath = Path.Combine(_testDirectory, "owned-create.txt");
+            byte[] createdBytes = Encoding.UTF8.GetBytes("created");
+
+            using (
+                FileStream deleteOwnership = new(
+                    existingPath + DurableFile.TemporarySuffix + DurableFile.OwnershipSuffix,
+                    FileMode.OpenOrCreate,
+                    FileAccess.ReadWrite,
+                    FileShare.Read,
+                    bufferSize: 1,
+                    FileOptions.DeleteOnClose
+                )
+            )
+            using (
+                FileStream createOwnership = new(
+                    missingPath + DurableFile.TemporarySuffix + DurableFile.OwnershipSuffix,
+                    FileMode.OpenOrCreate,
+                    FileAccess.ReadWrite,
+                    FileShare.Read,
+                    bufferSize: 1,
+                    FileOptions.DeleteOnClose
+                )
+            )
+            {
+                Assert.IsFalse(DurableFile.TryDelete(existingPath));
+                Assert.IsFalse(
+                    DurableFile.TryCreateAllBytes(missingPath, createdBytes, out Exception error)
+                );
+                Assert.IsTrue(error != null);
+                Assert.AreEqual("original", File.ReadAllText(existingPath));
+                Assert.IsFalse(File.Exists(missingPath));
+            }
+
+            Assert.IsTrue(DurableFile.TryDelete(existingPath));
+            Assert.IsTrue(
+                DurableFile.TryCreateAllBytes(missingPath, createdBytes, out Exception retryError),
+                retryError?.ToString()
+            );
+            CollectionAssert.AreEqual(createdBytes, File.ReadAllBytes(missingPath));
+        }
+
+        [Test]
         public void AppendingNothingSucceedsWithoutCreatingAFile()
         {
             string path = Path.Combine(_testDirectory, "ledger.log");
@@ -829,6 +913,9 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         {
             Assert.IsFalse(DurableFile.TryDelete(_testDirectory));
             Assert.IsTrue(Directory.Exists(_testDirectory));
+            string root = Path.GetPathRoot(_testDirectory);
+            Assert.IsFalse(DurableFile.TryDelete(root));
+            Assert.IsTrue(Directory.Exists(root));
         }
 
         [UnityTest]

@@ -1006,8 +1006,8 @@ guarantee without changing any code.
 - On platforms with `File.Replace`, a reader sees either complete old or complete new contents.
 - The data is forced out of the page cache before the swap makes it live.
 - Concurrent writes to the same path from your game are serialized.
-- A second process using `DurableFile` cannot replace another writer's staged bytes. Its competing
-  operation reports failure while the first writer owns the stage.
+- A second process using the public `DurableFile` write, append, or delete APIs cannot change the same
+  destination while the first operation owns it. Its competing operation reports failure.
 
 **What it does not promise:**
 
@@ -1016,6 +1016,7 @@ guarantee without changing any code.
 - On platforms without `File.Replace`, the delete-then-move fallback briefly exposes an absent file and
   can lose the old file if the move fails.
 - The ownership applies to one destination at a time. It is not a transaction across several files.
+- Tools that do not use `DurableFile` do not share this ownership and can still edit a destination.
 - An internal compare-then-replace operation checks a file before staging its replacement, but
   unrelated writers can edit the destination between that check and the swap. It does not provide
   atomic content compare-and-swap against external tools. See [#863](https://github.com/Ambiguous-Interactive/unity-helpers/issues/863)
