@@ -75,6 +75,35 @@ function New-SkillFixture {
   return $filePath
 }
 
+function Invoke-LinterRunspace {
+  param(
+    [string]$ScriptPath,
+    [switch]$Verbose
+  )
+  $runner = [System.Management.Automation.PowerShell]::Create()
+  try {
+    $null = $runner.AddCommand($ScriptPath)
+    if ($Verbose) { $null = $runner.AddParameter('VerboseOutput') }
+    $result = $runner.Invoke()
+    $output = [System.Collections.Generic.List[string]]::new()
+    foreach ($item in $result) { $output.Add($item.ToString()) }
+    foreach ($item in $runner.Streams.Information) { $output.Add($item.MessageData.ToString()) }
+    foreach ($item in $runner.Streams.Warning) { $output.Add($item.ToString()) }
+    foreach ($item in $runner.Streams.Error) { $output.Add($item.ToString()) }
+    if ($runner.Streams.Error.Count -gt 0) {
+      throw "Linter emitted a PowerShell error: $($output -join [Environment]::NewLine)"
+    }
+    $exitCode = $runner.Runspace.SessionStateProxy.GetVariable('LASTEXITCODE')
+    if ($null -eq $exitCode) {
+      throw "Linter returned without an exit code. $($output -join [Environment]::NewLine)"
+    }
+    return @{ ExitCode = [int]$exitCode; Output = ($output -join [Environment]::NewLine) }
+  }
+  finally {
+    $runner.Dispose()
+  }
+}
+
 function Invoke-Linter {
   param(
     [string]$SkillsDir,
@@ -132,20 +161,45 @@ function Invoke-Linter {
   }
 
   try {
-    $output = & pwsh -NoProfile -File @linterArgs 2>&1
-    $exitCode = $LASTEXITCODE
+    if ($null -ne $AdditionalArgs -and $AdditionalArgs.Count -gt 0) {
+      $output = & pwsh -NoProfile -File @linterArgs 2>&1
+      $result = @{ ExitCode = $LASTEXITCODE; Output = ($output -join "`n") }
+    }
+    else {
+      $result = Invoke-LinterRunspace -ScriptPath $linterArgs[0] -Verbose:$Verbose
+    }
   }
   finally {
     Remove-Item -Path $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
   }
 
-  return @{
-    ExitCode = $exitCode
-    Output = ($output -join "`n")
-  }
+  return $result
 }
 
 # ---- Test Cases ----
+
+$harnessScript = Join-Path ([System.IO.Path]::GetTempPath()) "skill-size-harness-$([System.Guid]::NewGuid().ToString('N')).ps1"
+try {
+  Set-Content -LiteralPath $harnessScript -Value "Write-Host 'harness-zero'; exit 0"
+  $harnessZero = Invoke-LinterRunspace -ScriptPath $harnessScript
+  Write-TestResult 'Harness_ExitZero' ($harnessZero.ExitCode -eq 0 -and $harnessZero.Output -match 'harness-zero') 'An explicit exit 0 must remain observable.'
+  Set-Content -LiteralPath $harnessScript -Value "Write-Host 'harness-one'; exit 1"
+  $harnessOne = Invoke-LinterRunspace -ScriptPath $harnessScript
+  Write-TestResult 'Harness_ExitOne' ($harnessOne.ExitCode -eq 1 -and $harnessOne.Output -match 'harness-one') 'An explicit exit 1 must remain observable.'
+  Set-Content -LiteralPath $harnessScript -Value "Write-Host 'harness-no-exit'"
+  $missingExitFailed = $false
+  try { $null = Invoke-LinterRunspace -ScriptPath $harnessScript }
+  catch { $missingExitFailed = $_.Exception.Message -match 'without an exit code' }
+  Write-TestResult 'Harness_MissingExitFails' $missingExitFailed 'A missing exit must fail the fixture.'
+  Set-Content -LiteralPath $harnessScript -Value "Write-Error 'harness-error'; exit 0"
+  $errorFailed = $false
+  try { $null = Invoke-LinterRunspace -ScriptPath $harnessScript }
+  catch { $errorFailed = $_.Exception.Message -match 'PowerShell error' }
+  Write-TestResult 'Harness_PowerShellErrorFails' $errorFailed 'An error stream must fail the fixture.'
+}
+finally {
+  Remove-Item -LiteralPath $harnessScript -Force -ErrorAction SilentlyContinue
+}
 
 Write-Host "Testing lint-skill-sizes.ps1 thresholds..." -ForegroundColor White
 
@@ -173,7 +227,7 @@ Write-Host "`nTest group: Warning threshold (181-198)" -ForegroundColor Magenta
 $tempDir3 = Join-Path ([System.IO.Path]::GetTempPath()) "skill-test-warn-$([System.Guid]::NewGuid().ToString('N').Substring(0,8))"
 New-Item -ItemType Directory -Path $tempDir3 -Force | Out-Null
 New-SkillFixture -Dir $tempDir3 -FileName "warning-skill.md" -LineCount 181
-$result3v = Invoke-Linter -SkillsDir $tempDir3 -Verbose
+$result3v = Invoke-Linter -SkillsDir $tempDir3 -AdditionalArgs @('-VerboseOutput')
 Write-TestResult "FileAt181Lines_ExitCode0" ($result3v.ExitCode -eq 0) "Expected exit code 0, got $($result3v.ExitCode)"
 Write-TestResult "FileAt181Lines_WarningInVerbose" ($result3v.Output -match 'WARNING') "Expected WARNING in verbose output"
 
