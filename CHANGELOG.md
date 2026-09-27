@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fix `DurableFile` ownership so append, create, and delete operations cannot change a destination during a staged write ([#871](https://github.com/Ambiguous-Interactive/unity-helpers/issues/871)).
+- Fix `DurableFile` ownership so append, create, and delete operations cannot change a destination during a staged write; competing operations also report failure without crashing Windows IL2CPP players ([#871](https://github.com/Ambiguous-Interactive/unity-helpers/issues/871)).
 - Fix cached package path conversion so blank package IDs return no path ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix Sentinel validation runs so targets with whitespace-only GUIDs or asset paths are skipped ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Ignore whitespace-only file paths in Unity Method Analyzer source selection, compiler messages, navigation, and report export ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).

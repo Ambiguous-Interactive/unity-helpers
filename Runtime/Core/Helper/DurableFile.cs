@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 {
     using System;
     using System.IO;
+    using System.Runtime.CompilerServices;
     using System.Runtime.InteropServices;
     using System.Text;
     using System.Threading;
@@ -271,7 +272,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 try
                 {
                     EnsureDirectory(path);
-                    ownership = OpenStagingOwnership(path + TemporarySuffix);
+                    if (!TryOpenStagingOwnership(path + TemporarySuffix, out ownership, out error))
+                    {
+                        return false;
+                    }
                     byte[] bytes = Utf8NoByteOrderMark.GetBytes(contents);
                     using FileStream stream = OpenAppendStream(path, useAsync: false);
                     stream.Write(bytes, 0, bytes.Length);
@@ -333,7 +337,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 try
                 {
                     EnsureDirectory(path);
-                    ownership = OpenStagingOwnership(path + TemporarySuffix);
+                    if (
+                        !TryOpenStagingOwnership(
+                            path + TemporarySuffix,
+                            out ownership,
+                            out Exception ownershipError
+                        )
+                    )
+                    {
+                        return ownershipError;
+                    }
                     byte[] bytes = Utf8NoByteOrderMark.GetBytes(contents);
                     using FileStream stream = OpenAppendStream(path, useAsync: true);
                     await stream
@@ -388,7 +401,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
                 try
                 {
-                    ownership = OpenStagingOwnership(temporaryPath);
+                    if (!TryOpenStagingOwnership(temporaryPath, out ownership, out error))
+                    {
+                        ReleaseFileStream(source);
+                        return false;
+                    }
                     staging = OpenStagingStream(temporaryPath, useAsync: false);
                 }
                 catch (Exception e)
@@ -476,7 +493,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         return false;
                     }
 
-                    ownership = OpenStagingOwnership(path + TemporarySuffix);
+                    if (
+                        !TryOpenStagingOwnership(
+                            path + TemporarySuffix,
+                            out ownership,
+                            out Exception ownershipError
+                        )
+                    )
+                    {
+                        return ownershipError is DirectoryNotFoundException;
+                    }
                     File.Delete(path);
                     return true;
                 }
@@ -541,7 +567,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 try
                 {
                     EnsureDirectory(path);
-                    ownership = OpenStagingOwnership(path + TemporarySuffix);
+                    if (!TryOpenStagingOwnership(path + TemporarySuffix, out ownership, out error))
+                    {
+                        return false;
+                    }
                     using (
                         FileStream staging = new(
                             temporaryPath,
@@ -705,7 +734,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 bool ownsStaging = false;
                 try
                 {
-                    ownership = OpenStagingOwnership(temporaryPath);
+                    if (!TryOpenStagingOwnership(temporaryPath, out ownership, out error))
+                    {
+                        return false;
+                    }
 #if UNITY_EDITOR
                     BeforeCompareReadForTests?.Invoke(temporaryPath);
 #endif
@@ -780,7 +812,11 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 try
                 {
                     EnsureDirectory(path);
-                    ownership = OpenStagingOwnership(temporaryPath);
+                    if (!TryOpenStagingOwnership(temporaryPath, out ownership, out error))
+                    {
+                        exchanged = false;
+                        return false;
+                    }
                     bool exists;
                     string current;
                     try
@@ -885,7 +921,17 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
 
                 try
                 {
-                    ownership = OpenStagingOwnership(temporaryPath);
+                    if (
+                        !TryOpenStagingOwnership(
+                            temporaryPath,
+                            out ownership,
+                            out Exception ownershipError
+                        )
+                    )
+                    {
+                        ReleaseFileStream(source);
+                        return ownershipError;
+                    }
                     staging = OpenStagingStream(temporaryPath, useAsync: true);
                 }
                 catch (Exception e)
@@ -980,7 +1026,16 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                                 : Utf8NoByteOrderMark.GetBytes(textContents)
                         );
                     EnsureDirectory(path);
-                    ownership = OpenStagingOwnership(temporaryPath);
+                    if (
+                        !TryOpenStagingOwnership(
+                            temporaryPath,
+                            out ownership,
+                            out Exception ownershipError
+                        )
+                    )
+                    {
+                        return ownershipError;
+                    }
                     staging = OpenStagingStream(temporaryPath, useAsync: true);
                 }
                 catch (Exception e)
@@ -1033,7 +1088,10 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             try
             {
                 EnsureDirectory(path);
-                ownership = OpenStagingOwnership(temporaryPath);
+                if (!TryOpenStagingOwnership(temporaryPath, out ownership, out error))
+                {
+                    return false;
+                }
                 staging = OpenStagingStream(temporaryPath, useAsync: false);
             }
             catch (Exception e)
@@ -1181,16 +1239,40 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             );
         }
 
-        private static FileStream OpenStagingOwnership(string temporaryPath)
+        // Keep the expected sharing failure in a small, non-inlined frame. Unity's Windows IL2CPP
+        // player can fault while matching that exception in a larger caller or async state machine.
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static bool TryOpenStagingOwnership(
+            string temporaryPath,
+            out FileStream ownership,
+            out Exception error
+        )
         {
-            return new FileStream(
-                temporaryPath + OwnershipSuffix,
-                FileMode.OpenOrCreate,
-                FileAccess.ReadWrite,
-                FileShare.Read,
-                bufferSize: 1,
-                FileOptions.DeleteOnClose
-            );
+            try
+            {
+                ownership = new FileStream(
+                    temporaryPath + OwnershipSuffix,
+                    FileMode.OpenOrCreate,
+                    FileAccess.ReadWrite,
+                    FileShare.Read,
+                    bufferSize: 1,
+                    FileOptions.DeleteOnClose
+                );
+                error = null;
+                return true;
+            }
+            catch (IOException e)
+            {
+                ownership = null;
+                error = e;
+                return false;
+            }
+            catch (Exception e)
+            {
+                ownership = null;
+                error = e;
+                return false;
+            }
         }
 
         private static void ReleaseStagingOwnership(FileStream ownership)
