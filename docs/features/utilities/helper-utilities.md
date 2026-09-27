@@ -1093,6 +1093,35 @@ using (var scope = SceneHelper.GetObjectOfTypeInScene<LevelConfig>("Scenes/Level
 
 ## Advanced Utilities
 
+### `DisposableScope`
+
+Use `DisposableScope.Create` for a short cleanup that belongs to a `using` block:
+
+```csharp
+using WallstopStudios.UnityHelpers.Utils;
+
+using DisposableScope scope = DisposableScope.Create(RestoreSetting);
+```
+
+Add actions with `WithCleanup` and dispose the final returned scope. Added actions run in reverse
+order, including when one throws:
+
+```csharp
+using var scope = DisposableScope.Create(RestoreSetting).WithCleanup(DeleteTempFolder);
+```
+
+Each layer is a value type. Copies share a disposal lease, so each action runs at most once even if
+several copies are disposed. Disposing a default scope or passing a null action is harmless, and
+`Dispose` never throws. For reverse ordering, keep the final scope and let its `using` block dispose
+it; disposing an earlier copy before the final scope can run that earlier action sooner. Concurrent
+disposal of copies still runs each action once, but ordering across threads is undefined.
+
+The scope itself does not allocate after its lease slots have warmed up. Reuse noncapturing delegates
+when an allocation-free call site matters; a capturing lambda can allocate when it creates its
+delegate.
+
+---
+
 ### `RestorableGlobal<T>`
 
 **The problem:** the obvious way to borrow a global for the length of a block captures the previous
