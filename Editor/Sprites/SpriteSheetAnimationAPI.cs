@@ -32,6 +32,86 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             '|',
         };
 
+        /// <summary>Finds sprite frames in a texture asset without opening an editor window.</summary>
+        /// <remarks>
+        /// When import settings need changing, a false result leaves the importer unchanged unless
+        /// <paramref name="configureImporter"/> is true. Reimporting an asset cannot be fully undone.
+        /// The output list is cleared before validation and sorted by sprite name on success.
+        /// </remarks>
+        public static bool TryDiscoverFrames(
+            Texture2D texture,
+            bool configureImporter,
+            List<Sprite> frames,
+            out string error
+        )
+        {
+            if (frames == null)
+            {
+                error = "A frame output list is required.";
+                return false;
+            }
+
+            frames.Clear();
+            if (texture == null)
+            {
+                error = "A sprite sheet texture is required.";
+                return false;
+            }
+
+            try
+            {
+                string path = AssetDatabase.GetAssetPath(texture);
+                if (string.IsNullOrWhiteSpace(path))
+                {
+                    error = "The sprite sheet texture must be an asset.";
+                    return false;
+                }
+
+                TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+                if (importer == null)
+                {
+                    error = "The sprite sheet has no texture importer.";
+                    return false;
+                }
+
+                bool needsConfiguration =
+                    importer.textureType != TextureImporterType.Sprite
+                    || importer.spriteImportMode != SpriteImportMode.Multiple;
+                if (needsConfiguration && !configureImporter)
+                {
+                    error = "The texture must use Sprite type and Multiple sprite mode.";
+                    return false;
+                }
+
+                if (needsConfiguration)
+                {
+                    importer.textureType = TextureImporterType.Sprite;
+                    importer.spriteImportMode = SpriteImportMode.Multiple;
+                    EditorUtility.SetDirty(importer);
+                    importer.SaveAndReimport();
+                }
+
+                UnityEngine.Object[] assets = AssetDatabase.LoadAllAssetRepresentationsAtPath(path);
+                foreach (UnityEngine.Object asset in assets)
+                {
+                    if (asset is Sprite sprite && sprite != null)
+                    {
+                        frames.Add(sprite);
+                    }
+                }
+
+                frames.SortByName();
+                error = null;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                frames.Clear();
+                error = exception.Message;
+                return false;
+            }
+        }
+
         /// <summary>
         /// Previews or creates a uniquely named animation asset in a project folder.
         /// </summary>

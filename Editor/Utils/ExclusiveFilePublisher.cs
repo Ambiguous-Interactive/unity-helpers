@@ -27,7 +27,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Utils
         {
             Exception warning = null;
             if (
-                !DurableFile.TryPublishStagedFileWithoutOverwrite(
+                !DurableFile.TryPublishOwnedStagedFileWithoutOverwrite(
                     stagedPath,
                     destinationPath,
                     out bool removeStagedFile

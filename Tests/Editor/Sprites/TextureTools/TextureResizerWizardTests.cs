@@ -189,7 +189,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
 
             bool succeeded = TextureResizerAPI.TryResizeTextures(
                 null,
-                new[] { Path.GetDirectoryName(sourcePath).SanitizePath() },
+                new[] { " \t", Path.GetDirectoryName(sourcePath).SanitizePath() },
                 1,
                 TextureResizerWizard.ResizeAlgorithm.Point,
                 1,

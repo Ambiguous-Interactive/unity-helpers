@@ -699,6 +699,41 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             );
         }
 
+        /// <summary>Publishes an editor stage while owning the destination.</summary>
+        internal static bool TryPublishOwnedStagedFileWithoutOverwrite(
+            string stagedPath,
+            string destinationPath,
+            out bool leavesStaged
+        )
+        {
+            using (EnterGate(destinationPath))
+            {
+                if (
+                    !TryOpenStagingOwnership(
+                        destinationPath + TemporarySuffix,
+                        out FileStream ownership,
+                        out Exception error
+                    )
+                )
+                {
+                    throw error;
+                }
+
+                try
+                {
+                    return TryPublishStagedFileWithoutOverwrite(
+                        stagedPath,
+                        destinationPath,
+                        out leavesStaged
+                    );
+                }
+                finally
+                {
+                    ReleaseStagingOwnership(ownership);
+                }
+            }
+        }
+
         /// <summary>Compares current bytes, then stages and replaces the file.</summary>
         /// <remarks>
         /// The staging-file ownership spans the read, staging write, and replacement, so cooperating

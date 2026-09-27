@@ -11,10 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `DisposableScope` for allocation-free `using` cleanup with copy-safe, reverse-order disposal ([#875](https://github.com/Ambiguous-Interactive/unity-helpers/issues/875)).
 - Add `SpriteSettingsApplierAPI.TrySaveProfiles` and `TryLoadProfiles` so editor scripts can persist sprite settings without opening the window, with explicit overwrite and independent profile copies ([#862](https://github.com/Ambiguous-Interactive/unity-helpers/issues/862)).
 - Add `UnityMethodAnalyzerReportExportAPI` so editor scripts can save Markdown and JSON findings with compiler coverage status without opening the window ([#861](https://github.com/Ambiguous-Interactive/unity-helpers/issues/861)).
 - Add `ValidationReportExportAPI` so editor scripts can write Sentinel JSON and JUnit reports from a validation run without opening the workspace ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Add `SpriteSheetAnimationAPI.TryCreate` so editor scripts can preview or create sprite sheet animation clips from ordered frames without opening the window ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
+- Add `SpriteSheetAnimationAPI.TryDiscoverFrames` so editor scripts can load ordered sprite frames and choose whether to update import settings without opening the window ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Add `AnimationClipFrameSaveAPI.TrySaveFrames` so editor scripts can save sprite frames and FPS to an existing clip without opening the window. See [Sprite Animation Editor](./docs/features/editor-tools/editor-tools-guide.md#sprite-animation-editor-animation-viewer-window) ([#851](https://github.com/Ambiguous-Interactive/unity-helpers/issues/851)).
 - Add `PrefabChecker.ScanFolders` so editor scripts can inspect prefab findings from explicit folders and options without opening the window ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Add `TextureResizerAPI.TryResizeTextures` so editor scripts can resize or preview PNGs from explicit textures and asset folders without opening the window. Textures process in natural name order ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
@@ -23,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fix `DurableFile` ownership so append, create, and delete operations cannot change a destination during a staged write; competing operations also report failure without crashing Windows IL2CPP players ([#871](https://github.com/Ambiguous-Interactive/unity-helpers/issues/871)).
+- Fix Image Blur and Sprite Sheet Extractor output publication so a competing staged-file writer cannot change the destination during publication ([#871](https://github.com/Ambiguous-Interactive/unity-helpers/issues/871)).
+- Fix Sprite Sheet Animation Creator so declining an import-settings prompt leaves the texture importer unchanged ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
+- Fix Texture Resizer batch calls so whitespace-only source folder entries are ignored like empty entries ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix cached package path conversion so blank package IDs return no path ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix Sentinel validation runs so targets with whitespace-only GUIDs or asset paths are skipped ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Ignore whitespace-only file paths in Unity Method Analyzer source selection, compiler messages, navigation, and report export ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).

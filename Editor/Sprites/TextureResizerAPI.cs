@@ -143,7 +143,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 foreach (string path in sourceFolderAssetPaths)
                 {
-                    if (string.IsNullOrEmpty(path))
+                    if (string.IsNullOrWhiteSpace(path))
                     {
                         continue;
                     }

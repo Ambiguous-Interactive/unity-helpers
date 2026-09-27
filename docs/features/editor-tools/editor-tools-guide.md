@@ -107,6 +107,8 @@ process creates the file while the blur is being written.
 New output files are published from a complete staged image in the same directory. A failed
 publication leaves the staged file for cleanup and does not expose a partial output. On Linux and
 macOS, the output filesystem must support hard links; otherwise the API reports an error.
+Publication shares destination ownership with `DurableFile` writes. If another writer holds that
+destination, publication fails and keeps the staged image for cleanup.
 On Linux and macOS, if staged-file cleanup fails after publication, the API still imports the
 output and returns its path, but returns `false` with the cleanup error.
 This operation writes a file;
@@ -515,7 +517,8 @@ public static class TextureResizeExample
 }
 ```
 
-Invalid source or output folders are rejected before any texture changes. Overwrite mode accepts
+Blank source folder entries are ignored; other invalid source or output folders are rejected before
+any texture changes. Overwrite mode accepts
 only textures under `Assets/`; package textures can be copied into an explicit `Assets/` output
 folder. Textures are processed in natural name order, so `Sprite2` precedes `Sprite10`. The dry run reports target sizes without changing files or importer settings. A real run
 writes PNG files, so Unity Undo cannot fully reverse it. A failed or canceled run may leave earlier
@@ -843,8 +846,14 @@ Unity Undo cannot reverse the file write. For several clips, pass `saveAssets: f
 `AssetDatabase.SaveAssets()` once after the batch. If saving fails after creation, the call returns
 `false` and retains the created asset path in `assetPath` so the caller can inspect or remove it.
 
+Call `SpriteSheetAnimationAPI.TryDiscoverFrames(texture, configureImporter, frames, out error)` to
+load sprite frames into a caller-owned list without opening the window. It clears the list first and
+returns frames sorted by name. Pass `configureImporter: false` to leave a texture with unsuitable
+import settings untouched and receive an error. Pass `true` to change the texture to Sprite type
+and Multiple sprite mode and reimport it; that asset change cannot be fully undone.
+
 The texture must already be sliced (`Sprite Mode: Multiple`) — this window reads Unity's sprites, it
-does not slice for you.
+does not slice for you. Declining the window's importer prompt leaves its settings unchanged.
 
 > **Visual Demo**
 >
@@ -886,6 +895,8 @@ without changing files or importers.
 With the default `overwriteExisting: false`, an output that appears during extraction is skipped
 and left unchanged. With `overwriteExisting: true`, the encoded PNG is staged before replacing the
 existing file. New outputs are published from a complete staged image in the same directory.
+New output publication shares destination ownership with `DurableFile` writes. If another writer
+holds that destination, extraction reports an error without publishing the staged image.
 Extraction attempts to remove its temporary file if publishing fails; a failed publication does not
 expose a partial new output. On Linux and macOS, the output filesystem must support hard links.
 If temporary-file cleanup fails, the result reports that error alongside the extraction failure.

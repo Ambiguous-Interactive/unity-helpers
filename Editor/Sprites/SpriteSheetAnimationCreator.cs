@@ -44,7 +44,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     {
         private const float ThumbnailSize = 64f;
 
-        private static bool SuppressUserPrompts { get; set; }
+        internal static bool SuppressUserPrompts { get; set; }
 
         private Texture2D _selectedSpriteSheet;
         private readonly List<Sprite> _availableSprites = new();
@@ -858,30 +858,22 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
-            bool importSettingsChanged = false;
-            if (importer.textureType != TextureImporterType.Sprite)
+            bool configureImporter = false;
+            if (
+                importer.textureType != TextureImporterType.Sprite
+                || importer.spriteImportMode != SpriteImportMode.Multiple
+            )
             {
-                importer.textureType = TextureImporterType.Sprite;
-                importSettingsChanged = true;
-            }
-            if (importer.spriteImportMode != SpriteImportMode.Multiple)
-            {
-                bool fix = SuppressUserPrompts
+                configureImporter = SuppressUserPrompts
                     ? false
                     : Utils.EditorUi.Confirm(
                         "Sprite Mode",
-                        "The selected texture is not in 'Sprite Mode: Multiple'. This is required to extract individual sprites.\n\nAttempt to change it automatically?",
+                        "The selected texture must use Sprite type and Multiple sprite mode to extract individual sprites.\n\nChange its import settings?",
                         "Yes, Change It",
                         "No, I'll Do It",
                         defaultWhenSuppressed: true
                     );
-                if (fix)
-                {
-                    importer.spriteImportMode = SpriteImportMode.Multiple;
-
-                    importSettingsChanged = true;
-                }
-                else
+                if (!configureImporter)
                 {
                     _availableSprites.Clear();
                     UpdateSpriteThumbnails();
@@ -889,24 +881,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 }
             }
 
-            if (importSettingsChanged)
+            if (
+                !SpriteSheetAnimationAPI.TryDiscoverFrames(
+                    _selectedSpriteSheet,
+                    configureImporter,
+                    _availableSprites,
+                    out string error
+                )
+            )
             {
-                EditorUtility.SetDirty(importer);
-                importer.SaveAndReimport();
-                AssetDatabase.Refresh();
+                Utils.EditorUi.Info("Error", error);
+                UpdateSpriteThumbnails();
+                return;
             }
-
-            _availableSprites.Clear();
-            Object[] assets = AssetDatabase.LoadAllAssetRepresentationsAtPath(path);
-            foreach (Object asset in assets)
-            {
-                if (asset is Sprite sprite && sprite != null)
-                {
-                    _availableSprites.Add(sprite);
-                }
-            }
-
-            _availableSprites.SortByName();
 
             if (_availableSprites.Count == 0)
             {

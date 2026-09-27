@@ -8,6 +8,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
     using System.IO;
     using NUnit.Framework;
     using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Tools;
     using WallstopStudios.UnityHelpers.Tests.Core;
 
@@ -131,6 +132,51 @@ namespace WallstopStudios.UnityHelpers.Tests.Tools
                 Assert.That(File.Exists(stagedPath), Is.False);
                 Assert.That(File.ReadAllBytes(destinationPath), Is.EqualTo(stagedBytes));
                 Assert.That(File.GetLastWriteTimeUtc(destinationPath), Is.EqualTo(stagedWriteTime));
+            }
+            finally
+            {
+                File.Delete(stagedPath);
+                File.Delete(destinationPath);
+            }
+        }
+
+        [Test]
+        public void PublishKeepsStagedBytesWhenDestinationOwnershipIsHeld()
+        {
+            string stagedPath = Path.GetTempFileName();
+            string destinationPath = stagedPath + ".png";
+            byte[] stagedBytes = { 1, 2, 3, 4 };
+            try
+            {
+                File.WriteAllBytes(stagedPath, stagedBytes);
+                using (
+                    FileStream ownership = new(
+                        destinationPath + DurableFile.TemporarySuffix + DurableFile.OwnershipSuffix,
+                        FileMode.OpenOrCreate,
+                        FileAccess.ReadWrite,
+                        FileShare.Read,
+                        bufferSize: 1,
+                        FileOptions.DeleteOnClose
+                    )
+                )
+                {
+                    Assert.Throws<IOException>(() =>
+                        ImageBlurAPI.TryPublishNewFile(stagedPath, destinationPath, out _)
+                    );
+                    Assert.That(File.ReadAllBytes(stagedPath), Is.EqualTo(stagedBytes));
+                    Assert.That(File.Exists(destinationPath), Is.False);
+                }
+
+                Assert.That(
+                    ImageBlurAPI.TryPublishNewFile(
+                        stagedPath,
+                        destinationPath,
+                        out Exception cleanupWarning
+                    ),
+                    Is.True
+                );
+                Assert.That(cleanupWarning, Is.Null);
+                Assert.That(File.ReadAllBytes(destinationPath), Is.EqualTo(stagedBytes));
             }
             finally
             {

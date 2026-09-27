@@ -5,10 +5,13 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
 {
 #if UNITY_EDITOR
     using System;
+    using System.Collections.Generic;
     using System.IO;
     using NUnit.Framework;
     using UnityEditor;
+    using UnityEditor.UIElements;
     using UnityEngine;
+    using UnityEngine.UIElements;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Editor.Sprites;
     using WallstopStudios.UnityHelpers.Tests.Core;
@@ -20,6 +23,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
     {
         private const string Root = "Assets/Temp/SpriteSheetAnimationAPITests";
         private const string SpritePath = Root + "/Sprite.png";
+        private const string ExistingSheetPath =
+            "Packages/com.wallstop-studios.unity-helpers/Tests/Editor/TestAssets/Sprites/test_2x2_grid.png";
         private const string PackageFolder =
             "Packages/com.wallstop-studios.unity-helpers/Tests/Editor/Sprites/Animation";
 
@@ -28,6 +33,141 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         {
             base.BaseSetUp();
             EnsureFolder(Root);
+        }
+
+        [Test]
+        public void DeclinedSpriteImportLeavesImporterAndFileUnchanged()
+        {
+            Texture2D texture = CreateTexture();
+            TextureImporter importer = AssetImporter.GetAtPath(SpritePath) as TextureImporter;
+            Assert.IsTrue(importer != null);
+            importer.textureType = TextureImporterType.Default;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            TextureImporterType originalType = importer.textureType;
+            SpriteImportMode originalMode = importer.spriteImportMode;
+            byte[] originalBytes = File.ReadAllBytes(AbsoluteSpritePath());
+            List<Sprite> frames = new() { null };
+
+            bool discovered = SpriteSheetAnimationAPI.TryDiscoverFrames(
+                texture,
+                false,
+                frames,
+                out string error
+            );
+
+            Assert.IsFalse(discovered);
+            Assert.IsNotEmpty(error);
+            Assert.IsEmpty(frames);
+            Assert.AreEqual(originalType, importer.textureType);
+            Assert.AreEqual(originalMode, importer.spriteImportMode);
+            Assert.That(File.ReadAllBytes(AbsoluteSpritePath()), Is.EqualTo(originalBytes));
+
+            bool previousPromptSuppression = SpriteSheetAnimationCreator.SuppressUserPrompts;
+            string sessionKey = typeof(SpriteSheetAnimationCreator).FullName;
+            string previousSession = SessionState.GetString(sessionKey, string.Empty);
+            SpriteSheetAnimationCreator window = null;
+            try
+            {
+                SpriteSheetAnimationCreator.SuppressUserPrompts = true;
+                SessionState.SetString(sessionKey, string.Empty);
+                window = ScriptableObject.CreateInstance<SpriteSheetAnimationCreator>(); // UNH-SUPPRESS UNH002: Destroy before restoring SessionState.
+                window.Show();
+                ObjectField sheetField = window.rootVisualElement.Q<ObjectField>();
+                Assert.IsTrue(sheetField != null);
+                sheetField.value = texture;
+
+                bool showsNoFrames = false;
+                foreach (Label label in window.rootVisualElement.Query<Label>().ToList())
+                {
+                    if (
+                        string.Equals(
+                            label.text,
+                            "No sprites loaded or sheet not sliced.",
+                            StringComparison.Ordinal
+                        )
+                    )
+                    {
+                        showsNoFrames = true;
+                        break;
+                    }
+                }
+                Assert.IsTrue(showsNoFrames);
+                Assert.AreEqual(originalType, importer.textureType);
+                Assert.AreEqual(originalMode, importer.spriteImportMode);
+                Assert.That(File.ReadAllBytes(AbsoluteSpritePath()), Is.EqualTo(originalBytes));
+            }
+            finally
+            {
+                if (window != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(window); // UNH-SUPPRESS UNH001: OnDisable writes SessionState.
+                }
+                SessionState.SetString(sessionKey, previousSession);
+                SpriteSheetAnimationCreator.SuppressUserPrompts = previousPromptSuppression;
+            }
+        }
+
+        [Test]
+        public void AcceptedSpriteImportConfiguresBothSettings()
+        {
+            Texture2D texture = CreateTexture();
+            TextureImporter importer = AssetImporter.GetAtPath(SpritePath) as TextureImporter;
+            Assert.IsTrue(importer != null);
+            importer.textureType = TextureImporterType.Default;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            List<Sprite> frames = new();
+
+            bool discovered = SpriteSheetAnimationAPI.TryDiscoverFrames(
+                texture,
+                true,
+                frames,
+                out string error
+            );
+
+            Assert.IsTrue(discovered, error);
+            Assert.AreEqual(TextureImporterType.Sprite, importer.textureType);
+            Assert.AreEqual(SpriteImportMode.Multiple, importer.spriteImportMode);
+        }
+
+        [Test]
+        public void ExistingSpriteSheetReturnsFramesInNameOrderWithoutChangingImporter()
+        {
+            Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(ExistingSheetPath);
+            Assert.IsTrue(texture != null);
+            TextureImporter importer =
+                AssetImporter.GetAtPath(ExistingSheetPath) as TextureImporter;
+            Assert.IsTrue(importer != null);
+            TextureImporterType originalType = importer.textureType;
+            SpriteImportMode originalMode = importer.spriteImportMode;
+            bool wasDirty = EditorUtility.IsDirty(importer);
+            List<Sprite> frames = new();
+
+            bool discovered = SpriteSheetAnimationAPI.TryDiscoverFrames(
+                texture,
+                false,
+                frames,
+                out string error
+            );
+
+            Assert.IsTrue(discovered, error);
+            Assert.AreEqual(4, frames.Count);
+            Assert.AreEqual("test_2x2_grid_sprite_0", frames[0].name);
+            Assert.AreEqual("test_2x2_grid_sprite_1", frames[1].name);
+            Assert.AreEqual("test_2x2_grid_sprite_2", frames[2].name);
+            Assert.AreEqual("test_2x2_grid_sprite_3", frames[3].name);
+            Assert.AreEqual(originalType, importer.textureType);
+            Assert.AreEqual(originalMode, importer.spriteImportMode);
+            Assert.AreEqual(wasDirty, EditorUtility.IsDirty(importer));
+        }
+
+        [Test]
+        public void InvalidDiscoveryClearsExistingFrames()
+        {
+            List<Sprite> frames = new() { null };
+
+            Assert.IsFalse(SpriteSheetAnimationAPI.TryDiscoverFrames(null, false, frames, out _));
+            Assert.IsEmpty(frames);
+            Assert.IsFalse(SpriteSheetAnimationAPI.TryDiscoverFrames(null, false, null, out _));
         }
 
         [Test]
@@ -355,14 +495,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
 
         private Sprite CreateSprite()
         {
-            Texture2D texture = Track(new Texture2D(2, 2));
-            string fullPath = Path.Combine(
-                Application.dataPath,
-                SpritePath.Substring("Assets/".Length)
-            );
-            File.WriteAllBytes(fullPath, texture.EncodeToPNG());
-            TrackAssetPath(SpritePath);
-            AssetDatabase.ImportAsset(SpritePath, ImportAssetOptions.ForceSynchronousImport);
+            CreateTexture();
             TextureImporter importer = AssetImporter.GetAtPath(SpritePath) as TextureImporter;
             Assert.IsTrue(importer != null);
             importer.textureType = TextureImporterType.Sprite;
@@ -370,6 +503,22 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(SpritePath);
             Assert.IsTrue(sprite != null);
             return sprite;
+        }
+
+        private Texture2D CreateTexture()
+        {
+            Texture2D source = Track(new Texture2D(2, 2));
+            File.WriteAllBytes(AbsoluteSpritePath(), source.EncodeToPNG());
+            TrackAssetPath(SpritePath);
+            AssetDatabase.ImportAsset(SpritePath, ImportAssetOptions.ForceSynchronousImport);
+            Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(SpritePath);
+            Assert.IsTrue(texture != null);
+            return texture;
+        }
+
+        private static string AbsoluteSpritePath()
+        {
+            return Path.Combine(Application.dataPath, SpritePath.Substring("Assets/".Length));
         }
     }
 #endif
