@@ -42,11 +42,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             return pixels;
         }
 
-        [TestCase(1_024, 1_024, false)]
-        [TestCase(2_048, 2_048, false)]
-        [TestCase(4_096, 2_047, false)]
+        [TestCase(1_024, 1_023, false)]
+        [TestCase(1_024, 1_024, true)]
+        [TestCase(2_048, 512, true)]
+        [TestCase(4_096, 2_047, true)]
         [TestCase(32_768, 256, false)]
-        [TestCase(4_096, 2_048, true)]
         [TestCase(8_192, 1_024, true)]
         [TestCase(16_384, 512, true)]
         public void ScanParallelizationRequiresEnoughPixelsAndRows(

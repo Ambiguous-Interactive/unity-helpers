@@ -129,6 +129,7 @@ that is mostly transparency. Sprite Cropper trims each texture to its alpha boun
 so the sprite does not shift in the scene, and shrinks the 9-slice border by the same amount.
 Padding a sprite that has no 9-slice border keeps that border at zero. When padding grows the
 output beyond the source import size limit, the output limit grows to fit the new image.
+Large sprites scan alpha in parallel to keep batch cropping responsive.
 
 1. Drop `Assets/Sprites/Characters` into **Input directories**.
 2. Leave **Sprite Name Regex** at `.*`, or narrow it (`^player_`) to crop one character.

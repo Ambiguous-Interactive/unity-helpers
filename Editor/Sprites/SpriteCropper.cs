@@ -57,7 +57,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
 
         private const int ParallelRowCopyThreshold = 512;
 
-        private const long ParallelPixelScanThreshold = 8_388_608L;
+        private const long ParallelPixelScanThreshold = 1_048_576L;
 
         private const int ParallelScanRowThreshold = 512;
 
