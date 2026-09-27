@@ -818,7 +818,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             }
         }
 
-        private void OnSpriteSheetSelected(ChangeEvent<Object> evt)
+        internal void OnSpriteSheetSelected(ChangeEvent<Object> evt)
         {
             _selectedSpriteSheet = evt.newValue as Texture2D;
             _animationDefinitions.Clear();

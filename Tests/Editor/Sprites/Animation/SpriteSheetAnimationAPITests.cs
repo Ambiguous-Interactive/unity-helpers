@@ -80,7 +80,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 window.CreateGUI();
                 ObjectField sheetField = window.rootVisualElement.Q<ObjectField>();
                 Assert.IsTrue(sheetField != null);
-                sheetField.value = texture;
+                sheetField.SetValueWithoutNotify(texture);
+                // Detached ObjectFields dispatch changes differently across Unity versions.
+                using (
+                    ChangeEvent<UnityEngine.Object> change =
+                        ChangeEvent<UnityEngine.Object>.GetPooled(null, texture)
+                )
+                {
+                    window.OnSpriteSheetSelected(change);
+                }
 
                 bool showsNoFrames = false;
                 foreach (Label label in window.rootVisualElement.Query<Label>().ToList())
@@ -179,7 +187,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void CreatesOrderedSpriteCurveAndPersistsSettings()
         {
-            Sprite sprite = CreateSprite();
+            Sprite sprite = LoadExistingSprite();
             string folder = Root + "/Animations";
             TrackAssetPath(folder);
             bool created = SpriteSheetAnimationAPI.TryCreate(
@@ -220,7 +228,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void DryRunReportsUniquePathWithoutCreatingFolderOrAsset()
         {
-            Sprite sprite = CreateSprite();
+            Sprite sprite = LoadExistingSprite();
             string folder = Root + "/PreviewOnly";
             Assert.IsTrue(
                 SpriteSheetAnimationAPI.TryCreate(
@@ -245,7 +253,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void RepeatedCreationKeepsExistingClipAndUsesUniquePath()
         {
-            Sprite sprite = CreateSprite();
+            Sprite sprite = LoadExistingSprite();
             Assert.IsTrue(
                 SpriteSheetAnimationAPI.TryCreate(
                     Root,
@@ -302,7 +310,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         public void CreatesInExistingPackageFolder()
         {
             Assert.IsTrue(AssetDatabase.IsValidFolder(PackageFolder));
-            Sprite sprite = CreateSprite();
+            Sprite sprite = LoadExistingSprite();
             string assetPath = null;
             try
             {
@@ -336,7 +344,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void NormalizesAssetsPrefixCasing()
         {
-            Sprite sprite = CreateSprite();
+            Sprite sprite = LoadExistingSprite();
             Assert.IsTrue(
                 SpriteSheetAnimationAPI.TryCreate(
                     "aSsEtS" + Root.Substring("Assets".Length),
@@ -360,7 +368,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void InvalidInputsDoNotCreateAssets()
         {
-            Sprite sprite = CreateSprite();
+            Sprite sprite = LoadExistingSprite();
             Assert.IsFalse(
                 SpriteSheetAnimationAPI.TryCreate(
                     "Assets/../Outside",
@@ -439,7 +447,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void DryRunRejectsOverflowingFrameTimesWithoutCreatingAsset()
         {
-            Sprite sprite = CreateSprite();
+            Sprite sprite = LoadExistingSprite();
             Assert.IsFalse(
                 SpriteSheetAnimationAPI.TryCreate(
                     Root,
@@ -464,7 +472,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         [Test]
         public void SaveFailureReportsCreatedAssetPath()
         {
-            Sprite sprite = CreateSprite();
+            Sprite sprite = LoadExistingSprite();
             RestorableGlobal<Action> saveAssets = new(
                 () => SpriteSheetAnimationAPI.SaveAssetsAction,
                 action => SpriteSheetAnimationAPI.SaveAssetsAction = action
@@ -499,16 +507,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Assert.AreEqual("UnnamedAnim", SpriteSheetAnimationAPI.SanitizeName(null));
         }
 
-        private Sprite CreateSprite()
+        private Sprite LoadExistingSprite()
         {
-            CreateTexture();
-            TextureImporter importer = AssetImporter.GetAtPath(SpritePath) as TextureImporter;
-            Assert.IsTrue(importer != null);
-            importer.textureType = TextureImporterType.Sprite;
-            importer.SaveAndReimport();
-            Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(SpritePath);
-            Assert.IsTrue(sprite != null);
-            return sprite;
+            UnityEngine.Object[] assets = AssetDatabase.LoadAllAssetRepresentationsAtPath(
+                ExistingSheetPath
+            );
+            foreach (UnityEngine.Object asset in assets)
+            {
+                if (asset is Sprite sprite)
+                {
+                    return sprite;
+                }
+            }
+
+            Assert.Fail("The committed sprite sheet has no imported Sprite assets.");
+            return null;
         }
 
         private Texture2D CreateTexture()
