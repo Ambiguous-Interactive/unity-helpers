@@ -32,8 +32,8 @@
 # pure I/O saving. "Supposed to be" is a claim about git's internals, so the
 # attribute-bypass section deletes that line from a copy too and requires the
 # two walks to fold to the same path-to-year map over EVERY path, not just the
-# 24 -- plus the precondition that makes it safe for the non-.cs paths the
-# narrowed walk cannot see: no tracked path carries a `diff` attribute.
+# 24 -- plus the precondition that C# sources have no diff override and only
+# non-C# binary assets disable diff together with text.
 #
 # Run: bash scripts/tests/test-license-year-copy-detection.sh
 # Exit codes: 0 = all tests pass, 1 = test failure
@@ -439,11 +439,9 @@ fi
 # =============================================================================
 # The attribute bypass: the same answer without the .gitattributes traffic
 # =============================================================================
-# The walk runs with `attr.tree` pointed at the empty tree (#680). That is a pure I/O saving --
-# `git log --name-status` diffs tree against tree, so no attribute can change which A/C/R/D records
-# come out -- but "cannot" is a claim about git's internals, and this repository is not the place to
-# take one on trust. So it is measured: fold the walk with the bypass and again without it, and
-# require the two maps to agree over EVERY path, not just the 24 named above.
+# The walk runs with `attr.tree` pointed at the empty tree (#680). Its effect on history pairing
+# is measured: fold the walk with the bypass and again without it, and require the two maps to
+# agree over EVERY path, not just the 24 named above.
 #
 # The bypass is worth 8.9x on a 9p bind mount (33.52s -> 3.77s) and nothing at all on a native
 # filesystem (3.57s -> 3.56s), where the lookups it removes are cache hits. That is why this
@@ -452,24 +450,21 @@ fi
 echo ""
 echo "=== Attribute bypass ==="
 
-# The precondition, asserted over every tracked path rather than the .cs ones the walk narrows to.
-# `diff` is the only attribute rename and copy detection can reach: `text`, `eol` and
-# `working-tree-encoding` drive conversions between the worktree and the index, and a history walk
-# reads neither of those -- strace over 25 commits shows it touching the working tree for
-# `.gitattributes` and for nothing else. So for as long as no tracked path sets `diff`, the bypass
-# cannot change a pairing, the .cs-from-non-.cs pairing the narrowed walk never sees included.
+# The precondition covers every tracked path. A custom diff driver or a C# source with `-diff`
+# could change pairing. Binary assets use `-diff -text`; the full-map comparison below verifies
+# that removing those attributes does not change this repository's history result.
 run_test
 attribute_offenders=$(
     git -C "$REPO_ROOT" ls-files -z |
-        git -C "$REPO_ROOT" check-attr --stdin -z diff |
-        awk 'BEGIN { RS = "\0" } { field[NR % 3] = $0 } NR % 3 == 0 && field[0] != "unspecified" { print field[1] ": " field[0] }'
+        git -C "$REPO_ROOT" check-attr --stdin -z diff text |
+        awk 'BEGIN { RS = "\0" } { field[NR % 6] = $0 } NR % 6 == 0 && field[3] != "unspecified" && !(field[3] == "unset" && field[0] == "unset" && field[1] !~ /\.cs$/) { print field[1] ": diff=" field[3] ", text=" field[0] }'
 )
 attributed_path_count=$(git -C "$REPO_ROOT" ls-files | grep -c . || true)
 if [[ -z "$attribute_offenders" && 0 -lt "$attributed_path_count" ]]; then
-    pass "No tracked path carries a diff attribute ($attributed_path_count paths checked)"
+    pass "Only binary assets carry a diff attribute ($attributed_path_count paths checked)"
 else
-    fail "No tracked path carries a diff attribute" \
-        "every tracked path unspecified, out of a non-empty corpus" \
+    fail "Only binary assets carry a diff attribute" \
+        "diff unspecified, or diff/text both unset on non-C# assets, out of a non-empty corpus" \
         "$attributed_path_count paths checked, offenders: $(printf '%s' "${attribute_offenders:-(none)}" | head -10)"
 fi
 

@@ -69,9 +69,9 @@ _LICENSE_YEAR_PRIME_PATHSPEC='*.cs'
 
 # The tree the walk reads gitattributes from, and the reason it is not the working tree.
 #
-# `git log --name-status` diffs tree against tree: both sides are blobs out of the object
-# database, and no attribute can change which A/C/R/D records come out of that. Git looks them up
-# anyway -- once per candidate the copy detection considers -- by asking the filesystem for
+# `git log --name-status` diffs committed trees, but attributes can affect rename and copy pairing.
+# The contract test compares complete history maps with and without the bypass. Git looks up
+# attributes once per candidate the copy detection considers by asking the filesystem for
 # `.gitattributes` in every directory of every candidate path, and `--find-copies-harder` is
 # precisely the flag that makes every file in the tree a candidate. Measured with strace over 25
 # commits of this history: 8,364 of the shipped walk's 8,705 file-system calls are those lookups,
@@ -79,11 +79,10 @@ _LICENSE_YEAR_PRIME_PATHSPEC='*.cs'
 #
 # Pointing `attr.tree` at the EMPTY tree answers every lookup from an empty attribute set without
 # touching the filesystem. It replaces only the in-tree `.gitattributes`; `$GIT_DIR/info/attributes`
-# and the global and system files are read by both variants, so the one source this removes is the
-# one no tracked path uses: `git check-attr diff` reports `unspecified` for every tracked path, and
-# `diff` is the only attribute rename and copy detection can reach. test-license-year-copy-detection
-# asserts that over the whole tree rather than over the .cs paths this walk narrows to, because a
-# .cs file copied from a non-.cs one is exactly what the narrowing already cannot see.
+# and the global and system files are read by both variants. No C# source uses a diff driver;
+# binary assets disable diff and text together. test-license-year-copy-detection checks that
+# precondition over every tracked path and compares the complete history maps with and without the
+# bypass, including any .cs file copied from a non-.cs source.
 #
 # It is a literal rather than a computed object id so that it degrades into the shipped behavior:
 # git before 2.40 ignores the unknown config key, and a value this repository's hash algorithm
