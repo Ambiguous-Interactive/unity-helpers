@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix cached package path conversion so blank package IDs return no path ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix Sentinel validation runs so targets with whitespace-only GUIDs or asset paths are skipped ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Ignore whitespace-only file paths in Unity Method Analyzer source selection, compiler messages, navigation, and report export ([#867](https://github.com/Ambiguous-Interactive/unity-helpers/issues/867)).
 - Fix `SpriteRendererMetadata` so material copies are released after replacement, pop, or destruction, and moving the top material to the back restores the prior top ([#855](https://github.com/Ambiguous-Interactive/unity-helpers/issues/855)).

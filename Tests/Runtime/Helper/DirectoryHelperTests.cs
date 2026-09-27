@@ -569,6 +569,15 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         }
 
         [Test]
+        public void AbsoluteToUnityLoadablePathWithPackageCacheWhitespacePackageIdReturnsEmpty()
+        {
+            string testPath =
+                "/Users/test/Project/Library/PackageCache/com.test.package@1.0.0/Editor/Script.cs";
+            string result = DirectoryHelper.AbsoluteToUnityLoadablePath(testPath, "   ");
+            Assert.AreEqual(string.Empty, result);
+        }
+
+        [Test]
         public void AbsoluteToUnityLoadablePathWithExternalPathReturnsEmpty()
         {
             string testPath = "/some/external/path/that/is/not/in/project";

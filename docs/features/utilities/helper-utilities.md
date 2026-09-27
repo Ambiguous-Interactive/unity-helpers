@@ -888,6 +888,10 @@ string relative = DirectoryHelper.AbsoluteToUnityRelativePath(absolute);
 // Result: "Assets/Textures/player.png"
 ```
 
+For paths in `Library/PackageCache`, `DirectoryHelper.AbsoluteToUnityLoadablePath` needs the
+package ID to build a `Packages/<package-id>/` path. It returns an empty string when the package
+ID is blank, so callers can skip a path that Unity cannot load.
+
 **Get calling script's directory:**
 
 <!-- doc-sample: compiles -->

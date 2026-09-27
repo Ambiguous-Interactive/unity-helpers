@@ -251,7 +251,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// </list>
         /// </summary>
         /// <param name="absolutePath">The absolute path to convert.</param>
-        /// <param name="packageId">The package identifier (e.g., "com.wallstop-studios.unity-helpers") used for Library/PackageCache resolution.</param>
+        /// <param name="packageId">The package identifier used for Library/PackageCache resolution; blank identifiers cannot resolve cached paths.</param>
         /// <returns>A Unity-loadable path, or empty string if the path cannot be resolved.</returns>
         public static string AbsoluteToUnityLoadablePath(string absolutePath, string packageId)
         {
@@ -281,7 +281,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                 if (0 < firstSlash)
                 {
                     string pathInsidePackage = afterCache[(firstSlash + 1)..];
-                    if (!string.IsNullOrEmpty(packageId))
+                    if (!string.IsNullOrWhiteSpace(packageId))
                     {
                         return $"Packages/{packageId}/{pathInsidePackage}";
                     }
