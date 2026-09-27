@@ -6,7 +6,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
 #if UNITY_EDITOR
     using System;
     using System.Collections.Generic;
-    using UnityEngine;
+    using WallstopStudios.UnityHelpers.Core.Serialization;
 
     /// <summary>
     /// A finished <see cref="ValidationRun"/> rendered as JSON, for a build that has to decide
@@ -25,8 +25,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
     /// that had no findings, which is the difference somebody reviewing the file needs to see.
     /// </para>
     /// <para>
-    /// Rendered through <c>JsonUtility</c>, the same way every other editor tool here writes JSON,
-    /// so escaping is Unity's problem rather than a hand-rolled writer's.
+    /// Rendered through the package JSON serializer so escaping and field handling follow the
+    /// package contract.
     /// </para>
     /// </remarks>
     public static class ValidationReport
@@ -68,13 +68,13 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 document.findings.Add(
                     new FindingRecord
                     {
-                        id = finding.Id,
-                        ruleId = finding.RuleId,
+                        id = finding.Id ?? string.Empty,
+                        ruleId = finding.RuleId ?? string.Empty,
                         severity = finding.Severity.ToString(),
-                        assetGuid = finding.AssetGuid,
-                        assetPath = finding.AssetPath,
-                        discriminator = finding.Discriminator,
-                        message = finding.Message,
+                        assetGuid = finding.AssetGuid ?? string.Empty,
+                        assetPath = finding.AssetPath ?? string.Empty,
+                        discriminator = finding.Discriminator ?? string.Empty,
+                        message = finding.Message ?? string.Empty,
                         suppressed = suppressed,
                     }
                 );
@@ -94,9 +94,9 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                     new FailureRecord
                     {
                         // Keep loader failures distinguishable from failures in unnamed rules.
-                        ruleId = failure.RuleId,
+                        ruleId = failure.RuleId ?? string.Empty,
                         loadFailure = failure.IsLoadFailure,
-                        assetPath = failure.AssetPath,
+                        assetPath = failure.AssetPath ?? string.Empty,
                         exception =
                             failure.Exception == null ? string.Empty : failure.Exception.ToString(),
                     }
@@ -109,7 +109,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Validation.Continuous
                 document.unusedSuppressions.Add(unused[index]);
             }
 
-            return JsonUtility.ToJson(document, prettyPrint);
+            return Serializer.JsonStringify(document, prettyPrint);
         }
 
         /// <summary>

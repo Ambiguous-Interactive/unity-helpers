@@ -405,8 +405,10 @@ Editor scripts can write reports without opening the workspace by calling
 `ValidationReportExportAPI.TryExportJson(path, run, suppressions, out error)` or
 `ValidationReportExportAPI.TryExportJUnit(path, run, suppressions, threshold, out error)`. Both require
 a `ValidationRun` and return an error without writing for invalid input. Cancelled and incomplete
-runs retain their coverage status in the report. A successful export replaces the target file through a staged write. File replacement is outside
-Unity Undo and cannot be reversed from the editor history.
+runs retain their coverage status in the report. The JSON report keeps its versioned field schema
+and escapes finding text through the package JSON serializer. A successful export replaces the
+target file through a staged write. File replacement is outside Unity Undo and cannot be reversed
+from the editor history.
 
 ## Turning Sentinel off
 

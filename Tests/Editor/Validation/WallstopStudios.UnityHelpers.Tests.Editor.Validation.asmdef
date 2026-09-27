@@ -12,7 +12,11 @@
   "excludePlatforms": [],
   "allowUnsafeCode": false,
   "overrideReferences": true,
-  "precompiledReferences": ["nunit.framework.dll", "Sirenix.Serialization.dll"],
+  "precompiledReferences": [
+    "nunit.framework.dll",
+    "Sirenix.Serialization.dll",
+    "System.Text.Json.dll"
+  ],
   "autoReferenced": false,
   "defineConstraints": ["UNITY_INCLUDE_TESTS"],
   "versionDefines": [],

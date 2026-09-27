@@ -5,6 +5,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
 {
     using System;
     using System.Collections.Generic;
+    using System.Text.Json;
     using NUnit.Framework;
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Helper;
@@ -309,22 +310,72 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
         }
 
         /// <summary>
-        /// Rendered through JsonUtility precisely so this is Unity's problem rather than a
-        /// hand-rolled writer's, and asserted so a later "simplification" cannot take it away.
+        /// Both output modes preserve strings that need JSON escaping.
         /// </summary>
-        [Test]
-        public void TheReportEscapesAMessageThatWouldBreakTheDocument()
+        [TestCase(false)]
+        [TestCase(true)]
+        public void TheReportEscapesAMessageThatWouldBreakTheDocument(bool prettyPrint)
         {
             ValidationRun run = RunOver(
                 Finding("Rule", FirstGuid, null, "Assets/A.asset", "he said \"stop\"\nthen \\left")
             );
 
-            ValidationReport.Document document = Read(
-                ValidationReport.ToJson(run, ValidationSuppressions.Empty)
+            string json = ValidationReport.ToJson(run, ValidationSuppressions.Empty, prettyPrint);
+            ValidationReport.Document document = Read(json);
+            using JsonDocument parsed = JsonDocument.Parse(json);
+            JsonElement root = parsed.RootElement;
+            Assert.AreEqual(
+                JsonValueKind.Number,
+                root.GetProperty(nameof(ValidationReport.Document.schemaVersion)).ValueKind
             );
-
+            JsonElement finding = root.GetProperty(nameof(ValidationReport.Document.findings))[0];
+            Assert.AreEqual(
+                JsonValueKind.String,
+                finding.GetProperty(nameof(ValidationReport.FindingRecord.discriminator)).ValueKind
+            );
+            Assert.AreEqual(
+                string.Empty,
+                finding
+                    .GetProperty(nameof(ValidationReport.FindingRecord.discriminator))
+                    .GetString()
+            );
+            Assert.AreEqual(
+                JsonValueKind.String,
+                finding.GetProperty(nameof(ValidationReport.FindingRecord.message)).ValueKind
+            );
             Assert.AreEqual(1, document.findings.Count);
             Assert.AreEqual("he said \"stop\"\nthen \\left", document.findings[0].message);
+        }
+
+        [Test]
+        public void TheReportKeepsTheLoaderFailureSchema()
+        {
+            ValidationRun run = new ValidationRun(
+                new List<IValidationRule> { new ScriptedRule(Array.Empty<ValidationFinding>()) },
+                new List<ValidationTarget>
+                {
+                    new ValidationTarget(FirstGuid, "Assets/A.asset", typeof(ScriptableObject)),
+                },
+                target => throw new InvalidOperationException("load failed")
+            );
+            while (!run.Step(double.MaxValue)) { }
+
+            string json = ValidationReport.ToJson(run, ValidationSuppressions.Empty, false);
+            using JsonDocument parsed = JsonDocument.Parse(json);
+            JsonElement failure = parsed.RootElement.GetProperty(
+                nameof(ValidationReport.Document.failures)
+            )[0];
+            Assert.AreEqual(
+                string.Empty,
+                failure.GetProperty(nameof(ValidationReport.FailureRecord.ruleId)).GetString()
+            );
+            Assert.IsTrue(
+                failure.GetProperty(nameof(ValidationReport.FailureRecord.loadFailure)).GetBoolean()
+            );
+            Assert.AreEqual(
+                JsonValueKind.String,
+                failure.GetProperty(nameof(ValidationReport.FailureRecord.assetPath)).ValueKind
+            );
         }
 
         [TestCase(ValidationSeverity.Info, ValidationSeverity.Warning, false)]
