@@ -76,7 +76,8 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 SpriteSheetAnimationCreator.SuppressUserPrompts = true;
                 SessionState.SetString(sessionKey, string.Empty);
                 window = ScriptableObject.CreateInstance<SpriteSheetAnimationCreator>(); // UNH-SUPPRESS UNH002: Destroy before restoring SessionState.
-                window.Show();
+                // Batchmode has no graphics device, so build the controls without opening a native view.
+                window.CreateGUI();
                 ObjectField sheetField = window.rootVisualElement.Q<ObjectField>();
                 Assert.IsTrue(sheetField != null);
                 sheetField.value = texture;
