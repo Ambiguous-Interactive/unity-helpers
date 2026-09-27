@@ -67,6 +67,34 @@ function Get-LinterScript {
   return $linterPath
 }
 
+function Invoke-LinterInDirectory {
+  param([string]$Linter, [string]$Directory)
+
+  $runner = [System.Management.Automation.PowerShell]::Create()
+  try {
+    $null = $runner.Runspace.SessionStateProxy.Path.SetLocation($Directory)
+    $null = $runner.AddCommand($Linter)
+    $result = $runner.Invoke()
+    $output = [System.Collections.Generic.List[string]]::new()
+    foreach ($item in $result) { $output.Add($item.ToString()) }
+    foreach ($item in $runner.Streams.Information) { $output.Add($item.MessageData.ToString()) }
+    foreach ($item in $runner.Streams.Error) { $output.Add($item.ToString()) }
+    if ($runner.Streams.Error.Count -gt 0) {
+      throw "Linter emitted a PowerShell error: $($output -join [Environment]::NewLine)"
+    }
+    $exitCode = $runner.Runspace.SessionStateProxy.GetVariable('LASTEXITCODE')
+    if ($null -eq $exitCode) {
+      throw "Linter returned without an exit code. $($output -join [Environment]::NewLine)"
+    }
+    return [pscustomobject]@{
+      ExitCode = [int]$exitCode
+      Output = $output
+    }
+  } finally {
+    $runner.Dispose()
+  }
+}
+
 function Test-LinterOnFile {
   param(
     [string]$FilePath,
@@ -84,21 +112,21 @@ function Test-LinterOnFile {
     # Copy the test file to the temp Runtime directory
     Copy-Item $FilePath -Destination $runtimeDir
     
-    # Run linter from temp directory
-    Push-Location $tempDir
-    try {
-      $output = & pwsh -NoProfile -File $linter 2>&1
-      $exitCode = $LASTEXITCODE
-    } finally {
-      Pop-Location
-    }
+    # Keep each fixture isolated without starting another PowerShell process.
+    $result = Invoke-LinterInDirectory -Linter $linter -Directory $tempDir.FullName
+    $exitCode = $result.ExitCode
+    $output = $result.Output
     
     Write-Info "Linter output for $fileName (exit code: $exitCode):"
     if ($VerboseOutput -and $output) {
       $output | ForEach-Object { Write-Info "  $_" }
     }
     
-    $linterFailed = ($exitCode -ne 0)
+    if ($exitCode -ne 0 -and $exitCode -ne 1) {
+      return @{ Passed = $false; Message = "Unexpected linter exit code: $exitCode" }
+    }
+
+    $linterFailed = ($exitCode -eq 1)
     
     if ($ExpectFailure -and $linterFailed) {
       return @{ Passed = $true; Message = "" }
@@ -166,12 +194,42 @@ function Run-ShouldPassTests {
   }
 }
 
+function Run-HarnessTests {
+  $root = Join-Path ([System.IO.Path]::GetTempPath()) "lint-harness-$([System.Guid]::NewGuid().ToString('N'))"
+  $null = New-Item -ItemType Directory -Path $root
+  $scriptPath = Join-Path $root 'harness.ps1'
+  try {
+    Set-Content -LiteralPath $scriptPath -Value "Write-Host 'harness-zero'; exit 0"
+    $result = Invoke-LinterInDirectory -Linter $scriptPath -Directory $root
+    Write-TestResult 'Harness_ExitZero' ($result.ExitCode -eq 0 -and ($result.Output -join ' ') -match 'harness-zero')
+
+    Set-Content -LiteralPath $scriptPath -Value "Write-Host 'harness-one'; exit 1"
+    $result = Invoke-LinterInDirectory -Linter $scriptPath -Directory $root
+    Write-TestResult 'Harness_ExitOne' ($result.ExitCode -eq 1 -and ($result.Output -join ' ') -match 'harness-one')
+
+    Set-Content -LiteralPath $scriptPath -Value "Write-Host 'harness-no-exit'"
+    $missingExitFailed = $false
+    try { $null = Invoke-LinterInDirectory -Linter $scriptPath -Directory $root }
+    catch { $missingExitFailed = $_.Exception.Message -match 'without an exit code' }
+    Write-TestResult 'Harness_MissingExitFails' $missingExitFailed
+
+    Set-Content -LiteralPath $scriptPath -Value "Write-Error 'harness-error'; exit 0"
+    $errorFailed = $false
+    try { $null = Invoke-LinterInDirectory -Linter $scriptPath -Directory $root }
+    catch { $errorFailed = $_.Exception.Message -match 'PowerShell error' }
+    Write-TestResult 'Harness_PowerShellErrorFails' $errorFailed
+  } finally {
+    Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
+  }
+}
+
 # Main execution
 Write-Host ""
 Write-Host "========================================" -ForegroundColor White
 Write-Host "Unity File Naming Linter Tests" -ForegroundColor White  
 Write-Host "========================================" -ForegroundColor White
 
+Run-HarnessTests
 Run-ShouldFailTests
 Run-ShouldPassTests
 
