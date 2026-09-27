@@ -1131,7 +1131,7 @@ function Test-NodeToolAvailable {
 
     Push-Location $RepoRoot
     try {
-        $toolOutput = & node (Join-Path $RepoRoot 'scripts/run-node-bin.js') $ToolName --version 2>&1
+        $toolOutput = & node (Join-Path $RepoRoot 'scripts/run-node-bin.js') $ToolName --check-install 2>&1
         if ($LASTEXITCODE -eq 0) {
             Write-Info "npm tool available for ${Purpose}: $ToolName"
             return $true
@@ -1145,7 +1145,7 @@ function Test-NodeToolAvailable {
         if (Invoke-NodeDependencyRepair -RepoRoot $RepoRoot) {
             Push-Location $RepoRoot
             try {
-                $toolOutput = & node (Join-Path $RepoRoot 'scripts/run-node-bin.js') $ToolName --version 2>&1
+                $toolOutput = & node (Join-Path $RepoRoot 'scripts/run-node-bin.js') $ToolName --check-install 2>&1
                 if ($LASTEXITCODE -eq 0) {
                     Write-Info "npm tool available for ${Purpose} after dependency repair: $ToolName"
                     return $true

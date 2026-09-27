@@ -51,6 +51,10 @@ if (!existsSync(binPath)) {
   process.exit(127);
 }
 
+if (process.argv[3] === "--check-install") {
+  process.exit(0);
+}
+
 // stdin is passed through, never read here. Every caller hands its file list to the tool in argv,
 // and a tool that does want stdin gets the descriptor itself. Reading it first cost nothing and
 // broke everything: touching `process.stdin` to decide whether to read makes Node set O_NONBLOCK on
