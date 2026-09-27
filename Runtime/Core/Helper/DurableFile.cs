@@ -457,7 +457,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
         /// this type reports failure while another operation owns the destination.
         /// </summary>
         /// <param name="path">File to delete.</param>
-        /// <returns>True if <see cref="File.Delete(string)"/> completed without throwing.</returns>
+        /// <returns>True if the file was deleted or its parent directory is absent.</returns>
         public static bool TryDelete(string path)
         {
             if (string.IsNullOrWhiteSpace(path))
@@ -476,13 +476,12 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
                         return false;
                     }
 
-                    if (!Directory.Exists(parent))
-                    {
-                        return true;
-                    }
-
                     ownership = OpenStagingOwnership(path + TemporarySuffix);
                     File.Delete(path);
+                    return true;
+                }
+                catch (DirectoryNotFoundException)
+                {
                     return true;
                 }
                 catch (Exception)

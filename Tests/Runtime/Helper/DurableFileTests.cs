@@ -906,6 +906,10 @@ namespace WallstopStudios.UnityHelpers.Tests.Helper
         public void DeleteReportsSuccessWhenNothingIsThere()
         {
             Assert.IsTrue(DurableFile.TryDelete(Path.Combine(_testDirectory, "absent.json")));
+            string missingParent = Path.Combine(_testDirectory, "missing-parent");
+            Assert.IsFalse(Directory.Exists(missingParent));
+            Assert.IsTrue(DurableFile.TryDelete(Path.Combine(missingParent, "absent.json")));
+            Assert.IsFalse(Directory.Exists(missingParent));
         }
 
         [Test]
