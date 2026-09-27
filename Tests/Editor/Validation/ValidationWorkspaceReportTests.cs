@@ -6,6 +6,7 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
     using System;
     using System.Collections.Generic;
     using System.IO;
+    using System.Text.Json;
     using System.Threading;
     using System.Threading.Tasks;
     using System.Xml;
@@ -90,8 +91,21 @@ namespace WallstopStudios.UnityHelpers.Tests.Editor.Validation
                 }
                 else
                 {
-                    StringAssert.Contains("\"schemaVersion\"", contents);
-                    StringAssert.Contains("Message <tag>", contents);
+                    using JsonDocument document = JsonDocument.Parse(contents);
+                    JsonElement root = document.RootElement;
+                    Assert.AreEqual(
+                        ValidationReport.SchemaVersion,
+                        root.GetProperty(nameof(ValidationReport.Document.schemaVersion)).GetInt32()
+                    );
+                    JsonElement finding = root.GetProperty(
+                        nameof(ValidationReport.Document.findings)
+                    )[0];
+                    Assert.AreEqual(
+                        "Message <tag> & \"quotes\"",
+                        finding
+                            .GetProperty(nameof(ValidationReport.FindingRecord.message))
+                            .GetString()
+                    );
                 }
             }
             finally
