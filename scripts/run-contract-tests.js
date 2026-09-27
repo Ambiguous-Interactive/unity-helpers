@@ -22,6 +22,8 @@
 // Commands are the npm scripts the chain ran, verbatim, so the definition of each check still lives
 // in exactly one place and the move changed no work.
 
+const fs = require("node:fs");
+const path = require("node:path");
 const { runChecks, runRegistry } = require("./check-runner");
 
 /** A check whose `run` is executed with `bash -c` from the repository root. */
@@ -462,18 +464,44 @@ function checksFor(includeHookRegressions) {
   return includeHookRegressions ? [...HOOK_CHECKS, ...CHECKS] : CHECKS;
 }
 
-module.exports = { CHECKS, HOOK_CHECKS, checksFor, runChecks };
+/** Resolve the same package scripts without starting an npm process for every local check. */
+function directChecksFor(includeHookRegressions) {
+  const packagePath = path.resolve(__dirname, "..", "package.json");
+  const scripts = JSON.parse(fs.readFileSync(packagePath, "utf8")).scripts;
+  return checksFor(includeHookRegressions).map((check) => {
+    const match = /^npm run ([\w:.-]+)$/.exec(check.run);
+    const command = match && scripts[match[1]];
+    if (typeof command !== "string" || command.trim().length === 0) {
+      throw new Error(`No package script resolves ${check.id}: ${check.run}`);
+    }
+    return { ...check, run: command };
+  });
+}
+
+module.exports = { CHECKS, HOOK_CHECKS, checksFor, directChecksFor, runChecks };
 
 if (require.main === module) {
   const argv = process.argv.slice(2);
   const includeHookRegressions = argv.includes("--include-hook-regressions");
+  const direct = argv.includes("--direct");
+  let checks;
+  try {
+    checks = direct ? directChecksFor(includeHookRegressions) : checksFor(includeHookRegressions);
+  } catch (error) {
+    process.stderr.write(`${error.message}\n`);
+    process.exitCode = 1;
+    return;
+  }
   runRegistry({
-    checks: checksFor(includeHookRegressions),
+    checks,
     title: "Contract Tests",
     command:
       "node scripts/run-contract-tests.js" +
-      (includeHookRegressions ? " --include-hook-regressions" : ""),
-    argv: argv.filter((argument) => argument !== "--include-hook-regressions")
+      (includeHookRegressions ? " --include-hook-regressions" : "") +
+      (direct ? " --direct" : ""),
+    argv: argv.filter(
+      (argument) => argument !== "--include-hook-regressions" && argument !== "--direct"
+    )
   }).then((code) => {
     process.exitCode = code;
   });

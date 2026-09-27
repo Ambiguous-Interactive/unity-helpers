@@ -19,7 +19,7 @@ const path = require("path");
 
 const repoRoot = path.resolve(__dirname, "..", "..");
 const runnerPath = path.join(repoRoot, "scripts", "run-contract-tests.js");
-const { CHECKS, HOOK_CHECKS, checksFor, runChecks } = require(runnerPath);
+const { CHECKS, HOOK_CHECKS, checksFor, directChecksFor, runChecks } = require(runnerPath);
 const repoLintChecks = require(path.join(repoRoot, "scripts", "run-repo-lint.js")).CHECKS;
 const { expandNpmScript, scriptPathsIn, leafCommands, filesInvoking } = require(
   path.join(repoRoot, "scripts", "tests", "test-run-repo-lint.js")
@@ -156,6 +156,42 @@ runTest("the combined CLI lists the exact registry and retains selection failure
     [runnerPath, "--include-hook-regressions", "--only", "not-a-real-check"],
     { cwd: repoRoot, encoding: "utf8" }
   );
+  assert.notStrictEqual(refused.status, 0);
+  assert.match(refused.stdout + refused.stderr, /Unknown check id/);
+});
+
+runTest("direct mode resolves every check to its package command and keeps its scope", () => {
+  for (const includeHookRegressions of [false, true]) {
+    const original = checksFor(includeHookRegressions);
+    const direct = directChecksFor(includeHookRegressions);
+    assert.strictEqual(direct.length, original.length);
+    for (let index = 0; index < original.length; index++) {
+      const scriptName = original[index].run.match(/^npm run ([\w:.-]+)$/)[1];
+      assert.strictEqual(direct[index].run, packageScripts[scriptName]);
+      assert.strictEqual(direct[index].id, original[index].id);
+      assert.strictEqual(direct[index].exclusive, original[index].exclusive);
+    }
+  }
+  assert.deepStrictEqual(
+    CHECKS.map((check) => check.run),
+    checksFor(false).map((check) => check.run)
+  );
+});
+
+runTest("direct mode runs a selected contract and refuses an unknown id", () => {
+  const selected = spawnSync(
+    process.execPath,
+    [runnerPath, "--direct", "--only", "lint-comparison-direction"],
+    { cwd: repoRoot, encoding: "utf8" }
+  );
+  assert.strictEqual(selected.status, 0, selected.stdout + selected.stderr);
+  assert.match(selected.stdout, /41 passed, 0 failed/);
+  assert.match(selected.stdout, /1\/1 checks passed/);
+
+  const refused = spawnSync(process.execPath, [runnerPath, "--direct", "--only", "unknown"], {
+    cwd: repoRoot,
+    encoding: "utf8"
+  });
   assert.notStrictEqual(refused.status, 0);
   assert.match(refused.stdout + refused.stderr, /Unknown check id/);
 });

@@ -74,10 +74,29 @@ function Write-TestResult {
 function Invoke-Linter {
   param([string]$Path, [int]$MaxEntryLength = 300)
 
-  $output = & pwsh -NoProfile -File $linter -ChangelogPath $Path -MaxEntryLength $MaxEntryLength 2>&1
-  return [pscustomobject]@{
-    ExitCode = $LASTEXITCODE
-    Output   = ($output | Out-String)
+  $runner = [System.Management.Automation.PowerShell]::Create()
+  try {
+    $null = $runner.AddCommand($linter).AddParameter('ChangelogPath', $Path).AddParameter('MaxEntryLength', $MaxEntryLength)
+    $result = $runner.Invoke()
+    $output = [System.Collections.Generic.List[string]]::new()
+    foreach ($item in $result) { $output.Add($item.ToString()) }
+    foreach ($item in $runner.Streams.Information) { $output.Add($item.MessageData.ToString()) }
+    foreach ($item in $runner.Streams.Warning) { $output.Add($item.ToString()) }
+    foreach ($item in $runner.Streams.Error) { $output.Add($item.ToString()) }
+    if ($runner.Streams.Error.Count -gt 0) {
+      throw "Linter emitted a PowerShell error: $($output -join [Environment]::NewLine)"
+    }
+    $exitCode = $runner.Runspace.SessionStateProxy.GetVariable('LASTEXITCODE')
+    if ($null -eq $exitCode) {
+      throw "Linter returned without an exit code. $($output -join [Environment]::NewLine)"
+    }
+    return [pscustomobject]@{
+      ExitCode = [int]$exitCode
+      Output   = ($output -join [Environment]::NewLine)
+    }
+  }
+  finally {
+    $runner.Dispose()
   }
 }
 
@@ -122,8 +141,8 @@ function Test-Red {
   param([string]$TestName, [string]$Name, [string]$Body, [string]$Expect, [int]$MaxEntryLength = 300)
 
   $result = Invoke-Linter -Path (New-Changelog -Name $Name -Body $Body) -MaxEntryLength $MaxEntryLength
-  if ($result.ExitCode -eq 0) {
-    Write-TestResult -TestName $TestName -Passed $false -Message "expected a non-zero exit, got 0"
+  if ($result.ExitCode -ne 1) {
+    Write-TestResult -TestName $TestName -Passed $false -Message "expected exit 1, got $($result.ExitCode)"
     return
   }
   $matched = $result.Output -match [regex]::Escape($Expect)
@@ -157,7 +176,7 @@ Write-Host '  Section: red halves'
 $missing = Join-Path $workspace 'does-not-exist.md'
 $missingResult = Invoke-Linter -Path $missing
 Write-TestResult -TestName 'a missing changelog fails' `
-  -Passed (($missingResult.ExitCode -ne 0) -and ($missingResult.Output -match 'CHANGELOG.md not found')) `
+  -Passed (($missingResult.ExitCode -eq 1) -and ($missingResult.Output -match 'CHANGELOG.md not found')) `
   -Message "exit $($missingResult.ExitCode): $($missingResult.Output)"
 
 Test-Red -TestName 'a malformed version header fails' -Name 'malformed-version' -Expect 'Malformed version header' -Body @'

@@ -79,9 +79,26 @@ function New-FixtureRoot {
 function Invoke-LintInFixture {
     param([string]$FixtureRoot)
     $lintCopy = Join-Path $FixtureRoot 'scripts/lint-workflow-run-expression-length.ps1'
-    $output = & pwsh -NoProfile -File $lintCopy -VerboseOutput *>&1
-    $exitCode = $LASTEXITCODE
-    return @{ ExitCode = $exitCode; Output = ($output | Out-String) }
+    $runner = [System.Management.Automation.PowerShell]::Create()
+    try {
+        $null = $runner.AddCommand($lintCopy).AddParameter('VerboseOutput', $true)
+        $result = $runner.Invoke()
+        $output = [System.Collections.Generic.List[string]]::new()
+        foreach ($item in $result) { $output.Add($item.ToString()) }
+        foreach ($item in $runner.Streams.Information) { $output.Add($item.MessageData.ToString()) }
+        foreach ($item in $runner.Streams.Error) { $output.Add($item.ToString()) }
+        if ($runner.Streams.Error.Count -gt 0) {
+            throw "Linter emitted a PowerShell error: $($output -join [Environment]::NewLine)"
+        }
+        $exitCode = $runner.Runspace.SessionStateProxy.GetVariable('LASTEXITCODE')
+        if ($null -eq $exitCode) {
+            throw "Linter returned without an exit code. $($output -join [Environment]::NewLine)"
+        }
+        return @{ ExitCode = [int]$exitCode; Output = ($output -join [Environment]::NewLine) }
+    }
+    finally {
+        $runner.Dispose()
+    }
 }
 
 # Produce a run-block body string of approximately $TargetChars characters by
@@ -129,6 +146,33 @@ runs:
 try {
     New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
 
+    $harnessRoot = New-FixtureRoot
+    $harnessScript = Join-Path $harnessRoot 'scripts/lint-workflow-run-expression-length.ps1'
+    Set-Content -LiteralPath $harnessScript -Value "Write-Host 'harness-zero'; exit 0"
+    $result = Invoke-LintInFixture $harnessRoot
+    Write-TestResult 'Harness_ExitZero' ($result.ExitCode -eq 0 -and $result.Output -match 'harness-zero') 'An explicit exit 0 must remain observable.'
+    Set-Content -LiteralPath $harnessScript -Value "Write-Host 'harness-one'; exit 1"
+    $result = Invoke-LintInFixture $harnessRoot
+    Write-TestResult 'Harness_ExitOne' ($result.ExitCode -eq 1 -and $result.Output -match 'harness-one') 'An explicit exit 1 must remain observable.'
+    Set-Content -LiteralPath $harnessScript -Value "Write-Host 'harness-no-exit'"
+    $missingExitFailed = $false
+    try {
+        $null = Invoke-LintInFixture $harnessRoot
+    }
+    catch {
+        $missingExitFailed = $_.Exception.Message -match 'without an exit code'
+    }
+    Write-TestResult 'Harness_MissingExitFails' $missingExitFailed 'A missing script exit must fail the self-test.'
+    Set-Content -LiteralPath $harnessScript -Value "Write-Error 'harness-error'; exit 0"
+    $errorFailed = $false
+    try {
+        $null = Invoke-LintInFixture $harnessRoot
+    }
+    catch {
+        $errorFailed = $_.Exception.Message -match 'PowerShell error'
+    }
+    Write-TestResult 'Harness_PowerShellErrorFails' $errorFailed 'A PowerShell error must fail the self-test.'
+
     Write-Host "Testing lint-workflow-run-expression-length.ps1..." -ForegroundColor White
     Write-Host "`n  Section: Negative (clean) fixtures" -ForegroundColor White
 
@@ -162,7 +206,7 @@ runs:
     Write-ActionWithRunBody -Root $root -ActionName 'oversized' -Body $body
     $result = Invoke-LintInFixture $root
     $hasWfl = ($result.Output -match 'WFL001') -and ($result.Output -match 'oversized')
-    Write-TestResult "Fail_LargeBlockWithExpressionInAction" ($result.ExitCode -ne 0 -and $hasWfl) "Expected exit != 0 + WFL001 on >20000-char action run block with `${{ }}. Exit: $($result.ExitCode). Output: $($result.Output)"
+    Write-TestResult "Fail_LargeBlockWithExpressionInAction" ($result.ExitCode -eq 1 -and $hasWfl) "Expected exit 1 + WFL001 on >20000-char action run block with `${{ }}. Exit: $($result.ExitCode). Output: $($result.Output)"
 
     # --- Fail_LargeBlockWithExpressionInWorkflow ---
     # Same condition but in a .github/workflows/*.yml file (the existing pwsh
@@ -181,7 +225,7 @@ jobs:
 '@ + "`n" + $wfBody)
     $result = Invoke-LintInFixture $root
     $hasWfl = ($result.Output -match 'WFL001') -and ($result.Output -match 'big\.yml')
-    Write-TestResult "Fail_LargeBlockWithExpressionInWorkflow" ($result.ExitCode -ne 0 -and $hasWfl) "Expected exit != 0 + WFL001 on >20000-char workflow run block with `${{ }}. Exit: $($result.ExitCode). Output: $($result.Output)"
+    Write-TestResult "Fail_LargeBlockWithExpressionInWorkflow" ($result.ExitCode -eq 1 -and $hasWfl) "Expected exit 1 + WFL001 on >20000-char workflow run block with `${{ }}. Exit: $($result.ExitCode). Output: $($result.Output)"
 
     # --- Fail_FoldedBlockScalarForm ---
     # `run: >` folded scalar over 20000 chars with ${{ }}. MUST flag WFL001.
@@ -190,7 +234,7 @@ jobs:
     Write-ActionWithRunBody -Root $root -ActionName 'folded' -Body $foldedBody -ScalarIndicator '>'
     $result = Invoke-LintInFixture $root
     $hasWfl = ($result.Output -match 'WFL001') -and ($result.Output -match 'folded')
-    Write-TestResult "Fail_FoldedBlockScalarForm" ($result.ExitCode -ne 0 -and $hasWfl) "Expected exit != 0 + WFL001 on folded `run: >` block. Exit: $($result.ExitCode). Output: $($result.Output)"
+    Write-TestResult "Fail_FoldedBlockScalarForm" ($result.ExitCode -eq 1 -and $hasWfl) "Expected exit 1 + WFL001 on folded `run: >` block. Exit: $($result.ExitCode). Output: $($result.Output)"
 
     # --- Fail_DashRunStepFormDeepIndent ---
     # The true `- run: |` step form, where `run:` is the FIRST key of a sequence
@@ -209,7 +253,7 @@ jobs:
 '@ + "`n" + $dashBody)
     $result = Invoke-LintInFixture $root
     $hasWfl = ($result.Output -match 'WFL001') -and ($result.Output -match 'dashrun\.yml')
-    Write-TestResult "Fail_DashRunStepFormDeepIndent" ($result.ExitCode -ne 0 -and $hasWfl) "Expected exit != 0 + WFL001 on `- run: |` step form. Exit: $($result.ExitCode). Output: $($result.Output)"
+    Write-TestResult "Fail_DashRunStepFormDeepIndent" ($result.ExitCode -eq 1 -and $hasWfl) "Expected exit 1 + WFL001 on `- run: |` step form. Exit: $($result.ExitCode). Output: $($result.Output)"
 
     Write-Host "`n  Section: False-positive guards" -ForegroundColor White
 
@@ -306,7 +350,7 @@ runs:
     $overMeasured = [regex]::Match($result.Output, 'over/action\.yml: run block at line \d+ -> length=(\d+)')
     $overOk = $overMeasured.Success -and ([int]$overMeasured.Groups[1].Value -gt 20000)
     $hasWfl = ($result.Output -match 'WFL001') -and ($result.Output -match 'over/action\.yml')
-    Write-TestResult "Fail_JustOverBoundary" ($result.ExitCode -ne 0 -and $hasWfl -and $overOk) "Expected exit != 0 + WFL001 and measured length > 20000. Exit: $($result.ExitCode). Output: $($result.Output)"
+    Write-TestResult "Fail_JustOverBoundary" ($result.ExitCode -eq 1 -and $hasWfl -and $overOk) "Expected exit 1 + WFL001 and measured length > 20000. Exit: $($result.ExitCode). Output: $($result.Output)"
 
     # --- Fail_MultipleRunBlocksOneOffending ---
     # A file with two run blocks: one clean small block, one oversized block
@@ -332,7 +376,7 @@ jobs:
     $hasWfl = ($result.Output -match 'WFL001') -and ($result.Output -match 'multi\.yml')
     # Exactly one violation line expected.
     $violationCount = ([regex]::Matches($result.Output, 'WFL001')).Count
-    Write-TestResult "Fail_MultipleRunBlocksOneOffending" ($result.ExitCode -ne 0 -and $hasWfl -and $violationCount -eq 1) "Expected exit != 0 + exactly one WFL001 (the oversized block). Exit: $($result.ExitCode). WFL001 count: $violationCount. Output: $($result.Output)"
+    Write-TestResult "Fail_MultipleRunBlocksOneOffending" ($result.ExitCode -eq 1 -and $hasWfl -and $violationCount -eq 1) "Expected exit 1 + exactly one WFL001 (the oversized block). Exit: $($result.ExitCode). WFL001 count: $violationCount. Output: $($result.Output)"
 
     Write-Host "`n  Section: Edge-case input files" -ForegroundColor White
 
