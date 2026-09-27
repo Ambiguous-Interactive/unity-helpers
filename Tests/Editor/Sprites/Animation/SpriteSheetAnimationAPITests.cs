@@ -28,6 +28,11 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
         private const string PackageFolder =
             "Packages/com.wallstop-studios.unity-helpers/Tests/Editor/Sprites/Animation";
 
+        private static string AbsoluteSpritePath()
+        {
+            return Path.Combine(Application.dataPath, SpritePath.Substring("Assets/".Length));
+        }
+
         [SetUp]
         public override void BaseSetUp()
         {
@@ -514,11 +519,6 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
             Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(SpritePath);
             Assert.IsTrue(texture != null);
             return texture;
-        }
-
-        private static string AbsoluteSpritePath()
-        {
-            return Path.Combine(Application.dataPath, SpritePath.Substring("Assets/".Length));
         }
     }
 #endif
