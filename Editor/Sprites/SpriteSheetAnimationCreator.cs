@@ -624,6 +624,19 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             rootVisualElement.UnregisterCallback<DragPerformEvent>(OnRootDragPerform);
         }
 
+        internal void OnSpriteSheetSelected(ChangeEvent<Object> evt)
+        {
+            _selectedSpriteSheet = evt.newValue as Texture2D;
+            _animationDefinitions.Clear();
+            AddAnimationDefinition();
+            _animationDefinitionsListView.Rebuild();
+            LoadAndDisplaySprites();
+            StopCurrentPreview();
+            _previewImage.sprite = null;
+            _previewImage.style.backgroundImage = null;
+            _previewFrameLabel.text = "Frame: -/- | FPS: -";
+        }
+
         private void OnEnable()
         {
             EditorApplication.update += _editorUpdateCallback;
@@ -816,19 +829,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 _animationDefinitionsListView.ScrollToItem(_animationDefinitions.Count - 1);
             }
-        }
-
-        internal void OnSpriteSheetSelected(ChangeEvent<Object> evt)
-        {
-            _selectedSpriteSheet = evt.newValue as Texture2D;
-            _animationDefinitions.Clear();
-            AddAnimationDefinition();
-            _animationDefinitionsListView.Rebuild();
-            LoadAndDisplaySprites();
-            StopCurrentPreview();
-            _previewImage.sprite = null;
-            _previewImage.style.backgroundImage = null;
-            _previewFrameLabel.text = "Frame: -/- | FPS: -";
         }
 
         private void LoadAndDisplaySprites()
