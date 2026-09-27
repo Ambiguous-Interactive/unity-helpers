@@ -52,12 +52,28 @@ function Invoke-LinterForContent {
   $linterPath = Join-Path $PSScriptRoot '..' 'lint-duplicate-usings.ps1'
 
   try {
-    $output = & pwsh -NoProfile -File $linterPath -Paths $fixturePath 2>&1
-    $exitCode = $LASTEXITCODE
-
-    return @{
-      ExitCode = $exitCode
-      Output = $output | Out-String
+    $runner = [System.Management.Automation.PowerShell]::Create()
+    try {
+      $null = $runner.AddCommand($linterPath).AddParameter('Paths', @($fixturePath))
+      $result = $runner.Invoke()
+      $output = [System.Collections.Generic.List[string]]::new()
+      foreach ($item in $result) { $output.Add($item.ToString()) }
+      foreach ($item in $runner.Streams.Information) { $output.Add($item.MessageData.ToString()) }
+      foreach ($item in $runner.Streams.Error) { $output.Add($item.ToString()) }
+      if ($runner.Streams.Error.Count -gt 0) {
+        throw "Linter emitted a PowerShell error: $($output -join [Environment]::NewLine)"
+      }
+      $exitCode = $runner.Runspace.SessionStateProxy.GetVariable('LASTEXITCODE')
+      if ($null -eq $exitCode) {
+        throw "Linter returned without an exit code. $($output -join [Environment]::NewLine)"
+      }
+      return @{
+        ExitCode = [int]$exitCode
+        Output = ($output -join [Environment]::NewLine)
+      }
+    }
+    finally {
+      $runner.Dispose()
     }
   }
   finally {

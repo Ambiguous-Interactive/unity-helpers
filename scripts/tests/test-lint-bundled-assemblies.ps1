@@ -77,10 +77,28 @@ function Write-TestResult {
 function Invoke-Linter {
   param([string]$Root)
 
-  $output = & pwsh -NoProfile -File $linter -BinariesRoot $Root 2>&1
-  return [pscustomobject]@{
-    ExitCode = $LASTEXITCODE
-    Output   = (($output | Out-String) -replace '\s+', ' ')
+  $runner = [System.Management.Automation.PowerShell]::Create()
+  try {
+    $null = $runner.AddCommand($linter).AddParameter('BinariesRoot', $Root)
+    $result = $runner.Invoke()
+    $output = [System.Collections.Generic.List[string]]::new()
+    foreach ($item in $result) { $output.Add($item.ToString()) }
+    foreach ($item in $runner.Streams.Information) { $output.Add($item.MessageData.ToString()) }
+    foreach ($item in $runner.Streams.Error) { $output.Add($item.ToString()) }
+    if ($runner.Streams.Error.Count -gt 0) {
+      throw "Linter emitted a PowerShell error: $($output -join [Environment]::NewLine)"
+    }
+    $exitCode = $runner.Runspace.SessionStateProxy.GetVariable('LASTEXITCODE')
+    if ($null -eq $exitCode) {
+      throw "Linter returned without an exit code. $($output -join [Environment]::NewLine)"
+    }
+    return [pscustomobject]@{
+      ExitCode = [int]$exitCode
+      Output   = (($output -join [Environment]::NewLine) -replace '\s+', ' ')
+    }
+  }
+  finally {
+    $runner.Dispose()
   }
 }
 

@@ -172,3 +172,4 @@ if ($failed) {
 }
 
 Write-Host "[lint-bundled-assemblies] OK: $($dlls.Count) bundled assemblies classified and constrained." -ForegroundColor Green
+exit 0

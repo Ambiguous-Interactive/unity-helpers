@@ -273,3 +273,4 @@ if ($failed) {
 }
 
 Write-Host "[lint-concurrent-cache-fill] OK: every ConcurrentDictionary fill is atomic and every cache-factory lambda is static ($scanned file(s) scanned, $exempted exempted, $lambdaChecked lambda(s) checked)." -ForegroundColor Green
+exit 0

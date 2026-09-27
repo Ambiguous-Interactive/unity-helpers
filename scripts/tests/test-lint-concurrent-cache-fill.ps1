@@ -65,8 +65,27 @@ function Invoke-LintOnSource {
     Copy-Item -LiteralPath $lintScriptPath -Destination (Join-Path $root 'scripts/lint-concurrent-cache-fill.ps1')
     Set-Content -LiteralPath (Join-Path $root 'Runtime/Fixture.cs') -Value $Source -NoNewline
 
-    $output = & pwsh -NoProfile -File (Join-Path $root 'scripts/lint-concurrent-cache-fill.ps1') -VerboseOutput 2>&1 | Out-String
-    return @{ ExitCode = $LASTEXITCODE; Output = $output }
+    $lintCopy = Join-Path $root 'scripts/lint-concurrent-cache-fill.ps1'
+    $runner = [System.Management.Automation.PowerShell]::Create()
+    try {
+        $null = $runner.AddCommand($lintCopy).AddParameter('VerboseOutput', $true)
+        $result = $runner.Invoke()
+        $output = [System.Collections.Generic.List[string]]::new()
+        foreach ($item in $result) { $output.Add($item.ToString()) }
+        foreach ($item in $runner.Streams.Information) { $output.Add($item.MessageData.ToString()) }
+        foreach ($item in $runner.Streams.Error) { $output.Add($item.ToString()) }
+        if ($runner.Streams.Error.Count -gt 0) {
+            throw "Linter emitted a PowerShell error: $($output -join [Environment]::NewLine)"
+        }
+        $exitCode = $runner.Runspace.SessionStateProxy.GetVariable('LASTEXITCODE')
+        if ($null -eq $exitCode) {
+            throw "Linter returned without an exit code. $($output -join [Environment]::NewLine)"
+        }
+        return @{ ExitCode = [int]$exitCode; Output = ($output -join [Environment]::NewLine) }
+    }
+    finally {
+        $runner.Dispose()
+    }
 }
 
 function Assert-Lint {
