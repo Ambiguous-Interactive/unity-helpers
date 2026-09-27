@@ -1,105 +1,67 @@
-###############################################################################
-# Line endings
-#
-# Enforce CRLF in the working tree for all text files to align with
-# .editorconfig (end_of_line = crlf, charset = utf-8 without BOM) and avoid
-# formatter diffs on Linux runners.
-###############################################################################
+# Store text as LF in Git and use the repository's CRLF default on checkout.
 * text=auto eol=crlf
 
-# Be explicit for common text file types in this repo
-*.cs        text eol=crlf
-*.csproj    text eol=crlf
-*.sln       text eol=crlf
-*.json      text eol=crlf
-*.yaml      text eol=lf
-*.yml       text eol=lf
-*.md        text eol=lf
-*.xml       text eol=crlf
-*.uxml      text eol=crlf
-*.uss       text eol=crlf
-*.shader    text eol=crlf
-*.hlsl      text eol=crlf
-*.compute   text eol=crlf
-*.cginc     text eol=crlf
-*.asmdef    text eol=crlf
-*.asmref    text eol=crlf
-*.meta      text eol=crlf
-*.ps1       text eol=crlf
+# Text formats with a defined CRLF working-tree convention.
+*.cs      text eol=crlf
+*.csproj  text eol=crlf
+*.sln     text eol=crlf
+*.json    text eol=crlf
+*.xml     text eol=crlf
+*.uxml    text eol=crlf
+*.uss     text eol=crlf
+*.shader  text eol=crlf
+*.hlsl    text eol=crlf
+*.compute text eol=crlf
+*.cginc   text eol=crlf
+*.asmdef  text eol=crlf
+*.asmref  text eol=crlf
+*.meta    text eol=crlf
+*.ps1     text eol=crlf
 
-# Shell scripts and git hooks MUST have LF line endings (Unix requirement)
-*.sh        text eol=lf
-.githooks/* text eol=lf
+# These files must retain LF on every platform.
+*.yaml                 text eol=lf
+*.yml                  text eol=lf
+*.md                   text eol=lf
+*.sh                   text eol=lf
+.githooks/**           text eol=lf
+.github/**             text=auto eol=lf
+package.json           text eol=lf
+package-lock.json      text eol=lf
+_includes/*.html       text eol=lf
 
-# GitHub-specific files MUST have LF line endings
-# - GitHub Actions run on Linux (LF is native)
-# - Dependabot commits with LF line endings
-# - This prevents line-ending diffs from dependabot PRs
-.github/**  text=auto eol=lf
-
-# npm package files MUST have LF line endings
-# - Dependabot updates npm dependencies and commits with LF
-package.json      text eol=lf
-package-lock.json text eol=lf
-
-# Jekyll includes MUST have LF line endings (GitHub Pages runs on Linux)
-_includes/*.html  text eol=lf
-
-###############################################################################
-# Set default behavior for command prompt diff.
-#
-# This is need for earlier builds of msysgit that does not have it on by
-# default for csharp files.
-# Note: This is only used by command line
-###############################################################################
-#*.cs     diff=csharp
-
-###############################################################################
-# Set the merge driver for project and solution files
-#
-# Merging from the command prompt will add diff markers to the files if there
-# are conflicts (Merging from VS is not affected by the settings below, in VS
-# the diff markers are never inserted). Diff markers may cause the following 
-# file extensions to fail to load in VS. An alternative would be to treat
-# these files as binary and thus will always conflict and require user
-# intervention with every merge. To do so, just uncomment the entries below
-###############################################################################
-#*.sln       merge=binary
-#*.csproj    merge=binary
-#*.vbproj    merge=binary
-#*.vcxproj   merge=binary
-#*.vcproj    merge=binary
-#*.dbproj    merge=binary
-#*.fsproj    merge=binary
-#*.lsproj    merge=binary
-#*.wixproj   merge=binary
-#*.modelproj merge=binary
-#*.sqlproj   merge=binary
-#*.wwaproj   merge=binary
-
-###############################################################################
-# behavior for image files
-#
-# image files are treated as binary by default.
-###############################################################################
-#*.jpg   binary
-#*.png   binary
-#*.gif   binary
-
-###############################################################################
-# diff behavior for common document formats
-# 
-# Convert binary document formats to text before diffing them. This feature
-# is only available from the command line. Turn it on by uncommenting the 
-# entries below.
-###############################################################################
-#*.doc   diff=astextplain
-#*.DOC   diff=astextplain
-#*.docx  diff=astextplain
-#*.DOCX  diff=astextplain
-#*.dot   diff=astextplain
-#*.DOT   diff=astextplain
-#*.pdf   diff=astextplain
-#*.PDF   diff=astextplain
-#*.rtf   diff=astextplain
-#*.RTF   diff=astextplain
+# Preserve binary bytes and suppress text diffs regardless of file contents.
+*.png          binary
+*.gif          binary
+*.jpg          binary
+*.jpeg         binary
+*.bmp          binary
+*.tga          binary
+*.psd          binary
+*.tif          binary
+*.tiff         binary
+*.exr          binary
+*.webp         binary
+*.ico          binary
+*.dll          binary
+*.pdb          binary
+*.so           binary
+*.dylib        binary
+*.exe          binary
+*.a            binary
+*.lib          binary
+*.ttf          binary
+*.otf          binary
+*.woff         binary
+*.woff2        binary
+*.mp3          binary
+*.ogg          binary
+*.wav          binary
+*.mp4          binary
+*.mov          binary
+*.webm         binary
+*.zip          binary
+*.7z           binary
+*.gz           binary
+*.unitypackage binary
+*.fbx          binary
+*.blend        binary
