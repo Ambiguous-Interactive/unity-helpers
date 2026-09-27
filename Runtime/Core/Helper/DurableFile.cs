@@ -1239,8 +1239,7 @@ namespace WallstopStudios.UnityHelpers.Core.Helper
             );
         }
 
-        // Keep the expected sharing failure in a small, non-inlined frame. Unity's Windows IL2CPP
-        // player can fault while matching that exception in a larger caller or async state machine.
+        // Isolate expected sharing failures from IL2CPP callers and async state machines.
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static bool TryOpenStagingOwnership(
             string temporaryPath,
