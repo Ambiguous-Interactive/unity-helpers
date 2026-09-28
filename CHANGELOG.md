@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.2] - 2026-09-28
+
 ### Added
 
 - Add `SpriteSettingsApplierAPI.TryApplyProfiles` to batch-apply and save sprite importer profiles from scripts without opening the window ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
