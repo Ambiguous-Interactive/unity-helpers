@@ -12,6 +12,8 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using UnityEngine;
     using WallstopStudios.UnityHelpers.Core.Helper;
     using WallstopStudios.UnityHelpers.Core.Serialization;
+    using WallstopStudios.UnityHelpers.Editor.Utils;
+    using WallstopStudios.UnityHelpers.Utils;
 
     /// <summary>
     /// Public API to apply SpriteSettings profiles to assets. Mirrors the window logic
@@ -30,6 +32,113 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             AssetDatabase.ImportAsset;
         internal static Func<string, SpriteSettingsProfileCollection> LoadProfileAssetAction =
             AssetDatabase.LoadAssetAtPath<SpriteSettingsProfileCollection>;
+
+        /// <summary>Applies profiles to explicit asset paths and persists changed importers.</summary>
+        /// <remarks>
+        /// Cancellation retains completed changes. Reimport and asset-database side effects cannot
+        /// be fully reversed by Unity Undo; a failure may leave earlier sprites changed.
+        /// </remarks>
+        public static bool TryApplyProfiles(
+            IReadOnlyList<string> assetPaths,
+            IReadOnlyList<SpriteSettings> profiles,
+            out int changedCount,
+            out bool canceled,
+            out string error,
+            Func<int, int, string, bool> cancelRequested = null,
+            TextureImporterSettings buffer = null,
+            Action beforeReimport = null
+        )
+        {
+            if (assetPaths == null || profiles == null)
+            {
+                changedCount = 0;
+                canceled = false;
+                error = "Asset paths and profiles are required.";
+                return false;
+            }
+
+            int localChangedCount = 0;
+            bool localCanceled = false;
+            string localError = null;
+            using PooledResource<List<TextureImporter>> changedLease =
+                Buffers<TextureImporter>.List.Get(out List<TextureImporter> changed);
+            try
+            {
+                List<PreparedProfile> prepared = PrepareProfiles(profiles);
+                using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
+                {
+                    for (int index = 0; index < assetPaths.Count; ++index)
+                    {
+                        string path = SanitizePath(assetPaths[index]);
+                        if (
+                            cancelRequested != null
+                            && cancelRequested(index, assetPaths.Count, path)
+                        )
+                        {
+                            localCanceled = true;
+                            break;
+                        }
+
+                        if (
+                            TryUpdateTextureSettings(
+                                path,
+                                prepared,
+                                out TextureImporter importer,
+                                buffer
+                            )
+                            && importer != null
+                        )
+                        {
+                            changed.Add(importer);
+                            ++localChangedCount;
+                        }
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                localError = $"Sprite settings apply failed: {exception.Message}";
+            }
+
+            try
+            {
+                beforeReimport?.Invoke();
+            }
+            catch (Exception exception)
+            {
+                localError ??= $"Sprite settings completion callback failed: {exception.Message}";
+            }
+
+            foreach (TextureImporter importer in changed)
+            {
+                try
+                {
+                    importer.SaveAndReimport();
+                }
+                catch (Exception exception)
+                {
+                    localError ??= $"Sprite reimport failed: {exception.Message}";
+                }
+            }
+
+            if (0 < localChangedCount)
+            {
+                try
+                {
+                    AssetDatabase.SaveAssets();
+                    AssetDatabase.Refresh();
+                }
+                catch (Exception exception)
+                {
+                    localError ??= $"Sprite settings save failed: {exception.Message}";
+                }
+            }
+
+            changedCount = localChangedCount;
+            canceled = localCanceled;
+            error = localError;
+            return localError == null;
+        }
 
         /// <summary>Saves independent copies of profiles to a project asset.</summary>
         /// <param name="assetPath">A path under Assets ending in .asset whose parent folder exists.</param>
@@ -84,6 +193,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         }
 
         public static List<PreparedProfile> PrepareProfiles(List<SpriteSettings> profiles)
+        {
+            return PrepareProfiles((IReadOnlyList<SpriteSettings>)profiles);
+        }
+
+        public static List<PreparedProfile> PrepareProfiles(IReadOnlyList<SpriteSettings> profiles)
         {
             List<PreparedProfile> result = new(profiles?.Count ?? 0);
             if (profiles == null)

@@ -7,6 +7,7 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
     using System;
     using System.Collections.Generic;
     using System.IO;
+    using System.Runtime.ExceptionServices;
     using UnityEditor;
     using UnityEngine;
     using CustomEditors;
@@ -164,7 +165,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         private int _spritesThatWillChange = -1;
         private bool _showPreviewOfChanges;
         private readonly List<string> _assetsThatWillChange = new();
-        private bool _applyCanceled;
         private readonly TextureImporterSettings _settingsBuffer = new();
         private readonly List<(string fullFilePath, string relativePath)> _targetSpriteBuffer =
             new();
@@ -257,9 +257,6 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
         internal void ApplySettings()
         {
             List<(string fullFilePath, string relativePath)> targetFiles = GetTargetSpritePaths();
-            int spriteCount = 0;
-            List<TextureImporter> updatedImporters = new(targetFiles.Count);
-            _applyCanceled = false;
 
             List<SpriteSettings> currentSettings;
             if (_serializedObject.targetObject is SpriteSettingsApplierWindow windowInstance)
@@ -280,68 +277,86 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
                 return;
             }
 
+            using PooledResource<List<string>> pathsLease = Buffers<string>.List.Get(
+                out List<string> paths
+            );
+            foreach ((string _, string relativePath) in targetFiles)
+            {
+                paths.Add(relativePath);
+            }
+
+            double lastUpdateTime = EditorApplication.timeSinceStartup;
+            bool progressCleared = false;
+            Exception progressError = null;
+            void ClearProgressOnce()
+            {
+                if (progressCleared)
+                {
+                    return;
+                }
+                progressCleared = true;
+                Utils.EditorUi.ClearProgress();
+            }
+
+            int spriteCount;
+            bool canceled;
+            string error;
+            bool succeeded;
             try
             {
-                using (AssetDatabaseBatchHelper.BeginBatch(refreshOnDispose: false))
-                {
-                    List<SpriteSettingsApplierAPI.PreparedProfile> prepared =
-                        SpriteSettingsApplierAPI.PrepareProfiles(currentSettings);
-                    double lastUpdateTime = EditorApplication.timeSinceStartup;
-
-                    for (int i = 0; i < targetFiles.Count; i++)
+                succeeded = SpriteSettingsApplierAPI.TryApplyProfiles(
+                    paths,
+                    currentSettings,
+                    out spriteCount,
+                    out canceled,
+                    out error,
+                    cancelRequested: (index, total, path) =>
                     {
-                        string filePath = targetFiles[i].relativePath;
                         double now = EditorApplication.timeSinceStartup;
                         bool shouldUpdate =
-                            i == 0
-                            || i == targetFiles.Count - 1
-                            || i % 50 == 0
+                            index == 0
+                            || index == total - 1
+                            || index % 50 == 0
                             || 0.2 < now - lastUpdateTime;
-                        if (
-                            shouldUpdate
-                            && Utils.EditorUi.CancelableProgress(
+                        if (!shouldUpdate)
+                        {
+                            return false;
+                        }
+                        lastUpdateTime = now;
+                        try
+                        {
+                            return Utils.EditorUi.CancelableProgress(
                                 "Applying Sprite Settings",
-                                $"Processing '{Path.GetFileName(filePath)}' ({i + 1}/{targetFiles.Count})",
-                                (float)(i + 1) / targetFiles.Count
-                            )
-                        )
-                        {
-                            _applyCanceled = true;
-                            break;
+                                $"Processing '{Path.GetFileName(path)}' ({index + 1}/{total})",
+                                (float)(index + 1) / total
+                            );
                         }
-                        if (shouldUpdate)
+                        catch (Exception exception)
                         {
-                            lastUpdateTime = now;
+                            progressError = exception;
+                            throw;
                         }
-
-                        if (
-                            SpriteSettingsApplierAPI.TryUpdateTextureSettings(
-                                filePath,
-                                prepared,
-                                out TextureImporter textureImporter,
-                                _settingsBuffer
-                            )
-                        )
-                        {
-                            if (textureImporter != null)
-                            {
-                                updatedImporters.Add(textureImporter);
-                                ++spriteCount;
-                            }
-                        }
-                    }
-                }
+                    },
+                    buffer: _settingsBuffer,
+                    beforeReimport: ClearProgressOnce
+                );
             }
             finally
             {
-                Utils.EditorUi.ClearProgress();
+                ClearProgressOnce();
             }
-            foreach (TextureImporter importer in updatedImporters)
+            if (progressError != null)
             {
-                importer.SaveAndReimport();
+                ExceptionDispatchInfo.Capture(progressError).Throw();
             }
 
-            if (_applyCanceled)
+            if (!succeeded)
+            {
+                this.LogError(
+                    $"Failed to apply sprite settings after {spriteCount} changed sprites: {error}"
+                );
+            }
+            else if (canceled)
             {
                 this.Log($"Canceled. Processed {spriteCount} sprites before cancel.");
             }
@@ -349,13 +364,11 @@ namespace WallstopStudios.UnityHelpers.Editor.Sprites
             {
                 this.Log($"Processed {spriteCount} sprites.");
             }
-            if (0 < spriteCount)
+            if (succeeded && 0 < spriteCount)
             {
-                AssetDatabase.SaveAssets();
-                AssetDatabase.Refresh();
                 this.Log($"Asset database saved and refreshed.");
             }
-            else
+            else if (succeeded && !canceled && spriteCount == 0)
             {
                 this.Log($"No sprites required changes.");
             }

@@ -42,6 +42,19 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 .SanitizePath();
         }
 
+        private static List<SpriteSettings> CreateSpriteProfile()
+        {
+            return new List<SpriteSettings>
+            {
+                new SpriteSettings
+                {
+                    matchBy = SpriteSettings.MatchMode.Any,
+                    applyTextureType = true,
+                    textureType = TextureImporterType.Sprite,
+                },
+            };
+        }
+
         public override void CommonOneTimeSetUp()
         {
             base.CommonOneTimeSetUp();
@@ -224,6 +237,176 @@ namespace WallstopStudios.UnityHelpers.Tests.Sprites
                 () => window.CalculateStats(),
                 "CalculateStats with empty directory should not throw"
             );
+        }
+
+        [Test]
+        public void BatchApplyPersistsTwoSpritesAndReportsNoOp()
+        {
+            CreateDefaultTextures(
+                nameof(BatchApplyPersistsTwoSpritesAndReportsNoOp),
+                out string firstPath,
+                out string secondPath
+            );
+            List<string> paths = new() { firstPath.Replace('/', '\\'), secondPath };
+            List<SpriteSettings> profiles = CreateSpriteProfile();
+
+            ExecuteWithImmediateImport(() =>
+            {
+                Assert.IsTrue(
+                    SpriteSettingsApplierAPI.TryApplyProfiles(
+                        paths,
+                        profiles,
+                        out int changed,
+                        out bool canceled,
+                        out string error
+                    ),
+                    error
+                );
+                Assert.AreEqual(2, changed);
+                Assert.IsFalse(canceled);
+                Assert.IsTrue(AssetDatabase.LoadAssetAtPath<Sprite>(firstPath) != null);
+                Assert.IsTrue(AssetDatabase.LoadAssetAtPath<Sprite>(secondPath) != null);
+
+                Assert.IsTrue(
+                    SpriteSettingsApplierAPI.TryApplyProfiles(
+                        paths,
+                        profiles,
+                        out changed,
+                        out canceled,
+                        out error
+                    ),
+                    error
+                );
+                Assert.AreEqual(0, changed);
+                Assert.IsFalse(canceled);
+            });
+        }
+
+        [Test]
+        public void BatchCancellationPersistsOnlyCompletedSprite()
+        {
+            CreateDefaultTextures(
+                nameof(BatchCancellationPersistsOnlyCompletedSprite),
+                out string firstPath,
+                out string secondPath
+            );
+            List<string> paths = new() { firstPath, secondPath };
+            List<SpriteSettings> profiles = CreateSpriteProfile();
+
+            ExecuteWithImmediateImport(() =>
+            {
+                Assert.IsTrue(
+                    SpriteSettingsApplierAPI.TryApplyProfiles(
+                        paths,
+                        profiles,
+                        out int changed,
+                        out bool canceled,
+                        out string error,
+                        cancelRequested: (index, total, path) => index == 1
+                    ),
+                    error
+                );
+                Assert.AreEqual(1, changed);
+                Assert.IsTrue(canceled);
+                Assert.IsTrue(AssetDatabase.LoadAssetAtPath<Sprite>(firstPath) != null);
+                Assert.IsTrue(AssetDatabase.LoadAssetAtPath<Sprite>(secondPath) == null);
+            });
+        }
+
+        [Test]
+        public void BatchCallbackFailureReportsPartialResultAndCompletes()
+        {
+            CreateDefaultTextures(
+                nameof(BatchCallbackFailureReportsPartialResultAndCompletes),
+                out string firstPath,
+                out string secondPath
+            );
+            List<string> paths = new() { firstPath, secondPath };
+            List<SpriteSettings> profiles = CreateSpriteProfile();
+            bool completed = false;
+
+            ExecuteWithImmediateImport(() =>
+            {
+                Assert.IsFalse(
+                    SpriteSettingsApplierAPI.TryApplyProfiles(
+                        paths,
+                        profiles,
+                        out int changed,
+                        out bool canceled,
+                        out string error,
+                        cancelRequested: (index, total, path) =>
+                            index == 1
+                                ? throw new System.InvalidOperationException("callback failed")
+                                : false,
+                        beforeReimport: () => completed = true
+                    )
+                );
+                Assert.AreEqual(1, changed);
+                Assert.IsFalse(canceled);
+                Assert.IsTrue(completed);
+                StringAssert.Contains("callback failed", error);
+                Assert.IsTrue(AssetDatabase.LoadAssetAtPath<Sprite>(firstPath) != null);
+                Assert.IsTrue(AssetDatabase.LoadAssetAtPath<Sprite>(secondPath) == null);
+            });
+        }
+
+        [Test]
+        public void BatchApplyRejectsMissingInputs()
+        {
+            List<SpriteSettings> profiles = CreateSpriteProfile();
+            Assert.IsFalse(
+                SpriteSettingsApplierAPI.TryApplyProfiles(
+                    null,
+                    profiles,
+                    out int changed,
+                    out bool canceled,
+                    out string error
+                )
+            );
+            Assert.AreEqual(0, changed);
+            Assert.IsFalse(canceled);
+            Assert.IsNotEmpty(error);
+
+            Assert.IsFalse(
+                SpriteSettingsApplierAPI.TryApplyProfiles(
+                    new List<string>(),
+                    null,
+                    out changed,
+                    out canceled,
+                    out error
+                )
+            );
+            Assert.AreEqual(0, changed);
+            Assert.IsFalse(canceled);
+            Assert.IsNotEmpty(error);
+        }
+
+        private void CreateDefaultTextures(
+            string prefix,
+            out string firstPath,
+            out string secondPath
+        )
+        {
+            firstPath = (Root + "/" + prefix + "_first.png").SanitizePath();
+            secondPath = (Root + "/" + prefix + "_second.png").SanitizePath();
+            string localFirstPath = firstPath;
+            string localSecondPath = secondPath;
+            ExecuteWithImmediateImport(() =>
+            {
+                CreatePng(localFirstPath, 8, 8, Color.white);
+                CreatePng(localSecondPath, 8, 8, Color.white);
+                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+                foreach (string path in new[] { localFirstPath, localSecondPath })
+                {
+                    TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+                    Assert.IsTrue(importer != null);
+                    if (importer.textureType != TextureImporterType.Default)
+                    {
+                        importer.textureType = TextureImporterType.Default;
+                        importer.SaveAndReimport();
+                    }
+                }
+            });
         }
 
         private void CreatePng(string relPath, int w, int h, Color c)

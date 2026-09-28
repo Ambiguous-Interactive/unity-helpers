@@ -405,7 +405,6 @@ fails, the error also identifies the staged restore bytes for inspection.
 
 ```csharp
 using System.Collections.Generic;
-using UnityEditor;
 using UnityEngine;
 using WallstopStudios.UnityHelpers.Editor.Sprites;
 
@@ -435,33 +434,32 @@ public static class SpriteImportStandard
         },
     };
 
-    public static void ApplyTo(string assetPath)
+    public static bool ApplyTo(
+        IReadOnlyList<string> assetPaths,
+        out int changed,
+        out bool canceled)
     {
-        List<SpriteSettingsApplierAPI.PreparedProfile> prepared =
-            SpriteSettingsApplierAPI.PrepareProfiles(Profiles);
-
-        if (!SpriteSettingsApplierAPI.WillTextureSettingsChange(assetPath, prepared))
+        bool succeeded = SpriteSettingsApplierAPI.TryApplyProfiles(
+            assetPaths,
+            Profiles,
+            out changed,
+            out canceled,
+            out string error);
+        if (!succeeded)
         {
-            return;
+            Debug.LogError(error);
         }
-
-        if (
-            SpriteSettingsApplierAPI.TryUpdateTextureSettings(
-                assetPath,
-                prepared,
-                out TextureImporter importer
-            )
-        )
-        {
-            importer.SaveAndReimport();
-        }
+        return succeeded;
     }
 }
 ```
 
-`PrepareProfiles` compiles the regexes once — hoist it out of the per-asset loop. `NameContains`
-matches the file name, `PathContains` and `Regex` match the full asset path, and `Regex` is always
-case-insensitive. Applying a `pivot` also forces `Sprite Alignment` to `Custom`.
+The batch API reimports and saves changed sprites. An optional cancellation callback keeps completed
+changes and reports `canceled`; an error can also leave earlier sprites changed. For one sprite,
+`PrepareProfiles`, `WillTextureSettingsChange`, and `TryUpdateTextureSettings` remain available;
+the latter returns an importer for the caller to reimport. `NameContains` matches the file name,
+`PathContains` and `Regex` match the full asset path, and `Regex` is always case-insensitive.
+Applying a `pivot` also forces `Sprite Alignment` to `Custom`.
 
 > **Visual Reference**
 >
