@@ -109,29 +109,60 @@ function Invoke-LintInFixture {
         [string]$FixtureRoot,
         [string]$WorkingDirectory = $FixtureRoot,
         [string[]]$Paths = @(),
-        [string]$Mode = ''
+        [string]$Mode = '',
+        [string]$ScriptPath = (Join-Path $FixtureRoot 'scripts/lint-doc-links.ps1'),
+        [switch]$Cli
     )
 
-    $lintCopy = Join-Path $FixtureRoot 'scripts/lint-doc-links.ps1'
     Save-FixtureFiles -Root $FixtureRoot
-    Push-Location $WorkingDirectory
+    if ($Cli) {
+        Push-Location $WorkingDirectory
+        try {
+            $arguments = @('-NoProfile', '-File', $ScriptPath)
+            if ($Paths -and $Paths.Count -gt 0) {
+                $arguments += '-Paths'
+                $arguments += $Paths
+            }
+            if (-not [string]::IsNullOrWhiteSpace($Mode)) {
+                $arguments += '-Mode'
+                $arguments += $Mode
+            }
+
+            $output = & pwsh @arguments *>&1
+            $exitCode = $LASTEXITCODE
+        } finally {
+            Pop-Location
+        }
+        return @{ ExitCode = $exitCode; Output = ($output | Out-String) }
+    }
+
+    $runner = [System.Management.Automation.PowerShell]::Create()
     try {
-        $arguments = @('-NoProfile', '-File', $lintCopy)
+        $null = $runner.AddCommand('Set-Location').AddParameter('LiteralPath', $WorkingDirectory)
+        $null = $runner.AddStatement().AddCommand($ScriptPath)
         if ($Paths -and $Paths.Count -gt 0) {
-            $arguments += '-Paths'
-            $arguments += $Paths
+            $null = $runner.AddParameter('Paths', $Paths)
         }
         if (-not [string]::IsNullOrWhiteSpace($Mode)) {
-            $arguments += '-Mode'
-            $arguments += $Mode
+            $null = $runner.AddParameter('Mode', $Mode)
         }
-
-        $output = & pwsh @arguments *>&1
-        $exitCode = $LASTEXITCODE
+        $result = $runner.Invoke()
+        $output = [System.Collections.Generic.List[string]]::new()
+        foreach ($item in $result) { $output.Add($item.ToString()) }
+        foreach ($item in $runner.Streams.Information) { $output.Add($item.MessageData.ToString()) }
+        foreach ($item in $runner.Streams.Warning) { $output.Add($item.ToString()) }
+        foreach ($item in $runner.Streams.Error) { $output.Add($item.ToString()) }
+        if ($runner.Streams.Error.Count -gt 0) {
+            throw "Linter emitted a PowerShell error: $($output -join [Environment]::NewLine)"
+        }
+        $exitCode = $runner.Runspace.SessionStateProxy.GetVariable('LASTEXITCODE')
+        if ($null -eq $exitCode) {
+            throw "Linter returned without an exit code. $($output -join [Environment]::NewLine)"
+        }
+        return @{ ExitCode = [int]$exitCode; Output = ($output -join [Environment]::NewLine) }
     } finally {
-        Pop-Location
+        $runner.Dispose()
     }
-    return @{ ExitCode = $exitCode; Output = ($output | Out-String) }
 }
 
 function Invoke-TestCase {
@@ -166,17 +197,14 @@ function Invoke-TestCase {
             $mode = [string]$Case.Mode
         }
 
-        $result = Invoke-LintInFixture -FixtureRoot $root -WorkingDirectory $workingDirectory -Paths $paths -Mode $mode
+        $cli = $Case.PSObject.Properties['Cli'] -and [bool]$Case.Cli
+        $result = Invoke-LintInFixture -FixtureRoot $root -WorkingDirectory $workingDirectory -Paths $paths -Mode $mode -Cli:$cli
 
         $reasons = @()
 
         if ($Case.PSObject.Properties['ExpectedExit']) {
-            $expected = $Case.ExpectedExit
-            if ($expected -is [string] -and $expected -eq 'nonzero') {
-                if ($result.ExitCode -eq 0) { $reasons += "expected nonzero exit, got 0" }
-            } else {
-                if ($result.ExitCode -ne [int]$expected) { $reasons += "expected exit $expected, got $($result.ExitCode)" }
-            }
+            $expected = [int]$Case.ExpectedExit
+            if ($result.ExitCode -ne $expected) { $reasons += "expected exit $expected, got $($result.ExitCode)" }
         }
 
         if ($Case.PSObject.Properties['ExpectedOutputContains']) {
@@ -208,6 +236,25 @@ function Invoke-TestCase {
 
 try {
     New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
+
+    $harnessRoot = New-FixtureRoot
+    $harnessScript = Join-Path $harnessRoot 'scripts/harness.ps1'
+    Set-Content -LiteralPath $harnessScript -Value "Write-Host 'harness-zero'; exit 0"
+    $harnessZero = Invoke-LintInFixture -FixtureRoot $harnessRoot -ScriptPath $harnessScript
+    Write-TestResult 'Harness_ExitZero' ($harnessZero.ExitCode -eq 0 -and $harnessZero.Output -match 'harness-zero')
+    Set-Content -LiteralPath $harnessScript -Value "Write-Host 'harness-one'; exit 1"
+    $harnessOne = Invoke-LintInFixture -FixtureRoot $harnessRoot -ScriptPath $harnessScript
+    Write-TestResult 'Harness_ExitOne' ($harnessOne.ExitCode -eq 1 -and $harnessOne.Output -match 'harness-one')
+    Set-Content -LiteralPath $harnessScript -Value "Write-Host 'harness-no-exit'"
+    $missingExitFailed = $false
+    try { $null = Invoke-LintInFixture -FixtureRoot $harnessRoot -ScriptPath $harnessScript }
+    catch { $missingExitFailed = $_.Exception.Message -match 'without an exit code' }
+    Write-TestResult 'Harness_MissingExitFails' $missingExitFailed
+    Set-Content -LiteralPath $harnessScript -Value "Write-Error 'harness-error'; exit 0"
+    $errorFailed = $false
+    try { $null = Invoke-LintInFixture -FixtureRoot $harnessRoot -ScriptPath $harnessScript }
+    catch { $errorFailed = $_.Exception.Message -match 'harness-error' }
+    Write-TestResult 'Harness_PowerShellErrorFails' $errorFailed
 
     Write-Host "Testing lint-doc-links.ps1..." -ForegroundColor White
     Write-Host "`n  Section A: Comment-masking regressions" -ForegroundColor White
@@ -340,7 +387,7 @@ $p = 'docs/fictional-live.md'
 Write-Host $p
 '@ }
             )
-            ExpectedExit = 'nonzero'
+            ExpectedExit = 1
             ExpectedOutputContains = @('docs/fictional-live.md')
             ExpectedOutputNotContains = @('docs/fictional-comment.md')
         }
@@ -362,7 +409,7 @@ class Foo {
 }
 '@ }
             )
-            ExpectedExit = 'nonzero'
+            ExpectedExit = 1
             ExpectedOutputContains = @('docs/nonexistent.md', 'Source reference')
             ExpectedOutputNotContains = @('Bare .md mention', 'jekyll-relative-links', 'Absolute GitHub Pages path')
         }
@@ -374,7 +421,7 @@ $x = 'docs/nonexistent.md'
 Write-Host $x
 '@ }
             )
-            ExpectedExit = 'nonzero'
+            ExpectedExit = 1
             ExpectedOutputContains = @('docs/nonexistent.md', 'Source reference')
             ExpectedOutputNotContains = @('Bare .md mention', 'jekyll-relative-links', 'Absolute GitHub Pages path')
         }
@@ -385,7 +432,7 @@ Write-Host $x
 x = "docs/nonexistent.md # not a comment"
 '@ }
             )
-            ExpectedExit = 'nonzero'
+            ExpectedExit = 1
             ExpectedOutputContains = @('docs/nonexistent.md', 'Source reference')
             ExpectedOutputNotContains = @('Bare .md mention', 'jekyll-relative-links', 'Absolute GitHub Pages path')
         }
@@ -400,7 +447,7 @@ class Foo {
 }
 '@ }
             )
-            ExpectedExit = 'nonzero'
+            ExpectedExit = 1
             ExpectedOutputContains = @('docs/nonexistent.md', 'Source reference')
             ExpectedOutputNotContains = @('Bare .md mention', 'jekyll-relative-links', 'Absolute GitHub Pages path')
         }
@@ -433,7 +480,7 @@ class Foo {
                 [pscustomobject]@{ Path = 'docs/readme.md'; Content = "# Readme`n" }
                 [pscustomobject]@{ Path = 'README.md'; Content = "See [docs](./Docs/readme.md).`n" }
             )
-            ExpectedExit = 'nonzero'
+            ExpectedExit = 1
             ExpectedOutputContains = @('does not resolve to an existing markdown file')
             ExpectedOutputNotContains = @('missing relative prefix', 'jekyll-relative-links', 'Bare .md mention', 'Absolute GitHub Pages path')
         }
@@ -458,7 +505,7 @@ class Foo {
             Files = @(
                 [pscustomobject]@{ Path = 'README.md'; Content = "See foo.md please.`n" }
             )
-            ExpectedExit = 'nonzero'
+            ExpectedExit = 1
             ExpectedOutputContains = @('Bare .md mention')
             ExpectedOutputNotContains = @('jekyll-relative-links', 'Absolute GitHub Pages path', 'does not resolve to an existing markdown file')
         }
@@ -467,7 +514,7 @@ class Foo {
             Files = @(
                 [pscustomobject]@{ Path = 'README.md'; Content = 'See `docs/readme.md` please.' }
             )
-            ExpectedExit = 'nonzero'
+            ExpectedExit = 1
             ExpectedOutputContains = @('Inline code mentions markdown file', 'docs/readme.md')
             ExpectedOutputNotContains = @('Bare .md mention', 'jekyll-relative-links', 'Absolute GitHub Pages path', 'does not resolve to an existing markdown file')
         }
@@ -493,7 +540,7 @@ class Foo {
                 [pscustomobject]@{ Path = 'docs/readme.md'; Content = "# Readme`n" }
                 [pscustomobject]@{ Path = 'README.md'; Content = "See [readme](docs/readme.md).`n" }
             )
-            ExpectedExit = 'nonzero'
+            ExpectedExit = 1
             ExpectedOutputContains = @('jekyll-relative-links')
             ExpectedOutputNotContains = @('Bare .md mention', 'Absolute GitHub Pages path', 'does not resolve to an existing markdown file')
         }
@@ -502,7 +549,7 @@ class Foo {
             Files = @(
                 [pscustomobject]@{ Path = 'README.md'; Content = "See [home](/unity-helpers/foo).`n" }
             )
-            ExpectedExit = 'nonzero'
+            ExpectedExit = 1
             ExpectedOutputContains = @('Absolute GitHub Pages path')
             ExpectedOutputNotContains = @('Bare .md mention', 'jekyll-relative-links', 'does not resolve to an existing markdown file')
         }
@@ -517,7 +564,7 @@ class Foo {
             Files = @(
                 [pscustomobject]@{ Path = 'README.md'; Content = 'See [docs](./Docs/missing.md).' ; NoNewline = $true }
             )
-            ExpectedExit = 'nonzero'
+            ExpectedExit = 1
             ExpectedOutputContains = @('Docs/missing.md', 'does not resolve to an existing markdown file')
             ExpectedOutputNotContains = @('Bare .md mention', 'jekyll-relative-links', 'Absolute GitHub Pages path')
         }
@@ -603,7 +650,7 @@ class Foo {
             Files = @(
                 [pscustomobject]@{ Path = 'README.md'; Content = "See the [license](./LICENSE).`n" }
             )
-            ExpectedExit = 'nonzero'
+            ExpectedExit = 1
             ExpectedOutputContains = @('LICENSE', 'local file or directory')
             ExpectedOutputNotContains = @('Bare .md mention', 'jekyll-relative-links', 'Absolute GitHub Pages path')
         }
@@ -612,7 +659,7 @@ class Foo {
             Files = @(
                 [pscustomobject]@{ Path = 'README.md'; Content = "See the [license][license].`n`n[license]: ./LICENSE`n" }
             )
-            ExpectedExit = 'nonzero'
+            ExpectedExit = 1
             ExpectedOutputContains = @('Reference link target', 'LICENSE', 'local file or directory')
             ExpectedOutputNotContains = @('Bare .md mention', 'jekyll-relative-links', 'Absolute GitHub Pages path')
         }
@@ -621,7 +668,7 @@ class Foo {
             Files = @(
                 [pscustomobject]@{ Path = 'README.md'; Content = "See [sample](./Samples~/Missing/README.md).`n" }
             )
-            ExpectedExit = 'nonzero'
+            ExpectedExit = 1
             ExpectedOutputContains = @('Samples~/Missing/README.md', 'does not resolve to an existing markdown file')
             ExpectedOutputNotContains = @('Bare .md mention', 'jekyll-relative-links', 'Absolute GitHub Pages path')
         }
@@ -632,6 +679,7 @@ class Foo {
                 [pscustomobject]@{ Path = 'README.md'; Content = "See [readme](./docs/readme.md).`n" }
             )
             WorkingDirectoryRelativePath = 'docs'
+            Cli = $true
             ExpectedExit = 0
             ExpectedOutputContains = @('Markdown link lint passed')
         }
@@ -642,7 +690,7 @@ class Foo {
                 [pscustomobject]@{ Path = 'docs/readme.md'; Content = "# Readme`n" }
             )
             Paths = @('README.md')
-            ExpectedExit = 'nonzero'
+            ExpectedExit = 1
             ExpectedOutputContains = @('Bare .md mention')
         }
         [pscustomobject]@{
@@ -662,12 +710,14 @@ class Foo {
                 [pscustomobject]@{ Path = 'README.md'; Content = "See foo.md please.`n" }
             )
             Paths = @('docs/readme.md', 'README.md')
-            ExpectedExit = 'nonzero'
+            Cli = $true
+            ExpectedExit = 1
             ExpectedOutputContains = @('Bare .md mention')
         }
         [pscustomobject]@{
             Name = 'Pass_FormatModeSkipsBrokenLocalTarget'
             Mode = 'Format'
+            Cli = $true
             Files = @(
                 [pscustomobject]@{ Path = 'README.md'; Content = "See [missing](./docs/missing.md).`n" }
             )
@@ -692,7 +742,7 @@ class Foo {
             Files = @(
                 [pscustomobject]@{ Path = 'README.md'; Content = "See [missing](./docs/missing.md).`n" }
             )
-            ExpectedExit = 'nonzero'
+            ExpectedExit = 1
             ExpectedOutputContains = @('docs/missing.md', 'does not resolve to an existing markdown file')
             ExpectedOutputNotContains = @('jekyll-relative-links')
         }
