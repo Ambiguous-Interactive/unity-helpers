@@ -73,9 +73,38 @@ function Get-NormalizedText {
   return ([System.IO.File]::ReadAllText($Path) -replace "`r`n", "`n")
 }
 
+function Invoke-Lint {
+  param([string]$ScriptPath = $lintScript, [switch]$AuthorshipPolicyOnly, [switch]$Cli)
+
+  if ($Cli) {
+    $null = & pwsh -NoProfile -File $ScriptPath 2>&1
+    if ($null -eq $LASTEXITCODE) { throw 'CLI linter returned without an exit code' }
+    return [int]$LASTEXITCODE
+  }
+
+  $runner = [System.Management.Automation.PowerShell]::Create()
+  try {
+    $null = $runner.AddCommand($ScriptPath)
+    if ($AuthorshipPolicyOnly) { $null = $runner.AddParameter('AuthorshipPolicyOnly') }
+    $null = $runner.Invoke()
+    $exitCode = $runner.Runspace.SessionStateProxy.GetVariable('LASTEXITCODE')
+    if ($null -eq $exitCode) { throw 'Runspace linter returned without an exit code' }
+    foreach ($errorRecord in $runner.Streams.Error) {
+      if ($errorRecord.FullyQualifiedErrorId -notin @('NativeCommandError', 'NativeCommandErrorMessage') -or $exitCode -eq 0) {
+        throw "Linter emitted a PowerShell error ($($errorRecord.FullyQualifiedErrorId), $($errorRecord.Exception.GetType().FullName)): $errorRecord"
+      }
+    }
+    return [int]$exitCode
+  }
+  finally {
+    $runner.Dispose()
+  }
+}
+
 # Generate to a temp file once and reuse the "expected" content/bytes.
 $expectedTemp = [System.IO.Path]::GetTempFileName()
 $determinismTemp = [System.IO.Path]::GetTempFileName()
+$harnessScript = Join-Path ([System.IO.Path]::GetTempPath()) ("llm-lint-harness-$([System.Guid]::NewGuid().ToString('N')).ps1")
 try {
   & pwsh -NoProfile -File $generateScript -OutputPath $expectedTemp | Out-Null
   $genExit1 = $LASTEXITCODE
@@ -291,8 +320,23 @@ try {
   # ===========================================================================
   Write-Host "`n  Section: Linter green path" -ForegroundColor White
 
-  & pwsh -NoProfile -File $lintScript | Out-Null
-  Write-TestResult "Lint.PassesOnCleanRepo" ($LASTEXITCODE -eq 0) "Expected exit 0 from lint-llm-instructions.ps1"
+  Set-Content -LiteralPath $harnessScript -Value 'exit 0'
+  Write-TestResult "Harness.ObservesExitZero" ((Invoke-Lint -ScriptPath $harnessScript) -eq 0)
+  Set-Content -LiteralPath $harnessScript -Value 'exit 1'
+  Write-TestResult "Harness.ObservesExitOne" ((Invoke-Lint -ScriptPath $harnessScript) -eq 1)
+  Set-Content -LiteralPath $harnessScript -Value "Write-Host 'no exit'"
+  $missingExitFailed = $false
+  try { $null = Invoke-Lint -ScriptPath $harnessScript }
+  catch { $missingExitFailed = $_.Exception.Message.Contains('without an exit code') }
+  Write-TestResult "Harness.RejectsMissingExit" $missingExitFailed
+  Set-Content -LiteralPath $harnessScript -Value "Write-Error 'unexpected'; exit 0"
+  $powerShellErrorFailed = $false
+  try { $null = Invoke-Lint -ScriptPath $harnessScript }
+  catch { $powerShellErrorFailed = $_.Exception.Message.Contains('PowerShell error') }
+  Write-TestResult "Harness.RejectsPowerShellError" $powerShellErrorFailed
+
+  $lintExit = Invoke-Lint -Cli
+  Write-TestResult "Lint.PassesOnCleanRepo" ($lintExit -eq 0) "Expected exit 0 from lint-llm-instructions.ps1, got $lintExit"
 
   # ===========================================================================
   Write-Host "`n  Section: Linter red paths (mutate + restore)" -ForegroundColor White
@@ -306,8 +350,8 @@ try {
       $emDash = [char]0x2014
       $mutated = $text -replace 'exception contract - every', "exception contract $emDash every"
       [System.IO.File]::WriteAllText($victim, $mutated, (New-Object System.Text.UTF8Encoding($false)))
-      & pwsh -NoProfile -File $lintScript | Out-Null
-      Write-TestResult "Lint.FailsOnNonAsciiTrigger" ($LASTEXITCODE -ne 0) "Lint should fail when a trigger has a non-ASCII character"
+      $lintExit = Invoke-Lint
+      Write-TestResult "Lint.FailsOnNonAsciiTrigger" ($lintExit -eq 1) "Lint should exit 1 when a trigger has a non-ASCII character; got $lintExit"
     }
     finally {
       [System.IO.File]::WriteAllBytes($victim, $backup)
@@ -322,8 +366,8 @@ try {
     $idxBackup = [System.IO.File]::ReadAllBytes($indexFile)
     try {
       Add-Content -LiteralPath $indexFile -Value '| [bogus](./bogus.md) | injected drift |'
-      & pwsh -NoProfile -File $lintScript | Out-Null
-      Write-TestResult "Lint.FailsOnIndexDrift" ($LASTEXITCODE -ne 0) "Lint should fail when index.md drifts from generator output"
+      $lintExit = Invoke-Lint
+      Write-TestResult "Lint.FailsOnIndexDrift" ($lintExit -eq 1) "Lint should exit 1 when index.md drifts from generator output; got $lintExit"
     }
     finally {
       [System.IO.File]::WriteAllBytes($indexFile, $idxBackup)
@@ -337,8 +381,8 @@ try {
       $text3 = [System.IO.File]::ReadAllText($victim)
       $mutated3 = $text3 -replace '\| Core -->', '| Core Skills -->'
       [System.IO.File]::WriteAllText($victim, $mutated3, (New-Object System.Text.UTF8Encoding($false)))
-      & pwsh -NoProfile -File $lintScript | Out-Null
-      Write-TestResult "Lint.FailsOnUnknownCategory" ($LASTEXITCODE -ne 0) "Lint should fail on an unknown/typo'd category"
+      $lintExit = Invoke-Lint
+      Write-TestResult "Lint.FailsOnUnknownCategory" ($lintExit -eq 1) "Lint should exit 1 on an unknown/typo'd category; got $lintExit"
     }
     finally {
       [System.IO.File]::WriteAllBytes($victim, $backup3)
@@ -352,9 +396,9 @@ try {
     $contextMutation = $contextText.Replace('GitHub MCP server **FIRST**', 'GitHub MCP server when convenient')
     $contextMutationApplied = -not [string]::Equals($contextText, $contextMutation, [System.StringComparison]::Ordinal)
     [System.IO.File]::WriteAllText($contextPolicyFile, $contextMutation, (New-Object System.Text.UTF8Encoding($false)))
-    & pwsh -NoProfile -File $lintScript -AuthorshipPolicyOnly | Out-Null
-    Write-TestResult "Lint.FailsWithoutGitHubMcpPriority" ($contextMutationApplied -and $LASTEXITCODE -ne 0) `
-      "Lint should fail when the context policy no longer makes GitHub MCP first; mutation applied=$contextMutationApplied"
+    $lintExit = Invoke-Lint -AuthorshipPolicyOnly
+    Write-TestResult "Lint.FailsWithoutGitHubMcpPriority" ($contextMutationApplied -and $lintExit -eq 1) `
+      "Lint should exit 1 when the context policy no longer makes GitHub MCP first; mutation applied=$contextMutationApplied, got $lintExit"
   }
   finally {
     [System.IO.File]::WriteAllBytes($contextPolicyFile, $contextBackup)
@@ -372,10 +416,10 @@ try {
       $contextMutation4b,
       [System.StringComparison]::Ordinal)
     [System.IO.File]::WriteAllText($contextPolicyFile, $contextMutation4b, (New-Object System.Text.UTF8Encoding($false)))
-    & pwsh -NoProfile -File $lintScript -AuthorshipPolicyOnly | Out-Null
+    $lintExit = Invoke-Lint -AuthorshipPolicyOnly
     Write-TestResult "Lint.FailsWithoutContextFallbackAnnouncement" `
-      ($contextMutationApplied -and $LASTEXITCODE -ne 0) `
-      "Lint should fail after context.md's fallback announcement is removed; mutation applied=$contextMutationApplied"
+      ($contextMutationApplied -and $lintExit -eq 1) `
+      "Lint should exit 1 after context.md's fallback announcement is removed; mutation applied=$contextMutationApplied, got $lintExit"
   }
   finally {
     [System.IO.File]::WriteAllBytes($contextPolicyFile, $contextBackup4b)
@@ -398,10 +442,10 @@ try {
         $authorshipMutation,
         [System.StringComparison]::Ordinal)
       [System.IO.File]::WriteAllText($mutation.Path, $authorshipMutation, (New-Object System.Text.UTF8Encoding($false)))
-      & pwsh -NoProfile -File $lintScript -AuthorshipPolicyOnly | Out-Null
+      $lintExit = Invoke-Lint -AuthorshipPolicyOnly
       Write-TestResult "Lint.FailsWithout$($mutation.Name)AuthorshipPolicy" `
-        ($authorshipMutationApplied -and $LASTEXITCODE -ne 0) `
-        "Authorship policy lint should fail when $($mutation.Name) drifts; mutation applied=$authorshipMutationApplied"
+        ($authorshipMutationApplied -and $lintExit -eq 1) `
+        "Authorship policy lint should exit 1 when $($mutation.Name) drifts; mutation applied=$authorshipMutationApplied, got $lintExit"
     }
     finally {
       [System.IO.File]::WriteAllBytes($mutation.Path, $authorshipBackup)
@@ -419,10 +463,10 @@ try {
       $githubOperationsMutation,
       [System.StringComparison]::Ordinal)
     [System.IO.File]::WriteAllText($githubOperationsSkill, $githubOperationsMutation, (New-Object System.Text.UTF8Encoding($false)))
-    & pwsh -NoProfile -File $lintScript -AuthorshipPolicyOnly | Out-Null
+    $lintExit = Invoke-Lint -AuthorshipPolicyOnly
     Write-TestResult "Lint.FailsWithoutSkillFallbackAnnouncement" `
-      ($githubOperationsMutationApplied -and $LASTEXITCODE -ne 0) `
-      "Lint should fail after github-operations.md's fallback announcement is removed; mutation applied=$githubOperationsMutationApplied"
+      ($githubOperationsMutationApplied -and $lintExit -eq 1) `
+      "Lint should exit 1 after github-operations.md's fallback announcement is removed; mutation applied=$githubOperationsMutationApplied, got $lintExit"
   }
   finally {
     [System.IO.File]::WriteAllBytes($githubOperationsSkill, $githubOperationsBackup)
@@ -435,20 +479,20 @@ try {
     $agentsText = [System.IO.File]::ReadAllText($agentsFile)
     $agentsMutation = $agentsText.Replace('](./.llm/context.md)', '](./.llm/missing.md)')
     [System.IO.File]::WriteAllText($agentsFile, $agentsMutation, (New-Object System.Text.UTF8Encoding($false)))
-    & pwsh -NoProfile -File $lintScript -AuthorshipPolicyOnly | Out-Null
-    Write-TestResult "Lint.FailsWhenAgentEntrypointDrifts" ($LASTEXITCODE -ne 0) `
-      "Lint should fail when an agent entrypoint stops delegating to context.md"
+    $lintExit = Invoke-Lint -AuthorshipPolicyOnly
+    Write-TestResult "Lint.FailsWhenAgentEntrypointDrifts" ($lintExit -eq 1) `
+      "Lint should exit 1 when an agent entrypoint stops delegating to context.md; got $lintExit"
   }
   finally {
     [System.IO.File]::WriteAllBytes($agentsFile, $agentsBackup)
   }
 
   # Confirm clean again after restores.
-  & pwsh -NoProfile -File $lintScript | Out-Null
-  Write-TestResult "Lint.GreenAfterRestore" ($LASTEXITCODE -eq 0) "Lint should pass again after restoring mutated files"
+  $lintExit = Invoke-Lint
+  Write-TestResult "Lint.GreenAfterRestore" ($lintExit -eq 0) "Lint should pass again after restoring mutated files; got $lintExit"
 }
 finally {
-  Remove-Item -LiteralPath $expectedTemp, $determinismTemp -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath $expectedTemp, $determinismTemp, $harnessScript -Force -ErrorAction SilentlyContinue
 }
 
 # =============================================================================
