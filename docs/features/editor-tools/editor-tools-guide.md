@@ -1233,6 +1233,22 @@ and **Deny Component Types (comma names)** skips those component types during ch
 
 **Fixing and reporting:** **Fix Missing Scripts** strips dead component slots, but it stays disabled
 until you tick **Enable Auto-fix options** — the gate is deliberate, because the fix deletes data.
+Editor scripts can call `PrefabChecker.TryRemoveMissingScripts` with explicit `Assets` folders. A
+dry run counts affected prefabs and missing scripts without changing assets; an apply run removes
+missing slots from prefab roots and children. The call opens no window or dialog, and reports an
+error through its final output parameter. It may leave earlier prefabs repaired if a later prefab
+fails. Applying the repair writes prefab files, which Unity Undo cannot fully reverse.
+
+```csharp
+bool repaired = PrefabChecker.TryRemoveMissingScripts(
+    new[] { "Assets/Prefabs" },
+    false,
+    out int changedPrefabs,
+    out int removedScripts,
+    out string repairError
+);
+```
+
 **Export Report (JSON)** and **Export Report (CSV)** write the same findings to a file for a build
 step or a review. The complete report is staged before replacing an existing file.
 

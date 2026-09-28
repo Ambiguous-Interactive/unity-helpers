@@ -71,6 +71,180 @@ namespace WallstopStudios.UnityHelpers.Editor
             return RunChecks(folders, options ?? new ScanOptions(), null);
         }
 
+        /// <summary>Previews or removes missing script components from prefabs in explicit folders.</summary>
+        /// <remarks>
+        /// Applying the repair writes prefab assets. Unity Undo cannot fully reverse those file changes.
+        /// Earlier prefabs may remain changed if a later prefab fails.
+        /// </remarks>
+        public static bool TryRemoveMissingScripts(
+            IEnumerable<string> folders,
+            bool dryRun,
+            out int changedPrefabs,
+            out int missingScripts,
+            out string error
+        )
+        {
+            changedPrefabs = 0;
+            missingScripts = 0;
+            error = null;
+            if (folders == null)
+            {
+                error = "No asset paths specified. Add folders containing prefabs.";
+                return false;
+            }
+
+            try
+            {
+                using PooledResource<List<string>> folderLease = Buffers<string>.List.Get(
+                    out List<string> validFolders
+                );
+                foreach (string folder in folders)
+                {
+                    if (
+                        !string.IsNullOrWhiteSpace(folder)
+                        && (
+                            string.Equals(folder, "Assets", StringComparison.Ordinal)
+                            || folder.StartsWith("Assets/", StringComparison.Ordinal)
+                        )
+                        && (
+                            string.Equals(folder, "Assets", StringComparison.Ordinal)
+                            || AssetDatabase.IsValidFolder(folder)
+                        )
+                    )
+                    {
+                        validFolders.Add(folder);
+                    }
+                }
+
+                if (validFolders.Count == 0)
+                {
+                    error = "None of the specified paths are valid Assets folders.";
+                    return false;
+                }
+
+                string[] guids = AssetDatabase.FindAssets("t:prefab", validFolders.ToArray());
+                using PooledResource<HashSet<string>> seenLease = Buffers<string>.HashSet.Get(
+                    out HashSet<string> seenPaths
+                );
+                foreach (string guid in guids)
+                {
+                    string path = AssetDatabase.GUIDToAssetPath(guid);
+                    if (string.IsNullOrWhiteSpace(path) || !seenPaths.Add(path))
+                    {
+                        continue;
+                    }
+
+                    if (
+                        !TryRemoveMissingScriptsFromPrefab(
+                            path,
+                            dryRun,
+                            out int prefabMissingScripts,
+                            out string prefabError
+                        )
+                    )
+                    {
+                        error = prefabError;
+                        return false;
+                    }
+
+                    if (prefabMissingScripts > 0)
+                    {
+                        changedPrefabs++;
+                        missingScripts += prefabMissingScripts;
+                    }
+                }
+
+                return true;
+            }
+            catch (Exception exception)
+            {
+                error = $"Could not inspect prefab folders: {exception.Message}";
+                return false;
+            }
+        }
+
+        private static bool TryRemoveMissingScriptsFromPrefab(
+            string path,
+            bool dryRun,
+            out int missingScripts,
+            out string error
+        )
+        {
+            missingScripts = 0;
+            error = null;
+            GameObject prefabRoot = null;
+            try
+            {
+                prefabRoot = PrefabUtility.LoadPrefabContents(path);
+                if (prefabRoot == null)
+                {
+                    error = $"Could not load prefab at {path}.";
+                    return false;
+                }
+
+                using PooledResource<List<Transform>> transformLease = Buffers<Transform>.List.Get(
+                    out List<Transform> transforms
+                );
+                prefabRoot.GetComponentsInChildren(true, transforms);
+                int found = 0;
+                foreach (Transform transform in transforms)
+                {
+                    found += GameObjectUtility.GetMonoBehavioursWithMissingScriptCount(
+                        transform.gameObject
+                    );
+                }
+
+                if (found > 0 && !dryRun)
+                {
+                    int removed = 0;
+                    foreach (Transform transform in transforms)
+                    {
+                        removed += GameObjectUtility.RemoveMonoBehavioursWithMissingScript(
+                            transform.gameObject
+                        );
+                    }
+
+                    if (removed != found)
+                    {
+                        error = $"Missing script count changed while repairing prefab at {path}.";
+                        return false;
+                    }
+
+                    PrefabUtility.SaveAsPrefabAsset(prefabRoot, path, out bool saved);
+                    if (!saved)
+                    {
+                        error = $"Could not save repaired prefab at {path}.";
+                        return false;
+                    }
+                }
+
+                missingScripts = found;
+            }
+            catch (Exception exception)
+            {
+                error = $"Could not repair prefab at {path}: {exception.Message}";
+            }
+            finally
+            {
+                if (prefabRoot != null)
+                {
+                    try
+                    {
+                        PrefabUtility.UnloadPrefabContents(prefabRoot);
+                    }
+                    catch (Exception exception)
+                    {
+                        if (error == null)
+                        {
+                            error = $"Could not unload prefab at {path}: {exception.Message}";
+                        }
+                    }
+                }
+            }
+
+            return error == null;
+        }
+
         private static Func<GUIContent, bool, float?, bool, bool> SetupDrawRightAlignedToggle()
         {
             return (label, value, overrideToggleX, isNested) =>
@@ -1406,25 +1580,23 @@ namespace WallstopStudios.UnityHelpers.Editor
             {
                 return;
             }
-
-            foreach (string folder in _assetPaths)
+            if (
+                !TryRemoveMissingScripts(
+                    _assetPaths,
+                    false,
+                    out int changedPrefabs,
+                    out int missingScripts,
+                    out string error
+                )
+            )
             {
-                string[] guids = AssetDatabase.FindAssets("t:prefab", new[] { folder });
-                foreach (string guid in guids)
-                {
-                    string path = AssetDatabase.GUIDToAssetPath(guid);
-                    GameObject go = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-                    if (go == null)
-                    {
-                        continue;
-                    }
-
-                    GameObjectUtility.RemoveMonoBehavioursWithMissingScript(go);
-                }
+                this.LogError($"Auto-fix failed: {error}");
+                return;
             }
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
-            this.Log($"Auto-fix complete: Removed missing scripts in selected folders.");
+
+            this.Log(
+                $"Auto-fix complete: Removed {missingScripts} missing scripts from {changedPrefabs} prefabs."
+            );
         }
 
         private void ExportLastReport()

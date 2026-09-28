@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `SpriteSheetAnimationAPI.TryDiscoverFrames` so editor scripts can load ordered sprite frames and choose whether to update import settings without opening the window ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Add `AnimationClipFrameSaveAPI.TrySaveFrames` so editor scripts can save sprite frames and FPS to an existing clip without opening the window. See [Sprite Animation Editor](./docs/features/editor-tools/editor-tools-guide.md#sprite-animation-editor-animation-viewer-window) ([#851](https://github.com/Ambiguous-Interactive/unity-helpers/issues/851)).
 - Add `PrefabChecker.ScanFolders` so editor scripts can inspect prefab findings from explicit folders and options without opening the window ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
+- Add `PrefabChecker.TryRemoveMissingScripts` so editor scripts can preview or repair missing script slots in prefabs without opening the window ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Add `TextureResizerAPI.TryResizeTextures` so editor scripts can resize or preview PNGs from explicit textures and asset folders without opening the window. Textures process in natural name order ([#821](https://github.com/Ambiguous-Interactive/unity-helpers/issues/821)).
 - Add an encoding-aware `DurableFile.TryWriteAllText` overload that preserves the encoding's byte order mark for staged writes.
 
