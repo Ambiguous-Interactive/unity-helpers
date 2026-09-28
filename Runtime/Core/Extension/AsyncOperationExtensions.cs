@@ -232,8 +232,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <remarks>
         /// <para>Null handling: Task cannot be null. onResult can be null.</para>
         /// <para>Thread safety: Must be iterated on Unity main thread. No Unity main thread requirement for task execution.</para>
-        /// <para>Performance: Delegates work to the generic Task overload. O(1) per iteration.</para>
-        /// <para>Allocations: Iterator allocation only.</para>
+        /// <para>Performance: Yields until the task completes. O(1) per iteration.</para>
+        /// <para>Allocations: Allocates an iterator without a callback adapter or closure.</para>
         /// <para>Edge cases: Returns immediately if task is complete. Propagates task exceptions.</para>
         /// </remarks>
         /// <exception cref="Exception">Throws the task's exception if the task is faulted.</exception>
@@ -242,13 +242,18 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             Action<T1, T2> onResult = null
         )
         {
-            return task.AsCoroutine(tuple =>
+            while (!task.IsCompleted)
             {
-                if (onResult != null)
-                {
-                    onResult(tuple.First, tuple.Second);
-                }
-            });
+                yield return null;
+            }
+
+            if (task.IsFaulted)
+            {
+                throw task.Exception;
+            }
+
+            (T1 First, T2 Second) result = task.Result;
+            onResult?.Invoke(result.First, result.Second);
         }
 
         /// <summary>
@@ -263,8 +268,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <remarks>
         /// <para>Null handling: Task cannot be null. onResult can be null.</para>
         /// <para>Thread safety: Must be iterated on Unity main thread. No Unity main thread requirement for task execution.</para>
-        /// <para>Performance: Delegates work to the generic Task overload. O(1) per iteration.</para>
-        /// <para>Allocations: Iterator allocation only.</para>
+        /// <para>Performance: Yields until the task completes. O(1) per iteration.</para>
+        /// <para>Allocations: Allocates an iterator without a callback adapter or closure.</para>
         /// <para>Edge cases: Returns immediately if task is complete. Propagates task exceptions.</para>
         /// </remarks>
         /// <exception cref="Exception">Throws the task's exception if the task is faulted.</exception>
@@ -273,13 +278,18 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             Action<T1, T2, T3> onResult = null
         )
         {
-            return task.AsCoroutine(tuple =>
+            while (!task.IsCompleted)
             {
-                if (onResult != null)
-                {
-                    onResult(tuple.First, tuple.Second, tuple.Third);
-                }
-            });
+                yield return null;
+            }
+
+            if (task.IsFaulted)
+            {
+                throw task.Exception;
+            }
+
+            (T1 First, T2 Second, T3 Third) result = task.Result;
+            onResult?.Invoke(result.First, result.Second, result.Third);
         }
 
         /// <summary>
@@ -370,8 +380,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <remarks>
         /// <para>Null handling: ValueTask is a value type and cannot be null. onResult can be null.</para>
         /// <para>Thread safety: Must be iterated on Unity main thread. No Unity main thread requirement for task execution.</para>
-        /// <para>Performance: Delegates work to the generic ValueTask overload. O(1) per iteration.</para>
-        /// <para>Allocations: Iterator allocation only.</para>
+        /// <para>Performance: Yields until the task completes. O(1) per iteration.</para>
+        /// <para>Allocations: Allocates an iterator without a callback adapter or closure.</para>
         /// <para>Edge cases: Returns immediately if task is complete. Propagates task exceptions.</para>
         /// </remarks>
         /// <exception cref="Exception">Throws the task's exception if the task is faulted.</exception>
@@ -380,13 +390,31 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             Action<T1, T2> onResult = null
         )
         {
-            return task.AsCoroutine(tuple =>
+            if (task.IsCompleted)
             {
-                if (onResult != null)
+                if (task.IsFaulted)
                 {
-                    onResult(tuple.First, tuple.Second);
+                    throw task.AsTask().Exception;
                 }
-            });
+
+                (T1 First, T2 Second) completedResult = task.Result;
+                onResult?.Invoke(completedResult.First, completedResult.Second);
+                yield break;
+            }
+
+            Task<(T1 First, T2 Second)> innerTask = task.AsTask();
+            while (!innerTask.IsCompleted)
+            {
+                yield return null;
+            }
+
+            if (innerTask.IsFaulted)
+            {
+                throw innerTask.Exception;
+            }
+
+            (T1 First, T2 Second) result = innerTask.Result;
+            onResult?.Invoke(result.First, result.Second);
         }
 
         /// <summary>
@@ -401,8 +429,8 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
         /// <remarks>
         /// <para>Null handling: ValueTask is a value type and cannot be null. onResult can be null.</para>
         /// <para>Thread safety: Must be iterated on Unity main thread. No Unity main thread requirement for task execution.</para>
-        /// <para>Performance: Delegates work to the generic ValueTask overload. O(1) per iteration.</para>
-        /// <para>Allocations: Iterator allocation only.</para>
+        /// <para>Performance: Yields until the task completes. O(1) per iteration.</para>
+        /// <para>Allocations: Allocates an iterator without a callback adapter or closure.</para>
         /// <para>Edge cases: Returns immediately if task is complete. Propagates task exceptions.</para>
         /// </remarks>
         /// <exception cref="Exception">Throws the task's exception if the task is faulted.</exception>
@@ -411,13 +439,35 @@ namespace WallstopStudios.UnityHelpers.Core.Extension
             Action<T1, T2, T3> onResult = null
         )
         {
-            return task.AsCoroutine(tuple =>
+            if (task.IsCompleted)
             {
-                if (onResult != null)
+                if (task.IsFaulted)
                 {
-                    onResult(tuple.First, tuple.Second, tuple.Third);
+                    throw task.AsTask().Exception;
                 }
-            });
+
+                (T1 First, T2 Second, T3 Third) completedResult = task.Result;
+                onResult?.Invoke(
+                    completedResult.First,
+                    completedResult.Second,
+                    completedResult.Third
+                );
+                yield break;
+            }
+
+            Task<(T1 First, T2 Second, T3 Third)> innerTask = task.AsTask();
+            while (!innerTask.IsCompleted)
+            {
+                yield return null;
+            }
+
+            if (innerTask.IsFaulted)
+            {
+                throw innerTask.Exception;
+            }
+
+            (T1 First, T2 Second, T3 Third) result = innerTask.Result;
+            onResult?.Invoke(result.First, result.Second, result.Third);
         }
 
         /// <summary>

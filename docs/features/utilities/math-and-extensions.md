@@ -1499,6 +1499,11 @@ IEnumerator Start()
 }
 ```
 
+Tuple overloads accept callbacks with two or three arguments. They allocate an iterator without
+an extra callback wrapper. Callbacks run when the coroutine observes completion, not when you
+create it. Tuple results are still consumed when the callback is omitted. Pending `ValueTask`
+operations may also allocate a backing task.
+
 ### Chain Continuations
 
 ```csharp

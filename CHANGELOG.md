@@ -53,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Improved
 
+- Improve tuple-to-coroutine adapters by removing extra callback allocations ([#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781)).
 - Improve Sprite Cropper scan speed for images of at least one million pixels ([#782](https://github.com/Ambiguous-Interactive/unity-helpers/issues/782)).
 - Improve `JesseSort` on large, sustained random-looking inputs with a direct-sort route while retaining pile merging for structured runs ([#747](https://github.com/Ambiguous-Interactive/unity-helpers/issues/747)).
 - Improve subset sampling from queues and hash sets by copying each source once ([#781](https://github.com/Ambiguous-Interactive/unity-helpers/issues/781)).

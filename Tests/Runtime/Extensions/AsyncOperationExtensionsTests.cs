@@ -18,6 +18,164 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
     public sealed class AsyncOperationExtensionsTests : CommonTestBase
     {
         [Test]
+        public void TupleCoroutineConsumesValueTaskSourceExactlyOnce(
+            [Values(false, true)] bool useTriple,
+            [Values(false, true)] bool provideCallback,
+            [Values(false, true)] bool initiallyComplete
+        )
+        {
+            CountingValueTaskSource<(int, string)> pair = new();
+            CountingValueTaskSource<(int, string, bool)> triple = new();
+            int callbackCount = 0;
+            Action<int, string> pairCallback = provideCallback
+                ? (number, text) =>
+                {
+                    Assert.AreEqual(7, number);
+                    Assert.AreEqual("seven", text);
+                    ++callbackCount;
+                }
+                : null;
+            Action<int, string, bool> tripleCallback = provideCallback
+                ? (number, text, flag) =>
+                {
+                    Assert.AreEqual(7, number);
+                    Assert.AreEqual("seven", text);
+                    Assert.IsTrue(flag);
+                    ++callbackCount;
+                }
+                : null;
+            if (initiallyComplete)
+            {
+                pair.Complete((7, "seven"));
+                triple.Complete((7, "seven", true));
+            }
+            IEnumerator coroutine = useTriple
+                ? triple.Task.AsCoroutine<int, string, bool>(tripleCallback)
+                : pair.Task.AsCoroutine<int, string>(pairCallback);
+            Assert.AreEqual(0, pair.GetResultCount + triple.GetResultCount);
+            Assert.AreEqual(0, callbackCount);
+            if (!initiallyComplete)
+            {
+                Assert.IsTrue(coroutine.MoveNext());
+                Assert.AreEqual(0, pair.GetResultCount + triple.GetResultCount);
+                pair.Complete((7, "seven"));
+                triple.Complete((7, "seven", true));
+                Assert.AreEqual(0, callbackCount);
+            }
+            Assert.IsFalse(coroutine.MoveNext());
+            Assert.IsFalse(coroutine.MoveNext());
+            Assert.AreEqual(provideCallback ? 1 : 0, callbackCount);
+            Assert.AreEqual(useTriple ? 0 : 1, pair.GetResultCount);
+            Assert.AreEqual(useTriple ? 1 : 0, triple.GetResultCount);
+            Assert.AreEqual(!initiallyComplete && !useTriple ? 1 : 0, pair.OnCompletedCount);
+            Assert.AreEqual(!initiallyComplete && useTriple ? 1 : 0, triple.OnCompletedCount);
+        }
+
+        [Test]
+        public void TupleCoroutineDefersCallbackAndCompletesOnce(
+            [Values(false, true)] bool useValueTask,
+            [Values(false, true)] bool useTriple,
+            [Values(false, true)] bool provideCallback,
+            [Values(false, true)] bool initiallyComplete
+        )
+        {
+            TaskCompletionSource<(int, string)> pair = new();
+            TaskCompletionSource<(int, string, bool)> triple = new();
+            int callbackCount = 0;
+            Action<int, string, bool> callback = provideCallback
+                ? (number, text, flag) =>
+                {
+                    Assert.AreEqual(7, number);
+                    Assert.AreEqual("seven", text);
+                    Assert.IsTrue(flag);
+                    ++callbackCount;
+                }
+                : null;
+            if (initiallyComplete)
+            {
+                pair.SetResult((7, "seven"));
+                triple.SetResult((7, "seven", true));
+            }
+            IEnumerator coroutine = CreateTupleCoroutine(
+                useValueTask,
+                useTriple,
+                pair.Task,
+                triple.Task,
+                callback
+            );
+            Assert.AreEqual(0, callbackCount);
+            if (!initiallyComplete)
+            {
+                Assert.IsTrue(coroutine.MoveNext());
+                Assert.IsTrue(coroutine.Current == null);
+                Assert.AreEqual(0, callbackCount);
+                pair.SetResult((7, "seven"));
+                triple.SetResult((7, "seven", true));
+            }
+            Assert.IsFalse(coroutine.MoveNext());
+            Assert.AreEqual(provideCallback ? 1 : 0, callbackCount);
+            Assert.IsFalse(coroutine.MoveNext());
+            Assert.AreEqual(provideCallback ? 1 : 0, callbackCount);
+        }
+
+        [Test]
+        public void TupleCoroutinePropagatesFailureWithoutInvokingCallback(
+            [Values(false, true)] bool useValueTask,
+            [Values(false, true)] bool useTriple,
+            [Values(false, true)] bool provideCallback,
+            [Values(false, true)] bool initiallyComplete,
+            [Values(false, true)] bool canceled
+        )
+        {
+            TaskCompletionSource<(int, string)> pair = new();
+            TaskCompletionSource<(int, string, bool)> triple = new();
+            InvalidOperationException failure = new(
+                nameof(TupleCoroutinePropagatesFailureWithoutInvokingCallback)
+            );
+            int callbackCount = 0;
+            Action<int, string, bool> callback = provideCallback
+                ? (_, _, _) => ++callbackCount
+                : null;
+            if (initiallyComplete)
+            {
+                CompleteTupleFailure(pair, triple, canceled, failure);
+            }
+            IEnumerator coroutine = CreateTupleCoroutine(
+                useValueTask,
+                useTriple,
+                pair.Task,
+                triple.Task,
+                callback
+            );
+            if (!initiallyComplete)
+            {
+                Assert.IsTrue(coroutine.MoveNext());
+                Assert.IsTrue(coroutine.Current == null);
+                CompleteTupleFailure(pair, triple, canceled, failure);
+            }
+            if (useValueTask && initiallyComplete && canceled)
+            {
+                Assert.Throws<TaskCanceledException>(() => coroutine.MoveNext());
+            }
+            else
+            {
+                AggregateException thrown = Assert.Throws<AggregateException>(() =>
+                    coroutine.MoveNext()
+                );
+                Assert.AreEqual(1, thrown.InnerExceptions.Count);
+                if (canceled)
+                {
+                    Assert.IsInstanceOf<TaskCanceledException>(thrown.InnerExceptions[0]);
+                }
+                else
+                {
+                    Assert.AreSame(failure, thrown.InnerExceptions[0]);
+                }
+            }
+            Assert.AreEqual(0, callbackCount);
+        }
+
+        [Test]
         public void WithContinuationOnValueTaskExecutesAction()
         {
             bool invoked = false;
@@ -136,6 +294,48 @@ namespace WallstopStudios.UnityHelpers.Tests.Extensions
             return GetAwaiterReturnsValidAwaiterAsync().AsCoroutine();
         }
 #endif
+
+        private static IEnumerator CreateTupleCoroutine(
+            bool useValueTask,
+            bool useTriple,
+            Task<(int, string)> pair,
+            Task<(int, string, bool)> triple,
+            Action<int, string, bool> callback
+        )
+        {
+            if (useTriple)
+            {
+                return useValueTask
+                    ? new ValueTask<(int, string, bool)>(triple).AsCoroutine<int, string, bool>(
+                        callback
+                    )
+                    : triple.AsCoroutine<int, string, bool>(callback);
+            }
+            Action<int, string> pairCallback =
+                callback == null ? null : (number, text) => callback(number, text, true);
+            return useValueTask
+                ? new ValueTask<(int, string)>(pair).AsCoroutine<int, string>(pairCallback)
+                : pair.AsCoroutine<int, string>(pairCallback);
+        }
+
+        private static void CompleteTupleFailure(
+            TaskCompletionSource<(int, string)> pair,
+            TaskCompletionSource<(int, string, bool)> triple,
+            bool canceled,
+            Exception failure
+        )
+        {
+            if (canceled)
+            {
+                pair.SetCanceled();
+                triple.SetCanceled();
+            }
+            else
+            {
+                pair.SetException(failure);
+                triple.SetException(failure);
+            }
+        }
 
         private static IEnumerator TestCoroutine(Action onComplete)
         {
