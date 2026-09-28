@@ -139,27 +139,57 @@ function Add-UnfilteredFile {
 function Invoke-Checker {
   param(
     [string]$RepoDir,
-    [string[]]$Paths = @()
+    [string[]]$Paths = @(),
+    [string]$ScriptPath,
+    [switch]$Cli
   )
 
-  $checkerArgs = @((Join-Path $RepoDir 'scripts/check-eol.ps1'), '-VerboseOutput')
+  $checkerScript = if ($ScriptPath) { $ScriptPath } else { Join-Path $RepoDir 'scripts/check-eol.ps1' }
+  $checkerArgs = @($checkerScript, '-VerboseOutput')
   if ($Paths.Count -gt 0) {
     $checkerArgs += '-Paths'
     $checkerArgs += $Paths
   }
 
-  Push-Location $RepoDir
-  try {
-    $output = & pwsh -NoProfile -File @checkerArgs 2>&1
-    $exitCode = $LASTEXITCODE
-  } finally {
-    Pop-Location
+  if ($Cli) {
+    Push-Location $RepoDir
+    try {
+      $output = & pwsh -NoProfile -File @checkerArgs 2>&1
+      $exitCode = $LASTEXITCODE
+    } finally {
+      Pop-Location
+    }
+    $joinedOutput = $output -join "`n"
+  }
+  else {
+    $runner = [System.Management.Automation.PowerShell]::Create()
+    try {
+      $null = $runner.AddCommand('Set-Location').AddParameter('LiteralPath', $RepoDir)
+      $null = $runner.AddStatement().AddCommand($checkerScript).AddParameter('VerboseOutput', $true)
+      if ($Paths.Count -gt 0) { $null = $runner.AddParameter('Paths', [string[]]$Paths) }
+      $result = $runner.Invoke()
+      $output = [System.Collections.Generic.List[string]]::new()
+      foreach ($item in $result) { $output.Add($item.ToString()) }
+      foreach ($item in $runner.Streams.Information) { $output.Add($item.MessageData.ToString()) }
+      foreach ($item in $runner.Streams.Warning) { $output.Add($item.Message) }
+      foreach ($item in $runner.Streams.Error) { $output.Add($item.ToString()) }
+      if ($runner.Streams.Error.Count -gt 0) {
+        throw "Checker emitted a PowerShell error: $($output -join [Environment]::NewLine)"
+      }
+      $exitCode = $runner.Runspace.SessionStateProxy.GetVariable('LASTEXITCODE')
+      if ($null -eq $exitCode) {
+        throw "Checker returned without an exit code. $($output -join [Environment]::NewLine)"
+      }
+      $joinedOutput = $output -join "`n"
+    } finally {
+      $runner.Dispose()
+    }
   }
 
-  Write-Info "exit=$exitCode output=$($output -join ' | ')"
+  Write-Info "exit=$exitCode output=$($joinedOutput -replace "`n", ' | ')"
   return @{
-    ExitCode = $exitCode
-    Output   = ($output -join "`n")
+    ExitCode = [int]$exitCode
+    Output   = $joinedOutput
   }
 }
 
@@ -178,6 +208,35 @@ function Get-CrlfBytes([string[]]$lines) {
 
 Write-Host 'Testing check-eol.ps1...' -ForegroundColor White
 
+$harnessRepo = New-TestRepo
+$harnessScript = Join-Path $harnessRepo 'scripts/harness.ps1'
+try {
+  Set-Content -LiteralPath $harnessScript -Value "param([switch]`$VerboseOutput) Write-Host 'harness-zero'; exit 0"
+  $harnessResult = Invoke-Checker -RepoDir $harnessRepo -ScriptPath $harnessScript
+  Write-TestResult 'Runspace_ExitZeroAndHostOutput' ($harnessResult.ExitCode -eq 0 -and $harnessResult.Output.Contains('harness-zero'))
+  Set-Content -LiteralPath $harnessScript -Value "param([switch]`$VerboseOutput) Write-Host 'harness-three'; exit 3"
+  $harnessResult = Invoke-Checker -RepoDir $harnessRepo -ScriptPath $harnessScript
+  Write-TestResult 'Runspace_ExitThreeAndHostOutput' ($harnessResult.ExitCode -eq 3 -and $harnessResult.Output.Contains('harness-three'))
+  Set-Content -LiteralPath $harnessScript -Value "param([switch]`$VerboseOutput) Write-Host 'harness-missing-exit'"
+  $missingExitFailed = $false
+  try {
+    $null = Invoke-Checker -RepoDir $harnessRepo -ScriptPath $harnessScript
+  } catch {
+    $missingExitFailed = $_.Exception.Message.Contains('without an exit code')
+  }
+  Write-TestResult 'Runspace_RejectsMissingExit' $missingExitFailed
+  Set-Content -LiteralPath $harnessScript -Value "param([switch]`$VerboseOutput) Write-Error 'harness-error' -ErrorAction Continue; exit 0"
+  $errorFailed = $false
+  try {
+    $null = Invoke-Checker -RepoDir $harnessRepo -ScriptPath $harnessScript
+  } catch {
+    $errorFailed = $_.Exception.Message.Contains('PowerShell error')
+  }
+  Write-TestResult 'Runspace_RejectsPowerShellError' $errorFailed
+} finally {
+  Remove-TestRepo $harnessRepo
+}
+
 # ==== Test group 1: normalized repository passes ====
 Write-Host "`nTest group: Normalized repository" -ForegroundColor Magenta
 
@@ -185,7 +244,7 @@ $repo = New-TestRepo
 try {
   Add-NormalizedFile -RepoDir $repo -RelativePath 'scripts/example.ps1' -Content "Write-Host 'a'`r`nWrite-Host 'b'`r`n"
   Add-NormalizedFile -RepoDir $repo -RelativePath 'docs/example.md' -Content "# Title`n`nBody`n"
-  $result = Invoke-Checker -RepoDir $repo
+  $result = Invoke-Checker -RepoDir $repo -Cli
   Write-TestResult 'NormalizedRepo_Passes' ($result.ExitCode -eq 0) "Expected exit 0, got $($result.ExitCode): $($result.Output)"
   Write-TestResult 'NormalizedRepo_ReportsZeroBlobs' ($result.Output -match 'Unnormalized committed blobs: 0') "Output: $($result.Output)"
 } finally {
@@ -347,7 +406,7 @@ try {
   Add-UnfilteredFile -RepoDir $repo -RelativePath $lastDirty -Bytes (Get-Bytes "Write-Host 'last'`r`n")
   Add-UnfilteredFile -RepoDir $repo -RelativePath $outsideDirty -Bytes (Get-Bytes "Write-Host 'outside'`r`n")
 
-  $chunked = Invoke-Checker -RepoDir $repo -Paths $scopePaths
+  $chunked = Invoke-Checker -RepoDir $repo -Paths $scopePaths -Cli
   $firstFinding = [regex]::Escape($firstDirty) + ' \(committed blob is crlf'
   $lastFinding = [regex]::Escape($lastDirty) + ' \(committed blob is crlf'
   Write-TestResult 'PathScope_65Paths_FindsFirstChunk' ($chunked.ExitCode -eq 3 -and $chunked.Output -match $firstFinding) "Expected first-chunk finding, got $($chunked.ExitCode): $($chunked.Output)"
